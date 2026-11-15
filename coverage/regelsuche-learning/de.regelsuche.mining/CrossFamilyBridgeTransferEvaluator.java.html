@@ -201,9 +201,9 @@ public final class CrossFamilyBridgeTransferEvaluator {
 <span class="fc" id="L201">            results.stream().anyMatch(result -&gt;</span>
 <span class="fc bfc" id="L202" title="All 2 branches covered.">                result.familyId().equals(family)</span>
 <span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    &amp;&amp; result.role() == FamilyRole.FORMATION</span>
-<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                    &amp;&amp; result.accepted()));</span>
-<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (!formationAccepted) {</span>
-<span class="nc" id="L206">            return TransferStatus.REJECTED_FORMATION_FAMILY;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                    &amp;&amp; result.accepted()));</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (!formationAccepted) {</span>
+<span class="fc" id="L206">            return TransferStatus.REJECTED_FORMATION_FAMILY;</span>
         }
 <span class="fc" id="L208">        boolean heldOutAccepted = heldOutFamilies.stream().allMatch(family -&gt;</span>
 <span class="fc" id="L209">            results.stream().anyMatch(result -&gt;</span>
@@ -401,7 +401,7 @@ public final class CrossFamilyBridgeTransferEvaluator {
 <span class="fc" id="L401">                report.executedNegativeHoldouts(),</span>
 <span class="fc" id="L402">                report.skippedNegativeHoldouts(),</span>
 <span class="fc" id="L403">                report.positiveResults().stream()</span>
-<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                    .filter(result -&gt; !result.passed())</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">                    .filter(result -&gt; !result.passed())</span>
 <span class="fc" id="L405">                    .map(PositiveHoldoutResult::id)</span>
 <span class="fc" id="L406">                    .toList(),</span>
 <span class="fc" id="L407">                report.negativeResults().stream()</span>

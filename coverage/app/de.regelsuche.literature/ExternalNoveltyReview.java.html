@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExternalNoveltyReview.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">ExternalNoveltyReview.java</span></div><h1>ExternalNoveltyReview.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.literature.CandidateLiteratureAssessments.Assessment;
+import de.regelsuche.literature.LiteratureReviewRepository.Subject;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Detached, offline review of a frozen scalar-equation candidate. Never promotes or publishes. */
+<span class="fc" id="L24">public final class ExternalNoveltyReview {</span>
+<span class="fc" id="L25">    private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L26">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L27">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)</span>
+<span class="fc" id="L28">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L29">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS).disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT).build();</span>
+<span class="fc" id="L30">    private static final Pattern ROOT = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L31">    public enum Disclosure { POST_FREEZE_ONLY }</span>
+<span class="fc" id="L32">    public enum Decision { PRIOR_ART_FOUND, NOVELTY_UNRESOLVED, NO_PRIOR_ART_FOUND_WITHIN_SCOPE, EXTERNALLY_NOVEL_CONFIRMED }</span>
+<span class="fc" id="L33">    public enum Vote { SUPPORT_SCOPED_NOVELTY, PRIOR_ART, ABSTAIN }</span>
+
+    /** A source-specific rendering inspected and authorized by the custodian before lookup. */
+    public record Translation(String source,String version,String family,String generatedQuery,
+                              String approvedQuery,String semanticRationale,String approvalEvidenceRoot) {
+<span class="fc" id="L38">        public Translation {</span>
+<span class="fc" id="L39">            text(source); text(version); text(family); text(generatedQuery);</span>
+<span class="fc" id="L40">            text(approvedQuery); text(semanticRationale); root(approvalEvidenceRoot);</span>
+<span class="fc" id="L41">        }</span>
+    }
+
+    public record Plan(Subject subject, String equation, List&lt;String&gt; assumptions, String formationEvidenceRoot,
+                       String exposureLedgerRoot, Disclosure formationAccess, String frozenAt,
+                       List&lt;Translation&gt; approvedTranslations) {
+        public Plan(Subject subject,String equation,List&lt;String&gt; assumptions,String formationEvidenceRoot,
+                    String exposureLedgerRoot,Disclosure formationAccess,String frozenAt) {
+<span class="fc" id="L49">            this(subject,equation,assumptions,formationEvidenceRoot,exposureLedgerRoot,formationAccess,frozenAt,List.of());</span>
+<span class="fc" id="L50">        }</span>
+
+<span class="fc" id="L52">        public Plan {</span>
+<span class="fc" id="L53">            Objects.requireNonNull(subject); Objects.requireNonNull(formationAccess); Instant.parse(frozenAt);</span>
+<span class="fc" id="L54">            assumptions = texts(assumptions,0,32);</span>
+<span class="fc" id="L55">            var forms = NoveltyQueryForms.forEquation(equation, assumptions);</span>
+<span class="fc" id="L56">            approvedTranslations = bounded(approvedTranslations,0,192);</span>
+<span class="fc" id="L57">            var unique = new HashSet&lt;List&lt;String&gt;&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (var approval : approvedTranslations) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                if (!approval.generatedQuery().equals(forms.get(approval.family()))</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                        || !unique.add(List.of(approval.source(),approval.version(),approval.family()))) {</span>
+<span class="nc" id="L61">                    throw bad(&quot;translation must bind one generated candidate query per source version and family&quot;);</span>
+                }
+<span class="fc" id="L63">            }</span>
+<span class="fc" id="L64">            root(formationEvidenceRoot); root(exposureLedgerRoot);</span>
+<span class="fc" id="L65">        }</span>
+    }
+    public record Source(String name,String version,String cataloguedOn,List&lt;String&gt; capabilities,
+                         String accessConditions,String limitations) {
+<span class="fc" id="L69">        public Source {</span>
+<span class="fc" id="L70">            text(name); text(version); LocalDate.parse(cataloguedOn);</span>
+<span class="fc" id="L71">            capabilities=texts(capabilities,1,12); text(accessConditions); text(limitations);</span>
+<span class="fc" id="L72">        }</span>
+    }
+    public record Catalogue(String revision,List&lt;Source&gt; sources) {
+<span class="fc" id="L75">        public Catalogue {</span>
+<span class="fc" id="L76">            text(revision); sources=bounded(sources,1,24);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if(sources.stream().map(Source::name).distinct().count()!=sources.size()) throw bad(&quot;duplicate source&quot;);</span>
+<span class="fc" id="L78">        }</span>
+    }
+    public record Query(@com.fasterxml.jackson.annotation.JsonProperty(required=true) int sourceIndex,String family,String expression,
+                        String submittedText,String executedAt,
+                        @com.fasterxml.jackson.annotation.JsonProperty(required=true) int resultCount,List&lt;String&gt; hitIds) {
+<span class="fc" id="L83">        public Query {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if(sourceIndex&lt;0) throw bad(&quot;negative source index&quot;);</span>
+<span class="fc" id="L85">            text(family); text(expression); text(submittedText); Instant.parse(executedAt); hitIds=texts(hitIds,0,128);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (resultCount &lt; hitIds.size()) throw bad(&quot;reported fewer results than observed identifiers&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if(new HashSet&lt;&gt;(hitIds).size()!=hitIds.size()) throw bad(&quot;duplicate hit&quot;);</span>
+<span class="fc" id="L88">        }</span>
+    }
+    public record QueryLog(String planRoot,String catalogueRoot,List&lt;Query&gt; entries) {
+<span class="fc" id="L91">        public QueryLog { root(planRoot); root(catalogueRoot); entries=bounded(entries,0,192); }</span>
+    }
+<span class="fc" id="L93">    public enum PriorArtRelation {</span>
+<span class="fc" id="L94">        EXACT_PRIOR_ART(RuleLiteratureCatalog.Relation.EXACT),</span>
+<span class="fc" id="L95">        ALPHA_EQUIVALENT_PRIOR_ART(RuleLiteratureCatalog.Relation.EQUIVALENT),</span>
+<span class="fc" id="L96">        SEMANTICALLY_EQUIVALENT_PRIOR_ART(RuleLiteratureCatalog.Relation.EQUIVALENT),</span>
+<span class="fc" id="L97">        STRICT_GENERALIZATION_PRIOR_ART(RuleLiteratureCatalog.Relation.SOURCE_GENERALIZATION),</span>
+<span class="fc" id="L98">        STRICT_SPECIAL_CASE_PRIOR_ART(RuleLiteratureCatalog.Relation.SOURCE_SPECIAL_CASE),</span>
+<span class="fc" id="L99">        RELATED_NOT_EQUIVALENT(RuleLiteratureCatalog.Relation.RELATED);</span>
+
+        final RuleLiteratureCatalog.Relation assessmentRelation;
+
+<span class="fc" id="L103">        PriorArtRelation(RuleLiteratureCatalog.Relation assessmentRelation) {</span>
+<span class="fc" id="L104">            this.assessmentRelation = assessmentRelation;</span>
+<span class="fc" id="L105">        }</span>
+    }
+
+    /** Context inspected at the cited locator, with a commitment to the source evidence. */
+    public record InspectedHit(@com.fasterxml.jackson.annotation.JsonProperty(required=true) int sourceIndex,
+                               String identifier, PriorArtRelation relation, String inspectedContext,
+                               String evidenceRoot) {
+<span class="fc" id="L112">        public InspectedHit {</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (sourceIndex &lt; 0) throw bad(&quot;invalid inspected source&quot;);</span>
+<span class="fc" id="L114">            text(identifier);</span>
+<span class="fc" id="L115">            Objects.requireNonNull(relation);</span>
+<span class="fc" id="L116">            text(inspectedContext);</span>
+<span class="fc" id="L117">            root(evidenceRoot);</span>
+<span class="fc" id="L118">        }</span>
+    }
+
+    public record Dossier(String logRoot, Assessment assessment, List&lt;InspectedHit&gt; inspected) {
+<span class="fc" id="L122">        public Dossier {</span>
+<span class="fc" id="L123">            root(logRoot);</span>
+<span class="fc" id="L124">            Objects.requireNonNull(assessment);</span>
+<span class="fc" id="L125">            inspected = bounded(inspected, 0, 32);</span>
+<span class="fc" id="L126">        }</span>
+    }
+    /** Provided independently by the receiving custodian; private evidence stays outside the run. */
+    public record Reviewer(String identityRoot,String publicKey,String qualificationRoot,String conflictClearanceRoot) {
+<span class="fc" id="L130">        public Reviewer { root(identityRoot); text(publicKey); root(qualificationRoot); root(conflictClearanceRoot); }</span>
+    }
+    public record Opinion(String packetRoot,String reviewerRoot,String qualificationRoot,String conflictClearanceRoot,
+                          Vote vote,String rationale) {
+<span class="fc" id="L134">        public Opinion {</span>
+<span class="fc" id="L135">            root(packetRoot); root(reviewerRoot); root(qualificationRoot); root(conflictClearanceRoot);</span>
+<span class="fc" id="L136">            Objects.requireNonNull(vote); text(rationale);</span>
+<span class="fc" id="L137">        }</span>
+    }
+    public record SignedOpinion(Opinion opinion,String signature) {
+<span class="fc" id="L140">        public SignedOpinion { Objects.requireNonNull(opinion); text(signature); }</span>
+    }
+    public record Intake(String packetRoot,List&lt;SignedOpinion&gt; reviews) {
+<span class="fc" id="L143">        public Intake { root(packetRoot); reviews=bounded(reviews,0,32); }</span>
+    }
+<span class="fc" id="L145">    public record Packet(Plan plan,Catalogue catalogue,QueryLog log,Dossier dossier) { }</span>
+<span class="fc" id="L146">    public record Outcome(String packetRoot,String intakeRoot,Decision decision) { }</span>
+<span class="fc" id="L147">    public record Run(String schema,Packet packet,Intake intake,Outcome outcome) { }</span>
+    public static final String SCHEMA=&quot;regelsuche.external-novelty-run/v1&quot;;
+
+    public static Catalogue scalarCatalogue() throws IOException {
+<span class="fc" id="L151">        try (var input = ExternalNoveltyReview.class.getResourceAsStream(&quot;/literature/scalar-source-catalogue-v1.json&quot;)) {</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (input == null) throw new IOException(&quot;missing scalar source catalogue&quot;);</span>
+<span class="fc" id="L153">            return JSON.readValue(input, Catalogue.class);</span>
+        }
+    }
+
+<span class="fc" id="L157">    public String freeze(Plan plan) { return identity(&quot;external-novelty-review-plan/v1&quot;,Objects.requireNonNull(plan)); }</span>
+<span class="fc" id="L158">    public String catalogueRoot(Catalogue catalogue) { return identity(&quot;external-source-catalog/v1&quot;,Objects.requireNonNull(catalogue)); }</span>
+<span class="fc" id="L159">    public String logRoot(QueryLog log) { return identity(&quot;external-search-log/v1&quot;,Objects.requireNonNull(log)); }</span>
+    public String packetRoot(Packet packet) {
+<span class="fc" id="L161">        NoveltyCoverage.check(this,packet);</span>
+<span class="fc" id="L162">        return identity(&quot;external-review-packet/v1&quot;,packet);</span>
+    }
+<span class="fc" id="L164">    public byte[] signingBytes(Opinion opinion) { return bytes(&quot;external-review-opinion/v1&quot;,opinion); }</span>
+
+    public Run evaluate(String expectedFreeze,String expectedCatalogue,Packet packet,Intake intake,List&lt;Reviewer&gt; eligible) {
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if(!freeze(packet.plan()).equals(expectedFreeze)||!catalogueRoot(packet.catalogue()).equals(expectedCatalogue))</span>
+<span class="fc" id="L168">            throw bad(&quot;review does not bind the receiver's expected freeze/catalogue&quot;);</span>
+<span class="fc" id="L169">        String id=packetRoot(packet);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if(!id.equals(intake.packetRoot())) throw bad(&quot;intake attached to another packet&quot;);</span>
+<span class="fc" id="L171">        var votes=NoveltySignatures.verify(this,id,intake,bounded(eligible,0,128));</span>
+<span class="fc" id="L172">        var outcome=new Outcome(id,identity(&quot;external-review-intake/v1&quot;,intake),decide(packet,votes,eligible.size()));</span>
+<span class="fc" id="L173">        return new Run(SCHEMA,packet,intake,outcome);</span>
+    }
+    private static Decision decide(Packet packet,List&lt;Vote&gt; votes,int assigned) {
+<span class="fc" id="L176">        var status=packet.dossier().assessment().status();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if(status==CandidateLiteratureAssessments.Status.PRIOR_ART_FOUND) return Decision.PRIOR_ART_FOUND;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if(status!=CandidateLiteratureAssessments.Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE</span>
+<span class="fc bfc" id="L179" title="All 4 branches covered.">                || votes.stream().anyMatch(v-&gt;v!=Vote.SUPPORT_SCOPED_NOVELTY)) return Decision.NOVELTY_UNRESOLVED;</span>
+<span class="fc bfc" id="L180" title="All 4 branches covered.">        return votes.size()&gt;=2 &amp;&amp; votes.size()==assigned ? Decision.EXTERNALLY_NOVEL_CONFIRMED : Decision.NO_PRIOR_ART_FOUND_WITHIN_SCOPE;</span>
+    }
+    public byte[] encode(Run run) throws IOException {
+<span class="fc" id="L183">        byte[] encoded=JSON.writeValueAsBytes(run);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if(encoded.length&gt;1024*1024) throw bad(&quot;run too large&quot;);</span>
+<span class="fc" id="L185">        return encoded;</span>
+    }
+    public Run replay(String expectedFreeze,String expectedCatalogue,List&lt;Reviewer&gt; eligible,byte[] encoded) throws IOException {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if(encoded.length&gt;1024*1024) throw bad(&quot;run too large&quot;);</span>
+<span class="fc" id="L189">        Run run=JSON.readValue(encoded,Run.class);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if(!SCHEMA.equals(run.schema())) throw bad(&quot;unsupported review run&quot;);</span>
+<span class="fc" id="L191">        Run verified=evaluate(expectedFreeze,expectedCatalogue,run.packet(),run.intake(),eligible);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if(!verified.equals(run)) throw bad(&quot;claimed review decision failed replay&quot;);</span>
+<span class="fc" id="L193">        return verified;</span>
+    }
+    /** Produce the seven private records after independently replaying the full submission. */
+    public Map&lt;String,byte[]&gt; artifacts(String expectedFreeze,String expectedCatalogue,List&lt;Reviewer&gt; eligible,byte[] submitted) throws IOException {
+<span class="fc" id="L197">        var run=replay(expectedFreeze,expectedCatalogue,eligible,submitted);</span>
+<span class="fc" id="L198">        var p=run.packet();</span>
+<span class="fc" id="L199">        var records=new LinkedHashMap&lt;String,byte[]&gt;();</span>
+<span class="fc" id="L200">        records.put(&quot;external-novelty-review-plan.json&quot;,bytes(&quot;external-novelty-review-plan/v1&quot;,p.plan()));</span>
+<span class="fc" id="L201">        records.put(&quot;external-source-catalog.json&quot;,bytes(&quot;external-source-catalog/v1&quot;,p.catalogue()));</span>
+<span class="fc" id="L202">        records.put(&quot;external-search-log.json&quot;,bytes(&quot;external-search-log/v1&quot;,p.log()));</span>
+<span class="fc" id="L203">        records.put(&quot;external-match-dossier.json&quot;,bytes(&quot;external-match-dossier/v1&quot;,p.dossier()));</span>
+<span class="fc" id="L204">        records.put(&quot;external-review-intake.json&quot;,bytes(&quot;external-review-intake/v1&quot;,run.intake()));</span>
+<span class="fc" id="L205">        records.put(&quot;external-novelty-decision.json&quot;,bytes(&quot;external-novelty-decision/v1&quot;,run.outcome()));</span>
+<span class="fc" id="L206">        records.put(&quot;external-novelty-run.json&quot;,encode(run));</span>
+<span class="fc" id="L207">        return Collections.unmodifiableMap(records);</span>
+    }
+    static String identity(String type,Object data) {
+<span class="fc" id="L210">        try { return &quot;sha256:&quot;+HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes(type,data))); }</span>
+<span class="nc" id="L211">        catch(GeneralSecurityException e) { throw new IllegalStateException(e); }</span>
+    }
+    private static byte[] bytes(String type,Object data) {
+<span class="fc" id="L214">        try { return JSON.writeValueAsBytes(List.of(type,data)); }</span>
+<span class="nc" id="L215">        catch(IOException e) { throw new IllegalArgumentException(&quot;invalid review data&quot;,e); }</span>
+    }
+<span class="pc bpc" id="L217" title="3 of 6 branches missed.">    static void text(String value) { if(value==null||value.isBlank()||value.length()&gt;3000) throw bad(&quot;invalid review text&quot;); }</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">    static void root(String value) { if(value==null||!ROOT.matcher(value).matches()) throw bad(&quot;invalid content identity&quot;); }</span>
+    static &lt;T&gt; List&lt;T&gt; bounded(List&lt;T&gt; values,int min,int max) {
+<span class="pc bpc" id="L220" title="3 of 6 branches missed.">        if(values==null||values.size()&lt;min||values.size()&gt;max) throw bad(&quot;invalid list size&quot;);</span>
+<span class="fc" id="L221">        return List.copyOf(values);</span>
+    }
+    private static List&lt;String&gt; texts(List&lt;String&gt; values,int min,int max) {
+<span class="fc" id="L224">        var list=bounded(values,min,max); list.forEach(ExternalNoveltyReview::text); return list;</span>
+    }
+<span class="fc" id="L226">    static IllegalArgumentException bad(String reason) { return new IllegalArgumentException(reason); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

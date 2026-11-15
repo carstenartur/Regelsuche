@@ -195,9 +195,9 @@ public record TreePosition(List&lt;Integer&gt; path, String text) implements Com
 <span class="nc" id="L195">                        break;</span>
                     }
 <span class="fc bfc" id="L197" title="All 2 branches covered.">                } else if (current instanceof FunctionExpr function) {</span>
-<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                    if (childIndex &gt;= function.arguments().size()) {</span>
-<span class="nc" id="L199">                        status = Status.INVALID_PATH;</span>
-<span class="nc" id="L200">                        break;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                    if (childIndex &gt;= function.arguments().size()) {</span>
+<span class="fc" id="L199">                        status = Status.INVALID_PATH;</span>
+<span class="fc" id="L200">                        break;</span>
                     }
 <span class="fc" id="L202">                    child = function.arguments().get(childIndex);</span>
                 } else {

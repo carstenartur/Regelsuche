@@ -136,7 +136,7 @@ public final class RuleLiteratureCatalog {
 <span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (authors.isEmpty()) throw new IllegalArgumentException(&quot;literature source requires authors&quot;);</span>
 <span class="fc" id="L137">            authors.forEach(author -&gt; requireText(author, &quot;author&quot;, 300));</span>
 <span class="fc" id="L138">            requireText(title, &quot;title&quot;, 1000);</span>
-<span class="pc bpc" id="L139" title="3 of 6 branches missed.">            if (year != null &amp;&amp; (year &lt; 1 || year &gt; 9999)) throw new IllegalArgumentException(&quot;invalid literature year&quot;);</span>
+<span class="pc bpc" id="L139" title="2 of 6 branches missed.">            if (year != null &amp;&amp; (year &lt; 1 || year &gt; 9999)) throw new IllegalArgumentException(&quot;invalid literature year&quot;);</span>
 <span class="fc" id="L140">            requireText(identifier, &quot;identifier&quot;, 500);</span>
 <span class="fc" id="L141">            requireText(version, &quot;version&quot;, 300);</span>
 <span class="fc" id="L142">            requireText(locator, &quot;locator&quot;, 500);</span>

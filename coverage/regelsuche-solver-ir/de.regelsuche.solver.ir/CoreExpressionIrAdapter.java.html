@@ -82,9 +82,9 @@ import java.util.Objects;
     }
 
     private static SolverIr.BinaryOperator toIrOperator(BinaryOperator operator) {
-<span class="pc bpc" id="L85" title="1 of 5 branches missed.">        return switch (operator) {</span>
+<span class="fc bfc" id="L85" title="All 5 branches covered.">        return switch (operator) {</span>
 <span class="fc" id="L86">            case ADD -&gt; SolverIr.BinaryOperator.ADD;</span>
-<span class="nc" id="L87">            case SUB -&gt; SolverIr.BinaryOperator.SUBTRACT;</span>
+<span class="fc" id="L87">            case SUB -&gt; SolverIr.BinaryOperator.SUBTRACT;</span>
 <span class="fc" id="L88">            case MUL -&gt; SolverIr.BinaryOperator.MULTIPLY;</span>
 <span class="fc" id="L89">            case DIV -&gt; SolverIr.BinaryOperator.DIVIDE;</span>
 <span class="fc" id="L90">            case POW -&gt; SolverIr.BinaryOperator.POWER;</span>
@@ -92,9 +92,9 @@ import java.util.Objects;
     }
 
     private static BinaryOperator toCoreOperator(SolverIr.BinaryOperator operator) {
-<span class="pc bpc" id="L95" title="1 of 5 branches missed.">        return switch (operator) {</span>
+<span class="fc bfc" id="L95" title="All 5 branches covered.">        return switch (operator) {</span>
 <span class="fc" id="L96">            case ADD -&gt; BinaryOperator.ADD;</span>
-<span class="nc" id="L97">            case SUBTRACT -&gt; BinaryOperator.SUB;</span>
+<span class="fc" id="L97">            case SUBTRACT -&gt; BinaryOperator.SUB;</span>
 <span class="fc" id="L98">            case MULTIPLY -&gt; BinaryOperator.MUL;</span>
 <span class="fc" id="L99">            case DIVIDE -&gt; BinaryOperator.DIV;</span>
 <span class="fc" id="L100">            case POWER -&gt; BinaryOperator.POW;</span>

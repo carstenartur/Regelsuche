@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProductionCandidateContinuation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">ProductionCandidateContinuation.java</span></div><h1>ProductionCandidateContinuation.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.CandidateOutput;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationPlan;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
+import de.regelsuche.mining.OpenTargetConjectureProofGate;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Advances one mined output through the same gates and holdouts as the pinned campaign. */
+public final class ProductionCandidateContinuation {
+<span class="fc" id="L29">    private static final JsonMapper JSON = new JsonMapper();</span>
+
+    @FunctionalInterface
+    public interface DispatchSink {
+        void executed(EvidenceStage stage, int batch, String branchId, String receiptHash,
+            ResourceKind resource, long work);
+    }
+
+    private final int batch;
+    private final CandidateOutput output;
+    private final OpenTargetConjecture conjecture;
+    private final EvaluationPlan plan;
+<span class="fc" id="L41">    private final ObjectNode receipts = JSON.createObjectNode();</span>
+<span class="fc" id="L42">    private EvidenceStage next = EvidenceStage.VALIDATION;</span>
+    private EvaluationReport evaluation;
+    private NoveltyReport novelty;
+    private ProofReport proof;
+<span class="fc" id="L46">    private String status = &quot;FORMED&quot;;</span>
+
+    /** Create the continuations strictly from the native formation receipt and replayed miner outputs. */
+    public static List&lt;ProductionCandidateContinuation&gt; fromBatch(
+            int batchIndex, AutonomousProductionMiningRunner.MiningBatch batch, long seed) {
+<span class="fc" id="L51">        return batch.binding().receipt().outputs().stream().map(output -&gt; {</span>
+<span class="fc" id="L52">            var conjecture = batch.evidence().report().conjectures().stream()</span>
+<span class="fc" id="L53">                .filter(item -&gt; item.conjectureId().equals(output.conjectureId())).findFirst().orElseThrow();</span>
+<span class="fc" id="L54">            return new ProductionCandidateContinuation(batchIndex, output, conjecture, seed);</span>
+<span class="fc" id="L55">        }).toList();</span>
+    }
+
+    private ProductionCandidateContinuation(int batch, CandidateOutput output,
+<span class="fc" id="L59">            OpenTargetConjecture conjecture, long seed) {</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (!output.conjectureId().equals(conjecture.conjectureId())) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;formation output and conjecture disagree&quot;);</span>
+        }
+<span class="fc" id="L63">        this.batch = batch;</span>
+<span class="fc" id="L64">        this.output = output;</span>
+<span class="fc" id="L65">        this.conjecture = conjecture;</span>
+<span class="fc" id="L66">        this.plan = AutonomousProductionLifecycleRunner.evaluationPlan(seed);</span>
+<span class="fc" id="L67">    }</span>
+
+<span class="fc" id="L69">    int batch() { return batch; }</span>
+<span class="fc" id="L70">    String id() { return output.outputBranchId(); }</span>
+<span class="fc" id="L71">    EvidenceStage nextStage() { return next; }</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    int requiredTickets() { return next == EvidenceStage.VALIDATION ? 2 : 1; }</span>
+
+    public ObjectNode evidence() {
+<span class="fc" id="L75">        ObjectNode row = JSON.createObjectNode();</span>
+<span class="fc" id="L76">        row.put(&quot;batch&quot;, batch).put(&quot;id&quot;, id()).put(&quot;conjectureId&quot;, conjecture.conjectureId())</span>
+<span class="fc" id="L77">            .put(&quot;lineageHash&quot;, output.lineageHash()).put(&quot;status&quot;, status);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        row.put(&quot;nextStage&quot;, next == null ? null : next.name());</span>
+<span class="fc" id="L79">        row.set(&quot;receipts&quot;, receipts.deepCopy());</span>
+<span class="fc" id="L80">        return row;</span>
+    }
+
+    void advance(DispatchSink ledger) {
+<span class="pc bpc" id="L84" title="1 of 5 branches missed.">        switch (next) {</span>
+            case VALIDATION -&gt; {
+<span class="fc" id="L86">                Map&lt;String, Long&gt; attempts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L87">                evaluation = OpenTargetConjectureEvaluator.observingCounterexampleAssignments(</span>
+<span class="fc" id="L88">                    source -&gt; attempts.merge(source, 1L, Math::addExact)).evaluate(conjecture, plan);</span>
+<span class="fc" id="L89">                record(EvidenceStage.VALIDATION, ResourceKind.VALIDATION_CHECKS,</span>
+<span class="fc" id="L90">                    evaluation.executedPositiveHoldouts() + evaluation.executedNegativeHoldouts(),</span>
+<span class="fc" id="L91">                    AutonomousLifecycleEvidenceJson.validation(evaluation), ledger);</span>
+<span class="fc" id="L92">                ObjectNode assignments = receipts.putObject(&quot;evaluatedAssignmentsBySource&quot;);</span>
+<span class="fc" id="L93">                attempts.forEach(assignments::put);</span>
+<span class="fc" id="L94">                record(EvidenceStage.COUNTEREXAMPLE_SEARCH, ResourceKind.COUNTEREXAMPLE_ATTEMPTS,</span>
+<span class="fc" id="L95">                    attempts.values().stream().mapToLong(Long::longValue).sum(),</span>
+<span class="fc" id="L96">                    AutonomousLifecycleEvidenceJson.counterexample(conjecture.conjectureId(), evaluation), ledger);</span>
+<span class="fc" id="L97">                status = evaluation.status().name();</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                next = evaluation.status() == EvaluationStatus.ACCEPTED_FOR_PROOF ? EvidenceStage.PROJECT_NOVELTY : null;</span>
+<span class="fc" id="L99">            }</span>
+            case PROJECT_NOVELTY -&gt; {
+<span class="fc" id="L101">                novelty = new OpenTargetConjectureNoveltyChecker().check(conjecture, new KnownRuleRepository(), List.of());</span>
+<span class="fc" id="L102">                record(next, ResourceKind.NOVELTY_COMPARISONS,</span>
+<span class="fc" id="L103">                    novelty.checkedActiveRules() + novelty.checkedPriorCandidates(),</span>
+<span class="fc" id="L104">                    AutonomousLifecycleEvidenceJson.novelty(novelty), ledger);</span>
+<span class="fc" id="L105">                status = novelty.status().name();</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                next = novelty.status() == NoveltyStatus.NOVEL_WITHIN_PROJECT ? EvidenceStage.PROOF : null;</span>
+<span class="fc" id="L107">            }</span>
+            case PROOF -&gt; {
+<span class="fc" id="L109">                proof = new OpenTargetConjectureProofGate().evaluate(conjecture, evaluation);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                record(next, ResourceKind.PROOF_ATTEMPTS, proof.proofObligationEmitted() ? 1 : 0,</span>
+<span class="fc" id="L111">                    proof.toCanonicalJson(), ledger);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if (proof.obligation() != null) {</span>
+<span class="fc" id="L113">                    receipts.set(&quot;solverObligation&quot;, parse(proof.obligation().toCanonicalJson()));</span>
+                }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (proof.result() != null) {</span>
+<span class="fc" id="L116">                    receipts.set(&quot;solverResult&quot;, parse(proof.result().toCanonicalJson()));</span>
+                }
+<span class="fc" id="L118">                status = proof.proofStatus().name();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                next = proof.proofStatus() == ProofStatus.SYMBOLICALLY_VERIFIED ? EvidenceStage.LIFECYCLE_HANDOFF : null;</span>
+<span class="fc" id="L120">            }</span>
+            case LIFECYCLE_HANDOFF -&gt; {
+<span class="fc" id="L122">                var candidate = new OpenTargetHypothesisCandidateAdapter().adapt(</span>
+                    conjecture, evaluation, AutonomousProductionLifecycleRunner.LIFECYCLE_CREATED_AT);
+<span class="fc" id="L124">                var decision = AutonomousCandidateLifecycleV2.decide(id(), novelty, proof, candidate);</span>
+<span class="fc" id="L125">                record(next, ResourceKind.LIFECYCLE_HANDOFFS,</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    decision.outcome() == AutonomousCandidateLifecycleV2.LifecycleOutcome.COMPLETED ? 1 : 0,</span>
+<span class="fc" id="L127">                    decision.toCanonicalJson(), ledger);</span>
+<span class="fc" id="L128">                receipts.set(&quot;lifecycleCandidate&quot;, parse(</span>
+<span class="fc" id="L129">                    AutonomousLifecycleEvidenceJson.lifecycleCandidate(candidate)));</span>
+<span class="fc" id="L130">                status = decision.outcome().name();</span>
+<span class="fc" id="L131">                next = null;</span>
+<span class="fc" id="L132">            }</span>
+<span class="nc" id="L133">            default -&gt; throw new IllegalStateException(&quot;ineligible continuation &quot; + next);</span>
+        }
+<span class="fc" id="L135">    }</span>
+
+    private void record(EvidenceStage stage, ResourceKind kind, long work, String json,
+            DispatchSink ledger) {
+<span class="fc" id="L139">        receipts.set(stage.name(), parse(json));</span>
+<span class="fc" id="L140">        ledger.executed(stage, batch, id(), AutonomousResearchBriefV2.hash(json), kind, work);</span>
+<span class="fc" id="L141">    }</span>
+
+    static JsonNode parse(String json) {
+        try {
+<span class="fc" id="L145">            return JSON.readTree(json);</span>
+<span class="nc" id="L146">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L147">            throw new IllegalArgumentException(&quot;invalid native artifact&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -20,7 +20,7 @@ public final class ExtractionCertificateCodec {
     private static final int FORMAT_VERSION = 1;
     private static final int MAX_BYTES = 16 * 1024 * 1024;
 <span class="fc" id="L22">    private static final List&lt;Kind&gt; TERM_KINDS = List.of(Kind.NUMBER, Kind.VARIABLE, Kind.BINARY, Kind.FUNCTION);</span>
-<span class="fc" id="L23">    private static final List&lt;String&gt; PATTERN_TAGS = List.of(&quot;P&quot;, &quot;NUMBER&quot;, &quot;BINARY&quot;, &quot;FUNCTION&quot;);</span>
+<span class="fc" id="L23">    private static final List&lt;String&gt; PATTERN_TAGS = List.of(&quot;P&quot;, &quot;NUMBER&quot;, &quot;BINARY&quot;, &quot;FUNCTION&quot;, &quot;VARIABLE&quot;);</span>
 
     private ExtractionCertificateCodec() {}
 
@@ -56,7 +56,7 @@ public final class ExtractionCertificateCodec {
         private final ProofSupport syntax;
 
 <span class="fc" id="L58">        Writer(ProofLimits limits) {</span>
-<span class="fc" id="L59">            syntax = new ProofSupport(limits);</span>
+<span class="fc" id="L59">            syntax = new ProofSupport(limits, true);</span>
 <span class="fc" id="L60">        }</span>
 
         void certificate(ExtractionCertificate value) {
@@ -206,7 +206,7 @@ public final class ExtractionCertificateCodec {
         private long readCharacters;
 
 <span class="fc" id="L208">        Reader(byte[] bytes, ProofLimits limits) {</span>
-<span class="fc" id="L209">            syntax = new ProofSupport(limits);</span>
+<span class="fc" id="L209">            syntax = new ProofSupport(limits, true);</span>
 <span class="fc" id="L210">            syntax.size(bytes.length, MAX_BYTES, &quot;certificate byte limit&quot;);</span>
 <span class="fc" id="L211">            syntax.work(bytes.length);</span>
 <span class="fc" id="L212">            input = ByteBuffer.wrap(bytes.clone());</span>
@@ -278,7 +278,7 @@ public final class ExtractionCertificateCodec {
 <span class="fc" id="L278">                String tag = PATTERN_TAGS.get(reference(tag(), PATTERN_TAGS.size()));</span>
 <span class="fc bfc" id="L279" title="All 2 branches covered.">                String label = text(tag.equals(&quot;NUMBER&quot;) ? 4096 : Long.MAX_VALUE);</span>
 <span class="fc bfc" id="L280" title="All 3 branches covered.">                int arity = switch (tag) {</span>
-<span class="fc" id="L281">                    case &quot;P&quot;, &quot;NUMBER&quot; -&gt; 0;</span>
+<span class="fc" id="L281">                    case &quot;P&quot;, &quot;NUMBER&quot;, &quot;VARIABLE&quot; -&gt; 0;</span>
 <span class="fc" id="L282">                    case &quot;BINARY&quot; -&gt; 2;</span>
 <span class="fc" id="L283">                    default -&gt; -1;</span>
                 };
@@ -302,105 +302,106 @@ public final class ExtractionCertificateCodec {
 <span class="fc" id="L302">            }</span>
 <span class="fc" id="L303">            syntax.size(expanded, syntax.limits.maxExpandedNodes(), &quot;expanded pattern&quot;);</span>
 <span class="fc" id="L304">            syntax.size(depth, syntax.limits.maxDepth(), &quot;pattern depth&quot;);</span>
-<span class="pc bpc" id="L305" title="1 of 5 branches missed.">            PatternExpr value = switch (tag) {</span>
+<span class="pc bpc" id="L305" title="1 of 6 branches missed.">            PatternExpr value = switch (tag) {</span>
 <span class="fc" id="L306">                case &quot;P&quot; -&gt; PatternExpr.var(label);</span>
-<span class="fc" id="L307">                case &quot;NUMBER&quot; -&gt; PatternExpr.num(syntax.number(label));</span>
-<span class="fc" id="L308">                case &quot;BINARY&quot; -&gt; PatternExpr.op(BinaryOperator.valueOf(label), arguments.get(0), arguments.get(1));</span>
-<span class="fc" id="L309">                case &quot;FUNCTION&quot; -&gt; new PatternExpr.Function(label, arguments);</span>
-<span class="nc" id="L310">                default -&gt; throw new IllegalArgumentException(&quot;unsupported pattern&quot;);</span>
+<span class="fc" id="L307">                case &quot;VARIABLE&quot; -&gt; PatternExpr.variable(label);</span>
+<span class="fc" id="L308">                case &quot;NUMBER&quot; -&gt; PatternExpr.num(syntax.number(label));</span>
+<span class="fc" id="L309">                case &quot;BINARY&quot; -&gt; PatternExpr.op(BinaryOperator.valueOf(label), arguments.get(0), arguments.get(1));</span>
+<span class="fc" id="L310">                case &quot;FUNCTION&quot; -&gt; new PatternExpr.Function(label, arguments);</span>
+<span class="nc" id="L311">                default -&gt; throw new IllegalArgumentException(&quot;unsupported pattern&quot;);</span>
             };
-<span class="fc" id="L312">            return new PatternNode(new ProofSupport.PNode(tag, label, children), value, depth, expanded);</span>
+<span class="fc" id="L313">            return new PatternNode(new ProofSupport.PNode(tag, label, children), value, depth, expanded);</span>
         }
 
         private Step step(int priorSteps, int ruleCount) {
-<span class="pc bpc" id="L316" title="2 of 6 branches missed.">            return switch (tag()) {</span>
+<span class="pc bpc" id="L317" title="2 of 6 branches missed.">            return switch (tag()) {</span>
                 case 0 -&gt; {
-<span class="fc" id="L318">                    syntax.refs(1);</span>
-<span class="fc" id="L319">                    yield new Reflexivity(termReference());</span>
+<span class="fc" id="L319">                    syntax.refs(1);</span>
+<span class="fc" id="L320">                    yield new Reflexivity(termReference());</span>
                 }
                 case 1 -&gt; {
-<span class="fc" id="L322">                    syntax.refs(1);</span>
-<span class="fc" id="L323">                    yield new Symmetry(reference(integer(), priorSteps));</span>
+<span class="fc" id="L323">                    syntax.refs(1);</span>
+<span class="fc" id="L324">                    yield new Symmetry(reference(integer(), priorSteps));</span>
                 }
                 case 2 -&gt; {
-<span class="nc" id="L326">                    syntax.refs(2);</span>
-<span class="nc" id="L327">                    yield new Transitivity(reference(integer(), priorSteps), reference(integer(), priorSteps));</span>
+<span class="nc" id="L327">                    syntax.refs(2);</span>
+<span class="nc" id="L328">                    yield new Transitivity(reference(integer(), priorSteps), reference(integer(), priorSteps));</span>
                 }
-<span class="fc" id="L329">                case 3 -&gt; congruence(priorSteps);</span>
-<span class="fc" id="L330">                case 4 -&gt; instance(ruleCount);</span>
-<span class="nc" id="L331">                default -&gt; throw new IllegalArgumentException(&quot;unknown proof step&quot;);</span>
+<span class="fc" id="L330">                case 3 -&gt; congruence(priorSteps);</span>
+<span class="fc" id="L331">                case 4 -&gt; instance(ruleCount);</span>
+<span class="nc" id="L332">                default -&gt; throw new IllegalArgumentException(&quot;unknown proof step&quot;);</span>
             };
         }
 
         private Congruence congruence(int priorSteps) {
-<span class="fc" id="L336">            int left = termReference();</span>
-<span class="fc" id="L337">            int right = termReference();</span>
-<span class="fc" id="L338">            syntax.refs(2);</span>
-<span class="fc" id="L339">            var proofs = indices(priorSteps, syntax.limits.maxReferences() - syntax.references, -1);</span>
-<span class="fc" id="L340">            syntax.refs(proofs.size());</span>
-<span class="fc" id="L341">            return new Congruence(left, right, proofs);</span>
+<span class="fc" id="L337">            int left = termReference();</span>
+<span class="fc" id="L338">            int right = termReference();</span>
+<span class="fc" id="L339">            syntax.refs(2);</span>
+<span class="fc" id="L340">            var proofs = indices(priorSteps, syntax.limits.maxReferences() - syntax.references, -1);</span>
+<span class="fc" id="L341">            syntax.refs(proofs.size());</span>
+<span class="fc" id="L342">            return new Congruence(left, right, proofs);</span>
         }
 
         private PatternInstance instance(int ruleCount) {
-<span class="fc" id="L345">            int rule = reference(integer(), ruleCount);</span>
-<span class="fc" id="L346">            int before = termReference();</span>
-<span class="fc" id="L347">            int after = termReference();</span>
-<span class="fc" id="L348">            syntax.refs(2);</span>
-<span class="fc" id="L349">            int count = count(syntax.limits.maxReferences() - syntax.references, 8, &quot;binding limit&quot;);</span>
-<span class="fc" id="L350">            syntax.refs(count);</span>
-<span class="fc" id="L351">            var bindings = new HashMap&lt;String, Integer&gt;();</span>
-<span class="fc" id="L352">            String previous = &quot;&quot;;</span>
-<span class="fc bfc" id="L353" title="All 2 branches covered.">            for (int index = 0; index &lt; count; index++) {</span>
-<span class="fc" id="L354">                String name = text();</span>
-<span class="fc" id="L355">                syntax.chars(name);</span>
-<span class="pc bpc" id="L356" title="2 of 4 branches missed.">                require(!name.isBlank() &amp;&amp; previous.compareTo(name) &lt; 0, &quot;noncanonical binding order&quot;);</span>
-<span class="fc" id="L357">                bindings.put(name, termReference());</span>
-<span class="fc" id="L358">                previous = name;</span>
+<span class="fc" id="L346">            int rule = reference(integer(), ruleCount);</span>
+<span class="fc" id="L347">            int before = termReference();</span>
+<span class="fc" id="L348">            int after = termReference();</span>
+<span class="fc" id="L349">            syntax.refs(2);</span>
+<span class="fc" id="L350">            int count = count(syntax.limits.maxReferences() - syntax.references, 8, &quot;binding limit&quot;);</span>
+<span class="fc" id="L351">            syntax.refs(count);</span>
+<span class="fc" id="L352">            var bindings = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L353">            String previous = &quot;&quot;;</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L355">                String name = text();</span>
+<span class="fc" id="L356">                syntax.chars(name);</span>
+<span class="pc bpc" id="L357" title="2 of 4 branches missed.">                require(!name.isBlank() &amp;&amp; previous.compareTo(name) &lt; 0, &quot;noncanonical binding order&quot;);</span>
+<span class="fc" id="L358">                bindings.put(name, termReference());</span>
+<span class="fc" id="L359">                previous = name;</span>
             }
-<span class="fc" id="L360">            return new PatternInstance(rule, bindings, before, after);</span>
+<span class="fc" id="L361">            return new PatternInstance(rule, bindings, before, after);</span>
         }
 
         private int termReference() {
-<span class="fc" id="L364">            return reference(integer(), syntax.terms.size());</span>
+<span class="fc" id="L365">            return reference(integer(), syntax.terms.size());</span>
         }
 
         private List&lt;Integer&gt; indices(int upperBound, long limit, int requiredArity) {
-<span class="fc" id="L368">            int count = count(limit, Integer.BYTES, &quot;reference limit&quot;);</span>
-<span class="pc bpc" id="L369" title="1 of 4 branches missed.">            require(requiredArity &lt; 0 || requiredArity == count, &quot;invalid node arity&quot;);</span>
-<span class="fc" id="L370">            var references = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc bfc" id="L371" title="All 2 branches covered.">            for (int index = 0; index &lt; count; index++) references.add(reference(integer(), upperBound));</span>
-<span class="fc" id="L372">            return references;</span>
+<span class="fc" id="L369">            int count = count(limit, Integer.BYTES, &quot;reference limit&quot;);</span>
+<span class="pc bpc" id="L370" title="1 of 4 branches missed.">            require(requiredArity &lt; 0 || requiredArity == count, &quot;invalid node arity&quot;);</span>
+<span class="fc" id="L371">            var references = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            for (int index = 0; index &lt; count; index++) references.add(reference(integer(), upperBound));</span>
+<span class="fc" id="L373">            return references;</span>
         }
 
         private String text() {
-<span class="fc" id="L376">            return text(Long.MAX_VALUE);</span>
+<span class="fc" id="L377">            return text(Long.MAX_VALUE);</span>
         }
 
         private String text(long labelLimit) {
-<span class="fc" id="L380">            long limit = Math.min(labelLimit, syntax.limits.maxCharacters() - readCharacters);</span>
-<span class="fc" id="L381">            int length = count(limit, Character.BYTES, &quot;character limit&quot;);</span>
-<span class="fc" id="L382">            readCharacters += length;</span>
-<span class="fc" id="L383">            char[] units = new char[length];</span>
-<span class="fc bfc" id="L384" title="All 2 branches covered.">            for (int index = 0; index &lt; length; index++) units[index] = input.getChar();</span>
-<span class="fc" id="L385">            return new String(units);</span>
+<span class="fc" id="L381">            long limit = Math.min(labelLimit, syntax.limits.maxCharacters() - readCharacters);</span>
+<span class="fc" id="L382">            int length = count(limit, Character.BYTES, &quot;character limit&quot;);</span>
+<span class="fc" id="L383">            readCharacters += length;</span>
+<span class="fc" id="L384">            char[] units = new char[length];</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            for (int index = 0; index &lt; length; index++) units[index] = input.getChar();</span>
+<span class="fc" id="L386">            return new String(units);</span>
         }
 
         private int count(long limit, int minimumBytes, String detail) {
-<span class="fc" id="L389">            int count = integer();</span>
-<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            require(count &gt;= 0, &quot;negative certificate count&quot;);</span>
-<span class="fc" id="L391">            syntax.size(count, limit, detail);</span>
-<span class="fc bfc" id="L392" title="All 2 branches covered.">            require((long) count * minimumBytes &lt;= input.remaining(), &quot;truncated certificate&quot;);</span>
-<span class="fc" id="L393">            return count;</span>
+<span class="fc" id="L390">            int count = integer();</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            require(count &gt;= 0, &quot;negative certificate count&quot;);</span>
+<span class="fc" id="L392">            syntax.size(count, limit, detail);</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            require((long) count * minimumBytes &lt;= input.remaining(), &quot;truncated certificate&quot;);</span>
+<span class="fc" id="L394">            return count;</span>
         }
 
         private int tag() {
-<span class="fc" id="L397">            require(input.hasRemaining(), &quot;truncated certificate&quot;);</span>
-<span class="fc" id="L398">            return Byte.toUnsignedInt(input.get());</span>
+<span class="fc" id="L398">            require(input.hasRemaining(), &quot;truncated certificate&quot;);</span>
+<span class="fc" id="L399">            return Byte.toUnsignedInt(input.get());</span>
         }
 
         private int integer() {
-<span class="fc bfc" id="L402" title="All 2 branches covered.">            require(input.remaining() &gt;= Integer.BYTES, &quot;truncated certificate&quot;);</span>
-<span class="fc" id="L403">            return input.getInt();</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            require(input.remaining() &gt;= Integer.BYTES, &quot;truncated certificate&quot;);</span>
+<span class="fc" id="L404">            return input.getInt();</span>
         }
     }
 }

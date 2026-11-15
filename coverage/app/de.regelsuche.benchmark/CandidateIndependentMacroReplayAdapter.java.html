@@ -120,11 +120,11 @@ public final class CandidateIndependentMacroReplayAdapter {
 <span class="fc" id="L120">            .toList();</span>
 <span class="fc" id="L121">        boolean complete = results.stream().allMatch(ReplayResult::reproduced);</span>
 <span class="fc" id="L122">        return new BatchResult(</span>
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            complete ? BatchStatus.REPRODUCED : BatchStatus.INCOMPLETE,</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            complete ? BatchStatus.REPRODUCED : BatchStatus.INCOMPLETE,</span>
             results,
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            complete</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            complete</span>
 <span class="fc" id="L126">                ? &quot;every frozen TRAIN replay was reproduced&quot;</span>
-<span class="pc" id="L127">                : &quot;one or more frozen TRAIN replays were not reproduced&quot;);</span>
+<span class="fc" id="L127">                : &quot;one or more frozen TRAIN replays were not reproduced&quot;);</span>
     }
 
     public ReplayResult replay(ReplayTrace trace) {

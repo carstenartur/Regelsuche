@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoveltyQueryForms.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">NoveltyQueryForms.java</span></div><h1>NoveltyQueryForms.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.canonical.PolynomialNormalizer;
+import java.util.List;
+import java.util.TreeSet;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/** Offline retrieval strings for bounded scalar equations, not equivalence certificates. */
+public final class NoveltyQueryForms {
+    private NoveltyQueryForms() { }
+    public static Map&lt;String, String&gt; forEquation(String statement) {
+<span class="nc" id="L22">        return forEquation(statement, List.of());</span>
+    }
+
+    public static Map&lt;String, String&gt; forEquation(String statement, List&lt;String&gt; assumptions) {
+<span class="pc bpc" id="L26" title="3 of 6 branches missed.">        if (statement == null || statement.isBlank() || statement.length() &gt; 128</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">                || statement.indexOf('=') &lt; 1 || statement.indexOf('=') != statement.lastIndexOf('=')) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;expected a bounded scalar equation&quot;);</span>
+        }
+<span class="fc" id="L30">        var eq = new ExpressionParser().parseEquation(statement);</span>
+<span class="fc" id="L31">        var names = new LinkedHashMap&lt;String,String&gt;();</span>
+<span class="fc" id="L32">        var left = render(eq.left(), names, false);</span>
+<span class="fc" id="L33">        var right = render(eq.right(), names, false);</span>
+<span class="fc" id="L34">        int eqAt = statement.indexOf('=');</span>
+<span class="fc" id="L35">        var forms = new LinkedHashMap&lt;String,String&gt;();</span>
+<span class="fc" id="L36">        forms.put(&quot;EXACT&quot;, statement);</span>
+<span class="fc" id="L37">        forms.put(&quot;ALPHA&quot;, &quot;(&quot; + left + &quot;=&quot; + right + &quot;)&quot;);</span>
+<span class="fc" id="L38">        forms.put(&quot;STRUCTURAL&quot;, &quot;eq(&quot; + render(eq.left(), names, true) + &quot;,&quot; + render(eq.right(), names, true) + &quot;)&quot;);</span>
+<span class="fc" id="L39">        forms.put(&quot;EQUIVALENT&quot;, statement.substring(eqAt+1).strip() + &quot; = &quot; + statement.substring(0,eqAt).strip());</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!assumptions.isEmpty()) {</span>
+<span class="fc" id="L41">            String restricted = statement + &quot; assuming &quot; + String.join(&quot;, &quot;, assumptions);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (restricted.length() &gt; 1000) throw new IllegalArgumentException(&quot;assumptions exceed query scope&quot;);</span>
+<span class="fc" id="L43">            forms.put(&quot;ASSUMPTIONS&quot;, restricted);</span>
+        }
+<span class="fc" id="L45">        var terms = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L46">        terms.add(&quot;scalar equation&quot;);</span>
+<span class="fc" id="L47">        classify(eq.left(), terms);</span>
+<span class="fc" id="L48">        classify(eq.right(), terms);</span>
+<span class="fc" id="L49">        forms.put(&quot;CLASSIFICATION&quot;, String.join(&quot; &quot;, terms));</span>
+<span class="fc" id="L50">        var normalizer = new PolynomialNormalizer();</span>
+<span class="fc" id="L51">        var normalizedLeft = normalizer.normalize(eq.left());</span>
+<span class="fc" id="L52">        var normalizedRight = normalizer.normalize(eq.right());</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (normalizedLeft.isPresent() &amp;&amp; normalizedRight.isPresent()) {</span>
+<span class="fc" id="L54">            String normal = ExpressionFormatter.format(normalizedLeft.get()) + &quot; = &quot;</span>
+<span class="fc" id="L55">                + ExpressionFormatter.format(normalizedRight.get());</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (normal.length() &lt;= 1000) forms.put(&quot;POLYNOMIAL_NORMAL_FORM&quot;, normal);</span>
+        }
+<span class="fc" id="L58">        return Collections.unmodifiableMap(forms);</span>
+    }
+
+    private static void classify(Expr expression, java.util.Set&lt;String&gt; terms) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L63">            terms.add(binary.operator().name().toLowerCase(java.util.Locale.ROOT));</span>
+<span class="fc" id="L64">            classify(binary.left(), terms);</span>
+<span class="fc" id="L65">            classify(binary.right(), terms);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        } else if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L67">            terms.add(function.name());</span>
+<span class="nc" id="L68">            function.arguments().forEach(argument -&gt; classify(argument, terms));</span>
+        }
+<span class="fc" id="L70">    }</span>
+    private static String render(Expr expression, Map&lt;String,String&gt; names, boolean shape) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return names.computeIfAbsent(v.name(), k -&gt; &quot;v&quot; + names.size());</span>
+<span class="pc bpc" id="L73" title="3 of 4 branches missed.">        if (expression instanceof NumberExpr n) return shape ? &quot;number&quot; : n.value().toString();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr f) {</span>
+<span class="nc" id="L75">            return f.name() + f.arguments().stream().map(a -&gt; render(a,names,shape)).collect(Collectors.joining(&quot;,&quot;, &quot;(&quot;, &quot;)&quot;));</span>
+        }
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr b) {</span>
+<span class="fc" id="L78">            String left = render(b.left(), names, shape);</span>
+<span class="fc" id="L79">            String right = render(b.right(), names, shape);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            return shape ? b.operator().name()+&quot;(&quot;+left+&quot;,&quot;+right+&quot;)&quot; : &quot;(&quot;+left+b.operator().symbol()+right+&quot;)&quot;;</span>
+        }
+<span class="nc" id="L82">        throw new IllegalArgumentException(&quot;unsupported query expression&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

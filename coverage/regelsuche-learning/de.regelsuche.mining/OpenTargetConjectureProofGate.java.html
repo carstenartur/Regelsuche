@@ -134,8 +134,8 @@ public final class OpenTargetConjectureProofGate {
 <span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (!evaluation.holdoutsComplete()) {</span>
 <span class="nc" id="L135">            blockers.add(&quot;holdout evaluation is incomplete&quot;);</span>
         }
-<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (!evaluation.allHoldoutsPassed()) {</span>
-<span class="nc" id="L138">            blockers.add(&quot;one or more holdouts failed&quot;);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (!evaluation.allHoldoutsPassed()) {</span>
+<span class="fc" id="L138">            blockers.add(&quot;one or more holdouts failed&quot;);</span>
         }
 <span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!&quot;NO_COUNTEREXAMPLE_FOUND&quot;.equals(evaluation.counterexample().status())) {</span>
 <span class="nc" id="L141">            blockers.add(&quot;counterexample search did not clear the candidate&quot;);</span>
@@ -310,11 +310,11 @@ public final class OpenTargetConjectureProofGate {
         }
 
         public String backendId() {
-<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            return result() == null ? &quot;&quot; : result().backendId();</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            return result() == null ? &quot;&quot; : result().backendId();</span>
         }
 
         public String backendEvidence() {
-<span class="pc bpc" id="L317" title="1 of 2 branches missed.">            return result() == null ? &quot;&quot; : result().message();</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            return result() == null ? &quot;&quot; : result().message();</span>
         }
 
         public String toCanonicalJson() {
@@ -325,20 +325,20 @@ public final class OpenTargetConjectureProofGate {
 <span class="fc" id="L325">                .property(&quot;proofStatus&quot;, proofStatus.name())</span>
 <span class="fc" id="L326">                .property(&quot;proofObligationEmitted&quot;, proofObligationEmitted())</span>
 <span class="fc" id="L327">                .property(&quot;solverObligationHash&quot;,</span>
-<span class="pc bpc" id="L328" title="1 of 2 branches missed.">                    obligation == null ? &quot;&quot; : obligation.contentHash())</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">                    obligation == null ? &quot;&quot; : obligation.contentHash())</span>
 <span class="fc" id="L329">                .property(&quot;solverTranslationHash&quot;,</span>
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                    translation() == null ? &quot;&quot; : translation().contentHash())</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                    translation() == null ? &quot;&quot; : translation().contentHash())</span>
 <span class="fc" id="L331">                .property(&quot;solverResultHash&quot;,</span>
-<span class="pc bpc" id="L332" title="1 of 2 branches missed.">                    result() == null ? &quot;&quot; : result().contentHash())</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                    result() == null ? &quot;&quot; : result().contentHash())</span>
 <span class="fc" id="L333">                .property(&quot;solverExecutionHash&quot;,</span>
-<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                    execution == null ? &quot;&quot; : execution.contentHash())</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                    execution == null ? &quot;&quot; : execution.contentHash())</span>
 <span class="fc" id="L335">                .property(&quot;backendId&quot;, backendId())</span>
 <span class="fc" id="L336">                .property(&quot;backendVersion&quot;,</span>
-<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                    result() == null ? &quot;&quot; : result().backendVersion())</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                    result() == null ? &quot;&quot; : result().backendVersion())</span>
 <span class="fc" id="L338">                .property(&quot;backendStatus&quot;,</span>
-<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                    result() == null ? &quot;NOT_RUN&quot; : result().status().name())</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">                    result() == null ? &quot;NOT_RUN&quot; : result().status().name())</span>
 <span class="fc" id="L340">                .property(&quot;translationStatus&quot;,</span>
-<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                    translation() == null ? &quot;NOT_EMITTED&quot;</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                    translation() == null ? &quot;NOT_EMITTED&quot;</span>
 <span class="fc" id="L342">                        : translation().status().name())</span>
 <span class="fc" id="L343">                .property(&quot;backendEvidence&quot;, backendEvidence())</span>
 <span class="fc" id="L344">                .property(&quot;formalProofStatus&quot;, formalProofStatus)</span>

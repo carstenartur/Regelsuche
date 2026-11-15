@@ -508,8 +508,8 @@ public final class HistoricalRediscoveryCorpus {
 <span class="fc" id="L508">            .collect(Collectors.toCollection(LinkedHashSet::new));</span>
 <span class="fc" id="L509">        int prefix = 0;</span>
 <span class="fc bfc" id="L510" title="All 2 branches covered.">        for (String expression : witness) {</span>
-<span class="pc bpc" id="L511" title="1 of 2 branches missed.">            if (!explored.contains(expressionKey(expression))) {</span>
-<span class="nc" id="L512">                break;</span>
+<span class="fc bfc" id="L511" title="All 2 branches covered.">            if (!explored.contains(expressionKey(expression))) {</span>
+<span class="fc" id="L512">                break;</span>
             }
 <span class="fc" id="L514">            prefix++;</span>
 <span class="fc" id="L515">        }</span>

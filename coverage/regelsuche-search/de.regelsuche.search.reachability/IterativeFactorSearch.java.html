@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IterativeFactorSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">IterativeFactorSearch.java</span></div><h1>IterativeFactorSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.search.reachability.ReversibleFactorFragment.Arc;
+import de.regelsuche.search.reachability.ReversibleFactorFragment.Counter;
+import de.regelsuche.search.reachability.ReversibleFactorSearch.State;
+import de.regelsuche.search.reachability.ReversibleFactorSearch.Step;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+
+/** Exact-path cycle detection; all depth passes spend the same forward allowance. */
+final class IterativeFactorSearch {
+    private IterativeFactorSearch() { }
+
+    static List&lt;Step&gt; find(ReversibleFactorFragment fragment, State source, State target, int depth, Counter work) {
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (source.equals(target)) return List.of();</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        for (int limit = 1; limit &lt;= depth; limit++) {</span>
+<span class="fc" id="L20">            Pass pass = searchToDepth(fragment, source, target, limit, work);</span>
+<span class="fc bfc" id="L21" title="All 6 branches covered.">            if (pass.path() != null || !pass.touchedLimit() || limit == depth) return pass.path();</span>
+        }
+<span class="nc" id="L23">        return null;</span>
+    }
+
+<span class="fc" id="L26">    private record Frame(State state, Iterator&lt;Arc&gt; arcs) { }</span>
+<span class="fc" id="L27">    private record Pass(List&lt;Step&gt; path, boolean touchedLimit) { }</span>
+
+    private static Pass searchToDepth(ReversibleFactorFragment fragment, State source, State target,
+            int limit, Counter work) {
+<span class="fc" id="L31">        var path = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L32">        var ancestors = new HashSet&lt;State&gt;();</span>
+<span class="fc" id="L33">        var stack = new ArrayDeque&lt;Frame&gt;();</span>
+<span class="fc" id="L34">        ancestors.add(source);</span>
+<span class="fc" id="L35">        stack.push(expand(fragment, source, work));</span>
+<span class="fc" id="L36">        boolean touchedLimit = false;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L38">            Frame frame = stack.peek();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (!frame.arcs().hasNext()) {</span>
+<span class="fc" id="L40">                stack.pop();</span>
+<span class="fc" id="L41">                ancestors.remove(frame.state());</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                if (!path.isEmpty()) path.removeLast();</span>
+                continue;
+            }
+<span class="fc" id="L45">            var primitive = frame.arcs().next().outgoing();</span>
+<span class="fc" id="L46">            var next = new State(primitive.transformedExpression(), source.assumptions());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (ancestors.contains(next)) continue;</span>
+<span class="fc" id="L48">            path.add(new Step(frame.state(), next, primitive));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (next.equals(target)) return new Pass(List.copyOf(path), false);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (path.size() == limit) {</span>
+<span class="fc" id="L51">                touchedLimit = true;</span>
+<span class="fc" id="L52">                path.removeLast();</span>
+            } else {
+<span class="fc" id="L54">                ancestors.add(next);</span>
+<span class="fc" id="L55">                stack.push(expand(fragment, next, work));</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        return new Pass(null, touchedLimit);</span>
+    }
+
+    private static Frame expand(ReversibleFactorFragment fragment, State state, Counter work) {
+<span class="fc" id="L62">        return new Frame(state, fragment.neighbors(state.expression(), work).iterator());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

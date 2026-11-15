@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModPowDispatchStudy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ModPowDispatchStudy.java</span></div><h1>ModPowDispatchStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import static de.regelsuche.benchmark.ModPowTransferFiles.JSON;
+import static de.regelsuche.benchmark.ModPowTransferFiles.hash;
+import static de.regelsuche.benchmark.ModPowTransferFiles.read;
+import static de.regelsuche.benchmark.ModPowTransferFiles.require;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.benchmark.ModPowTransferFiles.Row;
+import de.regelsuche.mining.TypedOutputPattern;
+import de.regelsuche.transform.RecognitionProfile;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.List;
+
+/** Public v4 comparison. The reference oracle is used only for outcome checks and reporting. */
+public final class ModPowDispatchStudy {
+    static final String PROTOCOL = &quot;03284a1911c4c83bf36c9665d0eb133c325ddf66b9ed31e67acba0c9954662a0&quot;;
+    static final String HISTORICAL = &quot;c5d040bd4ba2c088f9e229d8360997fb808c01ef2278c78a30bd1210bcbfc2b6&quot;;
+<span class="fc" id="L23">    private static final List&lt;String&gt; ARMS = List.of(&quot;primitive&quot;, &quot;exhaustive&quot;, &quot;indexed&quot;);</span>
+    private ModPowDispatchStudy() {}
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">        require(args.length == 5 || args.length == 7, &quot;acquire protocol TRAIN model receipt | evaluate protocol model receipt receipt-SHA256 historical-TEST result&quot;);</span>
+<span class="fc" id="L28">        Path protocolPath = Path.of(args[1]);</span>
+<span class="fc" id="L29">        var protocol = JSON.readTree(bound(protocolPath, PROTOCOL));</span>
+<span class="pc bpc" id="L30" title="3 of 4 branches missed.">        if (&quot;acquire&quot;.equals(args[0]) &amp;&amp; args.length == 5) {</span>
+<span class="nc" id="L31">            var work = new ModPowFrozenTransfer.TrainWork();</span>
+<span class="nc" id="L32">            String train = protocol.required(&quot;trainSha256&quot;).asText();</span>
+<span class="nc" id="L33">            var model = ModPowFrozenTransfer.train(Path.of(args[2]), train, work);</span>
+<span class="nc" id="L34">            work.serializations++;</span>
+<span class="nc" id="L35">            byte[] bytes = JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(model);</span>
+<span class="nc" id="L36">            String digest = hash(bytes);</span>
+<span class="nc" id="L37">            require(digest.equals(protocol.required(&quot;modelSha256&quot;).asText()), &quot;model drift&quot;);</span>
+<span class="nc" id="L38">            var receipt = JSON.createObjectNode().put(&quot;protocolSha256&quot;, PROTOCOL)</span>
+<span class="nc" id="L39">                .put(&quot;modelSha256&quot;, digest).put(&quot;trainSha256&quot;, train);</span>
+<span class="nc" id="L40">            receipt.set(&quot;counts&quot;, work.counts());</span>
+<span class="nc" id="L41">            receipt.put(&quot;work&quot;, total(work.counts()));</span>
+<span class="nc" id="L42">            Files.write(Path.of(args[3]), bytes, StandardOpenOption.CREATE_NEW);</span>
+<span class="nc" id="L43">            write(Path.of(args[4]), receipt);</span>
+<span class="nc" id="L44">            return;</span>
+        }
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        require(&quot;evaluate&quot;.equals(args[0]) &amp;&amp; args.length == 7, &quot;wrong mode/arguments&quot;);</span>
+<span class="fc" id="L47">        var artifact = JSON.readTree(bound(Path.of(args[2]), protocol.required(&quot;modelSha256&quot;).asText()));</span>
+<span class="nc" id="L48">        var acquisition = JSON.readTree(bound(Path.of(args[3]), args[4]));</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        require(acquisition.required(&quot;protocolSha256&quot;).asText().equals(PROTOCOL)</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            &amp;&amp; acquisition.required(&quot;trainSha256&quot;).equals(protocol.required(&quot;trainSha256&quot;))</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            &amp;&amp; acquisition.required(&quot;modelSha256&quot;).equals(protocol.required(&quot;modelSha256&quot;)), &quot;foreign receipt&quot;);</span>
+<span class="nc" id="L52">        long training = total(acquisition.required(&quot;counts&quot;));</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        require(training &gt; 0 &amp;&amp; training == acquisition.required(&quot;work&quot;).longValue(), &quot;acquisition total mismatch&quot;);</span>
+        // Decode the persisted model at TEST startup in addition to the validation decode already charged at TRAIN.
+<span class="nc" id="L55">        var matcher = new TypedOutputPattern(ModPowTransferFiles.candidate(artifact), RecognitionProfile.arithmeticAc());</span>
+<span class="nc" id="L56">        var index = matcher.compileIndex();</span>
+<span class="nc" id="L57">        var report = JSON.createObjectNode().put(&quot;schema&quot;, &quot;regelsuche.modpow-dispatch-result/v4&quot;)</span>
+<span class="nc" id="L58">            .put(&quot;protocolSha256&quot;, PROTOCOL).put(&quot;testSha256&quot;, protocol.required(&quot;testSha256&quot;).asText())</span>
+<span class="nc" id="L59">            .put(&quot;historicalTestSha256&quot;, HISTORICAL).put(&quot;receiptSha256&quot;, args[4]).put(&quot;testModelDecodes&quot;, 1)</span>
+<span class="nc" id="L60">            .put(&quot;indexCompilationWork&quot;, index.compilationWork());</span>
+<span class="nc" id="L61">        report.set(&quot;acquisition&quot;, acquisition);</span>
+<span class="nc" id="L62">        var panel = ModPowTransferFiles.rows(bound(protocolPath.resolveSibling(&quot;test.json&quot;),</span>
+<span class="nc" id="L63">            protocol.required(&quot;testSha256&quot;).asText()), &quot;TEST&quot;);</span>
+<span class="nc" id="L64">        var historical = ModPowTransferFiles.rows(bound(Path.of(args[5]), HISTORICAL), &quot;TEST&quot;);</span>
+<span class="nc" id="L65">        var budgets = protocol.required(&quot;budgetPoints&quot;);</span>
+<span class="nc" id="L66">        report.set(&quot;prospective&quot;, panel(panel, budgets, matcher, index, training + 1));</span>
+<span class="nc" id="L67">        report.set(&quot;retrospective&quot;, panel(historical, budgets, matcher, index, training + 1));</span>
+<span class="nc" id="L68">        write(Path.of(args[6]), report);</span>
+<span class="nc" id="L69">    }</span>
+
+    private static ObjectNode panel(List&lt;Row&gt; rows, JsonNode budgets, TypedOutputPattern matcher,
+            TypedOutputPattern.Indexed index, long acquisition) {
+<span class="nc" id="L73">        var out = JSON.createObjectNode();</span>
+<span class="nc" id="L74">        var cases = out.putArray(&quot;cases&quot;);</span>
+<span class="nc" id="L75">        long[] setup = {0, acquisition, acquisition + index.compilationWork()};</span>
+<span class="nc" id="L76">        long[] prefix = setup.clone();</span>
+<span class="nc" id="L77">        int[][] reach = new int[ARMS.size()][budgets.size()];</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        for (var row : rows) {</span>
+<span class="nc" id="L79">            runRow(row, cases.addObject(), budgets, matcher, index, setup, prefix, reach);</span>
+<span class="nc" id="L80">        }</span>
+<span class="nc" id="L81">        var summary = out.putObject(&quot;summary&quot;);</span>
+<span class="nc" id="L82">        summary.set(&quot;budgets&quot;, budgets);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        for (int arm = 0; arm &lt; ARMS.size(); arm++) {</span>
+<span class="nc" id="L84">            String name = ARMS.get(arm);</span>
+<span class="nc" id="L85">            var node = summary.putObject(name).put(&quot;setup&quot;, setup[arm]).put(&quot;streamWork&quot;, prefix[arm]);</span>
+<span class="nc" id="L86">            node.set(&quot;positiveStreamReach&quot;, JSON.valueToTree(reach[arm]));</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (arm &gt; 0) {</span>
+<span class="nc" id="L88">                node.set(&quot;warmDag&quot;, pairedOutcomes(cases, name, &quot;warmDag&quot;));</span>
+<span class="nc" id="L89">                node.set(&quot;coldDag&quot;, pairedOutcomes(cases, name, &quot;coldDag&quot;));</span>
+            }
+        }
+<span class="nc" id="L92">        return out;</span>
+    }
+
+    private static void runRow(Row row, ObjectNode result, JsonNode budgets,
+            TypedOutputPattern matcher, TypedOutputPattern.Indexed index, long[] setup, long[] prefix, int[][] reach) {
+<span class="nc" id="L97">        var targets = ModPowSearchTrace.referenceTargets(row);</span>
+<span class="nc" id="L98">        long optimum = ModPowSearchTrace.referenceDag(row, targets);</span>
+<span class="nc" id="L99">        long original = ModPowFrozenTransfer.cost(row, row.source()).dag();</span>
+<span class="nc" id="L100">        result.put(&quot;id&quot;, row.id()).put(&quot;positive&quot;, row.positive()).put(&quot;sourceDag&quot;, original)</span>
+<span class="nc" id="L101">            .put(&quot;optimumDag&quot;, optimum).put(&quot;uniquePrimitiveTargets&quot;, targets.size());</span>
+<span class="nc" id="L102">        var exhaustive = matcher.findWithMatchWork(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);</span>
+<span class="nc" id="L103">        var indexed = index.find(row.source(), TypedOutputPattern.MAXIMUM_ASSIGNMENTS);</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        require(exhaustive.result().complete() &amp;&amp; indexed.matching().result().complete()</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            &amp;&amp; exhaustive.result().applications().equals(indexed.matching().result().applications()),</span>
+<span class="nc" id="L106">            &quot;ordered applications differ on &quot; + row.id());</span>
+<span class="nc" id="L107">        result.put(&quot;learnedApplications&quot;, exhaustive.result().applications().size());</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        for (var proposal : exhaustive.result().applications()) {</span>
+<span class="nc" id="L109">            require(targets.contains(proposal.target()), &quot;learned target outside reference grammar&quot;);</span>
+<span class="nc" id="L110">        }</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        for (int arm = 0; arm &lt; ARMS.size(); arm++) {</span>
+<span class="nc" id="L112">            var trace = new ModPowSearchTrace(row);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (arm == 1) trace.runLearned(exhaustive, 0);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (arm == 2) trace.runLearned(indexed.matching(), indexed.dispatch().total());</span>
+<span class="nc" id="L115">            trace.runPrimitive();</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">            require(targets.equals(trace.primitiveTargets()) &amp;&amp; trace.best() == optimum, &quot;reference mismatch: &quot; + row.id());</span>
+<span class="nc" id="L117">            var node = result.putObject(ARMS.get(arm));</span>
+<span class="nc" id="L118">            node.set(&quot;ledger&quot;, JSON.valueToTree(trace.work()));</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            if (arm == 2) node.set(&quot;dispatch&quot;, JSON.valueToTree(indexed.dispatch()));</span>
+<span class="nc" id="L120">            recordCheckpoints(node, trace, budgets, original, optimum, setup[arm], prefix[arm],</span>
+<span class="nc" id="L121">                row.positive(), reach[arm]);</span>
+<span class="nc" id="L122">            prefix[arm] += trace.completedWork();</span>
+        }
+<span class="nc" id="L124">    }</span>
+
+    private static void recordCheckpoints(ObjectNode node, ModPowSearchTrace trace, JsonNode budgets,
+            long original, long optimum, long setup, long prefix, boolean positive, int[] reach) {
+<span class="nc" id="L128">        node.put(&quot;duplicates&quot;, trace.work().generated() - trace.work().replayed());</span>
+<span class="nc" id="L129">        node.set(&quot;improvements&quot;, JSON.valueToTree(trace.improvements()));</span>
+<span class="nc" id="L130">        long hit = trace.firstOptimum(original, optimum);</span>
+<span class="nc" id="L131">        node.put(&quot;firstOptimum&quot;, hit).put(&quot;streamFirstOptimum&quot;, prefix + hit)</span>
+<span class="nc" id="L132">            .put(&quot;completedWork&quot;, trace.completedWork());</span>
+<span class="nc" id="L133">        var checkpoints = node.putArray(&quot;checkpoints&quot;);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (int i = 0; i &lt; budgets.size(); i++) {</span>
+<span class="nc" id="L135">            long budget = budgets.get(i).longValue();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            boolean reached = budget &gt;= prefix + hit;</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">            if (positive &amp;&amp; reached) reach[i]++;</span>
+<span class="nc" id="L138">            checkpoints.addObject().put(&quot;budget&quot;, budget).put(&quot;warmDag&quot;, at(trace, original, budget))</span>
+<span class="nc" id="L139">                .put(&quot;coldDag&quot;, at(trace, original, budget - setup)).put(&quot;streamOptimum&quot;, reached);</span>
+        }
+<span class="nc" id="L141">    }</span>
+
+    private static ObjectNode pairedOutcomes(ArrayNode cases, String arm, String view) {
+<span class="nc" id="L144">        int wins = 0, ties = 0, losses = 0;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        for (var row : cases) {</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            if (!row.required(&quot;positive&quot;).booleanValue()) continue;</span>
+<span class="nc" id="L147">            var primitive = row.required(&quot;primitive&quot;).required(&quot;checkpoints&quot;);</span>
+<span class="nc" id="L148">            var learned = row.required(arm).required(&quot;checkpoints&quot;);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            for (int i = 0; i &lt; primitive.size(); i++) {</span>
+<span class="nc" id="L150">                long baseline = primitive.get(i).required(view).longValue();</span>
+<span class="nc" id="L151">                long candidate = learned.get(i).required(view).longValue();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (candidate &lt; baseline) wins++;</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                else if (candidate &gt; baseline) losses++;</span>
+<span class="nc" id="L154">                else ties++;</span>
+            }
+<span class="nc" id="L156">        }</span>
+<span class="nc" id="L157">        return JSON.createObjectNode().put(&quot;wins&quot;, wins).put(&quot;ties&quot;, ties).put(&quot;losses&quot;, losses);</span>
+    }
+
+    private static long at(ModPowSearchTrace trace, long original, long budget) {
+<span class="nc" id="L161">        long value = original;</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        for (var improvement : trace.improvements()) {</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (improvement.work() &gt; budget) break;</span>
+<span class="nc" id="L164">            value = improvement.dag();</span>
+<span class="nc" id="L165">        }</span>
+<span class="nc" id="L166">        return value;</span>
+    }
+
+    private static long total(JsonNode counts) {
+<span class="nc" id="L170">        long work = 0;</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        for (var count : counts) {</span>
+<span class="nc bnc" id="L172" title="All 6 branches missed.">            require(count.isIntegralNumber() &amp;&amp; count.canConvertToLong() &amp;&amp; count.longValue() &gt;= 0, &quot;invalid receipt count&quot;);</span>
+<span class="nc" id="L173">            work = Math.addExact(work, count.longValue());</span>
+<span class="nc" id="L174">        }</span>
+<span class="nc" id="L175">        return work;</span>
+    }
+
+    private static byte[] bound(Path path, String digest) throws Exception {
+<span class="fc" id="L179">        byte[] bytes = read(path);</span>
+<span class="fc" id="L180">        require(hash(bytes).equals(digest), &quot;digest mismatch for &quot; + path);</span>
+<span class="fc" id="L181">        return bytes;</span>
+    }
+
+    private static void write(Path path, JsonNode root) throws Exception {
+<span class="nc" id="L185">        Files.write(path, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(root), StandardOpenOption.CREATE_NEW);</span>
+<span class="nc" id="L186">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

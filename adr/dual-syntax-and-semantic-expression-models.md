@@ -120,17 +120,23 @@ The legacy `ValueKey` encodings continue to identify existing persisted values.
 
 ### Occurrences
 
-A concrete occurrence has independent identity and references one value,
-conceptually:
+`arena.project(root, maximumSyntaxNodes)` keeps the identity map produced while
+interning the root. Its limit counts physical syntax objects, including
+separately allocated equal objects. A shared input with two edges to the same
+child at each of 4,000 levels uses 4,001 syntax slots. The projection can look
+up a node already visited by a caller with `valueOf(syntax)`, or resolve a
+single occurrence by following a child-index path in the original tree.
 
 ```java
-record ExprOccurrence(
-    OccurrenceId id,
-    TreePosition position,
-    Expr syntax,
-    ExprValue value
-) {}
+var occurrence = projection.at(position).orElseThrow();
+var changed = occurrence.position().replaceAt(occurrence.source(), replacement);
 ```
+
+`occurrence.syntax()` returns the original object, so parser-issued source
+ranges remain available from the originating `ExactParsedTerm`. Occurrences
+compare by source object, owner-local value and child-index path. Closing the
+arena releases the projection index and prevents further lookups. A caller can
+keep an already selected immutable occurrence for its own lifetime.
 
 A value has no single mutable parent or path. Parent relationships, source metadata,
 provenance and local replacement belong to occurrences or edges.

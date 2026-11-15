@@ -51,7 +51,7 @@ import java.util.TreeSet;
 
 <span class="fc" id="L52">        AblationStatus status = overallStatus(transfer, blockers, results);</span>
 <span class="fc" id="L53">        List&lt;String&gt; orderedBlockers = blockers.stream()</span>
-<span class="pc bnc" id="L54" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
 <span class="fc" id="L55">            .distinct()</span>
 <span class="fc" id="L56">            .sorted()</span>
 <span class="fc" id="L57">            .toList();</span>
@@ -87,8 +87,8 @@ import java.util.TreeSet;
 <span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!hypothesis.trainingFamilies().equals(transfer.trainingFamilies())) {</span>
 <span class="nc" id="L88">            blockers.add(&quot;training-family provenance mismatch&quot;);</span>
         }
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!transfer.accepted()) {</span>
-<span class="nc" id="L91">            blockers.add(&quot;cross-family transfer is not accepted&quot;);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (!transfer.accepted()) {</span>
+<span class="fc" id="L91">            blockers.add(&quot;cross-family transfer is not accepted&quot;);</span>
         }
 <span class="fc" id="L93">        return List.copyOf(blockers);</span>
     }
@@ -196,8 +196,8 @@ import java.util.TreeSet;
         List&lt;String&gt; blockers,
         List&lt;FamilyAblationResult&gt; results
     ) {
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (!transfer.accepted()) {</span>
-<span class="nc" id="L200">            return AblationStatus.NOT_ELIGIBLE_TRANSFER;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (!transfer.accepted()) {</span>
+<span class="fc" id="L200">            return AblationStatus.NOT_ELIGIBLE_TRANSFER;</span>
         }
 <span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (!blockers.isEmpty()</span>
 <span class="pc bpc" id="L203" title="1 of 2 branches missed.">                || results.stream().anyMatch(result -&gt;</span>

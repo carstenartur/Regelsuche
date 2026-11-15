@@ -27,8 +27,7 @@ environment and does not require GitHub Actions.
    directories;
 3. compares both complete output trees byte-for-byte;
 4. compares the reproduced tree with committed `paper/generated`;
-5. requires exactly `foundation-verification.json` and
-   `foundation-summary.md`;
+5. requires the two foundation summaries, the public corpus split table, the controller tables, the candidate-slot allocation figure and the public recurrence formation and reuse tables;
 6. verifies that the receipt binds the manifest content hash and all required
    evidence issue IDs;
 7. requires `status=FOUNDATION`, pending central claims and
@@ -44,6 +43,8 @@ The underlying verifier additionally:
 - rejects symbolic manifest, schema, source and output paths;
 - restricts every listed source to the `paper/` tree;
 - checks every retained source SHA-256;
+- checks each public case identity and the freeze receipt before counting split assignments and formation access;
+- binds the decompressed public controller matrix to its integrated revision and digest, then derives per-policy tables and a shared-scale SVG;
 - recomputes the canonical manifest `contentHash`;
 - requires the limitations and foundation-only manuscript language.
 
@@ -69,3 +70,45 @@ performed only local verification. Central CI invokes the same Gradle contract
 and retains repository reports. Future journal, archive or DOI publication may
 use a separate write-capable workflow, but executable expectations must remain
 in Gradle and checked-in verifiers.
+
+## Manuscript PDF and source package
+
+From a clean Git checkout, provision the interpreter, renderer and command-line
+versions in `paper/archive-toolchain.json` (including Python packages
+`jsonschema==4.25.1`, `reportlab==4.4.9` and `Pillow==13.0.0`). The complete
+source checkout and its Git metadata are needed when assembling a new package.
+The build runs offline once these tools are installed.
+
+```bash
+revision=$(git rev-parse HEAD)
+python3 -B scripts/build-paper-archive.py --revision "$revision" --output ../paper-first.zip
+python3 -B scripts/build-paper-archive.py --revision "$revision" --output ../paper-second.zip
+cmp ../paper-first.zip ../paper-second.zip
+```
+
+The archive contains the manuscript PDF with generated tables, allocation figure,
+limitations, claims and artifact appendix. It includes the full committed source
+and raw evidence in `provenance/source.tar.gz`, the original Git commit bytes,
+the paper manifest, all six generated outputs, the license and citation files,
+the renderer environment and a SHA-256 inventory. The top-level
+`manifest.json` records the source commit and tree. The archive keeps the
+working manuscript's `FOUNDATION` status and pending author declarations.
+
+For an offline replay from the package, compare its expected revision with a
+separately retained commit SHA. Extract the source from the package into a fresh
+directory, inspect the build driver and execute it in the pinned environment:
+
+```bash
+unzip -p paper-first.zip provenance/source.tar.gz > source.tar.gz
+mkdir paper-checkout
+tar -xzf source.tar.gz -C paper-checkout
+python3 -B paper-checkout/scripts/build-paper-archive.py --revision "$revision" \
+  --replay paper-first.zip --output paper-replayed.zip
+cmp paper-first.zip paper-replayed.zip
+```
+
+The replay verifies the commit and its complete Git tree, including executable
+modes, before running the foundation verifier on the extracted inputs. It checks
+every packaged file digest and reproduces the PDF and complete archive bytes.
+Run `python3 -B scripts/test-paper-archive.py` for the independent source and
+inventory mutation controls.

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OpenMacroPathInventory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">OpenMacroPathInventory.java</span></div><h1>OpenMacroPathInventory.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+final class OpenMacroPathInventory {
+    record Start(String source, List&lt;String&gt; assumptions) {
+<span class="fc" id="L21">        Start {</span>
+<span class="fc" id="L22">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L23">        }</span>
+    }
+
+<span class="fc" id="L26">    record PathChoice(</span>
+            List&lt;String&gt; rules,
+            List&lt;String&gt; endpoints,
+            List&lt;String&gt; operations,
+            int endpointScore,
+            String key) {}
+
+<span class="fc" id="L33">    record Inventory(Start start, int expanded, int generated, List&lt;PathChoice&gt; choices) {}</span>
+
+<span class="fc" id="L35">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+    private final AstRewriteTransformationEngine engine;
+<span class="fc" id="L37">    private final Map&lt;String, String&gt; operation = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L38">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+
+<span class="fc" id="L40">    OpenMacroPathInventory(Map&lt;String, List&lt;String&gt;&gt; mapping) {</span>
+<span class="fc" id="L41">        new TreeMap&lt;&gt;(mapping)</span>
+<span class="fc" id="L42">                .forEach((op, rules) -&gt; rules.forEach(rule -&gt; operation.putIfAbsent(rule, op)));</span>
+        List&lt;RewriteRule&gt; rules =
+<span class="fc" id="L44">                AstRewriteTransformationEngine.defaultRules().stream()</span>
+<span class="fc" id="L45">                        .filter(rule -&gt; operation.containsKey(rule.id()))</span>
+<span class="fc" id="L46">                        .sorted(Comparator.comparing(RewriteRule::id))</span>
+<span class="fc" id="L47">                        .toList();</span>
+<span class="fc" id="L48">        engine = new AstRewriteTransformationEngine(rules, 16, 120);</span>
+<span class="fc" id="L49">    }</span>
+
+    Inventory generate(Start start) throws Exception {
+<span class="fc" id="L52">        String root = ExpressionFormatter.format(new ExpressionParser().parseTerm(start.source()));</span>
+<span class="fc" id="L53">        List&lt;Transformation&gt; first = engine.transform(root);</span>
+<span class="fc" id="L54">        int expanded = 1, generated = first.size();</span>
+<span class="fc" id="L55">        var choices = new TreeMap&lt;String, PathChoice&gt;();</span>
+        for (Transformation a :
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                legal(first, start.assumptions(), List.of(root)).stream().limit(12).toList()) {</span>
+<span class="fc" id="L58">            String mid = a.transformedExpression();</span>
+<span class="fc" id="L59">            var successors = engine.transform(mid);</span>
+<span class="fc" id="L60">            expanded++;</span>
+<span class="fc" id="L61">            generated += successors.size();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (Transformation b : legal(successors, start.assumptions(), List.of(root, mid))) {</span>
+<span class="fc" id="L63">                var ops = List.of(operation.get(a.rule()), operation.get(b.rule()));</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                if (ops.getFirst().equals(ops.getLast())) continue;</span>
+<span class="fc" id="L65">                var rules = List.of(a.rule(), b.rule());</span>
+<span class="fc" id="L66">                var ends = List.of(mid, b.transformedExpression());</span>
+<span class="fc" id="L67">                String key = JSON.writeValueAsString(List.of(rules, ends));</span>
+<span class="fc" id="L68">                choices.putIfAbsent(</span>
+                        key,
+                        new PathChoice(
+                                rules,
+                                ends,
+                                ops,
+<span class="fc" id="L74">                                scorer.score(ends.getLast()).weightedTotal(),</span>
+                                key));
+<span class="fc" id="L76">            }</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        return new Inventory(start, expanded, generated, List.copyOf(choices.values()));</span>
+    }
+
+    private static List&lt;Transformation&gt; legal(
+            List&lt;Transformation&gt; all, List&lt;String&gt; assumptions, List&lt;String&gt; visited) {
+<span class="fc" id="L83">        var declared = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L84">        var unique = new LinkedHashMap&lt;List&lt;String&gt;, Transformation&gt;();</span>
+<span class="fc" id="L85">        all.stream()</span>
+<span class="fc" id="L86">                .filter(Transformation::equivalencePreservingByConstruction)</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                .filter(t -&gt; !visited.contains(t.transformedExpression()))</span>
+<span class="fc" id="L88">                .filter(</span>
+                        t -&gt;
+<span class="fc" id="L90">                                declared.containsAll(</span>
+<span class="fc" id="L91">                                        AssumptionSignature.ofExpressions(t.assumptions())</span>
+<span class="fc" id="L92">                                                .normalizedAssumptions()))</span>
+<span class="fc" id="L93">                .sorted(</span>
+<span class="fc" id="L94">                        Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L95">                                .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L96">                                .thenComparing(Transformation::applicationKey))</span>
+<span class="fc" id="L97">                .forEach(t -&gt; unique.putIfAbsent(List.of(t.rule(), t.transformedExpression()), t));</span>
+<span class="fc" id="L98">        return List.copyOf(unique.values());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

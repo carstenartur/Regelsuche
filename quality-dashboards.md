@@ -75,6 +75,19 @@ public/dev/bench/badge.json
 public/dev/bench/index.html
 ```
 
+To replay the publication decision on retained raw JMH JSON with JDK 25 and Maven, run:
+
+```bash
+mvn -pl regelsuche-quality -Dregelsuche.jmh.publicationResult=/absolute/path/to/result.json verify
+```
+
+Maven writes `badge.json` and `index.html` under
+`regelsuche-quality/target/reports/quality/jmh-publication/`. The Gradle
+producer calls the same Java verifier on the live measurements. Both require
+the six-warmup policy, exact benchmark inventory and units, and a finite score
+and uncertainty. The publication fails when the lower confidence bound exceeds
+the versioned baseline score times its material-regression ratio.
+
 The performance page is a deterministic static report. The checkout also owns
 the content-bound v3 regression decision and the Java renderer for two retained
 JMH history snapshots and 29 SVG charts; see

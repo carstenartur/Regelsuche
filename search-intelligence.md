@@ -229,6 +229,10 @@ The atlas output is written under
 The witness-prefix and matched-budget artifacts use their separate sibling
 report directories described above.
 
+The [historical representation calibration](research/historical-intrinsic-calibration/result.md)
+publishes all retained scalar and diversity occurrences from the 14 public cases,
+their source-equivalence judgments and their post-search representation matches.
+
 The ordinary checkout-owned merge gate remains:
 
 ```bash

@@ -32,163 +32,169 @@ final class ProofSupport {
 
 <span class="fc" id="L33">    record Frame(Object node, boolean exit, int depth) {}</span>
 
-<span class="fc" id="L35">    ProofSupport(ProofLimits limits) {</span>
-<span class="fc" id="L36">        this.limits = nonNull(limits);</span>
-<span class="fc" id="L37">    }</span>
+    private final boolean literalVariablePatterns;
+
+<span class="fc" id="L37">    ProofSupport(ProofLimits limits) { this(limits, false); }</span>
+
+<span class="fc" id="L39">    ProofSupport(ProofLimits limits, boolean literalVariablePatterns) {</span>
+<span class="fc" id="L40">        this.limits = nonNull(limits);</span>
+<span class="fc" id="L41">        this.literalVariablePatterns = literalVariablePatterns;</span>
+<span class="fc" id="L42">    }</span>
 
     static &lt;T&gt; T nonNull(T value) {
-<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (value == null) throw new IllegalArgumentException(&quot;null proof input&quot;);</span>
-<span class="fc" id="L41">        return value;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (value == null) throw new IllegalArgumentException(&quot;null proof input&quot;);</span>
+<span class="fc" id="L46">        return value;</span>
     }
 
     void work(long n) {
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (n &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
-<span class="pc bfc" id="L46" title="All 4 branches covered.">        if (exhausted || n &gt; limits.maxWork() - work) fail(&quot;work limit&quot;);</span>
-<span class="fc" id="L47">        work += n;</span>
-<span class="fc" id="L48">    }</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (n &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="pc bfc" id="L51" title="All 4 branches covered.">        if (exhausted || n &gt; limits.maxWork() - work) fail(&quot;work limit&quot;);</span>
+<span class="fc" id="L52">        work += n;</span>
+<span class="fc" id="L53">    }</span>
 
     void fail(String reason) {
-<span class="fc" id="L51">        exhausted = true;</span>
-<span class="fc" id="L52">        throw new ExtractionProofBuilder.LimitExceeded(reason);</span>
+<span class="fc" id="L56">        exhausted = true;</span>
+<span class="fc" id="L57">        throw new ExtractionProofBuilder.LimitExceeded(reason);</span>
     }
 
     void refs(long n) {
-<span class="fc" id="L56">        work(n);</span>
-<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (n &gt; limits.maxReferences() - references) fail(&quot;reference limit&quot;);</span>
-<span class="fc" id="L58">        references += n;</span>
-<span class="fc" id="L59">    }</span>
+<span class="fc" id="L61">        work(n);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (n &gt; limits.maxReferences() - references) fail(&quot;reference limit&quot;);</span>
+<span class="fc" id="L63">        references += n;</span>
+<span class="fc" id="L64">    }</span>
 
     void chars(String s) {
-<span class="fc" id="L62">        nonNull(s);</span>
-<span class="fc" id="L63">        work(s.length());</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (s.length() &gt; limits.maxCharacters() - characters) fail(&quot;character limit&quot;);</span>
-<span class="fc" id="L65">        characters += s.length();</span>
-<span class="fc" id="L66">    }</span>
+<span class="fc" id="L67">        nonNull(s);</span>
+<span class="fc" id="L68">        work(s.length());</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (s.length() &gt; limits.maxCharacters() - characters) fail(&quot;character limit&quot;);</span>
+<span class="fc" id="L70">        characters += s.length();</span>
+<span class="fc" id="L71">    }</span>
 
     void size(long n, long max, String label) {
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (n &gt; max) fail(label);</span>
-<span class="fc" id="L70">    }</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (n &gt; max) fail(label);</span>
+<span class="fc" id="L75">    }</span>
 
     String rational(ExactRational r) {
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (r.numerator().getClass() != BigInteger.class</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                || r.denominator().getClass() != BigInteger.class)</span>
-<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;opaque rational scalar&quot;);</span>
-<span class="fc" id="L76">        work(1);</span>
-<span class="fc" id="L77">        size(r.numerator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
-<span class="fc" id="L78">        size(r.denominator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (r.numerator().getClass() != BigInteger.class</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                || r.denominator().getClass() != BigInteger.class)</span>
+<span class="fc" id="L80">            throw new IllegalArgumentException(&quot;opaque rational scalar&quot;);</span>
+<span class="fc" id="L81">        work(1);</span>
+<span class="fc" id="L82">        size(r.numerator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L83">        size(r.denominator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
         // A decimal rendering of b binary bits requires at most b/3+2 characters.
-<span class="fc" id="L80">        long estimate = (long) r.numerator().bitLength() / 3 + r.denominator().bitLength() / 3 + 5;</span>
-<span class="fc" id="L81">        size(estimate, 4096, &quot;rational text envelope&quot;);</span>
-<span class="fc" id="L82">        size(estimate, limits.maxCharacters(), &quot;rational text limit&quot;);</span>
-<span class="fc" id="L83">        work(estimate);</span>
-<span class="fc" id="L84">        String text = r.toString();</span>
-<span class="fc" id="L85">        size(text.length(), 4096, &quot;rational text envelope&quot;);</span>
-<span class="fc" id="L86">        return text;</span>
+<span class="fc" id="L85">        long estimate = (long) r.numerator().bitLength() / 3 + r.denominator().bitLength() / 3 + 5;</span>
+<span class="fc" id="L86">        size(estimate, 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L87">        size(estimate, limits.maxCharacters(), &quot;rational text limit&quot;);</span>
+<span class="fc" id="L88">        work(estimate);</span>
+<span class="fc" id="L89">        String text = r.toString();</span>
+<span class="fc" id="L90">        size(text.length(), 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L91">        return text;</span>
     }
 
     ExactRational number(String text) {
-<span class="fc" id="L90">        size(text.length(), 4096, &quot;rational text envelope&quot;);</span>
-<span class="fc" id="L91">        work(text.length());</span>
-<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (!text.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;))</span>
-<span class="nc" id="L93">            throw new IllegalArgumentException(&quot;noncanonical rational grammar&quot;);</span>
-<span class="fc" id="L94">        int slash = text.indexOf('/');</span>
-<span class="fc bfc" id="L95" title="All 4 branches covered.">        int numeratorDigits = (slash &lt; 0 ? text.length() : slash) - (text.startsWith(&quot;-&quot;) ? 1 : 0);</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        int denominatorDigits = slash &lt; 0 ? 1 : text.length() - slash - 1;</span>
+<span class="fc" id="L95">        size(text.length(), 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L96">        work(text.length());</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (!text.matches(&quot;-?(0|[1-9][0-9]*)(/[1-9][0-9]*)?&quot;))</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;noncanonical rational grammar&quot;);</span>
+<span class="fc" id="L99">        int slash = text.indexOf('/');</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">        int numeratorDigits = (slash &lt; 0 ? text.length() : slash) - (text.startsWith(&quot;-&quot;) ? 1 : 0);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        int denominatorDigits = slash &lt; 0 ? 1 : text.length() - slash - 1;</span>
         // 30103/100000 strictly exceeds log10(2). Bound digit allocation before parsing.
-<span class="fc" id="L98">        long maxDigits = ((long) limits.maxRationalBits() * 30103) / 100000 + 1;</span>
-<span class="fc" id="L99">        size(numeratorDigits, maxDigits, &quot;rational bits&quot;);</span>
-<span class="fc" id="L100">        size(denominatorDigits, maxDigits, &quot;rational bits&quot;);</span>
-<span class="fc" id="L101">        var value = ExactRational.fromCanonicalText(text);</span>
-<span class="fc" id="L102">        size(value.numerator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
-<span class="fc" id="L103">        size(value.denominator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
-<span class="fc" id="L104">        return value;</span>
+<span class="fc" id="L103">        long maxDigits = ((long) limits.maxRationalBits() * 30103) / 100000 + 1;</span>
+<span class="fc" id="L104">        size(numeratorDigits, maxDigits, &quot;rational bits&quot;);</span>
+<span class="fc" id="L105">        size(denominatorDigits, maxDigits, &quot;rational bits&quot;);</span>
+<span class="fc" id="L106">        var value = ExactRational.fromCanonicalText(text);</span>
+<span class="fc" id="L107">        size(value.numerator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L108">        size(value.denominator().bitLength(), limits.maxRationalBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L109">        return value;</span>
     }
 
     void registry(Collection&lt;? extends RewriteRule&gt; supplied) {
-<span class="fc" id="L108">        size(supplied.size(), limits.maxTerms(), &quot;rules limit&quot;);</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (RewriteRule rule : supplied) {</span>
-<span class="fc" id="L110">            work(1);</span>
-<span class="pc bpc" id="L111" title="1 of 4 branches missed.">            if (rule == null || rule.getClass() != PatternRewriteRule.class)</span>
-<span class="fc" id="L112">                throw new ExtractionProofBuilder.UnsupportedRule(</span>
+<span class="fc" id="L113">        size(supplied.size(), limits.maxTerms(), &quot;rules limit&quot;);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (RewriteRule rule : supplied) {</span>
+<span class="fc" id="L115">            work(1);</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">            if (rule == null || rule.getClass() != PatternRewriteRule.class)</span>
+<span class="fc" id="L117">                throw new ExtractionProofBuilder.UnsupportedRule(</span>
                         &quot;only base pattern rules supported&quot;);
-<span class="fc" id="L114">            PatternRewriteRule p = (PatternRewriteRule) rule;</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (!p.recognitionProfile().equals(RecognitionProfile.exact())</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                    || !p.isEquivalencePreservingByConstruction())</span>
-<span class="fc" id="L117">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;rule is not exact preserving&quot;);</span>
-<span class="fc" id="L118">            chars(p.id());</span>
-<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (ruleIds.containsKey(p.id()))</span>
-<span class="fc" id="L120">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;duplicate rule ID&quot;);</span>
-<span class="fc" id="L121">            int source = pattern(p.source()), target = pattern(p.target());</span>
-<span class="fc" id="L122">            Set&lt;String&gt; names = placeholders(source);</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (!names.containsAll(placeholders(target)))</span>
-<span class="fc" id="L124">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;unbound target placeholder&quot;);</span>
-<span class="fc" id="L125">            ruleIds.put(p.id(), rules.size());</span>
-<span class="fc" id="L126">            rules.add(new RuleData(source, target, Set.copyOf(names)));</span>
-<span class="fc" id="L127">            identities.add(new RuleIdentity(p.id(), p.source(), p.target()));</span>
-<span class="fc" id="L128">        }</span>
-<span class="fc" id="L129">    }</span>
+<span class="fc" id="L119">            PatternRewriteRule p = (PatternRewriteRule) rule;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (!p.recognitionProfile().equals(RecognitionProfile.exact())</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                    || !p.isEquivalencePreservingByConstruction())</span>
+<span class="fc" id="L122">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;rule is not exact preserving&quot;);</span>
+<span class="fc" id="L123">            chars(p.id());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (ruleIds.containsKey(p.id()))</span>
+<span class="fc" id="L125">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;duplicate rule ID&quot;);</span>
+<span class="fc" id="L126">            int source = pattern(p.source()), target = pattern(p.target());</span>
+<span class="fc" id="L127">            Set&lt;String&gt; names = placeholders(source);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!names.containsAll(placeholders(target)))</span>
+<span class="fc" id="L129">                throw new ExtractionProofBuilder.UnsupportedRule(&quot;unbound target placeholder&quot;);</span>
+<span class="fc" id="L130">            ruleIds.put(p.id(), rules.size());</span>
+<span class="fc" id="L131">            rules.add(new RuleData(source, target, Set.copyOf(names)));</span>
+<span class="fc" id="L132">            identities.add(new RuleIdentity(p.id(), p.source(), p.target()));</span>
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">    }</span>
 
     Set&lt;String&gt; placeholders(int root) {
-<span class="fc" id="L132">        Set&lt;String&gt; result = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L133">        Set&lt;Integer&gt; seen = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L134">        var pending = new ArrayDeque&lt;Integer&gt;();</span>
-<span class="fc" id="L135">        pending.push(root);</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L137">            work(1);</span>
-<span class="fc" id="L138">            int i = pending.pop();</span>
-<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (!seen.add(i)) continue;</span>
-<span class="fc" id="L140">            var p = patterns.get(i);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (p.tag.equals(&quot;P&quot;)) result.add(p.label);</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int c : p.children) {</span>
-<span class="fc" id="L143">                work(1);</span>
-<span class="fc" id="L144">                pending.push(c);</span>
-<span class="fc" id="L145">            }</span>
-<span class="fc" id="L146">        }</span>
-<span class="fc" id="L147">        return result;</span>
+<span class="fc" id="L137">        Set&lt;String&gt; result = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L138">        Set&lt;Integer&gt; seen = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L139">        var pending = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L140">        pending.push(root);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L142">            work(1);</span>
+<span class="fc" id="L143">            int i = pending.pop();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (!seen.add(i)) continue;</span>
+<span class="fc" id="L145">            var p = patterns.get(i);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (p.tag.equals(&quot;P&quot;)) result.add(p.label);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            for (int c : p.children) {</span>
+<span class="fc" id="L148">                work(1);</span>
+<span class="fc" id="L149">                pending.push(c);</span>
+<span class="fc" id="L150">            }</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        return result;</span>
     }
 
     Parts parts(Object o) {
-<span class="fc bfc" id="L151" title="All 9 branches covered.">        return switch (o) {</span>
-<span class="fc" id="L152">            case NumberExpr n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
-<span class="fc" id="L153">            case VariableExpr v -&gt; new Parts(&quot;VARIABLE&quot;, v.name(), List.of());</span>
-<span class="fc" id="L154">            case BinaryExpr b -&gt;</span>
-<span class="fc" id="L155">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
-<span class="fc" id="L156">            case FunctionExpr f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
-<span class="fc" id="L157">            case PatternExpr.Placeholder p -&gt; new Parts(&quot;P&quot;, p.name(), List.of());</span>
-<span class="fc" id="L158">            case PatternExpr.LiteralNumber n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
-<span class="fc" id="L159">            case PatternExpr.Operation b -&gt;</span>
+<span class="fc bfc" id="L156" title="All 10 branches covered.">        return switch (o) {</span>
+<span class="fc" id="L157">            case NumberExpr n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
+<span class="fc" id="L158">            case VariableExpr v -&gt; new Parts(&quot;VARIABLE&quot;, v.name(), List.of());</span>
+<span class="fc" id="L159">            case BinaryExpr b -&gt;</span>
 <span class="fc" id="L160">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
-<span class="fc" id="L161">            case PatternExpr.Function f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
-<span class="fc" id="L162">            default -&gt; throw new ExtractionProofBuilder.UnsupportedRule(&quot;unsupported syntax&quot;);</span>
+<span class="fc" id="L161">            case FunctionExpr f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
+<span class="fc" id="L162">            case PatternExpr.Placeholder p -&gt; new Parts(&quot;P&quot;, p.name(), List.of());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            case PatternExpr.LiteralVariable v when literalVariablePatterns -&gt; new Parts(&quot;VARIABLE&quot;, v.name(), List.of());</span>
+<span class="fc" id="L164">            case PatternExpr.LiteralNumber n -&gt; new Parts(&quot;NUMBER&quot;, rational(n.value()), List.of());</span>
+<span class="fc" id="L165">            case PatternExpr.Operation b -&gt;</span>
+<span class="fc" id="L166">                    new Parts(&quot;BINARY&quot;, b.operator().name(), List.of(b.left(), b.right()));</span>
+<span class="fc" id="L167">            case PatternExpr.Function f -&gt; new Parts(&quot;FUNCTION&quot;, f.name(), f.arguments());</span>
+<span class="fc" id="L168">            default -&gt; throw new ExtractionProofBuilder.UnsupportedRule(&quot;unsupported syntax&quot;);</span>
         };
     }
 
     int pattern(PatternExpr p) {
-<span class="fc" id="L167">        return inspect(p, true);</span>
+<span class="fc" id="L173">        return inspect(p, true);</span>
     }
 
     int expression(Expr e) {
-<span class="fc" id="L171">        return inspect(e, false);</span>
+<span class="fc" id="L177">        return inspect(e, false);</span>
     }
 
     int inspect(Object root, boolean pattern) {
-<span class="fc" id="L175">        nonNull(root);</span>
-<span class="fc" id="L176">        var ids = new IdentityHashMap&lt;Object, Integer&gt;();</span>
-<span class="fc" id="L177">        var facts = new IdentityHashMap&lt;Object, long[]&gt;();</span>
-<span class="fc" id="L178">        var descriptions = new IdentityHashMap&lt;Object, Parts&gt;();</span>
-<span class="fc" id="L179">        var stack = new ArrayDeque&lt;Frame&gt;();</span>
-<span class="fc" id="L180">        stack.push(new Frame(root, false, 1));</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
-<span class="fc" id="L182">            work(1);</span>
-<span class="fc" id="L183">            var frame = stack.pop();</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (ids.containsKey(frame.node)) continue;</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (!frame.exit) {</span>
-<span class="fc" id="L186">                scheduleSyntax(frame, descriptions, ids, stack);</span>
+<span class="fc" id="L181">        nonNull(root);</span>
+<span class="fc" id="L182">        var ids = new IdentityHashMap&lt;Object, Integer&gt;();</span>
+<span class="fc" id="L183">        var facts = new IdentityHashMap&lt;Object, long[]&gt;();</span>
+<span class="fc" id="L184">        var descriptions = new IdentityHashMap&lt;Object, Parts&gt;();</span>
+<span class="fc" id="L185">        var stack = new ArrayDeque&lt;Frame&gt;();</span>
+<span class="fc" id="L186">        stack.push(new Frame(root, false, 1));</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L188">            work(1);</span>
+<span class="fc" id="L189">            var frame = stack.pop();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (ids.containsKey(frame.node)) continue;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (!frame.exit) {</span>
+<span class="fc" id="L192">                scheduleSyntax(frame, descriptions, ids, stack);</span>
             } else {
-<span class="fc" id="L188">                completeSyntax(frame.node, pattern, descriptions, ids, facts);</span>
+<span class="fc" id="L194">                completeSyntax(frame.node, pattern, descriptions, ids, facts);</span>
             }
-<span class="fc" id="L190">        }</span>
-<span class="fc" id="L191">        return ids.get(root);</span>
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">        return ids.get(root);</span>
     }
 
     private void scheduleSyntax(
@@ -196,22 +202,22 @@ final class ProofSupport {
             IdentityHashMap&lt;Object, Parts&gt; descriptions,
             IdentityHashMap&lt;Object, Integer&gt; ids,
             ArrayDeque&lt;Frame&gt; stack) {
-<span class="fc" id="L199">        size(frame.depth, limits.maxDepth(), &quot;syntax depth&quot;);</span>
-<span class="fc" id="L200">        var p = parts(frame.node);</span>
-<span class="fc" id="L201">        size(descriptions.size() + 1L, limits.maxTerms(), &quot;syntax nodes&quot;);</span>
-<span class="fc" id="L202">        descriptions.put(frame.node, p);</span>
-<span class="fc" id="L203">        size(</span>
-<span class="fc" id="L204">                stack.size() + p.children.size() + 1L,</span>
-<span class="fc" id="L205">                limits.maxReferences(),</span>
+<span class="fc" id="L205">        size(frame.depth, limits.maxDepth(), &quot;syntax depth&quot;);</span>
+<span class="fc" id="L206">        var p = parts(frame.node);</span>
+<span class="fc" id="L207">        size(descriptions.size() + 1L, limits.maxTerms(), &quot;syntax nodes&quot;);</span>
+<span class="fc" id="L208">        descriptions.put(frame.node, p);</span>
+<span class="fc" id="L209">        size(</span>
+<span class="fc" id="L210">                stack.size() + p.children.size() + 1L,</span>
+<span class="fc" id="L211">                limits.maxReferences(),</span>
                 &quot;syntax pending references&quot;);
-<span class="fc" id="L207">        size(p.children.size(), limits.maxReferences(), &quot;syntax arity&quot;);</span>
-<span class="fc" id="L208">        stack.push(new Frame(frame.node, true, frame.depth));</span>
-<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (int i = p.children.size() - 1; i &gt;= 0; i--) {</span>
-<span class="fc" id="L210">            work(1);</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (!ids.containsKey(p.children.get(i)))</span>
-<span class="fc" id="L212">                stack.push(new Frame(p.children.get(i), false, frame.depth + 1));</span>
+<span class="fc" id="L213">        size(p.children.size(), limits.maxReferences(), &quot;syntax arity&quot;);</span>
+<span class="fc" id="L214">        stack.push(new Frame(frame.node, true, frame.depth));</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int i = p.children.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L216">            work(1);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            if (!ids.containsKey(p.children.get(i)))</span>
+<span class="fc" id="L218">                stack.push(new Frame(p.children.get(i), false, frame.depth + 1));</span>
         }
-<span class="fc" id="L214">    }</span>
+<span class="fc" id="L220">    }</span>
 
     private void completeSyntax(
             Object node,
@@ -220,146 +226,146 @@ final class ProofSupport {
             IdentityHashMap&lt;Object, Integer&gt; ids,
             IdentityHashMap&lt;Object, long[]&gt; facts) {
 
-<span class="fc" id="L223">        var p = descriptions.get(node);</span>
-<span class="fc" id="L224">        long count = 1, depth = 1;</span>
-<span class="fc" id="L225">        var children = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (Object child : p.children) {</span>
-<span class="fc" id="L227">            work(1);</span>
-<span class="fc" id="L228">            long[] f = facts.get(child);</span>
-<span class="fc" id="L229">            count += f[0];</span>
-<span class="fc" id="L230">            depth = Math.max(depth, 1 + f[1]);</span>
-<span class="fc" id="L231">            size(count, limits.maxExpandedNodes(), &quot;expanded syntax&quot;);</span>
-<span class="fc" id="L232">            children.add(ids.get(child));</span>
-<span class="fc" id="L233">        }</span>
-<span class="fc" id="L234">        size(count, limits.maxExpandedNodes(), &quot;expanded syntax&quot;);</span>
-<span class="fc" id="L235">        size(depth, limits.maxDepth(), &quot;syntax depth&quot;);</span>
+<span class="fc" id="L229">        var p = descriptions.get(node);</span>
+<span class="fc" id="L230">        long count = 1, depth = 1;</span>
+<span class="fc" id="L231">        var children = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (Object child : p.children) {</span>
+<span class="fc" id="L233">            work(1);</span>
+<span class="fc" id="L234">            long[] f = facts.get(child);</span>
+<span class="fc" id="L235">            count += f[0];</span>
+<span class="fc" id="L236">            depth = Math.max(depth, 1 + f[1]);</span>
+<span class="fc" id="L237">            size(count, limits.maxExpandedNodes(), &quot;expanded syntax&quot;);</span>
+<span class="fc" id="L238">            children.add(ids.get(child));</span>
+<span class="fc" id="L239">        }</span>
+<span class="fc" id="L240">        size(count, limits.maxExpandedNodes(), &quot;expanded syntax&quot;);</span>
+<span class="fc" id="L241">        size(depth, limits.maxDepth(), &quot;syntax depth&quot;);</span>
         int id;
-<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (pattern) {</span>
-<span class="fc" id="L238">            size(++patternNodes, limits.maxTerms(), &quot;pattern nodes&quot;);</span>
-<span class="fc" id="L239">            chars(p.label);</span>
-<span class="fc" id="L240">            refs(children.size());</span>
-<span class="fc" id="L241">            var key = new PNode(p.tag, p.label, List.copyOf(children));</span>
-<span class="fc" id="L242">            Integer old = patternIds.get(key);</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (old == null) {</span>
-<span class="fc" id="L244">                id = patterns.size();</span>
-<span class="fc" id="L245">                patterns.add(key);</span>
-<span class="fc" id="L246">                patternIds.put(key, id);</span>
-<span class="fc" id="L247">            } else id = old;</span>
-<span class="fc" id="L248">        } else id = intern(new Term(Kind.valueOf(p.tag), p.label, children));</span>
-<span class="fc" id="L249">        ids.put(node, id);</span>
-<span class="fc" id="L250">        facts.put(node, new long[] {count, depth});</span>
-<span class="fc" id="L251">    }</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (pattern) {</span>
+<span class="fc" id="L244">            size(++patternNodes, limits.maxTerms(), &quot;pattern nodes&quot;);</span>
+<span class="fc" id="L245">            chars(p.label);</span>
+<span class="fc" id="L246">            refs(children.size());</span>
+<span class="fc" id="L247">            var key = new PNode(p.tag, p.label, List.copyOf(children));</span>
+<span class="fc" id="L248">            Integer old = patternIds.get(key);</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (old == null) {</span>
+<span class="fc" id="L250">                id = patterns.size();</span>
+<span class="fc" id="L251">                patterns.add(key);</span>
+<span class="fc" id="L252">                patternIds.put(key, id);</span>
+<span class="fc" id="L253">            } else id = old;</span>
+<span class="fc" id="L254">        } else id = intern(new Term(Kind.valueOf(p.tag), p.label, children));</span>
+<span class="fc" id="L255">        ids.put(node, id);</span>
+<span class="fc" id="L256">        facts.put(node, new long[] {count, depth});</span>
+<span class="fc" id="L257">    }</span>
 
     int requireTerm(int i) {
-<span class="pc bpc" id="L254" title="1 of 4 branches missed.">        if (i &lt; 0 || i &gt;= terms.size())</span>
-<span class="fc" id="L255">            throw new IllegalArgumentException(&quot;invalid term reference&quot;);</span>
-<span class="fc" id="L256">        return i;</span>
+<span class="pc bpc" id="L260" title="1 of 4 branches missed.">        if (i &lt; 0 || i &gt;= terms.size())</span>
+<span class="fc" id="L261">            throw new IllegalArgumentException(&quot;invalid term reference&quot;);</span>
+<span class="fc" id="L262">        return i;</span>
     }
 
     int intern(Term t) {
-<span class="fc" id="L260">        work(1);</span>
-<span class="fc" id="L261">        nonNull(t);</span>
-<span class="fc" id="L262">        nonNull(t.kind());</span>
-<span class="fc" id="L263">        nonNull(t.payload());</span>
-<span class="fc" id="L264">        size(t.children().size(), limits.maxReferences(), &quot;term arity&quot;);</span>
-<span class="fc" id="L265">        long count = 1;</span>
-<span class="fc" id="L266">        int depth = 1;</span>
-<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int child : t.children()) {</span>
-<span class="fc" id="L268">            work(1);</span>
-<span class="fc" id="L269">            requireTerm(child);</span>
-<span class="fc" id="L270">            count += expanded.get(child);</span>
-<span class="fc" id="L271">            depth = Math.max(depth, depths.get(child) + 1);</span>
-<span class="fc" id="L272">            size(count, limits.maxExpandedNodes(), &quot;expanded term&quot;);</span>
-<span class="fc" id="L273">        }</span>
-<span class="fc" id="L274">        size(count, limits.maxExpandedNodes(), &quot;expanded term&quot;);</span>
-<span class="fc" id="L275">        size(depth, limits.maxDepth(), &quot;term depth&quot;);</span>
-<span class="pc bpc" id="L276" title="1 of 6 branches missed.">        if ((t.kind() == Kind.NUMBER || t.kind() == Kind.VARIABLE) &amp;&amp; !t.children().isEmpty()</span>
-<span class="pc bpc" id="L277" title="1 of 4 branches missed.">                || t.kind() == Kind.BINARY &amp;&amp; t.children().size() != 2)</span>
-<span class="nc" id="L278">            throw new IllegalArgumentException(&quot;term arity&quot;);</span>
+<span class="fc" id="L266">        work(1);</span>
+<span class="fc" id="L267">        nonNull(t);</span>
+<span class="fc" id="L268">        nonNull(t.kind());</span>
+<span class="fc" id="L269">        nonNull(t.payload());</span>
+<span class="fc" id="L270">        size(t.children().size(), limits.maxReferences(), &quot;term arity&quot;);</span>
+<span class="fc" id="L271">        long count = 1;</span>
+<span class="fc" id="L272">        int depth = 1;</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        for (int child : t.children()) {</span>
+<span class="fc" id="L274">            work(1);</span>
+<span class="fc" id="L275">            requireTerm(child);</span>
+<span class="fc" id="L276">            count += expanded.get(child);</span>
+<span class="fc" id="L277">            depth = Math.max(depth, depths.get(child) + 1);</span>
+<span class="fc" id="L278">            size(count, limits.maxExpandedNodes(), &quot;expanded term&quot;);</span>
+<span class="fc" id="L279">        }</span>
+<span class="fc" id="L280">        size(count, limits.maxExpandedNodes(), &quot;expanded term&quot;);</span>
+<span class="fc" id="L281">        size(depth, limits.maxDepth(), &quot;term depth&quot;);</span>
+<span class="pc bpc" id="L282" title="1 of 6 branches missed.">        if ((t.kind() == Kind.NUMBER || t.kind() == Kind.VARIABLE) &amp;&amp; !t.children().isEmpty()</span>
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">                || t.kind() == Kind.BINARY &amp;&amp; t.children().size() != 2)</span>
+<span class="nc" id="L284">            throw new IllegalArgumentException(&quot;term arity&quot;);</span>
         // Debit text before any parser, hash or equality touches it.
-<span class="fc" id="L280">        size(t.payload().length(), limits.maxCharacters(), &quot;label length&quot;);</span>
-<span class="fc" id="L281">        work(t.payload().length());</span>
-<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (t.kind() == Kind.NUMBER) {</span>
-<span class="fc" id="L283">            size(t.payload().length(), 4096, &quot;rational text envelope&quot;);</span>
-<span class="fc" id="L284">            var r = number(t.payload());</span>
-<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (!rational(r).equals(t.payload()))</span>
-<span class="nc" id="L286">                throw new IllegalArgumentException(&quot;noncanonical rational&quot;);</span>
+<span class="fc" id="L286">        size(t.payload().length(), limits.maxCharacters(), &quot;label length&quot;);</span>
+<span class="fc" id="L287">        work(t.payload().length());</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (t.kind() == Kind.NUMBER) {</span>
+<span class="fc" id="L289">            size(t.payload().length(), 4096, &quot;rational text envelope&quot;);</span>
+<span class="fc" id="L290">            var r = number(t.payload());</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            if (!rational(r).equals(t.payload()))</span>
+<span class="nc" id="L292">                throw new IllegalArgumentException(&quot;noncanonical rational&quot;);</span>
         }
-<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (t.kind() == Kind.BINARY) BinaryOperator.valueOf(t.payload());</span>
-<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (t.kind() == Kind.VARIABLE) new VariableExpr(t.payload());</span>
-<span class="pc bpc" id="L290" title="1 of 4 branches missed.">        if (t.kind() == Kind.FUNCTION &amp;&amp; t.payload().isBlank())</span>
-<span class="nc" id="L291">            throw new IllegalArgumentException(&quot;blank function&quot;);</span>
-<span class="fc" id="L292">        Integer old = indexes.get(t);</span>
-<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (old != null) return old;</span>
-<span class="fc" id="L294">        size(terms.size() + 1L, limits.maxTerms(), &quot;terms limit&quot;);</span>
-<span class="fc" id="L295">        chars(t.payload());</span>
-<span class="fc" id="L296">        refs(t.children().size());</span>
-<span class="fc" id="L297">        int id = terms.size();</span>
-<span class="fc" id="L298">        terms.add(t);</span>
-<span class="fc" id="L299">        indexes.put(t, id);</span>
-<span class="fc" id="L300">        expanded.add(count);</span>
-<span class="fc" id="L301">        depths.add(depth);</span>
-<span class="fc" id="L302">        return id;</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (t.kind() == Kind.BINARY) BinaryOperator.valueOf(t.payload());</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (t.kind() == Kind.VARIABLE) new VariableExpr(t.payload());</span>
+<span class="pc bpc" id="L296" title="1 of 4 branches missed.">        if (t.kind() == Kind.FUNCTION &amp;&amp; t.payload().isBlank())</span>
+<span class="nc" id="L297">            throw new IllegalArgumentException(&quot;blank function&quot;);</span>
+<span class="fc" id="L298">        Integer old = indexes.get(t);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (old != null) return old;</span>
+<span class="fc" id="L300">        size(terms.size() + 1L, limits.maxTerms(), &quot;terms limit&quot;);</span>
+<span class="fc" id="L301">        chars(t.payload());</span>
+<span class="fc" id="L302">        refs(t.children().size());</span>
+<span class="fc" id="L303">        int id = terms.size();</span>
+<span class="fc" id="L304">        terms.add(t);</span>
+<span class="fc" id="L305">        indexes.put(t, id);</span>
+<span class="fc" id="L306">        expanded.add(count);</span>
+<span class="fc" id="L307">        depths.add(depth);</span>
+<span class="fc" id="L308">        return id;</span>
     }
 
     void bindings(RuleData r, Map&lt;String, Integer&gt; bindings) {
-<span class="fc" id="L306">        nonNull(bindings);</span>
-<span class="fc" id="L307">        size(bindings.size(), limits.maxReferences(), &quot;bindings limit&quot;);</span>
-<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (bindings.size() != r.placeholders.size())</span>
-<span class="fc" id="L309">            throw new IllegalArgumentException(&quot;binding names&quot;);</span>
-<span class="fc bfc" id="L310" title="All 2 branches covered.">        for (var e : bindings.entrySet()) {</span>
-<span class="fc" id="L311">            work(1);</span>
-<span class="fc" id="L312">            String name = nonNull(e.getKey());</span>
-<span class="fc" id="L313">            int term = nonNull(e.getValue());</span>
-<span class="fc" id="L314">            size(name.length(), limits.maxCharacters(), &quot;binding label&quot;);</span>
-<span class="fc" id="L315">            work(name.length());</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (!r.placeholders.contains(name)) throw new IllegalArgumentException(&quot;binding names&quot;);</span>
-<span class="fc" id="L317">            requireTerm(term);</span>
-<span class="fc" id="L318">        }</span>
-<span class="fc" id="L319">    }</span>
+<span class="fc" id="L312">        nonNull(bindings);</span>
+<span class="fc" id="L313">        size(bindings.size(), limits.maxReferences(), &quot;bindings limit&quot;);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (bindings.size() != r.placeholders.size())</span>
+<span class="fc" id="L315">            throw new IllegalArgumentException(&quot;binding names&quot;);</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (var e : bindings.entrySet()) {</span>
+<span class="fc" id="L317">            work(1);</span>
+<span class="fc" id="L318">            String name = nonNull(e.getKey());</span>
+<span class="fc" id="L319">            int term = nonNull(e.getValue());</span>
+<span class="fc" id="L320">            size(name.length(), limits.maxCharacters(), &quot;binding label&quot;);</span>
+<span class="fc" id="L321">            work(name.length());</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            if (!r.placeholders.contains(name)) throw new IllegalArgumentException(&quot;binding names&quot;);</span>
+<span class="fc" id="L323">            requireTerm(term);</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">    }</span>
 
     int instantiate(int root, Map&lt;String, Integer&gt; bindings, boolean create) {
-<span class="fc" id="L322">        var done = new HashMap&lt;Integer, Integer&gt;();</span>
-<span class="fc" id="L323">        var stack = new ArrayDeque&lt;Integer&gt;();</span>
-<span class="fc" id="L324">        stack.push(root);</span>
-<span class="fc bfc" id="L325" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
-<span class="fc" id="L326">            work(1);</span>
-<span class="fc" id="L327">            int id = stack.peek();</span>
-<span class="fc" id="L328">            var p = patterns.get(id);</span>
-<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (done.containsKey(id)) {</span>
-<span class="fc" id="L330">                stack.pop();</span>
-<span class="fc" id="L331">                continue;</span>
+<span class="fc" id="L328">        var done = new HashMap&lt;Integer, Integer&gt;();</span>
+<span class="fc" id="L329">        var stack = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L330">        stack.push(root);</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L332">            work(1);</span>
+<span class="fc" id="L333">            int id = stack.peek();</span>
+<span class="fc" id="L334">            var p = patterns.get(id);</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">            if (done.containsKey(id)) {</span>
+<span class="fc" id="L336">                stack.pop();</span>
+<span class="fc" id="L337">                continue;</span>
             }
-<span class="fc" id="L333">            boolean ready = true;</span>
-<span class="fc bfc" id="L334" title="All 2 branches covered.">            for (int child : p.children) {</span>
-<span class="fc" id="L335">                work(1);</span>
-<span class="fc bfc" id="L336" title="All 2 branches covered.">                if (!done.containsKey(child)) {</span>
-<span class="fc" id="L337">                    stack.push(child);</span>
-<span class="fc" id="L338">                    ready = false;</span>
+<span class="fc" id="L339">            boolean ready = true;</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            for (int child : p.children) {</span>
+<span class="fc" id="L341">                work(1);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                if (!done.containsKey(child)) {</span>
+<span class="fc" id="L343">                    stack.push(child);</span>
+<span class="fc" id="L344">                    ready = false;</span>
                 }
-<span class="fc" id="L340">            }</span>
-<span class="fc bfc" id="L341" title="All 2 branches covered.">            if (!ready) continue;</span>
+<span class="fc" id="L346">            }</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (!ready) continue;</span>
             int value;
-<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (p.tag.equals(&quot;P&quot;)) value = bindings.get(p.label);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (p.tag.equals(&quot;P&quot;)) value = bindings.get(p.label);</span>
             else {
-<span class="fc" id="L345">                var children = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc bfc" id="L346" title="All 2 branches covered.">                for (int child : p.children) {</span>
-<span class="fc" id="L347">                    work(1);</span>
-<span class="fc" id="L348">                    children.add(done.get(child));</span>
-<span class="fc" id="L349">                }</span>
-<span class="fc" id="L350">                var term = new Term(Kind.valueOf(p.tag), p.label, children);</span>
-<span class="fc bfc" id="L351" title="All 2 branches covered.">                if (create) value = intern(term);</span>
+<span class="fc" id="L351">                var children = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">                for (int child : p.children) {</span>
+<span class="fc" id="L353">                    work(1);</span>
+<span class="fc" id="L354">                    children.add(done.get(child));</span>
+<span class="fc" id="L355">                }</span>
+<span class="fc" id="L356">                var term = new Term(Kind.valueOf(p.tag), p.label, children);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                if (create) value = intern(term);</span>
                 else {
-<span class="fc" id="L353">                    work(p.label.length() + children.size());</span>
-<span class="fc" id="L354">                    Integer found = indexes.get(term);</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">                    if (found == null) throw new IllegalArgumentException(&quot;instance term absent&quot;);</span>
-<span class="fc" id="L356">                    value = found;</span>
+<span class="fc" id="L359">                    work(p.label.length() + children.size());</span>
+<span class="fc" id="L360">                    Integer found = indexes.get(term);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                    if (found == null) throw new IllegalArgumentException(&quot;instance term absent&quot;);</span>
+<span class="fc" id="L362">                    value = found;</span>
                 }
             }
-<span class="fc" id="L359">            done.put(id, value);</span>
-<span class="fc" id="L360">            stack.pop();</span>
-<span class="fc" id="L361">        }</span>
-<span class="fc" id="L362">        return done.get(root);</span>
+<span class="fc" id="L365">            done.put(id, value);</span>
+<span class="fc" id="L366">            stack.pop();</span>
+<span class="fc" id="L367">        }</span>
+<span class="fc" id="L368">        return done.get(root);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

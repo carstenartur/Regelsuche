@@ -3,16 +3,18 @@
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.value.ExprValueArena;
+import de.regelsuche.value.ExprValueArena.Projection;
+import de.regelsuche.value.ExprValueArena.ValueId;
 import de.regelsuche.value.ExprValueFactory;
-import de.regelsuche.value.ExprValueFactory.ExprValue;
-import de.regelsuche.value.ExprValueFactory.ValueKey;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 
 /** Finds repeated non-leaf semantic values with exact AST occurrences. */
 public final class RepeatedStructureExtractor {
@@ -20,153 +22,138 @@ public final class RepeatedStructureExtractor {
     private final RepeatedStructureExtractionCandidate.Policy policy;
 
     public RepeatedStructureExtractor() {
-<span class="fc" id="L23">        this(</span>
+<span class="fc" id="L25">        this(</span>
             new ExpressionParser(),
-<span class="fc" id="L25">            RepeatedStructureExtractionCandidate.Policy.standard()</span>
+<span class="fc" id="L27">            RepeatedStructureExtractionCandidate.Policy.standard()</span>
         );
-<span class="fc" id="L27">    }</span>
+<span class="fc" id="L29">    }</span>
 
     public RepeatedStructureExtractor(
         RepeatedStructureExtractionCandidate.Policy policy
     ) {
-<span class="fc" id="L32">        this(new ExpressionParser(), policy);</span>
-<span class="fc" id="L33">    }</span>
+<span class="fc" id="L34">        this(new ExpressionParser(), policy);</span>
+<span class="fc" id="L35">    }</span>
 
     RepeatedStructureExtractor(
         ExpressionParser parser,
         RepeatedStructureExtractionCandidate.Policy policy
-<span class="fc" id="L38">    ) {</span>
-<span class="fc" id="L39">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
-<span class="fc" id="L40">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="fc" id="L41">    }</span>
+<span class="fc" id="L40">    ) {</span>
+<span class="fc" id="L41">        this.parser = Objects.requireNonNull(parser, &quot;parser&quot;);</span>
+<span class="fc" id="L42">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L43">    }</span>
 
     public RepeatedStructureExtractionCandidate.Policy policy() {
-<span class="fc" id="L44">        return policy;</span>
+<span class="fc" id="L46">        return policy;</span>
     }
 
     public List&lt;RepeatedStructureExtractionCandidate&gt; extract(
         String sourceExpression
     ) {
-<span class="fc" id="L50">        Expr root = parser.parseTerm(</span>
-<span class="fc" id="L51">            RepresentationCandidateAssessment.requireText(</span>
+<span class="fc" id="L52">        Expr root = parser.parseTerm(</span>
+<span class="fc" id="L53">            RepresentationCandidateAssessment.requireText(</span>
                 sourceExpression, &quot;sourceExpression&quot;));
-<span class="fc" id="L53">        String normalizedSource = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L54">        Map&lt;ValueKey, Integer&gt; occurrenceCounts = new TreeMap&lt;&gt;();</span>
-        Map&lt;ValueKey, List&lt;RepeatedStructureExtractionCandidate.Occurrence&gt;&gt;
-<span class="fc" id="L56">            occurrencesByValue = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L55">        String normalizedSource = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L56">        Map&lt;ValueId, Integer&gt; occurrenceCounts = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L57">        Map&lt;ValueId, List&lt;RepeatedStructureExtractionCandidate.Occurrence&gt;&gt; occurrencesByValue = new HashMap&lt;&gt;();</span>
 
-<span class="fc" id="L58">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
-<span class="fc" id="L59">            ExprValueFactory.Projection projection = factory.project(root);</span>
-<span class="fc" id="L60">            countOccurrences(</span>
-                root,
-<span class="fc" id="L62">                projection.valuesBySyntaxIdentity(),</span>
-                occurrenceCounts
-            );
-<span class="fc" id="L65">            collectRepeatedOccurrences(</span>
-                root,
-<span class="fc" id="L67">                ExpressionOccurrencePath.root(),</span>
-<span class="fc" id="L68">                projection.valuesBySyntaxIdentity(),</span>
-                occurrenceCounts,
-                occurrencesByValue
-            );
+<span class="fc" id="L59">        try (var arena = new ExprValueArena(ExprValueFactory.DEFAULT_MAXIMUM_ENTRIES);</span>
+<span class="fc" id="L60">             var evidenceKeys = new ExprValueFactory()) {</span>
+            // Each source token creates at most one AST node, plus an implicit zero for unary minus.
+<span class="fc" id="L62">            var projection = arena.project(root, 2L * sourceExpression.length());</span>
+<span class="fc" id="L63">            countOccurrences(root, projection, occurrenceCounts);</span>
+<span class="fc" id="L64">            collectRepeatedOccurrences(root, ExpressionOccurrencePath.root(), projection, occurrenceCounts,</span>
+                occurrencesByValue);
+
+<span class="fc" id="L67">            return occurrencesByValue.values().stream().map(occurrences -&gt; {</span>
+                // Only published groups need the historical, recursively encoded evidence key.
+<span class="fc" id="L69">                var first = occurrences.getFirst();</span>
+<span class="fc" id="L70">                var position = new TreePosition(first.path().childIndexes(), first.expression());</span>
+<span class="fc" id="L71">                var syntax = projection.at(position).orElseThrow().syntax();</span>
+<span class="fc" id="L72">                return RepeatedStructureExtractionCandidate.create(normalizedSource,</span>
+<span class="fc" id="L73">                    evidenceKeys.fromExpr(syntax).key().toString(), occurrences, policy);</span>
+<span class="fc" id="L74">            }).sorted().toList();</span>
         }
-
-<span class="fc" id="L74">        return occurrencesByValue.entrySet().stream()</span>
-<span class="fc" id="L75">            .filter(entry -&gt;</span>
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                entry.getValue().size() &gt;= policy.minimumOccurrences())</span>
-<span class="fc" id="L77">            .map(entry -&gt; RepeatedStructureExtractionCandidate.create(</span>
-                normalizedSource,
-<span class="fc" id="L79">                entry.getKey().toString(),</span>
-<span class="fc" id="L80">                entry.getValue(),</span>
-                policy
-            ))
-<span class="fc" id="L83">            .sorted()</span>
-<span class="fc" id="L84">            .toList();</span>
     }
 
     public List&lt;RepeatedStructureExtractionCandidate&gt; extractMaterial(
         String sourceExpression
     ) {
-<span class="fc" id="L90">        return extract(sourceExpression).stream()</span>
-<span class="fc" id="L91">            .filter(RepeatedStructureExtractionCandidate::material)</span>
-<span class="fc" id="L92">            .toList();</span>
+<span class="fc" id="L81">        return extract(sourceExpression).stream()</span>
+<span class="fc" id="L82">            .filter(RepeatedStructureExtractionCandidate::material)</span>
+<span class="fc" id="L83">            .toList();</span>
     }
 
     private int countOccurrences(
         Expr expression,
-        Map&lt;Expr, ExprValue&gt; valuesBySyntaxIdentity,
-        Map&lt;ValueKey, Integer&gt; occurrenceCounts
+        Projection projection,
+        Map&lt;ValueId, Integer&gt; occurrenceCounts
     ) {
-<span class="fc" id="L100">        int astNodeCount = 1;</span>
-<span class="fc" id="L101">        List&lt;Expr&gt; children = children(expression);</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
-<span class="fc" id="L103">            astNodeCount = Math.addExact(</span>
+<span class="fc" id="L91">        int astNodeCount = 1;</span>
+<span class="fc" id="L92">        List&lt;Expr&gt; children = children(expression);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
+<span class="fc" id="L94">            astNodeCount = Math.addExact(</span>
                 astNodeCount,
-<span class="fc" id="L105">                countOccurrences(</span>
-<span class="fc" id="L106">                    children.get(index),</span>
-                    valuesBySyntaxIdentity,
+<span class="fc" id="L96">                countOccurrences(</span>
+<span class="fc" id="L97">                    children.get(index),</span>
+                    projection,
                     occurrenceCounts
                 )
             );
         }
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (astNodeCount &gt;= policy.minimumSubtreeNodes()) {</span>
-<span class="fc" id="L113">            ExprValue value = Objects.requireNonNull(</span>
-<span class="fc" id="L114">                valuesBySyntaxIdentity.get(expression),</span>
-                &quot;semantic value for syntax occurrence&quot;);
-<span class="fc" id="L116">            occurrenceCounts.merge(value.key(), 1, Integer::sum);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (astNodeCount &gt;= policy.minimumSubtreeNodes()) {</span>
+<span class="fc" id="L104">            ValueId value = projection.valueOf(expression);</span>
+<span class="fc" id="L105">            occurrenceCounts.merge(value, 1, Integer::sum);</span>
         }
-<span class="fc" id="L118">        return astNodeCount;</span>
+<span class="fc" id="L107">        return astNodeCount;</span>
     }
 
     private int collectRepeatedOccurrences(
         Expr expression,
         ExpressionOccurrencePath path,
-        Map&lt;Expr, ExprValue&gt; valuesBySyntaxIdentity,
-        Map&lt;ValueKey, Integer&gt; occurrenceCounts,
-        Map&lt;ValueKey, List&lt;RepeatedStructureExtractionCandidate.Occurrence&gt;&gt;
+        Projection projection,
+        Map&lt;ValueId, Integer&gt; occurrenceCounts,
+        Map&lt;ValueId, List&lt;RepeatedStructureExtractionCandidate.Occurrence&gt;&gt;
             occurrencesByValue
     ) {
-<span class="fc" id="L129">        int astNodeCount = 1;</span>
-<span class="fc" id="L130">        List&lt;Expr&gt; children = children(expression);</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
-<span class="fc" id="L132">            astNodeCount = Math.addExact(</span>
+<span class="fc" id="L118">        int astNodeCount = 1;</span>
+<span class="fc" id="L119">        List&lt;Expr&gt; children = children(expression);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
+<span class="fc" id="L121">            astNodeCount = Math.addExact(</span>
                 astNodeCount,
-<span class="fc" id="L134">                collectRepeatedOccurrences(</span>
-<span class="fc" id="L135">                    children.get(index),</span>
-<span class="fc" id="L136">                    path.append(index),</span>
-                    valuesBySyntaxIdentity,
+<span class="fc" id="L123">                collectRepeatedOccurrences(</span>
+<span class="fc" id="L124">                    children.get(index),</span>
+<span class="fc" id="L125">                    path.append(index),</span>
+                    projection,
                     occurrenceCounts,
                     occurrencesByValue
                 )
             );
         }
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (astNodeCount &gt;= policy.minimumSubtreeNodes()) {</span>
-<span class="fc" id="L144">            ExprValue value = Objects.requireNonNull(</span>
-<span class="fc" id="L145">                valuesBySyntaxIdentity.get(expression),</span>
-                &quot;semantic value for syntax occurrence&quot;);
-<span class="fc" id="L147">            if (occurrenceCounts.getOrDefault(value.key(), 0)</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">                &gt;= policy.minimumOccurrences()) {</span>
-<span class="fc" id="L149">                occurrencesByValue.computeIfAbsent(</span>
-<span class="fc" id="L150">                    value.key(), ignored -&gt; new ArrayList&lt;&gt;()).add(</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (astNodeCount &gt;= policy.minimumSubtreeNodes()) {</span>
+<span class="fc" id="L133">            ValueId value = projection.valueOf(expression);</span>
+<span class="fc" id="L134">            if (occurrenceCounts.getOrDefault(value, 0)</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                &gt;= policy.minimumOccurrences()) {</span>
+<span class="fc" id="L136">                occurrencesByValue.computeIfAbsent(</span>
+<span class="fc" id="L137">                    value, ignored -&gt; new ArrayList&lt;&gt;()).add(</span>
                         new RepeatedStructureExtractionCandidate.Occurrence(
                             path,
-<span class="fc" id="L153">                            ExpressionFormatter.format(expression),</span>
+<span class="fc" id="L140">                            ExpressionFormatter.format(expression),</span>
                             astNodeCount
                         )
                     );
             }
         }
-<span class="fc" id="L159">        return astNodeCount;</span>
+<span class="fc" id="L146">        return astNodeCount;</span>
     }
 
     private static List&lt;Expr&gt; children(Expr expression) {
-<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L164">            return List.of(binary.left(), binary.right());</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L151">            return List.of(binary.left(), binary.right());</span>
         }
-<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="fc" id="L167">            return function.arguments();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L154">            return function.arguments();</span>
         }
-<span class="fc" id="L169">        return List.of();</span>
+<span class="fc" id="L156">        return List.of();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

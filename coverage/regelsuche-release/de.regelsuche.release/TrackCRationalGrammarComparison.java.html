@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TrackCRationalGrammarComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">TrackCRationalGrammarComparison.java</span></div><h1>TrackCRationalGrammarComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.evaluationTask;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.rationalCases;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.readObject;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.renderCandidate;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.renderEvaluation;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.renderFormationEvidence;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.renderResourceUse;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.requireContentHash;
+import static de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain.semanticHash;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.FormationResult;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.FormationSeed;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.ResourceBudget;
+import de.regelsuche.transform.RationalNormalizationHypothesisOperator.Forms;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Random;
+
+/** Target-free comparison of the two production rational rewrite forms and their union. */
+public final class TrackCRationalGrammarComparison {
+<span class="fc" id="L36">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+    private static final String PLAN = &quot;cb4aeb6cc607f7b42da33000a493f1402e6534aee5513c1feec68836146dd124&quot;;
+    private static final String CHALLENGE = &quot;rational-assumption-rewrites&quot;;
+<span class="fc" id="L39">    private static final ResourceBudget TASK_BUDGET = new ResourceBudget(5, 245, 45);</span>
+<span class="fc" id="L40">    private static final List&lt;Forms&gt; GRAMMAR = List.of(Forms.CANCELLATION, Forms.EQUAL_DENOMINATOR, Forms.COMBINED);</span>
+
+<span class="fc" id="L42">    enum Arm { PRODUCTION_FULL_OPERATOR, ENUMERATE_OPERATOR_GRAMMAR, SEEDED_RANDOM_OPERATOR_GRAMMAR }</span>
+
+<span class="fc" id="L44">    private record Frozen(Forms forms, FormationResult formation, ObjectNode receipt) {}</span>
+
+    private TrackCRationalGrammarComparison() {}
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;usage: TrackCRationalGrammarComparison &lt;corpus-directory&gt; &lt;output-json&gt;&quot;);</span>
+        }
+<span class="fc" id="L52">        Files.write(Path.of(args[1]), JSON.writeValueAsBytes(run(Path.of(args[0]))));</span>
+<span class="fc" id="L53">    }</span>
+
+    static ObjectNode run(Path directory) throws IOException {
+<span class="fc" id="L56">        Path protocol = directory.resolve(&quot;track-c-rational-grammar/comparison-plan.json&quot;);</span>
+<span class="fc" id="L57">        requireDigest(protocol, PLAN);</span>
+<span class="fc" id="L58">        ObjectNode plan = readObject(protocol);</span>
+<span class="fc" id="L59">        Path benchmarkPath = directory.resolve(&quot;benchmark-source.json&quot;);</span>
+<span class="fc" id="L60">        requireDigest(benchmarkPath, plan.required(&quot;benchmarkBytes&quot;).asText().substring(7));</span>
+<span class="fc" id="L61">        ObjectNode corpus = pinned(directory, &quot;case-corpus.json&quot;, plan, &quot;caseCorpusContentHash&quot;);</span>
+<span class="fc" id="L62">        pinned(directory, &quot;corpus-freeze-receipt.json&quot;, plan, &quot;freezeReceiptContentHash&quot;);</span>
+<span class="fc" id="L63">        pinned(directory, &quot;rational-assumption-primitives.json&quot;, plan, &quot;primitiveProfileContentHash&quot;);</span>
+<span class="fc" id="L64">        String benchmarkId = readObject(benchmarkPath).required(&quot;benchmarkId&quot;).asText();</span>
+<span class="fc" id="L65">        List&lt;FormationSeed&gt; seeds = projectTrain(corpus);</span>
+
+<span class="fc" id="L67">        List&lt;Frozen&gt; arms = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int campaign = 1; campaign &lt;= 4; campaign++) {</span>
+<span class="fc" id="L69">            String id = CHALLENGE + String.format(Locale.ROOT, &quot;-campaign-%02d&quot;, campaign);</span>
+<span class="fc" id="L70">            String seed = semanticHash(JSON.valueToTree(Map.of(&quot;benchmarkId&quot;, benchmarkId,</span>
+<span class="fc" id="L71">                &quot;campaignId&quot;, id, &quot;challengeId&quot;, CHALLENGE, &quot;index&quot;, campaign)));</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (Arm arm : Arm.values()) {</span>
+<span class="fc" id="L73">                arms.add(freeze(seeds, arm, id, seed));</span>
+            }
+        }
+
+<span class="fc" id="L77">        ObjectNode output = JSON.createObjectNode();</span>
+<span class="fc" id="L78">        output.put(&quot;schema&quot;, &quot;regelsuche.track-c-rational-grammar/v1&quot;);</span>
+<span class="fc" id="L79">        output.put(&quot;planBytes&quot;, &quot;sha256:&quot; + PLAN);</span>
+<span class="fc" id="L80">        output.set(&quot;formationInputs&quot;, JSON.valueToTree(seeds));</span>
+<span class="fc" id="L81">        ArrayNode freezes = output.putArray(&quot;frozenArms&quot;);</span>
+<span class="fc" id="L82">        arms.forEach(arm -&gt; freezes.add(arm.receipt()));</span>
+<span class="fc" id="L83">        output.put(&quot;formationFreezeHash&quot;, semanticHash(freezes));</span>
+
+<span class="fc" id="L85">        List&lt;ObjectNode&gt; cases = rationalCases(corpus);</span>
+<span class="fc" id="L86">        ArrayNode panels = output.putArray(&quot;evaluations&quot;);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (Frozen arm : arms) {</span>
+<span class="fc" id="L88">            var adapter = new RationalAssumptionRewriteAdapter(arm.forms());</span>
+<span class="fc" id="L89">            ObjectNode panel = panels.addObject();</span>
+<span class="fc" id="L90">            panel.put(&quot;frozenArmHash&quot;, semanticHash(arm.receipt()));</span>
+<span class="fc" id="L91">            ArrayNode tasks = panel.putArray(&quot;tasks&quot;);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (ObjectNode item : cases) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                for (JsonNode entry : item.required(&quot;evaluationInput&quot;).required(&quot;tasks&quot;)) {</span>
+<span class="fc" id="L94">                    ObjectNode task = (ObjectNode) entry;</span>
+<span class="fc" id="L95">                    tasks.add(renderEvaluation(item, task,</span>
+<span class="fc" id="L96">                        adapter.evaluate(evaluationTask(task), arm.formation(), TASK_BUDGET)));</span>
+<span class="fc" id="L97">                }</span>
+<span class="fc" id="L98">            }</span>
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">        return output;</span>
+    }
+
+    static List&lt;FormationSeed&gt; projectTrain(ObjectNode corpus) {
+<span class="fc" id="L104">        List&lt;FormationSeed&gt; seeds = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (JsonNode item : corpus.required(&quot;cases&quot;)) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (!CHALLENGE.equals(item.required(&quot;challengeId&quot;).asText())</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                    || !&quot;TRAIN&quot;.equals(item.required(&quot;split&quot;).asText())) {</span>
+<span class="fc" id="L108">                continue;</span>
+            }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (JsonNode seed : item.required(&quot;formationInput&quot;).required(&quot;seedExpressions&quot;)) {</span>
+<span class="fc" id="L111">                String id = &quot;input-&quot; + (seeds.size() + 1);</span>
+<span class="fc" id="L112">                List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L113">                seed.required(&quot;assumptions&quot;).forEach(value -&gt; assumptions.add(value.textValue()));</span>
+<span class="fc" id="L114">                seeds.add(new FormationSeed(id, seed.required(&quot;expression&quot;).textValue(), assumptions, id));</span>
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">        }</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (seeds.size() != 4) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;expected four TRAIN expressions&quot;);</span>
+        }
+<span class="fc" id="L120">        return List.copyOf(seeds);</span>
+    }
+
+    private static Frozen freeze(List&lt;FormationSeed&gt; seeds, Arm arm, String campaign, String seed) {
+<span class="fc" id="L124">        ObjectNode row = JSON.createObjectNode();</span>
+<span class="fc" id="L125">        row.put(&quot;campaignId&quot;, campaign);</span>
+<span class="fc" id="L126">        row.put(&quot;arm&quot;, arm.name());</span>
+<span class="fc" id="L127">        row.put(&quot;configuredSeed&quot;, seed);</span>
+<span class="fc" id="L128">        ArrayNode proposals = row.putArray(&quot;proposals&quot;);</span>
+<span class="fc" id="L129">        int states = 60;</span>
+<span class="fc" id="L130">        int candidates = 60;</span>
+<span class="fc" id="L131">        FormationResult selected = null;</span>
+<span class="fc" id="L132">        FormationResult last = null;</span>
+<span class="fc" id="L133">        Forms program = null;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (Forms proposed : schedule(arm, seed)) {</span>
+<span class="fc" id="L135">            var adapter = new RationalAssumptionRewriteAdapter(proposed);</span>
+            // Remaining resources are forwarded to the real adapter for every proposal and duplicate.
+<span class="fc" id="L137">            last = adapter.formCandidate(seeds, new ResourceBudget(5, states, candidates));</span>
+<span class="fc" id="L138">            states = last.resourceUse().remainingExploredStates();</span>
+<span class="fc" id="L139">            candidates = last.resourceUse().remainingCandidateEvaluations();</span>
+<span class="fc" id="L140">            ObjectNode proposal = proposals.addObject();</span>
+<span class="fc" id="L141">            proposal.put(&quot;program&quot;, proposed.name());</span>
+<span class="fc" id="L142">            proposal.put(&quot;status&quot;, last.status().name());</span>
+<span class="fc" id="L143">            proposal.put(&quot;detail&quot;, last.detail());</span>
+<span class="fc" id="L144">            proposal.set(&quot;resourceUse&quot;, renderResourceUse(last.resourceUse()));</span>
+<span class="fc" id="L145">            proposal.set(&quot;evidence&quot;, renderFormationEvidence(last.evidence()));</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (last.candidate().isPresent()) {</span>
+<span class="fc" id="L147">                proposal.set(&quot;candidate&quot;, renderCandidate(last.candidate().orElseThrow()));</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                if (selected == null) {</span>
+<span class="fc" id="L149">                    selected = last;</span>
+<span class="fc" id="L150">                    program = proposed;</span>
+                }
+            } else {
+<span class="fc" id="L153">                proposal.putNull(&quot;candidate&quot;);</span>
+            }
+<span class="fc" id="L155">        }</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        row.put(&quot;selected&quot;, program == null ? null : program.name());</span>
+<span class="fc" id="L157">        row.put(&quot;executedFormationStates&quot;, 60 - states);</span>
+<span class="fc" id="L158">        row.put(&quot;executedFormationCandidates&quot;, 60 - candidates);</span>
+        // The adapter's NO_CANDIDATE route records explicit zero-work evaluation rows.
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        return selected == null ? new Frozen(Forms.COMBINED, last, row) : new Frozen(program, selected, row);</span>
+    }
+
+    private static List&lt;Forms&gt; schedule(Arm arm, String seed) {
+<span class="fc bfc" id="L164" title="All 3 branches covered.">        return switch (arm) {</span>
+<span class="fc" id="L165">            case PRODUCTION_FULL_OPERATOR -&gt; List.of(Forms.COMBINED);</span>
+<span class="fc" id="L166">            case ENUMERATE_OPERATOR_GRAMMAR -&gt; GRAMMAR;</span>
+            case SEEDED_RANDOM_OPERATOR_GRAMMAR -&gt; {
+<span class="fc" id="L168">                var random = new Random(Long.parseUnsignedLong(seed.substring(7, 23), 16));</span>
+<span class="fc" id="L169">                List&lt;Forms&gt; draws = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                for (int index = 0; index &lt; 3; index++) {</span>
+<span class="fc" id="L171">                    draws.add(GRAMMAR.get(random.nextInt(GRAMMAR.size())));</span>
+                }
+<span class="fc" id="L173">                yield List.copyOf(draws);</span>
+            }
+        };
+    }
+
+    private static ObjectNode pinned(Path root, String file, ObjectNode plan, String field) throws IOException {
+<span class="fc" id="L179">        var data = readObject(root.resolve(file));</span>
+<span class="fc" id="L180">        requireContentHash(data, file);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (!data.required(&quot;contentHash&quot;).equals(plan.required(field))) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(&quot;input differs from plan: &quot; + file);</span>
+        }
+<span class="fc" id="L184">        return data;</span>
+    }
+
+    private static void requireDigest(Path file, String expected) throws IOException {
+        try {
+<span class="fc" id="L189">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;).digest(Files.readAllBytes(file));</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (!expected.equals(HexFormat.of().formatHex(digest))) {</span>
+<span class="nc" id="L191">                throw new IllegalArgumentException(&quot;changed registered bytes: &quot; + file);</span>
+            }
+<span class="nc" id="L193">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L194">            throw new IllegalStateException(exception);</span>
+<span class="fc" id="L195">        }</span>
+<span class="fc" id="L196">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

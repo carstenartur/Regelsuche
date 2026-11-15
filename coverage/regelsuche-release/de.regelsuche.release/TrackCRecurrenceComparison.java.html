@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TrackCRecurrenceComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">TrackCRecurrenceComparison.java</span></div><h1>TrackCRecurrenceComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain.Rational;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain.RecurrenceModel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+/** Replays the preregistered fixed-rule recurrence lane using only TRAIN prefix observations for formation. */
+public final class TrackCRecurrenceComparison {
+<span class="fc" id="L26">    static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L27">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L28">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L29">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();</span>
+    private static final String PLAN = &quot;sha256:f7475599a958f1ffe174ee936e00c82f267e59df03588454ab1c0f9957526ad4&quot;;
+    private static final String PLAN_COMMIT = &quot;95c1eefada1d2e989182e4bc92369e11c4840fc4&quot;;
+    private static final String CHALLENGE = &quot;finite-difference-recurrences&quot;;
+    private static final String DIRECTORY = &quot;track-c-recurrence&quot;;
+<span class="fc" id="L34">    private enum Arm { PRODUCTION_EXACT_FIT, ENUMERATE_VALID_GRAMMAR, SEEDED_RANDOM_VALID_GRAMMAR }</span>
+
+    private TrackCRecurrenceComparison() { }
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (args.length != 2) throw new IllegalArgumentException(&quot;usage: &lt;frozen-corpus-directory&gt; &lt;output.json&gt;&quot;);</span>
+<span class="fc" id="L40">        Path data = Path.of(args[0]);</span>
+<span class="fc" id="L41">        String planBytes = Files.readString(data.resolve(DIRECTORY).resolve(&quot;comparison-plan.json&quot;));</span>
+<span class="fc" id="L42">        require(hash(planBytes).equals(PLAN), &quot;comparison plan changed&quot;);</span>
+<span class="fc" id="L43">        JsonNode plan = JSON.readTree(planBytes);</span>
+<span class="fc" id="L44">        JsonNode corpus = frozen(data, &quot;case-corpus&quot;, plan.required(&quot;caseCorpusContentHash&quot;).textValue());</span>
+<span class="fc" id="L45">        frozen(data, &quot;corpus-freeze-receipt&quot;, plan.required(&quot;freezeReceiptContentHash&quot;).textValue());</span>
+<span class="fc" id="L46">        frozen(data, &quot;finite-sequence-candidate-forms&quot;, plan.required(&quot;formationProfileContentHash&quot;).textValue());</span>
+
+<span class="fc" id="L48">        List&lt;JsonNode&gt; cases = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L49">        List&lt;Prefix&gt; inputs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (JsonNode item : corpus.required(&quot;cases&quot;)) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (!CHALLENGE.equals(item.required(&quot;challengeId&quot;).textValue())) continue;</span>
+<span class="fc" id="L52">            cases.add(item);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (&quot;TRAIN&quot;.equals(item.required(&quot;split&quot;).textValue())) {</span>
+<span class="fc" id="L54">                JsonNode allowed = item.required(&quot;formationInput&quot;);</span>
+<span class="fc" id="L55">                inputs.add(new Prefix(terms(allowed.required(&quot;observedPrefix&quot;)), allowed.required(&quot;maximumOrder&quot;).intValue()));</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        require(cases.size() == 6 &amp;&amp; inputs.size() == 2, &quot;incorrect frozen comparison surface&quot;);</span>
+<span class="fc" id="L59">        List&lt;Frozen&gt; frozen = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int campaign = 1; campaign &lt;= plan.required(&quot;campaignCount&quot;).intValue(); campaign++) {</span>
+<span class="fc" id="L61">            String seed = campaignSeed(corpus.required(&quot;benchmarkId&quot;).textValue(), campaign);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (Arm arm : Arm.values()) frozen.add(form(arm, campaign, seed, inputs, plan));</span>
+        }
+<span class="fc" id="L64">        List&lt;Map&lt;String, Object&gt;&gt; campaigns = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (Frozen run : frozen) {</span>
+<span class="fc" id="L66">            var evaluations = cases.stream().map(item -&gt; evaluate(run.models(), item)).toList();</span>
+<span class="fc" id="L67">            campaigns.add(Map.of(&quot;campaign&quot;, run.index(), &quot;arm&quot;, run.arm(), &quot;seed&quot;, run.seed(),</span>
+<span class="fc" id="L68">                &quot;formation&quot;, run.evidence(), &quot;formationHash&quot;, run.hash(), &quot;evaluations&quot;, evaluations));</span>
+<span class="fc" id="L69">        }</span>
+<span class="fc" id="L70">        var report = Map.of(&quot;schema&quot;, &quot;regelsuche.track-c-recurrence-comparison/v1&quot;,</span>
+<span class="fc" id="L71">            &quot;planCommit&quot;, PLAN_COMMIT, &quot;planByteHash&quot;, PLAN, &quot;corpusContentHash&quot;, corpus.required(&quot;contentHash&quot;),</span>
+            &quot;campaigns&quot;, campaigns);
+<span class="fc" id="L73">        Files.writeString(Path.of(args[1]), JSON.writeValueAsString(report) + &quot;\n&quot;);</span>
+<span class="fc" id="L74">    }</span>
+
+<span class="fc" id="L76">    private record Prefix(List&lt;Long&gt; terms, int maximumOrder) { }</span>
+<span class="fc" id="L77">    private record Frozen(int index, Arm arm, String seed, List&lt;RecurrenceModel&gt; models,</span>
+                          Map&lt;String, Object&gt; evidence, String hash) { }
+
+    private static Frozen form(Arm arm, int index, String seed, List&lt;Prefix&gt; prefixes, JsonNode plan) throws Exception {
+<span class="fc" id="L81">        var rng = new Random(Long.parseUnsignedLong(seed.substring(7, 23), 16));</span>
+<span class="fc" id="L82">        var models = new LinkedHashSet&lt;RecurrenceModel&gt;();</span>
+<span class="fc" id="L83">        var inputs = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L84">        int lower = plan.required(&quot;minimumCoefficient&quot;).intValue();</span>
+<span class="fc" id="L85">        int upper = plan.required(&quot;maximumCoefficient&quot;).intValue();</span>
+<span class="fc" id="L86">        int cap = plan.required(&quot;proposalsPerTrainPrefix&quot;).intValue();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (Prefix prefix : prefixes) {</span>
+<span class="fc" id="L88">            List&lt;RecurrenceModel&gt; proposals = proposals(arm, prefix, rng, lower, upper, cap);</span>
+<span class="fc" id="L89">            var seen = new LinkedHashSet&lt;RecurrenceModel&gt;();</span>
+<span class="fc" id="L90">            var attempts = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (RecurrenceModel model : proposals) {</span>
+<span class="fc" id="L92">                List&lt;Boolean&gt; checks = checkPrefix(model, prefix.terms());</span>
+<span class="fc" id="L93">                boolean valid = allowed(model, lower, upper);</span>
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">                boolean supported = valid &amp;&amp; checks.stream().allMatch(Boolean::booleanValue);</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">                boolean duplicate = !seen.add(model) || models.contains(model);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (supported) models.add(model);</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">                String disposition = !valid ? &quot;OUTSIDE_GRAMMAR&quot; : supported ? &quot;SUPPORTED&quot; : &quot;REJECTED&quot;;</span>
+<span class="fc" id="L98">                attempts.add(Map.of(&quot;coefficients&quot;, coefficients(model), &quot;prefixChecks&quot;, checks,</span>
+<span class="fc" id="L99">                    &quot;disposition&quot;, disposition, &quot;duplicate&quot;, duplicate));</span>
+<span class="fc" id="L100">            }</span>
+<span class="fc" id="L101">            inputs.add(Map.of(&quot;prefix&quot;, prefix.terms(), &quot;maximumOrder&quot;, prefix.maximumOrder(), &quot;attempts&quot;, attempts));</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        var evidence = Map.&lt;String, Object&gt;of(&quot;inputs&quot;, inputs, &quot;models&quot;, models.stream()</span>
+<span class="fc" id="L104">            .map(TrackCRecurrenceComparison::coefficients).toList());</span>
+<span class="fc" id="L105">        return new Frozen(index, arm, seed, List.copyOf(models), evidence, hash(JSON.writeValueAsString(evidence)));</span>
+    }
+
+    private static List&lt;RecurrenceModel&gt; proposals(Arm arm, Prefix input, Random random,
+                                                   int low, int high, int cap) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (arm == Arm.PRODUCTION_EXACT_FIT) {</span>
+<span class="fc" id="L111">            return LinearRecurrenceSequenceDomain.inferUniqueRecurrence(input.terms(), input.maximumOrder())</span>
+<span class="fc" id="L112">                .stream().toList();</span>
+        }
+<span class="fc" id="L114">        int maximum = Math.min(input.maximumOrder(), input.terms().size() / 2);</span>
+<span class="fc" id="L115">        var grammar = new ArrayList&lt;RecurrenceModel&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (int order = 1; order &lt;= maximum; order++) enumerate(grammar, List.of(), order, low, high);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (arm == Arm.ENUMERATE_VALID_GRAMMAR) return grammar.stream().limit(cap).toList();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (grammar.isEmpty()) return List.of();</span>
+<span class="fc" id="L119">        var draws = new ArrayList&lt;RecurrenceModel&gt;(cap);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (int draw = 0; draw &lt; cap; draw++) draws.add(grammar.get(random.nextInt(grammar.size())));</span>
+<span class="fc" id="L121">        return draws;</span>
+    }
+
+    private static void enumerate(List&lt;RecurrenceModel&gt; grammar, List&lt;Rational&gt; prefix, int order, int low, int high) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (int value = low; value &lt;= high; value++) {</span>
+<span class="fc" id="L126">            var next = new ArrayList&lt;&gt;(prefix);</span>
+<span class="fc" id="L127">            next.add(Rational.of(value));</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (next.size() &lt; order) enumerate(grammar, next, order, low, high);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            else if (value != 0) grammar.add(new RecurrenceModel(order, next));</span>
+        }
+<span class="fc" id="L131">    }</span>
+
+    private static boolean allowed(RecurrenceModel model, int low, int high) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        return !model.coefficients().getLast().isZero() &amp;&amp; model.coefficients().stream()</span>
+<span class="pc bpc" id="L135" title="3 of 6 branches missed.">            .allMatch(c -&gt; c.isInteger() &amp;&amp; c.numerator().compareTo(java.math.BigInteger.valueOf(low)) &gt;= 0</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                &amp;&amp; c.numerator().compareTo(java.math.BigInteger.valueOf(high)) &lt;= 0);</span>
+    }
+
+    private static Map&lt;String, Object&gt; evaluate(List&lt;RecurrenceModel&gt; models, JsonNode item) {
+<span class="fc" id="L140">        JsonNode eval = item.required(&quot;evaluationInput&quot;);</span>
+<span class="fc" id="L141">        List&lt;Long&gt; observed = terms(eval.required(&quot;observedPrefix&quot;));</span>
+<span class="fc" id="L142">        List&lt;Long&gt; actual = terms(eval.required(&quot;holdoutContinuation&quot;));</span>
+<span class="fc" id="L143">        var outcomes = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        String status = models.isEmpty() ? &quot;NO_OUTPUT&quot; : &quot;PREFIX_MISMATCH&quot;;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (RecurrenceModel model : models) {</span>
+<span class="fc" id="L146">            var prefixChecks = checkPrefix(model, observed);</span>
+<span class="fc" id="L147">            var history = new ArrayList&lt;&gt;(observed);</span>
+<span class="fc" id="L148">            var predictions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L149">            boolean continuationMatches = true;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (long term : actual) {</span>
+<span class="fc" id="L151">                Rational next = nextTerm(model, history);</span>
+<span class="fc" id="L152">                predictions.add(next.canonical());</span>
+<span class="fc" id="L153">                continuationMatches &amp;= next.equals(Rational.of(term));</span>
+<span class="fc" id="L154">                history.add(term);</span>
+<span class="fc" id="L155">            }</span>
+<span class="fc" id="L156">            boolean fits = prefixChecks.stream().allMatch(Boolean::booleanValue);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            String outcome = !fits ? &quot;PREFIX_MISMATCH&quot; : continuationMatches ? &quot;CONFIRMED&quot; : &quot;REFUTED&quot;;</span>
+<span class="pc bpc" id="L158" title="3 of 6 branches missed.">            if (&quot;CONFIRMED&quot;.equals(outcome) || (&quot;REFUTED&quot;.equals(outcome) &amp;&amp; !&quot;CONFIRMED&quot;.equals(status))) status = outcome;</span>
+<span class="fc" id="L159">            outcomes.add(Map.of(&quot;coefficients&quot;, coefficients(model), &quot;prefixChecks&quot;, prefixChecks,</span>
+                &quot;predictions&quot;, predictions, &quot;outcome&quot;, outcome));
+<span class="fc" id="L161">        }</span>
+<span class="fc" id="L162">        return Map.of(&quot;caseId&quot;, item.required(&quot;caseId&quot;), &quot;split&quot;, item.required(&quot;split&quot;), &quot;outcome&quot;, status,</span>
+            &quot;observed&quot;, observed, &quot;continuation&quot;, actual, &quot;candidates&quot;, outcomes);
+    }
+
+    private static List&lt;Boolean&gt; checkPrefix(RecurrenceModel model, List&lt;Long&gt; observed) {
+<span class="fc" id="L167">        var checks = new ArrayList&lt;Boolean&gt;();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (int i = model.order(); i &lt; observed.size(); i++) {</span>
+<span class="fc" id="L169">            checks.add(nextTerm(model, observed.subList(0, i)).equals(Rational.of(observed.get(i))));</span>
+        }
+<span class="fc" id="L171">        return checks;</span>
+    }
+
+    private static Rational nextTerm(RecurrenceModel model, List&lt;Long&gt; history) {
+<span class="fc" id="L175">        Rational value = Rational.of(0);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int lag = 0; lag &lt; model.order(); lag++) {</span>
+<span class="fc" id="L177">            value = value.add(model.coefficients().get(lag).multiply(Rational.of(history.get(history.size() - lag - 1))));</span>
+        }
+<span class="fc" id="L179">        return value;</span>
+    }
+
+    private static List&lt;String&gt; coefficients(RecurrenceModel model) {
+<span class="fc" id="L183">        return model.coefficients().stream().map(Rational::canonical).toList();</span>
+    }
+
+    static List&lt;Long&gt; terms(JsonNode array) {
+<span class="fc" id="L187">        var terms = new ArrayList&lt;Long&gt;();</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (JsonNode value : array) {</span>
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">            require(value.isIntegralNumber() &amp;&amp; value.canConvertToLong(), &quot;invalid frozen sequence term&quot;);</span>
+<span class="fc" id="L190">            terms.add(value.longValue());</span>
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        return List.copyOf(terms);</span>
+    }
+
+    static ObjectNode frozen(Path data, String name, String expected) throws Exception {
+<span class="fc" id="L196">        ObjectNode doc = (ObjectNode) JSON.readTree(data.resolve(name + &quot;.json&quot;).toFile());</span>
+<span class="fc" id="L197">        ObjectNode content = doc.deepCopy();</span>
+<span class="fc" id="L198">        String declared = content.remove(&quot;contentHash&quot;).textValue();</span>
+<span class="fc" id="L199">        String canonical = JSON.writeValueAsString(JSON.treeToValue(content, Map.class));</span>
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">        require(expected.equals(declared) &amp;&amp; expected.equals(hash(canonical)), &quot;frozen hash mismatch: &quot; + name);</span>
+<span class="fc" id="L201">        return doc;</span>
+    }
+
+    static String campaignSeed(String benchmark, int index) throws Exception {
+<span class="fc" id="L205">        String campaignId = CHALLENGE + &quot;-campaign-&quot; + String.format(java.util.Locale.ROOT, &quot;%02d&quot;, index);</span>
+<span class="fc" id="L206">        return hash(JSON.writeValueAsString(Map.of(&quot;benchmarkId&quot;, benchmark, &quot;campaignId&quot;, campaignId,</span>
+<span class="fc" id="L207">            &quot;challengeId&quot;, CHALLENGE, &quot;index&quot;, index)));</span>
+    }
+
+    static String hash(String text) {
+        try {
+<span class="fc" id="L212">            return &quot;sha256:&quot; + HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L213">                .digest(text.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L214">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L215">            throw new IllegalStateException(ex);</span>
+        }
+    }
+
+    static void require(boolean condition, String message) {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(message);</span>
+<span class="fc" id="L221">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

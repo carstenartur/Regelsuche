@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessRestrictedEvaluation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessRestrictedEvaluation.java</span></div><h1>InterestingnessRestrictedEvaluation.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusCase;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusReport;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusSplit;
+import de.regelsuche.mining.InterestingnessIndependentReviewIntake.IntakeOutcome;
+import de.regelsuche.mining.InterestingnessIndependentReviewIntake.IntakeReport;
+import de.regelsuche.mining.InterestingnessIndependentReviewIntake.ReviewOrigin;
+import de.regelsuche.mining.InterestingnessIndependentReviewStudy.StudyPlan;
+import de.regelsuche.mining.InterestingnessProfileCalibration.CaseProfiles;
+import de.regelsuche.mining.InterestingnessReviewConsensus.ReviewLabel;
+import de.regelsuche.mining.InterestingnessReviewConsensus.ReviewSource;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Frozen-input bridge to the production consensus, calibration and pre-registered gate. */
+final class InterestingnessRestrictedEvaluation {
+    private InterestingnessRestrictedEvaluation() { }
+
+    static List&lt;CaseProfiles&gt; profiles(ObjectMapper json, JsonNode supplied, StudyPlan plan) throws IOException {
+<span class="fc" id="L27">        var pairs = List.of(json.treeToValue(supplied, CaseProfiles[].class)).stream()</span>
+<span class="fc" id="L28">            .sorted(Comparator.comparing(CaseProfiles::caseId)).toList();</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (pairs.size() != plan.cases().size() || pairs.stream().map(CaseProfiles::caseId).distinct().count() != pairs.size()) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(&quot;profile inputs must cover the frozen plan exactly&quot;);</span>
+        }
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (var pair : pairs) {</span>
+<span class="fc" id="L33">            var item = plan.requireCase(pair.caseId());</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">            if (!item.candidateId().equals(pair.candidateId()) || !item.assessmentContentHash().equals(pair.theoryDiscovery().contentHash())) {</span>
+<span class="nc" id="L35">                throw new IllegalArgumentException(&quot;profile input differs from frozen case&quot;);</span>
+            }
+<span class="fc" id="L37">            InterestingnessProfileCalibration.validateProfilePair(pair);</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        return pairs;</span>
+    }
+
+    static ObjectNode evaluate(ObjectMapper json, ObjectNode state) throws IOException {
+<span class="fc" id="L43">        JsonNode frozen = state.required(&quot;frozen&quot;);</span>
+<span class="fc" id="L44">        var plan = json.treeToValue(state.required(&quot;plan&quot;), StudyPlan.class);</span>
+<span class="fc" id="L45">        var intake = json.treeToValue(frozen.required(&quot;intake&quot;), IntakeReport.class);</span>
+<span class="fc" id="L46">        boolean fixture = state.required(&quot;registration&quot;).required(&quot;origin&quot;).asText().equals(ReviewOrigin.DEVELOPMENT_FIXTURE.name());</span>
+<span class="fc" id="L47">        var labels = new ArrayList&lt;ReviewLabel&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (var row : intake.decisions()) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            var accepted = fixture ? IntakeOutcome.DEVELOPMENT_ONLY : IntakeOutcome.COUNTED_EXPERT_REVIEW;</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (row.outcome() != accepted) throw new IllegalArgumentException(&quot;unexpected evidence origin or rejected decision&quot;);</span>
+<span class="fc" id="L51">            labels.add(new ReviewLabel(row.reviewId(), row.candidateId(), row.reviewerHash(),</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                fixture ? ReviewSource.TEST_FIXTURE : ReviewSource.EXPERT_REVIEW, row.blindReview(),</span>
+<span class="fc" id="L53">                row.relevancePermille(), row.confidencePermille(), row.rationaleCodes()));</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        var consensus = new InterestingnessReviewConsensus().evaluate(labels);</span>
+<span class="fc" id="L56">        var result = json.createObjectNode();</span>
+<span class="fc" id="L57">        result.put(&quot;schema&quot;, &quot;regelsuche.restricted-review-analysis/v1&quot;);</span>
+<span class="fc" id="L58">        result.put(&quot;freezeHash&quot;, frozen.required(&quot;freezeHash&quot;).textValue());</span>
+<span class="fc" id="L59">        result.put(&quot;registrationHash&quot;, state.required(&quot;registrationHash&quot;).textValue());</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        result.put(&quot;evidenceClass&quot;, fixture ? &quot;DEVELOPMENT_ONLY&quot; : &quot;EXTERNAL_REVIEW_COLLECTION&quot;);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        result.put(&quot;empiricalConsensusStatus&quot;, fixture ? &quot;NOT_EVALUATED&quot; : &quot;ASSESSED&quot;);</span>
+<span class="fc" id="L62">        result.put(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L63">        result.put(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L64">        result.put(&quot;thresholdLockHash&quot;, plan.thresholdLockHash());</span>
+<span class="fc" id="L65">        result.set(&quot;consensus&quot;, json.readTree(consensus.toCanonicalJson()));</span>
+<span class="fc" id="L66">        var exposures = result.putArray(&quot;testExposureLedger&quot;);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (var item : plan.cases()) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (item.split() == CorpusSplit.TEST) {</span>
+<span class="fc" id="L69">                var exposure = exposures.addObject();</span>
+<span class="fc" id="L70">                exposure.put(&quot;candidateArtifactHash&quot;, item.candidateArtifactHash());</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                exposure.put(&quot;kind&quot;, fixture ? &quot;DEVELOPMENT_EVALUATION&quot; : &quot;PRIOR_HELD_OUT_USE&quot;);</span>
+<span class="fc" id="L72">                exposure.put(&quot;sourceStudyHash&quot;, plan.contentHash());</span>
+<span class="fc" id="L73">                exposure.put(&quot;freezeHash&quot;, frozen.required(&quot;freezeHash&quot;).textValue());</span>
+            }
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        var problems = result.putArray(&quot;blockers&quot;);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (var item : plan.cases()) {</span>
+<span class="fc" id="L78">            var candidate = consensus.candidates().stream().filter(c -&gt; c.candidateId().equals(item.candidateId())).findFirst();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (candidate.isEmpty()) {</span>
+<span class="nc" id="L80">                problems.add(&quot;no-rating:&quot; + item.caseId());</span>
+<span class="nc" id="L81">                continue;</span>
+            }
+<span class="fc" id="L83">            var c = candidate.get();</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            int reviews = fixture ? c.reviewerHashes().size() : c.countedExpertReviews();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (reviews &lt; plan.reviewProtocol().minimumIndependentExpertReviews()) problems.add(&quot;insufficient-reviews:&quot; + item.caseId());</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (c.spreadPermille() &gt; InterestingnessReviewConsensus.MAX_CONSENSUS_SPREAD_PERMILLE) problems.add(&quot;disagreement:&quot; + item.caseId());</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (c.meanConfidencePermille() &lt; InterestingnessReviewConsensus.MIN_MEAN_CONFIDENCE_PERMILLE) problems.add(&quot;low-confidence:&quot; + item.caseId());</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (!problems.isEmpty()) {</span>
+<span class="fc" id="L90">            result.put(&quot;analysisStatus&quot;, &quot;INSUFFICIENT_CONSENSUS&quot;);</span>
+<span class="fc" id="L91">            return result;</span>
+        }
+<span class="fc" id="L93">        var pairs = profiles(json, state.required(&quot;profiles&quot;), plan);</span>
+<span class="fc" id="L94">        var cases = pairs.stream().map(pair -&gt; {</span>
+<span class="fc" id="L95">            var item = plan.requireCase(pair.caseId());</span>
+<span class="fc" id="L96">            return new CorpusCase(item.caseId(), item.candidateId(), item.split(), item.candidateFamily(),</span>
+<span class="fc" id="L97">                item.structuralSignatureHash(), item.assessmentContentHash(), pair.theoryDiscovery().evidence().controlClassification());</span>
+<span class="fc" id="L98">        }).toList();</span>
+<span class="fc" id="L99">        var builder = new InterestingnessCalibrationCorpus();</span>
+        CorpusReport corpus;
+        try {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            corpus = fixture ? builder.freezeDevelopmentDiagnostics(cases, consensus) : builder.freeze(cases, consensus);</span>
+<span class="nc" id="L103">        } catch (IllegalArgumentException blocked) {</span>
+<span class="nc" id="L104">            problems.add(Objects.requireNonNullElse(blocked.getMessage(), &quot;corpus-rejected&quot;));</span>
+<span class="nc" id="L105">            result.put(&quot;analysisStatus&quot;, &quot;CORPUS_REJECTED&quot;);</span>
+<span class="nc" id="L106">            return result;</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        var report = new InterestingnessProfileCalibration().calibrate(corpus, pairs);</span>
+<span class="fc" id="L109">        var gate = new InterestingnessAcceptanceGate().evaluate(report, plan.acceptanceThresholds());</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        result.put(&quot;analysisStatus&quot;, fixture ? &quot;FIXTURE_DIAGNOSTICS&quot; : &quot;HELD_OUT_EVALUATION&quot;);</span>
+<span class="fc" id="L111">        result.set(&quot;corpus&quot;, json.readTree(corpus.toCanonicalJson()));</span>
+<span class="fc" id="L112">        result.set(&quot;calibration&quot;, json.readTree(report.toCanonicalJson()));</span>
+<span class="fc" id="L113">        result.set(&quot;acceptance&quot;, json.readTree(gate.toCanonicalJson()));</span>
+<span class="fc" id="L114">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

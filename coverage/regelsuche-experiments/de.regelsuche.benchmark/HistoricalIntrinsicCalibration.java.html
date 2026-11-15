@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalIntrinsicCalibration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalIntrinsicCalibration.java</span></div><h1>HistoricalIntrinsicCalibration.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.Case;
+import de.regelsuche.benchmark.HistoricalRediscoveryCorpus.TargetRelation;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.discovery.representation.RepresentationCorrespondenceClassifier;
+import de.regelsuche.discovery.representation.RepresentationCorrespondenceClassifier.Correspondence;
+import de.regelsuche.discovery.representation.TargetFreeIntrinsicCandidateValidator;
+import de.regelsuche.discovery.representation.TargetFreeIntrinsicCandidateValidator.IntrinsicValidation;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngines;
+import de.regelsuche.validation.OracleValidator.OracleValidation;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+
+/** Public calibration only. Candidates are committed before historical correspondence is assessed. */
+public final class HistoricalIntrinsicCalibration {
+    private HistoricalIntrinsicCalibration() { }
+
+<span class="fc" id="L37">    enum Policy { SCALAR, STRUCTURAL_DIVERSITY }</span>
+
+    record Occurrence(String expression, int depth, List&lt;String&gt; rules, List&lt;String&gt; assumptions,
+                      List&lt;Boolean&gt; preserving) {
+<span class="fc" id="L41">        Occurrence {</span>
+<span class="fc" id="L42">            rules = List.copyOf(rules);</span>
+<span class="fc" id="L43">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L44">            preserving = List.copyOf(preserving);</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">            if (depth != rules.size() || depth != preserving.size()) {</span>
+<span class="nc" id="L46">                throw new IllegalArgumentException(&quot;incomplete occurrence lineage&quot;);</span>
+            }
+<span class="fc" id="L48">        }</span>
+
+        static Occurrence from(SearchState state) {
+<span class="fc" id="L51">            return new Occurrence(state.expression(), state.depth(), state.appliedRuleIds(),</span>
+<span class="fc" id="L52">                state.assumptions(), state.equivalencePreservingFlags());</span>
+        }
+    }
+
+    record Row(int caseIndex, Policy policy, String source, List&lt;Occurrence&gt; occurrences) {
+<span class="fc" id="L57">        Row {</span>
+<span class="fc" id="L58">            occurrences = List.copyOf(occurrences);</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">            if (occurrences.stream().filter(o -&gt; o.depth() == 0).count() != 1</span>
+<span class="pc bpc" id="L60" title="3 of 6 branches missed.">                    || occurrences.stream().noneMatch(o -&gt; o.depth() == 0 &amp;&amp; o.expression().equals(source))) {</span>
+<span class="nc" id="L61">                throw new IllegalArgumentException(&quot;frozen occurrence set lacks its unique source&quot;);</span>
+            }
+<span class="fc" id="L63">        }</span>
+    }
+
+<span class="fc" id="L66">    record Assessment(IntrinsicValidation validation, boolean exactMatch, boolean acMatch, boolean credited) { }</span>
+
+    static List&lt;Occurrence&gt; form(String source, SearchHeuristic limits, Policy policy) {
+<span class="fc" id="L69">        var primitives = AstRewriteTransformationEngines.production(</span>
+<span class="fc" id="L70">            AstRewriteTransformationEngine.defaultRules(), 128, Math.max(200, limits.maxCandidatesPerState() * 2));</span>
+<span class="fc" id="L71">        var problem = new SearchProblem(source, primitives, new ExpressionScorer(), new ExpressionCanonicalizer(), limits);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        List&lt;SearchState&gt; states = switch (policy) {</span>
+<span class="fc" id="L73">            case SCALAR -&gt; new BestFirstSearchStrategy().searchWithDiagnostics(problem).states();</span>
+<span class="fc" id="L74">            case STRUCTURAL_DIVERSITY -&gt; new StructuralDiversitySearchStrategy().search(problem);</span>
+        };
+<span class="fc" id="L76">        return states.stream().map(Occurrence::from).toList();</span>
+    }
+
+    static IntrinsicValidation validate(String source, Occurrence occurrence) {
+<span class="fc" id="L80">        return TargetFreeIntrinsicCandidateValidator.validate(source, occurrence.expression(), occurrence.assumptions(),</span>
+<span class="fc" id="L81">            occurrence.preserving().stream().allMatch(Boolean::booleanValue), HistoricalIntrinsicCalibration::comparePolynomials);</span>
+    }
+
+    private static OracleValidation comparePolynomials(String source, String expression) {
+<span class="fc" id="L85">        var exact = new ExactPolynomialAnalysis();</span>
+        try {
+<span class="fc" id="L87">            boolean same = exact.normalForm(source).equals(exact.normalForm(expression));</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            return same ? OracleValidation.agrees(&quot;Exact rational-polynomial normal forms agree&quot;)</span>
+<span class="fc" id="L89">                : OracleValidation.disagrees(&quot;Exact rational-polynomial normal forms differ&quot;);</span>
+<span class="fc" id="L90">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L91">            return OracleValidation.unavailable(&quot;Outside bounded exact rational-polynomial projection&quot;);</span>
+        }
+    }
+
+    static List&lt;Assessment&gt; assess(String source, List&lt;Occurrence&gt; occurrences, String target, TargetRelation relation) {
+<span class="fc" id="L96">        var classifier = new RepresentationCorrespondenceClassifier();</span>
+<span class="fc" id="L97">        String formattedTarget = format(target);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        boolean useExact = relation == TargetRelation.SYNTAX_EXACT;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        boolean sourceMatches = useExact ? format(source).equals(formattedTarget)</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            : classifier.classify(source, target) == Correspondence.SAME_REPRESENTATION_CLASS;</span>
+<span class="fc" id="L101">        return occurrences.stream().map(o -&gt; {</span>
+<span class="fc" id="L102">            IntrinsicValidation validation = validate(source, o);</span>
+<span class="fc" id="L103">            boolean exact = format(o.expression()).equals(formattedTarget);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            boolean ac = classifier.classify(o.expression(), target) == Correspondence.SAME_REPRESENTATION_CLASS;</span>
+<span class="fc bfc" id="L105" title="All 12 branches covered.">            boolean credited = !sourceMatches &amp;&amp; o.depth() &gt; 0 &amp;&amp; validation.intrinsicallyVerified() &amp;&amp; (useExact ? exact : ac);</span>
+<span class="fc" id="L106">            return new Assessment(validation, exact, ac, credited);</span>
+<span class="fc" id="L107">        }).toList();</span>
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (args.length != 1) throw new IllegalArgumentException(&quot;expected new output directory&quot;);</span>
+<span class="fc" id="L112">        Path output = Files.createDirectory(Path.of(args[0]));</span>
+<span class="fc" id="L113">        var corpus = HistoricalRediscoveryCorpus.load();</span>
+<span class="fc" id="L114">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int index = 0; index &lt; corpus.cases().size(); index++) {</span>
+<span class="fc" id="L116">            Case entry = corpus.cases().get(index);</span>
+<span class="fc" id="L117">            String source = format(entry.source());</span>
+<span class="fc" id="L118">            var limits = new SearchHeuristic(entry.searchMaxDepth(), entry.searchMaxVisitedStates(), 1,</span>
+<span class="fc" id="L119">                entry.maxExpandingSteps(), entry.maxCandidatesPerState(), entry.beamWidth());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (Policy policy : Policy.values()) {</span>
+<span class="fc" id="L121">                rows.add(new Row(index, policy, source, form(source, limits, policy)));</span>
+            }
+        }
+<span class="fc" id="L124">        JsonWriter freeze = new JsonWriter().beginObject().property(&quot;schema&quot;, &quot;historical-intrinsic-freeze/v1&quot;)</span>
+<span class="fc" id="L125">            .property(&quot;corpusSha256&quot;, corpus.contentSha256()).property(&quot;inventory&quot;, corpus.inventoryRevision());</span>
+<span class="fc" id="L126">        freeze.array(&quot;rows&quot;, array -&gt; rows.forEach(row -&gt; array.objectValue(value -&gt; writeFreezeRow(value, row)))).endObject();</span>
+<span class="fc" id="L127">        Path frozenFile = Files.writeString(output.resolve(&quot;freeze.json&quot;), freeze + &quot;\n&quot;, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L128">        String freezeHash = sha256(Files.readAllBytes(frozenFile));</span>
+
+<span class="fc" id="L130">        JsonWriter evidence = new JsonWriter().beginObject().property(&quot;schema&quot;, &quot;historical-intrinsic-assessment/v1&quot;)</span>
+<span class="fc" id="L131">            .property(&quot;freezeSha256&quot;, freezeHash).property(&quot;oracle&quot;, ExactPolynomialAnalysis.REVISION);</span>
+<span class="fc" id="L132">        evidence.array(&quot;rows&quot;, array -&gt; rows.forEach(row -&gt; array.objectValue(value -&gt;</span>
+<span class="fc" id="L133">            writeAssessmentRow(value, row, corpus.cases().get(row.caseIndex()))))).endObject();</span>
+<span class="fc" id="L134">        Files.writeString(output.resolve(&quot;assessment.json&quot;), evidence + &quot;\n&quot;, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L135">    }</span>
+
+    private static void writeFreezeRow(JsonWriter out, Row row) {
+<span class="fc" id="L138">        out.property(&quot;caseIndex&quot;, row.caseIndex()).property(&quot;policy&quot;, row.policy().name()).property(&quot;source&quot;, row.source());</span>
+<span class="fc" id="L139">        out.array(&quot;occurrences&quot;, array -&gt; row.occurrences().forEach(o -&gt; array.objectValue(item -&gt;</span>
+<span class="fc" id="L140">            item.property(&quot;expression&quot;, o.expression()).property(&quot;depth&quot;, o.depth()).stringArray(&quot;rules&quot;, o.rules())</span>
+<span class="fc" id="L141">                .stringArray(&quot;assumptions&quot;, o.assumptions()).booleanArray(&quot;equivalencePreserving&quot;, o.preserving()))));</span>
+<span class="fc" id="L142">    }</span>
+
+    private static void writeAssessmentRow(JsonWriter out, Row row, Case entry) {
+<span class="fc" id="L145">        List&lt;Assessment&gt; assessed = assess(row.source(), row.occurrences(), entry.target(), entry.targetRelation());</span>
+<span class="fc" id="L146">        out.property(&quot;caseIndex&quot;, row.caseIndex()).property(&quot;caseId&quot;, entry.id()).property(&quot;role&quot;, entry.role().name())</span>
+<span class="fc" id="L147">            .property(&quot;policy&quot;, row.policy().name()).property(&quot;target&quot;, entry.target()).property(&quot;criterion&quot;, entry.targetRelation().name());</span>
+<span class="fc" id="L148">        out.array(&quot;occurrences&quot;, array -&gt; assessed.forEach(a -&gt; array.objectValue(item -&gt;</span>
+<span class="fc" id="L149">            item.property(&quot;oracleStatus&quot;, a.validation().oracleStatus()).property(&quot;oracleEvidence&quot;, a.validation().oracleEvidence())</span>
+<span class="fc" id="L150">                .property(&quot;proofStatus&quot;, a.validation().status().name()).property(&quot;scope&quot;, a.validation().scope().name())</span>
+<span class="fc" id="L151">                .property(&quot;exactMatch&quot;, a.exactMatch()).property(&quot;acMatch&quot;, a.acMatch()).property(&quot;credited&quot;, a.credited()))));</span>
+<span class="fc" id="L152">    }</span>
+
+    private static String format(String expression) {
+<span class="fc" id="L155">        return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L160">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L161">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L162">            throw new IllegalStateException(impossible);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoveltyCoverage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">NoveltyCoverage.java</span></div><h1>NoveltyCoverage.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import static de.regelsuche.literature.ExternalNoveltyReview.bad;
+import de.regelsuche.literature.CandidateLiteratureAssessments.Access;
+import de.regelsuche.literature.ExternalNoveltyReview.Packet;
+import de.regelsuche.literature.ExternalNoveltyReview.Query;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+/** Checks the complete sequence of observed hits against the existing private assessment. */
+final class NoveltyCoverage {
+    private NoveltyCoverage() { }
+    static void check(ExternalNoveltyReview checker,Packet p) {
+<span class="fc" id="L19">        var a=p.dossier().assessment();</span>
+<span class="pc bpc" id="L20" title="2 of 4 branches missed.">        if(!checker.freeze(p.plan()).equals(p.log().planRoot())||!checker.catalogueRoot(p.catalogue()).equals(p.log().catalogueRoot())</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">                ||!checker.logRoot(p.log()).equals(p.dossier().logRoot())||!p.plan().subject().equals(a.subject()))</span>
+<span class="nc" id="L22">            throw bad(&quot;cross-bound review chain&quot;);</span>
+<span class="pc bpc" id="L23" title="2 of 4 branches missed.">        if(!CandidateLiteratureAssessments.COVERAGE_SCHEMA.equals(a.schema())||p.catalogue().sources().size()!=a.scope().size())</span>
+<span class="nc" id="L24">            throw bad(&quot;invalid subject-bound source scope&quot;);</span>
+<span class="fc" id="L25">        checkInspectedMatches(p);</span>
+<span class="fc" id="L26">        var forms=NoveltyQueryForms.forEquation(p.plan().equation(), p.plan().assumptions());</span>
+<span class="fc" id="L27">        var logged=new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        for(var q:p.log().entries()) {</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            if(q.sourceIndex()&gt;=a.scope().size()||!q.expression().equals(forms.get(q.family()))) throw bad(&quot;unknown query form or source&quot;);</span>
+<span class="fc" id="L30">            logged.add(q.expression());</span>
+<span class="fc" id="L31">        }</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if(!Set.copyOf(a.queries()).equals(logged)) throw bad(&quot;assessment queries do not match the log&quot;);</span>
+<span class="fc" id="L33">        var catalogue = new HashSet&lt;SourceVersion&gt;();</span>
+<span class="fc" id="L34">        p.catalogue().sources().forEach(source -&gt; catalogue.add(new SourceVersion(source.name(),source.version())));</span>
+<span class="fc" id="L35">        var translations = new HashMap&lt;SourceForm,String&gt;();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (var approved : p.plan().approvedTranslations()) {</span>
+<span class="fc" id="L37">            var source = new SourceVersion(approved.source(),approved.version());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (!catalogue.contains(source)) throw bad(&quot;approved translation uses a different catalogue source or revision&quot;);</span>
+<span class="fc" id="L39">            translations.put(new SourceForm(source,approved.family()),approved.approvedQuery());</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for(int i=0;i&lt;a.scope().size();i++) checkSource(p,i,forms.keySet(),translations);</span>
+<span class="fc" id="L42">    }</span>
+    private static void checkInspectedMatches(Packet packet) {
+<span class="fc" id="L44">        var matches = packet.dossier().assessment().matches();</span>
+<span class="fc" id="L45">        var inspected = packet.dossier().inspected();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (matches.size() != inspected.size()) throw bad(&quot;each reviewed match requires inspected evidence&quot;);</span>
+<span class="fc" id="L47">        var seen = new HashSet&lt;ExternalNoveltyReview.InspectedHit&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int index = 0; index &lt; matches.size(); index++) {</span>
+<span class="fc" id="L49">            var match = matches.get(index);</span>
+<span class="fc" id="L50">            var hit = inspected.get(index);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">            if (hit.sourceIndex() != match.scopeIndex() || !hit.identifier().equals(match.source().identifier())</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">                    || hit.relation().assessmentRelation != match.relation() || !seen.add(hit)) {</span>
+<span class="fc" id="L53">                throw bad(&quot;inspected evidence differs from its dossier match&quot;);</span>
+            }
+        }
+<span class="fc" id="L56">    }</span>
+
+<span class="fc" id="L58">    private record SourceVersion(String name,String version) {}</span>
+<span class="fc" id="L59">    private record SourceForm(SourceVersion source,String family) {}</span>
+
+    private static void checkSource(Packet p,int i,Set&lt;String&gt; families,Map&lt;SourceForm,String&gt; translations) {
+<span class="fc" id="L62">        var src=p.catalogue().sources().get(i);</span>
+<span class="fc" id="L63">        var a=p.dossier().assessment();</span>
+<span class="fc" id="L64">        var scope=a.scope().get(i);</span>
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if(!src.name().equals(scope.source())||!src.version().equals(scope.versionOrDate())) throw bad(&quot;substituted source&quot;);</span>
+<span class="fc" id="L66">        var queried=new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L67">        var hits=new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L68">        var frozen=Instant.parse(p.plan().frozenAt());</span>
+<span class="fc" id="L69">        var reviewed=LocalDate.parse(a.reviewedOn());</span>
+<span class="fc" id="L70">        var catalogued = LocalDate.parse(src.cataloguedOn());</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for(Query q:p.log().entries()) {</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if(q.sourceIndex()!=i) continue;</span>
+<span class="fc" id="L73">            var when=Instant.parse(q.executedAt());</span>
+<span class="fc" id="L74">            var date = when.atZone(ZoneOffset.UTC).toLocalDate();</span>
+<span class="pc bpc" id="L75" title="2 of 8 branches missed.">            if(when.isBefore(frozen)||date.isBefore(catalogued)||date.isAfter(reviewed)||!queried.add(q.family()))</span>
+<span class="fc" id="L76">                throw bad(&quot;invalid query chronology or duplicate family&quot;);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (scope.coverage().status() == Access.SEARCHED) {</span>
+<span class="fc" id="L78">                var sourceForm = new SourceForm(new SourceVersion(src.name(),src.version()),q.family());</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">                if (!q.submittedText().equals(q.expression()) &amp;&amp; !q.submittedText().equals(translations.get(sourceForm)))</span>
+<span class="fc" id="L80">                    throw bad(&quot;unapproved source translation requires partial coverage&quot;);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                if (q.resultCount() != q.hitIds().size())</span>
+<span class="fc" id="L82">                    throw bad(&quot;uninspected search results require partial coverage&quot;);</span>
+            }
+<span class="fc" id="L84">            hits.addAll(q.hitIds());</span>
+<span class="fc" id="L85">        }</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        if(scope.coverage().status()==Access.INACCESSIBLE&amp;&amp;!queried.isEmpty()) throw bad(&quot;searched inaccessible source&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">        if(scope.coverage().status()==Access.SEARCHED&amp;&amp;!queried.equals(families)) throw bad(&quot;incomplete search family coverage&quot;);</span>
+<span class="fc" id="L88">        var explained=new HashSet&lt;String&gt;();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        a.matches().stream().filter(m-&gt;m.scopeIndex()==i).forEach(m-&gt;explained.add(m.source().identifier()));</span>
+<span class="fc" id="L90">        scope.coverage().unresolvedHits().forEach(h-&gt;explained.add(h.identifier()));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if(!hits.equals(explained)) throw bad(&quot;unaccounted or unobserved literature hit&quot;);</span>
+<span class="fc" id="L92">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

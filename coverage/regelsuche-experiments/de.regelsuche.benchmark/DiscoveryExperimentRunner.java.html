@@ -675,8 +675,8 @@ public interface DiscoveryExperimentRunner {
         }
 
         private static String unavailableStatus(OracleEvidence oracle) {
-<span class="pc bpc" id="L678" title="1 of 2 branches missed.">            if (oracle.inconclusive()) {</span>
-<span class="nc" id="L679">                return ORACLE_BUDGET_INCONCLUSIVE;</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (oracle.inconclusive()) {</span>
+<span class="fc" id="L679">                return ORACLE_BUDGET_INCONCLUSIVE;</span>
             }
 <span class="pc bpc" id="L681" title="1 of 2 branches missed.">            if (oracle.completeClosureExhausted()) {</span>
 <span class="fc" id="L682">                return ORACLE_COMPLETE_CLOSURE_WITHOUT_WITNESS;</span>

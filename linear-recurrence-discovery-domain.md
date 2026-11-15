@@ -153,6 +153,8 @@ coordinates. The production implementation contains no Fibonacci/Cassini name
 or special coefficient vector. The same solver derives the Pell counterpart
 `x0^2 + 2*x0*x1 - x1^2` from its different transition.
 
+A later [public development qualification](research/cassini-development-v1/result.md) published the entire six-request candidate freeze before scoring historical correspondence. It retains eight independently verified laws, including all five identity-transition basis laws, a complete empty result and a budget-inconclusive result. Only the law from the original Fibonacci transition and initial state matched the preregistered Cassini representation.
+
 ### Reuse and limits of the learning claim
 
 `Proposal` is an untrusted value that callers may store. Reloading requires

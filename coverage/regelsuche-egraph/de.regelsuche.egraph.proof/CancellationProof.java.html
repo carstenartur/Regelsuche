@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CancellationProof.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">CancellationProof.java</span></div><h1>CancellationProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.egraph.ENode;
+import de.regelsuche.egraph.EqualitySaturation;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.transform.AstRewriteTransformationEngine.CancelDivisionFactorRule;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.ToIntFunction;
+import java.util.regex.Pattern;
+
+/** Derives ground scalar cancellation axioms from receiver-owned mathematical premises. */
+public final class CancellationProof {
+    private static final String PREFIX = &quot;eqsat.scalar.factor-cancellation/v1/&quot;;
+<span class="fc" id="L28">    private static final Pattern SYMBOL = Pattern.compile(&quot;[\\p{L}][\\p{L}\\p{N}_]*&quot;);</span>
+<span class="fc" id="L29">    private static final PatternExpr REST = PatternExpr.var(&quot;rest&quot;);</span>
+
+    private CancellationProof() {}
+
+    /** Reconstruct every authorized rule independently before invoking the bounded DAG interpreter. */
+    public static ExtractionProofChecker.CheckResult check(Expr input, Expr output, ExtractionCertificate certificate,
+            Collection&lt;? extends RewriteRule&gt; trustedRules, List&lt;Assumption&gt; assumptions, ProofLimits limits) {
+<span class="fc" id="L36">        var budget = new ProofSupport(limits);</span>
+        try {
+<span class="fc" id="L38">            requireRule(trustedRules);</span>
+<span class="fc" id="L39">            budget.size(certificate.rules().size(), limits.maxTerms(), &quot;guard rule limit&quot;);</span>
+<span class="fc" id="L40">            var rules = new ArrayList&lt;RewriteRule&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            for (var identity : certificate.rules()) {</span>
+<span class="fc" id="L42">                budget.work(1);</span>
+<span class="fc" id="L43">                String id = identity.id();</span>
+<span class="fc" id="L44">                budget.chars(id);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                if (!id.startsWith(PREFIX)) throw new IllegalArgumentException(&quot;foreign guarded rule&quot;);</span>
+<span class="fc" id="L46">                String[] parts = id.substring(PREFIX.length()).split(&quot;/&quot;, 3);</span>
+<span class="pc bpc" id="L47" title="2 of 6 branches missed.">                if (parts.length != 3 || !(parts[0].equals(&quot;left&quot;) || parts[0].equals(&quot;right&quot;))) {</span>
+<span class="nc" id="L48">                    throw new IllegalArgumentException(&quot;invalid guarded rule identity&quot;);</span>
+                }
+<span class="fc" id="L50">                boolean left = parts[0].equals(&quot;left&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 3 branches missed.">                Factor factor = switch (parts[1]) {</span>
+<span class="fc" id="L52">                    case &quot;number&quot; -&gt; exact(budget.number(parts[2]));</span>
+<span class="fc" id="L53">                    case &quot;symbol&quot; -&gt; symbol(parts[2], assumptions, budget);</span>
+<span class="nc" id="L54">                    default -&gt; throw new IllegalArgumentException(&quot;unsupported scalar factor&quot;);</span>
+                };
+<span class="fc" id="L56">                rules.add(rule(factor, left));</span>
+<span class="fc" id="L57">            }</span>
+<span class="fc" id="L58">            return ExtractionProofChecker.check(input, output, certificate, rules, remaining(limits, budget), true)</span>
+<span class="fc" id="L59">                .includingPrelude(budget.work);</span>
+<span class="fc" id="L60">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="fc" id="L61">            return ExtractionProofChecker.CheckResult.denied(ExtractionProofChecker.Status.LIMIT_EXCEEDED,</span>
+<span class="fc" id="L62">                exhausted.getMessage(), budget.work);</span>
+<span class="fc" id="L63">        } catch (IllegalArgumentException | NullPointerException invalid) {</span>
+<span class="fc" id="L64">            return ExtractionProofChecker.CheckResult.denied(ExtractionProofChecker.Status.REJECTED,</span>
+                &quot;missing or malformed cancellation premise&quot;, budget.work);
+        }
+    }
+
+    /** Runs the existing native guard engine, then reconstructs and checks only its justified ground witnesses. */
+    public static EqualitySaturation.ProvedResult run(EqualitySaturation engine, Expr input, List&lt;Assumption&gt; context,
+            ToIntFunction&lt;ENode&gt; objective, EqualitySaturation.ProofOptions options) {
+<span class="fc" id="L72">        var budget = new ProofSupport(options.captureLimits());</span>
+        try {
+<span class="fc" id="L74">            requireRule(engine.rules());</span>
+<span class="fc" id="L75">            var assumptions = List.copyOf(context);</span>
+            // Bound the complete input before it reaches the recursive native inserter.
+<span class="fc" id="L77">            var preflight = new ExtractionProofBuilder(List.of(), options.captureLimits());</span>
+<span class="fc" id="L78">            preflight.addExpression(input);</span>
+<span class="fc" id="L79">            budget.work(preflight.workUsed());</span>
+<span class="fc" id="L80">            var observed = engine.saturateUnderAssumptions(input, assumptions, objective);</span>
+<span class="fc" id="L81">            var axioms = new LinkedHashMap&lt;String, PatternRewriteRule&gt;();</span>
+<span class="fc" id="L82">            var instances = new ArrayList&lt;Instance&gt;();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (var decision : observed.decisions()) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (!decision.applied()) continue;</span>
+<span class="fc" id="L85">                var source = (BinaryExpr) decision.before();</span>
+<span class="fc" id="L86">                var product = (BinaryExpr) source.left();</span>
+<span class="pc bpc" id="L87" title="1 of 3 branches missed.">                Factor factor = switch (source.right()) {</span>
+<span class="fc" id="L88">                    case NumberExpr n -&gt; exact(budget.number(budget.rational(n.value())));</span>
+<span class="fc" id="L89">                    case VariableExpr v -&gt; symbol(v.name(), assumptions, budget);</span>
+<span class="nc" id="L90">                    default -&gt; throw new IllegalArgumentException(&quot;unsupported guard subject&quot;);</span>
+<span class="fc" id="L91">                };</span>
+                // The producer's orientation is a hint; replay checks the actual ground endpoints.
+<span class="fc" id="L93">                boolean left = source.right().equals(product.left());</span>
+<span class="fc" id="L94">                var rule = rule(factor, left);</span>
+<span class="fc" id="L95">                axioms.putIfAbsent(rule.id(), rule);</span>
+<span class="fc" id="L96">                instances.add(new Instance(rule.id(), decision.after()));</span>
+<span class="fc" id="L97">            }</span>
+<span class="fc" id="L98">            var builder = new ExtractionProofBuilder(axioms.values(), remaining(options.captureLimits(), budget), true);</span>
+<span class="fc" id="L99">            int before = builder.addExpression(input);</span>
+<span class="fc" id="L100">            Expr output = observed.result().expression();</span>
+<span class="fc" id="L101">            int after = builder.addExpression(output);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for (var instance : instances) {</span>
+<span class="fc" id="L103">                int rest = builder.addExpression(instance.rest());</span>
+<span class="fc" id="L104">                builder.recordInstance(builder.prepareInstance(instance.id(), Map.of(&quot;rest&quot;, rest)));</span>
+<span class="fc" id="L105">            }</span>
+<span class="fc" id="L106">            long capture = budget.work + builder.workUsed();</span>
+<span class="fc" id="L107">            var built = builder.build(before, after);</span>
+<span class="fc" id="L108">            long build = builder.workUsed() + budget.work - capture;</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (built.certificate().isEmpty()) {</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                var status = built.status() == ExtractionProofBuilder.BuildStatus.LIMIT_EXCEEDED</span>
+<span class="nc" id="L111">                    ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.EXTRACTION_UNAVAILABLE;</span>
+<span class="nc" id="L112">                return unavailable(input, status, built.detail(), capture, build, 0);</span>
+            }
+<span class="fc" id="L114">            var replay = check(input, output, built.certificate().orElseThrow(), engine.rules(), assumptions, options.replayLimits());</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (replay.status() != ExtractionProofChecker.Status.ACCEPTED) {</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                var status = replay.status() == ExtractionProofChecker.Status.LIMIT_EXCEEDED</span>
+<span class="pc" id="L117">                    ? ProofOutcome.Status.LIMIT_EXCEEDED : ProofOutcome.Status.REPLAY_REJECTED;</span>
+<span class="fc" id="L118">                return unavailable(input, status, replay.detail(), capture, build, replay.workUsed());</span>
+            }
+<span class="fc" id="L120">            return new EqualitySaturation.ProvedResult(output, Optional.empty(),</span>
+<span class="fc" id="L121">                ProofOutcome.complete(replay.checked().orElseThrow(), capture, build));</span>
+<span class="nc" id="L122">        } catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="nc" id="L123">            return unavailable(input, ProofOutcome.Status.LIMIT_EXCEEDED, exhausted.getMessage(), budget.work, 0, 0);</span>
+<span class="nc" id="L124">        } catch (IllegalArgumentException invalid) {</span>
+<span class="nc" id="L125">            return unavailable(input, ProofOutcome.Status.UNSUPPORTED_RULE, invalid.getMessage(), budget.work, 0, 0);</span>
+        }
+    }
+
+    private static Factor symbol(String name, List&lt;Assumption&gt; assumptions, ProofSupport budget) {
+<span class="fc" id="L130">        budget.chars(name);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (!SYMBOL.matcher(name).matches()) throw new IllegalArgumentException(&quot;non-atomic guard subject&quot;);</span>
+<span class="fc" id="L132">        var nonzero = Assumption.nonZero(name);</span>
+<span class="fc" id="L133">        var positive = Assumption.positive(name);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (var fact : assumptions) {</span>
+<span class="fc" id="L135">            budget.work(1);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (fact.symbols().size() != 1) continue;</span>
+<span class="fc" id="L137">            budget.chars(fact.symbols().getFirst());</span>
+<span class="fc" id="L138">            budget.chars(fact.expression());</span>
+<span class="fc bfc" id="L139" title="All 4 branches covered.">            if (fact.equals(nonzero) || fact.equals(positive)) {</span>
+<span class="fc" id="L140">                return new Factor(&quot;symbol/&quot; + name, PatternExpr.variable(name));</span>
+            }
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">        throw new IllegalArgumentException(&quot;receiver has no canonical nonzero premise&quot;);</span>
+    }
+
+    private static Factor exact(ExactRational number) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (number.isZero()) throw new IllegalArgumentException(&quot;zero cancellation&quot;);</span>
+<span class="fc" id="L148">        return new Factor(&quot;number/&quot; + number.canonicalText(), PatternExpr.num(number));</span>
+    }
+
+    private static PatternRewriteRule rule(Factor factor, boolean left) {
+<span class="fc bfc" id="L152" title="All 4 branches covered.">        var product = PatternExpr.op(BinaryOperator.MUL, left ? factor.subject() : REST, left ? REST : factor.subject());</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        return new PatternRewriteRule(PREFIX + (left ? &quot;left/&quot; : &quot;right/&quot;) + factor.key(),</span>
+<span class="fc" id="L154">            PatternExpr.op(BinaryOperator.DIV, product, factor.subject()), REST);</span>
+    }
+
+    private static void requireRule(Collection&lt;? extends RewriteRule&gt; rules) {
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        if (rules.size() != 1 || !(rules.iterator().next() instanceof CancelDivisionFactorRule)) {</span>
+<span class="fc" id="L159">            throw new IllegalArgumentException(&quot;requires only the built-in scalar cancellation rule&quot;);</span>
+        }
+<span class="fc" id="L161">    }</span>
+
+    private static ProofLimits remaining(ProofLimits limits, ProofSupport spent) {
+<span class="fc" id="L164">        return new ProofLimits(limits.maxTerms(), limits.maxProofSteps(), limits.maxReferences(),</span>
+<span class="fc" id="L165">            Math.toIntExact(limits.maxCharacters() - spent.characters), limits.maxRationalBits(),</span>
+<span class="fc" id="L166">            limits.maxDepth(), limits.maxExpandedNodes(), limits.maxWork() - spent.work);</span>
+    }
+
+    private static EqualitySaturation.ProvedResult unavailable(Expr input, ProofOutcome.Status status, String detail,
+            long capture, long build, long replay) {
+<span class="fc" id="L171">        return new EqualitySaturation.ProvedResult(input, Optional.empty(),</span>
+<span class="fc" id="L172">            ProofOutcome.unavailable(status, detail, capture, build, replay));</span>
+    }
+
+<span class="fc" id="L175">    private record Factor(String key, PatternExpr subject) {}</span>
+<span class="fc" id="L176">    private record Instance(String id, Expr rest) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

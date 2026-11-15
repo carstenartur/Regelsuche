@@ -14,64 +14,86 @@ public final class AutonomousCampaignFeedback {
     private AutonomousCampaignFeedback() {
     }
 
+    /** Dispatch eligible native continuations until exhaustion; return the number of consumed tickets. */
+    public static int continueEligible(List&lt;ProductionCandidateContinuation&gt; candidates, int tickets,
+            ProductionCandidateContinuation.DispatchSink sink) {
+<span class="fc" id="L20">        Objects.requireNonNull(sink, &quot;sink&quot;);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (tickets &lt; 0) { throw new IllegalArgumentException(&quot;negative dispatch budget&quot;); }</span>
+<span class="fc" id="L22">        int remaining = tickets;</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc" id="L24">            int available = remaining;</span>
+<span class="fc" id="L25">            var selected = candidates.stream()</span>
+<span class="fc bfc" id="L26" title="All 4 branches covered.">                .filter(candidate -&gt; candidate.nextStage() != null &amp;&amp; candidate.requiredTickets() &lt;= available)</span>
+<span class="fc" id="L27">                .min(java.util.Comparator</span>
+<span class="fc" id="L28">                    .comparing(ProductionCandidateContinuation::nextStage).reversed()</span>
+<span class="fc" id="L29">                    .thenComparingInt(ProductionCandidateContinuation::batch)</span>
+<span class="fc" id="L30">                    .thenComparing(ProductionCandidateContinuation::id));</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (selected.isEmpty()) { break; }</span>
+<span class="fc" id="L32">            var continuation = selected.get();</span>
+<span class="fc" id="L33">            remaining -= continuation.requiredTickets();</span>
+<span class="fc" id="L34">            continuation.advance(sink);</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        return tickets - remaining;</span>
+    }
+
     public static FeedbackDecision complete(
         LifecycleRun lifecycle,
         CampaignPlan nextPlan
     ) {
-<span class="fc" id="L21">        Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
-<span class="fc" id="L22">        Objects.requireNonNull(nextPlan, &quot;nextPlan&quot;);</span>
-<span class="fc" id="L23">        var mining = lifecycle.mining();</span>
-<span class="fc" id="L24">        var fullReceipt = mining.fullBatch().binding().receipt();</span>
-<span class="fc" id="L25">        var rejectionReceipt = mining.rejectionBatch().binding().receipt();</span>
-<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!nextPlan.decisions().isEmpty()) {</span>
-<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L43">        Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(nextPlan, &quot;nextPlan&quot;);</span>
+<span class="fc" id="L45">        var mining = lifecycle.mining();</span>
+<span class="fc" id="L46">        var fullReceipt = mining.fullBatch().binding().receipt();</span>
+<span class="fc" id="L47">        var rejectionReceipt = mining.rejectionBatch().binding().receipt();</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!nextPlan.decisions().isEmpty()) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
                 &quot;completed pinned campaign cannot allocate another Autopilot decision&quot;);
         }
-<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (fullReceipt.outputs().size() != 1</span>
-<span class="fc" id="L31">                || !fullReceipt.outputs().getFirst().outputBranchId()</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                    .equals(lifecycle.candidateBranchId())</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                || !rejectionReceipt.outputs().isEmpty()</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                || rejectionReceipt.rejectedClusters().isEmpty()) {</span>
-<span class="nc" id="L35">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (fullReceipt.outputs().size() != 1</span>
+<span class="fc" id="L53">                || !fullReceipt.outputs().getFirst().outputBranchId()</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                    .equals(lifecycle.candidateBranchId())</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                || !rejectionReceipt.outputs().isEmpty()</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                || rejectionReceipt.rejectedClusters().isEmpty()) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
                 &quot;feedback requires one completed candidate and explicit rejection evidence&quot;);
         }
-<span class="fc" id="L38">        List&lt;String&gt; completedBranches = List.of(lifecycle.candidateBranchId());</span>
-<span class="fc" id="L39">        List&lt;String&gt; rejectedClusters = rejectionReceipt.rejectedClusters().stream()</span>
-<span class="fc" id="L40">            .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
-<span class="fc" id="L41">            .sorted()</span>
-<span class="fc" id="L42">            .toList();</span>
-<span class="fc" id="L43">        List&lt;String&gt; reasons = List.of(</span>
+<span class="fc" id="L60">        List&lt;String&gt; completedBranches = List.of(lifecycle.candidateBranchId());</span>
+<span class="fc" id="L61">        List&lt;String&gt; rejectedClusters = rejectionReceipt.rejectedClusters().stream()</span>
+<span class="fc" id="L62">            .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
+<span class="fc" id="L63">            .sorted()</span>
+<span class="fc" id="L64">            .toList();</span>
+<span class="fc" id="L65">        List&lt;String&gt; reasons = List.of(</span>
             &quot;ALPHA_EQUIVALENT_CLUSTER_REJECTED&quot;,
             &quot;CANDIDATE_LIFECYCLE_COMPLETED&quot;,
             &quot;NO_ELIGIBLE_AUTOPILOT_BRANCHES&quot;,
             &quot;UNUSED_BUDGET_RETAINED&quot;);
-<span class="fc" id="L48">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L70">        String contentHash = AutonomousResearchBriefV2.hash(</span>
             SCHEMA
-<span class="fc" id="L50">                + &quot;\nbrief=&quot; + mining.generation().brief().contentHash()</span>
-<span class="fc" id="L51">                + &quot;\ncurrentPlan=&quot; + mining.plan().contentHash()</span>
-<span class="fc" id="L52">                + &quot;\nsuccessfulExecution=&quot; + mining.fullBatch().execution().contentHash()</span>
-<span class="fc" id="L53">                + &quot;\nrejectedExecution=&quot; + mining.rejectionBatch().execution().contentHash()</span>
-<span class="fc" id="L54">                + &quot;\nlifecycle=&quot; + lifecycle.lifecycleDecision().contentHash()</span>
-<span class="fc" id="L55">                + &quot;\nformationReceipt=&quot; + mining.formationReceipt().contentHash()</span>
-<span class="fc" id="L56">                + &quot;\nstageLedger=&quot; + lifecycle.stageLedger().contentHash()</span>
+<span class="fc" id="L72">                + &quot;\nbrief=&quot; + mining.generation().brief().contentHash()</span>
+<span class="fc" id="L73">                + &quot;\ncurrentPlan=&quot; + mining.plan().contentHash()</span>
+<span class="fc" id="L74">                + &quot;\nsuccessfulExecution=&quot; + mining.fullBatch().execution().contentHash()</span>
+<span class="fc" id="L75">                + &quot;\nrejectedExecution=&quot; + mining.rejectionBatch().execution().contentHash()</span>
+<span class="fc" id="L76">                + &quot;\nlifecycle=&quot; + lifecycle.lifecycleDecision().contentHash()</span>
+<span class="fc" id="L77">                + &quot;\nformationReceipt=&quot; + mining.formationReceipt().contentHash()</span>
+<span class="fc" id="L78">                + &quot;\nstageLedger=&quot; + lifecycle.stageLedger().contentHash()</span>
                 + &quot;\ncompletedBranches=&quot; + completedBranches
                 + &quot;\nrejectedClusters=&quot; + rejectedClusters
-<span class="fc" id="L59">                + &quot;\nnextPlan=&quot; + nextPlan.contentHash()</span>
+<span class="fc" id="L81">                + &quot;\nnextPlan=&quot; + nextPlan.contentHash()</span>
                 + &quot;\nreasons=&quot; + reasons
                 + &quot;\ndisposition=CAMPAIGN_COMPLETE&quot;);
-<span class="fc" id="L62">        return new FeedbackDecision(</span>
+<span class="fc" id="L84">        return new FeedbackDecision(</span>
             SCHEMA,
-<span class="fc" id="L64">            mining.generation().brief().contentHash(),</span>
-<span class="fc" id="L65">            mining.plan().contentHash(),</span>
-<span class="fc" id="L66">            mining.fullBatch().execution().contentHash(),</span>
-<span class="fc" id="L67">            mining.rejectionBatch().execution().contentHash(),</span>
-<span class="fc" id="L68">            lifecycle.lifecycleDecision().contentHash(),</span>
-<span class="fc" id="L69">            mining.formationReceipt().contentHash(),</span>
-<span class="fc" id="L70">            lifecycle.stageLedger().contentHash(),</span>
+<span class="fc" id="L86">            mining.generation().brief().contentHash(),</span>
+<span class="fc" id="L87">            mining.plan().contentHash(),</span>
+<span class="fc" id="L88">            mining.fullBatch().execution().contentHash(),</span>
+<span class="fc" id="L89">            mining.rejectionBatch().execution().contentHash(),</span>
+<span class="fc" id="L90">            lifecycle.lifecycleDecision().contentHash(),</span>
+<span class="fc" id="L91">            mining.formationReceipt().contentHash(),</span>
+<span class="fc" id="L92">            lifecycle.stageLedger().contentHash(),</span>
             completedBranches,
             rejectedClusters,
-<span class="fc" id="L73">            List.of(),</span>
-<span class="fc" id="L74">            nextPlan.contentHash(),</span>
+<span class="fc" id="L95">            List.of(),</span>
+<span class="fc" id="L96">            nextPlan.contentHash(),</span>
             0,
             &quot;CAMPAIGN_COMPLETE&quot;,
             reasons,
@@ -106,101 +128,101 @@ public final class AutonomousCampaignFeedback {
         String publicEvidenceStatus,
         String contentHash
     ) {
-<span class="fc" id="L109">        public FeedbackDecision {</span>
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L111">                throw new IllegalArgumentException(&quot;unsupported feedback schema&quot;);</span>
+<span class="fc" id="L131">        public FeedbackDecision {</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L133">                throw new IllegalArgumentException(&quot;unsupported feedback schema&quot;);</span>
             }
-<span class="fc" id="L113">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
-<span class="fc" id="L114">            requireSha256(currentPlanHash, &quot;currentPlanHash&quot;);</span>
-<span class="fc" id="L115">            requireSha256(successfulExecutionHash, &quot;successfulExecutionHash&quot;);</span>
-<span class="fc" id="L116">            requireSha256(rejectedExecutionHash, &quot;rejectedExecutionHash&quot;);</span>
-<span class="fc" id="L117">            requireSha256(lifecycleDecisionHash, &quot;lifecycleDecisionHash&quot;);</span>
-<span class="fc" id="L118">            requireSha256(candidateFormationReceiptHash,</span>
+<span class="fc" id="L135">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="fc" id="L136">            requireSha256(currentPlanHash, &quot;currentPlanHash&quot;);</span>
+<span class="fc" id="L137">            requireSha256(successfulExecutionHash, &quot;successfulExecutionHash&quot;);</span>
+<span class="fc" id="L138">            requireSha256(rejectedExecutionHash, &quot;rejectedExecutionHash&quot;);</span>
+<span class="fc" id="L139">            requireSha256(lifecycleDecisionHash, &quot;lifecycleDecisionHash&quot;);</span>
+<span class="fc" id="L140">            requireSha256(candidateFormationReceiptHash,</span>
                 &quot;candidateFormationReceiptHash&quot;);
-<span class="fc" id="L120">            requireSha256(downstreamStageLedgerHash, &quot;downstreamStageLedgerHash&quot;);</span>
-<span class="fc" id="L121">            completedCandidateBranchIds = sortedText(</span>
+<span class="fc" id="L142">            requireSha256(downstreamStageLedgerHash, &quot;downstreamStageLedgerHash&quot;);</span>
+<span class="fc" id="L143">            completedCandidateBranchIds = sortedText(</span>
                 completedCandidateBranchIds, &quot;completedCandidateBranchIds&quot;);
-<span class="fc" id="L123">            rejectedClusterHashes = sortedHashes(</span>
+<span class="fc" id="L145">            rejectedClusterHashes = sortedHashes(</span>
                 rejectedClusterHashes, &quot;rejectedClusterHashes&quot;);
-<span class="fc" id="L125">            eligibleBranchIds = sortedText(eligibleBranchIds, &quot;eligibleBranchIds&quot;);</span>
-<span class="fc" id="L126">            requireSha256(nextPlanHash, &quot;nextPlanHash&quot;);</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (completedCandidateBranchIds.size() != 1</span>
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                    || rejectedClusterHashes.isEmpty()</span>
-<span class="pc bpc" id="L129" title="2 of 4 branches missed.">                    || !eligibleBranchIds.isEmpty()</span>
+<span class="fc" id="L147">            eligibleBranchIds = sortedText(eligibleBranchIds, &quot;eligibleBranchIds&quot;);</span>
+<span class="fc" id="L148">            requireSha256(nextPlanHash, &quot;nextPlanHash&quot;);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (completedCandidateBranchIds.size() != 1</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                    || rejectedClusterHashes.isEmpty()</span>
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">                    || !eligibleBranchIds.isEmpty()</span>
                     || nextDecisionCount != 0
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                    || !&quot;CAMPAIGN_COMPLETE&quot;.equals(disposition)) {</span>
-<span class="nc" id="L132">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    || !&quot;CAMPAIGN_COMPLETE&quot;.equals(disposition)) {</span>
+<span class="nc" id="L154">                throw new IllegalArgumentException(</span>
                     &quot;completed feedback must retain completion, rejection and an empty next plan&quot;);
             }
-<span class="fc" id="L135">            reasonCodes = sortedText(reasonCodes, &quot;reasonCodes&quot;);</span>
-<span class="pc bpc" id="L136" title="3 of 6 branches missed.">            if (!usesOnlyRetainedEvidence</span>
+<span class="fc" id="L157">            reasonCodes = sortedText(reasonCodes, &quot;reasonCodes&quot;);</span>
+<span class="pc bpc" id="L158" title="3 of 6 branches missed.">            if (!usesOnlyRetainedEvidence</span>
                     || feedbackIsMathematicalEvidence
                     || externalNoveltyEvaluated) {
-<span class="nc" id="L139">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L161">                throw new IllegalArgumentException(</span>
                     &quot;feedback must use retained evidence without creating truth or novelty claims&quot;);
             }
-<span class="fc" id="L142">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
-<span class="fc" id="L143">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
-<span class="fc" id="L144">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L145">        }</span>
+<span class="fc" id="L164">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L165">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L166">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L167">        }</span>
 
         public String toCanonicalJson() {
-<span class="fc" id="L148">            return new JsonWriter().beginObject()</span>
-<span class="fc" id="L149">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L150">                .property(&quot;briefHash&quot;, briefHash)</span>
-<span class="fc" id="L151">                .property(&quot;currentPlanHash&quot;, currentPlanHash)</span>
-<span class="fc" id="L152">                .property(&quot;successfulExecutionHash&quot;, successfulExecutionHash)</span>
-<span class="fc" id="L153">                .property(&quot;rejectedExecutionHash&quot;, rejectedExecutionHash)</span>
-<span class="fc" id="L154">                .property(&quot;lifecycleDecisionHash&quot;, lifecycleDecisionHash)</span>
-<span class="fc" id="L155">                .property(&quot;candidateFormationReceiptHash&quot;,</span>
+<span class="fc" id="L170">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L171">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L172">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L173">                .property(&quot;currentPlanHash&quot;, currentPlanHash)</span>
+<span class="fc" id="L174">                .property(&quot;successfulExecutionHash&quot;, successfulExecutionHash)</span>
+<span class="fc" id="L175">                .property(&quot;rejectedExecutionHash&quot;, rejectedExecutionHash)</span>
+<span class="fc" id="L176">                .property(&quot;lifecycleDecisionHash&quot;, lifecycleDecisionHash)</span>
+<span class="fc" id="L177">                .property(&quot;candidateFormationReceiptHash&quot;,</span>
                     candidateFormationReceiptHash)
-<span class="fc" id="L157">                .property(&quot;downstreamStageLedgerHash&quot;, downstreamStageLedgerHash)</span>
-<span class="fc" id="L158">                .stringArray(&quot;completedCandidateBranchIds&quot;,</span>
+<span class="fc" id="L179">                .property(&quot;downstreamStageLedgerHash&quot;, downstreamStageLedgerHash)</span>
+<span class="fc" id="L180">                .stringArray(&quot;completedCandidateBranchIds&quot;,</span>
                     completedCandidateBranchIds)
-<span class="fc" id="L160">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
-<span class="fc" id="L161">                .stringArray(&quot;eligibleBranchIds&quot;, eligibleBranchIds)</span>
-<span class="fc" id="L162">                .property(&quot;nextPlanHash&quot;, nextPlanHash)</span>
-<span class="fc" id="L163">                .property(&quot;nextDecisionCount&quot;, nextDecisionCount)</span>
-<span class="fc" id="L164">                .property(&quot;disposition&quot;, disposition)</span>
-<span class="fc" id="L165">                .stringArray(&quot;reasonCodes&quot;, reasonCodes)</span>
-<span class="fc" id="L166">                .property(&quot;usesOnlyRetainedEvidence&quot;, usesOnlyRetainedEvidence)</span>
-<span class="fc" id="L167">                .property(&quot;feedbackIsMathematicalEvidence&quot;,</span>
+<span class="fc" id="L182">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
+<span class="fc" id="L183">                .stringArray(&quot;eligibleBranchIds&quot;, eligibleBranchIds)</span>
+<span class="fc" id="L184">                .property(&quot;nextPlanHash&quot;, nextPlanHash)</span>
+<span class="fc" id="L185">                .property(&quot;nextDecisionCount&quot;, nextDecisionCount)</span>
+<span class="fc" id="L186">                .property(&quot;disposition&quot;, disposition)</span>
+<span class="fc" id="L187">                .stringArray(&quot;reasonCodes&quot;, reasonCodes)</span>
+<span class="fc" id="L188">                .property(&quot;usesOnlyRetainedEvidence&quot;, usesOnlyRetainedEvidence)</span>
+<span class="fc" id="L189">                .property(&quot;feedbackIsMathematicalEvidence&quot;,</span>
                     feedbackIsMathematicalEvidence)
-<span class="fc" id="L169">                .property(&quot;externalNoveltyEvaluated&quot;, externalNoveltyEvaluated)</span>
-<span class="fc" id="L170">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
-<span class="fc" id="L171">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
-<span class="fc" id="L172">                .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L173">                .endObject()</span>
-<span class="fc" id="L174">                .toString();</span>
+<span class="fc" id="L191">                .property(&quot;externalNoveltyEvaluated&quot;, externalNoveltyEvaluated)</span>
+<span class="fc" id="L192">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L193">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L194">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L195">                .endObject()</span>
+<span class="fc" id="L196">                .toString();</span>
         }
     }
 
     private static List&lt;String&gt; sortedText(List&lt;String&gt; values, String name) {
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (values == null) {</span>
-<span class="nc" id="L180">            return List.of();</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L202">            return List.of();</span>
         }
-<span class="pc bpc" id="L182" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
-<span class="nc" id="L183">            throw new IllegalArgumentException(name + &quot; contains blank values&quot;);</span>
+<span class="pc bpc" id="L204" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L205">            throw new IllegalArgumentException(name + &quot; contains blank values&quot;);</span>
         }
-<span class="fc" id="L185">        return values.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L207">        return values.stream().distinct().sorted().toList();</span>
     }
 
     private static List&lt;String&gt; sortedHashes(List&lt;String&gt; values, String name) {
-<span class="fc" id="L189">        List&lt;String&gt; result = sortedText(values, name);</span>
-<span class="fc" id="L190">        result.forEach(value -&gt; requireSha256(value, name));</span>
-<span class="fc" id="L191">        return result;</span>
+<span class="fc" id="L211">        List&lt;String&gt; result = sortedText(values, name);</span>
+<span class="fc" id="L212">        result.forEach(value -&gt; requireSha256(value, name));</span>
+<span class="fc" id="L213">        return result;</span>
     }
 
     private static void requireSha256(String value, String name) {
-<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L196">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L217" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L218">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L198">    }</span>
+<span class="fc" id="L220">    }</span>
 
     private static void requireNotEvaluated(String value, String name) {
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
-<span class="nc" id="L202">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L224">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
         }
-<span class="fc" id="L204">    }</span>
+<span class="fc" id="L226">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

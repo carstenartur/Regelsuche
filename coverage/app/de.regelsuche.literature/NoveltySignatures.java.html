@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoveltySignatures.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">NoveltySignatures.java</span></div><h1>NoveltySignatures.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import static de.regelsuche.literature.ExternalNoveltyReview.bad;
+import de.regelsuche.literature.ExternalNoveltyReview.Intake;
+import de.regelsuche.literature.ExternalNoveltyReview.Reviewer;
+import de.regelsuche.literature.ExternalNoveltyReview.Vote;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+
+final class NoveltySignatures {
+    private NoveltySignatures() { }
+    static List&lt;Vote&gt; verify(ExternalNoveltyReview checker,String packet,Intake intake,List&lt;Reviewer&gt; eligible) {
+<span class="fc" id="L21">        var registry=new HashMap&lt;String,Reviewer&gt;();</span>
+<span class="fc" id="L22">        var keys=new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        for(var member:eligible) {</span>
+<span class="fc" id="L24">            var key=readKey(member.publicKey());</span>
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">            if(registry.put(member.identityRoot(),member)!=null||!keys.add(Base64.getEncoder().encodeToString(key.getEncoded())))</span>
+<span class="fc" id="L26">                throw bad(&quot;duplicate eligible person or key&quot;);</span>
+<span class="fc" id="L27">        }</span>
+<span class="fc" id="L28">        var seen=new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L29">        var votes=new ArrayList&lt;Vote&gt;();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for(var review:intake.reviews()) {</span>
+<span class="fc" id="L31">            var claim=review.opinion();</span>
+<span class="fc" id="L32">            var member=registry.get(claim.reviewerRoot());</span>
+<span class="fc bfc" id="L33" title="All 4 branches covered.">            if(member==null||!seen.add(member.identityRoot())) throw bad(&quot;ineligible or duplicate reviewer&quot;);</span>
+<span class="fc bfc" id="L34" title="All 4 branches covered.">            if(!packet.equals(claim.packetRoot())||!claim.qualificationRoot().equals(member.qualificationRoot())</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                    ||!claim.conflictClearanceRoot().equals(member.conflictClearanceRoot())) throw bad(&quot;wrong packet or attestation&quot;);</span>
+<span class="fc" id="L36">            verifySignature(readKey(member.publicKey()),checker.signingBytes(claim),review.signature()); votes.add(claim.vote());</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        return List.copyOf(votes);</span>
+    }
+    private static PublicKey readKey(String encoded) {
+        try {
+<span class="fc" id="L42">            var key=KeyFactory.getInstance(&quot;Ed25519&quot;).generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(encoded)));</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if(!Base64.getEncoder().encodeToString(key.getEncoded()).equals(encoded)) throw bad(&quot;non-canonical reviewer key&quot;);</span>
+<span class="fc" id="L44">            return key;</span>
+<span class="nc" id="L45">        } catch(GeneralSecurityException e) { throw new IllegalArgumentException(&quot;invalid reviewer key&quot;,e); }</span>
+    }
+    private static void verifySignature(PublicKey key,byte[] payload,String signature) {
+        try {
+<span class="fc" id="L49">            var verifier=Signature.getInstance(&quot;Ed25519&quot;); verifier.initVerify(key); verifier.update(payload);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if(!verifier.verify(Base64.getDecoder().decode(signature))) throw bad(&quot;invalid reviewer signature&quot;);</span>
+<span class="pc" id="L51">        } catch(GeneralSecurityException e) { throw new IllegalArgumentException(&quot;invalid reviewer signature&quot;,e); }</span>
+<span class="fc" id="L52">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -8,24 +8,38 @@ public final class AutonomousProductionCampaignMain {
     }
 
     public static void main(String[] args) {
-<span class="pc bpc" id="L11" title="2 of 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--compare-controllers&quot;.equals(args[0])) {</span>
+<span class="pc bpc" id="L11" title="1 of 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--compare-formation-fan-in&quot;.equals(args[0])) {</span>
 <span class="pc bpc" id="L12" title="1 of 2 branches missed.">            if (args.length != 2) {</span>
-<span class="nc" id="L13">                throw new IllegalArgumentException(&quot;Expected --compare-controllers &lt;output-file&gt;&quot;);</span>
+<span class="nc" id="L13">                throw new IllegalArgumentException(&quot;Expected --compare-formation-fan-in &lt;output-file&gt;&quot;);</span>
             }
-<span class="fc" id="L15">            CampaignControllerComparison.write(Path.of(args[1]));</span>
+<span class="fc" id="L15">            MiningFanInComparison.write(Path.of(args[1]));</span>
 <span class="fc" id="L16">            return;</span>
         }
-<span class="nc bnc" id="L18" title="All 2 branches missed.">        Path output = args.length &gt; 0</span>
-<span class="nc" id="L19">            ? Path.of(args[0])</span>
-<span class="nc" id="L20">            : Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;autopilot-production-campaign&quot;);</span>
-<span class="nc bnc" id="L21" title="All 2 branches missed.">        int parallelism = args.length &gt; 1</span>
-<span class="nc" id="L22">            ? Math.max(1, Integer.parseInt(args[1]))</span>
-<span class="nc" id="L23">            : Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors()));</span>
-<span class="nc" id="L24">        AutonomousProductionCampaignRunner runner =</span>
+<span class="pc bpc" id="L18" title="1 of 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--compare-controllers&quot;.equals(args[0])) {</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">            if (args.length != 2) {</span>
+<span class="nc" id="L20">                throw new IllegalArgumentException(&quot;Expected --compare-controllers &lt;output-file&gt;&quot;);</span>
+            }
+<span class="fc" id="L22">            CampaignControllerComparison.write(Path.of(args[1]));</span>
+<span class="fc" id="L23">            return;</span>
+        }
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--compare-stage-allocation&quot;.equals(args[0])) {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (args.length != 3) {</span>
+<span class="nc" id="L27">                throw new IllegalArgumentException(&quot;Expected --compare-stage-allocation &lt;plan-file&gt; &lt;output-file&gt;&quot;);</span>
+            }
+<span class="fc" id="L29">            StageAllocationComparison.write(Path.of(args[1]), Path.of(args[2]));</span>
+<span class="fc" id="L30">            return;</span>
+        }
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        Path output = args.length &gt; 0</span>
+<span class="nc" id="L33">            ? Path.of(args[0])</span>
+<span class="nc" id="L34">            : Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;autopilot-production-campaign&quot;);</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        int parallelism = args.length &gt; 1</span>
+<span class="nc" id="L36">            ? Math.max(1, Integer.parseInt(args[1]))</span>
+<span class="nc" id="L37">            : Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors()));</span>
+<span class="nc" id="L38">        AutonomousProductionCampaignRunner runner =</span>
             new AutonomousProductionCampaignRunner();
-<span class="nc" id="L26">        var run = runner.runPinned(parallelism);</span>
-<span class="nc" id="L27">        runner.write(output, run);</span>
-<span class="nc" id="L28">        System.out.println(run.contentHash());</span>
-<span class="nc" id="L29">    }</span>
+<span class="nc" id="L40">        var run = runner.runPinned(parallelism);</span>
+<span class="nc" id="L41">        runner.write(output, run);</span>
+<span class="nc" id="L42">        System.out.println(run.contentHash());</span>
+<span class="nc" id="L43">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

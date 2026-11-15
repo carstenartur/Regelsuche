@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TrackCOpenMacroComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">TrackCOpenMacroComparison.java</span></div><h1>TrackCOpenMacroComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import static de.regelsuche.benchmark.CandidateIndependentReusableMacroBatchMain.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayTrace;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.*;
+import de.regelsuche.benchmark.OpenMacroPathInventory.*;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+/** Open-target two-step discovery on the four macro TRAIN starts from the public #383 corpus. */
+public final class TrackCOpenMacroComparison {
+<span class="fc" id="L25">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+    private static final String DIRECTORY = &quot;track-c-open-macros&quot;;
+    private static final String PLAN =
+            &quot;sha256:b5780d13f2278b3eb91b94e4166f312f2ecb71acadda96aba49087cb7d0c7694&quot;;
+    private static final String COMMIT = &quot;1fa021ac7f17bcf7886f761b0cd2c37bce9fd26f&quot;;
+
+<span class="fc" id="L31">    private enum Arm {</span>
+<span class="fc" id="L32">        PRODUCTION_SCORE,</span>
+<span class="fc" id="L33">        ENUMERATE_PRIMITIVE_PATHS,</span>
+<span class="fc" id="L34">        SEEDED_RANDOM_PRIMITIVE_PATHS</span>
+    }
+
+<span class="fc" id="L37">    private record Frozen(</span>
+            int index,
+            Arm arm,
+            String seed,
+            ObjectNode evidence,
+            String hash,
+            FormationResult result) {}
+
+    private TrackCOpenMacroComparison() {}
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (args.length != 2)</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;expected frozen corpus directory and output&quot;);</span>
+<span class="fc" id="L50">        Path data = Path.of(args[0]);</span>
+<span class="fc" id="L51">        Path planFile = data.resolve(DIRECTORY + &quot;/comparison-plan.json&quot;);</span>
+        String planHash =
+                &quot;sha256:&quot;
+<span class="fc" id="L54">                        + HexFormat.of()</span>
+<span class="fc" id="L55">                                .formatHex(</span>
+<span class="fc" id="L56">                                        MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L57">                                                .digest(Files.readAllBytes(planFile)));</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!PLAN.equals(planHash)) throw new IllegalArgumentException(&quot;changed comparison plan&quot;);</span>
+<span class="fc" id="L59">        var plan = readObject(planFile);</span>
+<span class="fc" id="L60">        var corpus =</span>
+<span class="fc" id="L61">                frozenFile(data, &quot;case-corpus&quot;, plan.required(&quot;caseCorpusContentHash&quot;).textValue());</span>
+<span class="fc" id="L62">        frozenFile(</span>
+                data,
+                &quot;corpus-freeze-receipt&quot;,
+<span class="fc" id="L65">                plan.required(&quot;freezeReceiptContentHash&quot;).textValue());</span>
+<span class="fc" id="L66">        var mapping =</span>
+<span class="fc" id="L67">                operationRules(</span>
+<span class="fc" id="L68">                        frozenFile(</span>
+                                data,
+                                &quot;macro-primitives&quot;,
+<span class="fc" id="L71">                                plan.required(&quot;primitiveProfileContentHash&quot;).textValue()));</span>
+<span class="fc" id="L72">        var cases = macroCases(corpus);</span>
+<span class="fc" id="L73">        var starts = trainStarts(cases);</span>
+<span class="fc" id="L74">        var inventory = new OpenMacroPathInventory(mapping);</span>
+<span class="fc" id="L75">        var adapter = new CandidateIndependentReusableMacroAdapter(mapping);</span>
+<span class="fc" id="L76">        var universes = new ArrayList&lt;Inventory&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (var start : starts) universes.add(inventory.generate(start));</span>
+<span class="fc" id="L78">        var campaigns = new ArrayList&lt;Frozen&gt;();</span>
+<span class="fc" id="L79">        String challenge = plan.required(&quot;challengeId&quot;).textValue();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (int index = 1; index &lt;= plan.required(&quot;campaigns&quot;).intValue(); index++) {</span>
+<span class="fc" id="L81">            String seed =</span>
+<span class="fc" id="L82">                    semanticHash(</span>
+<span class="fc" id="L83">                            JSON.valueToTree(</span>
+<span class="fc" id="L84">                                    Map.of(</span>
+                                            &quot;campaignId&quot;,
+                                            challenge
+                                                    + &quot;-campaign-&quot;
+<span class="fc" id="L88">                                                    + String.format(</span>
+<span class="fc" id="L89">                                                            java.util.Locale.ROOT, &quot;%02d&quot;, index),</span>
+                                            &quot;challengeId&quot;,
+                                            challenge,
+                                            &quot;index&quot;,
+<span class="fc" id="L93">                                            index)));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (Arm arm : Arm.values()) campaigns.add(form(index, arm, seed, universes, adapter));</span>
+        }
+        // Evaluation targets, objectives and task budgets first enter here, after all candidate
+        // sets are bound.
+<span class="fc" id="L98">        var tasks = evaluationTasks(cases);</span>
+<span class="fc" id="L99">        var report = JSON.createObjectNode();</span>
+<span class="fc" id="L100">        report.put(&quot;schema&quot;, &quot;regelsuche.track-c-open-macro-comparison/v1&quot;);</span>
+<span class="fc" id="L101">        report.put(&quot;planCommit&quot;, COMMIT);</span>
+<span class="fc" id="L102">        report.put(&quot;planByteHash&quot;, PLAN);</span>
+<span class="fc" id="L103">        report.put(&quot;corpusHash&quot;, corpus.required(&quot;contentHash&quot;).textValue());</span>
+<span class="fc" id="L104">        report.set(&quot;pathUniverses&quot;, JSON.valueToTree(universes));</span>
+<span class="fc" id="L105">        var runs = report.putArray(&quot;campaigns&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (Frozen run : campaigns) {</span>
+<span class="fc" id="L107">            var row = runs.addObject();</span>
+<span class="fc" id="L108">            row.put(&quot;index&quot;, run.index());</span>
+<span class="fc" id="L109">            row.put(&quot;arm&quot;, run.arm().name());</span>
+<span class="fc" id="L110">            row.put(&quot;seed&quot;, run.seed());</span>
+<span class="fc" id="L111">            row.set(&quot;formation&quot;, run.evidence());</span>
+<span class="fc" id="L112">            row.put(&quot;formationHash&quot;, run.hash());</span>
+<span class="fc" id="L113">            var evals = row.putArray(&quot;evaluations&quot;);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (var task : tasks) {</span>
+<span class="fc" id="L115">                var baseline = adapter.baseline(task.task());</span>
+<span class="fc" id="L116">                var result = adapter.evaluate(task.task(), run.result(), baseline);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                if (result.outcome() == UtilityOutcome.CANDIDATE_NOT_FORMED) {</span>
+<span class="nc" id="L118">                    result =</span>
+                            new PairedEvaluation(
+<span class="nc" id="L120">                                    result.taskId(),</span>
+<span class="nc" id="L121">                                    result.outcome(),</span>
+<span class="nc" id="L122">                                    baseline.run(),</span>
+<span class="nc" id="L123">                                    result.macroEnabled(),</span>
+<span class="nc" id="L124">                                    result.correctnessRegression(),</span>
+<span class="nc" id="L125">                                    result.detail());</span>
+                }
+<span class="fc" id="L127">                evals.add(evaluation(task, result));</span>
+<span class="fc" id="L128">            }</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        Files.writeString(Path.of(args[1]), canonicalJson(report) + &quot;\n&quot;);</span>
+<span class="fc" id="L131">    }</span>
+
+    static List&lt;Start&gt; trainStarts(List&lt;ObjectNode&gt; cases) {
+<span class="fc" id="L134">        var starts = new ArrayList&lt;Start&gt;();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (var item : cases) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (!&quot;TRAIN&quot;.equals(item.required(&quot;split&quot;).textValue())) continue;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (var trace : item.required(&quot;formationInput&quot;).required(&quot;replayTraces&quot;)) {</span>
+<span class="fc" id="L138">                var assumptions = new ArrayList&lt;String&gt;();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                for (var assumption : trace.required(&quot;assumptions&quot;))</span>
+<span class="nc" id="L140">                    assumptions.add(assumption.textValue());</span>
+<span class="fc" id="L141">                starts.add(new Start(trace.required(&quot;source&quot;).textValue(), assumptions));</span>
+<span class="fc" id="L142">            }</span>
+<span class="fc" id="L143">        }</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (starts.size() != 4)</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(&quot;expected four public TRAIN starts&quot;);</span>
+<span class="fc" id="L146">        return List.copyOf(starts);</span>
+    }
+
+    private static ObjectNode frozenFile(Path data, String name, String expected) throws Exception {
+<span class="fc" id="L150">        var doc = readObject(data.resolve(name + &quot;.json&quot;));</span>
+<span class="fc" id="L151">        requireContentHash(doc, name);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!expected.equals(doc.required(&quot;contentHash&quot;).textValue()))</span>
+<span class="nc" id="L153">            throw new IllegalArgumentException(name);</span>
+<span class="fc" id="L154">        return doc;</span>
+    }
+
+    private static Frozen form(
+            int index,
+            Arm arm,
+            String seed,
+            List&lt;Inventory&gt; universe,
+            CandidateIndependentReusableMacroAdapter adapter) {
+<span class="fc" id="L163">        var random = new Random(Long.parseUnsignedLong(seed.substring(7, 23), 16));</span>
+<span class="fc" id="L164">        var groups = new LinkedHashMap&lt;List&lt;String&gt;, List&lt;ReplayTrace&gt;&gt;();</span>
+<span class="fc" id="L165">        var evidence = JSON.createObjectNode();</span>
+<span class="fc" id="L166">        var decisions = evidence.putArray(&quot;selections&quot;);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; universe.size(); i++) {</span>
+<span class="fc" id="L168">            var input = universe.get(i);</span>
+<span class="fc" id="L169">            var row = decisions.addObject();</span>
+<span class="fc" id="L170">            row.put(&quot;startIndex&quot;, i);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (input.choices().isEmpty()) {</span>
+<span class="fc" id="L172">                row.putNull(&quot;chosenKey&quot;);</span>
+<span class="fc" id="L173">                continue;</span>
+            }
+<span class="fc" id="L175">            var item = select(arm, input.choices(), random);</span>
+<span class="fc" id="L176">            row.put(&quot;chosenKey&quot;, item.key());</span>
+<span class="fc" id="L177">            var trace =</span>
+                    new ReplayTrace(
+                            &quot;open-path-&quot; + (i + 1),
+<span class="fc" id="L180">                            input.start().source(),</span>
+<span class="fc" id="L181">                            item.endpoints().getLast(),</span>
+<span class="fc" id="L182">                            item.operations(),</span>
+<span class="fc" id="L183">                            input.start().assumptions());</span>
+<span class="fc" id="L184">            groups.computeIfAbsent(item.operations(), ignored -&gt; new ArrayList&lt;&gt;()).add(trace);</span>
+        }
+<span class="fc" id="L186">        var accepted = new LinkedHashMap&lt;String, MacroCandidate&gt;();</span>
+<span class="fc" id="L187">        var replayRows = evidence.putArray(&quot;groups&quot;);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (var entry : groups.entrySet()) {</span>
+<span class="fc" id="L189">            var result = adapter.form(entry.getValue());</span>
+<span class="fc" id="L190">            var group = replayRows.addObject();</span>
+<span class="fc" id="L191">            group.set(&quot;operations&quot;, JSON.valueToTree(entry.getKey()));</span>
+<span class="fc" id="L192">            group.set(&quot;formation&quot;, formation(result));</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (result.status() == FormationStatus.SELECTED) {</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                for (var macro : result.macros()) accepted.putIfAbsent(macro.macroId(), macro);</span>
+            }
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">        var result =</span>
+                new FormationResult(
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                        accepted.isEmpty()</span>
+<span class="nc" id="L200">                                ? FormationStatus.GENERALIZATION_REJECTED</span>
+<span class="fc" id="L201">                                : FormationStatus.SELECTED,</span>
+<span class="fc" id="L202">                        List.copyOf(accepted.values()),</span>
+<span class="fc" id="L203">                        List.of(),</span>
+                        &quot;Frozen union of selected open-target groups&quot;);
+<span class="fc" id="L205">        evidence.set(&quot;accepted&quot;, formation(result));</span>
+<span class="fc" id="L206">        return new Frozen(index, arm, seed, evidence, semanticHash(evidence), result);</span>
+    }
+
+    private static PathChoice select(Arm arm, List&lt;PathChoice&gt; choices, Random random) {
+<span class="fc bfc" id="L210" title="All 3 branches covered.">        return switch (arm) {</span>
+            case PRODUCTION_SCORE -&gt;
+<span class="fc" id="L212">                    choices.stream()</span>
+<span class="fc" id="L213">                            .min(</span>
+<span class="fc" id="L214">                                    Comparator.comparingInt(PathChoice::endpointScore)</span>
+<span class="fc" id="L215">                                            .thenComparing(PathChoice::key))</span>
+<span class="fc" id="L216">                            .orElseThrow();</span>
+<span class="fc" id="L217">            case ENUMERATE_PRIMITIVE_PATHS -&gt; choices.getFirst();</span>
+<span class="fc" id="L218">            case SEEDED_RANDOM_PRIMITIVE_PATHS -&gt; choices.get(random.nextInt(choices.size()));</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

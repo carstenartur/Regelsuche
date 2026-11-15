@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FlagshipStudyPreregistration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FlagshipStudyPreregistration.java</span></div><h1>FlagshipStudyPreregistration.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision;
+import de.regelsuche.benchmark.HistoricalRewriteArchitectureDecision.VerifiedDecision;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryInformationBoundary.Track;
+import de.regelsuche.evolution.EvolutionRewriteProgramBaselineAblationPlan.TrackKind;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Public, outcome-free inputs reviewed against the sealed split commitments. */
+public record FlagshipStudyPreregistration(
+    String schema, String validationCommitmentHash, String finalTestCommitmentHash,
+    String architectureDecisionHash, Map&lt;Component, Revision&gt; components,
+    Map&lt;String, Tranche&gt; tranches, Map&lt;TrackKind, ComparatorIdentity&gt; baselines,
+    Endpoint endpoint
+) {
+    public static final String SCHEMA = &quot;regelsuche.flagship-study-preregistration/v1&quot;;
+<span class="fc" id="L29">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L30">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L31">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L32">        .enable(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L33">        .enable(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES)</span>
+<span class="fc" id="L34">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)</span>
+<span class="fc" id="L35">        .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)</span>
+<span class="fc" id="L36">        .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)</span>
+<span class="fc" id="L37">        .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)</span>
+<span class="fc" id="L38">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L39">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();</span>
+
+<span class="fc" id="L41">    public FlagshipStudyPreregistration {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) throw new IllegalArgumentException(&quot;unsupported study preregistration&quot;);</span>
+<span class="fc" id="L43">        hashes(validationCommitmentHash, finalTestCommitmentHash, architectureDecisionHash);</span>
+<span class="fc" id="L44">        components = complete(components, Set.of(Component.values()));</span>
+<span class="fc" id="L45">        tranches = Map.copyOf(tranches);</span>
+<span class="fc" id="L46">        baselines = complete(baselines, Set.of(TrackKind.values()));</span>
+<span class="fc" id="L47">        Objects.requireNonNull(endpoint);</span>
+<span class="fc" id="L48">    }</span>
+
+    public static FlagshipStudyPreregistration read(Path file) {
+        try {
+<span class="fc" id="L52">            return JSON.readValue(Files.readString(file), FlagshipStudyPreregistration.class);</span>
+<span class="fc" id="L53">        } catch (IOException ex) {</span>
+<span class="fc" id="L54">            throw new IllegalArgumentException(&quot;invalid public study preregistration&quot;, ex);</span>
+        }
+    }
+
+    public static VerifiedDecision readDecision(Path file) {
+        try {
+<span class="fc" id="L60">            return HistoricalRewriteArchitectureDecision.readFrozenDecision(Files.readString(file).stripTrailing());</span>
+<span class="nc" id="L61">        } catch (IOException ex) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;unable to read architecture decision&quot;, ex);</span>
+        }
+    }
+
+    public void requireInputs(VerifiedDecision decision, EvolutionRewriteProgramHeldOutCommitment validation,
+                              EvolutionRewriteProgramHeldOutCommitment finalTest) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (!architectureDecisionHash.equals(decision.contentHash())</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                || !validationCommitmentHash.equals(validation.contentHash())</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                || !finalTestCommitmentHash.equals(finalTest.contentHash())) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(&quot;decision or sealed split differs from reviewed input&quot;);</span>
+        }
+<span class="fc" id="L73">        complete(tranches, decision.dispositions().keySet());</span>
+<span class="fc" id="L74">        decision.dispositions().forEach((track, disposition) -&gt; {</span>
+<span class="fc" id="L75">            Tranche tranche = tranches.get(track);</span>
+<span class="fc" id="L76">            boolean deferred = disposition.startsWith(&quot;DEFERRED_&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (deferred != (tranche instanceof Deferred)) {</span>
+<span class="nc" id="L78">                throw new IllegalArgumentException(&quot;characterization or deferral differs for &quot; + track);</span>
+            }
+<span class="fc" id="L80">        });</span>
+<span class="fc" id="L81">        endpoint.thresholds().requireCompatibleWithFinalSurface(finalTest);</span>
+<span class="fc" id="L82">    }</span>
+
+    public String canonicalJson() {
+<span class="fc" id="L85">        return json(this);</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L89">        return EvolutionGenome.hash(canonicalJson());</span>
+    }
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L94">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L95">        } catch (IOException ex) {</span>
+<span class="nc" id="L96">            throw new IllegalStateException(&quot;cannot render study preregistration&quot;, ex);</span>
+        }
+    }
+
+    private static &lt;K, V&gt; Map&lt;K, V&gt; complete(Map&lt;K, V&gt; values, Set&lt;K&gt; keys) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!values.keySet().equals(keys)) throw new IllegalArgumentException(&quot;missing or unexpected axes: &quot; + keys);</span>
+<span class="fc" id="L102">        return Map.copyOf(values);</span>
+    }
+
+    private static void hashes(String... values) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (String value : values) EvolutionGenome.requireSha256(value, &quot;artifact identity&quot;);</span>
+<span class="fc" id="L107">    }</span>
+
+<span class="fc" id="L109">    public enum Component {</span>
+<span class="fc" id="L110">        SCALAR_VALUE_IDENTITY, SEARCH_QUOTIENT_RETAINED_LABELS, ASSUMPTION_PROPAGATION,</span>
+<span class="fc" id="L111">        RULE_DIRECTION_AND_COVERAGE, MATCHER_CANDIDATE_ORDER, SATURATION_RULE_COVERAGE,</span>
+<span class="fc" id="L112">        CERTIFICATE_BACKEND, PROGRAM_SOURCE, TOPOLOGY_INTERPRETER, SCHEDULER, TOTAL_WORK_ACCOUNTING,</span>
+<span class="fc" id="L113">        RUNTIME_ENVIRONMENT, BENCHMARK_SUITE</span>
+    }
+
+    public record Revision(String implementationHash, String characterizationHash) {
+<span class="fc" id="L117">        public Revision { hashes(implementationHash, characterizationHash); }</span>
+    }
+
+    public record ComparatorIdentity(String implementationHash, String configurationHash, String translationLossHash) {
+<span class="fc" id="L121">        public ComparatorIdentity { hashes(implementationHash, configurationHash, translationLossHash); }</span>
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = &quot;status&quot;)
+    @JsonSubTypes({@JsonSubTypes.Type(value = Included.class, name = &quot;INCLUDED&quot;),
+                   @JsonSubTypes.Type(value = Deferred.class, name = &quot;DEFERRED&quot;)})
+    public sealed interface Tranche permits Included, Deferred { }
+
+    public record Included(Revision revision) implements Tranche {
+<span class="fc" id="L130">        public Included { Objects.requireNonNull(revision); }</span>
+    }
+
+    public record Deferred(String knownLimitation, String corpusCoverageHash, String excludedClaimHash) implements Tranche {
+<span class="fc" id="L134">        public Deferred {</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (knownLimitation.isBlank()) throw new IllegalArgumentException(&quot;missing deferred capability&quot;);</span>
+<span class="fc" id="L136">            hashes(corpusCoverageHash, excludedClaimHash);</span>
+<span class="fc" id="L137">        }</span>
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = &quot;primary&quot;)
+    @JsonSubTypes({@JsonSubTypes.Type(value = SearchWork.class, name = &quot;SEARCH_WORK&quot;),
+                   @JsonSubTypes.Type(value = Representation.class, name = &quot;REPRESENTATION_DISCOVERY&quot;)})
+    public sealed interface Endpoint permits SearchWork, Representation {
+        FlagshipEndpointThresholds thresholds();
+    }
+
+    public record SearchWork(EvolutionRewriteProgramAcceptanceThresholds thresholds) implements Endpoint {
+<span class="fc" id="L148">        public SearchWork { Objects.requireNonNull(thresholds); }</span>
+    }
+
+<span class="fc" id="L151">    public enum RepresentationAxis {</span>
+<span class="fc" id="L152">        CANDIDATE_TAXONOMY, VALUE_AND_OCCURRENCE_IDENTITY, COMPRESSION_METRICS_AND_PROFILE,</span>
+<span class="fc" id="L153">        ANTI_ALIAS_EXPANDED_COST, KNOWN_STRUCTURE_CATALOGUE, CONSEQUENCES, RECOGNITION_SCOPE,</span>
+<span class="fc" id="L154">        CAPABILITY_FRONTIER_AND_MATERIAL_UNLOCK, RANKING_AND_QUALITY_DIVERSITY,</span>
+<span class="fc" id="L155">        GENERALIZED_BRIDGE_AND_HELD_OUT_REUSE, CERTIFICATE_POLICY</span>
+    }
+
+<span class="fc" id="L158">    public enum RepresentationBaseline {</span>
+<span class="fc" id="L159">        INFORMATION_EQUIVALENT_ENUMERATION, RANDOMIZED_VALID_CANDIDATE, HELD_OUT_CROSS_FAMILY_TRANSFER,</span>
+<span class="fc" id="L160">        NO_CROSS_OBSERVATION_GENERALIZATION, NO_COUNTEREXAMPLE_REFINEMENT, NO_PROJECT_NOVELTY_SCHEDULING</span>
+    }
+
+    public record Representation(Track informationTrack, Map&lt;RepresentationAxis, String&gt; policyRoots,
+                                 Map&lt;RepresentationBaseline, ComparatorIdentity&gt; comparisonBaselines,
+                                 RepresentationThresholds thresholds) implements Endpoint {
+<span class="fc" id="L166">        public Representation {</span>
+<span class="fc" id="L167">            Objects.requireNonNull(informationTrack);</span>
+<span class="fc" id="L168">            policyRoots = complete(policyRoots, Set.of(RepresentationAxis.values()));</span>
+<span class="fc" id="L169">            policyRoots.values().forEach(value -&gt; hashes(value));</span>
+<span class="fc" id="L170">            comparisonBaselines = complete(comparisonBaselines, Set.of(RepresentationBaseline.values()));</span>
+<span class="fc" id="L171">            Objects.requireNonNull(thresholds);</span>
+<span class="fc" id="L172">        }</span>
+    }
+
+    /** An eligible case meets all three gain thresholds under the same work budget and certificate policy. */
+    public record RepresentationThresholds(
+        int minimumExpandedCostReductionPermille, int minimumNewCapabilitiesPerCase,
+        int minimumHeldOutReusesPerCase, int minimumEligibleFinalCases, int minimumDistinctFamilies,
+        long maximumWorkPerCase, int maximumCorrectnessRegressions, int maximumAssumptionRegressions,
+        int requiredCleanReproductions, boolean requirePinnedReproduction, NullPolicy nullPolicy
+    ) implements FlagshipEndpointThresholds {
+<span class="fc" id="L182">        public RepresentationThresholds {</span>
+<span class="pc bpc" id="L183" title="8 of 16 branches missed.">            if (minimumExpandedCostReductionPermille &lt; 1 || minimumExpandedCostReductionPermille &gt; 1000</span>
+                    || minimumNewCapabilitiesPerCase &lt; 1 || minimumHeldOutReusesPerCase &lt; 1
+                    || minimumEligibleFinalCases &lt; 1 || minimumDistinctFamilies &lt; 1
+                    || minimumDistinctFamilies &gt; minimumEligibleFinalCases || maximumWorkPerCase &lt; 1) {
+<span class="nc" id="L187">                throw new IllegalArgumentException(&quot;infeasible representation gain or work limits&quot;);</span>
+            }
+<span class="pc bpc" id="L189" title="5 of 10 branches missed.">            if (maximumCorrectnessRegressions != 0 || maximumAssumptionRegressions != 0</span>
+                    || requiredCleanReproductions &lt; 2 || !requirePinnedReproduction || nullPolicy == null) {
+<span class="nc" id="L191">                throw new IllegalArgumentException(&quot;invalid representation no-regression or reproduction criteria&quot;);</span>
+            }
+<span class="fc" id="L193">        }</span>
+
+<span class="fc" id="L195">        public enum NullPolicy { REPORT_ALL_CASES_AND_BASELINES_WITH_UNMET_CRITERIA }</span>
+
+        @Override public void requireCompatibleWithFinalSurface(EvolutionRewriteProgramHeldOutCommitment finalTest) {
+<span class="fc" id="L198">            long families = finalTest.cases().stream().map(</span>
+<span class="fc" id="L199">                EvolutionRewriteProgramHeldOutCommitment.CaseCommitment::familyCommitmentHash).distinct().count();</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (finalTest.split() != EvolutionRewriteProgramHeldOutCommitment.Split.FINAL_TEST</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">                    || minimumEligibleFinalCases &gt; finalTest.cases().size() || minimumDistinctFamilies &gt; families) {</span>
+<span class="fc" id="L202">                throw new IllegalArgumentException(&quot;representation gate exceeds committed FINAL surface&quot;);</span>
+            }
+<span class="fc" id="L204">        }</span>
+
+<span class="fc" id="L206">        @Override public String toCanonicalJson() { return json(this); }</span>
+<span class="fc" id="L207">        @Override public String contentHash() { return EvolutionGenome.hash(toCanonicalJson()); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

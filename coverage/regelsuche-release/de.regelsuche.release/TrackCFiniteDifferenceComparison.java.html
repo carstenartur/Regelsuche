@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TrackCFiniteDifferenceComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">TrackCFiniteDifferenceComparison.java</span></div><h1>TrackCFiniteDifferenceComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import static de.regelsuche.release.TrackCRecurrenceComparison.*;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateContext;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain.SequenceState;
+
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+/** Bounded prospective Newton grammar comparison on the public frozen sequence panel. */
+public final class TrackCFiniteDifferenceComparison {
+    private static final String PLAN_HASH =
+            &quot;sha256:de9d3735d5e986bdf03087e8d5568a1cb30c1df3e8ebc5c7b87ecb84343d493c&quot;;
+    private static final String PLAN_COMMIT = &quot;85c2150586c68aa3436f6b17f84cb54bf5ff7eb9&quot;;
+
+<span class="fc" id="L26">    private enum Arm {</span>
+<span class="fc" id="L27">        PRODUCTION_DIFFERENCE_DOMAIN,</span>
+<span class="fc" id="L28">        ENUMERATE_VALID_GRAMMAR,</span>
+<span class="fc" id="L29">        SEEDED_RANDOM_VALID_GRAMMAR</span>
+    }
+
+<span class="fc" id="L32">    private record Prefix(List&lt;Long&gt; terms, int maximumOrder) {</span>
+        int degreeLimit() {
+<span class="fc" id="L34">            return Math.min(8, Math.min(maximumOrder, terms.size() - 2));</span>
+        }
+    }
+
+<span class="fc" id="L38">    private record Frozen(</span>
+            int campaign,
+            Arm arm,
+            String seed,
+            List&lt;List&lt;Long&gt;&gt; models,
+            Map&lt;String, Object&gt; evidence,
+            String hash) {}
+
+    private TrackCFiniteDifferenceComparison() {}
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        require(args.length == 2, &quot;usage: &lt;frozen corpus directory&gt; &lt;output.json&gt;&quot;);</span>
+<span class="fc" id="L50">        Path data = Path.of(args[0]);</span>
+<span class="fc" id="L51">        String planBytes =</span>
+<span class="fc" id="L52">                Files.readString(data.resolve(&quot;track-c-finite-differences/comparison-plan.json&quot;));</span>
+<span class="fc" id="L53">        require(PLAN_HASH.equals(hash(planBytes)), &quot;changed comparison plan&quot;);</span>
+<span class="fc" id="L54">        JsonNode plan = JSON.readTree(planBytes);</span>
+<span class="fc" id="L55">        JsonNode corpus =</span>
+<span class="fc" id="L56">                frozen(data, &quot;case-corpus&quot;, plan.required(&quot;caseCorpusContentHash&quot;).textValue());</span>
+<span class="fc" id="L57">        frozen(</span>
+                data,
+                &quot;corpus-freeze-receipt&quot;,
+<span class="fc" id="L60">                plan.required(&quot;freezeReceiptContentHash&quot;).textValue());</span>
+<span class="fc" id="L61">        frozen(</span>
+                data,
+                &quot;finite-sequence-candidate-forms&quot;,
+<span class="fc" id="L64">                plan.required(&quot;formationProfileContentHash&quot;).textValue());</span>
+
+<span class="fc" id="L66">        var cases = new ArrayList&lt;JsonNode&gt;();</span>
+<span class="fc" id="L67">        var inputs = new ArrayList&lt;Prefix&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (JsonNode row : corpus.required(&quot;cases&quot;)) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!plan.required(&quot;challengeId&quot;).equals(row.required(&quot;challengeId&quot;))) continue;</span>
+<span class="fc" id="L70">            cases.add(row);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (&quot;TRAIN&quot;.equals(row.required(&quot;split&quot;).textValue())) {</span>
+<span class="fc" id="L72">                JsonNode visible = row.required(&quot;formationInput&quot;);</span>
+<span class="fc" id="L73">                inputs.add(</span>
+                        new Prefix(
+<span class="fc" id="L75">                                terms(visible.required(&quot;observedPrefix&quot;)),</span>
+<span class="fc" id="L76">                                visible.required(&quot;maximumOrder&quot;).intValue()));</span>
+            }
+<span class="fc" id="L78">        }</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        require(cases.size() == 6 &amp;&amp; inputs.size() == 2, &quot;unexpected frozen panel&quot;);</span>
+<span class="fc" id="L80">        var runs = new ArrayList&lt;Frozen&gt;();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (int campaign = 1; campaign &lt;= plan.required(&quot;campaignCount&quot;).intValue(); campaign++) {</span>
+<span class="fc" id="L82">            String seed = campaignSeed(corpus.required(&quot;benchmarkId&quot;).textValue(), campaign);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (Arm arm : Arm.values()) runs.add(form(campaign, arm, seed, inputs, plan));</span>
+        }
+<span class="fc" id="L85">        var report = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (Frozen run : runs) {</span>
+<span class="fc" id="L87">            var rows = cases.stream().map(row -&gt; evaluate(run.models(), row)).toList();</span>
+<span class="fc" id="L88">            report.add(</span>
+<span class="fc" id="L89">                    Map.of(</span>
+                            &quot;campaign&quot;,
+<span class="fc" id="L91">                            run.campaign(),</span>
+                            &quot;arm&quot;,
+<span class="fc" id="L93">                            run.arm(),</span>
+                            &quot;seed&quot;,
+<span class="fc" id="L95">                            run.seed(),</span>
+                            &quot;formation&quot;,
+<span class="fc" id="L97">                            run.evidence(),</span>
+                            &quot;formationHash&quot;,
+<span class="fc" id="L99">                            run.hash(),</span>
+                            &quot;evaluations&quot;,
+                            rows));
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        Files.writeString(</span>
+<span class="fc" id="L104">                Path.of(args[1]),</span>
+<span class="fc" id="L105">                JSON.writeValueAsString(</span>
+<span class="fc" id="L106">                                Map.of(</span>
+                                        &quot;schema&quot;,
+                                        &quot;regelsuche.track-c-finite-difference-comparison/v1&quot;,
+                                        &quot;planCommit&quot;,
+                                        PLAN_COMMIT,
+                                        &quot;planByteHash&quot;,
+                                        PLAN_HASH,
+                                        &quot;corpusContentHash&quot;,
+<span class="fc" id="L114">                                        corpus.required(&quot;contentHash&quot;),</span>
+                                        &quot;campaigns&quot;,
+                                        report))
+                        + &quot;\n&quot;);
+<span class="fc" id="L118">    }</span>
+
+    private static Frozen form(
+            int campaign, Arm arm, String seed, List&lt;Prefix&gt; inputs, JsonNode plan)
+            throws Exception {
+<span class="fc" id="L123">        Random random = new Random(Long.parseUnsignedLong(seed.substring(7, 23), 16));</span>
+<span class="fc" id="L124">        var grammar = new Grammar(</span>
+<span class="fc" id="L125">                plan.required(&quot;minimumCoefficient&quot;).intValue(),</span>
+<span class="fc" id="L126">                plan.required(&quot;maximumCoefficient&quot;).intValue(),</span>
+<span class="fc" id="L127">                plan.required(&quot;proposalsPerTrainPrefix&quot;).intValue());</span>
+<span class="fc" id="L128">        var models = new LinkedHashSet&lt;List&lt;Long&gt;&gt;();</span>
+<span class="fc" id="L129">        var evidence = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (Prefix input : inputs) {</span>
+<span class="fc" id="L131">            evidence.add(formPrefix(input, arm, grammar, random, models));</span>
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">        var frozen = Map.&lt;String, Object&gt;of(&quot;inputs&quot;, evidence, &quot;models&quot;, List.copyOf(models));</span>
+<span class="fc" id="L134">        return new Frozen(</span>
+                campaign,
+                arm,
+                seed,
+<span class="fc" id="L138">                List.copyOf(models),</span>
+                frozen,
+<span class="fc" id="L140">                hash(JSON.writeValueAsString(frozen)));</span>
+    }
+
+<span class="fc" id="L143">    private record Grammar(int low, int high, int cap) {</span>
+        int size(Prefix input) {
+<span class="fc" id="L145">            return grammarSize(input.degreeLimit(), high - low + 1);</span>
+        }
+
+        boolean admits(Prefix input, List&lt;Long&gt; model) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            return model.size() &gt;= 2</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                    &amp;&amp; model.size() - 1 &lt;= input.degreeLimit()</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                    &amp;&amp; model.getLast() != 0</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                    &amp;&amp; model.getFirst().equals(input.terms().getFirst())</span>
+<span class="pc bpc" id="L153" title="3 of 6 branches missed.">                    &amp;&amp; model.subList(1, model.size()).stream().allMatch(a -&gt; low &lt;= a &amp;&amp; a &lt;= high);</span>
+        }
+
+        List&lt;List&lt;Long&gt;&gt; propose(Arm arm, Prefix input, Random random, List&lt;Integer&gt; levels) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (arm == Arm.PRODUCTION_DIFFERENCE_DOMAIN) return production(input, levels);</span>
+<span class="fc" id="L158">            int size = size(input);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (size == 0) return List.of();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            boolean enumerate = arm == Arm.ENUMERATE_VALID_GRAMMAR;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            int count = enumerate ? Math.min(size, cap) : cap;</span>
+<span class="fc" id="L162">            var proposed = new ArrayList&lt;List&lt;Long&gt;&gt;();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                int rank = enumerate ? i : random.nextInt(size);</span>
+<span class="fc" id="L165">                proposed.add(unrank(input.terms().getFirst(), rank, low, high));</span>
+            }
+<span class="fc" id="L167">            return proposed;</span>
+        }
+    }
+
+    private static Map&lt;String, Object&gt; formPrefix(
+            Prefix input, Arm arm, Grammar grammar, Random random, LinkedHashSet&lt;List&lt;Long&gt;&gt; models) {
+<span class="fc" id="L173">        var levels = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L174">        var seen = new LinkedHashSet&lt;List&lt;Long&gt;&gt;();</span>
+<span class="fc" id="L175">        var attempts = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (var model : grammar.propose(arm, input, random, levels)) {</span>
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">            boolean duplicate = !seen.add(model) || models.contains(model);</span>
+<span class="fc" id="L178">            var predicted = predictions(model, input.terms().size());</span>
+<span class="fc" id="L179">            boolean matchesPrefix = matches(predicted, input.terms());</span>
+<span class="fc" id="L180">            String disposition = &quot;OUTSIDE_GRAMMAR&quot;;</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (grammar.admits(input, model)) {</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                disposition = matchesPrefix ? &quot;SUPPORTED&quot; : &quot;REJECTED&quot;;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                if (matchesPrefix) models.add(model);</span>
+            }
+<span class="fc" id="L185">            attempts.add(Map.of(&quot;coefficients&quot;, model, &quot;predictions&quot;, predicted,</span>
+<span class="fc" id="L186">                    &quot;duplicate&quot;, duplicate, &quot;disposition&quot;, disposition));</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc" id="L188">        int subtractions = levels.stream().mapToInt(d -&gt; input.terms().size() - d).sum();</span>
+<span class="fc" id="L189">        return Map.of(</span>
+<span class="fc" id="L190">                &quot;prefix&quot;, input.terms(), &quot;maximumOrder&quot;, input.maximumOrder(),</span>
+<span class="fc" id="L191">                &quot;grammarSize&quot;, grammar.size(input), &quot;domainLevels&quot;, levels,</span>
+<span class="fc" id="L192">                &quot;domainSubtractions&quot;, subtractions, &quot;attempts&quot;, attempts,</span>
+<span class="fc" id="L193">                &quot;unusedSlots&quot;, grammar.cap() - attempts.size(),</span>
+<span class="fc" id="L194">                &quot;prefixChecks&quot;, attempts.size() * input.terms().size());</span>
+    }
+
+    private static List&lt;List&lt;Long&gt;&gt; production(Prefix input, List&lt;Integer&gt; degrees) {
+<span class="fc" id="L198">        var domain = new FiniteDifferenceSequenceDomain();</span>
+<span class="fc" id="L199">        var initial =</span>
+                new SequenceState(
+<span class="fc" id="L201">                        input.terms(), List.of(input.terms().getFirst()), List.of(input.terms()));</span>
+<span class="fc" id="L202">        var current = initial;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (int degree = 1; degree &lt;= input.degreeLimit(); degree++) {</span>
+<span class="fc" id="L204">            var next = domain.operators().getFirst().apply(current);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (next.isEmpty()) return List.of();</span>
+<span class="fc" id="L206">            current = next.getFirst().state();</span>
+<span class="fc" id="L207">            degrees.add(degree);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (domain.objective().assess(current).candidateReady()) {</span>
+<span class="fc" id="L209">                var candidate =</span>
+<span class="fc" id="L210">                        domain.candidateExtractor()</span>
+<span class="fc" id="L211">                                .extract(new CandidateContext&lt;&gt;(initial, current, List.of()));</span>
+<span class="fc" id="L212">                return List.of(candidate.initialDifferences());</span>
+            }
+        }
+<span class="fc" id="L215">        return List.of();</span>
+    }
+
+    private static int grammarSize(int degree, int radix) {
+<span class="fc" id="L219">        int total = 0;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (int i = 0; i &lt; degree; i++)</span>
+<span class="fc" id="L221">            total = Math.addExact(Math.multiplyExact(total, radix), radix - 1);</span>
+<span class="fc" id="L222">        return total;</span>
+    }
+
+    /** Decode increasing degree, signed lexicographic order; the final digit skips zero. */
+    private static List&lt;Long&gt; unrank(long first, int index, int low, int high) {
+<span class="fc" id="L227">        int radix = high - low + 1, block = radix - 1, degree = 1;</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        while (index &gt;= block) {</span>
+<span class="fc" id="L229">            index -= block;</span>
+<span class="fc" id="L230">            block = Math.multiplyExact(block, radix);</span>
+<span class="fc" id="L231">            degree++;</span>
+        }
+<span class="fc" id="L233">        var coefficients = new Long[degree + 1];</span>
+<span class="fc" id="L234">        coefficients[0] = first;</span>
+<span class="fc" id="L235">        int last = low + index % (radix - 1);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        coefficients[degree] = (long) (last &lt; 0 ? last : last + 1);</span>
+<span class="fc" id="L237">        index /= radix - 1;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        for (int i = degree - 1; i &gt;= 1; i--) {</span>
+<span class="fc" id="L239">            coefficients[i] = (long) (low + index % radix);</span>
+<span class="fc" id="L240">            index /= radix;</span>
+        }
+<span class="fc" id="L242">        return List.of(coefficients);</span>
+    }
+
+    private static List&lt;String&gt; predictions(List&lt;Long&gt; model, int length) {
+<span class="fc" id="L246">        var result = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (int n = 0; n &lt; length; n++) {</span>
+<span class="fc" id="L248">            BigInteger binomial = BigInteger.ONE, value = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L249" title="All 4 branches covered.">            for (int k = 0; k &lt; model.size() &amp;&amp; k &lt;= n; k++) {</span>
+<span class="fc" id="L250">                value = value.add(binomial.multiply(BigInteger.valueOf(model.get(k))));</span>
+<span class="fc" id="L251">                binomial =</span>
+<span class="fc" id="L252">                        binomial.multiply(BigInteger.valueOf(n - k))</span>
+<span class="fc" id="L253">                                .divide(BigInteger.valueOf(k + 1));</span>
+            }
+<span class="fc" id="L255">            result.add(value.toString());</span>
+        }
+<span class="fc" id="L257">        return result;</span>
+    }
+
+    private static boolean matches(List&lt;String&gt; predicted, List&lt;Long&gt; actual) {
+<span class="fc" id="L261">        boolean match = true;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (int index = 0; index &lt; actual.size(); index++) {</span>
+<span class="fc" id="L263">            match &amp;= predicted.get(index).equals(String.valueOf(actual.get(index)));</span>
+        }
+<span class="fc" id="L265">        return match;</span>
+    }
+
+    private static Map&lt;String, Object&gt; evaluate(List&lt;List&lt;Long&gt;&gt; models, JsonNode row) {
+<span class="fc" id="L269">        JsonNode eval = row.required(&quot;evaluationInput&quot;);</span>
+<span class="fc" id="L270">        List&lt;Long&gt; prefix = terms(eval.required(&quot;observedPrefix&quot;)),</span>
+<span class="fc" id="L271">                continuation = terms(eval.required(&quot;holdoutContinuation&quot;));</span>
+<span class="fc" id="L272">        var outcomes = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L273">        int best = 0;</span>
+<span class="fc" id="L274">        var statuses = List.of(&quot;NO_OUTPUT&quot;, &quot;PREFIX_MISMATCH&quot;, &quot;REFUTED&quot;, &quot;CONFIRMED&quot;);</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        for (var model : models) {</span>
+<span class="fc" id="L276">            var expected = predictions(model, prefix.size() + continuation.size());</span>
+<span class="fc" id="L277">            boolean fitsPrefix = matches(expected.subList(0, prefix.size()), prefix);</span>
+<span class="fc" id="L278">            boolean fitsContinuation =</span>
+<span class="fc" id="L279">                    matches(expected.subList(prefix.size(), expected.size()), continuation);</span>
+<span class="pc bpc" id="L280" title="1 of 4 branches missed.">            int status = !fitsPrefix ? 1 : fitsContinuation ? 3 : 2;</span>
+<span class="fc" id="L281">            best = Math.max(best, status);</span>
+<span class="fc" id="L282">            outcomes.add(</span>
+<span class="fc" id="L283">                    Map.of(</span>
+                            &quot;coefficients&quot;,
+                            model,
+                            &quot;predictions&quot;,
+                            expected,
+                            &quot;outcome&quot;,
+<span class="fc" id="L289">                            statuses.get(status)));</span>
+<span class="fc" id="L290">        }</span>
+<span class="fc" id="L291">        return Map.of(</span>
+                &quot;caseId&quot;,
+<span class="fc" id="L293">                row.required(&quot;caseId&quot;),</span>
+                &quot;split&quot;,
+<span class="fc" id="L295">                row.required(&quot;split&quot;),</span>
+                &quot;observed&quot;,
+                prefix,
+                &quot;continuation&quot;,
+                continuation,
+                &quot;outcome&quot;,
+<span class="fc" id="L301">                statuses.get(best),</span>
+                &quot;candidates&quot;,
+                outcomes,
+                &quot;prefixChecks&quot;,
+<span class="fc" id="L305">                models.size() * prefix.size(),</span>
+                &quot;continuationChecks&quot;,
+<span class="fc" id="L307">                models.size() * continuation.size());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

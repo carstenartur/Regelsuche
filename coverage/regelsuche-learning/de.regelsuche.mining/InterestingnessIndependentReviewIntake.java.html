@@ -172,8 +172,8 @@ import java.util.stream.Collectors;
 <span class="fc" id="L172">            blockers.add(&quot;UNDECLARED_RATIONALE_CODE&quot;);</span>
         }
 <span class="fc bfc" id="L174" title="All 2 branches covered.">        if (submission.origin() == ReviewOrigin.EXTERNAL_EXPERT</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                &amp;&amp; submission.qualificationEvidenceHash().isBlank()) {</span>
-<span class="nc" id="L176">            blockers.add(&quot;QUALIFICATION_EVIDENCE_REQUIRED&quot;);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                &amp;&amp; submission.qualificationEvidenceHash().isBlank()) {</span>
+<span class="fc" id="L176">            blockers.add(&quot;QUALIFICATION_EVIDENCE_REQUIRED&quot;);</span>
         }
 <span class="fc bfc" id="L178" title="All 2 branches covered.">        if (submission.origin() == ReviewOrigin.EXTERNAL_EXPERT</span>
 <span class="pc bpc" id="L179" title="1 of 2 branches missed.">                &amp;&amp; submission.independenceAttestationHash().isBlank()) {</span>

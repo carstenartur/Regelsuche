@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StageAllocationComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">StageAllocationComparison.java</span></div><h1>StageAllocationComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import static de.regelsuche.experiments.autopilot.ProductionCandidateContinuation.parse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateDecision;
+import de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunner.GeneratedObservation;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.mining.OpenTargetConjectureMiner.SupportScope;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage.*;
+
+/** Paired public campaign experiment with a preregistered budget of stage dispatch opportunities. */
+public final class StageAllocationComparison {
+    static final String PLAN_HASH = &quot;sha256:0b67a54b17f48304e38226579ff0f013180d4400fc679185a360ff023c981eb9&quot;;
+    private static final int TICKETS = 14;
+<span class="fc" id="L30">    private static final List&lt;EvidenceStage&gt; DOWNSTREAM =</span>
+<span class="fc" id="L31">        List.of(VALIDATION, PROJECT_NOVELTY, PROOF, LIFECYCLE_HANDOFF);</span>
+<span class="fc" id="L32">    private static final JsonMapper JSON = new JsonMapper();</span>
+
+<span class="fc" id="L34">    enum Arm { UNIFORM_ALL_STAGES, STATIC_NO_FEEDBACK, NATIVE_RECEIPT_DRIVEN }</span>
+
+    private StageAllocationComparison() {}
+
+<span class="fc" id="L38">    private static ObjectNode object() { return JSON.createObjectNode(); }</span>
+
+    public static void write(Path planFile, Path output) {
+        try {
+<span class="fc" id="L42">            String planText = Files.readString(planFile);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!AutonomousResearchBriefV2.hash(planText).equals(PLAN_HASH)) {</span>
+<span class="fc" id="L44">                throw new IllegalArgumentException(&quot;expected the frozen stage-allocation protocol&quot;);</span>
+            }
+<span class="fc" id="L46">            JsonNode plan = parse(planText);</span>
+<span class="fc" id="L47">            ObjectNode report = object().put(&quot;schema&quot;, &quot;regelsuche.track-f-stage-allocation/v1&quot;)</span>
+<span class="fc" id="L48">                .put(&quot;planSha256&quot;, PLAN_HASH);</span>
+<span class="fc" id="L49">            var reference = new AutonomousProductionCampaignRunner().runPinned(1);</span>
+<span class="fc" id="L50">            report.set(&quot;originalCampaign&quot;, parse(reference.toCanonicalJson()));</span>
+<span class="fc" id="L51">            report.set(&quot;originalTerminalFeedback&quot;, parse(reference.feedback().toCanonicalJson()));</span>
+<span class="fc" id="L52">            ArrayNode lanes = report.putArray(&quot;lanes&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (JsonNode panel : plan.required(&quot;panels&quot;)) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                for (Arm arm : Arm.values()) {</span>
+<span class="fc" id="L55">                    lanes.add(run(panel, arm));</span>
+                }
+<span class="fc" id="L57">            }</span>
+<span class="fc" id="L58">            Files.createDirectories(output.toAbsolutePath().getParent());</span>
+<span class="fc" id="L59">            Files.writeString(output, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report) + &quot;\n&quot;);</span>
+<span class="nc" id="L60">        } catch (IOException exception) {</span>
+<span class="nc" id="L61">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">    }</span>
+
+    private static ObjectNode run(JsonNode panel, Arm arm) {
+<span class="fc" id="L66">        var generation = new AutonomousProductionGenerationRunner().runPinned(1);</span>
+<span class="fc" id="L67">        var brief = generation.brief();</span>
+<span class="fc" id="L68">        Accounting ledger = new Accounting();</span>
+<span class="fc" id="L69">        String panelId = panel.required(&quot;id&quot;).asText();</span>
+<span class="fc" id="L70">        ObjectNode row = object().put(&quot;panel&quot;, panelId).put(&quot;arm&quot;, arm.name());</span>
+<span class="fc" id="L71">        row.set(&quot;brief&quot;, parse(brief.toCanonicalJson()));</span>
+<span class="fc" id="L72">        row.set(&quot;generation&quot;, parse(generation.toCanonicalJson()));</span>
+<span class="fc" id="L73">        row.set(&quot;seedCatalog&quot;, parse(generation.seedCatalog().toCanonicalJson()));</span>
+<span class="fc" id="L74">        row.set(&quot;generationReceipt&quot;, parse(generation.receipt().toCanonicalJson()));</span>
+<span class="fc" id="L75">        ledger.execute(GENERATION, -1, &quot;&quot;, generation.receipt().contentHash());</span>
+<span class="fc" id="L76">        ledger.charge(generation.receipt().executedResources(), generation.receipt().skippedResources());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (arm == Arm.UNIFORM_ALL_STAGES) {</span>
+<span class="fc" id="L78">            ledger.skip(GENERATION, -1, &quot;SINGLE_REGISTERED_CATALOG&quot;);</span>
+        }
+
+<span class="fc" id="L81">        List&lt;AggregateDecision&gt; decisions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L82">        List&lt;List&lt;GeneratedObservation&gt;&gt; inputs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (JsonNode selector : panel.required(&quot;batches&quot;)) {</span>
+<span class="fc" id="L84">            List&lt;GeneratedObservation&gt; selected = select(generation.observations(), selector);</span>
+<span class="fc" id="L85">            decisions.add(AutonomousEvidenceDagV2.planCandidateFormation(brief,</span>
+<span class="fc" id="L86">                panelId + &quot;-batch-&quot; + inputs.size(), selected.stream().map(GeneratedObservation::branch).toList(),</span>
+<span class="fc" id="L87">                Map.of(ResourceKind.MINING_BATCHES, 1L, ResourceKind.CANDIDATES, 6L),</span>
+<span class="fc" id="L88">                &quot;registered public panel &quot; + panelId + &quot;, batch &quot; + inputs.size()));</span>
+<span class="fc" id="L89">            inputs.add(selected);</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        var formationPlan = AutonomousCampaignArtifactsV2.plan(brief, decisions);</span>
+<span class="fc" id="L92">        row.set(&quot;formationPlan&quot;, parse(formationPlan.toCanonicalJson()));</span>
+<span class="fc" id="L93">        ArrayNode batches = row.putArray(&quot;batches&quot;);</span>
+<span class="fc" id="L94">        List&lt;ProductionCandidateContinuation&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (int index = 0; index &lt; decisions.size(); index++) {</span>
+<span class="fc" id="L96">            var batch = AutonomousProductionMiningRunner.mineBatch(</span>
+<span class="fc" id="L97">                brief, formationPlan, decisions.get(index),</span>
+<span class="fc" id="L98">                inputs.get(index), SupportScope.CROSS_OBSERVATION);</span>
+<span class="fc" id="L99">            var receipt = batch.binding().receipt();</span>
+<span class="fc" id="L100">            ObjectNode artifact = batches.addObject();</span>
+<span class="fc" id="L101">            artifact.set(&quot;decision&quot;, parse(batch.decision().toCanonicalJson()));</span>
+<span class="fc" id="L102">            artifact.set(&quot;receipt&quot;, parse(receipt.toCanonicalJson()));</span>
+<span class="fc" id="L103">            artifact.set(&quot;mining&quot;, parse(batch.evidence().toJson()));</span>
+<span class="fc" id="L104">            artifact.set(&quot;lineage&quot;, parse(batch.lineage().toCanonicalJson()));</span>
+<span class="fc" id="L105">            artifact.set(&quot;inputSeeds&quot;, JSON.valueToTree(inputs.get(index).stream().map(item -&gt; item.seed().id()).toList()));</span>
+<span class="fc" id="L106">            ledger.execute(CANDIDATE_FORMATION, index, &quot;&quot;, receipt.contentHash());</span>
+<span class="fc" id="L107">            ledger.charge(receipt.executedResources(), receipt.skippedResources());</span>
+<span class="fc" id="L108">            candidates.addAll(ProductionCandidateContinuation.fromBatch(index, batch, brief.deterministicSeed()));</span>
+        }
+
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        switch (arm) {</span>
+<span class="fc" id="L112">            case NATIVE_RECEIPT_DRIVEN -&gt; AutonomousCampaignFeedback.continueEligible(</span>
+<span class="fc" id="L113">                candidates, ledger.remaining(), ledger);</span>
+            case STATIC_NO_FEEDBACK -&gt; {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                List&lt;ProductionCandidateContinuation&gt; first = candidates.stream().filter(c -&gt; c.batch() == 0).toList();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                for (int ordinal = 0; ordinal &lt; 2; ordinal++) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                    var candidate = ordinal &lt; first.size() ? first.get(ordinal) : null;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                    for (EvidenceStage stage : DOWNSTREAM) {</span>
+<span class="fc" id="L119">                        dispatch(stage, candidate, 0, ledger);</span>
+<span class="fc" id="L120">                    }</span>
+                }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                dispatch(PROOF, first.stream().filter(c -&gt; c.nextStage() == PROOF).findFirst().orElse(null), 0, ledger);</span>
+<span class="fc" id="L123">            }</span>
+            case UNIFORM_ALL_STAGES -&gt; {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                for (EvidenceStage stage : DOWNSTREAM) {</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    var eligible = candidates.stream().filter(c -&gt; c.nextStage() == stage).limit(2).toList();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                    for (int slot = 0; slot &lt; 2; slot++) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                        dispatch(stage, slot &lt; eligible.size() ? eligible.get(slot) : null, -1, ledger);</span>
+                    }
+<span class="fc" id="L130">                }</span>
+            }
+        }
+<span class="fc" id="L133">        row.set(&quot;candidates&quot;, JSON.valueToTree(candidates.stream().map(ProductionCandidateContinuation::evidence).toList()));</span>
+<span class="fc" id="L134">        row.set(&quot;dispatch&quot;, ledger.events);</span>
+<span class="fc" id="L135">        row.put(&quot;configuredTickets&quot;, TICKETS).put(&quot;remainingTickets&quot;, ledger.remaining());</span>
+<span class="fc" id="L136">        row.set(&quot;resourceLedger&quot;, ledger.resources(brief));</span>
+<span class="fc" id="L137">        return row;</span>
+    }
+
+    private static List&lt;GeneratedObservation&gt; select(List&lt;GeneratedObservation&gt; all, JsonNode selector) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (&quot;ALL&quot;.equals(selector.asText())) { return all; }</span>
+<span class="fc" id="L142">        Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L143">        selector.forEach(item -&gt; ids.add(item.asText()));</span>
+<span class="fc" id="L144">        List&lt;GeneratedObservation&gt; selected = all.stream().filter(item -&gt; ids.contains(item.seed().id())).toList();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (selected.size() != selector.size()) { throw new IllegalArgumentException(&quot;missing or duplicate seed&quot;); }</span>
+<span class="fc" id="L146">        return selected;</span>
+    }
+
+    private static void dispatch(EvidenceStage stage, ProductionCandidateContinuation candidate,
+            int reservedBatch, Accounting ledger) {
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        if (candidate != null &amp;&amp; candidate.nextStage() == stage) {</span>
+<span class="fc" id="L152">            candidate.advance(ledger);</span>
+<span class="fc" id="L153">            return;</span>
+        }
+<span class="fc" id="L155">        ledger.skip(stage, reservedBatch, &quot;NO_ELIGIBLE_RESERVED_LINEAGE&quot;);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (stage == VALIDATION) {</span>
+<span class="fc" id="L157">            ledger.skip(COUNTEREXAMPLE_SEARCH, reservedBatch, &quot;NO_ELIGIBLE_RESERVED_LINEAGE&quot;);</span>
+        }
+<span class="fc" id="L159">    }</span>
+
+<span class="fc" id="L161">    static final class Accounting implements ProductionCandidateContinuation.DispatchSink {</span>
+<span class="fc" id="L162">        private final ArrayNode events = JSON.createArrayNode();</span>
+<span class="fc" id="L163">        private final Map&lt;ResourceKind, Long&gt; executed = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L164">        private final Map&lt;ResourceKind, Long&gt; skipped = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+
+<span class="fc" id="L166">        int remaining() { return TICKETS - events.size(); }</span>
+
+        @Override
+        public void executed(EvidenceStage stage, int batch, String id, String hash, ResourceKind kind, long work) {
+<span class="fc" id="L170">            execute(stage, batch, id, hash);</span>
+<span class="fc" id="L171">            charge(kind, work, 0);</span>
+<span class="fc" id="L172">        }</span>
+
+        void execute(EvidenceStage stage, int batch, String id, String receiptHash) {
+<span class="fc" id="L175">            event(stage, batch, &quot;EXECUTED&quot;).put(&quot;lineage&quot;, id).put(&quot;receiptHash&quot;, receiptHash);</span>
+<span class="fc" id="L176">        }</span>
+
+        void skip(EvidenceStage stage, int batch, String reason) {
+<span class="fc" id="L179">            event(stage, batch, &quot;SKIPPED&quot;).put(&quot;reason&quot;, reason);</span>
+<span class="fc" id="L180">        }</span>
+
+        private ObjectNode event(EvidenceStage stage, int batch, String status) {
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if (remaining() &lt;= 0) { throw new IllegalStateException(&quot;dispatch budget exhausted&quot;); }</span>
+<span class="fc" id="L184">            return events.addObject().put(&quot;stage&quot;, stage.name()).put(&quot;batch&quot;, batch).put(&quot;status&quot;, status);</span>
+        }
+
+        void charge(ResourceKind kind, long work, long skippedWork) {
+<span class="fc" id="L188">            executed.merge(kind, work, Math::addExact);</span>
+<span class="fc" id="L189">            skipped.merge(kind, skippedWork, Math::addExact);</span>
+<span class="fc" id="L190">        }</span>
+
+        void charge(Map&lt;ResourceKind, Long&gt; work, Map&lt;ResourceKind, Long&gt; skippedWork) {
+<span class="fc" id="L193">            work.forEach((kind, amount) -&gt; charge(kind, amount, 0));</span>
+<span class="fc" id="L194">            skippedWork.forEach((kind, amount) -&gt; charge(kind, 0, amount));</span>
+<span class="fc" id="L195">        }</span>
+
+        ObjectNode resources(AutonomousResearchBriefV2 brief) {
+<span class="fc" id="L198">            ObjectNode result = object();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            for (EvidenceStage stage : EvidenceStage.values()) {</span>
+<span class="fc" id="L200">                ObjectNode stageRow = result.putObject(stage.name());</span>
+<span class="fc" id="L201">                brief.budget(stage).resources().forEach((kind, limit) -&gt; {</span>
+<span class="fc" id="L202">                    long work = executed.getOrDefault(kind, 0L);</span>
+<span class="fc" id="L203">                    long unused = skipped.getOrDefault(kind, 0L);</span>
+<span class="fc" id="L204">                    long left = limit - work - unused;</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                    if (left &lt; 0) { throw new IllegalStateException(&quot;native resource ceiling exceeded &quot; + kind); }</span>
+<span class="fc" id="L206">                    stageRow.putObject(kind.name()).put(&quot;configured&quot;, limit).put(&quot;executed&quot;, work)</span>
+<span class="fc" id="L207">                        .put(&quot;skipped&quot;, unused).put(&quot;remaining&quot;, left);</span>
+<span class="fc" id="L208">                });</span>
+            }
+<span class="fc" id="L210">            return result;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

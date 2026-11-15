@@ -1,0 +1,745 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalRewriteArchitectureDecision.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">HistoricalRewriteArchitectureDecision.java</span></div><h1>HistoricalRewriteArchitectureDecision.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.json.JsonReader;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.EnumSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+<span class="nc" id="L22">public final class HistoricalRewriteArchitectureDecision {</span>
+    static final String SCHEMA =
+        &quot;regelsuche.rewrite-architecture-decision/v1&quot;;
+    static final String FILE_NAME = &quot;rewrite-architecture-decision.json&quot;;
+    static final String EVIDENCE_STATUS =
+        &quot;DERIVED_FROM_EXECUTED_HISTORICAL_DIAGNOSTICS&quot;;
+    static final String CLAIM_BOUNDARY =
+        &quot;This artifact is a reversible implementation-priority decision derived &quot;
+            + &quot;from the frozen historical diagnostic corpus and its retained &quot;
+            + &quot;search evidence. It is not mathematical proof, autonomous &quot;
+            + &quot;rediscovery, external novelty, a complete causal model or a claim &quot;
+            + &quot;of general search or architecture superiority.&quot;;
+
+    private static final long MAX_INPUT_BYTES = 32L * 1024L * 1024L;
+    private static final String CORPUS_SCHEMA =
+        &quot;regelsuche.historical-rediscovery-corpus/v1&quot;;
+
+    /** Verified public #620 output, including the disposition of each architecture track. */
+    public static final class VerifiedDecision {
+        private final Report report;
+
+<span class="fc" id="L43">        private VerifiedDecision(Report report) { this.report = report; }</span>
+
+<span class="fc" id="L45">        public String contentHash() { return report.contentHash(); }</span>
+<span class="fc" id="L46">        public String canonicalJson() { return report.json(); }</span>
+        public Map&lt;String, String&gt; dispositions() {
+<span class="fc" id="L48">            var values = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L49">            report.decisions().forEach(item -&gt; values.put(item.track(), item.disposition().name()));</span>
+<span class="fc" id="L50">            return Map.copyOf(values);</span>
+        }
+    }
+
+    public static VerifiedDecision readFrozenDecision(String json) {
+<span class="fc" id="L55">        View root = View.parse(json, &quot;architecture decision&quot;);</span>
+<span class="fc" id="L56">        View sources = root.object(&quot;sourceIdentities&quot;);</span>
+<span class="fc" id="L57">        View counts = root.object(&quot;measuredDistribution&quot;);</span>
+<span class="fc" id="L58">        List&lt;Decision&gt; matrix = root.array(&quot;decisions&quot;).stream().map(raw -&gt; {</span>
+<span class="fc" id="L59">            View entry = View.of(raw, &quot;decision&quot;);</span>
+<span class="fc" id="L60">            List&lt;String&gt; codes = entry.array(&quot;evidenceCodes&quot;).stream().map(String.class::cast).toList();</span>
+<span class="fc bfc" id="L61" title="All 4 branches covered.">            if (codes.stream().anyMatch(code -&gt; !code.matches(&quot;[A-Z0-9_]+&quot;))) {</span>
+<span class="fc" id="L62">                throw new IllegalArgumentException(&quot;invalid architecture evidence code&quot;);</span>
+            }
+<span class="fc" id="L64">            return new Decision(entry.text(&quot;track&quot;), Disposition.valueOf(entry.text(&quot;disposition&quot;)),</span>
+<span class="fc" id="L65">                entry.text(&quot;relatedIssue&quot;), codes, entry.text(&quot;reason&quot;));</span>
+<span class="fc" id="L66">        }).toList();</span>
+<span class="fc" id="L67">        Report report = new Report(root.text(&quot;repositoryRevision&quot;), root.text(&quot;corpusSha256&quot;),</span>
+<span class="fc" id="L68">            root.text(&quot;inventoryRevision&quot;), new Sources(sources.text(&quot;atlasRunContentHash&quot;),</span>
+<span class="fc" id="L69">                sources.text(&quot;atlasSha256&quot;), sources.text(&quot;witnessDiagnosticContentHash&quot;),</span>
+<span class="fc" id="L70">                sources.text(&quot;productionComparisonContentHash&quot;), sources.text(&quot;equalWorkComparisonContentHash&quot;)),</span>
+<span class="fc" id="L71">            new Distribution(counts.integer(&quot;caseCount&quot;), counts.integer(&quot;noProductionWitnessCount&quot;),</span>
+<span class="fc" id="L72">                counts.integer(&quot;scalarAlreadyReachedCount&quot;), counts.integer(&quot;oracleWitnessScalarMissCount&quot;),</span>
+<span class="fc" id="L73">                counts.integer(&quot;witnessPrefixLostCount&quot;), counts.integer(&quot;diversityRecoveredCompleteWitnessCount&quot;),</span>
+<span class="fc" id="L74">                counts.integer(&quot;checkpointCount&quot;), counts.integer(&quot;equalConsumedWorkCheckpointCount&quot;),</span>
+<span class="fc" id="L75">                counts.integer(&quot;equalWorkDiversityAdvantageCount&quot;), counts.integer(&quot;equalWorkDiversityCompleteWitnessCount&quot;)),</span>
+<span class="fc" id="L76">            matrix, root.text(&quot;contentHash&quot;));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (&quot;WORKTREE&quot;.equals(report.repositoryRevision())) {</span>
+<span class="fc" id="L78">            throw new IllegalArgumentException(&quot;a frozen architecture decision needs an exact revision&quot;);</span>
+        }
+<span class="fc" id="L80">        var verified = new VerifiedDecision(report);</span>
+<span class="fc" id="L81">        requireEqual(Set.copyOf(decisions().stream().map(Decision::track).toList()), verified.dispositions().keySet(),</span>
+            &quot;architecture tracks&quot;);
+<span class="fc" id="L83">        requireEqual(report.json(), json, &quot;canonical architecture decision&quot;);</span>
+<span class="fc" id="L84">        return verified;</span>
+    }
+
+    public static void main(String[] args) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (args.length != 8</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                || !&quot;rewrite-architecture-decision&quot;.equals(args[0])) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(</span>
+                &quot;usage: rewrite-architecture-decision &lt;repository-revision&gt; &quot;
+                    + &quot;&lt;run&gt; &lt;atlas&gt; &lt;witness&gt; &lt;comparison&gt; &lt;equal-work&gt; &lt;output&gt;&quot;);
+        }
+<span class="fc" id="L94">        Report report = derive(</span>
+            args[1],
+<span class="fc" id="L96">            Path.of(args[2]), Path.of(args[3]), Path.of(args[4]),</span>
+<span class="fc" id="L97">            Path.of(args[5]), Path.of(args[6]));</span>
+<span class="fc" id="L98">        Path output = write(Path.of(args[7]), report);</span>
+<span class="fc" id="L99">        System.out.println(&quot;historicalRewriteArchitectureDecision=&quot; + output);</span>
+<span class="fc" id="L100">        System.out.println(&quot;historicalRewriteArchitectureDecisionHash=&quot;</span>
+<span class="fc" id="L101">            + report.contentHash());</span>
+<span class="fc" id="L102">    }</span>
+
+    static Report derive(
+        String repositoryRevision,
+        Path runPath,
+        Path atlasPath,
+        Path witnessPath,
+        Path productionPath,
+        Path equalWorkPath
+    ) {
+<span class="fc" id="L112">        repositoryRevision = revision(repositoryRevision);</span>
+<span class="fc" id="L113">        Document run = Document.hashed(</span>
+            runPath,
+            &quot;atlas run&quot;,
+            &quot;regelsuche.historical-rediscovery-run/v1&quot;,
+            &quot;EXECUTED_DIAGNOSTIC&quot;);
+<span class="fc" id="L118">        String atlasSchema = run.root().text(&quot;atlasSchema&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!HistoricalRediscoveryAtlas.SCHEMA.equals(atlasSchema)</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                &amp;&amp; !HistoricalRediscoveryAtlas.LEGACY_SCHEMA.equals(atlasSchema)) {</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(&quot;unsupported historical rediscovery atlas schema&quot;);</span>
+        }
+<span class="fc" id="L123">        Document atlas = Document.plain(atlasPath, &quot;atlas&quot;, atlasSchema);</span>
+<span class="fc" id="L124">        Document witness = Document.hashed(</span>
+            witnessPath,
+            &quot;witness diagnostic&quot;,
+            &quot;regelsuche.witness-pruning-diagnostic/v1&quot;,
+            &quot;EXECUTED_TARGET_AWARE_ORACLE_DIAGNOSTIC&quot;);
+<span class="fc" id="L129">        Document production = Document.hashed(</span>
+            productionPath,
+            &quot;production comparison&quot;,
+            &quot;regelsuche.production-search-comparison/v1&quot;,
+            &quot;EXECUTED_MATCHED_DECLARED_BUDGET_COMPARISON&quot;);
+<span class="fc" id="L134">        Document equalWork = Document.hashed(</span>
+            equalWorkPath,
+            &quot;equal-work comparison&quot;,
+            &quot;regelsuche.equal-work-search-comparison/v1&quot;,
+            &quot;EXECUTED_TARGET_BLIND_FIXED_ADMITTED_WORK_CHECKPOINTS&quot;);
+<span class="fc" id="L139">        requireEqual(atlasSchema, witness.root().text(&quot;atlasSchema&quot;), &quot;witness atlas schema&quot;);</span>
+<span class="fc" id="L140">        requireEqual(atlasSchema, production.root().text(&quot;atlasSchema&quot;), &quot;production atlas schema&quot;);</span>
+<span class="fc" id="L141">        requireEqual(atlasSchema, equalWork.root().text(&quot;atlasSchema&quot;), &quot;equal-work atlas schema&quot;);</span>
+
+<span class="fc" id="L143">        String corpusHash = same(</span>
+            &quot;corpusSha256&quot;, run, atlas, witness, production, equalWork);
+<span class="fc" id="L145">        rawSha(corpusHash, &quot;corpusSha256&quot;);</span>
+<span class="fc" id="L146">        String inventory = same(</span>
+            &quot;inventoryRevision&quot;, run, atlas, witness, production, equalWork);
+<span class="fc" id="L148">        requireEqual(</span>
+            &quot;SCALAR_BEST_FIRST_TARGET_BLIND&quot;,
+<span class="fc" id="L150">            production.root().text(&quot;scalarPolicy&quot;),</span>
+            &quot;production scalar policy&quot;);
+<span class="fc" id="L152">        requireEqual(</span>
+            &quot;STRUCTURAL_DIVERSITY_TARGET_BLIND&quot;,
+<span class="fc" id="L154">            production.root().text(&quot;diversityPolicy&quot;),</span>
+            &quot;production diversity policy&quot;);
+<span class="fc" id="L156">        requireEqual(</span>
+            &quot;ENGINE_CALLS_AND_ADMITTED_PRIMITIVE_REWRITE_STEPS&quot;,
+<span class="fc" id="L158">            equalWork.root().text(&quot;workUnit&quot;),</span>
+            &quot;equal-work work unit&quot;);
+
+<span class="fc" id="L161">        String atlasHash = sha256(atlas.raw());</span>
+<span class="fc" id="L162">        requireEqual(</span>
+            atlasHash,
+<span class="fc" id="L164">            artifactHash(run, &quot;ATLAS_JSON&quot;),</span>
+            &quot;atlas-run payload identity&quot;);
+<span class="fc" id="L166">        requireEqual(</span>
+<span class="fc" id="L167">            run.root().text(&quot;assessmentDecision&quot;),</span>
+<span class="fc" id="L168">            atlas.root().object(&quot;assessment&quot;).text(&quot;decision&quot;),</span>
+            &quot;atlas assessment identity&quot;);
+<span class="fc" id="L170">        requireEqual(atlasHash, witness.root().text(&quot;atlasSha256&quot;), &quot;witness atlas&quot;);</span>
+<span class="fc" id="L171">        requireEqual(</span>
+<span class="fc" id="L172">            atlasHash, production.root().text(&quot;atlasSha256&quot;), &quot;production atlas&quot;);</span>
+<span class="fc" id="L173">        requireEqual(</span>
+<span class="fc" id="L174">            atlasHash, equalWork.root().text(&quot;atlasSha256&quot;), &quot;equal-work atlas&quot;);</span>
+<span class="fc" id="L175">        requireEqual(</span>
+<span class="fc" id="L176">            witness.contentHash(),</span>
+<span class="fc" id="L177">            production.root().text(&quot;witnessDiagnosticSha256&quot;),</span>
+            &quot;production witness identity&quot;);
+
+<span class="fc" id="L180">        View witnessSummary = witness.root().object(&quot;summary&quot;);</span>
+<span class="fc" id="L181">        View productionSummary = production.root().object(&quot;summary&quot;);</span>
+<span class="fc" id="L182">        View equalSummary = equalWork.root().object(&quot;summary&quot;);</span>
+<span class="fc" id="L183">        View equalStatuses = equalSummary.object(&quot;statusCounts&quot;);</span>
+<span class="fc" id="L184">        View witnessStatuses = witnessSummary.object(&quot;statusCounts&quot;);</span>
+<span class="fc" id="L185">        int caseCount = equalSummary.integer(&quot;caseCount&quot;);</span>
+<span class="fc" id="L186">        requireEqual(caseCount, atlas.root().array(&quot;cases&quot;).size(), &quot;atlas cases&quot;);</span>
+<span class="fc" id="L187">        requireEqual(caseCount, run.root().integer(&quot;caseCount&quot;), &quot;run cases&quot;);</span>
+<span class="fc" id="L188">        requireEqual(</span>
+<span class="fc" id="L189">            caseCount, witnessSummary.integer(&quot;caseCount&quot;), &quot;witness cases&quot;);</span>
+<span class="fc" id="L190">        requireEqual(</span>
+<span class="fc" id="L191">            caseCount, productionSummary.integer(&quot;caseCount&quot;),</span>
+            &quot;production cases&quot;);
+
+<span class="fc" id="L194">        Distribution distribution = new Distribution(</span>
+            caseCount,
+<span class="fc" id="L196">            equalStatuses.optionalInteger(&quot;NO_PRODUCTION_WITNESS&quot;),</span>
+<span class="fc" id="L197">            equalStatuses.optionalInteger(&quot;SCALAR_ALREADY_REACHED&quot;),</span>
+<span class="fc" id="L198">            equalStatuses.optionalInteger(</span>
+                &quot;EXECUTED_ORACLE_WITNESS_SCALAR_MISS&quot;),
+<span class="fc" id="L200">            witnessStatuses.optionalInteger(&quot;WITNESS_PREFIX_LOST&quot;),</span>
+<span class="fc" id="L201">            productionSummary.integer(</span>
+                &quot;diversityRecoveredCompleteWitnessCount&quot;),
+<span class="fc" id="L203">            equalSummary.integer(&quot;checkpointCount&quot;),</span>
+<span class="fc" id="L204">            equalSummary.integer(&quot;equalConsumedWorkCount&quot;),</span>
+<span class="fc" id="L205">            equalSummary.integer(&quot;equalWorkDiversityAdvantageCount&quot;),</span>
+<span class="fc" id="L206">            equalSummary.integer(</span>
+                &quot;equalWorkDiversityCompleteWitnessCount&quot;));
+<span class="fc" id="L208">        requireDecisionEvidence(atlas.root().object(&quot;assessment&quot;), distribution);</span>
+
+<span class="fc" id="L210">        Sources sources = new Sources(</span>
+<span class="fc" id="L211">            run.contentHash(), atlasHash, witness.contentHash(),</span>
+<span class="fc" id="L212">            production.contentHash(), equalWork.contentHash());</span>
+<span class="fc" id="L213">        List&lt;Decision&gt; decisions = decisions();</span>
+<span class="fc" id="L214">        String hash = reportHash(</span>
+            repositoryRevision, corpusHash, inventory,
+            sources, distribution, decisions);
+<span class="fc" id="L217">        return new Report(</span>
+            repositoryRevision, corpusHash, inventory,
+            sources, distribution, decisions, hash);
+    }
+
+    static Path write(Path directory, Report report) {
+<span class="fc" id="L223">        Path output = Objects.requireNonNull(directory, &quot;directory&quot;)</span>
+<span class="fc" id="L224">            .toAbsolutePath().normalize().resolve(FILE_NAME);</span>
+<span class="fc" id="L225">        String json = Objects.requireNonNull(report, &quot;report&quot;).json();</span>
+        try {
+<span class="fc" id="L227">            Files.createDirectories(output.getParent());</span>
+<span class="fc" id="L228">            AtomicJsonFile.writeUtf8(output, json);</span>
+<span class="fc" id="L229">            requireEqual(</span>
+                json,
+<span class="fc" id="L231">                Files.readString(output, StandardCharsets.UTF_8),</span>
+                &quot;written architecture decision&quot;);
+<span class="fc" id="L233">            return output;</span>
+<span class="nc" id="L234">        } catch (IOException exception) {</span>
+<span class="nc" id="L235">            throw new UncheckedIOException(</span>
+                &quot;Could not write architecture decision&quot;, exception);
+        }
+    }
+
+    private static void requireDecisionEvidence(
+        View assessment,
+        Distribution distribution
+    ) {
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!assessment.bool(&quot;representationLayerWorks&quot;)</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                || !assessment.bool(&quot;missingInventoryLayerIdentified&quot;)</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                || !assessment.bool(&quot;searchPolicyDifferenceIdentified&quot;)</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                || !assessment.bool(&quot;negativeControlPassed&quot;)</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                || distribution.noProductionWitnessCount() &lt; 1</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                || distribution.oracleWitnessScalarMissCount() &lt; 1</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                || distribution.witnessPrefixLostCount() &lt; 1</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                || distribution.diversityRecoveredCompleteWitnessCount() &lt; 1</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                || distribution.equalWorkDiversityAdvantageCount() &lt; 1</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                || distribution.equalWorkDiversityCompleteWitnessCount() &lt; 1) {</span>
+<span class="nc" id="L254">            throw new IllegalArgumentException(</span>
+                &quot;insufficient evidence for decision v1&quot;);
+        }
+<span class="fc" id="L257">    }</span>
+
+    private static String artifactHash(Document run, String role) {
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        for (Object raw : run.root().array(&quot;artifacts&quot;)) {</span>
+<span class="fc" id="L261">            View artifact = View.of(raw, &quot;artifact&quot;);</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            if (role.equals(artifact.text(&quot;role&quot;))) {</span>
+<span class="fc" id="L263">                return prefixedSha(artifact.text(&quot;byteHash&quot;), role + &quot; hash&quot;);</span>
+            }
+<span class="nc" id="L265">        }</span>
+<span class="nc" id="L266">        throw new IllegalArgumentException(</span>
+            &quot;atlas run is missing role &quot; + role);
+    }
+
+    private static String same(String key, Document first, Document... rest) {
+<span class="fc" id="L271">        String expected = first.root().text(key);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        for (Document value : rest) {</span>
+<span class="fc" id="L273">            requireEqual(expected, value.root().text(key), key);</span>
+        }
+<span class="fc" id="L275">        return expected;</span>
+    }
+
+    private static List&lt;Decision&gt; decisions() {
+<span class="fc" id="L279">        return List.of(</span>
+            new Decision(
+                &quot;DIRECTED_INVENTORY_DIRECTIONALITY_DIAGNOSIS&quot;,
+                Disposition.SELECTED_NEXT_REVERSIBLE_TRANCHE,
+                &quot;#620&quot;,
+<span class="fc" id="L284">                List.of(</span>
+                    &quot;NO_PRODUCTION_WITNESS_COUNT_POSITIVE&quot;,
+                    &quot;MISSING_INVENTORY_LAYER_IDENTIFIED&quot;),
+                &quot;Cases without a directed production witness cannot be repaired &quot;
+                    + &quot;by survivor ranking or broader runtime budgets.&quot;),
+            new Decision(
+                &quot;PARETO_COMPLEXITY_DEBT_SEARCH_CONTROL&quot;,
+                Disposition.SELECTED_NEXT_REVERSIBLE_TRANCHE,
+                &quot;#620&quot;,
+<span class="fc" id="L293">                List.of(</span>
+                    &quot;WITNESS_PREFIX_LOSS_RETAINED&quot;,
+                    &quot;MATCHED_ADMITTED_WORK_DIVERSITY_ADVANTAGE&quot;),
+                &quot;A target-blind diversity policy retains a complete witness at &quot;
+                    + &quot;a checkpoint where the admitted-work ledgers match, so a &quot;
+                    + &quot;small non-scalar policy control is justified.&quot;),
+            new Decision(
+                &quot;TARGET_FREE_REPRESENTATION_DISCOVERY&quot;,
+                Disposition.REQUIRED_NEXT_EVALUATION,
+                &quot;#663&quot;,
+<span class="fc" id="L303">                List.of(</span>
+                    &quot;HISTORICAL_ENDPOINT_CONTROL_IS_NARROW&quot;,
+                    &quot;PRIMARY_DISCOVERY_TARGET_IS_REPRESENTATION_GAIN&quot;),
+                &quot;The historical endpoint matrix is diagnostic; the next central &quot;
+                    + &quot;evaluation must test target-free compression and concrete &quot;
+                    + &quot;known-structure capability unlocks.&quot;),
+            new Decision(
+                &quot;EXACT_VALUE_ARENA_SEARCH_QUOTIENT&quot;,
+                Disposition.DEFERRED_NO_CAUSAL_EVIDENCE,
+                &quot;#661&quot;,
+<span class="fc" id="L313">                List.of(&quot;NO_VALUE_IDENTITY_CAUSAL_LOSS_RETAINED&quot;),</span>
+                &quot;The retained control does not show that exact scalar identity, &quot;
+                    + &quot;value interning or history-bearing quotienting caused the &quot;
+                    + &quot;observed witness loss.&quot;),
+            new Decision(
+                &quot;NATIVE_AC_CONDITIONAL_PROOF_EGRAPH&quot;,
+                Disposition.DEFERRED_NO_CAUSAL_EVIDENCE,
+                &quot;#662&quot;,
+<span class="fc" id="L321">                List.of(&quot;NO_MATCHER_GUARD_EGRAPH_CAUSAL_LOSS_RETAINED&quot;),</span>
+                &quot;The retained control does not establish an AC matcher, guard, &quot;
+                    + &quot;assumption or e-graph semantic failure.&quot;),
+            new Decision(
+                &quot;BROAD_RUNTIME_OPTIMIZATION&quot;,
+                Disposition.DEFERRED_PENDING_LAYER_PROFILE,
+                &quot;#620&quot;,
+<span class="fc" id="L328">                List.of(&quot;NO_LAYER_SEPARATED_PROFILE_RETAINED&quot;),</span>
+                &quot;Runtime work should be selected only after profiling shows the &quot;
+                    + &quot;dominant layer and an optimization increases reachable &quot;
+                    + &quot;depth, coverage or proof strength.&quot;));
+    }
+
+    private static String reportHash(
+        String repositoryRevision,
+        String corpusHash,
+        String inventory,
+        Sources sources,
+        Distribution distribution,
+        List&lt;Decision&gt; decisions
+    ) {
+<span class="fc" id="L342">        return sha256(render(</span>
+            repositoryRevision, corpusHash, inventory,
+            sources, distribution, decisions, null));
+    }
+
+    private static String render(
+        String repositoryRevision,
+        String corpusHash,
+        String inventory,
+        Sources sources,
+        Distribution distribution,
+        List&lt;Decision&gt; decisions,
+        String contentHash
+    ) {
+<span class="fc" id="L356">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L357">        writer.property(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L358">        writer.property(&quot;evidenceStatus&quot;, EVIDENCE_STATUS);</span>
+<span class="fc" id="L359">        writer.property(&quot;repositoryRevision&quot;, repositoryRevision);</span>
+<span class="fc" id="L360">        writer.property(&quot;corpusSchema&quot;, CORPUS_SCHEMA);</span>
+<span class="fc" id="L361">        writer.property(&quot;corpusSha256&quot;, corpusHash);</span>
+<span class="fc" id="L362">        writer.property(&quot;inventoryRevision&quot;, inventory);</span>
+<span class="fc" id="L363">        writer.object(&quot;sourceIdentities&quot;, object -&gt; write(object, sources));</span>
+<span class="fc" id="L364">        writer.object(&quot;measuredDistribution&quot;, object -&gt;</span>
+<span class="fc" id="L365">            write(object, distribution));</span>
+<span class="fc" id="L366">        writer.array(&quot;decisions&quot;, array -&gt; decisions.forEach(value -&gt;</span>
+<span class="fc" id="L367">            array.objectValue(object -&gt; write(object, value))));</span>
+<span class="fc" id="L368">        writer.property(&quot;claimBoundary&quot;, CLAIM_BOUNDARY);</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L370">            writer.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L372">        return writer.endObject().toString();</span>
+    }
+
+    private static void write(JsonWriter writer, Sources value) {
+<span class="fc" id="L376">        writer.property(&quot;atlasRunContentHash&quot;, value.atlasRunContentHash());</span>
+<span class="fc" id="L377">        writer.property(&quot;atlasSha256&quot;, value.atlasSha256());</span>
+<span class="fc" id="L378">        writer.property(</span>
+            &quot;witnessDiagnosticContentHash&quot;,
+<span class="fc" id="L380">            value.witnessDiagnosticContentHash());</span>
+<span class="fc" id="L381">        writer.property(</span>
+            &quot;productionComparisonContentHash&quot;,
+<span class="fc" id="L383">            value.productionComparisonContentHash());</span>
+<span class="fc" id="L384">        writer.property(</span>
+            &quot;equalWorkComparisonContentHash&quot;,
+<span class="fc" id="L386">            value.equalWorkComparisonContentHash());</span>
+<span class="fc" id="L387">    }</span>
+
+    private static void write(JsonWriter writer, Distribution value) {
+<span class="fc" id="L390">        writer.property(&quot;caseCount&quot;, value.caseCount());</span>
+<span class="fc" id="L391">        writer.property(</span>
+<span class="fc" id="L392">            &quot;noProductionWitnessCount&quot;, value.noProductionWitnessCount());</span>
+<span class="fc" id="L393">        writer.property(</span>
+<span class="fc" id="L394">            &quot;scalarAlreadyReachedCount&quot;, value.scalarAlreadyReachedCount());</span>
+<span class="fc" id="L395">        writer.property(</span>
+            &quot;oracleWitnessScalarMissCount&quot;,
+<span class="fc" id="L397">            value.oracleWitnessScalarMissCount());</span>
+<span class="fc" id="L398">        writer.property(</span>
+<span class="fc" id="L399">            &quot;witnessPrefixLostCount&quot;, value.witnessPrefixLostCount());</span>
+<span class="fc" id="L400">        writer.property(</span>
+            &quot;diversityRecoveredCompleteWitnessCount&quot;,
+<span class="fc" id="L402">            value.diversityRecoveredCompleteWitnessCount());</span>
+<span class="fc" id="L403">        writer.property(&quot;checkpointCount&quot;, value.checkpointCount());</span>
+<span class="fc" id="L404">        writer.property(</span>
+            &quot;equalConsumedWorkCheckpointCount&quot;,
+<span class="fc" id="L406">            value.equalConsumedWorkCheckpointCount());</span>
+<span class="fc" id="L407">        writer.property(</span>
+            &quot;equalWorkDiversityAdvantageCount&quot;,
+<span class="fc" id="L409">            value.equalWorkDiversityAdvantageCount());</span>
+<span class="fc" id="L410">        writer.property(</span>
+            &quot;equalWorkDiversityCompleteWitnessCount&quot;,
+<span class="fc" id="L412">            value.equalWorkDiversityCompleteWitnessCount());</span>
+<span class="fc" id="L413">    }</span>
+
+    private static void write(JsonWriter writer, Decision value) {
+<span class="fc" id="L416">        writer.property(&quot;track&quot;, value.track());</span>
+<span class="fc" id="L417">        writer.property(&quot;disposition&quot;, value.disposition().name());</span>
+<span class="fc" id="L418">        writer.property(&quot;relatedIssue&quot;, value.relatedIssue());</span>
+<span class="fc" id="L419">        writer.array(&quot;evidenceCodes&quot;, array -&gt;</span>
+<span class="fc" id="L420">            value.evidenceCodes().forEach(array::value));</span>
+<span class="fc" id="L421">        writer.property(&quot;reason&quot;, value.reason());</span>
+<span class="fc" id="L422">    }</span>
+
+    private static void requireEqual(
+        Object expected,
+        Object actual,
+        String label
+    ) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (!Objects.equals(expected, actual)) {</span>
+<span class="fc" id="L430">            throw new IllegalArgumentException(</span>
+                label + &quot; differs: expected=&quot; + expected + &quot;, actual=&quot; + actual);
+        }
+<span class="fc" id="L433">    }</span>
+
+    private static String text(String value, String label) {
+<span class="pc bpc" id="L436" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L437">            throw new IllegalArgumentException(&quot;blank &quot; + label);</span>
+        }
+<span class="fc" id="L439">        return value.trim();</span>
+    }
+
+    private static String revision(String value) {
+<span class="fc" id="L443">        String result = text(value, &quot;repositoryRevision&quot;);</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        if (!result.equals(&quot;WORKTREE&quot;)</span>
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">                &amp;&amp; !result.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L446">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be WORKTREE or a commit SHA&quot;);
+        }
+<span class="fc" id="L449">        return result;</span>
+    }
+
+    private static String rawSha(String value, String label) {
+<span class="fc" id="L453">        String result = text(value, label);</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (!result.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L455">            throw new IllegalArgumentException(&quot;invalid raw SHA-256: &quot; + label);</span>
+        }
+<span class="fc" id="L457">        return result;</span>
+    }
+
+    private static String prefixedSha(String value, String label) {
+<span class="fc" id="L461">        String result = text(value, label);</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (!result.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L463">            throw new IllegalArgumentException(</span>
+                &quot;invalid prefixed SHA-256: &quot; + label);
+        }
+<span class="fc" id="L466">        return result;</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L471">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L472">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L473">                    value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L474">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L475">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L479">    enum Disposition {</span>
+<span class="fc" id="L480">        SELECTED_NEXT_REVERSIBLE_TRANCHE,</span>
+<span class="fc" id="L481">        REQUIRED_NEXT_EVALUATION,</span>
+<span class="fc" id="L482">        DEFERRED_NO_CAUSAL_EVIDENCE,</span>
+<span class="fc" id="L483">        DEFERRED_PENDING_LAYER_PROFILE</span>
+    }
+
+    record Sources(
+        String atlasRunContentHash,
+        String atlasSha256,
+        String witnessDiagnosticContentHash,
+        String productionComparisonContentHash,
+        String equalWorkComparisonContentHash
+    ) {
+<span class="fc" id="L493">        Sources {</span>
+<span class="fc" id="L494">            atlasRunContentHash = prefixedSha(</span>
+                atlasRunContentHash, &quot;atlasRunContentHash&quot;);
+<span class="fc" id="L496">            atlasSha256 = prefixedSha(atlasSha256, &quot;atlasSha256&quot;);</span>
+<span class="fc" id="L497">            witnessDiagnosticContentHash = prefixedSha(</span>
+                witnessDiagnosticContentHash,
+                &quot;witnessDiagnosticContentHash&quot;);
+<span class="fc" id="L500">            productionComparisonContentHash = prefixedSha(</span>
+                productionComparisonContentHash,
+                &quot;productionComparisonContentHash&quot;);
+<span class="fc" id="L503">            equalWorkComparisonContentHash = prefixedSha(</span>
+                equalWorkComparisonContentHash,
+                &quot;equalWorkComparisonContentHash&quot;);
+<span class="fc" id="L506">        }</span>
+    }
+
+    record Distribution(
+        int caseCount,
+        int noProductionWitnessCount,
+        int scalarAlreadyReachedCount,
+        int oracleWitnessScalarMissCount,
+        int witnessPrefixLostCount,
+        int diversityRecoveredCompleteWitnessCount,
+        int checkpointCount,
+        int equalConsumedWorkCheckpointCount,
+        int equalWorkDiversityAdvantageCount,
+        int equalWorkDiversityCompleteWitnessCount
+    ) {
+<span class="fc" id="L521">        Distribution {</span>
+<span class="fc" id="L522">            int[] values = {</span>
+                caseCount,
+                noProductionWitnessCount,
+                scalarAlreadyReachedCount,
+                oracleWitnessScalarMissCount,
+                witnessPrefixLostCount,
+                diversityRecoveredCompleteWitnessCount,
+                checkpointCount,
+                equalConsumedWorkCheckpointCount,
+                equalWorkDiversityAdvantageCount,
+                equalWorkDiversityCompleteWitnessCount
+            };
+<span class="fc bfc" id="L534" title="All 2 branches covered.">            for (int value : values) {</span>
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">                if (value &lt; 0) {</span>
+<span class="nc" id="L536">                    throw new IllegalArgumentException(</span>
+                        &quot;negative distribution counter&quot;);
+                }
+            }
+<span class="pc bpc" id="L540" title="7 of 14 branches missed.">            if (caseCount &lt; 1</span>
+                    || noProductionWitnessCount + scalarAlreadyReachedCount
+                        + oracleWitnessScalarMissCount != caseCount
+                    || witnessPrefixLostCount &lt; oracleWitnessScalarMissCount
+                    || diversityRecoveredCompleteWitnessCount
+                        &lt; oracleWitnessScalarMissCount
+                    || equalConsumedWorkCheckpointCount &gt; checkpointCount
+                    || equalWorkDiversityAdvantageCount
+                        &gt; equalConsumedWorkCheckpointCount
+                    || equalWorkDiversityCompleteWitnessCount
+                        &gt; equalWorkDiversityAdvantageCount) {
+<span class="nc" id="L551">                throw new IllegalArgumentException(</span>
+                    &quot;inconsistent distribution&quot;);
+            }
+<span class="fc" id="L554">        }</span>
+    }
+
+    record Decision(
+        String track,
+        Disposition disposition,
+        String relatedIssue,
+        List&lt;String&gt; evidenceCodes,
+        String reason
+    ) {
+<span class="fc" id="L564">        Decision {</span>
+<span class="fc" id="L565">            track = text(track, &quot;track&quot;);</span>
+<span class="fc" id="L566">            Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
+<span class="fc" id="L567">            relatedIssue = text(relatedIssue, &quot;relatedIssue&quot;);</span>
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">            if (!relatedIssue.matches(&quot;#[0-9]+&quot;)) {</span>
+<span class="nc" id="L569">                throw new IllegalArgumentException(</span>
+                    &quot;invalid relatedIssue&quot;);
+            }
+<span class="fc" id="L572">            evidenceCodes = List.copyOf(</span>
+<span class="fc" id="L573">                Objects.requireNonNull(evidenceCodes, &quot;evidenceCodes&quot;));</span>
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">            if (evidenceCodes.isEmpty()</span>
+<span class="fc" id="L575">                    || new LinkedHashSet&lt;&gt;(evidenceCodes).size()</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                        != evidenceCodes.size()) {</span>
+<span class="nc" id="L577">                throw new IllegalArgumentException(</span>
+                    &quot;invalid evidenceCodes&quot;);
+            }
+<span class="fc" id="L580">            reason = text(reason, &quot;reason&quot;);</span>
+<span class="fc" id="L581">        }</span>
+    }
+
+    record Report(
+        String repositoryRevision,
+        String corpusSha256,
+        String inventoryRevision,
+        Sources sources,
+        Distribution distribution,
+        List&lt;Decision&gt; decisions,
+        String contentHash
+    ) {
+<span class="fc" id="L593">        Report {</span>
+<span class="fc" id="L594">            repositoryRevision = revision(repositoryRevision);</span>
+<span class="fc" id="L595">            corpusSha256 = rawSha(corpusSha256, &quot;corpusSha256&quot;);</span>
+<span class="fc" id="L596">            inventoryRevision = text(inventoryRevision, &quot;inventoryRevision&quot;);</span>
+<span class="fc" id="L597">            Objects.requireNonNull(sources, &quot;sources&quot;);</span>
+<span class="fc" id="L598">            Objects.requireNonNull(distribution, &quot;distribution&quot;);</span>
+<span class="fc" id="L599">            decisions = List.copyOf(</span>
+<span class="fc" id="L600">                Objects.requireNonNull(decisions, &quot;decisions&quot;));</span>
+<span class="fc" id="L601">            Set&lt;Disposition&gt; dispositions = EnumSet.noneOf(Disposition.class);</span>
+<span class="fc" id="L602">            decisions.forEach(value -&gt; dispositions.add(value.disposition()));</span>
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">            if (decisions.size() != 6</span>
+<span class="fc" id="L604">                    || new LinkedHashSet&lt;&gt;(decisions.stream()</span>
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">                        .map(Decision::track).toList()).size() != 6</span>
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">                    || !dispositions.equals(EnumSet.allOf(Disposition.class))) {</span>
+<span class="nc" id="L607">                throw new IllegalArgumentException(</span>
+                    &quot;invalid decision matrix v1&quot;);
+            }
+<span class="fc" id="L610">            contentHash = prefixedSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L611">            requireEqual(</span>
+<span class="fc" id="L612">                reportHash(</span>
+                    repositoryRevision, corpusSha256, inventoryRevision,
+                    sources, distribution, decisions),
+                contentHash,
+                &quot;decision contentHash&quot;);
+<span class="fc" id="L617">        }</span>
+
+        String json() {
+<span class="fc" id="L620">            return render(</span>
+                repositoryRevision, corpusSha256, inventoryRevision,
+                sources, distribution, decisions, contentHash);
+        }
+    }
+
+<span class="fc" id="L626">    private record Document(String raw, View root, String contentHash) {</span>
+        static Document plain(Path path, String label, String schema) {
+<span class="fc" id="L628">            String raw = read(path, label);</span>
+<span class="fc" id="L629">            View root = View.parse(raw, label);</span>
+<span class="fc" id="L630">            requireEqual(schema, root.text(&quot;schema&quot;), label + &quot; schema&quot;);</span>
+<span class="fc" id="L631">            return new Document(raw, root, &quot;&quot;);</span>
+        }
+
+        static Document hashed(
+            Path path,
+            String label,
+            String schema,
+            String status
+        ) {
+<span class="fc" id="L640">            String raw = read(path, label);</span>
+<span class="fc" id="L641">            View root = View.parse(raw, label);</span>
+<span class="fc" id="L642">            requireEqual(schema, root.text(&quot;schema&quot;), label + &quot; schema&quot;);</span>
+<span class="fc" id="L643">            requireEqual(</span>
+<span class="fc" id="L644">                status, root.text(&quot;evidenceStatus&quot;), label + &quot; status&quot;);</span>
+<span class="fc" id="L645">            String hash = prefixedSha(</span>
+<span class="fc" id="L646">                root.text(&quot;contentHash&quot;), label + &quot; contentHash&quot;);</span>
+<span class="fc" id="L647">            String suffix = &quot;,\&quot;contentHash\&quot;:\&quot;&quot; + hash + &quot;\&quot;}&quot;;</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">            if (!raw.endsWith(suffix)) {</span>
+<span class="nc" id="L649">                throw new IllegalArgumentException(</span>
+                    &quot;non-final contentHash: &quot; + label);
+            }
+<span class="fc" id="L652">            String withoutHash = raw.substring(</span>
+<span class="fc" id="L653">                0, raw.length() - suffix.length()) + &quot;}&quot;;</span>
+<span class="fc" id="L654">            requireEqual(hash, sha256(withoutHash), label + &quot; contentHash&quot;);</span>
+<span class="fc" id="L655">            return new Document(raw, root, hash);</span>
+        }
+    }
+
+<span class="fc" id="L659">    private record View(Map&lt;String, Object&gt; values) {</span>
+        static View parse(String json, String label) {
+            try {
+<span class="fc" id="L662">                return new View(new JsonReader(json).readObject());</span>
+<span class="nc" id="L663">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L664">                throw new IllegalArgumentException(</span>
+                    &quot;invalid JSON: &quot; + label, exception);
+            }
+        }
+
+        static View of(Object raw, String label) {
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">            if (!(raw instanceof Map&lt;?, ?&gt; map)) {</span>
+<span class="nc" id="L671">                throw new IllegalArgumentException(&quot;object required: &quot; + label);</span>
+            }
+<span class="fc" id="L673">            Map&lt;String, Object&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L674">            map.forEach((key, value) -&gt; {</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">                if (!(key instanceof String text)) {</span>
+<span class="nc" id="L676">                    throw new IllegalArgumentException(</span>
+                        &quot;non-string key: &quot; + label);
+                }
+<span class="fc" id="L679">                values.put(text, value);</span>
+<span class="fc" id="L680">            });</span>
+<span class="fc" id="L681">            return new View(Map.copyOf(values));</span>
+        }
+
+        String text(String key) {
+<span class="fc" id="L685">            Object raw = values.get(key);</span>
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">            if (!(raw instanceof String value)) {</span>
+<span class="nc" id="L687">                throw new IllegalArgumentException(&quot;text required: &quot; + key);</span>
+            }
+<span class="fc" id="L689">            return HistoricalRewriteArchitectureDecision.text(value, key);</span>
+        }
+
+        int integer(String key) {
+<span class="fc" id="L693">            Object raw = values.get(key);</span>
+<span class="pc bpc" id="L694" title="1 of 2 branches missed.">            if (!(raw instanceof Number number)) {</span>
+<span class="nc" id="L695">                throw new IllegalArgumentException(&quot;number required: &quot; + key);</span>
+            }
+<span class="fc" id="L697">            double decimal = number.doubleValue();</span>
+<span class="fc" id="L698">            int value = number.intValue();</span>
+<span class="pc bpc" id="L699" title="2 of 4 branches missed.">            if (!Double.isFinite(decimal) || decimal != value) {</span>
+<span class="nc" id="L700">                throw new IllegalArgumentException(&quot;integer required: &quot; + key);</span>
+            }
+<span class="fc" id="L702">            return value;</span>
+        }
+
+        int optionalInteger(String key) {
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">            return values.containsKey(key) ? integer(key) : 0;</span>
+        }
+
+        boolean bool(String key) {
+<span class="fc" id="L710">            Object raw = values.get(key);</span>
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            if (!(raw instanceof Boolean value)) {</span>
+<span class="nc" id="L712">                throw new IllegalArgumentException(&quot;boolean required: &quot; + key);</span>
+            }
+<span class="fc" id="L714">            return value;</span>
+        }
+
+        View object(String key) {
+<span class="fc" id="L718">            return of(values.get(key), key);</span>
+        }
+
+        List&lt;?&gt; array(String key) {
+<span class="fc" id="L722">            Object raw = values.get(key);</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">            if (!(raw instanceof List&lt;?&gt; list)) {</span>
+<span class="nc" id="L724">                throw new IllegalArgumentException(&quot;array required: &quot; + key);</span>
+            }
+<span class="fc" id="L726">            return List.copyOf(list);</span>
+        }
+    }
+
+    private static String read(Path path, String label) {
+<span class="fc" id="L731">        Path normalized = Objects.requireNonNull(path, label + &quot; path&quot;)</span>
+<span class="fc" id="L732">            .toAbsolutePath().normalize();</span>
+        try {
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            if (!Files.isRegularFile(normalized)</span>
+<span class="pc bpc" id="L735" title="1 of 2 branches missed.">                    || Files.size(normalized) &gt; MAX_INPUT_BYTES) {</span>
+<span class="nc" id="L736">                throw new IllegalArgumentException(</span>
+                    &quot;invalid bounded file: &quot; + label);
+            }
+<span class="fc" id="L739">            return Files.readString(normalized, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L740">        } catch (IOException exception) {</span>
+<span class="nc" id="L741">            throw new UncheckedIOException(&quot;Read failed: &quot; + label, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

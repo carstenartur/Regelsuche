@@ -36,7 +36,7 @@ public record SaturationStats(
 
     /** Why saturation stopped. */
 <span class="fc" id="L38">    public enum Reason {</span>
-        /** No progress, rule failures or incomplete owned matches — relative fix-point reached. */
+        /** All active native rules reached a relative fix-point without failures or incomplete matches. */
 <span class="fc" id="L40">        FIX_POINT,</span>
         /** Hit the configured iteration budget. */
 <span class="fc" id="L42">        ITERATION_BUDGET,</span>
@@ -49,12 +49,14 @@ public record SaturationStats(
         /** A guard remained undecided in the run's fixed assumption context. */
 <span class="fc" id="L50">        UNDECIDED_GUARDS,</span>
         /** A conditional application would exceed the retained guard decision budget. */
-<span class="fc" id="L52">        GUARD_BUDGET</span>
+<span class="fc" id="L52">        GUARD_BUDGET,</span>
+        /** Concrete callbacks inspect only selected child representatives. Closure is unverified. */
+<span class="fc" id="L54">        INCOMPLETE_REFERENCE_BRIDGE</span>
     }
 
-<span class="fc" id="L55">    public SaturationStats {</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        appliedRules = appliedRules == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(appliedRules));</span>
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L57">    public SaturationStats {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        appliedRules = appliedRules == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(appliedRules));</span>
+<span class="fc" id="L59">    }</span>
 
     public SaturationStats(
         int eclasses,
@@ -66,7 +68,7 @@ public record SaturationStats(
         boolean saturated,
         Reason stopReason
     ) {
-<span class="nc" id="L69">        this(</span>
+<span class="nc" id="L71">        this(</span>
             eclasses,
             enodes,
             merges,
@@ -82,18 +84,18 @@ public record SaturationStats(
             0L,
             0L,
             iterations,
-<span class="nc bnc" id="L85" title="All 2 branches missed.">            appliedRules == null ? 0 : appliedRules.values().stream().mapToInt(Integer::intValue).sum()</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            appliedRules == null ? 0 : appliedRules.values().stream().mapToInt(Integer::intValue).sum()</span>
         );
-<span class="nc" id="L87">    }</span>
+<span class="nc" id="L89">    }</span>
 
     /** Total number of rule applications across all iterations. */
     public int totalApplications() {
-<span class="fc" id="L91">        return appliedRules.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="fc" id="L93">        return appliedRules.values().stream().mapToInt(Integer::intValue).sum();</span>
     }
 
     /** Distinct rules that fired at least once. */
     public int distinctRulesFired() {
-<span class="nc" id="L96">        return appliedRules.size();</span>
+<span class="nc" id="L98">        return appliedRules.size();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

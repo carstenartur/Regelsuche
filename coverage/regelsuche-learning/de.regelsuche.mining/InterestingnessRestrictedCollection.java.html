@@ -1,0 +1,458 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessRestrictedCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessRestrictedCollection.java</span></div><h1>InterestingnessRestrictedCollection.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.mining.InterestingnessBlindReviewPacketExporter.ReviewAssignment;
+import de.regelsuche.mining.InterestingnessIndependentReviewIntake.IntakeOutcome;
+import de.regelsuche.mining.InterestingnessIndependentReviewIntake.ReviewOrigin;
+import de.regelsuche.mining.InterestingnessIndependentReviewIntake.ReviewSubmission;
+import de.regelsuche.mining.InterestingnessIndependentReviewStudy.StudyPlan;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/** Custodian-operated, single-host POSIX intake. The only outward-facing values are commitments. */
+public final class InterestingnessRestrictedCollection {
+<span class="fc" id="L31">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L32">        .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L33">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L34">    private static final Set&lt;String&gt; FIELDS = Set.of(&quot;registrationHash&quot;, &quot;packetId&quot;, &quot;packetContentHash&quot;,</span>
+        &quot;revision&quot;, &quot;disposition&quot;, &quot;blind&quot;, &quot;independent&quot;, &quot;relevancePermille&quot;, &quot;confidencePermille&quot;,
+        &quot;rationaleCodes&quot;, &quot;qualificationEvidenceHash&quot;, &quot;optionalProse&quot;, &quot;reason&quot;);
+<span class="fc" id="L37">    private static final Set&lt;String&gt; EXCLUSION_REASONS = Set.of(&quot;WITHDRAWN&quot;, &quot;CONFLICT&quot;, &quot;EXPOSURE&quot;, &quot;INELIGIBLE&quot;);</span>
+    private static final String STATE = &quot;collection.json&quot;;
+    private static final int MAX_FORM_BYTES = 64 * 1024;
+
+    private InterestingnessRestrictedCollection() { }
+
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (args.length &lt; 2) throw new IllegalArgumentException(</span>
+            &quot;init VAULT PLAN EXPORT POLICY ORIGIN [PROFILES] | submit VAULT REVIEWER_HASH | freeze VAULT | audit VAULT [REVISION] | revise VAULT PRIOR_FREEZE REASON | evaluate VAULT&quot;);
+<span class="nc" id="L46">        Path root = Path.of(args[1]);</span>
+        String result;
+        try {
+<span class="nc" id="L49">            result = run(args, root);</span>
+<span class="nc" id="L50">        } catch (IOException | RuntimeException failure) {</span>
+<span class="nc" id="L51">            System.err.println(&quot;Restricted review command failed. Check the custodian inputs and vault state.&quot;);</span>
+<span class="nc" id="L52">            System.exit(1);</span>
+<span class="nc" id="L53">            return;</span>
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">        System.out.println(result);</span>
+<span class="nc" id="L56">    }</span>
+
+    private static String run(String[] args, Path root) throws IOException {
+<span class="nc bnc" id="L59" title="All 7 branches missed.">        return switch (args[0]) {</span>
+            case &quot;init&quot; -&gt; {
+<span class="nc bnc" id="L61" title="All 4 branches missed.">                require(args.length == 6 || args.length == 7, &quot;init requires vault, plan, export, policy, origin and optional profiles&quot;);</span>
+<span class="nc" id="L62">                yield init(root, Path.of(args[2]), Path.of(args[3]), Path.of(args[4]), ReviewOrigin.valueOf(args[5]),</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                    args.length == 7 ? Path.of(args[6]) : null);</span>
+            }
+            case &quot;submit&quot; -&gt; {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                require(args.length == 3, &quot;submit requires vault and authenticated reviewer hash&quot;);</span>
+<span class="nc" id="L67">                var bytes = System.in.readNBytes(MAX_FORM_BYTES + 1);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                require(bytes.length &lt;= MAX_FORM_BYTES, &quot;form too large&quot;);</span>
+<span class="nc" id="L69">                yield submit(root, args[2], new String(bytes, StandardCharsets.UTF_8));</span>
+            }
+            case &quot;freeze&quot; -&gt; {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">                require(args.length == 2, &quot;freeze requires vault&quot;);</span>
+<span class="nc" id="L73">                yield freeze(root);</span>
+            }
+            case &quot;audit&quot; -&gt; {
+<span class="nc bnc" id="L76" title="All 4 branches missed.">                require(args.length == 2 || args.length == 3, &quot;audit requires vault and optional revision&quot;);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                yield args.length == 3 ? audit(root, Integer.parseInt(args[2])) : audit(root);</span>
+            }
+            case &quot;revise&quot; -&gt; {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                require(args.length == 4, &quot;revise requires vault, predecessor freeze hash and reason&quot;);</span>
+<span class="nc" id="L81">                yield revise(root, args[2], args[3]);</span>
+            }
+            case &quot;evaluate&quot; -&gt; {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                require(args.length == 2, &quot;evaluate requires vault&quot;);</span>
+<span class="nc" id="L85">                yield evaluate(root);</span>
+            }
+<span class="nc" id="L87">            default -&gt; throw new IllegalArgumentException(&quot;unknown restricted collection command&quot;);</span>
+        };
+    }
+
+    public static synchronized String init(Path root, Path planFile, Path export, Path policy,
+            ReviewOrigin origin) throws IOException {
+<span class="fc" id="L93">        return init(root, planFile, export, policy, origin, null);</span>
+    }
+
+    public static synchronized String init(Path root, Path planFile, Path export, Path policy,
+            ReviewOrigin origin, Path profileFile) throws IOException {
+<span class="fc" id="L98">        StudyPlan plan = JSON.treeToValue(read(planFile), StudyPlan.class);</span>
+<span class="fc" id="L99">        var privateFile = export.resolve(&quot;private/assignment-manifest.json&quot;);</span>
+<span class="fc" id="L100">        var supplied = read(privateFile);</span>
+<span class="fc" id="L101">        List&lt;ReviewAssignment&gt; assignments = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L102">        var presentations = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L103">        var packets = new HashMap&lt;String, JsonNode&gt;();</span>
+<span class="fc" id="L104">        String instructions = null;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (JsonNode row : supplied.required(&quot;assignments&quot;)) {</span>
+<span class="fc" id="L106">            String packetId = text(row, &quot;packetId&quot;);</span>
+<span class="fc" id="L107">            require(packetId.matches(&quot;packet-[0-9a-f]{24}&quot;), &quot;invalid packet ID&quot;);</span>
+<span class="fc" id="L108">            var packet = read(export.resolve(&quot;public/packets&quot;).resolve(packetId + &quot;.json&quot;));</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            require(packets.put(packetId, packet) == null, &quot;duplicate packet&quot;);</span>
+<span class="fc" id="L110">            assignments.add(new ReviewAssignment(text(row, &quot;assignmentId&quot;), text(row, &quot;reviewerHash&quot;), text(row, &quot;caseId&quot;)));</span>
+<span class="fc" id="L111">            presentations.put(text(row, &quot;blindedPresentationHash&quot;), text(packet, &quot;blindedPresentation&quot;));</span>
+<span class="fc" id="L112">            instructions = text(packet, &quot;reviewerInstructions&quot;);</span>
+<span class="fc" id="L113">        }</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        require(instructions != null, &quot;empty export&quot;);</span>
+<span class="fc" id="L115">        requireExactPublicTree(export, packets.keySet());</span>
+<span class="fc" id="L116">        var expected = new InterestingnessBlindReviewPacketExporter().export(plan, assignments, presentations, instructions);</span>
+<span class="fc" id="L117">        require(JSON.readTree(expected.privateManifest().toCanonicalJson()).equals(supplied), &quot;private manifest mismatch&quot;);</span>
+<span class="fc" id="L118">        require(JSON.readTree(expected.publicManifest().toCanonicalJson()).equals(read(export.resolve(&quot;public/manifest.json&quot;))),</span>
+            &quot;public manifest mismatch&quot;);
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (var packet : expected.packets()) {</span>
+<span class="fc" id="L121">            require(JSON.readTree(packet.toCanonicalJson()).equals(packets.get(packet.id())), &quot;packet mismatch&quot;);</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">        byte[] policyBytes = Files.readAllBytes(policy);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        require(policyBytes.length &gt; 0, &quot;empty policy&quot;);</span>
+<span class="fc" id="L125">        var registration = JSON.createObjectNode();</span>
+<span class="fc" id="L126">        registration.put(&quot;schema&quot;, &quot;regelsuche.restricted-review-registration/v1&quot;);</span>
+<span class="fc" id="L127">        registration.put(&quot;studyPlanHash&quot;, plan.contentHash());</span>
+<span class="fc" id="L128">        registration.put(&quot;policyHash&quot;, InterestingnessIndependentReviewStudy.sha256(policyBytes));</span>
+<span class="fc" id="L129">        registration.put(&quot;reviewerInstructionsHash&quot;, plan.reviewProtocol().reviewerInstructionsHash());</span>
+<span class="fc" id="L130">        registration.put(&quot;publicManifestHash&quot;, expected.publicManifest().contentHash());</span>
+<span class="fc" id="L131">        registration.put(&quot;privateAssignmentManifestHash&quot;, expected.privateManifest().contentHash());</span>
+<span class="fc" id="L132">        registration.put(&quot;origin&quot;, origin.name());</span>
+<span class="fc" id="L133">        registration.put(&quot;revision&quot;, 1);</span>
+<span class="fc" id="L134">        JsonNode profiles = null;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (profileFile != null) {</span>
+<span class="fc" id="L136">            profiles = JSON.valueToTree(InterestingnessRestrictedEvaluation.profiles(JSON, read(profileFile), plan));</span>
+<span class="fc" id="L137">            registration.put(&quot;profileInputsHash&quot;, digest(profiles));</span>
+        }
+<span class="fc" id="L139">        String registrationHash = digest(registration);</span>
+<span class="fc" id="L140">        var state = JSON.createObjectNode();</span>
+<span class="fc" id="L141">        state.set(&quot;registration&quot;, registration);</span>
+<span class="fc" id="L142">        state.put(&quot;registrationHash&quot;, registrationHash);</span>
+<span class="fc" id="L143">        state.set(&quot;plan&quot;, JSON.readTree(plan.toCanonicalJson()));</span>
+<span class="fc" id="L144">        state.set(&quot;assignments&quot;, supplied.required(&quot;assignments&quot;));</span>
+<span class="fc" id="L145">        state.putObject(&quot;receipts&quot;);</span>
+<span class="fc" id="L146">        state.putObject(&quot;history&quot;);</span>
+<span class="fc" id="L147">        state.put(&quot;revision&quot;, 1);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (profiles != null) state.set(&quot;profiles&quot;, profiles);</span>
+
+<span class="fc" id="L150">        Path target = root.toAbsolutePath().normalize();</span>
+<span class="fc" id="L151">        Path parent = target.getParent();</span>
+<span class="pc bpc" id="L152" title="3 of 6 branches missed.">        require(parent != null &amp;&amp; Files.isDirectory(parent) &amp;&amp; !Files.exists(target, LinkOption.NOFOLLOW_LINKS),</span>
+            &quot;vault must be new and have an existing trusted parent&quot;);
+<span class="fc" id="L154">        var privateMode = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString(&quot;rwx------&quot;));</span>
+<span class="fc" id="L155">        Path stage = Files.createTempDirectory(parent, &quot;.review-collection-&quot;, privateMode);</span>
+        try {
+<span class="fc" id="L157">            Files.createDirectory(stage.resolve(&quot;prose&quot;), privateMode);</span>
+<span class="fc" id="L158">            Files.createFile(stage.resolve(&quot;lock&quot;));</span>
+<span class="fc" id="L159">            Files.write(stage.resolve(&quot;policy&quot;), policyBytes);</span>
+<span class="fc" id="L160">            writeAtomically(stage.resolve(STATE), state);</span>
+<span class="fc" id="L161">            Files.move(stage, target, StandardCopyOption.ATOMIC_MOVE);</span>
+        } finally {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (Files.exists(stage)) {</span>
+<span class="nc" id="L164">                try (var paths = Files.walk(stage)) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                    for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);</span>
+                }
+            }
+        }
+<span class="fc" id="L169">        return registrationHash;</span>
+    }
+
+    /** reviewerHash comes from the custodian-authenticated delivery channel, never the form. */
+    public static String submit(Path root, String reviewerHash, String formJson) throws IOException {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        require(formJson.getBytes(StandardCharsets.UTF_8).length &lt;= MAX_FORM_BYTES, &quot;form too large&quot;);</span>
+<span class="fc" id="L175">        var form = JSON.readTree(formJson);</span>
+<span class="pc bpc" id="L176" title="2 of 4 branches missed.">        require(form != null &amp;&amp; form.isObject(), &quot;expected one submission object&quot;);</span>
+<span class="fc" id="L177">        form.fieldNames().forEachRemaining(key -&gt; require(FIELDS.contains(key), &quot;unexpected form field&quot;));</span>
+<span class="fc" id="L178">        return locked(root, state -&gt; {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (state.has(&quot;frozen&quot;)) throw new IllegalStateException(&quot;collection is frozen&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            require(text(form, &quot;registrationHash&quot;).equals(text(state, &quot;registrationHash&quot;))</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                &amp;&amp; integer(form, &quot;revision&quot;) == state.required(&quot;revision&quot;).intValue(), &quot;registration or revision mismatch&quot;);</span>
+<span class="fc" id="L182">            String packetId = text(form, &quot;packetId&quot;);</span>
+<span class="fc" id="L183">            JsonNode assignment = null;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (var row : state.required(&quot;assignments&quot;)) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                if (packetId.equals(text(row, &quot;packetId&quot;))) assignment = row;</span>
+<span class="fc" id="L186">            }</span>
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">            require(assignment != null &amp;&amp; reviewerHash.equals(text(assignment, &quot;reviewerHash&quot;))</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                &amp;&amp; text(form, &quot;packetContentHash&quot;).equals(text(assignment, &quot;packetContentHash&quot;)), &quot;assignment mismatch&quot;);</span>
+<span class="fc" id="L189">            var receipts = (ObjectNode) state.required(&quot;receipts&quot;);</span>
+<span class="fc bfc" id="L190" title="All 4 branches covered.">            require(!receipts.has(packetId) || integer(receipts.required(packetId), &quot;revision&quot;) &lt; integer(state, &quot;revision&quot;),</span>
+                &quot;assignment already submitted in this revision&quot;);
+<span class="fc" id="L192">            String disposition = text(form, &quot;disposition&quot;);</span>
+<span class="fc" id="L193">            require(Set.of(&quot;RATED&quot;, &quot;ABSTAINED&quot;, &quot;EXCLUDED&quot;).contains(disposition), &quot;unknown disposition&quot;);</span>
+<span class="fc" id="L194">            boolean blind = bool(form, &quot;blind&quot;);</span>
+<span class="fc" id="L195">            boolean independent = bool(form, &quot;independent&quot;);</span>
+<span class="fc bfc" id="L196" title="All 6 branches covered.">            if (!disposition.equals(&quot;EXCLUDED&quot;)) require(blind &amp;&amp; independent, &quot;blind independent review required&quot;);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (disposition.equals(&quot;EXCLUDED&quot;)) {</span>
+<span class="fc" id="L198">                require(EXCLUSION_REASONS.contains(text(form, &quot;reason&quot;)), &quot;unknown exclusion reason&quot;);</span>
+            } else {
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                require(!form.has(&quot;reason&quot;), &quot;reason is for exclusions only&quot;);</span>
+            }
+<span class="fc" id="L202">            var receipt = JSON.createObjectNode();</span>
+<span class="fc" id="L203">            receipt.put(&quot;registrationHash&quot;, text(state, &quot;registrationHash&quot;));</span>
+<span class="fc" id="L204">            receipt.put(&quot;assignmentHash&quot;, text(assignment, &quot;contentHash&quot;));</span>
+<span class="fc" id="L205">            receipt.put(&quot;packetContentHash&quot;, text(assignment, &quot;packetContentHash&quot;));</span>
+<span class="fc" id="L206">            receipt.put(&quot;revision&quot;, integer(state, &quot;revision&quot;));</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (receipts.has(packetId)) receipt.set(&quot;priorReceiptHash&quot;, receipts.required(packetId).required(&quot;receiptHash&quot;));</span>
+<span class="fc" id="L208">            receipt.put(&quot;blind&quot;, blind);</span>
+<span class="fc" id="L209">            receipt.put(&quot;independent&quot;, independent);</span>
+<span class="fc" id="L210">            receipt.put(&quot;disposition&quot;, disposition);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (form.has(&quot;reason&quot;)) receipt.put(&quot;reason&quot;, text(form, &quot;reason&quot;));</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (disposition.equals(&quot;RATED&quot;)) {</span>
+<span class="fc" id="L213">                StudyPlan plan = JSON.treeToValue(state.required(&quot;plan&quot;), StudyPlan.class);</span>
+<span class="fc" id="L214">                var origin = ReviewOrigin.valueOf(text(state.required(&quot;registration&quot;), &quot;origin&quot;));</span>
+<span class="fc" id="L215">                var label = new ReviewSubmission(packetId, plan.contentHash(), text(assignment, &quot;caseId&quot;),</span>
+<span class="fc" id="L216">                    text(assignment, &quot;candidateId&quot;), reviewerHash, origin, blind, integer(form, &quot;relevancePermille&quot;),</span>
+<span class="fc" id="L217">                    integer(form, &quot;confidencePermille&quot;), codes(form),</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                    form.has(&quot;qualificationEvidenceHash&quot;) ? text(form, &quot;qualificationEvidenceHash&quot;) : &quot;&quot;, digest(receipt));</span>
+<span class="fc" id="L219">                var decision = new InterestingnessIndependentReviewIntake().evaluate(plan, List.of(label), 1, &quot;&quot;).decisions().getFirst();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                require(decision.outcome() != IntakeOutcome.REJECTED, &quot;submission violates frozen protocol: &quot; + decision.blockers());</span>
+<span class="fc" id="L221">                receipt.set(&quot;label&quot;, JSON.valueToTree(label));</span>
+<span class="fc" id="L222">            } else {</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">                require(!form.has(&quot;relevancePermille&quot;) &amp;&amp; !form.has(&quot;confidencePermille&quot;)</span>
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">                    &amp;&amp; !form.has(&quot;rationaleCodes&quot;) &amp;&amp; !form.has(&quot;qualificationEvidenceHash&quot;), &quot;non-rating contains labels&quot;);</span>
+            }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            String prose = form.has(&quot;optionalProse&quot;) ? text(form, &quot;optionalProse&quot;) : &quot;&quot;;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (!prose.isEmpty()) receipt.put(&quot;proseHash&quot;, InterestingnessIndependentReviewStudy.sha256(</span>
+<span class="fc" id="L228">                prose.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="fc" id="L229">            String receiptHash = digest(receipt);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (!prose.isEmpty()) {</span>
+<span class="fc" id="L231">                Files.writeString(root.resolve(&quot;prose&quot;).resolve(receiptHash.substring(7)), prose);</span>
+            }
+<span class="fc" id="L233">            receipt.put(&quot;receiptHash&quot;, receiptHash);</span>
+<span class="fc" id="L234">            receipts.set(packetId, receipt);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (&quot;WITHDRAWN&quot;.equals(receipt.path(&quot;reason&quot;).textValue())) {</span>
+<span class="fc" id="L236">                deleteAssignmentProse(root, state, packetId);</span>
+            }
+<span class="fc" id="L238">            writeAtomically(root.resolve(STATE), state);</span>
+<span class="fc" id="L239">            return receiptHash;</span>
+        });
+    }
+
+    private static void deleteAssignmentProse(Path root, ObjectNode state, String packetId) throws IOException {
+<span class="fc" id="L244">        JsonNode current = state.required(&quot;receipts&quot;).required(packetId);</span>
+<span class="fc" id="L245">        Files.deleteIfExists(root.resolve(&quot;prose&quot;).resolve(text(current, &quot;receiptHash&quot;).substring(7)));</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (var history : state.required(&quot;history&quot;)) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            for (var slot : history.required(&quot;slots&quot;)) {</span>
+<span class="pc bpc" id="L248" title="1 of 4 branches missed.">                if (packetId.equals(text(slot.required(&quot;assignment&quot;), &quot;packetId&quot;)) &amp;&amp; slot.has(&quot;receiptHash&quot;)) {</span>
+<span class="fc" id="L249">                    Files.deleteIfExists(root.resolve(&quot;prose&quot;).resolve(text(slot, &quot;receiptHash&quot;).substring(7)));</span>
+                }
+<span class="fc" id="L251">            }</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">    }</span>
+
+    public static String freeze(Path root) throws IOException {
+<span class="fc" id="L256">        return locked(root, state -&gt; {</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (state.has(&quot;frozen&quot;)) return text(state.required(&quot;frozen&quot;), &quot;freezeHash&quot;);</span>
+<span class="fc" id="L258">            var frozen = JSON.createObjectNode();</span>
+<span class="fc" id="L259">            frozen.put(&quot;schema&quot;, &quot;regelsuche.restricted-review-freeze/v1&quot;);</span>
+<span class="fc" id="L260">            frozen.put(&quot;registrationHash&quot;, text(state, &quot;registrationHash&quot;));</span>
+<span class="fc" id="L261">            frozen.set(&quot;registration&quot;, state.required(&quot;registration&quot;));</span>
+<span class="fc" id="L262">            frozen.set(&quot;historicalExposures&quot;, state.required(&quot;plan&quot;).required(&quot;historicalExposures&quot;));</span>
+<span class="fc" id="L263">            frozen.set(&quot;revision&quot;, state.required(&quot;revision&quot;));</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (state.has(&quot;priorFreezeHash&quot;)) {</span>
+<span class="fc" id="L265">                frozen.set(&quot;priorFreezeHash&quot;, state.required(&quot;priorFreezeHash&quot;));</span>
+<span class="fc" id="L266">                frozen.set(&quot;correctionReason&quot;, state.required(&quot;correctionReason&quot;));</span>
+            }
+<span class="fc" id="L268">            var slots = frozen.putArray(&quot;slots&quot;);</span>
+<span class="fc" id="L269">            var submissions = new ArrayList&lt;ReviewSubmission&gt;();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            for (var assignment : state.required(&quot;assignments&quot;)) {</span>
+<span class="fc" id="L271">                var slot = slots.addObject();</span>
+<span class="fc" id="L272">                slot.set(&quot;assignment&quot;, assignment);</span>
+<span class="fc" id="L273">                JsonNode receipt = state.required(&quot;receipts&quot;).get(text(assignment, &quot;packetId&quot;));</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                if (receipt == null) {</span>
+<span class="fc" id="L275">                    slot.put(&quot;disposition&quot;, &quot;MISSING&quot;);</span>
+                } else {
+<span class="fc" id="L277">                    var material = ((ObjectNode) receipt).deepCopy();</span>
+<span class="fc" id="L278">                    material.remove(&quot;receiptHash&quot;);</span>
+<span class="fc" id="L279">                    require(digest(material).equals(text(receipt, &quot;receiptHash&quot;)), &quot;receipt hash mismatch&quot;);</span>
+<span class="fc" id="L280">                    slot.setAll((ObjectNode) receipt);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                    if (receipt.has(&quot;label&quot;)) submissions.add(JSON.treeToValue(receipt.required(&quot;label&quot;), ReviewSubmission.class));</span>
+                }
+<span class="fc" id="L283">            }</span>
+<span class="fc" id="L284">            StudyPlan plan = JSON.treeToValue(state.required(&quot;plan&quot;), StudyPlan.class);</span>
+<span class="fc" id="L285">            var intake = new InterestingnessIndependentReviewIntake().evaluate(plan, submissions, integer(state, &quot;revision&quot;),</span>
+<span class="fc" id="L286">                state.path(&quot;priorLabeledEvaluationHash&quot;).asText(&quot;&quot;));</span>
+<span class="fc" id="L287">            frozen.set(&quot;intake&quot;, JSON.readTree(intake.toCanonicalJson()));</span>
+<span class="fc" id="L288">            String freezeHash = digest(frozen);</span>
+<span class="fc" id="L289">            frozen.put(&quot;freezeHash&quot;, freezeHash);</span>
+<span class="fc" id="L290">            state.set(&quot;frozen&quot;, frozen);</span>
+<span class="fc" id="L291">            writeAtomically(root.resolve(STATE), state);</span>
+<span class="fc" id="L292">            return freezeHash;</span>
+        });
+    }
+
+    public static String revise(Path root, String priorFreezeHash, String reason) throws IOException {
+<span class="fc" id="L297">        require(Set.of(&quot;TRANSCRIPTION&quot;, &quot;WITHDRAWAL&quot;, &quot;INCIDENT&quot;, &quot;ATTESTATION_CORRECTION&quot;).contains(reason),</span>
+            &quot;unknown correction reason&quot;);
+<span class="fc" id="L299">        return locked(root, state -&gt; {</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (!state.has(&quot;frozen&quot;)) throw new IllegalStateException(&quot;freeze current revision first&quot;);</span>
+<span class="fc" id="L301">            ObjectNode previous = (ObjectNode) state.required(&quot;frozen&quot;);</span>
+<span class="fc" id="L302">            require(text(previous, &quot;freezeHash&quot;).equals(priorFreezeHash), &quot;predecessor freeze mismatch&quot;);</span>
+<span class="fc" id="L303">            int revision = integer(state, &quot;revision&quot;);</span>
+<span class="fc" id="L304">            ((ObjectNode) state.required(&quot;history&quot;)).set(Integer.toString(revision), previous);</span>
+<span class="fc" id="L305">            state.remove(&quot;frozen&quot;);</span>
+<span class="fc" id="L306">            state.put(&quot;revision&quot;, Math.incrementExact(revision));</span>
+<span class="fc" id="L307">            state.put(&quot;priorFreezeHash&quot;, priorFreezeHash);</span>
+<span class="fc" id="L308">            state.put(&quot;priorLabeledEvaluationHash&quot;, previous.required(&quot;intake&quot;).required(&quot;labeledEvaluationHash&quot;).asText());</span>
+<span class="fc" id="L309">            state.put(&quot;correctionReason&quot;, reason);</span>
+<span class="fc" id="L310">            writeAtomically(root.resolve(STATE), state);</span>
+<span class="fc" id="L311">            return priorFreezeHash;</span>
+        });
+    }
+
+    /** Atomically saves the only analysis of TEST in this registration. Retries retrieve the same receipt. */
+    public static String evaluate(Path root) throws IOException {
+<span class="fc" id="L317">        return locked(root, state -&gt; {</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">            if (!state.has(&quot;frozen&quot;)) throw new IllegalStateException(&quot;freeze current revision first&quot;);</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            if (!state.has(&quot;profiles&quot;)) throw new IllegalStateException(&quot;no profile inputs registered before intake&quot;);</span>
+<span class="fc" id="L320">            JsonNode frozen = state.required(&quot;frozen&quot;);</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (state.has(&quot;evaluation&quot;)) {</span>
+<span class="fc" id="L322">                var saved = state.required(&quot;evaluation&quot;);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">                if (!saved.required(&quot;freezeHash&quot;).equals(frozen.required(&quot;freezeHash&quot;))) {</span>
+<span class="fc" id="L324">                    throw new IllegalStateException(&quot;TEST was already exposed on an earlier revision&quot;);</span>
+                }
+<span class="fc" id="L326">                return text(saved, &quot;evaluationHash&quot;);</span>
+            }
+<span class="fc" id="L328">            require(digest(state.required(&quot;profiles&quot;)).equals(text(state.required(&quot;registration&quot;), &quot;profileInputsHash&quot;)),</span>
+                &quot;registered profile input mismatch&quot;);
+<span class="fc" id="L330">            var result = InterestingnessRestrictedEvaluation.evaluate(JSON, state);</span>
+<span class="fc" id="L331">            String commitment = digest(result);</span>
+<span class="fc" id="L332">            result.put(&quot;evaluationHash&quot;, commitment);</span>
+<span class="fc" id="L333">            state.set(&quot;evaluation&quot;, result);</span>
+<span class="fc" id="L334">            writeAtomically(root.resolve(STATE), state);</span>
+<span class="fc" id="L335">            return commitment;</span>
+        });
+    }
+
+    /** Role-restricted audit. The primary freeze and any later analysis have independent commitments. */
+    public static String audit(Path root) throws IOException {
+<span class="fc" id="L341">        return audit(root, 0);</span>
+    }
+
+    public static String audit(Path root, int requestedRevision) throws IOException {
+<span class="fc" id="L345">        return locked(root, state -&gt; {</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            int revision = requestedRevision == 0 ? integer(state, &quot;revision&quot;) : requestedRevision;</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            JsonNode saved = revision == integer(state, &quot;revision&quot;) ? state.get(&quot;frozen&quot;)</span>
+<span class="fc" id="L348">                : state.required(&quot;history&quot;).get(Integer.toString(revision));</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (saved == null) throw new IllegalStateException(&quot;revision is open or does not exist&quot;);</span>
+<span class="fc" id="L350">            ObjectNode frozen = ((ObjectNode) saved).deepCopy();</span>
+<span class="fc" id="L351">            var claimed = frozen.remove(&quot;freezeHash&quot;);</span>
+<span class="fc" id="L352">            require(digest(frozen).equals(claimed.asText()), &quot;freeze hash mismatch&quot;);</span>
+<span class="fc" id="L353">            frozen.set(&quot;freezeHash&quot;, claimed);</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">            if (state.has(&quot;evaluation&quot;)) {</span>
+<span class="fc" id="L355">                var result = (ObjectNode) state.required(&quot;evaluation&quot;);</span>
+<span class="fc" id="L356">                var material = result.deepCopy();</span>
+<span class="fc" id="L357">                var hash = material.remove(&quot;evaluationHash&quot;);</span>
+<span class="pc bpc" id="L358" title="1 of 4 branches missed.">                require(hash != null &amp;&amp; digest(material).equals(hash.asText()), &quot;evaluation hash mismatch&quot;);</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                if (result.required(&quot;freezeHash&quot;).equals(claimed)) {</span>
+<span class="fc" id="L360">                    frozen.set(&quot;evaluation&quot;, result);</span>
+                } else {
+<span class="fc" id="L362">                    frozen.set(&quot;priorTestExposureLedger&quot;, result.required(&quot;testExposureLedger&quot;));</span>
+<span class="fc" id="L363">                    frozen.set(&quot;priorEvaluationHash&quot;, result.required(&quot;evaluationHash&quot;));</span>
+                }
+            }
+<span class="fc" id="L366">            return frozen.toString();</span>
+        });
+    }
+
+    @FunctionalInterface
+    private interface Operation {
+        String apply(ObjectNode state) throws IOException;
+    }
+
+    private static synchronized String locked(Path root, Operation operation) throws IOException {
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        require(Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            &amp;&amp; Files.getPosixFilePermissions(root).equals(PosixFilePermissions.fromString(&quot;rwx------&quot;)),</span>
+            &quot;owner-only vault required&quot;);
+<span class="fc" id="L379">        try (var channel = FileChannel.open(root.resolve(&quot;lock&quot;), StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);</span>
+<span class="fc" id="L380">             var lock = channel.lock()) {</span>
+<span class="fc" id="L381">            ObjectNode state = (ObjectNode) read(root.resolve(STATE));</span>
+<span class="fc" id="L382">            var registration = state.required(&quot;registration&quot;);</span>
+<span class="fc" id="L383">            require(digest(registration).equals(text(state, &quot;registrationHash&quot;)), &quot;registration hash mismatch&quot;);</span>
+<span class="fc" id="L384">            require(registration.required(&quot;studyPlanHash&quot;).equals(state.required(&quot;plan&quot;).required(&quot;contentHash&quot;)),</span>
+                &quot;registered study mismatch&quot;);
+<span class="fc" id="L386">            return operation.apply(state);</span>
+        }
+    }
+
+    private static void requireExactPublicTree(Path export, Set&lt;String&gt; packetIds) throws IOException {
+<span class="fc" id="L391">        Path directory = export.resolve(&quot;public&quot;);</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        require(Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            &amp;&amp; Files.isDirectory(directory.resolve(&quot;packets&quot;), LinkOption.NOFOLLOW_LINKS), &quot;public packet directory unavailable&quot;);</span>
+<span class="fc" id="L394">        try (var entries = Files.list(directory)) {</span>
+<span class="fc" id="L395">            require(entries.map(path -&gt; path.getFileName().toString()).collect(java.util.stream.Collectors.toSet())</span>
+<span class="fc" id="L396">                .equals(Set.of(&quot;manifest.json&quot;, &quot;packets&quot;)), &quot;unexpected public export entry&quot;);</span>
+        }
+<span class="fc" id="L398">        var expected = packetIds.stream().map(id -&gt; id + &quot;.json&quot;).collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc" id="L399">        try (var entries = Files.list(directory.resolve(&quot;packets&quot;))) {</span>
+<span class="fc" id="L400">            require(entries.map(path -&gt; path.getFileName().toString()).collect(java.util.stream.Collectors.toSet())</span>
+<span class="fc" id="L401">                .equals(expected), &quot;unexpected packet file&quot;);</span>
+        }
+<span class="fc" id="L403">    }</span>
+
+    private static List&lt;String&gt; codes(JsonNode form) {
+<span class="fc" id="L406">        JsonNode values = form.required(&quot;rationaleCodes&quot;);</span>
+<span class="fc" id="L407">        require(values.isArray(), &quot;rationaleCodes must be an array&quot;);</span>
+<span class="fc" id="L408">        var result = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L409">        var seen = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        for (var value : values) {</span>
+<span class="pc bpc" id="L411" title="2 of 4 branches missed.">            require(value.isTextual() &amp;&amp; seen.add(value.textValue()), &quot;invalid or duplicate rationale code&quot;);</span>
+<span class="fc" id="L412">            result.add(value.textValue());</span>
+<span class="fc" id="L413">        }</span>
+<span class="fc" id="L414">        return result;</span>
+    }
+
+    private static int integer(JsonNode node, String key) {
+<span class="fc" id="L418">        var value = node.required(key);</span>
+<span class="pc bpc" id="L419" title="2 of 4 branches missed.">        require(value.isIntegralNumber() &amp;&amp; value.canConvertToInt(), &quot;expected integer &quot; + key);</span>
+<span class="fc" id="L420">        return value.intValue();</span>
+    }
+
+    private static boolean bool(JsonNode node, String key) {
+<span class="fc" id="L424">        var value = node.required(key);</span>
+<span class="fc" id="L425">        require(value.isBoolean(), &quot;expected boolean &quot; + key);</span>
+<span class="fc" id="L426">        return value.booleanValue();</span>
+    }
+
+    private static String text(JsonNode node, String key) {
+<span class="fc" id="L430">        var value = node.required(key);</span>
+<span class="fc" id="L431">        require(value.isTextual(), &quot;expected text &quot; + key);</span>
+<span class="fc" id="L432">        return value.textValue();</span>
+    }
+
+    private static String digest(JsonNode value) {
+<span class="fc" id="L436">        return InterestingnessIndependentReviewStudy.sha256(value.toString().getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private static JsonNode read(Path path) throws IOException {
+<span class="fc" id="L440">        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS), &quot;expected regular input file&quot;);</span>
+<span class="fc" id="L441">        return JSON.readTree(Files.readString(path));</span>
+    }
+
+    private static void writeAtomically(Path target, JsonNode data) throws IOException {
+<span class="fc" id="L445">        Path temporary = Files.createTempFile(target.getParent(), &quot;.review-&quot;, &quot;.tmp&quot;);</span>
+        try {
+<span class="fc" id="L447">            Files.writeString(temporary, data.toString());</span>
+<span class="fc" id="L448">            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);</span>
+        } finally {
+<span class="fc" id="L450">            Files.deleteIfExists(temporary);</span>
+        }
+<span class="fc" id="L452">    }</span>
+
+    private static void require(boolean condition, String message) {
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(message);</span>
+<span class="fc" id="L456">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

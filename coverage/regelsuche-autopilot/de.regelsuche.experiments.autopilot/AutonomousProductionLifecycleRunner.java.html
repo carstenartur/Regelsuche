@@ -44,7 +44,7 @@ import java.util.TreeSet;
     private static final String VALIDATION_REVISION =
         &quot;production-validation-holdouts-348/v1&quot;;
     private static final int RANDOM_COUNTEREXAMPLE_SAMPLES = 64;
-<span class="fc" id="L47">    private static final Instant LIFECYCLE_CREATED_AT =</span>
+<span class="fc" id="L47">    static final Instant LIFECYCLE_CREATED_AT =</span>
 <span class="fc" id="L48">        Instant.parse(&quot;2026-07-15T00:00:00Z&quot;);</span>
 
     public LifecycleRun runPinned(int parallelism) {
@@ -167,7 +167,7 @@ import java.util.TreeSet;
 <span class="fc" id="L167">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
 <span class="fc" id="L168">    }</span>
 
-    private static EvaluationPlan evaluationPlan(long deterministicSeed) {
+    static EvaluationPlan evaluationPlan(long deterministicSeed) {
 <span class="fc" id="L171">        return new EvaluationPlan(</span>
             VALIDATION_REVISION,
 <span class="fc" id="L173">            List.of(</span>

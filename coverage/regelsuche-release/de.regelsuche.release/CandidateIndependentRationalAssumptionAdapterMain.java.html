@@ -53,10 +53,10 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
     private static final int TASK_MAX_CANDIDATES = 45;
     private static final int SEARCH_MAX_DEPTH = 5;
 
-<span class="nc" id="L56">    private static final ObjectMapper JSON = new ObjectMapper(</span>
-<span class="nc" id="L57">        JsonFactory.builder()</span>
-<span class="nc" id="L58">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
-<span class="nc" id="L59">            .build());</span>
+<span class="fc" id="L56">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L57">        JsonFactory.builder()</span>
+<span class="fc" id="L58">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L59">            .build());</span>
 
     private CandidateIndependentRationalAssumptionAdapterMain() {
     }
@@ -294,45 +294,45 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
 <span class="nc" id="L294">        return campaign;</span>
     }
 
-    private static ObjectNode renderEvaluation(
+    static ObjectNode renderEvaluation(
         ObjectNode benchmarkCase,
         ObjectNode task,
         SearchResult result
     ) {
-<span class="nc" id="L302">        ObjectNode output = JSON.createObjectNode();</span>
-<span class="nc" id="L303">        String split = text(benchmarkCase, &quot;split&quot;);</span>
-<span class="nc" id="L304">        output.put(&quot;caseId&quot;, text(benchmarkCase, &quot;caseId&quot;));</span>
-<span class="nc" id="L305">        output.put(&quot;caseContentHash&quot;, text(benchmarkCase, &quot;contentHash&quot;));</span>
-<span class="nc" id="L306">        output.put(&quot;split&quot;, split);</span>
-<span class="nc" id="L307">        output.put(&quot;structuralCluster&quot;,</span>
-<span class="nc" id="L308">            text(benchmarkCase, &quot;structuralCluster&quot;));</span>
-<span class="nc" id="L309">        output.put(&quot;taskId&quot;, text(task, &quot;taskId&quot;));</span>
-<span class="nc" id="L310">        output.put(&quot;formationVisibility&quot;,</span>
-<span class="nc bnc" id="L311" title="All 2 branches missed.">            &quot;TRAIN&quot;.equals(split) ? &quot;ALLOWED&quot; : &quot;PROHIBITED&quot;);</span>
-<span class="nc" id="L312">        output.put(&quot;targetReadStage&quot;, &quot;EVALUATION_ONLY&quot;);</span>
-<span class="nc" id="L313">        output.put(&quot;source&quot;, text(task, &quot;source&quot;));</span>
-<span class="nc" id="L314">        output.put(&quot;target&quot;, text(task, &quot;target&quot;));</span>
-<span class="nc" id="L315">        output.set(&quot;assumptions&quot;, copyArray(requireArray(</span>
+<span class="fc" id="L302">        ObjectNode output = JSON.createObjectNode();</span>
+<span class="fc" id="L303">        String split = text(benchmarkCase, &quot;split&quot;);</span>
+<span class="fc" id="L304">        output.put(&quot;caseId&quot;, text(benchmarkCase, &quot;caseId&quot;));</span>
+<span class="fc" id="L305">        output.put(&quot;caseContentHash&quot;, text(benchmarkCase, &quot;contentHash&quot;));</span>
+<span class="fc" id="L306">        output.put(&quot;split&quot;, split);</span>
+<span class="fc" id="L307">        output.put(&quot;structuralCluster&quot;,</span>
+<span class="fc" id="L308">            text(benchmarkCase, &quot;structuralCluster&quot;));</span>
+<span class="fc" id="L309">        output.put(&quot;taskId&quot;, text(task, &quot;taskId&quot;));</span>
+<span class="fc" id="L310">        output.put(&quot;formationVisibility&quot;,</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            &quot;TRAIN&quot;.equals(split) ? &quot;ALLOWED&quot; : &quot;PROHIBITED&quot;);</span>
+<span class="fc" id="L312">        output.put(&quot;targetReadStage&quot;, &quot;EVALUATION_ONLY&quot;);</span>
+<span class="fc" id="L313">        output.put(&quot;source&quot;, text(task, &quot;source&quot;));</span>
+<span class="fc" id="L314">        output.put(&quot;target&quot;, text(task, &quot;target&quot;));</span>
+<span class="fc" id="L315">        output.set(&quot;assumptions&quot;, copyArray(requireArray(</span>
             task, &quot;assumptions&quot;, &quot;task assumptions&quot;)));
-<span class="nc" id="L317">        output.put(&quot;outcome&quot;, result.status().name());</span>
-<span class="nc" id="L318">        output.put(&quot;reasonCode&quot;, reasonCode(result));</span>
-<span class="nc" id="L319">        output.put(&quot;detail&quot;, result.detail());</span>
-<span class="nc" id="L320">        output.set(&quot;steps&quot;, renderSteps(result.steps()));</span>
-<span class="nc" id="L321">        output.set(&quot;resourceUse&quot;, renderResourceUse(result.resourceUse()));</span>
-<span class="nc" id="L322">        output.put(&quot;correctnessRegression&quot;,</span>
-<span class="nc bnc" id="L323" title="All 2 branches missed.">            result.status() == SearchStatus.TARGET_REFUTED);</span>
-<span class="nc" id="L324">        output.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
-<span class="nc" id="L325">        output.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
-<span class="nc" id="L326">        output.put(&quot;publicationEligible&quot;, false);</span>
-<span class="nc" id="L327">        addContentHash(output);</span>
-<span class="nc" id="L328">        return output;</span>
+<span class="fc" id="L317">        output.put(&quot;outcome&quot;, result.status().name());</span>
+<span class="fc" id="L318">        output.put(&quot;reasonCode&quot;, reasonCode(result));</span>
+<span class="fc" id="L319">        output.put(&quot;detail&quot;, result.detail());</span>
+<span class="fc" id="L320">        output.set(&quot;steps&quot;, renderSteps(result.steps()));</span>
+<span class="fc" id="L321">        output.set(&quot;resourceUse&quot;, renderResourceUse(result.resourceUse()));</span>
+<span class="fc" id="L322">        output.put(&quot;correctnessRegression&quot;,</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            result.status() == SearchStatus.TARGET_REFUTED);</span>
+<span class="fc" id="L324">        output.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L325">        output.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L326">        output.put(&quot;publicationEligible&quot;, false);</span>
+<span class="fc" id="L327">        addContentHash(output);</span>
+<span class="fc" id="L328">        return output;</span>
     }
 
     private static String reasonCode(SearchResult result) {
-<span class="nc bnc" id="L332" title="All 5 branches missed.">        return switch (result.status()) {</span>
+<span class="pc bpc" id="L332" title="3 of 5 branches missed.">        return switch (result.status()) {</span>
             case REACHED_AND_CONFIRMED -&gt;
-<span class="nc" id="L334">                &quot;TARGET_REACHED_BY_SELECTED_FORM_AND_FROZEN_PRIMITIVES&quot;;</span>
-<span class="nc" id="L335">            case NO_RESULT -&gt; &quot;NO_PATH_WITH_SELECTED_FORM_AND_FROZEN_PRIMITIVES&quot;;</span>
+<span class="fc" id="L334">                &quot;TARGET_REACHED_BY_SELECTED_FORM_AND_FROZEN_PRIMITIVES&quot;;</span>
+<span class="fc" id="L335">            case NO_RESULT -&gt; &quot;NO_PATH_WITH_SELECTED_FORM_AND_FROZEN_PRIMITIVES&quot;;</span>
 <span class="nc" id="L336">            case BUDGET_EXHAUSTED -&gt; &quot;FROZEN_BUDGET_EXHAUSTED&quot;;</span>
 <span class="nc" id="L337">            case CANDIDATE_NOT_FORMED -&gt; &quot;FORMATION_SELECTED_NO_CANDIDATE&quot;;</span>
 <span class="nc" id="L338">            case TARGET_REFUTED -&gt; &quot;REACHED_TARGET_FAILED_INDEPENDENT_VALIDATION&quot;;</span>
@@ -340,87 +340,87 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
     }
 
     private static ArrayNode renderSteps(List&lt;SearchStep&gt; steps) {
-<span class="nc" id="L343">        ArrayNode result = JSON.createArrayNode();</span>
-<span class="nc bnc" id="L344" title="All 2 branches missed.">        for (SearchStep step : steps) {</span>
-<span class="nc" id="L345">            ObjectNode item = result.addObject();</span>
-<span class="nc" id="L346">            item.put(&quot;sequence&quot;, step.sequence());</span>
-<span class="nc" id="L347">            item.put(&quot;ruleId&quot;, step.ruleId());</span>
-<span class="nc" id="L348">            item.put(&quot;source&quot;, step.source());</span>
-<span class="nc" id="L349">            item.put(&quot;target&quot;, step.target());</span>
-<span class="nc" id="L350">            item.set(&quot;generatedAssumptions&quot;, strings(</span>
-<span class="nc" id="L351">                step.generatedAssumptions()));</span>
-<span class="nc" id="L352">            item.set(&quot;requiredNonZeroFactors&quot;, strings(</span>
-<span class="nc" id="L353">                step.requiredNonZeroFactors()));</span>
-<span class="nc" id="L354">            item.set(&quot;providedNonZeroFactors&quot;, strings(</span>
-<span class="nc" id="L355">                step.providedNonZeroFactors()));</span>
-<span class="nc" id="L356">            item.put(&quot;leftCrossNormalForm&quot;, step.leftCrossNormalForm());</span>
-<span class="nc" id="L357">            item.put(&quot;rightCrossNormalForm&quot;, step.rightCrossNormalForm());</span>
-<span class="nc" id="L358">            addContentHash(item);</span>
-<span class="nc" id="L359">        }</span>
-<span class="nc" id="L360">        return result;</span>
+<span class="fc" id="L343">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (SearchStep step : steps) {</span>
+<span class="fc" id="L345">            ObjectNode item = result.addObject();</span>
+<span class="fc" id="L346">            item.put(&quot;sequence&quot;, step.sequence());</span>
+<span class="fc" id="L347">            item.put(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L348">            item.put(&quot;source&quot;, step.source());</span>
+<span class="fc" id="L349">            item.put(&quot;target&quot;, step.target());</span>
+<span class="fc" id="L350">            item.set(&quot;generatedAssumptions&quot;, strings(</span>
+<span class="fc" id="L351">                step.generatedAssumptions()));</span>
+<span class="fc" id="L352">            item.set(&quot;requiredNonZeroFactors&quot;, strings(</span>
+<span class="fc" id="L353">                step.requiredNonZeroFactors()));</span>
+<span class="fc" id="L354">            item.set(&quot;providedNonZeroFactors&quot;, strings(</span>
+<span class="fc" id="L355">                step.providedNonZeroFactors()));</span>
+<span class="fc" id="L356">            item.put(&quot;leftCrossNormalForm&quot;, step.leftCrossNormalForm());</span>
+<span class="fc" id="L357">            item.put(&quot;rightCrossNormalForm&quot;, step.rightCrossNormalForm());</span>
+<span class="fc" id="L358">            addContentHash(item);</span>
+<span class="fc" id="L359">        }</span>
+<span class="fc" id="L360">        return result;</span>
     }
 
-    private static ObjectNode renderCandidate(CandidateForm candidate) {
-<span class="nc" id="L364">        ObjectNode result = JSON.createObjectNode();</span>
-<span class="nc" id="L365">        result.put(&quot;candidateFormId&quot;, candidate.candidateFormId());</span>
-<span class="nc" id="L366">        result.put(&quot;operatorId&quot;, candidate.operatorId());</span>
-<span class="nc" id="L367">        result.put(&quot;implementationClass&quot;, candidate.implementationClass());</span>
-<span class="nc" id="L368">        result.set(&quot;supportSeedIds&quot;, strings(candidate.supportSeedIds()));</span>
-<span class="nc" id="L369">        result.set(&quot;frozenPrimitiveRuleIds&quot;, strings(</span>
-<span class="nc" id="L370">            candidate.frozenPrimitiveRuleIds()));</span>
-<span class="nc" id="L371">        addContentHash(result);</span>
-<span class="nc" id="L372">        return result;</span>
+    static ObjectNode renderCandidate(CandidateForm candidate) {
+<span class="fc" id="L364">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="fc" id="L365">        result.put(&quot;candidateFormId&quot;, candidate.candidateFormId());</span>
+<span class="fc" id="L366">        result.put(&quot;operatorId&quot;, candidate.operatorId());</span>
+<span class="fc" id="L367">        result.put(&quot;implementationClass&quot;, candidate.implementationClass());</span>
+<span class="fc" id="L368">        result.set(&quot;supportSeedIds&quot;, strings(candidate.supportSeedIds()));</span>
+<span class="fc" id="L369">        result.set(&quot;frozenPrimitiveRuleIds&quot;, strings(</span>
+<span class="fc" id="L370">            candidate.frozenPrimitiveRuleIds()));</span>
+<span class="fc" id="L371">        addContentHash(result);</span>
+<span class="fc" id="L372">        return result;</span>
     }
 
-    private static ArrayNode renderFormationEvidence(
+    static ArrayNode renderFormationEvidence(
         List&lt;FormationEvidence&gt; evidence
     ) {
-<span class="nc" id="L378">        ArrayNode result = JSON.createArrayNode();</span>
-<span class="nc bnc" id="L379" title="All 2 branches missed.">        for (FormationEvidence value : evidence) {</span>
-<span class="nc" id="L380">            ObjectNode item = result.addObject();</span>
-<span class="nc" id="L381">            item.put(&quot;seedId&quot;, value.seedId());</span>
-<span class="nc" id="L382">            item.put(&quot;sourceReference&quot;, value.sourceReference());</span>
-<span class="nc" id="L383">            item.put(&quot;inputExpression&quot;, value.inputExpression());</span>
-<span class="nc" id="L384">            item.set(&quot;declaredAssumptions&quot;, strings(</span>
-<span class="nc" id="L385">                value.declaredAssumptions()));</span>
-<span class="nc" id="L386">            item.put(&quot;selectedExpression&quot;, value.selectedExpression());</span>
-<span class="nc" id="L387">            item.set(&quot;candidateAssumptions&quot;, strings(</span>
-<span class="nc" id="L388">                value.candidateAssumptions()));</span>
-<span class="nc" id="L389">            item.put(&quot;inputAstNodes&quot;, value.inputAstNodes());</span>
-<span class="nc" id="L390">            item.put(&quot;selectedAstNodes&quot;, value.selectedAstNodes());</span>
-<span class="nc" id="L391">            item.set(&quot;requiredNonZeroFactors&quot;, strings(</span>
-<span class="nc" id="L392">                value.requiredNonZeroFactors()));</span>
-<span class="nc" id="L393">            item.set(&quot;providedNonZeroFactors&quot;, strings(</span>
-<span class="nc" id="L394">                value.providedNonZeroFactors()));</span>
-<span class="nc" id="L395">            item.put(&quot;leftCrossNormalForm&quot;, value.leftCrossNormalForm());</span>
-<span class="nc" id="L396">            item.put(&quot;rightCrossNormalForm&quot;, value.rightCrossNormalForm());</span>
-<span class="nc" id="L397">            item.put(&quot;evaluationInputRead&quot;, false);</span>
-<span class="nc" id="L398">            item.put(&quot;targetVisible&quot;, false);</span>
-<span class="nc" id="L399">            addContentHash(item);</span>
-<span class="nc" id="L400">        }</span>
-<span class="nc" id="L401">        return result;</span>
+<span class="fc" id="L378">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        for (FormationEvidence value : evidence) {</span>
+<span class="fc" id="L380">            ObjectNode item = result.addObject();</span>
+<span class="fc" id="L381">            item.put(&quot;seedId&quot;, value.seedId());</span>
+<span class="fc" id="L382">            item.put(&quot;sourceReference&quot;, value.sourceReference());</span>
+<span class="fc" id="L383">            item.put(&quot;inputExpression&quot;, value.inputExpression());</span>
+<span class="fc" id="L384">            item.set(&quot;declaredAssumptions&quot;, strings(</span>
+<span class="fc" id="L385">                value.declaredAssumptions()));</span>
+<span class="fc" id="L386">            item.put(&quot;selectedExpression&quot;, value.selectedExpression());</span>
+<span class="fc" id="L387">            item.set(&quot;candidateAssumptions&quot;, strings(</span>
+<span class="fc" id="L388">                value.candidateAssumptions()));</span>
+<span class="fc" id="L389">            item.put(&quot;inputAstNodes&quot;, value.inputAstNodes());</span>
+<span class="fc" id="L390">            item.put(&quot;selectedAstNodes&quot;, value.selectedAstNodes());</span>
+<span class="fc" id="L391">            item.set(&quot;requiredNonZeroFactors&quot;, strings(</span>
+<span class="fc" id="L392">                value.requiredNonZeroFactors()));</span>
+<span class="fc" id="L393">            item.set(&quot;providedNonZeroFactors&quot;, strings(</span>
+<span class="fc" id="L394">                value.providedNonZeroFactors()));</span>
+<span class="fc" id="L395">            item.put(&quot;leftCrossNormalForm&quot;, value.leftCrossNormalForm());</span>
+<span class="fc" id="L396">            item.put(&quot;rightCrossNormalForm&quot;, value.rightCrossNormalForm());</span>
+<span class="fc" id="L397">            item.put(&quot;evaluationInputRead&quot;, false);</span>
+<span class="fc" id="L398">            item.put(&quot;targetVisible&quot;, false);</span>
+<span class="fc" id="L399">            addContentHash(item);</span>
+<span class="fc" id="L400">        }</span>
+<span class="fc" id="L401">        return result;</span>
     }
 
-    private static ObjectNode renderResourceUse(ResourceUse use) {
-<span class="nc" id="L405">        ObjectNode result = JSON.createObjectNode();</span>
-<span class="nc" id="L406">        result.put(&quot;configuredStates&quot;, use.configuredExploredStates());</span>
-<span class="nc" id="L407">        result.put(&quot;executedStates&quot;, use.executedExploredStates());</span>
-<span class="nc" id="L408">        result.put(&quot;remainingStates&quot;, use.remainingExploredStates());</span>
-<span class="nc" id="L409">        result.put(&quot;configuredCandidateEvaluations&quot;,</span>
-<span class="nc" id="L410">            use.configuredCandidateEvaluations());</span>
-<span class="nc" id="L411">        result.put(&quot;executedCandidateEvaluations&quot;,</span>
-<span class="nc" id="L412">            use.executedCandidateEvaluations());</span>
-<span class="nc" id="L413">        result.put(&quot;remainingCandidateEvaluations&quot;,</span>
-<span class="nc" id="L414">            use.remainingCandidateEvaluations());</span>
-<span class="nc" id="L415">        return result;</span>
+    static ObjectNode renderResourceUse(ResourceUse use) {
+<span class="fc" id="L405">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="fc" id="L406">        result.put(&quot;configuredStates&quot;, use.configuredExploredStates());</span>
+<span class="fc" id="L407">        result.put(&quot;executedStates&quot;, use.executedExploredStates());</span>
+<span class="fc" id="L408">        result.put(&quot;remainingStates&quot;, use.remainingExploredStates());</span>
+<span class="fc" id="L409">        result.put(&quot;configuredCandidateEvaluations&quot;,</span>
+<span class="fc" id="L410">            use.configuredCandidateEvaluations());</span>
+<span class="fc" id="L411">        result.put(&quot;executedCandidateEvaluations&quot;,</span>
+<span class="fc" id="L412">            use.executedCandidateEvaluations());</span>
+<span class="fc" id="L413">        result.put(&quot;remainingCandidateEvaluations&quot;,</span>
+<span class="fc" id="L414">            use.remainingCandidateEvaluations());</span>
+<span class="fc" id="L415">        return result;</span>
     }
 
-    private static EvaluationTask evaluationTask(ObjectNode task) {
-<span class="nc" id="L419">        return new EvaluationTask(</span>
-<span class="nc" id="L420">            text(task, &quot;taskId&quot;),</span>
-<span class="nc" id="L421">            text(task, &quot;source&quot;),</span>
-<span class="nc" id="L422">            text(task, &quot;target&quot;),</span>
-<span class="nc" id="L423">            stringValues(requireArray(task, &quot;assumptions&quot;, &quot;task assumptions&quot;)));</span>
+    static EvaluationTask evaluationTask(ObjectNode task) {
+<span class="fc" id="L419">        return new EvaluationTask(</span>
+<span class="fc" id="L420">            text(task, &quot;taskId&quot;),</span>
+<span class="fc" id="L421">            text(task, &quot;source&quot;),</span>
+<span class="fc" id="L422">            text(task, &quot;target&quot;),</span>
+<span class="fc" id="L423">            stringValues(requireArray(task, &quot;assumptions&quot;, &quot;task assumptions&quot;)));</span>
     }
 
     private static List&lt;FormationSeed&gt; formationSeeds(
@@ -538,103 +538,103 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
 <span class="nc" id="L538">        }</span>
 <span class="nc" id="L539">    }</span>
 
-    private static List&lt;ObjectNode&gt; rationalCases(ObjectNode corpus) {
-<span class="nc" id="L542">        List&lt;ObjectNode&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L543" title="All 2 branches missed.">        for (JsonNode item : requireArray(corpus, &quot;cases&quot;, &quot;case corpus cases&quot;)) {</span>
-<span class="nc bnc" id="L544" title="All 4 branches missed.">            if (!item.isObject() || !CHALLENGE.equals(text(item, &quot;challengeId&quot;))) {</span>
-<span class="nc" id="L545">                continue;</span>
+    static List&lt;ObjectNode&gt; rationalCases(ObjectNode corpus) {
+<span class="fc" id="L542">        List&lt;ObjectNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        for (JsonNode item : requireArray(corpus, &quot;cases&quot;, &quot;case corpus cases&quot;)) {</span>
+<span class="pc bpc" id="L544" title="1 of 4 branches missed.">            if (!item.isObject() || !CHALLENGE.equals(text(item, &quot;challengeId&quot;))) {</span>
+<span class="fc" id="L545">                continue;</span>
             }
-<span class="nc" id="L547">            ObjectNode benchmarkCase = (ObjectNode) item;</span>
-<span class="nc" id="L548">            requireContentHash(benchmarkCase,</span>
-<span class="nc" id="L549">                &quot;rational case &quot; + text(benchmarkCase, &quot;caseId&quot;));</span>
-<span class="nc" id="L550">            validateExposure(benchmarkCase);</span>
-<span class="nc" id="L551">            result.add(benchmarkCase);</span>
-<span class="nc" id="L552">        }</span>
-<span class="nc" id="L553">        result.sort(Comparator.comparing(item -&gt; text(item, &quot;caseId&quot;)));</span>
-<span class="nc" id="L554">        require(result.stream().map(item -&gt; text(item, &quot;caseId&quot;)).toList()</span>
-<span class="nc" id="L555">                .equals(List.of(</span>
+<span class="fc" id="L547">            ObjectNode benchmarkCase = (ObjectNode) item;</span>
+<span class="fc" id="L548">            requireContentHash(benchmarkCase,</span>
+<span class="fc" id="L549">                &quot;rational case &quot; + text(benchmarkCase, &quot;caseId&quot;));</span>
+<span class="fc" id="L550">            validateExposure(benchmarkCase);</span>
+<span class="fc" id="L551">            result.add(benchmarkCase);</span>
+<span class="fc" id="L552">        }</span>
+<span class="fc" id="L553">        result.sort(Comparator.comparing(item -&gt; text(item, &quot;caseId&quot;)));</span>
+<span class="fc" id="L554">        require(result.stream().map(item -&gt; text(item, &quot;caseId&quot;)).toList()</span>
+<span class="fc" id="L555">                .equals(List.of(</span>
                     &quot;case-01&quot;, &quot;case-02&quot;, &quot;case-03&quot;,
                     &quot;case-04&quot;, &quot;case-05&quot;, &quot;case-06&quot;)),
             &quot;rational case identities changed&quot;);
-<span class="nc" id="L559">        Map&lt;String, Long&gt; splits = result.stream().collect(</span>
-<span class="nc" id="L560">            java.util.stream.Collectors.groupingBy(</span>
-<span class="nc" id="L561">                item -&gt; text(item, &quot;split&quot;),</span>
+<span class="fc" id="L559">        Map&lt;String, Long&gt; splits = result.stream().collect(</span>
+<span class="fc" id="L560">            java.util.stream.Collectors.groupingBy(</span>
+<span class="fc" id="L561">                item -&gt; text(item, &quot;split&quot;),</span>
                 java.util.TreeMap::new,
-<span class="nc" id="L563">                java.util.stream.Collectors.counting()));</span>
-<span class="nc" id="L564">        require(splits.equals(Map.of(</span>
-<span class="nc" id="L565">                &quot;TRAIN&quot;, 2L,</span>
-<span class="nc" id="L566">                &quot;VALIDATION&quot;, 2L,</span>
-<span class="nc" id="L567">                &quot;TEST&quot;, 2L)),</span>
+<span class="fc" id="L563">                java.util.stream.Collectors.counting()));</span>
+<span class="fc" id="L564">        require(splits.equals(Map.of(</span>
+<span class="fc" id="L565">                &quot;TRAIN&quot;, 2L,</span>
+<span class="fc" id="L566">                &quot;VALIDATION&quot;, 2L,</span>
+<span class="fc" id="L567">                &quot;TEST&quot;, 2L)),</span>
             &quot;rational split counts changed: &quot; + splits);
-<span class="nc" id="L569">        int tasks = result.stream()</span>
-<span class="nc" id="L570">            .mapToInt(item -&gt; requireArray(</span>
-<span class="nc" id="L571">                requireObjectField(item, &quot;evaluationInput&quot;, &quot;evaluation input&quot;),</span>
+<span class="fc" id="L569">        int tasks = result.stream()</span>
+<span class="fc" id="L570">            .mapToInt(item -&gt; requireArray(</span>
+<span class="fc" id="L571">                requireObjectField(item, &quot;evaluationInput&quot;, &quot;evaluation input&quot;),</span>
                 &quot;tasks&quot;,
-<span class="nc" id="L573">                &quot;evaluation tasks&quot;).size())</span>
-<span class="nc" id="L574">            .sum();</span>
-<span class="nc bnc" id="L575" title="All 2 branches missed.">        require(tasks == TASKS_PER_CAMPAIGN,</span>
+<span class="fc" id="L573">                &quot;evaluation tasks&quot;).size())</span>
+<span class="fc" id="L574">            .sum();</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        require(tasks == TASKS_PER_CAMPAIGN,</span>
             &quot;rational task count changed: &quot; + tasks);
-<span class="nc" id="L577">        return List.copyOf(result);</span>
+<span class="fc" id="L577">        return List.copyOf(result);</span>
     }
 
     private static void validateExposure(ObjectNode benchmarkCase) {
-<span class="nc" id="L581">        String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
-<span class="nc" id="L582">        String split = text(benchmarkCase, &quot;split&quot;);</span>
-<span class="nc" id="L583">        ObjectNode policy = requireObjectField(</span>
+<span class="fc" id="L581">        String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
+<span class="fc" id="L582">        String split = text(benchmarkCase, &quot;split&quot;);</span>
+<span class="fc" id="L583">        ObjectNode policy = requireObjectField(</span>
             benchmarkCase, &quot;exposurePolicy&quot;, &quot;case exposure policy&quot;);
-<span class="nc" id="L585">        ArrayNode mayRead = requireArray(</span>
+<span class="fc" id="L585">        ArrayNode mayRead = requireArray(</span>
             policy, &quot;candidateFormationMayRead&quot;, &quot;formation readable inputs&quot;);
-<span class="nc" id="L587">        ArrayNode mustNotRead = requireArray(</span>
+<span class="fc" id="L587">        ArrayNode mustNotRead = requireArray(</span>
             policy, &quot;candidateFormationMustNotRead&quot;, &quot;formation prohibited inputs&quot;);
-<span class="nc bnc" id="L589" title="All 2 branches missed.">        require(mustNotRead.size() == 1</span>
-<span class="nc bnc" id="L590" title="All 2 branches missed.">                &amp;&amp; &quot;evaluationInput&quot;.equals(mustNotRead.get(0).asText()),</span>
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">        require(mustNotRead.size() == 1</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">                &amp;&amp; &quot;evaluationInput&quot;.equals(mustNotRead.get(0).asText()),</span>
             &quot;case &quot; + caseId + &quot; does not prohibit evaluation input&quot;);
-<span class="nc bnc" id="L592" title="All 2 branches missed.">        if (&quot;TRAIN&quot;.equals(split)) {</span>
-<span class="nc bnc" id="L593" title="All 2 branches missed.">            require(mayRead.size() == 1</span>
-<span class="nc bnc" id="L594" title="All 2 branches missed.">                    &amp;&amp; &quot;formationInput&quot;.equals(mayRead.get(0).asText()),</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        if (&quot;TRAIN&quot;.equals(split)) {</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">            require(mayRead.size() == 1</span>
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                    &amp;&amp; &quot;formationInput&quot;.equals(mayRead.get(0).asText()),</span>
                 &quot;TRAIN case formation surface changed: &quot; + caseId);
-<span class="nc" id="L596">            require(benchmarkCase.path(&quot;formationInput&quot;).isObject(),</span>
+<span class="fc" id="L596">            require(benchmarkCase.path(&quot;formationInput&quot;).isObject(),</span>
                 &quot;TRAIN case has no formation input: &quot; + caseId);
         } else {
-<span class="nc" id="L599">            require(mayRead.isEmpty(),</span>
+<span class="fc" id="L599">            require(mayRead.isEmpty(),</span>
                 &quot;held-out case exposes formation input: &quot; + caseId);
-<span class="nc" id="L601">            require(benchmarkCase.path(&quot;formationInput&quot;).isNull(),</span>
+<span class="fc" id="L601">            require(benchmarkCase.path(&quot;formationInput&quot;).isNull(),</span>
                 &quot;held-out case has formation payload: &quot; + caseId);
         }
-<span class="nc" id="L604">        ObjectNode evaluation = requireObjectField(</span>
+<span class="fc" id="L604">        ObjectNode evaluation = requireObjectField(</span>
             benchmarkCase, &quot;evaluationInput&quot;, &quot;case evaluation input&quot;);
-<span class="nc" id="L606">        require(!evaluation.path(&quot;expectedReferencesVisibleDuringFormation&quot;)</span>
-<span class="nc bnc" id="L607" title="All 2 branches missed.">                .asBoolean(true),</span>
+<span class="fc" id="L606">        require(!evaluation.path(&quot;expectedReferencesVisibleDuringFormation&quot;)</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                .asBoolean(true),</span>
             &quot;case exposes expected references during formation: &quot; + caseId);
-<span class="nc" id="L609">    }</span>
+<span class="fc" id="L609">    }</span>
 
-    private static ObjectNode readObject(Path path) throws IOException {
-<span class="nc bnc" id="L612" title="All 4 branches missed.">        require(Files.isRegularFile(path) &amp;&amp; !Files.isSymbolicLink(path),</span>
+    static ObjectNode readObject(Path path) throws IOException {
+<span class="pc bpc" id="L612" title="2 of 4 branches missed.">        require(Files.isRegularFile(path) &amp;&amp; !Files.isSymbolicLink(path),</span>
             &quot;expected regular non-symbolic JSON file: &quot; + path);
-<span class="nc" id="L614">        JsonNode value = JSON.readTree(Files.readString(</span>
+<span class="fc" id="L614">        JsonNode value = JSON.readTree(Files.readString(</span>
             path, StandardCharsets.UTF_8));
-<span class="nc" id="L616">        return requireObject(value, path.toString());</span>
+<span class="fc" id="L616">        return requireObject(value, path.toString());</span>
     }
 
-    private static void requireContentHash(ObjectNode value, String context) {
-<span class="nc" id="L620">        String retained = text(value, &quot;contentHash&quot;);</span>
-<span class="nc" id="L621">        ObjectNode material = value.deepCopy();</span>
-<span class="nc" id="L622">        material.remove(&quot;contentHash&quot;);</span>
-<span class="nc" id="L623">        String expected = semanticHash(material);</span>
-<span class="nc" id="L624">        require(retained.equals(expected),</span>
+    static void requireContentHash(ObjectNode value, String context) {
+<span class="fc" id="L620">        String retained = text(value, &quot;contentHash&quot;);</span>
+<span class="fc" id="L621">        ObjectNode material = value.deepCopy();</span>
+<span class="fc" id="L622">        material.remove(&quot;contentHash&quot;);</span>
+<span class="fc" id="L623">        String expected = semanticHash(material);</span>
+<span class="fc" id="L624">        require(retained.equals(expected),</span>
             context + &quot; contentHash mismatch: &quot; + retained + &quot; != &quot; + expected);
-<span class="nc" id="L626">    }</span>
+<span class="fc" id="L626">    }</span>
 
     private static void addContentHash(ObjectNode value) {
-<span class="nc bnc" id="L629" title="All 2 branches missed.">        require(!value.has(&quot;contentHash&quot;), &quot;contentHash already present&quot;);</span>
-<span class="nc" id="L630">        value.put(&quot;contentHash&quot;, semanticHash(value));</span>
-<span class="nc" id="L631">    }</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">        require(!value.has(&quot;contentHash&quot;), &quot;contentHash already present&quot;);</span>
+<span class="fc" id="L630">        value.put(&quot;contentHash&quot;, semanticHash(value));</span>
+<span class="fc" id="L631">    }</span>
 
-    private static String semanticHash(JsonNode value) {
+    static String semanticHash(JsonNode value) {
         try {
-<span class="nc" id="L635">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(</span>
-<span class="nc" id="L636">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
-<span class="nc" id="L637">                    canonicalJson(value).getBytes(StandardCharsets.UTF_8)));</span>
+<span class="fc" id="L635">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L636">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="fc" id="L637">                    canonicalJson(value).getBytes(StandardCharsets.UTF_8)));</span>
 <span class="nc" id="L638">        } catch (NoSuchAlgorithmException exception) {</span>
 <span class="nc" id="L639">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
         }
@@ -642,32 +642,32 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
 
     private static String canonicalJson(JsonNode value) {
         try {
-<span class="nc bnc" id="L645" title="All 2 branches missed.">            if (value.isObject()) {</span>
-<span class="nc" id="L646">                TreeSet&lt;String&gt; fields = new TreeSet&lt;&gt;();</span>
-<span class="nc" id="L647">                value.fieldNames().forEachRemaining(fields::add);</span>
-<span class="nc" id="L648">                StringBuilder result = new StringBuilder(&quot;{&quot;);</span>
-<span class="nc" id="L649">                int index = 0;</span>
-<span class="nc bnc" id="L650" title="All 2 branches missed.">                for (String field : fields) {</span>
-<span class="nc bnc" id="L651" title="All 2 branches missed.">                    if (index++ &gt; 0) {</span>
-<span class="nc" id="L652">                        result.append(',');</span>
+<span class="fc bfc" id="L645" title="All 2 branches covered.">            if (value.isObject()) {</span>
+<span class="fc" id="L646">                TreeSet&lt;String&gt; fields = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L647">                value.fieldNames().forEachRemaining(fields::add);</span>
+<span class="fc" id="L648">                StringBuilder result = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc" id="L649">                int index = 0;</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">                for (String field : fields) {</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">                    if (index++ &gt; 0) {</span>
+<span class="fc" id="L652">                        result.append(',');</span>
                     }
-<span class="nc" id="L654">                    result.append(JSON.writeValueAsString(field))</span>
-<span class="nc" id="L655">                        .append(':')</span>
-<span class="nc" id="L656">                        .append(canonicalJson(value.get(field)));</span>
-<span class="nc" id="L657">                }</span>
-<span class="nc" id="L658">                return result.append('}').toString();</span>
+<span class="fc" id="L654">                    result.append(JSON.writeValueAsString(field))</span>
+<span class="fc" id="L655">                        .append(':')</span>
+<span class="fc" id="L656">                        .append(canonicalJson(value.get(field)));</span>
+<span class="fc" id="L657">                }</span>
+<span class="fc" id="L658">                return result.append('}').toString();</span>
             }
-<span class="nc bnc" id="L660" title="All 2 branches missed.">            if (value.isArray()) {</span>
-<span class="nc" id="L661">                StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
-<span class="nc bnc" id="L662" title="All 2 branches missed.">                for (int index = 0; index &lt; value.size(); index++) {</span>
-<span class="nc bnc" id="L663" title="All 2 branches missed.">                    if (index &gt; 0) {</span>
-<span class="nc" id="L664">                        result.append(',');</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">            if (value.isArray()) {</span>
+<span class="fc" id="L661">                StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L662" title="All 2 branches covered.">                for (int index = 0; index &lt; value.size(); index++) {</span>
+<span class="fc bfc" id="L663" title="All 2 branches covered.">                    if (index &gt; 0) {</span>
+<span class="fc" id="L664">                        result.append(',');</span>
                     }
-<span class="nc" id="L666">                    result.append(canonicalJson(value.get(index)));</span>
+<span class="fc" id="L666">                    result.append(canonicalJson(value.get(index)));</span>
                 }
-<span class="nc" id="L668">                return result.append(']').toString();</span>
+<span class="fc" id="L668">                return result.append(']').toString();</span>
             }
-<span class="nc" id="L670">            return JSON.writeValueAsString(value);</span>
+<span class="fc" id="L670">            return JSON.writeValueAsString(value);</span>
 <span class="nc" id="L671">        } catch (IOException exception) {</span>
 <span class="nc" id="L672">            throw new IllegalStateException(&quot;cannot canonicalize JSON&quot;, exception);</span>
         }
@@ -678,34 +678,34 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
     }
 
     private static ArrayNode strings(List&lt;String&gt; values) {
-<span class="nc" id="L681">        ArrayNode result = JSON.createArrayNode();</span>
-<span class="nc" id="L682">        values.forEach(result::add);</span>
-<span class="nc" id="L683">        return result;</span>
+<span class="fc" id="L681">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="fc" id="L682">        values.forEach(result::add);</span>
+<span class="fc" id="L683">        return result;</span>
     }
 
     private static ArrayNode copyArray(ArrayNode values) {
-<span class="nc" id="L687">        ArrayNode result = JSON.createArrayNode();</span>
-<span class="nc" id="L688">        values.forEach(result::add);</span>
-<span class="nc" id="L689">        return result;</span>
+<span class="fc" id="L687">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="fc" id="L688">        values.forEach(result::add);</span>
+<span class="fc" id="L689">        return result;</span>
     }
 
     private static List&lt;String&gt; stringValues(ArrayNode values) {
-<span class="nc" id="L693">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L694" title="All 2 branches missed.">        for (JsonNode value : values) {</span>
-<span class="nc bnc" id="L695" title="All 4 branches missed.">            require(value.isTextual() &amp;&amp; !value.asText().isBlank(),</span>
+<span class="fc" id="L693">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">        for (JsonNode value : values) {</span>
+<span class="pc bpc" id="L695" title="2 of 4 branches missed.">            require(value.isTextual() &amp;&amp; !value.asText().isBlank(),</span>
                 &quot;expected nonblank string array item&quot;);
-<span class="nc" id="L697">            result.add(value.asText());</span>
-<span class="nc" id="L698">        }</span>
-<span class="nc" id="L699">        return List.copyOf(result);</span>
+<span class="fc" id="L697">            result.add(value.asText());</span>
+<span class="fc" id="L698">        }</span>
+<span class="fc" id="L699">        return List.copyOf(result);</span>
     }
 
     private static ObjectNode requireObject(
         JsonNode value,
         String context
     ) {
-<span class="nc bnc" id="L706" title="All 4 branches missed.">        require(value != null &amp;&amp; value.isObject(),</span>
+<span class="pc bpc" id="L706" title="2 of 4 branches missed.">        require(value != null &amp;&amp; value.isObject(),</span>
             context + &quot; is not an object&quot;);
-<span class="nc" id="L708">        return (ObjectNode) value;</span>
+<span class="fc" id="L708">        return (ObjectNode) value;</span>
     }
 
     private static ObjectNode requireObjectField(
@@ -713,7 +713,7 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         String field,
         String context
     ) {
-<span class="nc" id="L716">        return requireObject(value.get(field), context);</span>
+<span class="fc" id="L716">        return requireObject(value.get(field), context);</span>
     }
 
     private static ArrayNode requireArray(
@@ -721,19 +721,19 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
         String field,
         String context
     ) {
-<span class="nc" id="L724">        JsonNode child = value.get(field);</span>
-<span class="nc bnc" id="L725" title="All 4 branches missed.">        require(child != null &amp;&amp; child.isArray(),</span>
+<span class="fc" id="L724">        JsonNode child = value.get(field);</span>
+<span class="pc bpc" id="L725" title="2 of 4 branches missed.">        require(child != null &amp;&amp; child.isArray(),</span>
             context + &quot; is not an array&quot;);
-<span class="nc" id="L727">        return (ArrayNode) child;</span>
+<span class="fc" id="L727">        return (ArrayNode) child;</span>
     }
 
     private static String text(JsonNode value, String field) {
-<span class="nc" id="L731">        Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="nc" id="L732">        JsonNode child = value.get(field);</span>
-<span class="nc bnc" id="L733" title="All 4 branches missed.">        require(child != null &amp;&amp; child.isTextual()</span>
-<span class="nc bnc" id="L734" title="All 2 branches missed.">                &amp;&amp; !child.asText().isBlank(),</span>
+<span class="fc" id="L731">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L732">        JsonNode child = value.get(field);</span>
+<span class="pc bpc" id="L733" title="2 of 4 branches missed.">        require(child != null &amp;&amp; child.isTextual()</span>
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">                &amp;&amp; !child.asText().isBlank(),</span>
             &quot;missing textual field &quot; + field);
-<span class="nc" id="L736">        return child.asText();</span>
+<span class="fc" id="L736">        return child.asText();</span>
     }
 
     private static int integer(
@@ -748,10 +748,10 @@ public final class CandidateIndependentRationalAssumptionAdapterMain {
     }
 
     private static void require(boolean condition, String message) {
-<span class="nc bnc" id="L751" title="All 2 branches missed.">        if (!condition) {</span>
+<span class="pc bpc" id="L751" title="1 of 2 branches missed.">        if (!condition) {</span>
 <span class="nc" id="L752">            throw new IllegalStateException(message);</span>
         }
-<span class="nc" id="L754">    }</span>
+<span class="fc" id="L754">    }</span>
 
     private record FrozenBudget(
         int maxStates,

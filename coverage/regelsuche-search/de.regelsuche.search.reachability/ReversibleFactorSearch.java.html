@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Target-directed breadth-first diagnostic on the reciprocal additive factor/distribution fragment. */
+/** Target-directed path search on the reciprocal additive factor/distribution fragment. */
 <span class="fc" id="L15">public final class ReversibleFactorSearch {</span>
     public static final String INVENTORY = ReversibleFactorFragment.ID;
-<span class="fc" id="L17">    public enum Mode { ONE_SIDED, BIDIRECTIONAL }</span>
+<span class="fc" id="L17">    public enum Mode { ONE_SIDED, BIDIRECTIONAL, ITERATIVE_DEEPENING }</span>
 <span class="fc" id="L18">    public enum Status { REACHED, NO_PATH_WITHIN_DEPTH, WORK_EXHAUSTED }</span>
 <span class="fc" id="L19">    public record Count(int calls, long generated) {}</span>
 <span class="fc" id="L20">    public record Work(Count forward, Count reverse, Count replay) {</span>
@@ -39,96 +39,103 @@ import java.util.Objects;
 <span class="fc" id="L39">        var reverse = new Frontier(end, new Counter(allowance));</span>
 <span class="fc" id="L40">        var replay = new Counter(allowance);</span>
         try {
-<span class="fc" id="L42">            State meeting = find(fragment, forward, reverse, depth, mode);</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (meeting == null) return result(Status.NO_PATH_WITHIN_DEPTH, List.of(), forward, reverse, replay);</span>
-<span class="fc" id="L44">            var path = join(forward, reverse, meeting);</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (!replays(new ReversibleFactorFragment(), start, end, path, replay)) throw new IllegalStateException(&quot;invalid reconstructed path&quot;);</span>
-<span class="fc" id="L46">            return result(Status.REACHED, path, forward, reverse, replay);</span>
-<span class="fc" id="L47">        } catch (BoundedReachabilityOracle.EngineWorkExhausted exhausted) {</span>
-<span class="fc" id="L48">            return result(Status.WORK_EXHAUSTED, List.of(), forward, reverse, replay);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            List&lt;Step&gt; path = mode == Mode.ITERATIVE_DEEPENING</span>
+<span class="fc" id="L43">                ? IterativeFactorSearch.find(fragment, start, end, depth, forward.work)</span>
+<span class="fc" id="L44">                : breadthFirstPath(fragment, forward, reverse, depth, mode);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (path == null) return result(Status.NO_PATH_WITHIN_DEPTH, List.of(), forward, reverse, replay);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (!replays(new ReversibleFactorFragment(), start, end, path, replay)) throw new IllegalStateException(&quot;invalid reconstructed path&quot;);</span>
+<span class="fc" id="L47">            return result(Status.REACHED, path, forward, reverse, replay);</span>
+<span class="fc" id="L48">        } catch (BoundedReachabilityOracle.EngineWorkExhausted exhausted) {</span>
+<span class="fc" id="L49">            return result(Status.WORK_EXHAUSTED, List.of(), forward, reverse, replay);</span>
         }
     }
 
+    private static List&lt;Step&gt; breadthFirstPath(ReversibleFactorFragment fragment, Frontier forward,
+            Frontier reverse, int depth, Mode mode) {
+<span class="fc" id="L55">        State meeting = find(fragment, forward, reverse, depth, mode);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return meeting == null ? null : join(forward, reverse, meeting);</span>
+    }
+
     private static Result result(Status status, List&lt;Step&gt; path, Frontier left, Frontier right, Counter replay) {
-<span class="fc" id="L53">        return new Result(status, path, new Work(left.work.snapshot(), right.work.snapshot(), replay.snapshot()));</span>
+<span class="fc" id="L60">        return new Result(status, path, new Work(left.work.snapshot(), right.work.snapshot(), replay.snapshot()));</span>
     }
 
     /** Exhaust the entire bounded closure. The four rules preserve variable names; the fresh target is unreachable. */
     public Closure closure(String source, AssumptionSignature assumptions, BoundedReachabilityOracle.Budget limits, int callLimit) {
-<span class="fc" id="L58">        var fragment = new ReversibleFactorFragment();</span>
-<span class="fc" id="L59">        String start = fragment.endpoint(source);</span>
-<span class="fc" id="L60">        String sentinel = &quot;UnreachableDiagnosticSymbol&quot;;</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        while (start.contains(sentinel)) sentinel += &quot;X&quot;;</span>
-<span class="fc" id="L62">        var counter = new Counter(new Allowance(callLimit));</span>
-<span class="fc" id="L63">        var oracle = new BoundedReachabilityOracle().analyze(start, sentinel, assumptions,</span>
-<span class="nc" id="L64">            expr -&gt; fragment.neighbors(expr, counter).stream().map(ReversibleFactorFragment.Arc::outgoing).toList(), limits);</span>
-<span class="fc" id="L65">        return new Closure(oracle, counter.snapshot());</span>
+<span class="fc" id="L65">        var fragment = new ReversibleFactorFragment();</span>
+<span class="fc" id="L66">        String start = fragment.endpoint(source);</span>
+<span class="fc" id="L67">        String sentinel = &quot;UnreachableDiagnosticSymbol&quot;;</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        while (start.contains(sentinel)) sentinel += &quot;X&quot;;</span>
+<span class="fc" id="L69">        var counter = new Counter(new Allowance(callLimit));</span>
+<span class="fc" id="L70">        var oracle = new BoundedReachabilityOracle().analyze(start, sentinel, assumptions,</span>
+<span class="nc" id="L71">            expr -&gt; fragment.neighbors(expr, counter).stream().map(ReversibleFactorFragment.Arc::outgoing).toList(), limits);</span>
+<span class="fc" id="L72">        return new Closure(oracle, counter.snapshot());</span>
     }
 
     private static State find(ReversibleFactorFragment fragment, Frontier left, Frontier right, int depth, Mode mode) {
-<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (left.root.equals(right.root)) return left.root;</span>
-<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (int level = 0; level &lt; depth; level++) {</span>
-<span class="fc bfc" id="L71" title="All 4 branches covered.">            boolean backward = mode == Mode.BIDIRECTIONAL &amp;&amp; level % 2 == 1;</span>
-<span class="fc bfc" id="L72" title="All 2 branches covered.">            Frontier active = backward ? right : left;</span>
-<span class="fc bfc" id="L73" title="All 2 branches covered.">            Frontier other = backward ? left : right;</span>
-<span class="fc" id="L74">            State found = active.advance(fragment, other, backward);</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (found != null) return found;</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (active.layer.isEmpty()) break;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (left.root.equals(right.root)) return left.root;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int level = 0; level &lt; depth; level++) {</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            boolean backward = mode == Mode.BIDIRECTIONAL &amp;&amp; level % 2 == 1;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            Frontier active = backward ? right : left;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            Frontier other = backward ? left : right;</span>
+<span class="fc" id="L81">            State found = active.advance(fragment, other, backward);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (found != null) return found;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (active.layer.isEmpty()) break;</span>
         }
-<span class="fc" id="L78">        return null;</span>
+<span class="fc" id="L85">        return null;</span>
     }
 
     private static final class Frontier {
         final State root;
         final Counter work;
-<span class="fc" id="L84">        final Map&lt;State, Step&gt; parent = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L91">        final Map&lt;State, Step&gt; parent = new LinkedHashMap&lt;&gt;();</span>
         List&lt;State&gt; layer;
-<span class="fc" id="L86">        Frontier(State root, Counter work) {</span>
-<span class="fc" id="L87">            this.root = root;</span>
-<span class="fc" id="L88">            this.work = work;</span>
-<span class="fc" id="L89">            parent.put(root, null);</span>
-<span class="fc" id="L90">            layer = List.of(root);</span>
-<span class="fc" id="L91">        }</span>
+<span class="fc" id="L93">        Frontier(State root, Counter work) {</span>
+<span class="fc" id="L94">            this.root = root;</span>
+<span class="fc" id="L95">            this.work = work;</span>
+<span class="fc" id="L96">            parent.put(root, null);</span>
+<span class="fc" id="L97">            layer = List.of(root);</span>
+<span class="fc" id="L98">        }</span>
         State advance(ReversibleFactorFragment fragment, Frontier other, boolean backward) {
-<span class="fc" id="L93">            List&lt;State&gt; next = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (State state : layer) {</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">                for (var arc : fragment.neighbors(state.expression, work)) {</span>
-<span class="fc" id="L96">                    var neighbor = new State(arc.outgoing().transformedExpression(), state.assumptions);</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">                    if (parent.containsKey(neighbor)) continue;</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">                    parent.put(neighbor, backward ? new Step(neighbor, state, arc.returning()) : new Step(state, neighbor, arc.outgoing()));</span>
-<span class="fc bfc" id="L99" title="All 2 branches covered.">                    if (other.parent.containsKey(neighbor)) return neighbor;</span>
-<span class="fc" id="L100">                    next.add(neighbor);</span>
-<span class="fc" id="L101">                }</span>
-<span class="fc" id="L102">            }</span>
-<span class="fc" id="L103">            layer = next;</span>
-<span class="fc" id="L104">            return null;</span>
+<span class="fc" id="L100">            List&lt;State&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (State state : layer) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                for (var arc : fragment.neighbors(state.expression, work)) {</span>
+<span class="fc" id="L103">                    var neighbor = new State(arc.outgoing().transformedExpression(), state.assumptions);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    if (parent.containsKey(neighbor)) continue;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                    parent.put(neighbor, backward ? new Step(neighbor, state, arc.returning()) : new Step(state, neighbor, arc.outgoing()));</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                    if (other.parent.containsKey(neighbor)) return neighbor;</span>
+<span class="fc" id="L107">                    next.add(neighbor);</span>
+<span class="fc" id="L108">                }</span>
+<span class="fc" id="L109">            }</span>
+<span class="fc" id="L110">            layer = next;</span>
+<span class="fc" id="L111">            return null;</span>
         }
     }
 
     private static List&lt;Step&gt; join(Frontier left, Frontier right, State meeting) {
-<span class="fc" id="L109">        List&lt;Step&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (Step s = left.parent.get(meeting); s != null; s = left.parent.get(s.from)) result.add(s);</span>
-<span class="fc" id="L111">        Collections.reverse(result);</span>
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (Step s = right.parent.get(meeting); s != null; s = right.parent.get(s.to)) result.add(s);</span>
-<span class="fc" id="L113">        return result;</span>
+<span class="fc" id="L116">        List&lt;Step&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (Step s = left.parent.get(meeting); s != null; s = left.parent.get(s.from)) result.add(s);</span>
+<span class="fc" id="L118">        Collections.reverse(result);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (Step s = right.parent.get(meeting); s != null; s = right.parent.get(s.to)) result.add(s);</span>
+<span class="fc" id="L120">        return result;</span>
     }
 
     public boolean replays(String source, String target, AssumptionSignature assumptions, List&lt;Step&gt; path) {
-<span class="fc" id="L117">        var fragment = new ReversibleFactorFragment();</span>
-<span class="fc" id="L118">        var context = BoundedReachabilityOracle.normalizeSignature(assumptions);</span>
-<span class="fc" id="L119">        return replays(fragment, new State(fragment.endpoint(source), context), new State(fragment.endpoint(target), context),</span>
+<span class="fc" id="L124">        var fragment = new ReversibleFactorFragment();</span>
+<span class="fc" id="L125">        var context = BoundedReachabilityOracle.normalizeSignature(assumptions);</span>
+<span class="fc" id="L126">        return replays(fragment, new State(fragment.endpoint(source), context), new State(fragment.endpoint(target), context),</span>
             path, new Counter(new Allowance(Integer.MAX_VALUE)));
     }
 
     private static boolean replays(ReversibleFactorFragment fragment, State source, State target, List&lt;Step&gt; path, Counter counter) {
-<span class="fc" id="L124">        State current = source;</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (Step step : path) {</span>
-<span class="pc bpc" id="L126" title="1 of 4 branches missed.">            if (!current.equals(step.from) || !source.assumptions.equals(step.to.assumptions)</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                    || !step.to.expression.equals(step.primitive.transformedExpression())) return false;</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (fragment.neighbors(current.expression, counter).stream().noneMatch(arc -&gt; arc.outgoing().equals(step.primitive))) return false;</span>
-<span class="fc" id="L129">            current = step.to;</span>
-<span class="fc" id="L130">        }</span>
-<span class="fc" id="L131">        return current.equals(target);</span>
+<span class="fc" id="L131">        State current = source;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (Step step : path) {</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">            if (!current.equals(step.from) || !source.assumptions.equals(step.to.assumptions)</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                    || !step.to.expression.equals(step.primitive.transformedExpression())) return false;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (fragment.neighbors(current.expression, counter).stream().noneMatch(arc -&gt; arc.outgoing().equals(step.primitive))) return false;</span>
+<span class="fc" id="L136">            current = step.to;</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        return current.equals(target);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

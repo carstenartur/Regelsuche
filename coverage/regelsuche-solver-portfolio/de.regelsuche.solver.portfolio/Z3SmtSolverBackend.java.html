@@ -148,51 +148,66 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     }
 
     /** Full raw evidence for one invocation of this existing backend. */
-<span class="nc" id="L151">    public record RetainedAttempt(SolverExecution execution, java.nio.file.Path directory) { }</span>
+<span class="fc" id="L151">    public record RetainedAttempt(SolverExecution execution, java.nio.file.Path directory) {</span>
+        /** Optional independent replay of the retained native real-symbol equality fragment. */
+        public boolean replaysEqualityProof(Obligation expected) throws IOException {
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">            if (expected == null || !execution.obligationHash().equals(expected.contentHash())</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                    || execution.result().status() != ResultStatus.CONFIRMED) return false;</span>
+<span class="fc" id="L156">            try (var input = java.nio.file.Files.newInputStream(directory.resolve(&quot;invocation-2/proof.txt&quot;))) {</span>
+<span class="fc" id="L157">                byte[] bytes = input.readNBytes(Z3EqualityProofReplay.MAX_BYTES + 1);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                if (bytes.length &gt; Z3EqualityProofReplay.MAX_BYTES) return false;</span>
+<span class="fc" id="L159">                String proof = new String(bytes, StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                return SolverIr.sha256(proof).equals(execution.result().certificateHash())</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    &amp;&amp; Z3EqualityProofReplay.verifies(expected, proof);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            } catch (java.nio.file.NoSuchFileException missing) {</span>
+<span class="nc" id="L163">                return false;</span>
+            }
+        }
+    }
 
     public RetainedAttempt executeWithEvidence(Obligation obligation, java.nio.file.Path root)
             throws IOException {
-<span class="nc" id="L155">        java.nio.file.Files.createDirectories(root);</span>
-<span class="nc" id="L156">        java.nio.file.Path directory = java.nio.file.Files.createTempDirectory(root, &quot;smt-&quot;);</span>
-<span class="nc" id="L157">        java.nio.file.Files.writeString(directory.resolve(&quot;obligation.json&quot;), obligation.toCanonicalJson());</span>
-<span class="nc" id="L158">        java.nio.file.Files.writeString(directory.resolve(&quot;backend.txt&quot;),</span>
-<span class="nc" id="L159">            descriptor.backendId() + &quot;\n&quot; + descriptor.backendVersion() + &quot;\n&quot; + configurationHash + &quot;\n&quot;);</span>
-<span class="nc" id="L160">        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();</span>
-<span class="nc" id="L161">        ProcessRunner recording = (cmd, input, limit) -&gt; {</span>
+<span class="fc" id="L170">        java.nio.file.Files.createDirectories(root);</span>
+<span class="fc" id="L171">        java.nio.file.Path directory = java.nio.file.Files.createTempDirectory(root, &quot;smt-&quot;);</span>
+<span class="fc" id="L172">        java.nio.file.Files.writeString(directory.resolve(&quot;obligation.json&quot;), obligation.toCanonicalJson());</span>
+<span class="fc" id="L173">        java.nio.file.Files.writeString(directory.resolve(&quot;backend.txt&quot;),</span>
+<span class="fc" id="L174">            descriptor.backendId() + &quot;\n&quot; + descriptor.backendVersion() + &quot;\n&quot; + configurationHash + &quot;\n&quot;);</span>
+<span class="fc" id="L175">        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();</span>
+<span class="fc" id="L176">        ProcessRunner recording = (cmd, input, limit) -&gt; {</span>
             try {
-<span class="nc" id="L163">                java.nio.file.Path invocation = java.nio.file.Files.createDirectory(</span>
-<span class="nc" id="L164">                    directory.resolve(&quot;invocation-&quot; + calls.incrementAndGet()));</span>
-<span class="nc" id="L165">                java.nio.file.Files.writeString(invocation.resolve(&quot;input.smt2&quot;), input);</span>
-<span class="nc" id="L166">                java.nio.file.Files.writeString(invocation.resolve(&quot;command.txt&quot;), cmd.toString());</span>
-<span class="nc" id="L167">                ProcessOutput output = processRunner.run(cmd, input, limit);</span>
-<span class="nc" id="L168">                java.nio.file.Files.writeString(invocation.resolve(&quot;stdout.txt&quot;), output.stdout());</span>
-<span class="nc" id="L169">                java.nio.file.Files.writeString(invocation.resolve(&quot;stderr.txt&quot;), output.stderr());</span>
-<span class="nc" id="L170">                java.nio.file.Files.writeString(invocation.resolve(&quot;status.txt&quot;),</span>
-<span class="nc" id="L171">                    &quot;available=&quot; + output.available() + &quot;\ntimedOut=&quot; + output.timedOut()</span>
-<span class="nc" id="L172">                        + &quot;\nexitCode=&quot; + output.exitCode() + &quot;\n&quot;);</span>
+<span class="fc" id="L178">                java.nio.file.Path invocation = java.nio.file.Files.createDirectory(</span>
+<span class="fc" id="L179">                    directory.resolve(&quot;invocation-&quot; + calls.incrementAndGet()));</span>
+<span class="fc" id="L180">                java.nio.file.Files.writeString(invocation.resolve(&quot;input.smt2&quot;), input);</span>
+<span class="fc" id="L181">                java.nio.file.Files.writeString(invocation.resolve(&quot;command.txt&quot;), cmd.toString());</span>
+<span class="fc" id="L182">                ProcessOutput output = processRunner.run(cmd, input, limit);</span>
+<span class="fc" id="L183">                java.nio.file.Files.writeString(invocation.resolve(&quot;stdout.txt&quot;), output.stdout());</span>
+<span class="fc" id="L184">                java.nio.file.Files.writeString(invocation.resolve(&quot;stderr.txt&quot;), output.stderr());</span>
+<span class="fc" id="L185">                java.nio.file.Files.writeString(invocation.resolve(&quot;status.txt&quot;),</span>
+<span class="fc" id="L186">                    &quot;available=&quot; + output.available() + &quot;\ntimedOut=&quot; + output.timedOut()</span>
+<span class="fc" id="L187">                        + &quot;\nexitCode=&quot; + output.exitCode() + &quot;\n&quot;);</span>
                 // Store the exact canonical payload whose hash the native result carries.
-<span class="nc bnc" id="L174" title="All 2 branches missed.">                if (input.contains(&quot;(get-proof)&quot;))</span>
-<span class="nc" id="L175">                    java.nio.file.Files.writeString(invocation.resolve(&quot;proof.txt&quot;),</span>
-<span class="nc" id="L176">                        payloadAfterStatus(output.stdout(), &quot;unsat&quot;));</span>
-<span class="nc" id="L177">                return output;</span>
-<span class="nc" id="L178">            } catch (IOException failure) {</span>
-<span class="nc" id="L179">                throw new java.io.UncheckedIOException(failure);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                if (input.contains(&quot;(get-proof)&quot;))</span>
+<span class="fc" id="L190">                    java.nio.file.Files.writeString(invocation.resolve(&quot;proof.txt&quot;),</span>
+<span class="fc" id="L191">                        payloadAfterStatus(output.stdout(), &quot;unsat&quot;));</span>
+<span class="fc" id="L192">                return output;</span>
+<span class="nc" id="L193">            } catch (IOException failure) {</span>
+<span class="nc" id="L194">                throw new java.io.UncheckedIOException(failure);</span>
             }
         };
         try {
-<span class="nc" id="L183">            SolverExecution result = new Z3SmtSolverBackend(descriptor.backendVersion(),</span>
-<span class="nc" id="L184">                command, Duration.ofMillis(timeoutMillis), recording).execute(obligation);</span>
-<span class="nc" id="L185">            java.nio.file.Files.writeString(directory.resolve(&quot;translation.json&quot;), result.translation().toCanonicalJson());</span>
-<span class="nc" id="L186">            java.nio.file.Files.writeString(directory.resolve(&quot;result.json&quot;), result.result().toCanonicalJson());</span>
-<span class="nc" id="L187">            java.nio.file.Files.writeString(directory.resolve(&quot;execution.json&quot;), result.toCanonicalJson());</span>
-<span class="nc" id="L188">            java.nio.file.Files.writeString(directory.resolve(&quot;semantics.txt&quot;),</span>
+<span class="fc" id="L198">            SolverExecution result = new Z3SmtSolverBackend(descriptor.backendVersion(),</span>
+<span class="fc" id="L199">                command, Duration.ofMillis(timeoutMillis), recording).execute(obligation);</span>
+<span class="fc" id="L200">            java.nio.file.Files.writeString(directory.resolve(&quot;translation.json&quot;), result.translation().toCanonicalJson());</span>
+<span class="fc" id="L201">            java.nio.file.Files.writeString(directory.resolve(&quot;result.json&quot;), result.result().toCanonicalJson());</span>
+<span class="fc" id="L202">            java.nio.file.Files.writeString(directory.resolve(&quot;execution.json&quot;), result.toCanonicalJson());</span>
+<span class="fc" id="L203">            java.nio.file.Files.writeString(directory.resolve(&quot;semantics.txt&quot;),</span>
                 &quot;Conditional on the exact declared premises; consistency is not inferred.\n&quot;
                 + &quot;The solver proof object is retained, not independently kernel-replayed here.\n&quot;);
-<span class="nc" id="L191">            return new RetainedAttempt(result, directory);</span>
-<span class="nc" id="L192">        } catch (RuntimeException failure) {</span>
-<span class="nc" id="L193">            try { java.nio.file.Files.writeString(directory.resolve(&quot;FAILED.txt&quot;), failure.toString()); }</span>
-<span class="nc" id="L194">            catch (IOException retention) { failure.addSuppressed(retention); }</span>
-<span class="nc" id="L195">            throw failure;</span>
+<span class="fc" id="L206">            return new RetainedAttempt(result, directory);</span>
+<span class="nc" id="L207">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L208">            try { java.nio.file.Files.writeString(directory.resolve(&quot;FAILED.txt&quot;), failure.toString()); }</span>
+<span class="nc" id="L209">            catch (IOException retention) { failure.addSuppressed(retention); }</span>
+<span class="nc" id="L210">            throw failure;</span>
         }
     }
 
@@ -200,47 +215,47 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         Obligation obligation,
         SmtLibRenderer.Material material
     ) {
-<span class="fc" id="L203">        ProcessOutput proof = processRunner.run(</span>
+<span class="fc" id="L218">        ProcessOutput proof = processRunner.run(</span>
             command,
             &quot;(set-option :produce-proofs true)\n&quot;
-<span class="fc" id="L206">                + material.scriptPrefix() + &quot;(check-sat)\n(get-proof)\n&quot;,</span>
+<span class="fc" id="L221">                + material.scriptPrefix() + &quot;(check-sat)\n(get-proof)\n&quot;,</span>
             timeoutMillis);
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (!proof.available()) {</span>
-<span class="fc" id="L209">            return result(obligation, ResultStatus.ERROR,</span>
-<span class="fc" id="L210">                &quot;Z3 proof retrieval unavailable&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (!proof.available()) {</span>
+<span class="fc" id="L224">            return result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L225">                &quot;Z3 proof retrieval unavailable&quot;, Map.of(), &quot;&quot;);</span>
         }
-<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (proof.timedOut()) {</span>
-<span class="fc" id="L213">            return result(obligation, ResultStatus.TIMEOUT,</span>
-<span class="fc" id="L214">                &quot;Z3 proof retrieval timed out&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (proof.timedOut()) {</span>
+<span class="fc" id="L228">            return result(obligation, ResultStatus.TIMEOUT,</span>
+<span class="fc" id="L229">                &quot;Z3 proof retrieval timed out&quot;, Map.of(), &quot;&quot;);</span>
         }
-<span class="fc" id="L216">        String payload = payloadAfterStatus(proof.stdout(), &quot;unsat&quot;);</span>
-<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (proof.exitCode() != 0</span>
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || hasSmtError(proof.stderr())</span>
-<span class="fc bfc" id="L219" title="All 2 branches covered.">                || !validProofPayload(payload)) {</span>
-<span class="fc" id="L220">            return result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L231">        String payload = payloadAfterStatus(proof.stdout(), &quot;unsat&quot;);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (proof.exitCode() != 0</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                || hasSmtError(proof.stderr())</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                || !validProofPayload(payload)) {</span>
+<span class="fc" id="L235">            return result(obligation, ResultStatus.ERROR,</span>
                 &quot;Z3 confirmed unsat but returned no valid proof object: &quot;
-<span class="fc" id="L222">                    + normalize(payload + ' ' + proof.stderr()),</span>
-<span class="fc" id="L223">                Map.of(), &quot;&quot;);</span>
+<span class="fc" id="L237">                    + normalize(payload + ' ' + proof.stderr()),</span>
+<span class="fc" id="L238">                Map.of(), &quot;&quot;);</span>
         }
-<span class="fc" id="L225">        return result(obligation, ResultStatus.CONFIRMED,</span>
+<span class="fc" id="L240">        return result(obligation, ResultStatus.CONFIRMED,</span>
             &quot;Z3 returned unsat with a proof object&quot;,
-<span class="fc" id="L227">            Map.of(), SolverIr.sha256(payload));</span>
+<span class="fc" id="L242">            Map.of(), SolverIr.sha256(payload));</span>
     }
 
     private SolverResult modelResult(
         Obligation obligation,
         SmtLibRenderer.Material material
     ) {
-<span class="fc" id="L234">        ProcessOutput model = processRunner.run(</span>
+<span class="fc" id="L249">        ProcessOutput model = processRunner.run(</span>
             command,
-<span class="fc" id="L236">            material.scriptPrefix() + &quot;(check-sat)\n(get-model)\n&quot;,</span>
+<span class="fc" id="L251">            material.scriptPrefix() + &quot;(check-sat)\n(get-model)\n&quot;,</span>
             timeoutMillis);
-<span class="pc bpc" id="L238" title="1 of 4 branches missed.">        String payload = model.available() &amp;&amp; !model.timedOut()</span>
-<span class="pc bpc" id="L239" title="2 of 4 branches missed.">                &amp;&amp; model.exitCode() == 0 &amp;&amp; !hasSmtError(model.stderr())</span>
-<span class="fc" id="L240">            ? payloadAfterStatus(model.stdout(), &quot;sat&quot;) : &quot;&quot;;</span>
-<span class="fc bfc" id="L241" title="All 2 branches covered.">        Map&lt;String, String&gt; counterexample = validModelPayload(payload)</span>
-<span class="fc" id="L242">            ? Map.of(&quot;smtModel&quot;, payload) : Map.of();</span>
-<span class="fc" id="L243">        return result(obligation, ResultStatus.REFUTED,</span>
+<span class="pc bpc" id="L253" title="1 of 4 branches missed.">        String payload = model.available() &amp;&amp; !model.timedOut()</span>
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">                &amp;&amp; model.exitCode() == 0 &amp;&amp; !hasSmtError(model.stderr())</span>
+<span class="fc" id="L255">            ? payloadAfterStatus(model.stdout(), &quot;sat&quot;) : &quot;&quot;;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        Map&lt;String, String&gt; counterexample = validModelPayload(payload)</span>
+<span class="fc" id="L257">            ? Map.of(&quot;smtModel&quot;, payload) : Map.of();</span>
+<span class="fc" id="L258">        return result(obligation, ResultStatus.REFUTED,</span>
             &quot;Z3 found a satisfying countermodel for the negated goal&quot;,
             counterexample, &quot;&quot;);
     }
@@ -252,17 +267,17 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         Map&lt;String, String&gt; counterexample,
         String certificateHash
     ) {
-<span class="fc" id="L255">        List&lt;String&gt; capabilities = new ArrayList&lt;&gt;(List.of(</span>
+<span class="fc" id="L270">        List&lt;String&gt; capabilities = new ArrayList&lt;&gt;(List.of(</span>
             &quot;EXTERNAL_Z3&quot;, &quot;SMT_LIB_2&quot;, &quot;LOSSLESS_STRUCTURED_ASSUMPTIONS&quot;));
-<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (status == ResultStatus.CONFIRMED) {</span>
-<span class="fc" id="L258">            capabilities.add(&quot;SMT_UNSAT_PROOF_OBJECT&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (status == ResultStatus.CONFIRMED) {</span>
+<span class="fc" id="L273">            capabilities.add(&quot;SMT_UNSAT_PROOF_OBJECT&quot;);</span>
         }
-<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (status == ResultStatus.REFUTED) {</span>
-<span class="fc" id="L261">            capabilities.add(&quot;SMT_COUNTERMODEL&quot;);</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (status == ResultStatus.REFUTED) {</span>
+<span class="fc" id="L276">            capabilities.add(&quot;SMT_COUNTERMODEL&quot;);</span>
         }
-<span class="fc" id="L263">        return SolverResult.create(</span>
+<span class="fc" id="L278">        return SolverResult.create(</span>
             obligation, descriptor, status, TranslationStatus.LOSSLESS,
-<span class="fc" id="L265">            capabilities, List.of(), message, counterexample, certificateHash);</span>
+<span class="fc" id="L280">            capabilities, List.of(), message, counterexample, certificateHash);</span>
     }
 
     private SolverExecution rejected(
@@ -270,83 +285,83 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         Map&lt;String, String&gt; terms,
         List&lt;String&gt; issues
     ) {
-<span class="fc" id="L273">        SolverTranslation translation = SolverTranslation.create(</span>
+<span class="fc" id="L288">        SolverTranslation translation = SolverTranslation.create(</span>
             obligation, descriptor, TranslationStatus.REJECTED, issues, terms);
-<span class="fc" id="L275">        SolverResult result = SolverResult.create(</span>
+<span class="fc" id="L290">        SolverResult result = SolverResult.create(</span>
             obligation, descriptor, ResultStatus.UNSUPPORTED,
-<span class="fc" id="L277">            TranslationStatus.REJECTED, List.of(), issues,</span>
-<span class="fc" id="L278">            &quot;Z3 translation rejected before execution&quot;, Map.of(), &quot;&quot;);</span>
-<span class="fc" id="L279">        return SolverExecution.create(obligation, translation, result);</span>
+<span class="fc" id="L292">            TranslationStatus.REJECTED, List.of(), issues,</span>
+<span class="fc" id="L293">            &quot;Z3 translation rejected before execution&quot;, Map.of(), &quot;&quot;);</span>
+<span class="fc" id="L294">        return SolverExecution.create(obligation, translation, result);</span>
     }
 
     public static Detection detectSystemZ3() {
-<span class="fc" id="L283">        ProcessRunner runner = new DefaultProcessRunner();</span>
-<span class="fc" id="L284">        ProcessOutput output = runner.run(</span>
-<span class="fc" id="L285">            List.of(&quot;z3&quot;, &quot;-version&quot;), &quot;&quot;, 2_000L);</span>
-<span class="pc bpc" id="L286" title="3 of 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
-<span class="nc" id="L287">            return new Detection(</span>
+<span class="fc" id="L298">        ProcessRunner runner = new DefaultProcessRunner();</span>
+<span class="fc" id="L299">        ProcessOutput output = runner.run(</span>
+<span class="fc" id="L300">            List.of(&quot;z3&quot;, &quot;-version&quot;), &quot;&quot;, 2_000L);</span>
+<span class="pc bpc" id="L301" title="3 of 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
+<span class="nc" id="L302">            return new Detection(</span>
                 new Z3SmtSolverBackend(
-<span class="nc" id="L289">                    &quot;unavailable&quot;, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
-<span class="nc" id="L290">                    Duration.ofSeconds(20), runner),</span>
+<span class="nc" id="L304">                    &quot;unavailable&quot;, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
+<span class="nc" id="L305">                    Duration.ofSeconds(20), runner),</span>
                 BackendAvailability.UNAVAILABLE,
-<span class="nc" id="L292">                normalize(output.stdout() + ' ' + output.stderr()));</span>
+<span class="nc" id="L307">                normalize(output.stdout() + ' ' + output.stderr()));</span>
         }
-<span class="fc" id="L294">        String version = normalize(output.stdout());</span>
-<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (version.isBlank()) {</span>
-<span class="nc" id="L296">            version = &quot;system&quot;;</span>
+<span class="fc" id="L309">        String version = normalize(output.stdout());</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (version.isBlank()) {</span>
+<span class="nc" id="L311">            version = &quot;system&quot;;</span>
         }
-<span class="fc" id="L298">        return new Detection(</span>
+<span class="fc" id="L313">        return new Detection(</span>
             new Z3SmtSolverBackend(
-<span class="fc" id="L300">                version, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
-<span class="fc" id="L301">                Duration.ofSeconds(20), runner),</span>
+<span class="fc" id="L315">                version, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
+<span class="fc" id="L316">                Duration.ofSeconds(20), runner),</span>
             BackendAvailability.AVAILABLE,
             version);
     }
 
     private static boolean validProofPayload(String payload) {
-<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        String normalized = payload == null ? &quot;&quot; : payload.trim();</span>
-<span class="fc" id="L308">        String lower = normalized.toLowerCase(Locale.ROOT);</span>
-<span class="fc bfc" id="L309" title="All 2 branches covered.">        return normalized.startsWith(&quot;(&quot;)</span>
-<span class="pc bpc" id="L310" title="1 of 2 branches missed.">            &amp;&amp; !lower.startsWith(&quot;(error&quot;)</span>
-<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            &amp;&amp; !lower.contains(&quot;\n(error&quot;);</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        String normalized = payload == null ? &quot;&quot; : payload.trim();</span>
+<span class="fc" id="L323">        String lower = normalized.toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        return normalized.startsWith(&quot;(&quot;)</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            &amp;&amp; !lower.startsWith(&quot;(error&quot;)</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            &amp;&amp; !lower.contains(&quot;\n(error&quot;);</span>
     }
 
     private static boolean validModelPayload(String payload) {
-<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        String normalized = payload == null ? &quot;&quot; : payload.trim();</span>
-<span class="fc" id="L316">        return normalized.startsWith(&quot;(model&quot;);</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        String normalized = payload == null ? &quot;&quot; : payload.trim();</span>
+<span class="fc" id="L331">        return normalized.startsWith(&quot;(model&quot;);</span>
     }
 
     private static String checkStatus(ProcessOutput check) {
-<span class="fc bfc" id="L320" title="All 2 branches covered.">        return hasSmtError(check.stderr()) ? &quot;&quot; : check.stdout().strip();</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        return hasSmtError(check.stderr()) ? &quot;&quot; : check.stdout().strip();</span>
     }
 
     private static boolean hasSmtError(String output) {
-<span class="fc" id="L324">        return output.lines()</span>
-<span class="fc" id="L325">            .map(line -&gt; line.stripLeading().toLowerCase(Locale.ROOT))</span>
-<span class="pc bpc" id="L326" title="3 of 4 branches missed.">            .anyMatch(line -&gt; line.startsWith(&quot;(error&quot;) || line.startsWith(&quot;error:&quot;));</span>
+<span class="fc" id="L339">        return output.lines()</span>
+<span class="fc" id="L340">            .map(line -&gt; line.stripLeading().toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L341" title="3 of 4 branches missed.">            .anyMatch(line -&gt; line.startsWith(&quot;(error&quot;) || line.startsWith(&quot;error:&quot;));</span>
     }
 
     private static String payloadAfterStatus(String output, String expectedStatus) {
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (output == null) {</span>
-<span class="nc" id="L331">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (output == null) {</span>
+<span class="nc" id="L346">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L333">        List&lt;String&gt; lines = output.lines()</span>
-<span class="fc" id="L334">            .map(String::trim)</span>
-<span class="fc bfc" id="L335" title="All 2 branches covered.">            .filter(line -&gt; !line.isBlank())</span>
-<span class="fc" id="L336">            .toList();</span>
-<span class="pc bpc" id="L337" title="1 of 4 branches missed.">        if (lines.size() &lt; 2 || !lines.getFirst().equals(expectedStatus)) {</span>
-<span class="fc" id="L338">            return &quot;&quot;;</span>
+<span class="fc" id="L348">        List&lt;String&gt; lines = output.lines()</span>
+<span class="fc" id="L349">            .map(String::trim)</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            .filter(line -&gt; !line.isBlank())</span>
+<span class="fc" id="L351">            .toList();</span>
+<span class="pc bpc" id="L352" title="1 of 4 branches missed.">        if (lines.size() &lt; 2 || !lines.getFirst().equals(expectedStatus)) {</span>
+<span class="fc" id="L353">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L340">        List&lt;String&gt; payload = lines.subList(1, lines.size());</span>
-<span class="fc bfc" id="L341" title="All 2 branches covered.">        if (payload.stream().anyMatch(line -&gt;</span>
-<span class="pc bpc" id="L342" title="2 of 6 branches missed.">                line.equals(&quot;sat&quot;) || line.equals(&quot;unsat&quot;) || line.equals(&quot;unknown&quot;))) {</span>
-<span class="fc" id="L343">            return &quot;&quot;;</span>
+<span class="fc" id="L355">        List&lt;String&gt; payload = lines.subList(1, lines.size());</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (payload.stream().anyMatch(line -&gt;</span>
+<span class="pc bpc" id="L357" title="2 of 6 branches missed.">                line.equals(&quot;sat&quot;) || line.equals(&quot;unsat&quot;) || line.equals(&quot;unknown&quot;))) {</span>
+<span class="fc" id="L358">            return &quot;&quot;;</span>
         }
-<span class="fc" id="L345">        return String.join(&quot;\n&quot;, payload);</span>
+<span class="fc" id="L360">        return String.join(&quot;\n&quot;, payload);</span>
     }
 
     private static String normalize(String value) {
-<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     public record Detection(
@@ -354,11 +369,11 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         BackendAvailability availability,
         String detail
     ) {
-<span class="fc" id="L357">        public Detection {</span>
-<span class="fc" id="L358">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
-<span class="fc" id="L359">            Objects.requireNonNull(availability, &quot;availability&quot;);</span>
-<span class="fc bfc" id="L360" title="All 2 branches covered.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="fc" id="L361">        }</span>
+<span class="fc" id="L372">        public Detection {</span>
+<span class="fc" id="L373">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="fc" id="L374">            Objects.requireNonNull(availability, &quot;availability&quot;);</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L376">        }</span>
     }
 
     @FunctionalInterface
@@ -373,10 +388,10 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         String stdout,
         String stderr
     ) {
-<span class="fc" id="L376">        public ProcessOutput {</span>
-<span class="fc bfc" id="L377" title="All 2 branches covered.">            stdout = stdout == null ? &quot;&quot; : stdout;</span>
-<span class="fc bfc" id="L378" title="All 2 branches covered.">            stderr = stderr == null ? &quot;&quot; : stderr;</span>
-<span class="fc" id="L379">        }</span>
+<span class="fc" id="L391">        public ProcessOutput {</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            stdout = stdout == null ? &quot;&quot; : stdout;</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            stderr = stderr == null ? &quot;&quot; : stderr;</span>
+<span class="fc" id="L394">        }</span>
     }
 
     private static final class DefaultProcessRunner implements ProcessRunner {
@@ -388,58 +403,58 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         ) {
             Process process;
             try {
-<span class="fc" id="L391">                process = new ProcessBuilder(command).start();</span>
-<span class="nc" id="L392">            } catch (IOException exception) {</span>
-<span class="nc" id="L393">                return new ProcessOutput(</span>
-<span class="nc" id="L394">                    false, false, -1, &quot;&quot;, exception.getMessage());</span>
-<span class="fc" id="L395">            }</span>
-<span class="fc" id="L396">            ThreadFactory factory = runnable -&gt; {</span>
-<span class="fc" id="L397">                Thread thread = new Thread(runnable, &quot;z3-output-reader&quot;);</span>
-<span class="fc" id="L398">                thread.setDaemon(true);</span>
-<span class="fc" id="L399">                return thread;</span>
+<span class="fc" id="L406">                process = new ProcessBuilder(command).start();</span>
+<span class="nc" id="L407">            } catch (IOException exception) {</span>
+<span class="nc" id="L408">                return new ProcessOutput(</span>
+<span class="nc" id="L409">                    false, false, -1, &quot;&quot;, exception.getMessage());</span>
+<span class="fc" id="L410">            }</span>
+<span class="fc" id="L411">            ThreadFactory factory = runnable -&gt; {</span>
+<span class="fc" id="L412">                Thread thread = new Thread(runnable, &quot;z3-output-reader&quot;);</span>
+<span class="fc" id="L413">                thread.setDaemon(true);</span>
+<span class="fc" id="L414">                return thread;</span>
             };
-<span class="fc" id="L401">            ExecutorService readers = Executors.newFixedThreadPool(2, factory);</span>
-<span class="fc" id="L402">            Future&lt;String&gt; stdout = readers.submit(</span>
-<span class="fc" id="L403">                () -&gt; new String(process.getInputStream().readAllBytes(),</span>
+<span class="fc" id="L416">            ExecutorService readers = Executors.newFixedThreadPool(2, factory);</span>
+<span class="fc" id="L417">            Future&lt;String&gt; stdout = readers.submit(</span>
+<span class="fc" id="L418">                () -&gt; new String(process.getInputStream().readAllBytes(),</span>
                     StandardCharsets.UTF_8));
-<span class="fc" id="L405">            Future&lt;String&gt; stderr = readers.submit(</span>
-<span class="fc" id="L406">                () -&gt; new String(process.getErrorStream().readAllBytes(),</span>
+<span class="fc" id="L420">            Future&lt;String&gt; stderr = readers.submit(</span>
+<span class="fc" id="L421">                () -&gt; new String(process.getErrorStream().readAllBytes(),</span>
                     StandardCharsets.UTF_8));
             try {
-<span class="fc" id="L409">                process.getOutputStream().write(</span>
-<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                    (stdin == null ? &quot;&quot; : stdin).getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L411">                process.getOutputStream().close();</span>
-<span class="fc" id="L412">                boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
-<span class="pc bpc" id="L413" title="1 of 2 branches missed.">                if (!finished) {</span>
-<span class="nc" id="L414">                    process.destroyForcibly();</span>
-<span class="nc" id="L415">                    return new ProcessOutput(</span>
-<span class="nc" id="L416">                        true, true, -1, getQuietly(stdout), getQuietly(stderr));</span>
+<span class="fc" id="L424">                process.getOutputStream().write(</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                    (stdin == null ? &quot;&quot; : stdin).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L426">                process.getOutputStream().close();</span>
+<span class="fc" id="L427">                boolean finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                if (!finished) {</span>
+<span class="nc" id="L429">                    process.destroyForcibly();</span>
+<span class="nc" id="L430">                    return new ProcessOutput(</span>
+<span class="nc" id="L431">                        true, true, -1, getQuietly(stdout), getQuietly(stderr));</span>
                 }
-<span class="fc" id="L418">                return new ProcessOutput(</span>
-<span class="fc" id="L419">                    true, false, process.exitValue(),</span>
-<span class="fc" id="L420">                    getQuietly(stdout), getQuietly(stderr));</span>
-<span class="nc" id="L421">            } catch (IOException exception) {</span>
-<span class="nc" id="L422">                process.destroyForcibly();</span>
-<span class="nc" id="L423">                return new ProcessOutput(</span>
-<span class="nc" id="L424">                    true, false, -1, getQuietly(stdout), exception.getMessage());</span>
-<span class="nc" id="L425">            } catch (InterruptedException exception) {</span>
-<span class="nc" id="L426">                Thread.currentThread().interrupt();</span>
-<span class="nc" id="L427">                process.destroyForcibly();</span>
-<span class="nc" id="L428">                return new ProcessOutput(</span>
-<span class="nc" id="L429">                    true, true, -1, getQuietly(stdout), &quot;interrupted&quot;);</span>
+<span class="fc" id="L433">                return new ProcessOutput(</span>
+<span class="fc" id="L434">                    true, false, process.exitValue(),</span>
+<span class="fc" id="L435">                    getQuietly(stdout), getQuietly(stderr));</span>
+<span class="nc" id="L436">            } catch (IOException exception) {</span>
+<span class="nc" id="L437">                process.destroyForcibly();</span>
+<span class="nc" id="L438">                return new ProcessOutput(</span>
+<span class="nc" id="L439">                    true, false, -1, getQuietly(stdout), exception.getMessage());</span>
+<span class="nc" id="L440">            } catch (InterruptedException exception) {</span>
+<span class="nc" id="L441">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L442">                process.destroyForcibly();</span>
+<span class="nc" id="L443">                return new ProcessOutput(</span>
+<span class="nc" id="L444">                    true, true, -1, getQuietly(stdout), &quot;interrupted&quot;);</span>
             } finally {
-<span class="fc" id="L431">                readers.shutdownNow();</span>
+<span class="fc" id="L446">                readers.shutdownNow();</span>
             }
         }
 
         private static String getQuietly(Future&lt;String&gt; output) {
             try {
-<span class="fc" id="L437">                return output.get(2, TimeUnit.SECONDS);</span>
-<span class="nc" id="L438">            } catch (InterruptedException exception) {</span>
-<span class="nc" id="L439">                Thread.currentThread().interrupt();</span>
-<span class="nc" id="L440">                return &quot;&quot;;</span>
-<span class="nc" id="L441">            } catch (ExecutionException | java.util.concurrent.TimeoutException exception) {</span>
-<span class="nc" id="L442">                return &quot;&quot;;</span>
+<span class="fc" id="L452">                return output.get(2, TimeUnit.SECONDS);</span>
+<span class="nc" id="L453">            } catch (InterruptedException exception) {</span>
+<span class="nc" id="L454">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L455">                return &quot;&quot;;</span>
+<span class="nc" id="L456">            } catch (ExecutionException | java.util.concurrent.TimeoutException exception) {</span>
+<span class="nc" id="L457">                return &quot;&quot;;</span>
             }
         }
     }

@@ -94,11 +94,11 @@ final class CandidateIndependentMacroFormation {
 <span class="fc" id="L94">        List&lt;ReplayEvidence&gt; replayEvidence = replayBatch.results().stream()</span>
 <span class="fc" id="L95">            .map(CandidateIndependentMacroReplayAdapter.ReplayResult::evidence)</span>
 <span class="fc" id="L96">            .toList();</span>
-<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (replayBatch.status()</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (replayBatch.status()</span>
                 != CandidateIndependentMacroReplayAdapter.BatchStatus.REPRODUCED) {
-<span class="nc" id="L99">            return new FormationResult(</span>
+<span class="fc" id="L99">            return new FormationResult(</span>
                 FormationStatus.REPLAY_NOT_REPRODUCED,
-<span class="nc" id="L101">                List.of(), replayEvidence, replayBatch.detail());</span>
+<span class="fc" id="L101">                List.of(), replayEvidence, replayBatch.detail());</span>
         }
 <span class="fc" id="L103">        List&lt;SuccessfulTransformationPath&gt; paths = replayBatch.results().stream()</span>
 <span class="fc" id="L104">            .map(result -&gt; result.path().orElseThrow())</span>
