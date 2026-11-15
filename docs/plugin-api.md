@@ -244,7 +244,8 @@ Vollständiges integriertes Beispiel mit allen Erweiterungspunkten:
 app/src/main/java/de/regelsuche/plugin/example/BinomialFormulaPlugin.java
 ```
 
-Für Issue #104 sind zusätzlich separat klon- und baubare Community-Beispiele
-erforderlich, die gegen veröffentlichte API-Artefakte statt interne App-Pakete
-bauen. Das integrierte Beispiel ersetzt diese noch ausstehenden externen
-Referenzprojekte nicht.
+Der [Algebra-Consumer](../examples/external-consumers/hello-rule-java25) und
+der [Discovery-Consumer](../examples/external-consumers/geometric-sequence-domain-java25)
+sind eigenständige Projekte und bauen gegen veröffentlichte SDK-Artefakte.
+Die [SDK-Qualifikation](released-sdk-maven-qualification.md) dokumentiert ihre
+Builds und die Prüfung der exportierbaren Regelvorlagen.
