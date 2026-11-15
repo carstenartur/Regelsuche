@@ -247,6 +247,15 @@ Wichtige fokussierte Verträge:
 
 Convenience-Skripte dürfen lediglich an diese checkout-eigenen Tasks delegieren.
 
+Der Track-B-Replay von `verifyComparativeBenchmarks` verwendet den exakten
+Validator mit konstanten Nennern aus [Revision `c1f3a273`](https://github.com/carstenartur/Regelsuche/commit/c1f3a273d6d0a81e9862f8564729dfcf3cd35c89).
+Beide Suchverfahren bestätigen 19 von 20 Fällen. Je 38 von 40 Negativprüfungen
+werden ausgeführt, ohne eine falsche Regelanwendung zu finden. Die v2-Zusammenfassung
+führt diese Messung neben den beiden früheren eingefrorenen Ergebnissen auf.
+Checkout und gepinnter Container müssen die 138.533 Bytes des neuen Berichts
+mit SHA-256 `1af25ae8e84e3d0e88d7fe1d3a8547b99bf35afb877e0318bfa95f0511801fdc`
+bytegleich reproduzieren.
+
 ## Testdaten und Determinismus
 
 - Fixtures gehören zum fachlichen Test oder zu einer versionierten

@@ -12,6 +12,7 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.linalg.Matrix;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -65,13 +66,15 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         collectVariables(left, variables);
         collectVariables(right, variables);
         List<String> orderedVariables = new ArrayList<>(variables);
-        List<AssumptionGuard> assumptionGuards = assumptionGuards(hypothesis.assumptions());
+        var realWitnesses = new ExactScalarWitnessSearch(
+            hypothesis.leftExpression(), hypothesis.rightExpression(), hypothesis.assumptions());
+        boolean exact = ExactScalarWitnessSearch.accepts(left) && ExactScalarWitnessSearch.accepts(right);
 
         if (budget.includeBoundaryValues()) {
             String source = "numeric-boundary-values";
             attemptedSources.add(source);
             Optional<Counterexample> edgeCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, assumptionGuards, source
+                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, source, realWitnesses, exact
             );
             if (edgeCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -87,7 +90,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             String source = "rational-samples";
             attemptedSources.add(source);
             Optional<Counterexample> rationalCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, assumptionGuards, source
+                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, source, realWitnesses, exact
             );
             if (rationalCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -108,7 +111,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 randomValues.add(-5.0 + (10.0 * random.nextDouble()));
             }
             Optional<Counterexample> randomCounterexample = searchNumericAssignments(
-                left, right, orderedVariables, randomValues, inferredAssumptions, assumptionGuards, source
+                left, right, orderedVariables, randomValues, inferredAssumptions, source, realWitnesses, exact
             );
             if (randomCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -120,7 +123,8 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             }
         }
 
-        if (budget.includeMatrices() && budget.maxMatrixDimension() >= 2) {
+        boolean premiseFree = hypothesis.assumptions().isEmpty();
+        if (premiseFree && budget.includeMatrices() && budget.maxMatrixDimension() >= 2) {
             Optional<Counterexample> matrixCounterexample = tryMatrixCounterexample(
                 left, right, orderedVariables, attemptedSources
             );
@@ -134,9 +138,11 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             }
         }
 
+        // Keep the configured probes in the work ledger. A rounded complex
+        // probe cannot authorize a refutation in the exact scalar fragment.
         if (budget.includeComplex()) {
             Optional<Counterexample> complexCounterexample = tryComplexCounterexample(
-                left, right, orderedVariables, attemptedSources, assumptionGuards
+                left, right, orderedVariables, attemptedSources, premiseFree, !exact
             );
             if (complexCounterexample.isPresent()) {
                 return CounterexampleSearchResult.counterexampleFound(
@@ -158,6 +164,12 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 typedAssumptions(inferredAssumptions)
             );
         }
+        if (exact && !realWitnesses.evaluated() && attemptedSources.stream().anyMatch(
+                name -> name.startsWith("numeric-") || name.equals("rational-samples"))) {
+            return new CounterexampleSearchResult(CounterexampleSearchService.Status.INCONCLUSIVE,
+                Optional.empty(), inferredAssumptionExpressions(inferredAssumptions), attemptedSources,
+                "no defined scalar pair within the exact arithmetic bounds", typedAssumptions(inferredAssumptions));
+        }
         return CounterexampleSearchResult.noCounterexampleFound(
             inferredAssumptionExpressions(inferredAssumptions),
             attemptedSources,
@@ -171,55 +183,62 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         List<String> orderedVariables,
         List<Double> values,
         Map<String, CounterexampleSearchService.TypedAssumption> inferredAssumptions,
-        List<AssumptionGuard> assumptionGuards,
-        String source
+        String source,
+        ExactScalarWitnessSearch realWitnesses,
+        boolean exact
     ) {
-        if (values.isEmpty()) {
-            return Optional.empty();
-        }
+        if (values.isEmpty()) return Optional.empty();
         if (orderedVariables.isEmpty()) {
-            onAssignment.accept(source);
-            Evaluation leftEvaluation = evaluate(left, Map.of());
-            Evaluation rightEvaluation = evaluate(right, Map.of());
-            if (leftEvaluation.defined() && rightEvaluation.defined()) {
-                if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
-                    return Optional.of(new Counterexample(List.of(), leftEvaluation.value().asText(), rightEvaluation.value().asText()));
-                }
-            }
-            return Optional.empty();
+            if (exact) return realWitnesses.compare(Map.of(), List.of(), () -> onAssignment.accept(source)).witness();
+            return realWitnesses.premisesSatisfied(Map.of())
+                ? numericWitness(left, right, Map.of(), List.of(), inferredAssumptions, source)
+                : Optional.empty();
         }
 
         int assignmentCount = Math.max(values.size(), orderedVariables.size());
         for (int i = 0; i < assignmentCount; i++) {
             Map<String, RuntimeValue> assignment = new HashMap<>();
+            Map<String, String> exactAssignment = new LinkedHashMap<>();
             List<String> assignmentText = new ArrayList<>();
             int j = 0;
             for (String variable : orderedVariables) {
                 double value = values.get((i + j) % values.size());
                 assignment.put(variable, RuntimeValue.scalar(value));
-                assignmentText.add(variable + "=" + trimDouble(value));
+                String text = ExactScalarWitnessSearch.sampleText(value, source.equals("rational-samples"));
+                exactAssignment.put(variable, text);
+                assignmentText.add(variable + "=" + (exact ? text : trimDouble(value)));
                 j++;
             }
-            if (violatesAssumptions(assignment, assumptionGuards)) {
-                continue;
+            Optional<Counterexample> witness;
+            if (!exact) {
+                if (!realWitnesses.premisesSatisfied(exactAssignment)) continue;
+                witness = numericWitness(left, right, assignment, assignmentText, inferredAssumptions, source);
+            } else {
+                var result = realWitnesses.compare(exactAssignment, assignmentText, () -> onAssignment.accept(source));
+                witness = result.witness();
+                if (!result.defined()) {
+                    // Preserve domain-obligation inference, without promoting a projected value to a witness.
+                    inferAssumptions(evaluate(left, assignment), inferredAssumptions, source);
+                    inferAssumptions(evaluate(right, assignment), inferredAssumptions, source);
+                }
             }
-            onAssignment.accept(source);
-            Evaluation leftEvaluation = evaluate(left, assignment);
-            Evaluation rightEvaluation = evaluate(right, assignment);
-            if (!leftEvaluation.defined() || !rightEvaluation.defined()) {
-                inferAssumptions(leftEvaluation, inferredAssumptions, source);
-                inferAssumptions(rightEvaluation, inferredAssumptions, source);
-                continue;
-            }
-            if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
-                return Optional.of(new Counterexample(
-                    assignmentText,
-                    leftEvaluation.value().asText(),
-                    rightEvaluation.value().asText()
-                ));
-            }
+            if (witness.isPresent()) return witness;
         }
         return Optional.empty();
+    }
+
+    private Optional<Counterexample> numericWitness(Expr left, Expr right, Map<String, RuntimeValue> assignment,
+            List<String> labels, Map<String, CounterexampleSearchService.TypedAssumption> inferredAssumptions, String source) {
+        onAssignment.accept(source);
+        Evaluation a = evaluate(left, assignment);
+        Evaluation b = evaluate(right, assignment);
+        if (!a.defined() || !b.defined()) {
+            inferAssumptions(a, inferredAssumptions, source);
+            inferAssumptions(b, inferredAssumptions, source);
+            return Optional.empty();
+        }
+        return a.value().approximatelyEquals(b.value()) ? Optional.empty()
+            : Optional.of(new Counterexample(labels, a.value().asText(), b.value().asText()));
     }
 
     private Optional<Counterexample> tryComplexCounterexample(
@@ -227,12 +246,14 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         Expr right,
         List<String> orderedVariables,
         List<String> attemptedSources,
-        List<AssumptionGuard> assumptionGuards
+        boolean premiseFree,
+        boolean mayRefute
     ) {
         if (orderedVariables.isEmpty()) {
             return Optional.empty();
         }
         attemptedSources.add("complex-samples");
+        if (!premiseFree) return Optional.empty();
         List<Complex> values = List.of(
             new Complex(0.0, 1.0),
             new Complex(0.0, -1.0),
@@ -249,13 +270,10 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 assignmentText.add(variable + "=" + value.asText());
                 j++;
             }
-            if (violatesAssumptions(assignment, assumptionGuards)) {
-                continue;
-            }
             onAssignment.accept("complex-samples");
             Evaluation leftEvaluation = evaluate(left, assignment);
             Evaluation rightEvaluation = evaluate(right, assignment);
-            if (leftEvaluation.defined()
+            if (mayRefute && leftEvaluation.defined()
                 && rightEvaluation.defined()
                 && !leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {
                 return Optional.of(new Counterexample(
@@ -274,7 +292,8 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         List<String> orderedVariables,
         List<String> attemptedSources
     ) {
-        if (orderedVariables.size() < 2 || orderedVariables.stream().anyMatch(v -> !isSingleUppercaseVariable(v))) {
+        if (orderedVariables.size() < 2 || orderedVariables.stream().anyMatch(v -> !isSingleUppercaseVariable(v))
+                || !acceptsExactMatrixProbe(left) || !acceptsExactMatrixProbe(right)) {
             return Optional.empty();
         }
         attemptedSources.add("matrix-non-commutative");
@@ -297,6 +316,27 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
             ));
         }
         return Optional.empty();
+    }
+
+    // The fixed nonnegative integer fixtures have maximum row sum four.
+    // Up to 26 factors therefore leave every product and sum at most 2^52,
+    // within the exact integer range of the Matrix implementation.
+    private static boolean acceptsExactMatrixProbe(Expr expression) {
+        var pending = new ArrayDeque<Expr>();
+        pending.push(expression);
+        int factors = 0;
+        while (!pending.isEmpty()) {
+            Expr next = pending.pop();
+            if (next instanceof VariableExpr) {
+                if (++factors > 26) return false;
+            } else if (next instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
+                pending.push(binary.right());
+                pending.push(binary.left());
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isSingleUppercaseVariable(String name) {
@@ -322,7 +362,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
     private Evaluation evaluate(Expr expression, Map<String, RuntimeValue> variables) {
         if (expression instanceof NumberExpr numberExpr) {
-            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue()));
+            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().approximate(java.math.MathContext.DECIMAL128).value().doubleValue()));
         }
         if (expression instanceof VariableExpr variableExpr) {
             RuntimeValue value = variables.get(variableExpr.name());
@@ -438,8 +478,12 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         if (!left.isNumeric() || right.kind() != RuntimeValue.Kind.SCALAR) {
             return Evaluation.undefined(Set.of());
         }
-        if (left.kind() == RuntimeValue.Kind.COMPLEX && right.scalar() == Math.rint(right.scalar())) {
-            return Evaluation.defined(RuntimeValue.complex(left.complex().pow((int) right.scalar())));
+        if (left.kind() == RuntimeValue.Kind.COMPLEX) {
+            double exponent = right.scalar();
+            if (exponent != Math.rint(exponent) || exponent < Integer.MIN_VALUE || exponent > Integer.MAX_VALUE) {
+                return Evaluation.undefined(Set.of());
+            }
+            return Evaluation.defined(RuntimeValue.complex(left.complex().pow((int) exponent)));
         }
         if (left.kind() == RuntimeValue.Kind.SCALAR) {
             if (left.scalar() < 0.0 && Math.abs(right.scalar() - Math.rint(right.scalar())) > EPS) {
@@ -470,58 +514,6 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
                 typedAssumption(candidate, source),
                 this::mergeTypedAssumptions);
         }
-    }
-
-    private List<AssumptionGuard> assumptionGuards(List<String> assumptions) {
-        if (assumptions == null || assumptions.isEmpty()) {
-            return List.of();
-        }
-        List<AssumptionGuard> guards = new ArrayList<>();
-        for (String assumption : AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions()) {
-            guards.addAll(guardsFor(assumption));
-        }
-        return List.copyOf(guards);
-    }
-
-    private boolean violatesAssumptions(Map<String, RuntimeValue> assignment, List<AssumptionGuard> guards) {
-        for (AssumptionGuard guard : guards) {
-            RuntimeValue value = assignment.get(guard.symbol());
-            if (value != null && value.isNumeric() && value.asComplex().abs() <= EPS) {
-                if (guard.relation() == Relation.NON_ZERO) {
-                    return true;
-                }
-            }
-            if (value != null && value.kind() == RuntimeValue.Kind.COMPLEX
-                    && (guard.relation() == Relation.POSITIVE || guard.relation() == Relation.NON_NEGATIVE)) {
-                return true;
-            }
-            if (value != null && value.kind() == RuntimeValue.Kind.SCALAR) {
-                double scalar = value.scalar();
-                if (guard.relation() == Relation.POSITIVE && scalar <= 0.0) {
-                    return true;
-                }
-                if (guard.relation() == Relation.NON_NEGATIVE && scalar < 0.0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private List<AssumptionGuard> guardsFor(String assumption) {
-        if (assumption.endsWith(" != 0")) {
-            String left = assumption.substring(0, assumption.length() - " != 0".length()).trim();
-            return left.isBlank() ? List.of() : List.of(new AssumptionGuard(left, Relation.NON_ZERO));
-        }
-        if (assumption.endsWith(" > 0")) {
-            String left = assumption.substring(0, assumption.length() - " > 0".length()).trim();
-            return left.isBlank() ? List.of() : List.of(new AssumptionGuard(left, Relation.POSITIVE));
-        }
-        if (assumption.endsWith(" >= 0")) {
-            String left = assumption.substring(0, assumption.length() - " >= 0".length()).trim();
-            return left.isBlank() ? List.of() : List.of(new AssumptionGuard(left, Relation.NON_NEGATIVE));
-        }
-        return List.of();
     }
 
     private Set<InferenceCandidate> nonZeroAssumption(Expr expression) {
@@ -656,7 +648,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     }
 
     private static String trimDouble(double value) {
-        if (value == Math.floor(value) && !Double.isInfinite(value)) {
+        if (value >= -0x1p63 && value < 0x1p63 && value == Math.rint(value)) {
             return Long.toString((long) value);
         }
         return Double.toString(value);
@@ -672,7 +664,7 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         }
 
         static Evaluation defined(RuntimeValue value) {
-            return new Evaluation(value, true, Set.of());
+            return value.finite() ? new Evaluation(value, true, Set.of()) : undefined(Set.of());
         }
 
         static Evaluation undefined(Set<InferenceCandidate> inferredAssumptions) {
@@ -686,15 +678,6 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         String normalizedPredicate,
         Set<String> affectedVariables
     ) {
-    }
-
-    private enum Relation {
-        NON_ZERO,
-        POSITIVE,
-        NON_NEGATIVE
-    }
-
-    private record AssumptionGuard(String symbol, Relation relation) {
     }
 
     private record RuntimeValue(Kind kind, double scalar, Matrix matrix, Complex complex) {
@@ -714,6 +697,22 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
 
         static RuntimeValue complex(Complex value) {
             return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);
+        }
+
+        boolean finite() {
+            return switch (kind) {
+                case SCALAR -> Double.isFinite(scalar);
+                case COMPLEX -> Double.isFinite(complex.real()) && Double.isFinite(complex.imaginary());
+                case MATRIX -> {
+                    boolean finite = true;
+                    for (int row = 0; row < matrix.rows() && finite; row++) {
+                        for (int column = 0; column < matrix.columns() && finite; column++) {
+                            finite = Double.isFinite(matrix.get(row, column));
+                        }
+                    }
+                    yield finite;
+                }
+            };
         }
 
         boolean isNumeric() {
@@ -788,15 +787,20 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         }
 
         Complex pow(int exponent) {
-            if (exponent == 0) {
-                return new Complex(1.0, 0.0);
+            Complex one = new Complex(1.0, 0.0);
+            Complex result = one;
+            Complex factor = exponent < 0 ? one.divide(this) : this;
+            long remaining = Math.abs((long) exponent);
+            while (remaining > 0) {
+                if ((remaining & 1) != 0) {
+                    result = result.multiply(factor);
+                }
+                remaining >>>= 1;
+                if (remaining > 0) {
+                    factor = factor.multiply(factor);
+                }
             }
-            Complex result = new Complex(1.0, 0.0);
-            int count = Math.abs(exponent);
-            for (int i = 0; i < count; i++) {
-                result = result.multiply(this);
-            }
-            return exponent < 0 ? new Complex(1.0, 0.0).divide(result) : result;
+            return result;
         }
 
         Complex sqrt() {

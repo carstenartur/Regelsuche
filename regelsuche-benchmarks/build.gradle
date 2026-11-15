@@ -53,7 +53,7 @@ def configureComparativeWriter = { task, Object output ->
     task.dependsOn tasks.named('classes')
     task.classpath = sourceSets.main.runtimeClasspath
     task.mainClass = 'de.regelsuche.benchmarks.ComparativeBenchmarkMain'
-    task.args output
+    task.args '--public', rootProject.projectDir.absolutePath, output
     task.outputs.dir output
     task.outputs.upToDateWhen { false }
     configureComparativeEnvironment(task)

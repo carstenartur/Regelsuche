@@ -20,10 +20,18 @@ INK = colors.HexColor("#25303c")
 ACCENT = colors.HexColor("#17566b")
 WIDTH = A4[0] - 96
 SECTIONS = ("paper/manuscript.md", "paper/generated/public-corpus-splits.md",
-            "paper/generated/public-controller-results.md", "paper/generated/public-recurrence-results.md",
+            "paper/generated/public-controller-results.md", "paper/generated/public-recurrence-results.md", "paper/generated/public-discovery-comparisons.md",
             "paper/limitations.md",
             "paper/claims-and-evidence.md", "paper/artifact-appendix.md")
 WIDTHS = {
+    "Mined checks": (.24, .12, .16, .16, .16, .16),
+    "Negative executed": (.16, .22, .12, .18, .17, .15),
+    "Emitted": (.15, .22, .12, .11, .13, .14, .13),
+    "Distinct keys": (.16, .14, .14, .56),
+    "Applications": (.28, .16, .14, .14, .12, .16),
+    "Completed / formed": (.20, .21, .16, .14, .13, .16),
+    "Batches": (.38, .16, .18, .28),
+    "Score changes": (.26, .14, .13, .14, .18, .15),
     "Proposals": (.22, .15, .16, .16, .16, .15),
     "Slots": (.19, .14, .09, .14, .15, .16, .13),
     "Challenge": (.38, .13, .17, .13, .19),
@@ -91,7 +99,7 @@ def table(node, source, root, revision):
     return result
 
 
-def article(source, root, revision, png):
+def article(source, root, revision, figures):
     data = subprocess.check_output(["pandoc", "--from=gfm", "--to=html5", "--wrap=none", source])
     html = ET.fromstring(b"<article>" + data + b"</article>")
     items = []
@@ -105,9 +113,11 @@ def article(source, root, revision, png):
             items.append(Paragraph(rich(node, source, root, revision), heading))
         elif node.tag == "p" and node.find("img") is not None:
             image = node.find("img")
-            if image.get("src") != "public-controller-allocation.svg":
+            name = image.get("src")
+            if name not in figures:
                 raise ValueError("unknown generated paper figure")
-            items.extend([Image(str(png), width=WIDTH, height=WIDTH * 199 / 600), Spacer(1, 8)])
+            png, ratio = figures[name]
+            items.extend([Image(str(png), width=WIDTH, height=WIDTH * ratio), Spacer(1, 8)])
         elif node.tag == "p":
             items.append(Paragraph(rich(node, source, root, revision), BODY))
         elif node.tag == "pre":
@@ -131,20 +141,24 @@ def render(root, revision, output):
     for name, font in (("Vera", "Vera"), ("VeraBold", "VeraBd"), ("VeraItalic", "VeraIt"), ("VeraBoldItalic", "VeraBI")):
         pdfmetrics.registerFont(TTFont(name, str(fonts / (font + ".ttf"))))
     pdfmetrics.registerFontFamily("Vera", normal="Vera", bold="VeraBold", italic="VeraItalic", boldItalic="VeraBoldItalic")
-    png = output.parent / "allocation.png"
+    figures = {}
     # Use the embedded Vera family when rasterizing the verified SVG, including its bold face.
     config = output.parent / "fonts.conf"
     config.write_text("<fontconfig><dir>" + escape(str(fonts)) + "</dir><cachedir>" +
                       escape(str(output.parent / "font-cache")) + "</cachedir><alias><family>sans-serif</family>"
                       "<prefer><family>Bitstream Vera Sans</family></prefer></alias></fontconfig>", encoding="utf-8")
-    subprocess.run(["inkscape", str(root / "paper/generated/public-controller-allocation.svg"),
-                    "--export-width=1800", "--export-filename=" + str(png)], check=True, stdout=subprocess.DEVNULL,
-                   env={**os.environ, "FONTCONFIG_FILE": str(config), "LC_ALL": "C.UTF-8"})
+    for name, ratio in (("public-controller-allocation", 199 / 600), ("public-stage-dispatch", 236 / 660)):
+        png = output.parent / (name + ".png")
+        source = root / "paper/generated" / (name + ".svg")
+        subprocess.run(["inkscape", str(source), "--export-width=1800", "--export-filename=" + str(png)],
+                       check=True, stdout=subprocess.DEVNULL,
+                       env={**os.environ, "FONTCONFIG_FILE": str(config), "LC_ALL": "C.UTF-8"})
+        figures[name + ".svg"] = png, ratio
     story = []
     for n, section in enumerate(SECTIONS):
         if n:
             story.extend([CondPageBreak(145), Spacer(1, 20)])
-        story.extend(article(root / section, root, revision, png))
+        story.extend(article(root / section, root, revision, figures))
 
     def furniture(sheet, doc):
         sheet.saveState()

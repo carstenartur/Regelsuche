@@ -20,11 +20,19 @@ Thumbs.db
 
 # Gradle build definitions may declare public JSON schemas as verification
 # inputs even when an image target only runs installDist. Keep the schemas in
-# the isolated build context, but continue to exclude documentation media and
-# prose from application images.
+# the isolated build context, together with the frozen comparative evidence.
 docs/**
 !docs/schemas/
 !docs/schemas/**
+!docs/evidence/
+docs/evidence/**
+!docs/evidence/autopilot-controller-comparison-v1.json.gz
+!docs/evidence/discovery-component-panel-exact-v1.json.gz
+!docs/evidence/discovery-component-panel-v1.json.gz
+!docs/evidence/open-target-fan-in-v1.json.gz
+!docs/autopilot-controller-comparison.md
+!docs/discovery-component-panel-protocol.md
+!docs/open-target-fan-in-control.md
 
 LICENSE
 README.md

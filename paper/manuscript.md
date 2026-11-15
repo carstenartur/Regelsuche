@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. We evaluate two claims that can be tested on retained public evidence. Changing how a controller allocated candidate slots left the surviving output unchanged in a one-round campaign. In a separate recurrence experiment, production and both grammar controls found models for a TRAIN sequence, but none transferred to the VALIDATION or TEST cases. These observations bound what the system demonstrated on the two protocols. Broader performance and end-to-end cost claims remain pending. [Controller outcomes](generated/public-controller-results.md) · [Recurrence outcomes](generated/public-recurrence-results.md)
+Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. The public comparisons cover candidate formation, held-out reuse, component ablations and campaign allocation. The tested sequence models did not transfer to the held-out cases, and the learned bridge added no transformations to native search. The feedback controller and uniform allocation completed the same lineages on both continuation panels. Each scheduler recovered 19 of 20 rules with the historical validator, 13 with the initial exact validator, and 19 after exact normalization supported provably nonzero constant denominators. The results describe the registered public panels. Broader performance and end-to-end cost remain open. [Generated public comparisons](generated/public-discovery-comparisons.md)
 
 ## 1. Research question
 
@@ -72,7 +72,7 @@ Every transition retains source identities, configured and executed resources, t
 
 ## 5. Candidate-independent experimental design
 
-The final evaluation will use the corpus and split protocol from #383, informed by the evaluator-backed challenge portfolio in #390. Corpus construction, structural clusters, split assignments, budgets, metrics, and thresholds must be frozen before evaluated campaigns run.
+The public open-target comparison uses the corpus and split protocol from #383 and the evaluator-backed challenge portfolio in #390. The case payloads, structural clusters and split assignments were public before the comparative algorithms ran. Each prospective comparison registered its formation inputs, resource bounds and scoring rules before measurement.
 
 The registered public corpus separates cases used for formation from cases reserved for evaluation. The split labels describe roles within a public development corpus. A human who already knows a published case could select a grammar or search bound favorable to it. Restricting formation inputs and registering the comparison plan limit what the program can use during execution. They cannot remove prior knowledge from the experimental design. Independent sealed cases would be needed to assess performance on previously unseen material. The generated split table counts each challenge directly from the case manifest, checks each case identity against its contents and binds the corpus to its freeze receipt. The table tests the stated information policy. Determining what a particular learner actually consumed requires that learner's execution receipts. [Corpus splits and declared access](generated/public-corpus-splits.md)
 
@@ -89,15 +89,7 @@ The design requires:
 
 Comparisons are track-scoped under #235. Target-directed search, hidden-rule rediscovery, open-target formation, cross-family transfer, equality validation, proof, and campaign control are not collapsed into one leaderboard.
 
-The final open-target evaluation will include at least:
-
-- an information-equivalent enumerative or grammar-based rule-induction baseline;
-- a randomized valid-candidate baseline;
-- the unmodified Regelsuche production configuration;
-- at least three discovery-component ablations;
-- at least two campaign-controller ablations.
-
-All configurations must receive the same information and budgets within a track. Unsupported capabilities remain visible.
+For each open-target form, the public comparison ran the production former, an ordered enumeration or grammar policy, and a seeded random policy on identical permitted TRAIN inputs. Each arm froze its selected candidates before evaluation. Discovery ablations and controller allocation use separate public panels with their own assumptions and resource accounts. [Generated comparative tables](generated/public-discovery-comparisons.md)
 
 ## 7. Utility and amortization
 
@@ -119,7 +111,7 @@ The independent artifact in #387 must execute without undocumented maintainer kn
 
 ## 9. Results
 
-The complete primary evaluation remains pending. The following results derive from two public comparisons with different units of observation.
+The complete primary evaluation remains pending. The public experiments below report candidate formation, held-out reuse, paired search utility and campaign completion in their respective units. The public comparison report also contains the target-directed search, simplification and equality-validation results with their task-specific limits. [Public comparison report](../research/benchmarks/comparative-v2/report.json)
 
 ### Retrospective controller comparison
 
@@ -147,11 +139,21 @@ Required result families include:
 
 No primary result may be copied manually into the manuscript.
 
+### Open-target formation, transfer and controller allocation
+
+Four frozen comparisons cover the three challenges and four candidate forms in the public eighteen-case corpus. Neither sequence form transferred to a VALIDATION or TEST case. All rational arms reached the same two symbolic difference-of-squares TEST tasks and missed the two nested-reciprocal TEST tasks. The macro arms improved a TRAIN path and recorded no held-out improvement. Each campaign repeated the same public evaluation cases. The historical inventory audit shows how different definitions of novelty affect interpretation. A macro classified as new by the seven-rule checker matched a pattern emitted by an earlier project run through different operations. [Evidence-generated formation, evaluation and historical inventory tables](generated/public-discovery-comparisons.md)
+
+On a separate bridge panel, eight source-only searches formed a coefficient-gap bridge. Native factorization reached both intended held-out targets with or without that bridge. The bridge matcher emitted no moves. On the seven-stage controller panel, receipt-driven and uniform scheduling completed the same lineages using the same native work. The static policy completed fewer lineages when it had already allocated its chains to the first batch. The panel contained one distinct conjecture. [Paired transfer table and controller allocation figure](generated/public-discovery-comparisons.md)
+
+The archived component comparison used the public fixture revision and pre-#1245 counterexample validator pinned by its protocol. Under that validator, production pooled 23 observations and formed five candidates. Per-observation mining formed none. Removing project-novelty scheduling changed four scores and left the selected order unchanged at all 47 prefix budgets. Disabling counterexample-guided refinement produced no difference in terminal dispositions. The separate unguarded-log challenge inferred three positivity guards but produced no refuting witness or revised hypothesis in any arm. This null control limits conclusions about refinement under that validator. [Matched discovery-component ablations](generated/public-discovery-comparisons.md)
+
+Repeating the component protocol with the exact-arithmetic validator preserved candidate formation and all ranked prefixes. One rational cancellation candidate became inconclusive because the evaluator found no defined scalar pair within the configured bounds. This accounts for one terminal check in each of the three nonempty arms. The four other candidates kept their bounded no-counterexample outcomes. In the separate twenty-task hidden-rule replay, each search recovered 19 rules with the historical validator and 13 with the initial exact validator. The corrected exact validator normalizes polynomial quotients when the denominator simplifies exactly to a nonzero constant. Both searches recovered 19 rules with that correction. Each search reported zero false positives among executed negative holdouts. The historical and corrected exact runs each executed 38 of 40 and skipped two. The initial exact run executed 26 of 40 and skipped fourteen. [Results and denominators by validator version](generated/public-discovery-comparisons.md)
+
 ## 10. Limitations
 
 The public controller replay offers no choice among eligible follow-up branches. Agreement among the three policies leaves their behavior in a longer campaign unresolved. In the recurrence comparison, a finite geometric prefix admits several coefficient tuples. Agreement with its finite continuation tests those predictions, while an infinite-sequence identity would require a proof. Repeated campaigns on the same cases also share their mathematical content. The reported slots cannot serve as independent samples of mathematical families. [Controller outcomes](generated/public-controller-results.md) · [Recurrence outcomes](generated/public-recurrence-results.md)
 
-Both studies measure performance under fixed information, grammars and budgets. Neither collects independent human judgments, tests the protected flagship corpus or establishes external novelty. End-to-end savings require a task stream frozen before evaluation, per-task paired search receipts and a complete discovery-cost ledger. We draw no break-even conclusion from these public comparisons. [Limitations and claim boundaries](limitations.md)
+Each public study uses its own fixed information, grammar and budget. Independent human judgments, protected flagship evaluation and external novelty remain outside the public result scope. End-to-end savings require a task stream frozen before evaluation, per-task paired search receipts and a complete discovery-cost ledger. We draw no break-even conclusion from these public comparisons. [Limitations and claim boundaries](limitations.md)
 
 ## 11. Related work
 
@@ -185,4 +187,4 @@ The repository distributes the implementation and associated documentation under
 
 ## 13. Conclusion
 
-The public comparisons distinguish forming a candidate from choosing a continuation and transferring a frozen candidate to another case. The controller retained the same output under every allocation. The recurrence formers recovered a TRAIN pattern but had no confirmed transfer on the registered VALIDATION or TEST cases. Retaining the rejected attempts, empty campaign and unchanged controller outcomes makes both conclusions reproducible from their source records. The full open-target and cross-family baseline and ablation comparisons remain open. [Controller results](generated/public-controller-results.md) · [Recurrence results](generated/public-recurrence-results.md)
+The four frozen form comparisons show where selected candidates transfer. The rational arms reached the same bounded TEST tasks, while neither sequence fitting nor the macro comparison established held-out improvement. The bridge panel produced a null result even though native search reached the intended targets. The seven-stage controller comparison tied uniform allocation on native work and lifecycle completions. These outcomes concern the registered public panels, primitive inventories and resource ceilings. Claims about amortized discovery cost, external novelty and independent qualification require their own evidence. [Generated comparison results](generated/public-discovery-comparisons.md)

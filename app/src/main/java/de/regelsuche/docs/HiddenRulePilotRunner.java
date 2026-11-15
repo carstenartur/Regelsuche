@@ -1,7 +1,11 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.validation.OracleValidator.OracleValidationStatus;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.learning.MacroLearningPipeline;
@@ -31,6 +35,7 @@ import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import de.regelsuche.value.ExprValueFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +52,8 @@ public final class HiddenRulePilotRunner {
     private final ExpressionScorer scorer = new ExpressionScorer();
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final ExpressionParser parser = new ExpressionParser();
-    private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();
+    private final PolynomialNormalFormEquivalenceService equivalence =
+        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
     private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();
 
     private final BestFirstSearchStrategy searchStrategy;
@@ -147,7 +153,8 @@ public final class HiddenRulePilotRunner {
     private SuccessfulTransformationPath toLearningPath(RuntimeTask task, SearchState reached) {
         String first = reached.path().getFirst();
         String last = reached.path().getLast();
-        boolean verified = equivalence.areEquivalent(first, last);
+        var evidence = equivalence.validateEquivalence(first, last);
+        boolean verified = evidence.status() == OracleValidationStatus.AGREE;
         return new SuccessfulTransformationPath(
             task.opaqueCaseId() + "-path",
             first,
@@ -157,7 +164,7 @@ public final class HiddenRulePilotRunner {
             scorer.score(first),
             reached.score(),
             verified,
-            verified ? "symbolic-equivalence" : "equivalence-unconfirmed",
+            verified ? "symbolic-equivalence" : evidence.evidence(),
             Map.of("source", "hidden-rule-pilot-runtime"),
             reached.assumptions());
     }
@@ -178,9 +185,10 @@ public final class HiddenRulePilotRunner {
         PositiveHoldout holdout
     ) {
         List<Transformation> direct = operator.generateCandidates(holdout.inputExpression());
-        boolean applies = direct.stream().anyMatch(candidate ->
-            equivalence.areEquivalent(candidate.transformedExpression(), holdout.targetExpression()));
         SearchTarget target = syntaxTarget(holdout.targetExpression());
+        var targetSyntax = parser.parseTerm(holdout.targetExpression());
+        boolean applies = direct.stream().anyMatch(candidate ->
+            matchesHoldout(candidate.transformedExpression(), holdout.targetExpression(), targetSyntax));
 
         GoalSearchResult baseline = search(
             task.primitiveEngine(),
@@ -197,6 +205,20 @@ public final class HiddenRulePilotRunner {
         AblationEvidence ablation = AblationEvidence.from(baseline, withCandidate);
         return new PositiveHoldoutResult(
             holdout.id(), applies, baseline.reached(), withCandidate.reached(), ablation);
+    }
+
+    private boolean matchesHoldout(String candidate, String target, Expr targetSyntax) {
+        Expr candidateSyntax = parser.parseTerm(candidate);
+        if (candidateSyntax.equals(targetSyntax) || equivalence.areEquivalent(candidate, target)) {
+            return true;
+        }
+        if (!ExpressionDefinedness.isTotal(candidateSyntax) || !ExpressionDefinedness.isTotal(targetSyntax)) {
+            return false;
+        }
+        // Scalar sums and products can regroup without treating shared function terms as polynomial variables.
+        try (var values = new ExprValueFactory()) {
+            return values.fromExpr(candidateSyntax).sameValue(values.fromExpr(targetSyntax));
+        }
     }
 
     private NegativeHoldoutResult validateNegative(

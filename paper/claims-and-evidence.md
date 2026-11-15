@@ -16,6 +16,8 @@ This registry is normative for the working manuscript. A central claim may appea
 | C10 | Expert judgments agree with the interestingness ranking. | Real blinded study from #332/#389. | `OPTIONAL_PENDING_389` |
 | C11 | A candidate is externally novel mathematics. | Complete external novelty protocol and decision from #391. | `NOT_AUTHORIZED` |
 
+The public tables report raw arm-level comparisons on the frozen corpus, paired bridge work and conditional controller effects. Their study-level denominators and proof scope accompany every result. Claims C5 and C6 retain their authorization status for the full declared programme. [Generated public comparisons](generated/public-discovery-comparisons.md)
+
 ## Rules
 
 1. `SUPPORTED_EXISTING_METHOD` authorizes a methods description, not a new broad empirical conclusion.

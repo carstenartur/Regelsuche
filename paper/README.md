@@ -4,7 +4,7 @@ This directory contains the source-controlled foundation for the claim-bounded R
 
 ## Status
 
-The package is intentionally marked `FOUNDATION`. It defines the research question, claim inventory, limitations, artifact contract and reproducible build entry point. It does **not** yet contain final results from the candidate-independent benchmark (#383), information-parity comparisons (#235), end-to-end amortization study (#384), or independent reproduction (#387).
+The package is marked `FOUNDATION`. Its public results include the four Track C forms and historical inventory audit, paired cross-family transfer, the original and seven-stage controller comparisons, and discovery-component controls. The claim registry separately tracks the complete studies and independent reproduction.
 
 No pending claim may be promoted to a central empirical result by editing prose alone. The final build must consume retained canonical evidence and the claim-status source from #385.
 
@@ -14,7 +14,7 @@ No pending claim may be promoted to a central empirical result by editing prose 
 ./paper/reproduce-paper.sh
 ```
 
-The foundation build performs deterministic structural checks and writes the claim and artifact summaries, the case split table, the per-policy results for the public controller campaign and its allocation figure, and the recurrence formation and reuse tables below `paper/generated/`. The checkout can also render the methods manuscript and assemble the complete source and evidence package. See [PDF build and offline archive replay](../docs/paper-foundation-verification.md#manuscript-pdf-and-source-package) for the pinned tools and commands.
+The foundation build performs deterministic structural checks and writes the claim and artifact summaries, the case split table, the per-policy results for the public controller campaign and its allocation figure, the recurrence formation and reuse tables, the cross-form and transfer measures, and the seven-stage dispatch figure below `paper/generated/`. The checkout can also render the methods manuscript and assemble the complete source and evidence package. See [PDF build and offline archive replay](../docs/paper-foundation-verification.md#manuscript-pdf-and-source-package) for the pinned tools and commands.
 
 ## Source of truth
 

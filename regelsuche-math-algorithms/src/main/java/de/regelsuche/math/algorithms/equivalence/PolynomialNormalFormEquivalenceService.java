@@ -3,6 +3,7 @@ package de.regelsuche.math.algorithms.equivalence;
 import de.regelsuche.equivalence.PolynomialEquivalenceService;
 import de.regelsuche.math.algorithms.equivalence.PolynomialArithmetic.LinearEquation;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
+import de.regelsuche.validation.OracleValidator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -11,10 +12,10 @@ import java.util.Optional;
 /**
  * Deterministic polynomial normal-form equivalence for direct polynomial identities.
  *
- * <p>This service expands and canonicalizes supported polynomial expressions. It is not a Gröbner-basis
- * implementation and does not decide ideal membership or polynomial systems.
+ * <p>This service expands and canonicalizes direct polynomial identities over the rationals.
+ * Nonzero constant denominators become exact rational coefficients.
  */
-public class PolynomialNormalFormEquivalenceService implements PolynomialEquivalenceService {
+public class PolynomialNormalFormEquivalenceService implements PolynomialEquivalenceService, OracleValidator {
     private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
     private final MathematicalAlgorithmRegistry registry;
     private MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult =
@@ -30,22 +31,37 @@ public class PolynomialNormalFormEquivalenceService implements PolynomialEquival
 
     @Override
     public boolean arePolynomiallyEquivalent(String leftPolynomial, String rightPolynomial) {
+        return validateEquivalence(leftPolynomial, rightPolynomial).status() == OracleValidationStatus.AGREE;
+    }
+
+    @Override
+    public OracleValidation validateEquivalence(String leftPolynomial, String rightPolynomial) {
+        var decision = comparePolynomial(leftPolynomial, rightPolynomial);
+        lastResult = decision;
+        return switch (decision.resultType()) {
+            case PROOF -> OracleValidation.agrees(decision.detail());
+            case REFUTATION -> OracleValidation.disagrees(decision.detail());
+            default -> OracleValidation.unavailable(decision.detail());
+        };
+    }
+
+    private MathematicalAlgorithmRegistry.AlgorithmExecutionResult comparePolynomial(
+        String leftPolynomial, String rightPolynomial
+    ) {
         if (!isEnabled()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(
+            return MathematicalAlgorithmRegistry.AlgorithmExecutionResult.disabled(
                 "polynomialEquivalence must be enabled for normal-form identity checks");
-            return false;
         }
 
         Optional<Polynomial> left = parsePolynomial(leftPolynomial);
         Optional<Polynomial> right = parsePolynomial(rightPolynomial);
         if (left.isEmpty() || right.isEmpty()) {
-            lastResult = MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
+            return MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown(
                 "unsupported non-polynomial expression domain");
-            return false;
         }
 
         boolean equal = left.orElseThrow().equals(right.orElseThrow());
-        lastResult = new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
+        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
             MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
             equal ? MathematicalAlgorithmRegistry.ResultType.PROOF : MathematicalAlgorithmRegistry.ResultType.REFUTATION,
             equal ? "matching deterministic polynomial normal form" : "normal forms differ",
@@ -56,13 +72,11 @@ public class PolynomialNormalFormEquivalenceService implements PolynomialEquival
                 "rightNormalForm", right.orElseThrow().toCanonicalString()
             )
         );
-        return equal;
     }
 
     @Override
     public String evidence(String leftExpression, String rightExpression) {
-        arePolynomiallyEquivalent(leftExpression, rightExpression);
-        return lastResult.detail();
+        return validateEquivalence(leftExpression, rightExpression).evidence();
     }
 
     public Optional<String> normalForm(String polynomialExpression) {

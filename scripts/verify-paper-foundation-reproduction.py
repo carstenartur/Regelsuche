@@ -28,6 +28,8 @@ EXPECTED_OUTPUT_FILES = (
     "public-controller-results.md",
     "public-corpus-splits.md",
     "public-recurrence-results.md",
+    "public-discovery-comparisons.md",
+    "public-stage-dispatch.svg",
     "foundation-summary.md",
     "foundation-verification.json",
 )

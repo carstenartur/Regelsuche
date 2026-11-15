@@ -19,6 +19,9 @@ public class SymPyOracleValidator implements OracleValidator {
 
     @Override
     public OracleValidation validateEquivalence(String leftExpression, String rightExpression) {
+        if (equivalenceService instanceof OracleValidator typedOracle) {
+            return typedOracle.validateEquivalence(leftExpression, rightExpression);
+        }
         try {
             ExpressionFormatter.format(parser.parseTerm(leftExpression));
             ExpressionFormatter.format(parser.parseTerm(rightExpression));
@@ -27,6 +30,8 @@ public class SymPyOracleValidator implements OracleValidator {
         }
         boolean equivalent = equivalenceService.areEquivalent(leftExpression, rightExpression);
         String evidence = equivalenceService.evidence(leftExpression, rightExpression);
-        return equivalent ? OracleValidation.agrees(evidence) : OracleValidation.disagrees(evidence);
+        // A boolean backend has no typed certificate or counterexample.
+        return new OracleValidation(equivalent ? OracleValidationStatus.SAMPLE_AGREEMENT
+            : OracleValidationStatus.SAMPLE_DISAGREEMENT, evidence);
     }
 }

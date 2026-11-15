@@ -172,9 +172,24 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after the Track F integration (2026-11-15)
+
+The reference is clean main `f7f244c4488ea09413861028e956c97c18a6fed9`.
+All seven verification authorities and the aggregate `Checkout-local ciCheck`
+passed and produced the quality acceptance artifact. The downstream report
+publication was cancelled after verification. The pinned extractor measured
+787180 context units, an increase of 12860 within the existing allowance of
+15000. The acceptance record binds the clean tree and verifies the size and
+SHA-256 of all 287 indexed files. [CI run](https://github.com/carstenartur/Regelsuche/actions/runs/43684112280) · [Acceptance record](../ai-knowledge/baseline-history/2026-11-15-main-f7f244c/provenance.json)
+
+The earlier #1248 head `9acff854` measured 789720 units, an increase of 15400
+under the previous baseline. Reapplying the unchanged trend check to that
+recorded measurement with the accepted main baseline gives an increase of
+2540. The rejected measurement contributes no baseline values. [Rejected CI run](https://github.com/carstenartur/Regelsuche/actions/runs/43687276553) · [Original trend report](../ai-knowledge/baseline-history/2026-11-15-main-f7f244c/rejected-trend.json)
+
 ### Accepted main before merging the public discovery and workbench comparisons (2026-11-14)
 
-The reference is the clean main checkout `be1b27ba0bdbc383190d0543ffb3cfdf9f73e08b`. Its [post-merge CI](https://github.com/carstenartur/Regelsuche/actions/runs/43594627405) passed the seven verification jobs and the aggregate checkout gate. The extractor measured 774320 context units, 9070 more than the previous reference. The allowance is 15000. The [acceptance record](../ai-knowledge/baseline-history/2026-11-14-main-be1b27ba/provenance.json) binds all 286 indexed files to their byte lengths and hashes.
+The previous reference was the clean main checkout `be1b27ba0bdbc383190d0543ffb3cfdf9f73e08b`. Its [post-merge CI](https://github.com/carstenartur/Regelsuche/actions/runs/43594627405) passed the seven verification jobs and the aggregate checkout gate. The extractor measured 774320 context units, 9070 more than the previous reference. The allowance is 15000. The [acceptance record](../ai-knowledge/baseline-history/2026-11-14-main-be1b27ba/provenance.json) binds all 286 indexed files to their byte lengths and hashes.
 
 After the later merges, main `03b58d1d` measured 782420 units. The previous reference yielded an increase of 17170 and one [rejected trend](../ai-knowledge/baseline-history/2026-11-14-main-be1b27ba/rejected-trend.json). Applying the pinned extractor to the accepted predecessor gives an increase of 8100 on the same source. The measurement from the rejected run is retained for comparison.
 

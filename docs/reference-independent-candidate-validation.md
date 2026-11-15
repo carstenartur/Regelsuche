@@ -56,15 +56,7 @@ The historical freeze does not contain independently replayed per-step occurrenc
 receipts. The companion therefore states `FROZEN_LINEAGE_NOT_REPLAYED`; it does
 not manufacture a primitive proof from retained path names.
 
-The existing `SymPyOracleValidator` delegates to local deterministic numeric
-samples and normalized quadratic coefficients. It does **not** invoke external
-SymPy. The companion retains its legacy `SYMBOLICALLY_VERIFIED / AGREE` status,
-but separately identifies `DETERMINISTIC_NUMERIC_SAMPLES` or
-`NORMALIZED_QUADRATIC_COEFFICIENTS`, with `formalProofStatus=NOT_ESTABLISHED`.
-Numeric agreement does not establish original-domain completeness. Conditional
-non-agreement remains unresolved when the oracle cannot consume assumptions.
-The legacy service's explicit `no equivalence evidence found` response is
-retained as `UNAVAILABLE`, rather than turned into a refutation.
+The local oracle compares the supported univariate polynomial fragment by exact rational normal forms. Constant comparisons and polynomial comparisons have separate evidence-strength labels. Outside that fragment its finite numerical observations carry `SAMPLE_AGREEMENT` or `SAMPLE_DISAGREEMENT` and remain `OBSERVED` during intrinsic qualification. Undefined or over-budget ground arithmetic is `UNAVAILABLE`. The older archived run described below recorded numerical agreement under the historical oracle. Its labels and counts describe that revision.
 
 `ReferenceIndependentValidationHistoricalComparison` is a separate, subsequent
 join. Its public API and CLI require an externally supplied expected historical
@@ -165,12 +157,20 @@ semantics and oracle replay.
 
 ## Observed bounded result and remaining work
 
-The full local companion and replay retained 4,316 outcomes and 4,316 completed
+The historical local companion and replay retained 4,316 outcomes and 4,316 completed
 oracle invocations, with 305,365 input characters. All received agreement under
 the existing numeric-sample oracle. The subsequent historical join found 2,923
 non-reference lineages whose historical oracle had not run; those now have
 reference-independent oracle agreement. The original historical qualification
 bytes and decisions remain unchanged.
+
+Re-evaluating the same 144 frozen rows and 4,316 candidates with the typed
+local oracle yields 1,868 exact agreements and 2,448 observed sample
+agreements. Of the sampled cases, 1,866 retain unresolved assumptions and
+582 have no unconditional mathematical decision. The schema and the
+historical comparison accept both the archived vocabulary and these new
+evidence-strength labels. The test receipt uses the fixture revision.
+Reproduction of a particular checkout uses its actual commit.
 
 This establishes completion of the bounded validation path, not completion of
 #868. Unknown-candidate salience dossiers, executable downstream utility,
