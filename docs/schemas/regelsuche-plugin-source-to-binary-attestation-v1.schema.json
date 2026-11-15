@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-source-to-binary-attestation/v1",
+  "title": "Independent source-to-binary build attestation",
+  "type": "object",
+  "required": [
+    "schema",
+    "provenanceContentHash",
+    "artifactIdentityHash",
+    "sourceSha256",
+    "buildRecipeSha256",
+    "rebuiltArtifactSha256",
+    "builderId",
+    "keyId",
+    "algorithm",
+    "signatureBase64"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    }
+  },
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-source-to-binary-attestation/v1"
+    },
+    "provenanceContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifactIdentityHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sourceSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "buildRecipeSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rebuiltArtifactSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "builderId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "keyId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "signatureBase64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{85}[AQgw]==$"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Binds an authenticated publisher assertion, index entry, source and recipe to bytes produced by a separately pinned builder."
+}

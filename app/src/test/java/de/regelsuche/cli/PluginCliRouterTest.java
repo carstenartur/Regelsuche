@@ -7,10 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.plugin.RuleFileParser;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -245,6 +247,52 @@ class PluginCliRouterTest {
         assertTrue(Files.exists(outputDir.resolve("exported-rules.regelsuche")));
         String exported = Files.readString(outputDir.resolve("exported-rules.regelsuche"));
         assertTrue(exported.contains("multiply_by_one"), () -> "exported content: " + exported);
+    }
+
+    @Test
+    void portableFactorizationExampleExportsAndReloadsOnlyItsOwnRules(@TempDir Path tempDir) throws Exception {
+        Path examples = Path.of(System.getProperty("regelsuche.repositoryRoot", ".."), "examples");
+        Path rules = tempDir.resolve("rules");
+        Path exports = tempDir.resolve("exports");
+        Path restored = tempDir.resolve("restored");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        CliRouter router = new CliRouter(
+            new PrintStream(output),
+            new InMemoryExpressionGraphStore(),
+            new InMemoryRuleInventoryRepository(),
+            new DefaultTransformationExportService(),
+            true
+        );
+        for (String example : List.of("factorization.regelsuche", "factorization-export-profile.rules")) {
+            assertEquals(0, router.run(new String[]{"rules", "import", examples.resolve(example).toString(),
+                "--into", rules.toString()}), output::toString);
+        }
+        assertEquals(0, router.run(new String[]{"rules", "export", "--dir", rules.toString(),
+            "--profile", "factorization_export", "--out", exports.toString()}), output::toString);
+        Path exported = exports.resolve("exported-rules-factorization_export.regelsuche");
+        var parsed = new RuleFileParser().parse(exported);
+        assertFalse(parsed.hasErrors(), () -> parsed.diagnostics().toString());
+        var ids = parsed.entries().stream().map(RuleFileParser.Entry::id).sorted().toList();
+        assertEquals(List.of("difference_of_squares.backward", "difference_of_squares.forward",
+            "extract_common_factor.backward", "extract_common_factor.forward"), ids);
+
+        assertEquals(0, router.run(new String[]{"rules", "import", exported.toString(),
+            "--into", restored.toString()}), output::toString);
+        Path imported = restored.resolve(exported.getFileName());
+        assertEquals(-1L, Files.mismatch(exported, imported));
+        output.reset();
+        assertEquals(0, router.run(new String[]{"rules", "list", "--dir", restored.toString()}), output::toString);
+        String report = output.toString();
+        for (String id : ids) {
+            assertTrue(report.contains("rule " + id + " (" + imported + ", tier=plugin, enabled)"), () -> report);
+        }
+        assertFalse(report.contains("Duplicate rule id"), () -> report);
+
+        output.reset();
+        assertEquals(0, router.run(new String[]{"rules", "debug", "2*x+3*x", "--dir", restored.toString()}),
+            output::toString);
+        assertTrue(output.toString().lines().map(String::stripLeading).anyMatch(line ->
+            line.matches("extract_common_factor\\.forward\\s+APPLIED\\s+APPLIED.*")), output::toString);
     }
 
     @Test

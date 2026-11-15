@@ -166,8 +166,10 @@ Content-Hash und Indexeintrag veröffentlicht werden.
 app rules export --dir rules/ --out exports/
 ```
 
-Die erzeugte Datei `exported-rules.regelsuche` enthält die aktiven Regeln und
-lässt sich mit `rules import` in eine andere Installation übernehmen:
+Die erzeugte Datei enthält aktive Musterregeln. Für ein transportables Datenpaket
+wähle ein Profil, das die weiterzugebenden Regeln gezielt aktiviert. Das
+[Faktorisierungsbeispiel](rule-files.md) verwendet dafür `factorization_export`.
+Mit `rules import` übernimmst du die Datei in die Zielinstallation.
 
 ```text
 app rules import exported-rules.regelsuche --into rules/

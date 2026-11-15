@@ -1,8 +1,7 @@
 # Released SDK Maven consumer qualification
 
-The preferred Maven entry has a separate, reproducible acceptance check. It
-qualifies the **current complete external examples against the actual published
-SDK 0.5.2 ZIP**, rather than rebuilding SDK modules from the source reactor.
+The acceptance check uses the **published SDK 0.5.2 ZIP** to qualify the three
+external Java examples and the data-only factorization rule package.
 
 From a checkout with JDK 25 and Maven **3.9.9 or newer from the 3.x line**:
 
@@ -60,6 +59,17 @@ sequence CLI must find the provider through ServiceLoader, confirm multiplier
 Two executions of that same build must agree on the full output and evidence hash.
 Missing, malformed or unstable IDs reject qualification.
 
+The released Discovery consumer loads the provider through the 0.5.2 classpath
+SPI. The generated starter uses the same public SDK entry points. Its custom
+Java package and Maven coordinates were exercised in the original qualification.
+[PR #1190](https://github.com/carstenartur/Regelsuche/pull/1190)
+
+The released greeting example uses the generic Extension SPI v2 on the trusted
+classpath.
+The authenticated installed-provider path uses the later source tree and its
+SPI-v2 Discovery contribution. See the installation and evidence contracts in
+the [Discovery SDK guide](java-discovery-sdk.md#installierte-spi-v2-domänen-ausführen-aktueller-quellstand).
+
 The classpath catalogue includes the provider's absolute CodeSource URL in its
 origin, so a different private build directory legitimately changes its hash.
 A hash recorded by a separate `javac` smoke run is not a universal expected
@@ -69,27 +79,31 @@ External-admission origins instead bind their admitted artifact/trust hashes in
 the manifest; this does not turn a catalogue ID into a publisher signature or
 mathematical proof. No stub Maven runner or success fixture is used.
 
+### Data-only rule package
+
+The verifier copies `factorization.regelsuche` and its portable export profile
+outside the checkout. Java 25 runs the parser check with exactly
+`regelsuche-plugin-api` and `regelsuche-core` on its classpath, both from the
+verified SDK ZIP. The stable `RuleFileParser` must return the two expected
+bidirectional rules and both typed profiles. An incomplete rule without a
+replacement must fail parsing. The separate [published CLI recipe](rule-files.md#portables-faktorisierungspaket-mit-052)
+checks import, activation and export through the application distribution.
+
 ## Evidence and CI
 
 Every invocation creates a new directory below
 `build/reports/released-sdk-maven-consumers/`. Its `qualification.json` records
 checkout revision, exact tool versions, archive hash/checksum count, all copied
 source hashes, original command/exit records, JUnit counts and case names,
-runtime coordinates/JAR hashes, CLI output and final status. Raw combined Maven
-output, raw Surefire reports and CLI output remain alongside it, including on
-failure. `PASSED` is written only after all three consumers satisfy every gate;
-a failed run exits nonzero and retains `FAILED` evidence.
+runtime coordinates/JAR hashes, CLI output and final status. The `rulePackage`
+record binds the data and verifier hashes, both release JAR hashes, the actual
+Java command and its result. Raw Maven output, Surefire and CLI logs are
+retained. `PASSED` requires all three Maven consumers and the data-only parser
+check. Failure exits nonzero and retains `FAILED` evidence.
 
 The existing Maven product job invokes the adapter, keeping assertions and
 qualification orchestration out of the workflow itself. It runs **before** the unchanged
 `mvn -Pfull,sdk-release verify`. Its existing always-run artifact upload includes
 the dedicated evidence directory. No new workflow or relaxed gate is introduced.
 
-The earlier [recorded Java execution](demos/README.md) demonstrated that the
-released binaries could compile/run the examples; it did **not** establish Maven
-model resolution, JUnit execution or the resolved runtime closure. This check
-closes those distinct acceptance requirements when it completes successfully.
-Local attempts still fail at Central DNS in the restricted workspace; that
-failure is retained rather than converted into a successful qualification.
-The runner has network access, but a successful CI receipt must be inspected
-before claiming that the Maven entry has passed.
+The three Maven consumer checks passed in the original [#1190 Maven CI run](https://github.com/carstenartur/Regelsuche/actions/runs/43513021000/job/132187770580).

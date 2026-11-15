@@ -292,6 +292,27 @@ The strict schemas are in `docs/schemas/regelsuche-plugin-{artifact-provenance,
 installation,distribution-retrieval}-v1.schema.json`. Parsers also reject duplicate
 keys, trailing tokens, unknown properties and content-hash mismatches where present.
 
+## Independent source-to-binary verification
+
+The versioned [builder receipt](schemas/regelsuche-plugin-source-to-binary-attestation-v1.schema.json)
+binds the selected artifact entry and the exact signed publisher assertion to the
+source archive, build recipe and rebuilt artifact. The builder signs its receipt
+with an independently pinned Ed25519 key. The verifier requires a builder
+identity and public key distinct from the identities and keys in the working
+publisher trust store.
+
+Use `PluginSourceToBinaryAttestation.requireVerified` with the selected entry,
+its signed publisher assertion, the authenticated publisher trust store and the
+operator's builder pin. Supply the actual source archive, recipe and rebuilt
+artifact bytes. The verifier authenticates both signatures and hashes the three
+byte inputs. The rebuilt artifact hash must match the selected index entry.
+The standard installer uses the signed publisher assertion described above.
+Operators can invoke the independent build verification as a separate step.
+
+The test fixture builds the same bound Java package in two separate directories
+using Java 25. It checks the exact rebuilt bytes and rejects mutated source,
+recipe and artifact bytes, mismatched receipts and invalid builder pins.
+
 ## Java integration example
 
 The embedding operator obtains `checkpointAuthority`, `pinnedAuthorityRoots`, and
@@ -345,7 +366,7 @@ policy. The external authority and roots must not be reset to work around missin
 cache files or rejected updates. Recovery must reconcile the trusted selected
 hash/checkpoint and restore the matching retained generation.
 
-## Verification and remaining issue #104 work
+## Verification of the test installation
 
 JUnit tests run real loopback HTTP/HTTPS retrieval with separate generated Ed25519
 root, curator and publisher keys. They cover chunked limits, stalled bodies,
@@ -361,21 +382,27 @@ snapshot copying, authority selection, lifecycle transitions, admission origins
 and rejection before initialization for damaged bytes or incompatible signed
 metadata.
 
-Run the client-focused tests with Java 25:
+Reproduce the test installation with Java 25.
 
 ```sh
-mvn -pl app -am -Dtest=PluginDistributionClientTest,PluginDistributionTransactionsTest,InstalledExtensionRuntimeTest,PluginDistributionTransportTest,PluginArtifactProvenanceTest,PluginDistributionCanonicalJsonTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl app -am \
+  -Dtest=PluginTestCatalogTest,InstalledDiscoveryCommandTest,PluginSourceToBinaryAttestationTest,PluginDistributionClientTest,PluginDistributionTransactionsTest,PluginDistributionTransportTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-They are normal application tests and run in the existing Gradle `ciCheck` authority;
-there is no separate production npm or Python orchestrator. Issue #104 remains open
-for a real hosted/federated catalog, qualification and deployment of the externally
-protected checkpoint provider, substantiated source-to-binary provenance,
-separately published community examples and public service operations. The
-embedded installed-JAR-to-v2 activation path and the App's installed Discovery
-command below are implemented in the current source. Workbench/HTTP transformation
-routes, the legacy v1 runtime and data-only rule/knowledge-pack installation remain
-separate migrations. This command does not establish those broader migrations.
+`PluginTestCatalogTest` starts a loopback HTTPS catalogue with test signers and
+serves three immutable, signed revisions. It checks the version and artifact
+kind catalogue, compatibility, dependencies and signed provenance. Bounded
+refreshes check the trust chain and preserve the exact selected index.
+`InstalledDiscoveryCommandTest` uses that fixture to resolve and install a real
+SPI v2 Discovery provider, invoke it, reject a damaged update, retry with the
+signed bytes, remove the provider and restore an ancestor offline. The test
+binds exported Discovery evidence to the selected artifact and generation.
+
+These tests use an isolated checkpoint ledger. The checkout's
+`PluginCheckpointPostgresTest` separately covers the real database authority.
+Public catalogue operation and deployment are tracked in the
+[external TODO](TODO-extern.md#öffentlicher-plugin-katalog).
 
 ## Run an installed Discovery domain
 

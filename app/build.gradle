@@ -51,6 +51,8 @@ application {
 }
 
 tasks.named('test') {
+    inputs.files(rootProject.file('examples/factorization.regelsuche'),
+        rootProject.file('examples/factorization-export-profile.rules'))
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
     systemProperty 'regelsuche.recordDocs',

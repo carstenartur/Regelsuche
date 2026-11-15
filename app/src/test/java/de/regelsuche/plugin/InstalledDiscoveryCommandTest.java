@@ -95,16 +95,25 @@ class InstalledDiscoveryCommandTest {
         }
     }
     @Test void failedUpdatePreservesActiveDiscoveryAndOfflineRollbackRestoresTheOriginalProvider() throws Exception {
-        try (var fixture = new Fixture()) {
-            var original = fixture.install("1.0.0", "normal");
+        try (var fixture = new Fixture(); var catalog = new PluginTestCatalog(fixture.distribution)) {
+            byte[] originalJar = InstalledDiscoveryFixture.jar(directory.resolve("original-provider"), fixture.marker,
+                "1.0.0", "normal");
+            var originalEntry = catalog.publishArtifact(PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,
+                "example", "1.0.0", "2", "1.0.0", "", List.of("algebra"), List.of(), originalJar);
+            var genesis = catalog.publishRevision(1, "", catalog.publishers(), List.of(originalEntry));
+            var initial = fixture.transactions.install("install", genesis.sources(),
+                InstalledExtensionRuntimeTest.request("1.0.0", "1.0.0", "2"));
+            assertEquals(Outcome.COMMITTED, initial.outcome());
+            var original = initial.installation();
             assertDiscoveryRun(fixture, "original.json", original, "1.0.0");
             var originalState = fixture.ledger.delegate.read();
 
             byte[] updateJar = InstalledDiscoveryFixture.jar(directory.resolve("update-provider"), fixture.marker,
                 "2.0.0", "normal");
-            var entry = fixture.distribution.entry("2.0.0", updateJar, "2", "1.0.0", "");
-            var publication = publish(fixture.distribution, entry, updateJar, 2,
-                original.checkpoint().revisionHash(), fixture.distribution.publishers);
+            var entry = catalog.publishArtifact(PluginArtifactIndex.ArtifactKind.JAVA_PLUGIN,
+                "example", "2.0.0", "2", "1.0.0", "", List.of("algebra"), List.of(), updateJar);
+            var publication = catalog.publishRevision(2, genesis.revision().contentHash(),
+                catalog.publishers(), List.of(originalEntry, entry));
             var request = InstalledExtensionRuntimeTest.request("2.0.0", "1.0.0", "2");
             String artifactPath = URI.create(entry.artifactUri()).getPath();
             byte[] wrongBytes = updateJar.clone();
