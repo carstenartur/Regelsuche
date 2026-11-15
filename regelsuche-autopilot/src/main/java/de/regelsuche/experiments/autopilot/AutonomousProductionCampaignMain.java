@@ -8,6 +8,13 @@ public final class AutonomousProductionCampaignMain {
     }
 
     public static void main(String[] args) {
+        if (args.length > 0 && "--compare-formation-fan-in".equals(args[0])) {
+            if (args.length != 2) {
+                throw new IllegalArgumentException("Expected --compare-formation-fan-in <output-file>");
+            }
+            MiningFanInComparison.write(Path.of(args[1]));
+            return;
+        }
         if (args.length > 0 && "--compare-controllers".equals(args[0])) {
             if (args.length != 2) {
                 throw new IllegalArgumentException("Expected --compare-controllers <output-file>");

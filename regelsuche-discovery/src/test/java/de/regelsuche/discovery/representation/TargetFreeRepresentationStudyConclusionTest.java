@@ -40,9 +40,9 @@ class TargetFreeRepresentationStudyConclusionTest {
         assertEquals(8, summary.qualifiedEntries());
         assertEquals(8, summary.qualifiedCandidates());
         assertEquals(6, summary.configuredCases());
-        assertEquals(2, summary.uniformlyQualifiedCaseCount());
-        assertEquals(4, summary.uniformlyUnqualifiedCaseCount());
-        assertEquals(0, summary.policyDifferentiatingCaseCount());
+        assertEquals(1, summary.uniformlyQualifiedCaseCount());
+        assertEquals(1, summary.uniformlyUnqualifiedCaseCount());
+        assertEquals(4, summary.policyDifferentiatingCaseCount());
         assertEquals(4, summary.configuredPolicies());
         assertEquals(0, summary.allPolicyMatchedWorkCaseCount());
         assertEquals(8, summary.qualifiedCandidatesAtDepthOne());
@@ -69,8 +69,7 @@ class TargetFreeRepresentationStudyConclusionTest {
             content.decision().evidenceClassification()
         );
         assertEquals(
-            TargetFreeRepresentationStudyConclusion
-                .POLICY_COMPARISON_STATUS,
+            "POLICY_DIFFERENCE_REQUIRES_SEPARATE_INTERPRETATION",
             content.decision().policyComparisonStatus()
         );
         assertEquals(
@@ -84,7 +83,7 @@ class TargetFreeRepresentationStudyConclusionTest {
 
         assertTrue(content.policies().stream().allMatch(policy ->
             policy.configuredCases() == 6
-                && policy.qualifiedCases() == 2
+                && policy.qualifiedCases() == ("BOUNDED_ENUMERATION_V1".equals(policy.policyId()) ? 5 : 1)
         ));
         assertEquals(
             List.of(
@@ -107,10 +106,10 @@ class TargetFreeRepresentationStudyConclusionTest {
                     "repeated-term-compression"))
                 .findFirst().orElseThrow().status()
         );
-        assertEquals(2L, content.cases().stream()
+        assertEquals(1L, content.cases().stream()
             .filter(value -> "QUALIFIED_BY_ALL_POLICIES".equals(
                 value.status())).count());
-        assertEquals(4L, content.cases().stream()
+        assertEquals(1L, content.cases().stream()
             .filter(value -> "NO_POLICY_QUALIFIED".equals(
                 value.status())).count());
 

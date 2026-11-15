@@ -37,4 +37,15 @@ class FrozenPrimitiveLineageTest {
         assertFalse(replay.verifies("(x*y)/x", "y", 1, ids, ids, List.of(), List.of(), List.of()));
         assertFalse(replay.verifies("(x*y)/x", "y", 1, ids, ids, List.of(), List.of("y != 0"), List.of()));
     }
+
+    @Test void replayMustRetainDefinednessOfBothSides() {
+        var ids = List.of("ast_multiply_zero_left");
+        assertFalse(replay.verifies("0*(1/0)", "0", 1, ids, ids, List.of(), List.of(), List.of()));
+        assertFalse(replay.verifies("0*(1/x)", "0", 1, ids, ids, List.of(), List.of(), List.of()));
+        var premise = List.of("x != 0");
+        assertTrue(replay.verifies("0*(1/x)", "0", 1, ids, ids, premise, premise, List.of()));
+        assertFalse(replay.verifies("0*(1/(x*y))", "0", 1, ids, ids, premise, premise, List.of()));
+        var factors = List.of("x != 0", "y != 0");
+        assertTrue(replay.verifies("0*(1/(x*y))", "0", 1, ids, ids, factors, factors, List.of()));
+    }
 }

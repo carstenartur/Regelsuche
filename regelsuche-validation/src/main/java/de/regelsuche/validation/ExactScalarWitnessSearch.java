@@ -48,8 +48,12 @@ final class ExactScalarWitnessSearch {
         return evaluated;
     }
 
+    boolean premisesSatisfied(Map<String, String> assignment) {
+        return assumptions.stream().allMatch(guard -> satisfied(guard, assignment));
+    }
+
     Comparison compare(Map<String, String> assignment, List<String> labels, Runnable onAssignment) {
-        if (!assumptions.stream().allMatch(guard -> satisfied(guard, assignment))) {
+        if (!premisesSatisfied(assignment)) {
             return new Comparison(true, Optional.empty());
         }
         // A rejected premise does not evaluate the source/candidate pair.

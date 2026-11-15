@@ -66,4 +66,39 @@ class ExactCounterexampleWitnessTest {
         assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, unavailable.status());
         assertTrue(unavailable.counterexample().isEmpty());
     }
+
+    @Test void samplesWithDifferentDomainsCannotRefuteAnExactScalarIdentity() {
+        var complex = new CounterexampleSearchService.CounterexampleBudget(0, true, false, 1L, true);
+        var exactIdentity = finder.search(new CounterexampleSearchService.HypothesisInput(
+            "exact cancellation", "(9007199254740992+x)-9007199254740992", "x", List.of()), complex);
+        assertTrue(exactIdentity.counterexample().isEmpty());
+
+        var matrices = new CounterexampleSearchService.CounterexampleBudget(0, false, true, 1L);
+        var guarded = finder.search(new CounterexampleSearchService.HypothesisInput(
+            "zero matrix", "A*B", "B*A", List.of("A=0")), matrices);
+        assertEquals(CounterexampleSearchService.Status.INCONCLUSIVE, guarded.status());
+    }
+
+    @Test void complexPowersHandleTheMinimumIntExponent() {
+        var complex = new CounterexampleSearchService.CounterexampleBudget(0, false, false, 1L, true);
+        var outcome = finder.search(new CounterexampleSearchService.HypothesisInput(
+            "unequal modulus", "abs(x^(-2147483648))", "1", List.of()), complex);
+        assertEquals(CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND, outcome.status());
+    }
+
+    @Test void approximateAnalyticSamplesMustSatisfyEveryDeclaredPremise() {
+        var guarded = finder.search(new CounterexampleSearchService.HypothesisInput(
+            "fixed real value", "abs(x)", "0", List.of("x=0")),
+            CounterexampleSearchService.CounterexampleBudget.defaultBudget());
+        assertTrue(guarded.counterexample().isEmpty());
+    }
+
+    @Test void matrixSamplingDoesNotAuthorizeDifferencesFromRounding() {
+        String nine = "(A*B)*".repeat(8) + "(A*B)";
+        String ten = nine + "*(A*B)";
+        var matrices = new CounterexampleSearchService.CounterexampleBudget(0, false, true, 1L);
+        var associative = finder.search(new CounterexampleSearchService.HypothesisInput(
+            "matrix associativity", nine + "*" + ten, "(" + nine + ")*(" + ten + ")", List.of()), matrices);
+        assertTrue(associative.counterexample().isEmpty());
+    }
 }

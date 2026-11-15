@@ -314,4 +314,5 @@ def validate_run(*args: object, **kwargs: object) -> tuple[int, int]:
 
 VERIFIER.validate_run = validate_run
 
-raise SystemExit(VERIFIER.main())
+if __name__ == "__main__":
+    raise SystemExit(VERIFIER.main())

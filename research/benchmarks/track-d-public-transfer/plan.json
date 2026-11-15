@@ -1,0 +1,22 @@
+{
+  "schema": "regelsuche.track-d-public-transfer-plan/v1",
+  "baseRevision": "03b58d1dfdd9c5076622f1f9bf35dd9c618bf897",
+  "inputs": {
+    "formation.json": "f9cfcacdfa85a326fd758e70aeb74d9ee3972edbde4d8181a0db2d369dcf21e8",
+    "posthoc-family-labels.json": "ef33ccd33dc3d2d48609bb0971abc9a0211e5f137d5d9ee7dd78254d2e0e7265",
+    "evaluation.json": "593c4ff74cc7095af0578f3fca997c868ca50a3036c9455dc908d50969e1696d"
+  },
+  "formation": "Run default native AST rules and untargeted BestFirstSearch on each expression, then OpenTargetConjectureMiner independently on each opaque batch. Input contains root expressions only. Supply no targets, family names, held-out examples or validation outcomes to search or mining. Attach the registered family label only after each candidate set is fixed. Identify independently formed candidates by miner ID plus the digest of their observation IDs; never count identical observation IDs twice. Preserve all rejected clusters, including duplicate or neutral variants. Apply CrossFamilyStructuralClusterer and CrossFamilyBridgeHypothesisBuilder. Retain all eligible bridges in canonical order. Zero eligible bridges is a reportable null.",
+  "searchHeuristic": [
+    3,
+    80,
+    1,
+    2,
+    40,
+    16
+  ],
+  "inventory": "AstRewriteTransformationEngine.defaultRules() at baseRevision for formation and both paired arms; preserve all incumbent factoring and normalization rules. Append the single compiled mined bridge after native transformations only in its treatment arm. Run BestFirstSearchStrategy with syntax-exact targets for utility. Retain every run even if transfer, proof or usefulness fails.",
+  "validation": "After all formation outputs are fixed, open evaluation.json. For each retained bridge, run the ordinary CrossFamilyBridgeTransferEvaluator with one fresh positive and one near-miss negative per family and CounterexampleBudget.defaultBudget(). Evaluate positives and negatives against the frozen patterns using the native compiler, equivalence checker and counterexample service. Retain all blockers, assumptions, checks and outcomes. Run OpenTargetConjectureProofGate with its standard backend on the family validation results. Formal status follows the backend; symbolic verification does not establish theorem-prover proof.",
+  "utility": "For every bridge and family run both arms on BOTH registered targets with identical search budget. A positive asks for the factored form, the near miss asks for an intentionally inequivalent form. Attribute any reached invalid target as a correctness regression. Supply observed positive runs to CrossFamilyBridgeAblationEvaluator. Preserve native path, assumptions, all GoalMetrics, actual bridge emissions, success, best distance and rule use for each arm and task. Keep unchanged and losing pairs. No aggregate success may erase a negative-control failure.",
+  "scope": "Retrospective public factoring stress test, two disjoint TRAIN coefficient series and two held-out expression families. Public evaluation cases and their deliberate construction preclude protected-test or independent-discovery claims. A newly compiled copy of an available factorization rule is not project novelty. No parameter tuning or family substitution after registration."
+}

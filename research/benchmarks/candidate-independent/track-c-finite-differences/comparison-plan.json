@@ -1,0 +1,22 @@
+{
+  "schema": "regelsuche.track-c-finite-difference-comparison-plan/v1",
+  "sourceRevision": "03b58d1dfdd9c5076622f1f9bf35dd9c618bf897",
+  "challengeId": "finite-difference-recurrences",
+  "caseCorpusContentHash": "sha256:8cb19a8e33964c3d2296515cbf9aef3a62432410840cbf0c4062338bad5b1802",
+  "freezeReceiptContentHash": "sha256:e8098edb6339d6debff04a4d97ad6e4f416202a94be7c6921fa239b066726f58",
+  "formationProfileContentHash": "sha256:235f9196671e23e96b12ce213b8224ed5d0e9f1ca3fe932aadea179cbde7d331",
+  "campaignCount": 4,
+  "arms": ["PRODUCTION_DIFFERENCE_DOMAIN", "ENUMERATE_VALID_GRAMMAR", "SEEDED_RANDOM_VALID_GRAMMAR"],
+  "minimumCoefficient": -3,
+  "maximumCoefficient": 3,
+  "proposalsPerTrainPrefix": 30,
+  "formation": "Pass only the two TRAIN formationInput.observedPrefix values and their maximumOrder, in corpus order. No identifiers, split labels, challenge features, continuations or evaluation inputs reach a former. Freeze all 12 candidate sets before reading evaluationInput.",
+  "grammar": "Fixed Newton forward model at zero-based index n. Coefficients (a0,...,ad) are initial forward differences, degree d from 1 through min(prefix maximumOrder, frozen profile cap 8, prefix length minus 2). a0 is the first observed term, common to every arm. a1 through ad are integers from -3 through 3; ad is nonzero for a unique degree. No shift, free intercept, refitting or alternative parameterization.",
+  "production": "Create an actual FiniteDifferenceSequenceDomain.SequenceState with the visible prefix as the initial row and a one-term placeholder equal to its first observed term in the mandatory holdout field. Execute the unmodified transition operator, objective and candidate extractor in increasing degree; stop at the first objective hit or the degree boundary. Retain a domain proposal outside the common grammar as OUTSIDE_GRAMMAR, including constant sequences. Never call the holdout evaluator. Keep all attempted row degrees and actual subtractions.",
+  "enumeration": "Increasing degree, then lexicographic free coefficient tuple in signed ascending order, within the identical grammar. Emit at most 30 valid proposals per prefix, retain unused slots.",
+  "random": "Uniform with replacement on the identical complete ordered grammar using java.util.Random.nextInt(grammarSize). Use the first 64 bits of the existing #383 campaign digest, big-endian. One stream per campaign across both TRAIN prefixes. Keep every attempted draw and duplicates.",
+  "selection": "Evaluate the exact Newton/binomial polynomial at EVERY generating-prefix index from zero. Check coefficient admissibility and all prefix equalities for every proposal. Keep distinct supported coefficient vectors in first-emission order, preserving rejected, duplicate and excluded attempts, empty results and actual check counts. Deduplication uses the entire vector including the intercept.",
+  "evaluation": "Evaluate frozen candidates independently without parameter updates on every observed prefix and continuation at each zero-based index. Compare ALL terms and classify in order NO_OUTPUT, PREFIX_MISMATCH, REFUTED, CONFIRMED, taking the strongest available outcome for each row. Retain complete predicted sequences and role counts even when zero. All six panel cases are required per arm/campaign, including all TRAIN, VALIDATION and TEST slots.",
+  "work": "Equal maximum 30 proposal slots per TRAIN prefix, 60 per campaign. Measure actual proposals, duplicates, prefix evaluations, case evaluations, attempted domain difference levels and subtractions; enumerative grammar traversal and random draws are separately identified. Distinct discovery algorithms do different work. No equal wall time, total computation, proof or external novelty claim.",
+  "interpretation": "Prospective comparison protocol on the publicly known, previously evaluated #383 panel. No prior external novelty, universal superiority, unique infinite continuation or generalization claim. No tuning after execution."
+}
