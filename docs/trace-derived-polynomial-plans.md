@@ -67,8 +67,10 @@ werden ausdrücklich abgewiesen. Die bestehende exakte Parserprovenienz liefert
 die Zahlen; `NumberExpr.value()` ist keine Zahlenautorität dieses Lerners.
 
 Die Reihenfolge und Zahl der Stufen müssen in allen ausgewählten Spuren gleich
-sein. Variablennamen werden abstrahiert. Quellen müssen dieselbe geordnete
-AST-Form haben; bei der Anwendbarkeitsprüfung variieren Zahlen außer Exponenten.
+sein. Variablennamen werden abstrahiert. Im Standardmodus müssen Quellen
+dieselbe geordnete AST-Form haben; bei der Anwendbarkeitsprüfung variieren Zahlen
+außer Exponenten. Der [separate Monomträger-Modus](#übertragung-auf-andere-eingabeformen)
+nutzt die exakten nicht verschwindenden Grade für den Einstieg.
 Die Ausgaben werden gleichzeitig über alle Trainingszeilen verallgemeinert:
 Gleiche Literale bleiben erhalten, unterschiedliche ganzzahlige Literale werden
 zu Koeffizientenlücken. Gleiche Wertespalten verwenden dieselbe Lücke, sodass
@@ -193,3 +195,55 @@ die eingefrorene Identität, auch bei gleichem sichtbaren Vorlagennamen.
 Dies verbindet beide Bausteine in einem begrenzten Entwicklungsfall derselben
 quadratischen Familie. Unabhängige Kontrollen, vollständige Kostenbilanz,
 familienfremde Übertragung und Produktionspromotion bleiben unter #874/#750 offen.
+
+## Übertragung auf andere Eingabeformen
+
+`learnWithMonomialSupport(traces, limits)` lernt für die **erste** Stufe die
+Grade der nicht verschwindenden Monome aus den geprüften TRAIN-Quellen. Dazu
+verwendet der Lerner die ohnehin benötigte exakte Polynomprojektion. Ein
+Produkt mit Summand kann damit zu derselben Vorlage passen wie seine
+ausmultiplizierte Form. Die Folgestufen prüfen weiterhin die geordnete
+AST-Form ihrer Zwischenquellen. Der Solver prüft jede neue Koeffizientenbelegung
+gegen den tatsächlichen Quellausdruck. Trainingsidentitäten, Integer-Grenzen,
+Koeffizientendomänen und kumulative Budgets gelten auch in diesem Modus.
+`learn(traces, limits)` verwendet weiterhin den historischen Syntaxvertrag.
+
+Der öffentliche Entwicklungsvergleich in `TracePlanTransferTest` friert die
+Auswahl aus drei verifizierten Formationsspuren und zwei separaten
+Selektor-TRAIN-Polynomen ein. Die sechs Auswertungsausdrücke gehen weder in
+die Vorlagenbildung noch in die Auswahl ein. Alle drei Varianten haben
+dasselbe Faktorisierungsziel und dieselben Belegungs- und Theoriepfadbudgets.
+Die direkte Kontrolle nutzt denselben exakten Solver und Replay für eine
+deklarierte Faktorisierungsvorlage mit denselben Faktorgrenzen.
+
+| Auswertung | Gelernte Syntaxform | Gelernter Monomträger | Direkte Vorlage |
+| --- | --- | --- | --- |
+| `u*(u+16)+55` | Form passt nicht | Geprüfte Zwischenform und Faktoren 5, 11 | Faktoren 5, 11 |
+| `(v+3)^2+10*v+54` | Form passt nicht | Geprüfte Zwischenform und Faktoren 7, 9 | Faktoren 7, 9 |
+| `w*(w+11)+30` | Form passt nicht | Kein ganzzahliger Offset für die Zwischenform | Faktoren 5, 6 |
+| `n*(n+14)+50` | Form passt nicht | Keine Belegung im begrenzten Ansatz | Keine Belegung im begrenzten Ansatz |
+| `q*(q^2+1)+2` | Form passt nicht | Monomträger passt nicht | Keine Belegung im begrenzten Ansatz |
+| `(r+2)*(r+7)` | Ziel bereits erfüllt | Ziel bereits erfüllt | Ziel bereits erfüllt |
+
+| Ausgeführte Koeffizientenprüfungen | Gelernte Syntaxform | Gelernter Monomträger | Direkte Vorlage |
+| --- | ---: | ---: | ---: |
+| Formationsspuren einschließlich Replay | 1.548 | 1.548 | 0 |
+| Vollständige Auswahl auf TRAIN | 4.056 | 5.070 | 1.014 |
+| Sechs Auswertungsfälle einschließlich Fehlversuchen | 0 | 3.042 | 2.535 |
+| Summe | 5.604 | 9.660 | 3.549 |
+
+Der zweite Ansatz erweitert die Anwendbarkeit innerhalb univariater Polynome.
+Er erreicht in diesem Vergleich zwei neue Faktorisierungen in je zwei
+verifizierten Schritten. Die direkte Vorlage erreicht beide mit je einem
+Schritt und löst zusätzlich den Fall mit ungeradem Linearkoeffizienten.
+Für diesen Aufgabenstrom ist die direkte Vorlage die günstigere Wahl.
+
+Die Tabelle zählt tatsächliche Solverbelegungen der Erzeugung und beider
+Replay-Prüfungen. Die Testausgabe enthält zusätzliche getrennte Zähler für
+Projektionen, AST-Besuche und belegte Pfadarbeit. Das Experiment erfasst weder
+vollständige CPU-Kosten noch Transfer in eine andere mathematische Domäne.
+
+```bash
+mvn -B -pl regelsuche-learning -am -Dtest=TracePlanTransferTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```

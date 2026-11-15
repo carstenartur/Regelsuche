@@ -15,12 +15,13 @@ public final class FinitePolynomialTemplate {
     public static final int MAX_EXPRESSION_CHARS = 4096;
 
     public enum Origin { DECLARED_GRAMMAR, VERIFIED_TRACE_DERIVED }
-    public enum Applicability { ANY_SUPPORTED_UNIVARIATE, EXACT_SOURCE_SHAPE }
+    public enum Applicability { ANY_SUPPORTED_UNIVARIATE, EXACT_SOURCE_SHAPE, EXACT_MONOMIAL_SUPPORT }
 
     private final String id;
     private final String expression;
     private final List<HoleDomain> domains;
     private final Origin origin;
+    private final Applicability applicability;
     private final String sourceShape;
     private final String formationHash;
     private final List<String> provenanceRoots;
@@ -28,7 +29,7 @@ public final class FinitePolynomialTemplate {
     private final List<String> formationStateIdentities;
 
     private FinitePolynomialTemplate(String id, String expression, List<HoleDomain> domains,
-                                    Origin origin, String sourceShape, LearnedPlan formation) {
+                                    Origin origin, Applicability applicability, String sourceShape, LearnedPlan formation) {
         this.id = SchematicProofPlan.requireId(id, "template id");
         if (id.length() > 64 || expression == null || expression.isBlank() || expression.length() > MAX_EXPRESSION_CHARS
                 || !StandardCharsets.UTF_8.newEncoder().canEncode(expression)
@@ -45,6 +46,7 @@ public final class FinitePolynomialTemplate {
             throw new IllegalArgumentException("invalid or excessive finite template domains");
         }
         this.origin = origin;
+        this.applicability = applicability;
         this.sourceShape = sourceShape;
         this.formationHash = formation == null ? "" : formation.contentHash();
         this.provenanceRoots = formation == null ? List.of() : formation.trainingRoots();
@@ -53,7 +55,8 @@ public final class FinitePolynomialTemplate {
     }
 
     public static FinitePolynomialTemplate declared(String id, String expression, List<HoleDomain> domains) {
-        return new FinitePolynomialTemplate(id, expression, domains, Origin.DECLARED_GRAMMAR, "", null);
+        return new FinitePolynomialTemplate(id, expression, domains, Origin.DECLARED_GRAMMAR,
+            Applicability.ANY_SUPPORTED_UNIVARIATE, "", null);
     }
 
     /**
@@ -100,17 +103,14 @@ public final class FinitePolynomialTemplate {
         String digest = formation.contentHash().substring("sha256:".length());
         return new FinitePolynomialTemplate("trace-" + digest.substring(0, 40) + "-" + stageIndex,
             stage.ansatzTemplate(), stage.holeDomains(), Origin.VERIFIED_TRACE_DERIVED,
-            stage.sourceShape(), formation);
+            stage.applicability(), stage.sourceShape(), formation);
     }
 
     public String id() { return id; }
     public String expression() { return expression; }
     public List<HoleDomain> domains() { return domains; }
     public Origin origin() { return origin; }
-    public Applicability applicability() {
-        return origin == Origin.DECLARED_GRAMMAR
-            ? Applicability.ANY_SUPPORTED_UNIVARIATE : Applicability.EXACT_SOURCE_SHAPE;
-    }
+    public Applicability applicability() { return applicability; }
     public String sourceShape() { return sourceShape; }
     public String formationHash() { return formationHash; }
     public List<String> provenanceRoots() { return provenanceRoots; }
@@ -134,7 +134,7 @@ public final class FinitePolynomialTemplate {
 
     ShapeCheck checkShape(ExactFinitePolynomialInput.Projection input) {
         return applicability() == Applicability.ANY_SUPPORTED_UNIVARIATE ? new ShapeCheck(true, 0)
-            : ExactFinitePolynomialTraceLearner.checkSourceShape(sourceShape, input.parsed());
+            : ExactFinitePolynomialTraceLearner.checkSourceShape(sourceShape, input, applicability);
     }
 
     public String toCanonicalJson() {
@@ -149,8 +149,11 @@ public final class FinitePolynomialTemplate {
             .property("maxExpressionChars", MAX_EXPRESSION_CHARS)
             .property("origin", origin.name()).property("applicability", applicability().name())
             .property("sourceShape", sourceShape)
-            .property("applicabilityRevision", origin == Origin.VERIFIED_TRACE_DERIVED
-                ? ExactFinitePolynomialTraceLearner.REVISION : ExactFinitePolynomialInput.REVISION)
+            .property("applicabilityRevision", switch (applicability) {
+                case ANY_SUPPORTED_UNIVARIATE -> ExactFinitePolynomialInput.REVISION;
+                case EXACT_SOURCE_SHAPE -> ExactFinitePolynomialTraceLearner.REVISION;
+                case EXACT_MONOMIAL_SUPPORT -> ExactFinitePolynomialTraceLearner.MONOMIAL_SUPPORT_REVISION;
+            })
             .property("formationHash", formationHash).stringArray("provenanceRoots", provenanceRoots)
             .property("inputIdentityRevision", ExactFinitePolynomialInput.REVISION)
             .property("inputViewBudget", ExactFinitePolynomialInput.BUDGET.canonicalMaterial())
