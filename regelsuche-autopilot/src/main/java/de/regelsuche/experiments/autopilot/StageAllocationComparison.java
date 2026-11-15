@@ -9,6 +9,7 @@ import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateDeci
 import de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunner.GeneratedObservation;
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.mining.OpenTargetConjectureMiner.SupportScope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -92,7 +93,9 @@ public final class StageAllocationComparison {
         ArrayNode batches = row.putArray("batches");
         List<ProductionCandidateContinuation> candidates = new ArrayList<>();
         for (int index = 0; index < decisions.size(); index++) {
-            var batch = AutonomousProductionMiningRunner.mineBatch(brief, formationPlan, decisions.get(index), inputs.get(index));
+            var batch = AutonomousProductionMiningRunner.mineBatch(
+                brief, formationPlan, decisions.get(index),
+                inputs.get(index), SupportScope.CROSS_OBSERVATION);
             var receipt = batch.binding().receipt();
             ObjectNode artifact = batches.addObject();
             artifact.set("decision", parse(batch.decision().toCanonicalJson()));
