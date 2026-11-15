@@ -1,5 +1,7 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
@@ -33,6 +35,7 @@ import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import de.regelsuche.value.ExprValueFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -185,8 +188,7 @@ public final class HiddenRulePilotRunner {
         SearchTarget target = syntaxTarget(holdout.targetExpression());
         var targetSyntax = parser.parseTerm(holdout.targetExpression());
         boolean applies = direct.stream().anyMatch(candidate ->
-            parser.parseTerm(candidate.transformedExpression()).equals(targetSyntax)
-                || equivalence.areEquivalent(candidate.transformedExpression(), holdout.targetExpression()));
+            matchesHoldout(candidate.transformedExpression(), holdout.targetExpression(), targetSyntax));
 
         GoalSearchResult baseline = search(
             task.primitiveEngine(),
@@ -203,6 +205,20 @@ public final class HiddenRulePilotRunner {
         AblationEvidence ablation = AblationEvidence.from(baseline, withCandidate);
         return new PositiveHoldoutResult(
             holdout.id(), applies, baseline.reached(), withCandidate.reached(), ablation);
+    }
+
+    private boolean matchesHoldout(String candidate, String target, Expr targetSyntax) {
+        Expr candidateSyntax = parser.parseTerm(candidate);
+        if (candidateSyntax.equals(targetSyntax) || equivalence.areEquivalent(candidate, target)) {
+            return true;
+        }
+        if (!ExpressionDefinedness.isTotal(candidateSyntax) || !ExpressionDefinedness.isTotal(targetSyntax)) {
+            return false;
+        }
+        // Scalar sums and products can regroup without treating shared function terms as polynomial variables.
+        try (var values = new ExprValueFactory()) {
+            return values.fromExpr(candidateSyntax).sameValue(values.fromExpr(targetSyntax));
+        }
     }
 
     private NegativeHoldoutResult validateNegative(
