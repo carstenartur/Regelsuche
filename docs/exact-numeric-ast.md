@@ -68,9 +68,14 @@ zweier Ganzzahlliterale dar.
   `9007199254740992` und `9007199254740993` unterscheidbar. Division durch
   null und überschrittene Auswertungsgrenzen ergeben `UNAVAILABLE`.
   Exakte univariate Polynome vergleicht der Dienst anhand ihrer rationalen Normalformen.
+  Die polynomiale Normalform verwendet die formale Konvention für die
+  nullte Potenz. Die Prüfung reeller Umformungspfade kontrolliert separat
+  die Definitionsbedingungen ihrer Zwischenausdrücke.
   Endliche Stichproben tragen gesonderte Ergebnisse (`SAMPLE_AGREEMENT` und
-  `SAMPLE_DISAGREEMENT`). Der Discovery-Pfad hält sie als Beobachtungen fest. Gegenbeispiel-Samples mit nichtendlichen Skalar-,
-  Matrix- oder komplexen Werten liefern keinen Widerspruch.
+  `SAMPLE_DISAGREEMENT`). Der Discovery-Pfad hält sie als Beobachtungen fest.
+  Reelle Gegenbeispielproben prüfen die angegebenen Prämissen rational.
+  Die Matrixprobe setzt keine Prämissen voraus und bleibt bei Produkten
+  innerhalb des exakt darstellbaren Ganzzahlbereichs.
 - Zahlenfaltung, Koeffizientenrechnung, Ableitungen, quadratische Ergänzungen
   und die linearen Gleichungs- und Ungleichungslöser rechnen rational. Die
   primitive Zahlenfaltung ist auf 4.096 Bit je rationaler Komponente begrenzt.

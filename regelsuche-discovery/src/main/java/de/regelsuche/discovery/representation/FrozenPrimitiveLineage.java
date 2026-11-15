@@ -1,10 +1,15 @@
 package de.regelsuche.discovery.representation;
 
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionContext;
 import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.assumption.ExpressionDefinedness;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.knowledge.RuleStatus;
+import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteRule;
@@ -33,11 +38,12 @@ final class FrozenPrimitiveLineage {
             List<String> primitiveRuleIds, List<String> initialAssumptions, List<String> assumptions, List<String> pathExpressions) {
         if (!eligible(depth, pathRuleIds, primitiveRuleIds)) return false;
         var expected = pathExpressions.stream().map(parser::parseTerm).toList();
+        Expr start = parser.parseTerm(source);
         Expr target = parser.parseTerm(candidate);
-        if (!matchesEndpoints(expected, depth, parser.parseTerm(source), target)) return false;
+        if (!matchesEndpoints(expected, depth, start, target)) return false;
         Set<String> permitted = premises(assumptions);
         Set<String> initial = premises(initialAssumptions);
-        if (!permitted.containsAll(initial)) return false;
+        if (!permitted.containsAll(initial) || !definedUnder(start, permitted)) return false;
         var remaining = new Work();
         Set<Node> frontier = Set.of(new Node(source, initial));
         for (int i = 0; i < depth; i++) {
@@ -62,6 +68,25 @@ final class FrozenPrimitiveLineage {
         return Set.copyOf(AssumptionSignature.ofExpressions(values).normalizedAssumptions());
     }
 
+    private boolean definedUnder(Expr expression, Set<String> permitted) {
+        var requirements = new AssumptionContext();
+        return ExpressionDefinedness.canElideWithoutDomainLoss(expression, requirements)
+            && requirements.snapshot().stream().allMatch(required -> declared(required, permitted)
+                || required.kind() == Assumption.Kind.NON_ZERO
+                    && provesNonZero(parser.parseTerm(required.symbols().getFirst()), permitted));
+    }
+
+    private static boolean declared(Assumption assumption, Set<String> permitted) {
+        return permitted.contains(AssumptionSignature.normalizeExpression(assumption.expression()));
+    }
+
+    private static boolean provesNonZero(Expr expression, Set<String> permitted) {
+        if (expression instanceof NumberExpr number) return number.value().signum() != 0;
+        if (declared(Assumption.nonZero(ExpressionFormatter.format(expression)), permitted)) return true;
+        return expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL
+            && provesNonZero(binary.left(), permitted) && provesNonZero(binary.right(), permitted);
+    }
+
     private Set<Node> expand(Set<Node> frontier, String rule, Expr required, Set<String> permitted, Work remaining) {
         var next = new LinkedHashSet<Node>();
         for (var node : frontier) {
@@ -74,7 +99,7 @@ final class FrozenPrimitiveLineage {
                 if (!move.primitiveRuleIds().equals(List.of(rule)) || !move.equivalencePreservingByConstruction()) continue;
                 Expr after = parser.parseTerm(move.transformedExpression());
                 if (required != null && !after.equals(required)) continue;
-                if (!rebuilds(generated, engine.rules().getFirst(), after)) continue;
+                if (!rebuilds(generated, engine.rules().getFirst(), after) || !definedUnder(after, permitted)) continue;
                 var obligations = new LinkedHashSet<>(node.premises());
                 obligations.addAll(premises(move.assumptions()));
                 if (permitted.containsAll(obligations)) next.add(new Node(move.transformedExpression(), Set.copyOf(obligations)));

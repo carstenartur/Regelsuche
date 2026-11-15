@@ -18,7 +18,7 @@ mkdir -p build/logs
 set -o pipefail
 ./gradlew \
   :regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence \
-  :regelsuche-release:runDomainGenericQualification \
+  :regelsuche-release:verifyRetainedDomainGenericQualification \
   --rerun-tasks \
   --console=plain \
   2>&1 | tee build/logs/capability-status-evidence.log

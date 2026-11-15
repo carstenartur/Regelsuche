@@ -164,8 +164,37 @@ unter CPython und `QQ` zeigt den Unterschied an zwei Entwicklungsbeispielen.
 Für `x^4+x-1` und `x^4+x+1` werden je drei Eingabeterme und ein Faktor
 mit drei Ausgabetermen beobachtet. Beim ersten Aufruf wurde die interne
 Funktion `dup_zz_hensel_step` nullmal aufgerufen, beim zweiten zweimal.
-Diese Funktionsaufrufe sind eine Diagnose für die unsichtbare Arbeit und
-keine kanonischen Studieneinheiten. Der eingefrorene GraalPy-Run steht aus.
+Die Funktionsaufrufe geben einen Hinweis auf die unterschiedlichen Rechenwege.
+
+### Koeffizientenarbeit der historischen SymPy-Kerne
+
+Der Entwicklungsaufruf unten misst die tatsächlich ausgeführten
+Koeffizientenoperationen in vier SymPy-1.14.0-Funktionen unter dem historischen
+GraalPy. Die beiden öffentlichen Polynome werden in unabhängigen,
+gleich initialisierten Durchläufen mit und ohne Messung faktorisiert.
+`dup_mul`, `dup_sqr`, `gf_mul` und `gf_sqr` belasten vor jeder Addition,
+Multiplikation, Quadrierung und modularen Reduktion den gemeinsamen Zähler.
+Ein erschöpftes Budget erhält die bis dahin verbrauchte Arbeit und die erste
+abgelehnte Operation. Die normalen SymPy-Importe verwenden dabei dieselben
+Funktionsobjekte. Die beiden geprüften Quelldateien sind per SHA-256 gebunden.
+Der Prozess stellt die ursprünglichen Funktionen auch nach einem Abbruch wieder her.
+
+Ausgehend von der obigen Installation:
+
+```sh
+PYTHONPATH="$work/packages" "$work/graalpy/bin/graalpy" \
+  "$repo/scripts/check-frozen-polynomial-coefficient-work.py" "$plan" --checkout "$repo" > coefficient-work.json
+cmp coefficient-work.json "$repo/docs/research/polynomial-theory-runtime/public-coefficient-work.json"
+```
+
+Für `x^4+x-1` wurden in diesen vier Kernen 0 Operationen ausgeführt, für
+`x^4+x+1` insgesamt 250. Für ein handprüfbares Produkt zweier linearer
+Polynome über dem Restklassenkörper modulo 5 prüft das Programm jede mögliche
+Budgetgrenze von 0 bis 11. Der Modus zählt ausschließlich die ausgewiesenen
+Koeffizientenoperationen. Unter anderem fehlen Divisions- und GCD-Schritte,
+Arbeit für Zugriffe, Faktorauswahl und Rekombination sowie Teile der Konvertierung
+zwischen Zahlbereichen. Beide Messwerte haben daher `completeBackendWork=false`.
+Die Registry hält die Ausführung des externen Studienprofils weiterhin gesperrt.
 
 Die Kontrollen umfassen je 20 öffentliche CP06-Formationsfälle für Cache und
 Spezialprofil, echte Cache-Insert-/Replay-/FIFO-Folgen unter ausdrücklich

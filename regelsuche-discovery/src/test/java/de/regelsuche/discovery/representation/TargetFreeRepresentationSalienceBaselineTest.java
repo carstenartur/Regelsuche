@@ -100,8 +100,29 @@ class TargetFreeRepresentationSalienceBaselineTest {
 
         assertEquals(24L, retainedReferenceRows);
         assertEquals(20L, recognizedReferenceRows);
-        assertEquals(20, QUALIFICATION.content().summary()
+        // The twenty structurally recognized rows remain in the frozen
+        // batch. Only eight have independently checked symbolic authority
+        // with the strict scalar oracle; sample agreement does not prove
+        // the other twelve. Do not silently restore the historical claim.
+        assertEquals(8, QUALIFICATION.content().summary()
             .qualifiedEntries());
+        long referenceRowsWithoutProof = QUALIFICATION.content().entries()
+            .stream()
+            .filter(row -> row.candidates().stream().anyMatch(candidate ->
+                candidate.referenceMatched()
+                    && !candidate.candidateTypes().contains(
+                        "NO_MATERIAL_REPRESENTATION_GAIN")
+                    && !candidate.qualified()
+                    && candidate.disqualificationReasons().contains(
+                        "SYMBOLIC_VALIDATION_NOT_CONFIRMED")))
+            .count();
+        assertEquals(12L, referenceRowsWithoutProof);
+        assertTrue(QUALIFICATION.content().entries().stream()
+            .flatMap(row -> row.candidates().stream())
+            .filter(candidate -> candidate.qualified())
+            .allMatch(candidate ->
+                "SYMBOLICALLY_VERIFIED".equals(candidate.proofStatus())
+                    && !candidate.oracleStatus().startsWith("SAMPLE_")));
     }
 
     @Test

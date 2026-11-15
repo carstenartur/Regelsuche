@@ -143,6 +143,84 @@ class LandingPageBrowserFlowTest {
     }
 
     @Test
+    void visualFormulaEditsAndTextUseTheSearchParserBeforeSubmission() {
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        input.fill("-x + y");
+        page.locator("#previewFormula").click();
+        var preview = page.locator("#formulaPreview");
+        page.waitForFunction("() => document.querySelector('#formulaPreview math') !== null");
+        assertEquals("ADD(SUB(0, x), y)", preview.locator("code").textContent());
+        input.evaluate("node => node.setSelectionRange(1, 2)");
+        page.locator("button[data-formula='square']").click();
+        assertEquals("-(x)^2 + y", input.inputValue());
+        assertEquals(0, preview.locator("math").count(), "an edit must invalidate the old AST");
+        page.locator("#previewFormula").click();
+        page.waitForFunction("() => document.querySelector('#formulaPreview msup') !== null");
+        assertEquals("ADD(SUB(0, POW(x, 2)), y)", preview.locator("code").textContent());
+        page.locator("#searchForm select[name='type']").selectOption("EQUATION");
+        input.fill("x/(a+b) = z");
+        page.locator("#previewFormula").click();
+        page.waitForFunction("() => document.querySelector('#formulaPreview mfrac') !== null");
+        assertEquals("EQUATION(DIV(x, ADD(a, b)), z)", preview.locator("code").textContent());
+        String submitted = page.waitForRequest("**/api/search",
+            () -> page.locator("#searchForm button[type='submit']").click()).postData();
+        assertTrue(submitted.contains("x/(a+b) = z"), submitted);
+        page.locator("#searchForm select[name='type']").selectOption("TERM");
+        input.fill("x/(");
+        page.locator("#previewFormula").click();
+        page.waitForFunction("() => document.querySelector('#formulaPreview').textContent.includes('position')");
+        assertEquals(0, preview.locator("math").count());
+        var range = preview.locator("button");
+        range.click();
+        assertEquals(3, input.evaluate("node => node.selectionStart"));
+        assertEquals(3, input.evaluate("node => node.selectionEnd"));
+
+        page.locator("#searchForm select[name='type']").selectOption("EQUATION");
+        input.fill("  α = 2💡 + β");
+        page.locator("#previewFormula").click();
+        range.click();
+        assertEquals("💡", input.evaluate("node => node.value.slice(node.selectionStart, node.selectionEnd)"));
+        assertEquals(7, input.evaluate("node => node.selectionStart"));
+        assertEquals(9, input.evaluate("node => node.selectionEnd"));
+
+        page.locator("#searchForm select[name='type']").selectOption("TERM");
+        input.fill("2x");
+        page.locator("#previewFormula").click();
+        range.click();
+        assertEquals("x", input.evaluate("node => node.value.slice(node.selectionStart, node.selectionEnd)"));
+        input.fill("2*x");
+        page.locator("#previewFormula").click();
+        page.waitForFunction("() => document.querySelector('#formulaPreview math') !== null");
+        assertEquals("MUL(2, x)", preview.locator("code").textContent());
+
+        // The caller may change input while the production parser response is in flight.
+        page.evaluate("""
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async (...args) => {
+                const response = await originalFetch(...args);
+                if (args[0] === '/api/inspect/formula') {
+                    await new Promise(resolve => { window.releaseFormulaResponse = resolve; });
+                }
+                return response;
+            };
+            """);
+        input.fill("x + 1");
+        page.locator("#previewFormula").click();
+        page.waitForFunction("() => typeof window.releaseFormulaResponse === 'function'");
+        page.locator("#loadExample-trig").click();
+        page.evaluate("async () => { window.releaseFormulaResponse(); await new Promise(resolve => requestAnimationFrame(resolve)); }");
+        assertEquals("", preview.textContent());
+        assertEquals("sin(x)^2 + cos(x)^2", input.inputValue());
+
+        var tooLong = page.request().post(app.baseUrl() + "/api/inspect/formula",
+            com.microsoft.playwright.options.RequestOptions.create().setData(java.util.Map.of(
+                "type", "TERM", "expression", "x".repeat(257))));
+        assertEquals(400, tooLong.status());
+        assertTrue(tooLong.text().contains("256"));
+    }
+
+    @Test
     void primaryTasksAndKeyboardNavigationKeepToolsReachable() {
         assertTrue(page.locator("#workflowExplore").isVisible());
         assertTrue(page.locator("#workflowLearn").isVisible());
