@@ -23,7 +23,7 @@ import java.util.Random;
 
 /** Replays the preregistered fixed-rule recurrence lane using only TRAIN prefix observations for formation. */
 public final class TrackCRecurrenceComparison {
-    private static final JsonMapper JSON = JsonMapper.builder()
+    static final JsonMapper JSON = JsonMapper.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
@@ -183,7 +183,7 @@ public final class TrackCRecurrenceComparison {
         return model.coefficients().stream().map(Rational::canonical).toList();
     }
 
-    private static List<Long> terms(JsonNode array) {
+    static List<Long> terms(JsonNode array) {
         var terms = new ArrayList<Long>();
         for (JsonNode value : array) {
             require(value.isIntegralNumber() && value.canConvertToLong(), "invalid frozen sequence term");
@@ -192,7 +192,7 @@ public final class TrackCRecurrenceComparison {
         return List.copyOf(terms);
     }
 
-    private static ObjectNode frozen(Path data, String name, String expected) throws Exception {
+    static ObjectNode frozen(Path data, String name, String expected) throws Exception {
         ObjectNode doc = (ObjectNode) JSON.readTree(data.resolve(name + ".json").toFile());
         ObjectNode content = doc.deepCopy();
         String declared = content.remove("contentHash").textValue();
@@ -201,13 +201,13 @@ public final class TrackCRecurrenceComparison {
         return doc;
     }
 
-    private static String campaignSeed(String benchmark, int index) throws Exception {
+    static String campaignSeed(String benchmark, int index) throws Exception {
         String campaignId = CHALLENGE + "-campaign-" + String.format(java.util.Locale.ROOT, "%02d", index);
         return hash(JSON.writeValueAsString(Map.of("benchmarkId", benchmark, "campaignId", campaignId,
             "challengeId", CHALLENGE, "index", index)));
     }
 
-    private static String hash(String text) {
+    static String hash(String text) {
         try {
             return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(text.getBytes(StandardCharsets.UTF_8)));
@@ -216,7 +216,7 @@ public final class TrackCRecurrenceComparison {
         }
     }
 
-    private static void require(boolean condition, String message) {
+    static void require(boolean condition, String message) {
         if (!condition) throw new IllegalArgumentException(message);
     }
 }
