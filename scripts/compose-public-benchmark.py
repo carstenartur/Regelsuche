@@ -113,6 +113,46 @@ def stages(data):
              "resourceLedger": lane["resourceLedger"]} for lane in data["lanes"]]
 
 
+def final_qualification(data, allocation, allocation_hash):
+    require(data["stageAllocationSha256"] == "sha256:" + allocation_hash,
+            "qualification belongs to another stage allocation")
+    require(data["qualificationExecutions"] == 1, "expected one qualification of the shared rule")
+    qualification = data["qualification"]
+    evidence, run = qualification["evidence"], qualification["run"]
+    require(evidence["qualified"] is True and run["qualified"] is True
+            and run["qualificationEvidenceHash"] == evidence["contentHash"]
+            and run["campaignManifestHash"] == allocation["originalCampaign"]["contentHash"],
+            "qualification receipt does not belong to the reference campaign")
+    lanes = []
+    for source, result in zip(allocation["lanes"], data["lanes"], strict=True):
+        identity = select(source, "panel", "arm")
+        require(identity == select(result, "panel", "arm"), "qualification lane identity")
+        qualified = 0
+        for candidate, lineage in zip(source["candidates"], result["lineages"], strict=True):
+            require(select(candidate, "id", "batch", "lineageHash", "conjectureId")
+                    == select(lineage, "id", "batch", "lineageHash", "conjectureId")
+                    and candidate["status"] == lineage["allocationStatus"], "qualification lineage identity")
+            if candidate["status"] == "COMPLETED":
+                handoff = candidate["receipts"]["LIFECYCLE_HANDOFF"]
+                require(lineage["qualificationStatus"] == "QUALIFIED"
+                        and lineage["conjectureId"] == evidence["conjectureId"]
+                        and lineage["qualificationRunHash"] == run["contentHash"]
+                        and lineage["handoffHash"] == handoff["contentHash"], "qualification handoff link")
+                qualified += 1
+            else:
+                require(lineage["qualificationStatus"] == "NOT_EVALUATED",
+                        "unfinished lineage cannot receive qualification")
+        require(result["qualifiedLineages"] == qualified
+                and result["distinctQualifiedCandidates"] == int(qualified > 0), "qualification counts")
+        lanes.append({**identity, "qualifiedLineages": qualified, "distinctQualifiedCandidates": int(qualified > 0),
+                      "notEvaluatedLineages": len(source["candidates"]) - qualified})
+    return {**select(data, "scope", "qualificationExecutions"),
+            **select(evidence, "conjectureId", "configuredPositiveHoldouts", "executedPositiveHoldouts",
+                     "configuredNegativeHoldouts", "executedNegativeHoldouts", "refutingHoldouts",
+                     "correctnessRegressionCount"),
+            "qualificationRunHash": run["contentHash"], "lanes": lanes}
+
+
 def components(data):
     arms = {}
     for name, arm in data["arms"].items():
@@ -154,6 +194,8 @@ def compose(raw, sources):
     tracks["F"] = {"terminalAllocation": {"coverageGaps": data["terminal"]["coverageGaps"], "arms": {
         r["policy"]: {**select(r, "stopReason", "status"), "nextPlanDecisions": len(r["nextPlan"]["decisions"])}
         for r in data["terminal"]["lanes"]}}, "sevenStageAllocation": stages(data["stages-measured"]),
+        "finalQualification": final_qualification(data["stages-qualification"], data["stages-measured"],
+                                                  sources["stages-measured"]["sha256"]),
         "sharedBudget": data["stages-plan"]["unit"], "scope": data["stages-plan"]["stopping"]}
     component = {key: components(data[key]) for key in ("components", "components-exact")}
     component["independentFanInControl"] = {arm: [{"accepted": len(r["mining"]["conjectures"]), "rejected": len(r["mining"]["rejectedClusters"])} for r in data["fan-in"][arm]] for arm in ("production", "noFanIn")}

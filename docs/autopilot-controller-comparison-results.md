@@ -76,3 +76,13 @@ regelsuche-autopilot/build/install/regelsuche-autopilot/bin/regelsuche-autopilot
 gzip -dc "$dir/measured.json.gz" | cmp - "$out"
 python3 scripts/verify-track-f-stage-allocation.py --report "$out"
 ```
+
+### Qualification after handoff
+
+The seven completed lineages link to one qualification run of the identical rewrite. The run used the existing public composite-factor suite. The split audit compared the suite with all twelve formation inputs and the development expressions and found zero collisions. All twelve positive and twelve negative cases passed. The paired utility evaluation recorded material gains on all twelve positive cases and zero correctness regressions. The two formed lineages without completed handoff have qualification status `NOT_EVALUATED`. The receipt binds the symbolic verification and handoff for each completed lineage and records qualification work separately from allocation work. [Frozen allocation](../research/benchmarks/track-f-stage-allocation/measured.json.gz) · [Qualification and lineage bindings](../research/benchmarks/track-f-stage-allocation/qualification.json.gz)
+
+Run the reproduction check on Java 25. The comparative benchmark build executes the same check inside its pinned container. The qualification output binds the exact allocation bytes and includes the suite, split audit, case results, paired work and qualification receipt.
+
+```sh
+./gradlew :regelsuche-release:test --tests de.regelsuche.release.TrackFQualificationComparisonTest
+```

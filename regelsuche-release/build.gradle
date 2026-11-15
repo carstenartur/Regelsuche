@@ -68,6 +68,11 @@ tasks.withType(Test).configureEach {
     systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
 }
 
+tasks.named('test', Test) {
+    inputs.files(rootProject.file('research/benchmarks/track-f-stage-allocation/measured.json.gz'),
+        rootProject.file('research/benchmarks/track-f-stage-allocation/qualification.json.gz'))
+}
+
 // This retained-root reader deliberately has no evidence-generation dependency.
 tasks.register('verifyRetainedReleaseReadinessJava', JavaExec) {
     group = 'verification'
