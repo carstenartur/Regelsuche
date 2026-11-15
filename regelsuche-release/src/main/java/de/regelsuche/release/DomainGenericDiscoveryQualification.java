@@ -36,18 +36,14 @@ public final class DomainGenericDiscoveryQualification {
         "states",
         "path");
 
-    public QualificationReport evaluate(
-        List<VerifiedDomainExport> exports,
-        int cleanRunCount,
-        boolean cleanRunsIdentical
-    ) {
-        Objects.requireNonNull(exports, "exports");
-        if (exports.stream().anyMatch(Objects::isNull)) {
-            throw new IllegalArgumentException("exports must not contain null");
-        }
-        if (cleanRunCount < 0) {
-            throw new IllegalArgumentException("cleanRunCount must be non-negative");
-        }
+    /** Derives clean-run facts exclusively from verified, immutable export snapshots. */
+    public QualificationReport evaluate(List<List<VerifiedDomainExport>> verifiedRuns) {
+        List<String> fingerprints = verifiedRuns.stream()
+            .map(DomainGenericDiscoveryQualification::runFingerprint).toList();
+        int cleanRunCount = fingerprints.size();
+        boolean cleanRunsIdentical = cleanRunCount >= DomainGenericQualificationRunner.CLEAN_RUN_COUNT
+            && fingerprints.stream().distinct().count() == 1L;
+        List<VerifiedDomainExport> exports = verifiedRuns.isEmpty() ? List.of() : verifiedRuns.getFirst();
 
         List<DomainSummary> domains = exports.stream()
             .map(DomainGenericDiscoveryQualification::summarize)
@@ -84,6 +80,17 @@ public final class DomainGenericDiscoveryQualification {
             NOT_EVALUATED,
             NOT_EVALUATED,
             NOT_EVALUATED);
+    }
+
+    static String runFingerprint(List<VerifiedDomainExport> exports) {
+        List<String> material = exports.stream()
+            .sorted(Comparator.comparing(item -> item.manifest().domainId()))
+            .map(item -> item.manifest().domainId() + '|'
+                + item.manifest().contentHash() + '|'
+                + item.verification().contentHash())
+            .toList();
+        return AutonomousResearchBriefV2.hash(
+            "regelsuche.domain-generic-clean-run/v1\nexports=" + material);
     }
 
     private static List<RequirementCheck> checks(

@@ -27,7 +27,7 @@ environment and does not require GitHub Actions.
    directories;
 3. compares both complete output trees byte-for-byte;
 4. compares the reproduced tree with committed `paper/generated`;
-5. requires the two foundation summaries, the public corpus split table, the controller tables and the candidate-slot allocation figure;
+5. requires the two foundation summaries, the public corpus split table, the controller tables, the candidate-slot allocation figure and the public recurrence formation and reuse tables;
 6. verifies that the receipt binds the manifest content hash and all required
    evidence issue IDs;
 7. requires `status=FOUNDATION`, pending central claims and
@@ -89,7 +89,7 @@ cmp ../paper-first.zip ../paper-second.zip
 The archive contains the manuscript PDF with generated tables, allocation figure,
 limitations, claims and artifact appendix. It includes the full committed source
 and raw evidence in `provenance/source.tar.gz`, the original Git commit bytes,
-the paper manifest, all five generated outputs, the license and citation files,
+the paper manifest, all six generated outputs, the license and citation files,
 the renderer environment and a SHA-256 inventory. The top-level
 `manifest.json` records the source commit and tree. The archive keeps the
 working manuscript's `FOUNDATION` status and pending author declarations.

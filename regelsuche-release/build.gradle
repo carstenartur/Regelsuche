@@ -181,6 +181,15 @@ tasks.register('runDomainGenericQualification', JavaExec) {
         .get().asFile.absolutePath
 }
 
+tasks.register('verifyRetainedDomainGenericQualification', JavaExec) {
+    group = 'verification'
+    description = 'Reconstructs the public domain qualification from the original verified source bytes.'
+    dependsOn 'runDomainGenericQualification'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.release.DomainGenericQualificationMain'
+    args '--verify-retained', layout.buildDirectory.dir('reports/domain-generic-qualification').get().asFile.absolutePath
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')

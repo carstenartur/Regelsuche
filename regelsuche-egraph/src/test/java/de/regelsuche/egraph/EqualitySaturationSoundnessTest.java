@@ -2,7 +2,9 @@ package de.regelsuche.egraph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.calculus.CalculusDerivativeRules;
 import de.regelsuche.parse.ExpressionParser;
@@ -63,6 +65,33 @@ class EqualitySaturationSoundnessTest {
             }
         };
         assertUnchanged("x", rule);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void onlyNativeMatchingCanCloseOverAlternativeChildNodes(boolean nativeMatcher) {
+        var x = PatternExpr.var("x");
+        var source = PatternExpr.op(BinaryOperator.MUL, PatternExpr.num(1),
+            PatternExpr.op(BinaryOperator.ADD, x, PatternExpr.num(0)));
+        // Identical mathematical rule; the subclass must take the concrete callback path.
+        var rule = nativeMatcher ? new PatternRewriteRule("one-times-sum-zero", source, x)
+            : new PatternRewriteRule("one-times-sum-zero", source, x) {};
+        var graph = new EGraph();
+        var root = graph.addExpression(parser.parseTerm("1*(x+0)"));
+        var child = graph.addExpression(parser.parseTerm("x"));
+        graph.union(child, graph.addExpression(parser.parseTerm("x+0")));
+        graph.rebuild();
+
+        var result = new EqualitySaturation(List.of(rule)).saturate(graph, root, node -> 1);
+        assertEquals(nativeMatcher, graph.areEquivalent(root, child));
+        assertEquals(nativeMatcher ? List.of() : List.of(rule.id()), result.diagnostics().referenceBridgeRules());
+        if (nativeMatcher) {
+            assertTrue(result.stats().saturated());
+            assertEquals(SaturationStats.Reason.FIX_POINT, result.stats().stopReason());
+        } else {
+            assertFalse(result.stats().saturated());
+            assertEquals(SaturationStats.Reason.INCOMPLETE_REFERENCE_BRIDGE, result.stats().stopReason());
+        }
     }
 
     private void assertUnchanged(String input, RewriteRule rule) {

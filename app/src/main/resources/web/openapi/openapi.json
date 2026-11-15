@@ -1625,6 +1625,29 @@
         "responses": {"200": {"description": "Markdown-Export", "content": {"text/markdown": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
       }
     },
+    "/api/inspect/formula": {
+      "post": {
+        "tags": ["Rule Inspection"],
+        "operationId": "previewFormulaAst",
+        "summary": "Term oder Gleichung mit dem Suchparser ohne Suche als AST lesen",
+        "x-regelsuche-context": "/api/inspect",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object", "required": ["expression"], "properties": {
+            "type": {"type": "string", "enum": ["TERM", "EQUATION"], "default": "TERM"},
+            "expression": {"type": "string", "minLength": 1, "maxLength": 256}
+          }
+        }}}},
+        "responses": {
+          "200": {"description": "Vom Parser erzeugter AST", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FormulaAstNode"}}}},
+          "422": {"description": "Parserfehler mit halboffenem UTF-16-Bereich im Originaltext. Fehlende Zeichen haben einen leeren Bereich.", "content": {"application/json": {"schema": {
+            "type": "object", "required": ["message", "startInclusive", "endExclusive"],
+            "properties": {"message": {"type": "string"}, "startInclusive": {"type": "integer", "minimum": 0}, "endExclusive": {"type": "integer", "minimum": 0}}
+          }}}},
+          "400": {"$ref": "#/components/responses/BadRequestText"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"}
+        }
+      }
+    },
     "/api/inspect/tree": {
       "get": {
         "tags": ["Rule Inspection"],
@@ -1714,6 +1737,14 @@
       "Unavailable": {"description": "Funktion ist in der aktuellen Konfiguration deaktiviert oder nicht verfügbar"}
     },
     "schemas": {
+      "FormulaAstNode": {
+        "type": "object", "required": ["kind", "value", "children"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["EQUATION", "NUMBER", "VARIABLE", "FUNCTION", "ADD", "SUB", "MUL", "DIV", "POW"]},
+          "value": {"type": "string"},
+          "children": {"type": "array", "items": {"$ref": "#/components/schemas/FormulaAstNode"}}
+        }
+      },
       "RetainedCandidateDossier": {
         "type": "object",
         "additionalProperties": false,
