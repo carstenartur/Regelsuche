@@ -48,6 +48,7 @@ def verifyPaperFoundation = tasks.register(
     inputs.file(paperRepositoryRoot.file('paper/public-reproduction.json'))
     inputs.file(paperRepositoryRoot.file('research/benchmarks/comparative-v2/legacy.json.gz'))
     inputs.file(paperRepositoryRoot.file('research/benchmarks/comparative-v2/rewriting.json.gz'))
+    inputs.file(paperRepositoryRoot.file('research/benchmarks/track-f-stage-allocation/qualification.json.gz'))
     inputs.file(paperRepositoryRoot.file('scripts/paper_recurrence_results.py'))
     inputs.file(paperRepositoryRoot.file('research/benchmarks/candidate-independent/track-c-recurrence/comparison-result.json'))
     inputs.file(paperManifest)

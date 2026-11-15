@@ -45,18 +45,20 @@ Native factorization reached all four positive targets. No negative control was 
 
 Both panels ran the same registered twelve seeds and two six-slot formation batches. Completed counts eligible lineages that reached conservative lifecycle handoff. The two batches in the second panel formed different lineages for the same conjecture.
 
-| Batch outputs | Policy | Completed / formed | Executed | Skipped | Remaining |
-| --- | --- | --- | --- | --- | --- |
-| Zero then one | Receipt-driven | 1/1 | 8 | 0 | 6 |
-| Zero then one | Uniform | 1/1 | 8 | 6 | 0 |
-| Zero then one | Static | 0/1 | 3 | 11 | 0 |
-| One then one | Receipt-driven | 2/2 | 13 | 0 | 1 |
-| One then one | Uniform | 2/2 | 13 | 1 | 0 |
-| One then one | Static | 1/2 | 8 | 6 | 0 |
+| Batch outputs | Policy | Completed / formed | Executed | Skipped | Remaining | Qualified / formed |
+| --- | --- | --- | --- | --- | --- | --- |
+| Zero then one | Receipt-driven | 1/1 | 8 | 0 | 6 | 1/1 |
+| Zero then one | Uniform | 1/1 | 8 | 6 | 0 | 1/1 |
+| Zero then one | Static | 0/1 | 3 | 11 | 0 | 0/1 |
+| One then one | Receipt-driven | 2/2 | 13 | 0 | 1 | 2/2 |
+| One then one | Uniform | 2/2 | 13 | 1 | 0 | 2/2 |
+| One then one | Static | 1/2 | 8 | 6 | 0 | 1/2 |
 
 ![Dispatch opportunities grouped by disposition](public-stage-dispatch.svg)
 
 Every lane had fourteen stage dispatch opportunities. The evaluator uses one validation and one counterexample ticket in the same call. Receipt-driven and uniform allocation completed the same branches using identical native work. The static policy reserved both candidate chains for the first batch. Tickets do not establish CPU parity. [All six dispatch traces and native resource ledgers](https://github.com/carstenartur/Regelsuche/blob/ab12f340e7e6f894ff32088adbc2df1dfa4f11b8/research/benchmarks/track-f-stage-allocation/measured.json.gz).
+
+The completed handoffs all retained a confirmed symbolic polynomial-normal-form check. Their formal-proof status remains `NOT_EVALUATED`. The public composite-factor suite evaluated the same rewrite in one post-handoff run linked to 7 of 9 formed lineages. It passed 12/12 positive holdouts and 12/12 negative controls. The paired search measured material gains on 12 of 12 tasks and 0 correctness regressions, with 423 explored states in the baseline and 32 with the rewrite. The other 2 handoffs stayed incomplete and had no qualification evaluation. [Public qualification companion](../../research/benchmarks/track-f-stage-allocation/qualification.json.gz). Decoded evidence SHA-256 `ad45f3b6f84013a0872d7761079e2fae768cbe5178a73cff20667ea7e75c863d`.
 
 ## Cross-observation formation
 
