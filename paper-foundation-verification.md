@@ -51,6 +51,8 @@ The underlying verifier additionally:
 - checks the pinned source digests for the public discovery comparisons, then
   derives the cross-form, transfer, stage allocation, ablation and
   validator-version tables and the dispatch figure;
+- checks the frozen A1, A2, E1 and E2 evidence digests, then derives baseline
+  results, failure and coverage tables and the earlier reproduction matrix;
 - recomputes the canonical manifest `contentHash`;
 - requires the limitations and foundation-only manuscript language.
 

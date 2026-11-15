@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TrackFQualificationComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">TrackFQualificationComparison.java</span></div><h1>TrackFQualificationComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import static de.regelsuche.release.ReleaseReadinessBindings.require;
+import static de.regelsuche.release.ReleaseReadinessBindings.sha256;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner;
+import de.regelsuche.util.AtomicJsonFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.zip.GZIPInputStream;
+
+/** Applies the existing public qualification suite to the rule retained by Track F. */
+public final class TrackFQualificationComparison {
+    private static final String ALLOCATION_HASH =
+        &quot;sha256:5c3a00f1db80ae5632ffe3ce734badbcde93575be1786094eb443c76c7801df0&quot;;
+    private static final int ALLOCATION_BYTES = 651_684;
+<span class="fc" id="L22">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+
+    private TrackFQualificationComparison() {}
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (args.length != 2) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;expected &lt;measured.json[.gz]&gt; &lt;qualification.json&gt;&quot;);</span>
+        }
+<span class="nc" id="L30">        AtomicJsonFile.writeUtf8(Path.of(args[1]), run(Path.of(args[0])));</span>
+<span class="nc" id="L31">    }</span>
+
+    static String run(Path frozenAllocation) throws IOException {
+<span class="fc" id="L34">        JsonNode allocation = readAllocation(frozenAllocation);</span>
+<span class="fc" id="L35">        var campaign = new AutonomousProductionCampaignRunner().runPinned(1);</span>
+<span class="fc" id="L36">        require(allocation.required(&quot;originalCampaign&quot;).equals(JSON.readTree(campaign.toCanonicalJson())),</span>
+            &quot;the Track F reference campaign did not reproduce&quot;);
+<span class="fc" id="L38">        var lifecycle = campaign.lifecycle();</span>
+<span class="fc" id="L39">        var generationHash = lifecycle.mining().generation().contentHash();</span>
+<span class="fc" id="L40">        JsonNode hypothesis = JSON.readTree(lifecycle.lifecycleCandidateJson());</span>
+<span class="fc" id="L41">        JsonNode obligation = JSON.readTree(lifecycle.proof().obligation().toCanonicalJson());</span>
+<span class="fc" id="L42">        var run = new AutonomousCandidateQualificationRunner().run(campaign);</span>
+
+<span class="fc" id="L44">        ObjectNode report = JSON.createObjectNode();</span>
+<span class="fc" id="L45">        report.put(&quot;schema&quot;, &quot;regelsuche.track-f-qualification/v1&quot;);</span>
+<span class="fc" id="L46">        report.put(&quot;stageAllocationSha256&quot;, ALLOCATION_HASH);</span>
+<span class="fc" id="L47">        report.put(&quot;qualificationExecutions&quot;, 1);</span>
+<span class="fc" id="L48">        report.put(&quot;scope&quot;, &quot;Post-handoff evaluation of one identical rewrite on the public composite-factor suite&quot;);</span>
+<span class="fc" id="L49">        ObjectNode qualification = report.putObject(&quot;qualification&quot;);</span>
+<span class="fc" id="L50">        qualification.set(&quot;suite&quot;, JSON.readTree(run.suiteJson()));</span>
+<span class="fc" id="L51">        qualification.set(&quot;splitAudit&quot;, JSON.readTree(run.split().toCanonicalJson()));</span>
+<span class="fc" id="L52">        qualification.set(&quot;evaluation&quot;, JSON.readTree(run.evaluationJson()));</span>
+<span class="fc" id="L53">        qualification.set(&quot;utility&quot;, JSON.readTree(run.utility().toCanonicalJson()));</span>
+<span class="fc" id="L54">        qualification.set(&quot;evidence&quot;, JSON.readTree(run.evidence().toCanonicalJson()));</span>
+<span class="fc" id="L55">        qualification.set(&quot;run&quot;, JSON.readTree(run.toCanonicalJson()));</span>
+
+<span class="fc" id="L57">        var lanes = report.putArray(&quot;lanes&quot;);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (JsonNode lane : allocation.required(&quot;lanes&quot;)) {</span>
+<span class="fc" id="L59">            require(generationHash.equals(lane.required(&quot;generation&quot;).required(&quot;contentHash&quot;).asText()),</span>
+                &quot;qualification split audit belongs to different formation inputs&quot;);
+<span class="fc" id="L61">            ObjectNode result = lanes.addObject()</span>
+<span class="fc" id="L62">                .put(&quot;panel&quot;, lane.required(&quot;panel&quot;).asText())</span>
+<span class="fc" id="L63">                .put(&quot;arm&quot;, lane.required(&quot;arm&quot;).asText());</span>
+<span class="fc" id="L64">            var lineages = result.putArray(&quot;lineages&quot;);</span>
+<span class="fc" id="L65">            int qualified = 0;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            for (JsonNode candidate : lane.required(&quot;candidates&quot;)) {</span>
+<span class="fc" id="L67">                ObjectNode lineage = lineages.addObject()</span>
+<span class="fc" id="L68">                    .put(&quot;batch&quot;, candidate.required(&quot;batch&quot;).asInt())</span>
+<span class="fc" id="L69">                    .put(&quot;id&quot;, candidate.required(&quot;id&quot;).asText())</span>
+<span class="fc" id="L70">                    .put(&quot;lineageHash&quot;, candidate.required(&quot;lineageHash&quot;).asText())</span>
+<span class="fc" id="L71">                    .put(&quot;conjectureId&quot;, candidate.required(&quot;conjectureId&quot;).asText())</span>
+<span class="fc" id="L72">                    .put(&quot;allocationStatus&quot;, candidate.required(&quot;status&quot;).asText());</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if (&quot;COMPLETED&quot;.equals(candidate.required(&quot;status&quot;).asText())) {</span>
+<span class="fc" id="L74">                    bindQualification(candidate, hypothesis, obligation, lineage, run.contentHash());</span>
+<span class="fc" id="L75">                    qualified++;</span>
+                } else {
+<span class="fc" id="L77">                    lineage.put(&quot;qualificationStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L78">                        .put(&quot;reason&quot;, &quot;LIFECYCLE_HANDOFF_NOT_COMPLETED&quot;);</span>
+                }
+<span class="fc" id="L80">            }</span>
+<span class="fc" id="L81">            result.put(&quot;qualifiedLineages&quot;, qualified)</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                .put(&quot;distinctQualifiedCandidates&quot;, qualified == 0 ? 0 : 1);</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        return JSON.writeValueAsString(report) + &quot;\n&quot;;</span>
+    }
+
+    private static JsonNode readAllocation(Path path) throws IOException {
+<span class="fc" id="L88">        try (var source = Files.newInputStream(path);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                var decoded = path.toString().endsWith(&quot;.gz&quot;) ? new GZIPInputStream(source) : source) {</span>
+<span class="fc" id="L90">            byte[] bytes = decoded.readNBytes(ALLOCATION_BYTES + 1);</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">            require(bytes.length == ALLOCATION_BYTES &amp;&amp; ALLOCATION_HASH.equals(sha256(bytes)),</span>
+                &quot;expected the frozen Track F allocation&quot;);
+<span class="fc" id="L93">            return JSON.readTree(bytes);</span>
+        }
+    }
+
+    private static void bindQualification(JsonNode candidate, JsonNode referenceHypothesis,
+            JsonNode referenceObligation, ObjectNode lineage, String qualificationRunHash) {
+<span class="fc" id="L99">        JsonNode receipts = candidate.required(&quot;receipts&quot;);</span>
+<span class="fc" id="L100">        JsonNode hypothesis = receipts.required(&quot;lifecycleCandidate&quot;);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (String field : List.of(&quot;id&quot;, &quot;leftPattern&quot;, &quot;rightPattern&quot;, &quot;assumptions&quot;,</span>
+                &quot;parameterRelations&quot;, &quot;expressionPlaceholders&quot;)) {
+<span class="fc" id="L103">            require(hypothesis.required(field).equals(referenceHypothesis.required(field)),</span>
+                &quot;completed Track F lineage contains another qualification subject&quot;);
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">        JsonNode obligation = receipts.required(&quot;solverObligation&quot;);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (String field : List.of(&quot;declarations&quot;, &quot;theories&quot;, &quot;assumptions&quot;, &quot;goal&quot;, &quot;requestedEvidence&quot;)) {</span>
+<span class="fc" id="L108">            require(obligation.required(field).equals(referenceObligation.required(field)),</span>
+                &quot;completed Track F lineage has a different proof obligation&quot;);
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        JsonNode handoff = receipts.required(&quot;LIFECYCLE_HANDOFF&quot;);</span>
+<span class="fc" id="L112">        JsonNode proof = receipts.required(&quot;PROOF&quot;);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        require(&quot;COMPLETED&quot;.equals(handoff.required(&quot;outcome&quot;).asText())</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                &amp;&amp; handoff.required(&quot;candidateBranchId&quot;).equals(candidate.required(&quot;id&quot;))</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                &amp;&amp; handoff.required(&quot;candidateId&quot;).equals(hypothesis.required(&quot;id&quot;))</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                &amp;&amp; candidate.required(&quot;conjectureId&quot;).equals(hypothesis.required(&quot;id&quot;))</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                &amp;&amp; handoff.required(&quot;proofEvidenceHash&quot;).equals(proof.required(&quot;evidenceHash&quot;))</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                &amp;&amp; proof.required(&quot;solverObligationHash&quot;).equals(obligation.required(&quot;contentHash&quot;))</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                &amp;&amp; &quot;SYMBOLICALLY_VERIFIED&quot;.equals(proof.required(&quot;proofStatus&quot;).asText()),</span>
+            &quot;qualification requires the completed Track F proof and handoff&quot;);
+<span class="fc" id="L121">        lineage.put(&quot;qualificationStatus&quot;, &quot;QUALIFIED&quot;)</span>
+<span class="fc" id="L122">            .put(&quot;qualificationRunHash&quot;, qualificationRunHash)</span>
+<span class="fc" id="L123">            .put(&quot;handoffHash&quot;, handoff.required(&quot;contentHash&quot;).asText())</span>
+<span class="fc" id="L124">            .put(&quot;formalProofStatus&quot;, proof.required(&quot;formalProofStatus&quot;).asText());</span>
+<span class="fc" id="L125">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

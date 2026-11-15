@@ -56,74 +56,111 @@ public final class FinitePolynomialTemplate {
 <span class="fc" id="L56">        return new FinitePolynomialTemplate(id, expression, domains, Origin.DECLARED_GRAMMAR, &quot;&quot;, null);</span>
     }
 
+    /**
+     * Forms a deterministic, target-free univariate monomial basis. Every
+     * coefficient is a finite exact hole; the existing polynomial solver
+     * verifies instantiated expressions against the source independently.
+     * Degree, coefficient domains and the Cartesian product are bounded
+     * before any search is admitted.
+     *
+     * &lt;p&gt;This creates an ansatz, not a proof, a learned tactic or a claim of
+     * discovering a factorization. In particular it never reads a target
+     * expression or a reference result.&lt;/p&gt;
+     */
+    public static FinitePolynomialTemplate declaredUnivariateMonomialBasis(
+            String id, int maxDegree, int minCoefficient, int maxCoefficient) {
+        // The generic resolver currently admits at most eight finite holes.
+        // At least one nonconstant monomial is needed for the @v slot.
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        if (maxDegree &lt; 1 || maxDegree &gt; 7) {</span>
+<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;monomial degree must be in [1,7]&quot;);</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (minCoefficient &gt; maxCoefficient) {</span>
+<span class="fc" id="L78">            throw new IllegalArgumentException(&quot;empty coefficient domain&quot;);</span>
+        }
+<span class="fc" id="L80">        var terms = new java.util.ArrayList&lt;String&gt;(maxDegree + 1);</span>
+<span class="fc" id="L81">        var domains = new java.util.ArrayList&lt;HoleDomain&gt;(maxDegree + 1);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (int degree = 0; degree &lt;= maxDegree; degree++) {</span>
+<span class="fc" id="L83">            String idPart = &quot;coef&quot; + degree;</span>
+<span class="fc" id="L84">            domains.add(HoleDomain.integerRange(idPart, minCoefficient, maxCoefficient));</span>
+<span class="fc bfc" id="L85" title="All 3 branches covered.">            terms.add(&quot;${&quot; + idPart + &quot;}&quot; + switch (degree) {</span>
+<span class="fc" id="L86">                case 0 -&gt; &quot;&quot;;</span>
+<span class="fc" id="L87">                case 1 -&gt; &quot;*@v&quot;;</span>
+<span class="fc" id="L88">                default -&gt; &quot;*@v^&quot; + degree;</span>
+<span class="fc" id="L89">            });</span>
+        }
+        // The constructor rejects an excessive Cartesian product (100000),
+        // keeping the exact solver and canonical formation bounded.
+<span class="fc" id="L93">        return declared(id, String.join(&quot; + &quot;, terms), domains);</span>
+    }
+
     // Only a verifier-backed, privately issued LearnedPlan can supply this origin.
     static FinitePolynomialTemplate learned(LearnedPlan formation, int stageIndex) {
-<span class="fc" id="L61">        Objects.requireNonNull(formation, &quot;formation&quot;);</span>
-<span class="fc" id="L62">        var stage = formation.stageData(stageIndex);</span>
-<span class="fc" id="L63">        String digest = formation.contentHash().substring(&quot;sha256:&quot;.length());</span>
-<span class="fc" id="L64">        return new FinitePolynomialTemplate(&quot;trace-&quot; + digest.substring(0, 40) + &quot;-&quot; + stageIndex,</span>
-<span class="fc" id="L65">            stage.ansatzTemplate(), stage.holeDomains(), Origin.VERIFIED_TRACE_DERIVED,</span>
-<span class="fc" id="L66">            stage.sourceShape(), formation);</span>
+<span class="fc" id="L98">        Objects.requireNonNull(formation, &quot;formation&quot;);</span>
+<span class="fc" id="L99">        var stage = formation.stageData(stageIndex);</span>
+<span class="fc" id="L100">        String digest = formation.contentHash().substring(&quot;sha256:&quot;.length());</span>
+<span class="fc" id="L101">        return new FinitePolynomialTemplate(&quot;trace-&quot; + digest.substring(0, 40) + &quot;-&quot; + stageIndex,</span>
+<span class="fc" id="L102">            stage.ansatzTemplate(), stage.holeDomains(), Origin.VERIFIED_TRACE_DERIVED,</span>
+<span class="fc" id="L103">            stage.sourceShape(), formation);</span>
     }
 
-<span class="fc" id="L69">    public String id() { return id; }</span>
-<span class="fc" id="L70">    public String expression() { return expression; }</span>
-<span class="fc" id="L71">    public List&lt;HoleDomain&gt; domains() { return domains; }</span>
-<span class="fc" id="L72">    public Origin origin() { return origin; }</span>
+<span class="fc" id="L106">    public String id() { return id; }</span>
+<span class="fc" id="L107">    public String expression() { return expression; }</span>
+<span class="fc" id="L108">    public List&lt;HoleDomain&gt; domains() { return domains; }</span>
+<span class="fc" id="L109">    public Origin origin() { return origin; }</span>
     public Applicability applicability() {
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        return origin == Origin.DECLARED_GRAMMAR</span>
-<span class="fc" id="L75">            ? Applicability.ANY_SUPPORTED_UNIVARIATE : Applicability.EXACT_SOURCE_SHAPE;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        return origin == Origin.DECLARED_GRAMMAR</span>
+<span class="fc" id="L112">            ? Applicability.ANY_SUPPORTED_UNIVARIATE : Applicability.EXACT_SOURCE_SHAPE;</span>
     }
-<span class="fc" id="L77">    public String sourceShape() { return sourceShape; }</span>
-<span class="fc" id="L78">    public String formationHash() { return formationHash; }</span>
-<span class="fc" id="L79">    public List&lt;String&gt; provenanceRoots() { return provenanceRoots; }</span>
-<span class="fc" id="L80">    public List&lt;String&gt; formationInputIdentities() { return formationInputIdentities; }</span>
-<span class="fc" id="L81">    public List&lt;String&gt; formationStateIdentities() { return formationStateIdentities; }</span>
+<span class="fc" id="L114">    public String sourceShape() { return sourceShape; }</span>
+<span class="fc" id="L115">    public String formationHash() { return formationHash; }</span>
+<span class="fc" id="L116">    public List&lt;String&gt; provenanceRoots() { return provenanceRoots; }</span>
+<span class="fc" id="L117">    public List&lt;String&gt; formationInputIdentities() { return formationInputIdentities; }</span>
+<span class="fc" id="L118">    public List&lt;String&gt; formationStateIdentities() { return formationStateIdentities; }</span>
 
     public long assignmentCount() {
-<span class="fc" id="L84">        long count = 1;</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (HoleDomain domain : domains) {</span>
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (count &gt; 100_000L / domain.values().size()) {</span>
-<span class="nc" id="L87">                throw new IllegalArgumentException(&quot;template exceeds 100000 assignments&quot;);</span>
+<span class="fc" id="L121">        long count = 1;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (HoleDomain domain : domains) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (count &gt; 100_000L / domain.values().size()) {</span>
+<span class="fc" id="L124">                throw new IllegalArgumentException(&quot;template exceeds 100000 assignments&quot;);</span>
             }
-<span class="fc" id="L89">            count *= domain.values().size();</span>
-<span class="fc" id="L90">        }</span>
-<span class="fc" id="L91">        return count;</span>
+<span class="fc" id="L126">            count *= domain.values().size();</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return count;</span>
     }
 
-<span class="fc" id="L94">    String instantiateVariable(String variable) { return expression.replace(VARIABLE_SLOT, variable); }</span>
+<span class="fc" id="L131">    String instantiateVariable(String variable) { return expression.replace(VARIABLE_SLOT, variable); }</span>
 
-<span class="fc" id="L96">    record ShapeCheck(boolean matches, long visitedNodes) {}</span>
+<span class="fc" id="L133">    record ShapeCheck(boolean matches, long visitedNodes) {}</span>
 
     ShapeCheck checkShape(ExactFinitePolynomialInput.Projection input) {
-<span class="fc bfc" id="L99" title="All 2 branches covered.">        return applicability() == Applicability.ANY_SUPPORTED_UNIVARIATE ? new ShapeCheck(true, 0)</span>
-<span class="fc" id="L100">            : ExactFinitePolynomialTraceLearner.checkSourceShape(sourceShape, input.parsed());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        return applicability() == Applicability.ANY_SUPPORTED_UNIVARIATE ? new ShapeCheck(true, 0)</span>
+<span class="fc" id="L137">            : ExactFinitePolynomialTraceLearner.checkSourceShape(sourceShape, input.parsed());</span>
     }
 
     public String toCanonicalJson() {
-<span class="fc" id="L104">        JsonWriter writer = new JsonWriter().beginObject();</span>
-<span class="fc" id="L105">        writeJson(writer);</span>
-<span class="fc" id="L106">        return writer.endObject().toString();</span>
+<span class="fc" id="L141">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L142">        writeJson(writer);</span>
+<span class="fc" id="L143">        return writer.endObject().toString();</span>
     }
 
     void writeJson(JsonWriter writer) {
-<span class="fc" id="L110">        writer.property(&quot;schema&quot;, REVISION).property(&quot;authority&quot;, &quot;REQUIRES_FRESH_VERIFICATION&quot;)</span>
-<span class="fc" id="L111">            .property(&quot;id&quot;, id).property(&quot;expression&quot;, expression).property(&quot;variableSlot&quot;, VARIABLE_SLOT)</span>
-<span class="fc" id="L112">            .property(&quot;maxExpressionChars&quot;, MAX_EXPRESSION_CHARS)</span>
-<span class="fc" id="L113">            .property(&quot;origin&quot;, origin.name()).property(&quot;applicability&quot;, applicability().name())</span>
-<span class="fc" id="L114">            .property(&quot;sourceShape&quot;, sourceShape)</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            .property(&quot;applicabilityRevision&quot;, origin == Origin.VERIFIED_TRACE_DERIVED</span>
-<span class="fc" id="L116">                ? ExactFinitePolynomialTraceLearner.REVISION : ExactFinitePolynomialInput.REVISION)</span>
-<span class="fc" id="L117">            .property(&quot;formationHash&quot;, formationHash).stringArray(&quot;provenanceRoots&quot;, provenanceRoots)</span>
-<span class="fc" id="L118">            .property(&quot;inputIdentityRevision&quot;, ExactFinitePolynomialInput.REVISION)</span>
-<span class="fc" id="L119">            .property(&quot;inputViewBudget&quot;, ExactFinitePolynomialInput.BUDGET.canonicalMaterial())</span>
-<span class="fc" id="L120">            .stringArray(&quot;formationInputIdentities&quot;, formationInputIdentities)</span>
-<span class="fc" id="L121">            .stringArray(&quot;formationStateIdentities&quot;, formationStateIdentities)</span>
-<span class="fc" id="L122">            .array(&quot;domains&quot;, values -&gt; domains.forEach(domain -&gt; values.objectValue(value -&gt;</span>
-<span class="fc" id="L123">                value.property(&quot;id&quot;, domain.holeId()).property(&quot;kind&quot;, domain.kind().name())</span>
-<span class="fc" id="L124">                    .array(&quot;values&quot;, scalars -&gt; domain.values().forEach(scalar -&gt; scalars.value(scalar.canonicalText()))))));</span>
-<span class="fc" id="L125">    }</span>
+<span class="fc" id="L147">        writer.property(&quot;schema&quot;, REVISION).property(&quot;authority&quot;, &quot;REQUIRES_FRESH_VERIFICATION&quot;)</span>
+<span class="fc" id="L148">            .property(&quot;id&quot;, id).property(&quot;expression&quot;, expression).property(&quot;variableSlot&quot;, VARIABLE_SLOT)</span>
+<span class="fc" id="L149">            .property(&quot;maxExpressionChars&quot;, MAX_EXPRESSION_CHARS)</span>
+<span class="fc" id="L150">            .property(&quot;origin&quot;, origin.name()).property(&quot;applicability&quot;, applicability().name())</span>
+<span class="fc" id="L151">            .property(&quot;sourceShape&quot;, sourceShape)</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            .property(&quot;applicabilityRevision&quot;, origin == Origin.VERIFIED_TRACE_DERIVED</span>
+<span class="fc" id="L153">                ? ExactFinitePolynomialTraceLearner.REVISION : ExactFinitePolynomialInput.REVISION)</span>
+<span class="fc" id="L154">            .property(&quot;formationHash&quot;, formationHash).stringArray(&quot;provenanceRoots&quot;, provenanceRoots)</span>
+<span class="fc" id="L155">            .property(&quot;inputIdentityRevision&quot;, ExactFinitePolynomialInput.REVISION)</span>
+<span class="fc" id="L156">            .property(&quot;inputViewBudget&quot;, ExactFinitePolynomialInput.BUDGET.canonicalMaterial())</span>
+<span class="fc" id="L157">            .stringArray(&quot;formationInputIdentities&quot;, formationInputIdentities)</span>
+<span class="fc" id="L158">            .stringArray(&quot;formationStateIdentities&quot;, formationStateIdentities)</span>
+<span class="fc" id="L159">            .array(&quot;domains&quot;, values -&gt; domains.forEach(domain -&gt; values.objectValue(value -&gt;</span>
+<span class="fc" id="L160">                value.property(&quot;id&quot;, domain.holeId()).property(&quot;kind&quot;, domain.kind().name())</span>
+<span class="fc" id="L161">                    .array(&quot;values&quot;, scalars -&gt; domain.values().forEach(scalar -&gt; scalars.value(scalar.canonicalText()))))));</span>
+<span class="fc" id="L162">    }</span>
 
-<span class="fc" id="L127">    public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
+<span class="fc" id="L164">    public String contentHash() { return SchematicProofPlan.hash(toCanonicalJson()); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
