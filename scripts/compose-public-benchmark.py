@@ -121,6 +121,8 @@ def final_qualification(data, allocation, allocation_hash):
     evidence, run = qualification["evidence"], qualification["run"]
     require(evidence["qualified"] is True and run["qualified"] is True
             and run["qualificationEvidenceHash"] == evidence["contentHash"]
+            and evidence["campaignManifestHash"] == run["campaignManifestHash"]
+            and run["promotionStatus"] == "NOT_EVALUATED" and run["publicEvidenceStatus"] == "NOT_EVALUATED"
             and run["campaignManifestHash"] == allocation["originalCampaign"]["contentHash"],
             "qualification receipt does not belong to the reference campaign")
     lanes = []
@@ -138,9 +140,12 @@ def final_qualification(data, allocation, allocation_hash):
                         and lineage["conjectureId"] == evidence["conjectureId"]
                         and lineage["qualificationRunHash"] == run["contentHash"]
                         and lineage["handoffHash"] == handoff["contentHash"], "qualification handoff link")
+                require(lineage["formalProofStatus"] == candidate["receipts"]["PROOF"]["formalProofStatus"],
+                        "qualification changed the formal proof status of the retained lineage")
                 qualified += 1
             else:
-                require(lineage["qualificationStatus"] == "NOT_EVALUATED",
+                require(lineage["qualificationStatus"] == "NOT_EVALUATED"
+                        and not any(key in lineage for key in ("qualificationRunHash", "handoffHash", "formalProofStatus")),
                         "unfinished lineage cannot receive qualification")
         require(result["qualifiedLineages"] == qualified
                 and result["distinctQualifiedCandidates"] == int(qualified > 0), "qualification counts")

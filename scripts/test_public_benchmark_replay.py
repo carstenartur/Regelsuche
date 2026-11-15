@@ -56,6 +56,28 @@ class PublicBenchmarkReplayTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unfinished lineage"):
             COMPOSER.final_qualification(result, stage, allocation["sha256"])
 
+    def test_qualification_rejects_changed_proof_strength_and_claim_gates(self):
+        registry = json.loads((COMPOSER.PUBLIC / "sources.json").read_bytes())
+        allocation = registry["stages-measured"]
+        qualification = registry["stages-qualification"]
+        stage = json.loads(COMPOSER.read_source(COMPOSER.ROOT / allocation["path"]))
+        retained = COMPOSER.read_source(COMPOSER.ROOT / qualification["path"])
+        for field, value, message in (
+            ("formalProofStatus", "FORMALLY_PROVED", "formal proof status"),
+            ("promotionStatus", "PROMOTED", "qualification receipt"),
+            ("campaignManifestHash", "sha256:" + "0" * 64, "qualification receipt"),
+        ):
+            with self.subTest(field=field):
+                result = json.loads(retained)
+                if field == "formalProofStatus":
+                    result["lanes"][0]["lineages"][0][field] = value
+                elif field == "campaignManifestHash":
+                    result["qualification"]["evidence"][field] = value
+                else:
+                    result["qualification"]["run"][field] = value
+                with self.assertRaisesRegex(ValueError, message):
+                    COMPOSER.final_qualification(result, stage, allocation["sha256"])
+
 
 if __name__ == "__main__":
     unittest.main()
