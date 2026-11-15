@@ -100,3 +100,12 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`RecurrenceInvariantSynthesis.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesis.java#L26) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesis.java | public final class RecurrenceInvariantSynthesis { -->
 - [`OrderedStateChoiceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedStateChoiceExperimentTest.java#L25) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedStateChoiceExperimentTest.java | class OrderedStateChoiceExperimentTest { -->
 - [`RecurrenceStateChoiceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceStateChoiceExperimentTest.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceStateChoiceExperimentTest.java | class RecurrenceStateChoiceExperimentTest { -->
+
+## Gradaufteilung in der vollständigen Rekurrenzsuche
+
+- **Hypothese.** Bei linearen Übergängen ohne Verschiebung lassen sich die Gradblöcke unabhängig lösen und anschließend in der bisherigen Reihenfolge ausgeben.
+- **Umsetzungsstand.** Der reguläre Aufruf durchsucht alle nichtkonstanten Grade für beide Vorzeichen. Affine Übergänge mit Verschiebung behalten den gekoppelten Ansatzraum.
+- **Befund.** Ein Budget von 10.000 Einheiten genügt für alle fünf Gesetze des dreidimensionalen Vergleichsfalls. Der frühere Aufruf benötigt 11.686 Einheiten.
+- **Folgerung.** Die vollständige Gradaufteilung dient als Referenz für Vergleiche zur weiteren Reduktion von Koeffizienten- und Prüfarbeit. [Festgelegte gekoppelte Aufgaben](../../config/benchmarks/coupled-recurrence-v1.json)
+
+- [`RecurrenceInvariantSynthesisTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesisTest.java#L20) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesisTest.java | class RecurrenceInvariantSynthesisTest { -->

@@ -1,0 +1,70 @@
+{
+  "schema": "regelsuche.coupled-recurrence/v1",
+  "scope": "Six diagnostic tasks from three independently published transition formulas. Matrices, initial states, signs, degree and budget were fixed before running the comparison. Expected law counts are only used by the evaluator.",
+  "degree": 2,
+  "workBudget": 100000,
+  "queryReserve": 54,
+  "indices": [0, 1, 2, 7, 16, 63],
+  "sources": {
+    "oscillator": "https://www.cfca.nao.ac.jp/~tito/ndyn/pdfproc/proc_CeleMechNbodyDyn2001Kusatsu.pdf",
+    "cayley": "https://www.cis.upenn.edu/~jean/invers.pdf",
+    "axialDrift": "https://hades.mech.northwestern.edu/images/9/90/MR-tablet-temporary.pdf",
+    "tribonacci": "https://doi.org/10.3390/math7010074"
+  },
+  "cases": [
+    {
+      "id": "symplectic-euler",
+      "family": "oscillator",
+      "linear": [["3/4", "1/2"], ["-1/2", "1"]],
+      "offset": ["0", "0"],
+      "initial": ["2", "3"],
+      "fixed": 1,
+      "alternating": 0
+    },
+    {
+      "id": "symplectic-euler-shifted",
+      "family": "oscillator",
+      "linear": [["3/4", "1/2"], ["-1/2", "1"]],
+      "offset": ["1", "1"],
+      "initial": ["2", "3"],
+      "fixed": 1,
+      "alternating": 0
+    },
+    {
+      "id": "cayley-rotation",
+      "family": "cayley",
+      "linear": [["-11/15", "2/3", "2/15"], ["-2/15", "-1/3", "14/15"], ["2/3", "2/3", "1/3"]],
+      "offset": ["0", "0", "0"],
+      "initial": ["2", "-3", "4"],
+      "fixed": 3,
+      "alternating": 0
+    },
+    {
+      "id": "cayley-rotoreflection",
+      "family": "cayley",
+      "linear": [["11/15", "-2/3", "-2/15"], ["2/15", "1/3", "-14/15"], ["-2/3", "-2/3", "-1/3"]],
+      "offset": ["0", "0", "0"],
+      "initial": ["2", "-3", "4"],
+      "fixed": 2,
+      "alternating": 1
+    },
+    {
+      "id": "cayley-axial-drift",
+      "family": "cayley",
+      "linear": [["-11/15", "2/3", "2/15"], ["-2/15", "-1/3", "14/15"], ["2/3", "2/3", "1/3"]],
+      "offset": ["1", "2", "3"],
+      "initial": ["2", "-3", "4"],
+      "fixed": 1,
+      "alternating": 0
+    },
+    {
+      "id": "tribonacci",
+      "family": "tribonacci",
+      "linear": [["1", "1", "1"], ["1", "0", "0"], ["0", "1", "0"]],
+      "offset": ["0", "0", "0"],
+      "initial": ["1", "1", "0"],
+      "fixed": 0,
+      "alternating": 0
+    }
+  ]
+}
