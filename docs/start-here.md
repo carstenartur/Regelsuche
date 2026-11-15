@@ -12,6 +12,12 @@ It contains a retained Sophie-Germain search trace and an actual run of an
 external consumer against the released SDK 0.5.2. It is a recording, not a live
 server. [Provenance and reproduction](demos/README.md) accompany it.
 
+**Compare benefit and failed transfer:** [download the public discovery comparison](https://raw.githubusercontent.com/carstenartur/Regelsuche/main/app/src/main/resources/web/public-discovery-comparison.html)
+and open the HTML file, or follow the public comparison link in the Workbench’s
+demo area or **Gespeicherte Runs**. Expand individual composite-factor cases
+or follow the actual retained cross-family search paths, including the negative
+controls and recorded stopping conditions.
+
 ## Choose a workflow
 
 | Goal | Start | Inspect |
