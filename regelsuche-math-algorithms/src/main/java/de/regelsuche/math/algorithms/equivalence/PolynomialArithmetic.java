@@ -92,7 +92,13 @@ final class PolynomialArithmetic {
             case ADD -> Optional.of(left.orElseThrow().add(right.orElseThrow()));
             case SUB -> Optional.of(left.orElseThrow().subtract(right.orElseThrow()));
             case MUL -> Optional.of(left.orElseThrow().multiply(right.orElseThrow()));
-            case DIV -> Optional.empty();
+            case DIV -> {
+                Polynomial divisor = right.orElseThrow();
+                Rational constant = divisor.terms().get(Monomial.constant());
+                yield divisor.termCount() == 1 && constant != null
+                    ? Optional.of(left.orElseThrow().multiply(Rational.ONE.divide(constant)))
+                    : Optional.empty();
+            }
             case POW -> integerExponent(binaryExpr.right()).map(exponent -> left.orElseThrow().pow(exponent));
         };
     }

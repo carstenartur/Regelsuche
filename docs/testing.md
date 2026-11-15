@@ -247,20 +247,14 @@ Wichtige fokussierte Verträge:
 
 Convenience-Skripte dürfen lediglich an diese checkout-eigenen Tasks delegieren.
 
-Der Track-B-Replay von `verifyComparativeBenchmarks` verwendet den integrierten
-Validator aus [Revision `74efc6d`](https://github.com/carstenartur/Regelsuche/commit/74efc6da0a8edadd1870c7fb2d17b078d1303ab5).
-Gegenüber dem eingefrorenen Bericht aus Revision `9ddd37ac` entfällt bei
-`case-002` in `best-first` und `project-a-star` je der Eintrag
-`matrix-non-commutative` in `validation.counterexampleSearches[0].attemptedSources`.
-Die neue Zulässigkeitsprüfung verwirft die nicht unterstützten Matrixpotenzen
-vor dem Aufruf. Alle übrigen Bytes stimmen mit dem eingefrorenen Bericht
-überein.
-
-Der integrierte Replay hat 121.655 Bytes und SHA-256
-`dd7dc15f2455727d8a9bf1d7b4782085e40ef29da5f40797767f2424bda7b9ce`.
-Die Berichte aus Checkout und gepinntem Container müssen bytegleich sein.
-Die beiden eingefrorenen Track-B-Berichte bleiben die Quellen der
-v2-Zusammenfassung.
+Der Track-B-Replay von `verifyComparativeBenchmarks` verwendet den exakten
+Validator mit konstanten Nennern aus [Revision `c1f3a273`](https://github.com/carstenartur/Regelsuche/commit/c1f3a273d6d0a81e9862f8564729dfcf3cd35c89).
+Beide Suchverfahren bestätigen 19 von 20 Fällen. Je 38 von 40 Negativprüfungen
+werden ausgeführt, ohne eine falsche Regelanwendung zu finden. Die v2-Zusammenfassung
+führt diese Messung neben den beiden früheren eingefrorenen Ergebnissen auf.
+Checkout und gepinnter Container müssen die 138.533 Bytes des neuen Berichts
+mit SHA-256 `1af25ae8e84e3d0e88d7fe1d3a8547b99bf35afb877e0318bfa95f0511801fdc`
+bytegleich reproduzieren.
 
 ## Testdaten und Determinismus
 

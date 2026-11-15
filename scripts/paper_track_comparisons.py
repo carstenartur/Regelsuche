@@ -19,6 +19,8 @@ SOURCES = {
                          "46605224e9851071df8522c9d74ed70bf09ff1911d3d54448888f09a8449ff7e", "df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b"),
     "exactHidden": ("research/benchmarks/comparative-v2/hidden-rule-current.json.gz",
                     "eea493b38abcc45719d694f4ef4c58e29f5e2a4b7732ad24d9cec5b5cd2bdf08", "df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b"),
+    "correctedHidden": ("research/benchmarks/comparative-v2/hidden-rule-constant-denominators.json.gz",
+                        "1af25ae8e84e3d0e88d7fe1d3a8547b99bf35afb877e0318bfa95f0511801fdc", "afc8018d45138b2cabff2462e9bb4cd48700cf13"),
     "exactComponents": ("docs/evidence/discovery-component-panel-exact-v1.json.gz",
                         "fbeb2b16f1a61ff4281c22a9d31996e693e3fcbce709b63f91cdcb4dd971176a", "5ddc10da51282fd6e23a01c3b6c7de1dd3bfa3cb"),
     "components": ("docs/evidence/discovery-component-panel-v1.json.gz",
@@ -130,15 +132,16 @@ def validator_table(historical, exact):
                   "Exact: no witness", "Exact inconclusive"], rows)
 
 
-def rediscovery_table(previous, current):
-    if previous["tasks"] != current["tasks"]:
+def rediscovery_table(historical, exact, corrected):
+    if historical["tasks"] != exact["tasks"] or historical["tasks"] != corrected["tasks"]:
         raise ValueError("hidden-rule tasks changed across validator versions")
     rows = []
-    for version, panel in (("Historical", previous), ("Exact", current)):
+    for version, panel in (("Historical", historical), ("Exact (initial)", exact), ("Exact (corrected)", corrected)):
         for key, name in (("best-first", "Best-first"), ("project-a-star", "Project A*")):
             data = panel["profiles"][key]["summary"]
             rows.append([version, name, fraction(data["rediscoveredCases"], data["cases"]),
-                         data["evaluatedNegativeHoldouts"], data["skippedNegativeHoldouts"], data["falsePositiveHoldouts"]])
+                         fraction(data["evaluatedNegativeHoldouts"], data["negativeHoldouts"]),
+                         data["skippedNegativeHoldouts"], data["falsePositiveHoldouts"]])
     return table(["Validator", "Search", "Recovered", "Negative executed", "Negative skipped", "False positives"], rows)
 
 
@@ -234,9 +237,12 @@ def write_track_reports(root, output, require_input):
         "univariate normal-form provenance. Both versions of the separate log control retained three positivity guards "
         "and found no refuting witness. "
         f"[Historical component execution]({source('components')}) · [Exact execution]({source('exactComponents')}).",
-        "The separate hidden-rule replay used the same twenty tasks in both versions. A missing admitted candidate "
-        "can leave negative holdouts unexecuted. The false-positive count has the executed holdouts as its denominator.",
-        rediscovery_table(reports["historicalHidden"], reports["exactHidden"]),
-        f"[Historical hidden-rule execution]({source('historicalHidden')}) · [Exact execution]({source('exactHidden')}).",
+        "The separate hidden-rule replay used the same twenty tasks under all three validator revisions. "
+        "The corrected exact polynomial normalizer handles quotients whose denominator simplifies exactly to a "
+        "nonzero constant. A missing admitted candidate can leave negative holdouts unexecuted. The false-positive "
+        "count covers the executed holdouts only.",
+        rediscovery_table(reports["historicalHidden"], reports["exactHidden"], reports["correctedHidden"]),
+        f"[Historical hidden-rule execution]({source('historicalHidden')}) · "
+        f"[Initial exact execution]({source('exactHidden')}) · [Corrected exact execution]({source('correctedHidden')}).",
     ])
     (output / "public-discovery-comparisons.md").write_text("\n\n".join(sections) + "\n")

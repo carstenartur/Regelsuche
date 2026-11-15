@@ -93,13 +93,15 @@ The same public component protocol ran with the exactness revision. No witness m
 
 One distinct rational cancellation candidate changed to inconclusive in every arm that formed it. Its exact search found no defined scalar pair within the bounds. The four other mined candidates retained their bounded no-witness status. Twelve polynomial source pairs now carry exact univariate normal-form provenance. Both versions of the separate log control retained three positivity guards and found no refuting witness. [Historical component execution](https://github.com/carstenartur/Regelsuche/blob/a0abfcbf8b136047c52e51d87a13b0933433f9d7/docs/evidence/discovery-component-panel-v1.json.gz) · [Exact execution](https://github.com/carstenartur/Regelsuche/blob/5ddc10da51282fd6e23a01c3b6c7de1dd3bfa3cb/docs/evidence/discovery-component-panel-exact-v1.json.gz).
 
-The separate hidden-rule replay used the same twenty tasks in both versions. A missing admitted candidate can leave negative holdouts unexecuted. The false-positive count has the executed holdouts as its denominator.
+The separate hidden-rule replay used the same twenty tasks under all three validator revisions. The corrected exact polynomial normalizer handles quotients whose denominator simplifies exactly to a nonzero constant. A missing admitted candidate can leave negative holdouts unexecuted. The false-positive count covers the executed holdouts only.
 
 | Validator | Search | Recovered | Negative executed | Negative skipped | False positives |
 | --- | --- | --- | --- | --- | --- |
-| Historical | Best-first | 19/20 | 38 | 2 | 0 |
-| Historical | Project A* | 19/20 | 38 | 2 | 0 |
-| Exact | Best-first | 13/20 | 26 | 14 | 0 |
-| Exact | Project A* | 13/20 | 26 | 14 | 0 |
+| Historical | Best-first | 19/20 | 38/40 | 2 | 0 |
+| Historical | Project A* | 19/20 | 38/40 | 2 | 0 |
+| Exact (initial) | Best-first | 13/20 | 26/40 | 14 | 0 |
+| Exact (initial) | Project A* | 13/20 | 26/40 | 14 | 0 |
+| Exact (corrected) | Best-first | 19/20 | 38/40 | 2 | 0 |
+| Exact (corrected) | Project A* | 19/20 | 38/40 | 2 | 0 |
 
-[Historical hidden-rule execution](https://github.com/carstenartur/Regelsuche/blob/df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b/research/benchmarks/comparative-v2/hidden-rule-historical.json.gz) · [Exact execution](https://github.com/carstenartur/Regelsuche/blob/df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b/research/benchmarks/comparative-v2/hidden-rule-current.json.gz).
+[Historical hidden-rule execution](https://github.com/carstenartur/Regelsuche/blob/df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b/research/benchmarks/comparative-v2/hidden-rule-historical.json.gz) · [Initial exact execution](https://github.com/carstenartur/Regelsuche/blob/df5d2a28d9ad0184b3d80d1723ba23aca9b92a7b/research/benchmarks/comparative-v2/hidden-rule-current.json.gz) · [Corrected exact execution](https://github.com/carstenartur/Regelsuche/blob/afc8018d45138b2cabff2462e9bb4cd48700cf13/research/benchmarks/comparative-v2/hidden-rule-constant-denominators.json.gz).
