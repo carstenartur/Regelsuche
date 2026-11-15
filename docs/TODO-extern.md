@@ -62,3 +62,13 @@ Die [technische Testinstallation](plugin-distribution-client.md#verification-of-
 beschreibt den reproduzierbaren Testkatalog, die Herkunftsprüfung und den
 Installationsablauf. Die [SDK-Qualifikation](released-sdk-maven-qualification.md)
 dokumentiert die eigenständig baubaren Beispiele.
+
+## Geschützte Qualifikation und prospektive Repräsentationsstudien
+
+**Herkunft:** [#748](https://github.com/carstenartur/Regelsuche/issues/748) (Polynomtheorie), [#750](https://github.com/carstenartur/Regelsuche/issues/750) (Repräsentationen), [#874](https://github.com/carstenartur/Regelsuche/issues/874) (gelernte Beweispläne). Die technische Studie und ihre Freigabe sind getrennte Vorgänge; die öffentlichen Entwicklungskontrollen aus diesen Issues ersetzen keine unabhängig verwahrten Testdaten.
+
+- [ ] Für eine tatsächlich geschützte oder versiegelte Qualifikation eine berechtigte Verwahrstelle, die Zugriffsrechte und die Freigabe der **konkreten** Datensatz-/Protokollrevision klären. Für #748 gilt dies insbesondere für die 600-Zeilen-Qualifikation. Vor vollständigem, überprüftem Kandidaten-Freeze keine Einsicht in die geschützten Ergebnisse; Hash, Länge und Pfad allein erlauben noch keinen Zugriff.
+- [ ] Für eine prospektive unabhängige Evaluation in #750 beziehungsweise einen historischen Blind-/Transfervergleich in #874 durch eine unabhängige zuständige Stelle wirklich disjunkte Fälle und Familien auswählen, verwahren und erst nach dem gebundenen Freeze freigeben. Die bereits öffentlich bekannten Pilot-, Cassini- und Brahmagupta-Fälle gelten nicht als unabhängige Blindstichprobe.
+- [ ] Nach einer ausdrücklich erteilten Freigabe den zugelassenen einmaligen Versuch samt Abbrüchen, Negativbefunden und vollständigen Arbeitszählern unabhängig auditieren lassen. Ohne diese externe Autorität dürfen keine Aussagen über unabhängigen Studienerfolg oder allgemeine Überlegenheit getroffen werden.
+
+**Technik bleibt in den Issues:** Quellen-/Laufzeitfixierung, vollständige öffentliche Kandidaten-Freeze-Belege, fail-closed Freigabegrenzen, synthetische Negativtests, Reproduktionswerkzeuge und öffentliche, zielverdeckte Entwicklungskontrollen können ohne Zugriff auf geschützte Daten umgesetzt und qualifiziert werden. Diese Liste gibt keine Veröffentlichung, Datenöffnung oder Studienausführung frei.

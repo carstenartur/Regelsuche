@@ -6,6 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.evolution.ExactFinitePolynomialPlanCandidateEvidenceVerifier.VerifiedCandidateEvidence;
+import de.regelsuche.evolution.FinitePolynomialTemplate.Applicability;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.math.algorithms.equivalence.ExactFinitePolynomialHoleSolver.HoleDomain;
 import de.regelsuche.parse.ExactExpressionFormatter;
@@ -34,6 +35,7 @@ import java.util.Set;
  */
 public final class ExactFinitePolynomialTraceLearner {
     public static final String REVISION = "regelsuche.exact-finite-polynomial-trace-learner/v2";
+    static final String MONOMIAL_SUPPORT_REVISION = "regelsuche.exact-finite-polynomial-trace-learner/v3";
     private static final String VARIABLE = FinitePolynomialTemplate.VARIABLE_SLOT;
     private static final int MAX_EXPRESSION_CHARS = 16_384;
     private static final int MAX_STRUCTURAL_TOKENS = 128;
@@ -74,7 +76,8 @@ public final class ExactFinitePolynomialTraceLearner {
         public Instantiation { holeDomains = List.copyOf(holeDomains); }
     }
 
-    record Stage(String sourceShape, String ansatzTemplate, List<HoleDomain> holeDomains) {
+    record Stage(Applicability applicability, String sourceShape, String ansatzTemplate,
+                 List<HoleDomain> holeDomains) {
         Stage { holeDomains = List.copyOf(holeDomains); }
     }
 
@@ -123,8 +126,8 @@ public final class ExactFinitePolynomialTraceLearner {
         public String contentHash() { return contentHash; }
 
         /**
-         * Exact syntactic applicability only. Empty means a shape mismatch, not
-         * mathematical impossibility. Unsupported syntax/limits throw explicitly.
+         * Empty means the input falls outside the frozen stage's applicability.
+         * Unsupported syntax or limits throw explicitly.
          * @param stageIndex zero-based index into {@link #stages()}
          * @throws IllegalArgumentException if the stage index is outside the learned plan
          */
@@ -137,7 +140,7 @@ public final class ExactFinitePolynomialTraceLearner {
             if (formationStateIdentities.contains(parsed.projection().identity())) {
                 throw new IllegalArgumentException("training-equivalent input is not held-out reuse");
             }
-            if (!stage.sourceShape().equals(shape(parsed.term(), parsed.term().expression(), false))) {
+            if (!stage.sourceShape().equals(sourceShape(parsed.projection(), stage.applicability()))) {
                 return Optional.empty();
             }
             String template = stage.instantiateVariable(parsed.variable());
@@ -148,6 +151,21 @@ public final class ExactFinitePolynomialTraceLearner {
     }
 
     public LearnedPlan learn(List<TrainingTrace> training, Limits limits) {
+        return learn(training, limits, Applicability.EXACT_SOURCE_SHAPE);
+    }
+
+    /**
+     * Learns the first stage's nonzero monomial degrees from the verified TRAIN sources.
+     * The bounded exact projection can admit a new surface form of an integer
+     * polynomial with the same support. Later stages match the syntax of the
+     * preceding stage's output. Every application still needs fresh verification
+     * against its original source expression.
+     */
+    public LearnedPlan learnWithMonomialSupport(List<TrainingTrace> training, Limits limits) {
+        return learn(training, limits, Applicability.EXACT_MONOMIAL_SUPPORT);
+    }
+
+    private LearnedPlan learn(List<TrainingTrace> training, Limits limits, Applicability rootApplicability) {
         Objects.requireNonNull(training, "training");
         Objects.requireNonNull(limits, "limits");
         if (training.size() < limits.minimumTraces() || training.size() > limits.maximumTraces()) {
@@ -182,10 +200,12 @@ public final class ExactFinitePolynomialTraceLearner {
                     throw new IllegalArgumentException("step changes its variable identity");
                 }
             }
-            String inputShape = shape(inputs.getFirst().term(), inputs.getFirst().term().expression(), false);
-            if (inputs.stream().anyMatch(input -> !inputShape.equals(
-                    shape(input.term(), input.term().expression(), false)))) {
-                throw new IllegalArgumentException("training sources have different syntax shapes");
+            Applicability applicability = index == 0 ? rootApplicability : Applicability.EXACT_SOURCE_SHAPE;
+            String inputShape = sourceShape(inputs.getFirst().projection(), applicability);
+            if (inputs.stream().anyMatch(input -> !inputShape.equals(sourceShape(input.projection(), applicability)))) {
+                throw new IllegalArgumentException(applicability == Applicability.EXACT_MONOMIAL_SUPPORT
+                    ? "training sources have different monomial support"
+                    : "training sources have different syntax shapes");
             }
             Generalization context = new Generalization(limits);
             String template = generalize(outputs, outputs.stream().map(p -> p.term().expression()).toList(),
@@ -193,7 +213,7 @@ public final class ExactFinitePolynomialTraceLearner {
             if (context.domains.isEmpty()) {
                 throw new IllegalArgumentException("no varying coefficient: stage would memorize a fixed form");
             }
-            stages.add(new Stage(inputShape, template, context.domains));
+            stages.add(new Stage(applicability, inputShape, template, context.domains));
         }
         return new LearnedPlan(limits, stages, traces.stream().map(CheckedTrace::root).toList(),
             sourceIdentities.stream().sorted().toList(), formation);
@@ -339,7 +359,20 @@ public final class ExactFinitePolynomialTraceLearner {
             + " " + shape(term, binary.right(), binary.operator() == BinaryOperator.POW) + ")";
     }
 
-    static FinitePolynomialTemplate.ShapeCheck checkSourceShape(String expected, ExactParsedTerm term) {
+    private static String sourceShape(ExactFinitePolynomialInput.Projection input, Applicability applicability) {
+        if (applicability == Applicability.EXACT_MONOMIAL_SUPPORT) {
+            var polynomial = input.polynomial();
+            boolean constantRing = polynomial.ring().variables().isEmpty();
+            return polynomial.terms().keySet().stream()
+                .mapToInt(monomial -> constantRing ? 0 : monomial.exponent(0))
+                .sorted().mapToObj(Integer::toString).collect(java.util.stream.Collectors.joining(","));
+        }
+        return shape(input.parsed(), input.parsed().expression(), false);
+    }
+
+    static FinitePolynomialTemplate.ShapeCheck checkSourceShape(
+            String expected, ExactFinitePolynomialInput.Projection input, Applicability applicability) {
+        ExactParsedTerm term = input.parsed();
         int[] visits = new int[1];
         Set<String> variables = new HashSet<>();
         try {
@@ -350,14 +383,16 @@ public final class ExactFinitePolynomialTraceLearner {
         if (variables.size() != 1) {
             return new FinitePolynomialTemplate.ShapeCheck(false, visits[0]);
         }
-        return new FinitePolynomialTemplate.ShapeCheck(
-            expected.equals(shape(term, term.expression(), false)), 2L * visits[0]);
+        long nodeVisits = applicability == Applicability.EXACT_MONOMIAL_SUPPORT ? visits[0] : 2L * visits[0];
+        return new FinitePolynomialTemplate.ShapeCheck(expected.equals(sourceShape(input, applicability)), nodeVisits);
     }
 
     private static String render(Limits limits, List<Stage> stages, List<String> roots,
                                  List<String> inputIdentities, List<String> formationIdentities,
                                  int formationObservations, long identityWork) {
-        return new JsonWriter().beginObject().property("schema", REVISION)
+        String revision = stages.getFirst().applicability() == Applicability.EXACT_MONOMIAL_SUPPORT
+            ? MONOMIAL_SUPPORT_REVISION : REVISION;
+        return new JsonWriter().beginObject().property("schema", revision)
             .property("authority", "NON_EXECUTABLE_REQUIRES_FRESH_VERIFICATION")
             .property("resolverRevision", ExactFinitePolynomialPlanResolver.REVISION_HASH)
             .property("verifierRevision", ExactFinitePolynomialPlanCandidateEvidenceVerifier.REVISION_HASH)
@@ -377,9 +412,13 @@ public final class ExactFinitePolynomialTraceLearner {
                 .property("maximumCoefficient", limits.maximumCoefficient())
                 .property("maximumAssignmentsPerStep", limits.maximumAssignmentsPerStep()))
             .stringArray("trainingRoots", roots)
-            .array("stages", w -> stages.forEach(stage -> w.objectValue(s -> s
-                .property("sourceShape", stage.sourceShape()).property("ansatzTemplate", stage.ansatzTemplate())
-                .stringArray("coefficientHoles", stage.holeDomains().stream().map(HoleDomain::holeId).toList()))))
+            .array("stages", w -> stages.forEach(stage -> w.objectValue(s -> {
+                if (MONOMIAL_SUPPORT_REVISION.equals(revision)) {
+                    s.property("applicability", stage.applicability().name());
+                }
+                s.property("sourceShape", stage.sourceShape()).property("ansatzTemplate", stage.ansatzTemplate())
+                    .stringArray("coefficientHoles", stage.holeDomains().stream().map(HoleDomain::holeId).toList());
+            })))
             .endObject().toString();
     }
 
