@@ -104,9 +104,9 @@ final class TargetFreeRepresentationStudyConclusion {
 <span class="fc" id="L104">        Decision decision = new Decision(</span>
             RESULT_CLASSIFICATION,
 <span class="pc bpc" id="L106" title="1 of 2 branches missed.">            summary.policyDifferentiatingCaseCount() == 0</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                    &amp;&amp; summary.allPolicyMatchedWorkCaseCount() == 0</span>
-<span class="fc" id="L108">                ? POLICY_COMPARISON_STATUS</span>
-<span class="nc" id="L109">                : &quot;POLICY_DIFFERENCE_REQUIRES_SEPARATE_INTERPRETATION&quot;,</span>
+<span class="pc bnc" id="L107" title="All 2 branches missed.">                    &amp;&amp; summary.allPolicyMatchedWorkCaseCount() == 0</span>
+<span class="nc" id="L108">                ? POLICY_COMPARISON_STATUS</span>
+<span class="fc" id="L109">                : &quot;POLICY_DIFFERENCE_REQUIRES_SEPARATE_INTERPRETATION&quot;,</span>
 <span class="pc bpc" id="L110" title="1 of 2 branches missed.">            summary.qualifiedCandidatesAtDepthAtLeastThree() == 0</span>
 <span class="fc" id="L111">                ? DIFFICULTY_STATUS</span>
 <span class="pc" id="L112">                : &quot;MULTI_STEP_QUALIFIED_RESULT_PRESENT&quot;,</span>
@@ -428,9 +428,9 @@ final class TargetFreeRepresentationStudyConclusion {
 <span class="pc bpc" id="L428" title="1 of 2 branches missed.">                work.size() == 1,</span>
 <span class="fc bfc" id="L429" title="All 2 branches covered.">                qualifiedPolicies == rows.size()</span>
 <span class="fc" id="L430">                    ? ALL_POLICIES</span>
-<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                    : qualifiedPolicies == 0</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">                    : qualifiedPolicies == 0</span>
 <span class="fc" id="L432">                        ? NO_POLICIES</span>
-<span class="pc" id="L433">                        : SOME_POLICIES</span>
+<span class="fc" id="L433">                        : SOME_POLICIES</span>
             );
         }
 

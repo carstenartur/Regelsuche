@@ -7,6 +7,8 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.List;
@@ -25,95 +27,113 @@ public final class ComparativeBenchmarkMain {
     }
 
     public static void main(String[] args) {
-<span class="pc bpc" id="L28" title="2 of 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--shared-rewrite-fragment&quot;.equals(args[0])) {</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (args.length != 2) {</span>
-<span class="fc" id="L30">                throw new IllegalArgumentException(&quot;expected --shared-rewrite-fragment &lt;output-file&gt;&quot;);</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--shared-rewrite-fragment&quot;.equals(args[0])) {</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            if (args.length != 2) {</span>
+<span class="fc" id="L32">                throw new IllegalArgumentException(&quot;expected --shared-rewrite-fragment &lt;output-file&gt;&quot;);</span>
             }
-<span class="fc" id="L32">            SharedFragmentRewriteBenchmark.write(Path.of(args[1]));</span>
-<span class="fc" id="L33">            return;</span>
+<span class="fc" id="L34">            SharedFragmentRewriteBenchmark.write(Path.of(args[1]));</span>
+<span class="fc" id="L35">            return;</span>
         }
-<span class="nc bnc" id="L35" title="All 2 branches missed.">        Path output = args.length == 0</span>
-<span class="nc" id="L36">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;comparative-benchmarks&quot;)</span>
-<span class="nc" id="L37">            : Path.of(args[0]);</span>
-<span class="nc" id="L38">        Report report = ComparativeBenchmarkRunner.system().run();</span>
-<span class="nc" id="L39">        new ComparativeBenchmarkBundleWriter().write(output, report);</span>
-<span class="nc" id="L40">    }</span>
+<span class="nc bnc" id="L37" title="All 4 branches missed.">        if (args.length &gt; 0 &amp;&amp; &quot;--public&quot;.equals(args[0])) {</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            if (args.length != 3) {</span>
+<span class="nc" id="L39">                throw new IllegalArgumentException(&quot;expected --public &lt;source-root&gt; &lt;output-directory&gt;&quot;);</span>
+            }
+<span class="nc" id="L41">            writePublic(Path.of(args[1]), Path.of(args[2]));</span>
+<span class="nc" id="L42">            return;</span>
+        }
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        Path output = args.length == 0</span>
+<span class="nc" id="L45">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;comparative-benchmarks&quot;)</span>
+<span class="nc" id="L46">            : Path.of(args[0]);</span>
+<span class="nc" id="L47">        new ComparativeBenchmarkBundleWriter().write(output, ComparativeBenchmarkRunner.system().run());</span>
+<span class="nc" id="L48">    }</span>
+
+    private static void writePublic(Path repository, Path output) {
+<span class="nc" id="L51">        var report = ComparativeBenchmarkRunner.system().run();</span>
+<span class="nc" id="L52">        verify(report);</span>
+        try {
+<span class="nc" id="L54">            var attachments = PublicComparativeEvidence.read(repository, report.toCanonicalJson(),</span>
+<span class="nc" id="L55">                SharedFragmentRewriteBenchmark.canonicalReport());</span>
+<span class="nc" id="L56">            new ComparativeBenchmarkBundleWriter().write(output, report, attachments);</span>
+<span class="nc" id="L57">        } catch (IOException failure) {</span>
+<span class="nc" id="L58">            throw new UncheckedIOException(&quot;Could not verify public comparative evidence&quot;, failure);</span>
+<span class="nc" id="L59">        }</span>
+<span class="nc" id="L60">    }</span>
 
     static void verify(Report report) {
-<span class="fc" id="L43">        EnumSet&lt;Track&gt; measuredTracks = EnumSet.noneOf(Track.class);</span>
-<span class="fc" id="L44">        report.configurations().stream()</span>
-<span class="fc" id="L45">            .map(Configuration::track)</span>
-<span class="fc" id="L46">            .forEach(measuredTracks::add);</span>
-<span class="fc" id="L47">        report.cases().forEach(benchmarkCase -&gt;</span>
-<span class="fc" id="L48">            measuredTracks.add(benchmarkCase.track()));</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (measuredTracks.isEmpty()) {</span>
-<span class="nc" id="L50">            throw new IllegalStateException(</span>
+<span class="fc" id="L63">        EnumSet&lt;Track&gt; measuredTracks = EnumSet.noneOf(Track.class);</span>
+<span class="fc" id="L64">        report.configurations().stream()</span>
+<span class="fc" id="L65">            .map(Configuration::track)</span>
+<span class="fc" id="L66">            .forEach(measuredTracks::add);</span>
+<span class="fc" id="L67">        report.cases().forEach(benchmarkCase -&gt;</span>
+<span class="fc" id="L68">            measuredTracks.add(benchmarkCase.track()));</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (measuredTracks.isEmpty()) {</span>
+<span class="nc" id="L70">            throw new IllegalStateException(</span>
                 &quot;comparative benchmark contains no measured track&quot;);
         }
 
-<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (Track track : measuredTracks) {</span>
-<span class="fc" id="L55">            long configurations = report.configurations().stream()</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">                .filter(configuration -&gt; configuration.track() == track)</span>
-<span class="fc" id="L57">                .count();</span>
-<span class="fc" id="L58">            long cases = report.cases().stream()</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">                .filter(benchmarkCase -&gt; benchmarkCase.track() == track)</span>
-<span class="fc" id="L60">                .count();</span>
-<span class="fc bfc" id="L61" title="All 4 branches covered.">            if (configurations == 0L || cases == 0L) {</span>
-<span class="fc" id="L62">                throw new IllegalStateException(</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (Track track : measuredTracks) {</span>
+<span class="fc" id="L75">            long configurations = report.configurations().stream()</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                .filter(configuration -&gt; configuration.track() == track)</span>
+<span class="fc" id="L77">                .count();</span>
+<span class="fc" id="L78">            long cases = report.cases().stream()</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                .filter(benchmarkCase -&gt; benchmarkCase.track() == track)</span>
+<span class="fc" id="L80">                .count();</span>
+<span class="fc bfc" id="L81" title="All 4 branches covered.">            if (configurations == 0L || cases == 0L) {</span>
+<span class="fc" id="L82">                throw new IllegalStateException(</span>
                     &quot;incomplete comparative track definition for &quot; + track
                         + &quot;: configurations=&quot; + configurations
                         + &quot;, cases=&quot; + cases);
             }
-<span class="fc" id="L67">            long expected = Math.multiplyExact(configurations, cases);</span>
-<span class="fc" id="L68">            long actual = report.results().stream()</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">                .filter(result -&gt; result.track() == track)</span>
-<span class="fc" id="L70">                .count();</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (actual != expected) {</span>
-<span class="nc" id="L72">                throw new IllegalStateException(</span>
+<span class="fc" id="L87">            long expected = Math.multiplyExact(configurations, cases);</span>
+<span class="fc" id="L88">            long actual = report.results().stream()</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                .filter(result -&gt; result.track() == track)</span>
+<span class="fc" id="L90">                .count();</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (actual != expected) {</span>
+<span class="nc" id="L92">                throw new IllegalStateException(</span>
                     &quot;incomplete comparative result matrix for &quot; + track
                         + &quot;: expected &quot; + expected + &quot;, found &quot; + actual);
             }
-<span class="fc" id="L76">        }</span>
+<span class="fc" id="L96">        }</span>
 
         // An unavailable, timed-out or crashed system means the evidence was
         // not produced at all. That must never replace a prior complete bundle.
-<span class="fc" id="L80">        List&lt;Result&gt; notExecuted = report.results().stream()</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">            .filter(result -&gt; result.disposition() != Disposition.EXECUTED)</span>
-<span class="fc" id="L82">            .toList();</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (!notExecuted.isEmpty()) {</span>
-<span class="fc" id="L84">            throw new IllegalStateException(</span>
+<span class="fc" id="L100">        List&lt;Result&gt; notExecuted = report.results().stream()</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            .filter(result -&gt; result.disposition() != Disposition.EXECUTED)</span>
+<span class="fc" id="L102">            .toList();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!notExecuted.isEmpty()) {</span>
+<span class="fc" id="L104">            throw new IllegalStateException(</span>
                 &quot;comparative benchmark did not execute every configured system: &quot;
-<span class="fc" id="L86">                    + report.toCanonicalJson());</span>
+<span class="fc" id="L106">                    + report.toCanonicalJson());</span>
         }
 
         // Retained incorrect results are legitimate evidence, but they must be
         // reflected in the claim of their own track.
-<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (CapabilityClaim claim : report.claims()) {</span>
-<span class="fc" id="L92">            List&lt;Result&gt; trackResults = report.results().stream()</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">                .filter(result -&gt; result.track() == claim.track())</span>
-<span class="fc" id="L94">                .toList();</span>
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (trackResults.isEmpty()) {</span>
-<span class="nc" id="L96">                throw new IllegalStateException(</span>
-<span class="nc" id="L97">                    &quot;comparative claim without track evidence: &quot; + claim.id());</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (CapabilityClaim claim : report.claims()) {</span>
+<span class="fc" id="L112">            List&lt;Result&gt; trackResults = report.results().stream()</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                .filter(result -&gt; result.track() == claim.track())</span>
+<span class="fc" id="L114">                .toList();</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (trackResults.isEmpty()) {</span>
+<span class="nc" id="L116">                throw new IllegalStateException(</span>
+<span class="nc" id="L117">                    &quot;comparative claim without track evidence: &quot; + claim.id());</span>
             }
-<span class="fc bfc" id="L99" title="All 2 branches covered.">            ClaimStatus derived = trackResults.stream().allMatch(Result::correct)</span>
-<span class="fc" id="L100">                ? ClaimStatus.SUPPORTED</span>
-<span class="fc" id="L101">                : ClaimStatus.NEGATIVE;</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (claim.status() != derived) {</span>
-<span class="fc" id="L103">                throw new IllegalStateException(</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            ClaimStatus derived = trackResults.stream().allMatch(Result::correct)</span>
+<span class="fc" id="L120">                ? ClaimStatus.SUPPORTED</span>
+<span class="fc" id="L121">                : ClaimStatus.NEGATIVE;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (claim.status() != derived) {</span>
+<span class="fc" id="L123">                throw new IllegalStateException(</span>
                     &quot;comparative claim status is not derived from its own track: &quot;
-<span class="fc" id="L105">                        + claim.id() + &quot; declares &quot; + claim.status()</span>
+<span class="fc" id="L125">                        + claim.id() + &quot; declares &quot; + claim.status()</span>
                         + &quot; but its results imply &quot; + derived);
             }
-<span class="fc" id="L108">        }</span>
+<span class="fc" id="L128">        }</span>
 
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (Track track : measuredTracks) {</span>
-<span class="fc" id="L111">            if (report.claims().stream()</span>
-<span class="pc bpc" id="L112" title="1 of 4 branches missed.">                    .noneMatch(claim -&gt; claim.track() == track)) {</span>
-<span class="nc" id="L113">                throw new IllegalStateException(</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (Track track : measuredTracks) {</span>
+<span class="fc" id="L131">            if (report.claims().stream()</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">                    .noneMatch(claim -&gt; claim.track() == track)) {</span>
+<span class="nc" id="L133">                throw new IllegalStateException(</span>
                     &quot;comparative track without a retained claim: &quot; + track);
             }
-<span class="fc" id="L116">        }</span>
-<span class="fc" id="L117">    }</span>
+<span class="fc" id="L136">        }</span>
+<span class="fc" id="L137">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

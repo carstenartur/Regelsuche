@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PublicComparativeEvidence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">PublicComparativeEvidence.java</span></div><h1>PublicComparativeEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.json.JsonReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.zip.GZIPInputStream;
+
+/** Validates every registered public artifact before the previous publication is replaced. */
+final class PublicComparativeEvidence {
+<span class="fc" id="L17">    private static final Path PUBLICATION = Path.of(&quot;research/benchmarks/comparative-v2/report.json&quot;);</span>
+<span class="fc" id="L18">    private static final Path REGISTRY = PUBLICATION.resolveSibling(&quot;sources.json&quot;);</span>
+
+    private PublicComparativeEvidence() {}
+
+    static Map&lt;Path, byte[]&gt; read(Path repository, String legacy, String rewriting) throws IOException {
+<span class="fc" id="L23">        byte[] report = Files.readAllBytes(repository.resolve(PUBLICATION));</span>
+<span class="fc" id="L24">        var registry = new JsonReader(Files.readString(repository.resolve(REGISTRY))).readObject();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (!sha256(report).equals(registry.remove(&quot;compositionSha256&quot;))) {</span>
+<span class="fc" id="L26">            throw new IOException(&quot;Public comparative composition digest differs: &quot; + PUBLICATION);</span>
+        }
+<span class="fc" id="L28">        var index = new JsonReader(new String(report, StandardCharsets.UTF_8)).readObject();</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (!&quot;regelsuche.public-comparative-benchmark/v2&quot;.equals(index.get(&quot;schema&quot;))</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">                || !(index.get(&quot;sources&quot;) instanceof Map&lt;?, ?&gt; sources)</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                || !sources.keySet().equals(registry.keySet())) {</span>
+<span class="nc" id="L32">            throw new IOException(&quot;Public comparative report does not cover its source registry&quot;);</span>
+        }
+<span class="fc" id="L34">        var attachments = new LinkedHashMap&lt;Path, byte[]&gt;();</span>
+<span class="fc" id="L35">        attachments.put(Path.of(&quot;v2/report.json&quot;), report);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (var entry : registry.entrySet()) {</span>
+<span class="fc" id="L37">            String name = entry.getKey();</span>
+<span class="fc" id="L38">            var source = (Map&lt;?, ?&gt;) entry.getValue();</span>
+<span class="fc" id="L39">            Path path = Path.of((String) source.get(&quot;path&quot;));</span>
+<span class="fc" id="L40">            var indexed = new LinkedHashMap&lt;&gt;((Map&lt;?, ?&gt;) sources.get(name));</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            String extension = path.toString().endsWith(&quot;.md&quot;) ? &quot;.md&quot; : &quot;.json&quot;;</span>
+<span class="fc" id="L42">            String attachment = &quot;evidence/&quot; + source.get(&quot;sha256&quot;) + extension;</span>
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">            if (!attachment.equals(indexed.remove(&quot;attachment&quot;)) || !source.equals(indexed)</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">                    || path.isAbsolute() || path.normalize().startsWith(&quot;..&quot;)) {</span>
+<span class="nc" id="L45">                throw new IOException(&quot;Invalid public benchmark source: &quot; + name);</span>
+            }
+<span class="fc" id="L47">            byte[] bytes = readSource(repository.resolve(path));</span>
+<span class="fc" id="L48">            verify(bytes, source);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (name.equals(&quot;legacy&quot;)) {</span>
+<span class="fc" id="L50">                verify(legacy.getBytes(StandardCharsets.UTF_8), source);</span>
+            }
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (name.equals(&quot;rewriting&quot;)) {</span>
+<span class="nc" id="L53">                verify(rewriting.getBytes(StandardCharsets.UTF_8), source);</span>
+            }
+<span class="fc" id="L55">            attachments.put(Path.of(&quot;v2&quot;, attachment), bytes);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return attachments;</span>
+    }
+
+    private static byte[] readSource(Path path) throws IOException {
+<span class="fc" id="L61">        try (var file = Files.newInputStream(path);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">             var input = path.toString().endsWith(&quot;.gz&quot;) ? new GZIPInputStream(file) : file) {</span>
+<span class="fc" id="L63">            return input.readAllBytes();</span>
+        }
+    }
+
+    private static void verify(byte[] bytes, Map&lt;?, ?&gt; source) throws IOException {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!sha256(bytes).equals(source.get(&quot;sha256&quot;))</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                || bytes.length != ((Number) source.get(&quot;bytes&quot;)).longValue()) {</span>
+<span class="nc" id="L70">            throw new IOException(&quot;Public benchmark artifact changed: &quot; + source.get(&quot;path&quot;));</span>
+        }
+<span class="fc" id="L72">    }</span>
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L76">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L77">        } catch (NoSuchAlgorithmException failure) {</span>
+<span class="nc" id="L78">            throw new IllegalStateException(failure);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

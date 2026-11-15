@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HiddenRulePilotRunner.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">HiddenRulePilotRunner.java</span></div><h1>HiddenRulePilotRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
 
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.validation.OracleValidator.OracleValidationStatus;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
 import de.regelsuche.learning.MacroLearningPipeline;
@@ -31,6 +35,7 @@ import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import de.regelsuche.value.ExprValueFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -44,132 +49,134 @@ import java.util.Objects;
  * engine, and holdouts. Post-hoc comparison belongs to {@link HiddenRulePilotEvaluator}.&lt;/p&gt;
  */
 public final class HiddenRulePilotRunner {
-<span class="fc" id="L47">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
-<span class="fc" id="L48">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
-<span class="fc" id="L49">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L50">    private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();</span>
-<span class="fc" id="L51">    private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();</span>
+<span class="fc" id="L52">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L53">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L54">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L55">    private final PolynomialNormalFormEquivalenceService equivalence =</span>
+        new PolynomialNormalFormEquivalenceService(new DefaultMathematicalAlgorithmRegistry());
+<span class="fc" id="L57">    private final DynamicOperatorCompiler compiler = new DynamicOperatorCompiler();</span>
 
     private final BestFirstSearchStrategy searchStrategy;
 
     public HiddenRulePilotRunner() {
-<span class="fc" id="L56">        this(new BestFirstSearchStrategy());</span>
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L62">        this(new BestFirstSearchStrategy());</span>
+<span class="fc" id="L63">    }</span>
 
-<span class="fc" id="L59">    HiddenRulePilotRunner(BestFirstSearchStrategy searchStrategy) {</span>
-<span class="fc" id="L60">        this.searchStrategy = Objects.requireNonNull(searchStrategy);</span>
-<span class="fc" id="L61">    }</span>
+<span class="fc" id="L65">    HiddenRulePilotRunner(BestFirstSearchStrategy searchStrategy) {</span>
+<span class="fc" id="L66">        this.searchStrategy = Objects.requireNonNull(searchStrategy);</span>
+<span class="fc" id="L67">    }</span>
 
     public RuntimeResult run(RuntimeTask task) {
-<span class="fc" id="L64">        Objects.requireNonNull(task, &quot;task&quot;);</span>
-<span class="fc" id="L65">        GoalSearchResult discovery = search(</span>
-<span class="fc" id="L66">            task.primitiveEngine(),</span>
-<span class="fc" id="L67">            task.inputExpression(),</span>
-<span class="fc" id="L68">            task.target(),</span>
-<span class="fc" id="L69">            task.heuristic());</span>
-<span class="pc bpc" id="L70" title="1 of 4 branches missed.">        if (!discovery.reached() || discovery.reachedState() == null</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                || discovery.reachedState().depth() == 0) {</span>
-<span class="fc" id="L72">            return RuntimeResult.searchFailure(task.opaqueCaseId(), discovery);</span>
+<span class="fc" id="L70">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L71">        GoalSearchResult discovery = search(</span>
+<span class="fc" id="L72">            task.primitiveEngine(),</span>
+<span class="fc" id="L73">            task.inputExpression(),</span>
+<span class="fc" id="L74">            task.target(),</span>
+<span class="fc" id="L75">            task.heuristic());</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (!discovery.reached() || discovery.reachedState() == null</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                || discovery.reachedState().depth() == 0) {</span>
+<span class="fc" id="L78">            return RuntimeResult.searchFailure(task.opaqueCaseId(), discovery);</span>
         }
 
-<span class="fc" id="L75">        SearchState reached = discovery.reachedState();</span>
-<span class="fc" id="L76">        SuccessfulTransformationPath path = toLearningPath(task, reached);</span>
-<span class="fc" id="L77">        MacroLearningResult learning = learn(path);</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (learning.newlyActivated().isEmpty()) {</span>
-<span class="nc" id="L79">            return RuntimeResult.learningFailure(</span>
-<span class="nc" id="L80">                task.opaqueCaseId(), discovery, reached,</span>
-<span class="nc" id="L81">                CandidateValidationEvidence.from(learning, null),</span>
-<span class="nc" id="L82">                learning.stageEvidence());</span>
+<span class="fc" id="L81">        SearchState reached = discovery.reachedState();</span>
+<span class="fc" id="L82">        SuccessfulTransformationPath path = toLearningPath(task, reached);</span>
+<span class="fc" id="L83">        MacroLearningResult learning = learn(path);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (learning.newlyActivated().isEmpty()) {</span>
+<span class="nc" id="L85">            return RuntimeResult.learningFailure(</span>
+<span class="nc" id="L86">                task.opaqueCaseId(), discovery, reached,</span>
+<span class="nc" id="L87">                CandidateValidationEvidence.from(learning, null),</span>
+<span class="nc" id="L88">                learning.stageEvidence());</span>
         }
 
-<span class="fc" id="L85">        ReusableRule learned = learning.newlyActivated().getFirst();</span>
-<span class="fc" id="L86">        CandidateValidationEvidence validation =</span>
-<span class="fc" id="L87">            CandidateValidationEvidence.from(learning, learned);</span>
-<span class="fc" id="L88">        DynamicOperatorCompiler.CompilationResult compilation = compiler.compile(</span>
-<span class="fc" id="L89">            &quot;pilot-&quot; + task.opaqueCaseId(),</span>
+<span class="fc" id="L91">        ReusableRule learned = learning.newlyActivated().getFirst();</span>
+<span class="fc" id="L92">        CandidateValidationEvidence validation =</span>
+<span class="fc" id="L93">            CandidateValidationEvidence.from(learning, learned);</span>
+<span class="fc" id="L94">        DynamicOperatorCompiler.CompilationResult compilation = compiler.compile(</span>
+<span class="fc" id="L95">            &quot;pilot-&quot; + task.opaqueCaseId(),</span>
             &quot;frozen-v1&quot;,
-<span class="fc" id="L91">            learned.leftPattern(),</span>
-<span class="fc" id="L92">            learned.rightPattern());</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!compilation.isSuccess()) {</span>
-<span class="nc" id="L94">            return RuntimeResult.compilationFailure(</span>
-<span class="nc" id="L95">                task.opaqueCaseId(), discovery, reached, learned, validation,</span>
-<span class="nc" id="L96">                learning.stageEvidence(), compilation.rejectionReason());</span>
+<span class="fc" id="L97">            learned.leftPattern(),</span>
+<span class="fc" id="L98">            learned.rightPattern());</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (!compilation.isSuccess()) {</span>
+<span class="nc" id="L100">            return RuntimeResult.compilationFailure(</span>
+<span class="nc" id="L101">                task.opaqueCaseId(), discovery, reached, learned, validation,</span>
+<span class="nc" id="L102">                learning.stageEvidence(), compilation.rejectionReason());</span>
         }
 
-<span class="fc" id="L99">        DynamicPatternOperator operator = compilation.operator().orElseThrow();</span>
-<span class="fc" id="L100">        HoldoutSummary holdouts = validateHoldouts(task, operator);</span>
-<span class="fc" id="L101">        CandidateSnapshot candidate = new CandidateSnapshot(</span>
-<span class="fc" id="L102">            learned.leftPattern(),</span>
-<span class="fc" id="L103">            learned.rightPattern(),</span>
-<span class="fc" id="L104">            learned.assumptions(),</span>
-<span class="fc" id="L105">            learned.confidenceScore(),</span>
-<span class="fc" id="L106">            operator.ruleId(),</span>
-<span class="fc" id="L107">            operator.provenanceHash());</span>
+<span class="fc" id="L105">        DynamicPatternOperator operator = compilation.operator().orElseThrow();</span>
+<span class="fc" id="L106">        HoldoutSummary holdouts = validateHoldouts(task, operator);</span>
+<span class="fc" id="L107">        CandidateSnapshot candidate = new CandidateSnapshot(</span>
+<span class="fc" id="L108">            learned.leftPattern(),</span>
+<span class="fc" id="L109">            learned.rightPattern(),</span>
+<span class="fc" id="L110">            learned.assumptions(),</span>
+<span class="fc" id="L111">            learned.confidenceScore(),</span>
+<span class="fc" id="L112">            operator.ruleId(),</span>
+<span class="fc" id="L113">            operator.provenanceHash());</span>
         RuntimeStatus status;
         String failure;
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (!validation.passed()) {</span>
-<span class="nc" id="L111">            status = RuntimeStatus.VALIDATION_FAILED;</span>
-<span class="nc" id="L112">            failure = &quot;candidate validation evidence failed&quot;;</span>
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        } else if (!holdouts.allPassed()) {</span>
-<span class="nc" id="L114">            status = RuntimeStatus.HOLDOUT_FAILED;</span>
-<span class="nc" id="L115">            failure = &quot;one or more holdouts failed&quot;;</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (!validation.passed()) {</span>
+<span class="nc" id="L117">            status = RuntimeStatus.VALIDATION_FAILED;</span>
+<span class="nc" id="L118">            failure = &quot;candidate validation evidence failed&quot;;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        } else if (!holdouts.allPassed()) {</span>
+<span class="nc" id="L120">            status = RuntimeStatus.HOLDOUT_FAILED;</span>
+<span class="nc" id="L121">            failure = &quot;one or more holdouts failed&quot;;</span>
         } else {
-<span class="fc" id="L117">            status = RuntimeStatus.CANDIDATE_FROZEN;</span>
-<span class="fc" id="L118">            failure = &quot;&quot;;</span>
+<span class="fc" id="L123">            status = RuntimeStatus.CANDIDATE_FROZEN;</span>
+<span class="fc" id="L124">            failure = &quot;&quot;;</span>
         }
-<span class="fc" id="L120">        return new RuntimeResult(</span>
-<span class="fc" id="L121">            task.opaqueCaseId(),</span>
+<span class="fc" id="L126">        return new RuntimeResult(</span>
+<span class="fc" id="L127">            task.opaqueCaseId(),</span>
             status,
-<span class="fc" id="L123">            discovery.status(),</span>
-<span class="fc" id="L124">            discovery.metrics(),</span>
-<span class="fc" id="L125">            reached.path(),</span>
-<span class="fc" id="L126">            reached.appliedRuleIds(),</span>
-<span class="fc" id="L127">            reached.assumptions(),</span>
+<span class="fc" id="L129">            discovery.status(),</span>
+<span class="fc" id="L130">            discovery.metrics(),</span>
+<span class="fc" id="L131">            reached.path(),</span>
+<span class="fc" id="L132">            reached.appliedRuleIds(),</span>
+<span class="fc" id="L133">            reached.assumptions(),</span>
             candidate,
             validation,
             holdouts,
-<span class="fc" id="L131">            learning.stageEvidence(),</span>
+<span class="fc" id="L137">            learning.stageEvidence(),</span>
             failure);
     }
 
     private MacroLearningResult learn(SuccessfulTransformationPath path) {
-<span class="fc" id="L136">        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();</span>
-<span class="fc" id="L137">        MacroLearningPipeline pipeline = new MacroLearningPipeline(</span>
+<span class="fc" id="L142">        InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();</span>
+<span class="fc" id="L143">        MacroLearningPipeline pipeline = new MacroLearningPipeline(</span>
             inventory,
             new PatternGeneralizer(),
             equivalence,
             new DeterministicCounterexampleSearchService(),
             new RuntimeBlindKnownRules(),
             MacroLearningPipeline.DEFAULT_CONFIDENCE_THRESHOLD);
-<span class="fc" id="L144">        return pipeline.learn(List.of(path));</span>
+<span class="fc" id="L150">        return pipeline.learn(List.of(path));</span>
     }
 
     private SuccessfulTransformationPath toLearningPath(RuntimeTask task, SearchState reached) {
-<span class="fc" id="L148">        String first = reached.path().getFirst();</span>
-<span class="fc" id="L149">        String last = reached.path().getLast();</span>
-<span class="fc" id="L150">        boolean verified = equivalence.areEquivalent(first, last);</span>
-<span class="fc" id="L151">        return new SuccessfulTransformationPath(</span>
-<span class="fc" id="L152">            task.opaqueCaseId() + &quot;-path&quot;,</span>
+<span class="fc" id="L154">        String first = reached.path().getFirst();</span>
+<span class="fc" id="L155">        String last = reached.path().getLast();</span>
+<span class="fc" id="L156">        var evidence = equivalence.validateEquivalence(first, last);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        boolean verified = evidence.status() == OracleValidationStatus.AGREE;</span>
+<span class="fc" id="L158">        return new SuccessfulTransformationPath(</span>
+<span class="fc" id="L159">            task.opaqueCaseId() + &quot;-path&quot;,</span>
             first,
             last,
-<span class="fc" id="L155">            reached.path(),</span>
-<span class="fc" id="L156">            reached.appliedRuleIds(),</span>
-<span class="fc" id="L157">            scorer.score(first),</span>
-<span class="fc" id="L158">            reached.score(),</span>
+<span class="fc" id="L162">            reached.path(),</span>
+<span class="fc" id="L163">            reached.appliedRuleIds(),</span>
+<span class="fc" id="L164">            scorer.score(first),</span>
+<span class="fc" id="L165">            reached.score(),</span>
             verified,
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            verified ? &quot;symbolic-equivalence&quot; : &quot;equivalence-unconfirmed&quot;,</span>
-<span class="fc" id="L161">            Map.of(&quot;source&quot;, &quot;hidden-rule-pilot-runtime&quot;),</span>
-<span class="fc" id="L162">            reached.assumptions());</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            verified ? &quot;symbolic-equivalence&quot; : evidence.evidence(),</span>
+<span class="fc" id="L168">            Map.of(&quot;source&quot;, &quot;hidden-rule-pilot-runtime&quot;),</span>
+<span class="fc" id="L169">            reached.assumptions());</span>
     }
 
     private HoldoutSummary validateHoldouts(RuntimeTask task, DynamicPatternOperator operator) {
-<span class="fc" id="L166">        List&lt;PositiveHoldoutResult&gt; positives = task.positiveHoldouts().stream()</span>
-<span class="fc" id="L167">            .map(holdout -&gt; validatePositive(task, operator, holdout))</span>
-<span class="fc" id="L168">            .toList();</span>
-<span class="fc" id="L169">        List&lt;NegativeHoldoutResult&gt; negatives = task.negativeHoldouts().stream()</span>
-<span class="fc" id="L170">            .map(holdout -&gt; validateNegative(operator, holdout))</span>
-<span class="fc" id="L171">            .toList();</span>
-<span class="fc" id="L172">        return new HoldoutSummary(positives, negatives);</span>
+<span class="fc" id="L173">        List&lt;PositiveHoldoutResult&gt; positives = task.positiveHoldouts().stream()</span>
+<span class="fc" id="L174">            .map(holdout -&gt; validatePositive(task, operator, holdout))</span>
+<span class="fc" id="L175">            .toList();</span>
+<span class="fc" id="L176">        List&lt;NegativeHoldoutResult&gt; negatives = task.negativeHoldouts().stream()</span>
+<span class="fc" id="L177">            .map(holdout -&gt; validateNegative(operator, holdout))</span>
+<span class="fc" id="L178">            .toList();</span>
+<span class="fc" id="L179">        return new HoldoutSummary(positives, negatives);</span>
     }
 
     private PositiveHoldoutResult validatePositive(
@@ -177,34 +184,49 @@ public final class HiddenRulePilotRunner {
         DynamicPatternOperator operator,
         PositiveHoldout holdout
     ) {
-<span class="fc" id="L180">        List&lt;Transformation&gt; direct = operator.generateCandidates(holdout.inputExpression());</span>
-<span class="fc" id="L181">        boolean applies = direct.stream().anyMatch(candidate -&gt;</span>
-<span class="fc" id="L182">            equivalence.areEquivalent(candidate.transformedExpression(), holdout.targetExpression()));</span>
-<span class="fc" id="L183">        SearchTarget target = syntaxTarget(holdout.targetExpression());</span>
+<span class="fc" id="L187">        List&lt;Transformation&gt; direct = operator.generateCandidates(holdout.inputExpression());</span>
+<span class="fc" id="L188">        SearchTarget target = syntaxTarget(holdout.targetExpression());</span>
+<span class="fc" id="L189">        var targetSyntax = parser.parseTerm(holdout.targetExpression());</span>
+<span class="fc" id="L190">        boolean applies = direct.stream().anyMatch(candidate -&gt;</span>
+<span class="fc" id="L191">            matchesHoldout(candidate.transformedExpression(), holdout.targetExpression(), targetSyntax));</span>
 
-<span class="fc" id="L185">        GoalSearchResult baseline = search(</span>
-<span class="fc" id="L186">            task.primitiveEngine(),</span>
-<span class="fc" id="L187">            holdout.inputExpression(),</span>
+<span class="fc" id="L193">        GoalSearchResult baseline = search(</span>
+<span class="fc" id="L194">            task.primitiveEngine(),</span>
+<span class="fc" id="L195">            holdout.inputExpression(),</span>
             target,
-<span class="fc" id="L189">            holdout.heuristicOr(task.heuristic()));</span>
-<span class="fc" id="L190">        TransformationEngine augmented = new HypothesisTransformationEngine(</span>
-<span class="fc" id="L191">            task.primitiveEngine(), List.of(operator), 4);</span>
-<span class="fc" id="L192">        GoalSearchResult withCandidate = search(</span>
+<span class="fc" id="L197">            holdout.heuristicOr(task.heuristic()));</span>
+<span class="fc" id="L198">        TransformationEngine augmented = new HypothesisTransformationEngine(</span>
+<span class="fc" id="L199">            task.primitiveEngine(), List.of(operator), 4);</span>
+<span class="fc" id="L200">        GoalSearchResult withCandidate = search(</span>
             augmented,
-<span class="fc" id="L194">            holdout.inputExpression(),</span>
+<span class="fc" id="L202">            holdout.inputExpression(),</span>
             target,
-<span class="fc" id="L196">            holdout.heuristicOr(task.heuristic()));</span>
-<span class="fc" id="L197">        AblationEvidence ablation = AblationEvidence.from(baseline, withCandidate);</span>
-<span class="fc" id="L198">        return new PositiveHoldoutResult(</span>
-<span class="fc" id="L199">            holdout.id(), applies, baseline.reached(), withCandidate.reached(), ablation);</span>
+<span class="fc" id="L204">            holdout.heuristicOr(task.heuristic()));</span>
+<span class="fc" id="L205">        AblationEvidence ablation = AblationEvidence.from(baseline, withCandidate);</span>
+<span class="fc" id="L206">        return new PositiveHoldoutResult(</span>
+<span class="fc" id="L207">            holdout.id(), applies, baseline.reached(), withCandidate.reached(), ablation);</span>
+    }
+
+    private boolean matchesHoldout(String candidate, String target, Expr targetSyntax) {
+<span class="fc" id="L211">        Expr candidateSyntax = parser.parseTerm(candidate);</span>
+<span class="fc bfc" id="L212" title="All 4 branches covered.">        if (candidateSyntax.equals(targetSyntax) || equivalence.areEquivalent(candidate, target)) {</span>
+<span class="fc" id="L213">            return true;</span>
+        }
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (!ExpressionDefinedness.isTotal(candidateSyntax) || !ExpressionDefinedness.isTotal(targetSyntax)) {</span>
+<span class="nc" id="L216">            return false;</span>
+        }
+        // Scalar sums and products can regroup without treating shared function terms as polynomial variables.
+<span class="fc" id="L219">        try (var values = new ExprValueFactory()) {</span>
+<span class="fc" id="L220">            return values.fromExpr(candidateSyntax).sameValue(values.fromExpr(targetSyntax));</span>
+        }
     }
 
     private NegativeHoldoutResult validateNegative(
         DynamicPatternOperator operator,
         NegativeHoldout holdout
     ) {
-<span class="fc" id="L206">        List&lt;Transformation&gt; candidates = operator.generateCandidates(holdout.inputExpression());</span>
-<span class="fc" id="L207">        return new NegativeHoldoutResult(holdout.id(), candidates.isEmpty(), candidates.size());</span>
+<span class="fc" id="L228">        List&lt;Transformation&gt; candidates = operator.generateCandidates(holdout.inputExpression());</span>
+<span class="fc" id="L229">        return new NegativeHoldoutResult(holdout.id(), candidates.isEmpty(), candidates.size());</span>
     }
 
     private GoalSearchResult search(
@@ -213,22 +235,22 @@ public final class HiddenRulePilotRunner {
         SearchTarget target,
         SearchHeuristic heuristic
     ) {
-<span class="fc" id="L216">        SearchProblem problem = new SearchProblem(</span>
-<span class="fc" id="L217">            input, engine, scorer, canonicalizer, heuristic).withTarget(target);</span>
-<span class="fc" id="L218">        return searchStrategy.searchWithDiagnostics(problem);</span>
+<span class="fc" id="L238">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L239">            input, engine, scorer, canonicalizer, heuristic).withTarget(target);</span>
+<span class="fc" id="L240">        return searchStrategy.searchWithDiagnostics(problem);</span>
     }
 
     private SearchTarget syntaxTarget(String expression) {
-<span class="fc" id="L222">        return SearchTarget.syntaxExact(ExpressionFormatter.format(parser.parseTerm(expression)));</span>
+<span class="fc" id="L244">        return SearchTarget.syntaxExact(ExpressionFormatter.format(parser.parseTerm(expression)));</span>
     }
 
-<span class="fc" id="L225">    public enum RuntimeStatus {</span>
-<span class="fc" id="L226">        SEARCH_FAILED,</span>
-<span class="fc" id="L227">        LEARNING_REJECTED,</span>
-<span class="fc" id="L228">        COMPILATION_REJECTED,</span>
-<span class="fc" id="L229">        VALIDATION_FAILED,</span>
-<span class="fc" id="L230">        HOLDOUT_FAILED,</span>
-<span class="fc" id="L231">        CANDIDATE_FROZEN</span>
+<span class="fc" id="L247">    public enum RuntimeStatus {</span>
+<span class="fc" id="L248">        SEARCH_FAILED,</span>
+<span class="fc" id="L249">        LEARNING_REJECTED,</span>
+<span class="fc" id="L250">        COMPILATION_REJECTED,</span>
+<span class="fc" id="L251">        VALIDATION_FAILED,</span>
+<span class="fc" id="L252">        HOLDOUT_FAILED,</span>
+<span class="fc" id="L253">        CANDIDATE_FROZEN</span>
     }
 
     public record RuntimeTask(
@@ -240,35 +262,35 @@ public final class HiddenRulePilotRunner {
         List&lt;PositiveHoldout&gt; positiveHoldouts,
         List&lt;NegativeHoldout&gt; negativeHoldouts
     ) {
-<span class="fc" id="L243">        public RuntimeTask {</span>
-<span class="fc" id="L244">            requireText(opaqueCaseId, &quot;opaqueCaseId&quot;);</span>
-<span class="fc" id="L245">            requireText(inputExpression, &quot;inputExpression&quot;);</span>
-<span class="fc" id="L246">            Objects.requireNonNull(target, &quot;target&quot;);</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (target.relation() != TargetRelation.SYNTAX_EXACT) {</span>
-<span class="nc" id="L248">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L265">        public RuntimeTask {</span>
+<span class="fc" id="L266">            requireText(opaqueCaseId, &quot;opaqueCaseId&quot;);</span>
+<span class="fc" id="L267">            requireText(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L268">            Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            if (target.relation() != TargetRelation.SYNTAX_EXACT) {</span>
+<span class="nc" id="L270">                throw new IllegalArgumentException(</span>
                     &quot;hidden-rule tasks require an observable SYNTAX_EXACT endpoint&quot;);
             }
-<span class="fc" id="L251">            Objects.requireNonNull(primitiveEngine, &quot;primitiveEngine&quot;);</span>
-<span class="fc" id="L252">            Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
-<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            positiveHoldouts = positiveHoldouts == null ? List.of() : List.copyOf(positiveHoldouts);</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            negativeHoldouts = negativeHoldouts == null ? List.of() : List.copyOf(negativeHoldouts);</span>
-<span class="fc" id="L255">        }</span>
+<span class="fc" id="L273">            Objects.requireNonNull(primitiveEngine, &quot;primitiveEngine&quot;);</span>
+<span class="fc" id="L274">            Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            positiveHoldouts = positiveHoldouts == null ? List.of() : List.copyOf(positiveHoldouts);</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            negativeHoldouts = negativeHoldouts == null ? List.of() : List.copyOf(negativeHoldouts);</span>
+<span class="fc" id="L277">        }</span>
 
         public String observableInput() {
-<span class="fc" id="L258">            List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L259">            values.add(opaqueCaseId);</span>
-<span class="fc" id="L260">            values.add(inputExpression);</span>
-<span class="fc" id="L261">            values.add(target.targetExpression());</span>
-<span class="fc" id="L262">            positiveHoldouts.forEach(holdout -&gt; {</span>
-<span class="fc" id="L263">                values.add(holdout.id());</span>
-<span class="fc" id="L264">                values.add(holdout.inputExpression());</span>
-<span class="fc" id="L265">                values.add(holdout.targetExpression());</span>
-<span class="fc" id="L266">            });</span>
-<span class="fc" id="L267">            negativeHoldouts.forEach(holdout -&gt; {</span>
-<span class="fc" id="L268">                values.add(holdout.id());</span>
-<span class="fc" id="L269">                values.add(holdout.inputExpression());</span>
-<span class="fc" id="L270">            });</span>
-<span class="fc" id="L271">            return String.join(&quot;\n&quot;, values);</span>
+<span class="fc" id="L280">            List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L281">            values.add(opaqueCaseId);</span>
+<span class="fc" id="L282">            values.add(inputExpression);</span>
+<span class="fc" id="L283">            values.add(target.targetExpression());</span>
+<span class="fc" id="L284">            positiveHoldouts.forEach(holdout -&gt; {</span>
+<span class="fc" id="L285">                values.add(holdout.id());</span>
+<span class="fc" id="L286">                values.add(holdout.inputExpression());</span>
+<span class="fc" id="L287">                values.add(holdout.targetExpression());</span>
+<span class="fc" id="L288">            });</span>
+<span class="fc" id="L289">            negativeHoldouts.forEach(holdout -&gt; {</span>
+<span class="fc" id="L290">                values.add(holdout.id());</span>
+<span class="fc" id="L291">                values.add(holdout.inputExpression());</span>
+<span class="fc" id="L292">            });</span>
+<span class="fc" id="L293">            return String.join(&quot;\n&quot;, values);</span>
         }
     }
 
@@ -278,26 +300,26 @@ public final class HiddenRulePilotRunner {
         String targetExpression,
         SearchHeuristic heuristic
     ) {
-<span class="fc" id="L281">        public PositiveHoldout {</span>
-<span class="fc" id="L282">            requireText(id, &quot;positive holdout id&quot;);</span>
-<span class="fc" id="L283">            requireText(inputExpression, &quot;positive holdout input&quot;);</span>
-<span class="fc" id="L284">            requireText(targetExpression, &quot;positive holdout target&quot;);</span>
-<span class="fc" id="L285">        }</span>
+<span class="fc" id="L303">        public PositiveHoldout {</span>
+<span class="fc" id="L304">            requireText(id, &quot;positive holdout id&quot;);</span>
+<span class="fc" id="L305">            requireText(inputExpression, &quot;positive holdout input&quot;);</span>
+<span class="fc" id="L306">            requireText(targetExpression, &quot;positive holdout target&quot;);</span>
+<span class="fc" id="L307">        }</span>
 
         public PositiveHoldout(String id, String inputExpression, String targetExpression) {
-<span class="fc" id="L288">            this(id, inputExpression, targetExpression, null);</span>
-<span class="fc" id="L289">        }</span>
+<span class="fc" id="L310">            this(id, inputExpression, targetExpression, null);</span>
+<span class="fc" id="L311">        }</span>
 
         SearchHeuristic heuristicOr(SearchHeuristic fallback) {
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            return heuristic == null ? fallback : heuristic;</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            return heuristic == null ? fallback : heuristic;</span>
         }
     }
 
     public record NegativeHoldout(String id, String inputExpression) {
-<span class="fc" id="L297">        public NegativeHoldout {</span>
-<span class="fc" id="L298">            requireText(id, &quot;negative holdout id&quot;);</span>
-<span class="fc" id="L299">            requireText(inputExpression, &quot;negative holdout input&quot;);</span>
-<span class="fc" id="L300">        }</span>
+<span class="fc" id="L319">        public NegativeHoldout {</span>
+<span class="fc" id="L320">            requireText(id, &quot;negative holdout id&quot;);</span>
+<span class="fc" id="L321">            requireText(inputExpression, &quot;negative holdout input&quot;);</span>
+<span class="fc" id="L322">        }</span>
     }
 
     public record CandidateSnapshot(
@@ -308,9 +330,9 @@ public final class HiddenRulePilotRunner {
         String dynamicRuleId,
         String provenanceHash
     ) {
-<span class="fc" id="L311">        public CandidateSnapshot {</span>
-<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="fc" id="L313">        }</span>
+<span class="fc" id="L333">        public CandidateSnapshot {</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L335">        }</span>
     }
 
     /** Structured validation evidence, independent of post-hoc hidden-rule similarity. */
@@ -320,34 +342,34 @@ public final class HiddenRulePilotRunner {
         int failedValidationExamples,
         List&lt;CounterexampleEvidence&gt; counterexampleSearches
     ) {
-<span class="fc" id="L323">        public CandidateValidationEvidence {</span>
-<span class="pc bpc" id="L324" title="2 of 4 branches missed.">            proofStatus = proofStatus == null || proofStatus.isBlank() ? &quot;NONE&quot; : proofStatus;</span>
-<span class="pc bpc" id="L325" title="3 of 6 branches missed.">            if (generatedValidationExamples &lt; 0 || failedValidationExamples &lt; 0</span>
+<span class="fc" id="L345">        public CandidateValidationEvidence {</span>
+<span class="pc bpc" id="L346" title="2 of 4 branches missed.">            proofStatus = proofStatus == null || proofStatus.isBlank() ? &quot;NONE&quot; : proofStatus;</span>
+<span class="pc bpc" id="L347" title="3 of 6 branches missed.">            if (generatedValidationExamples &lt; 0 || failedValidationExamples &lt; 0</span>
                     || failedValidationExamples &gt; generatedValidationExamples) {
-<span class="nc" id="L327">                throw new IllegalArgumentException(&quot;invalid validation example counts&quot;);</span>
+<span class="nc" id="L349">                throw new IllegalArgumentException(&quot;invalid validation example counts&quot;);</span>
             }
-<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            counterexampleSearches = counterexampleSearches == null</span>
-<span class="nc" id="L330">                ? List.of()</span>
-<span class="fc" id="L331">                : List.copyOf(counterexampleSearches);</span>
-<span class="fc" id="L332">        }</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">            counterexampleSearches = counterexampleSearches == null</span>
+<span class="nc" id="L352">                ? List.of()</span>
+<span class="fc" id="L353">                : List.copyOf(counterexampleSearches);</span>
+<span class="fc" id="L354">        }</span>
 
         static CandidateValidationEvidence empty() {
-<span class="fc" id="L335">            return new CandidateValidationEvidence(&quot;NONE&quot;, 0, 0, List.of());</span>
+<span class="fc" id="L357">            return new CandidateValidationEvidence(&quot;NONE&quot;, 0, 0, List.of());</span>
         }
 
         static CandidateValidationEvidence from(
             MacroLearningResult learning,
             ReusableRule learned
         ) {
-<span class="fc" id="L342">            int generated = learning.validationExamples().size();</span>
-<span class="fc" id="L343">            int failed = (int) learning.validationExamples().stream()</span>
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                .filter(example -&gt; !example.equivalent())</span>
-<span class="fc" id="L345">                .count();</span>
-<span class="fc" id="L346">            List&lt;CounterexampleEvidence&gt; searches = learning.counterexampleSearches().stream()</span>
-<span class="fc" id="L347">                .map(CounterexampleEvidence::from)</span>
-<span class="fc" id="L348">                .toList();</span>
-<span class="fc" id="L349">            return new CandidateValidationEvidence(</span>
-<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                learned == null ? &quot;NONE&quot; : learned.proofStatus().name(),</span>
+<span class="fc" id="L364">            int generated = learning.validationExamples().size();</span>
+<span class="fc" id="L365">            int failed = (int) learning.validationExamples().stream()</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                .filter(example -&gt; !example.equivalent())</span>
+<span class="fc" id="L367">                .count();</span>
+<span class="fc" id="L368">            List&lt;CounterexampleEvidence&gt; searches = learning.counterexampleSearches().stream()</span>
+<span class="fc" id="L369">                .map(CounterexampleEvidence::from)</span>
+<span class="fc" id="L370">                .toList();</span>
+<span class="fc" id="L371">            return new CandidateValidationEvidence(</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                learned == null ? &quot;NONE&quot; : learned.proofStatus().name(),</span>
                 generated,
                 failed,
                 searches);
@@ -356,20 +378,20 @@ public final class HiddenRulePilotRunner {
         public boolean passed() {
             CandidateProofStatus status;
             try {
-<span class="fc" id="L359">                status = CandidateProofStatus.valueOf(proofStatus);</span>
-<span class="fc" id="L360">            } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L361">                return false;</span>
-<span class="fc" id="L362">            }</span>
-<span class="pc bpc" id="L363" title="1 of 2 branches missed.">            boolean positiveProof = switch (status) {</span>
+<span class="fc" id="L381">                status = CandidateProofStatus.valueOf(proofStatus);</span>
+<span class="fc" id="L382">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L383">                return false;</span>
+<span class="fc" id="L384">            }</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">            boolean positiveProof = switch (status) {</span>
                 case VALIDATED_BY_EXAMPLES, SYMBOLICALLY_VERIFIED,
-<span class="fc" id="L365">                    FORMALLY_PROVABLE, FORMALLY_PROVED -&gt; true;</span>
-<span class="nc" id="L366">                default -&gt; false;</span>
+<span class="fc" id="L387">                    FORMALLY_PROVABLE, FORMALLY_PROVED -&gt; true;</span>
+<span class="nc" id="L388">                default -&gt; false;</span>
             };
-<span class="fc" id="L368">            boolean noCounterexample = counterexampleSearches.stream()</span>
-<span class="pc bpc" id="L369" title="1 of 2 branches missed.">                .noneMatch(search -&gt; search.counterexamplePresent()</span>
-<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                    || search.status().equals(</span>
-<span class="fc" id="L371">                        CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()));</span>
-<span class="pc bpc" id="L372" title="4 of 8 branches missed.">            return positiveProof</span>
+<span class="fc" id="L390">            boolean noCounterexample = counterexampleSearches.stream()</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                .noneMatch(search -&gt; search.counterexamplePresent()</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">                    || search.status().equals(</span>
+<span class="fc" id="L393">                        CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND.name()));</span>
+<span class="pc bpc" id="L394" title="4 of 8 branches missed.">            return positiveProof</span>
                 &amp;&amp; generatedValidationExamples &gt; 0
                 &amp;&amp; failedValidationExamples == 0
                 &amp;&amp; noCounterexample;
@@ -382,22 +404,22 @@ public final class HiddenRulePilotRunner {
         List&lt;String&gt; attemptedSources,
         String explanation
     ) {
-<span class="fc" id="L385">        public CounterexampleEvidence {</span>
-<span class="pc bpc" id="L386" title="2 of 4 branches missed.">            status = status == null || status.isBlank() ? &quot;INCONCLUSIVE&quot; : status;</span>
-<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            attemptedSources = attemptedSources == null</span>
-<span class="nc" id="L388">                ? List.of()</span>
-<span class="fc" id="L389">                : attemptedSources.stream().distinct().sorted().toList();</span>
-<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
-<span class="fc" id="L391">        }</span>
+<span class="fc" id="L407">        public CounterexampleEvidence {</span>
+<span class="pc bpc" id="L408" title="2 of 4 branches missed.">            status = status == null || status.isBlank() ? &quot;INCONCLUSIVE&quot; : status;</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            attemptedSources = attemptedSources == null</span>
+<span class="nc" id="L410">                ? List.of()</span>
+<span class="fc" id="L411">                : attemptedSources.stream().distinct().sorted().toList();</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L413">        }</span>
 
         static CounterexampleEvidence from(
             CounterexampleSearchService.CounterexampleSearchResult result
         ) {
-<span class="fc" id="L396">            return new CounterexampleEvidence(</span>
-<span class="fc" id="L397">                result.status().name(),</span>
-<span class="fc" id="L398">                result.counterexample().isPresent(),</span>
-<span class="fc" id="L399">                result.attemptedSources(),</span>
-<span class="fc" id="L400">                result.explanation());</span>
+<span class="fc" id="L418">            return new CounterexampleEvidence(</span>
+<span class="fc" id="L419">                result.status().name(),</span>
+<span class="fc" id="L420">                result.counterexample().isPresent(),</span>
+<span class="fc" id="L421">                result.attemptedSources(),</span>
+<span class="fc" id="L422">                result.explanation());</span>
         }
     }
 
@@ -415,24 +437,24 @@ public final class HiddenRulePilotRunner {
         List&lt;String&gt; stageEvidence,
         String failureReason
     ) {
-<span class="fc" id="L418">        public RuntimeResult {</span>
-<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
-<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            primitiveRuleIds = primitiveRuleIds == null ? List.of() : List.copyOf(primitiveRuleIds);</span>
-<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L422" title="1 of 2 branches missed.">            validationEvidence = validationEvidence == null</span>
-<span class="nc" id="L423">                ? CandidateValidationEvidence.empty()</span>
-<span class="fc" id="L424">                : validationEvidence;</span>
-<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            holdouts = holdouts == null ? HoldoutSummary.empty() : holdouts;</span>
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">            stageEvidence = stageEvidence == null ? List.of() : List.copyOf(stageEvidence);</span>
-<span class="pc bpc" id="L427" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
-<span class="fc" id="L428">        }</span>
+<span class="fc" id="L440">        public RuntimeResult {</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">            primitiveRuleIds = primitiveRuleIds == null ? List.of() : List.copyOf(primitiveRuleIds);</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">            validationEvidence = validationEvidence == null</span>
+<span class="nc" id="L445">                ? CandidateValidationEvidence.empty()</span>
+<span class="fc" id="L446">                : validationEvidence;</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">            holdouts = holdouts == null ? HoldoutSummary.empty() : holdouts;</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            stageEvidence = stageEvidence == null ? List.of() : List.copyOf(stageEvidence);</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">            failureReason = failureReason == null ? &quot;&quot; : failureReason;</span>
+<span class="fc" id="L450">        }</span>
 
         static RuntimeResult searchFailure(String id, GoalSearchResult search) {
-<span class="fc" id="L431">            return new RuntimeResult(</span>
-<span class="fc" id="L432">                id, RuntimeStatus.SEARCH_FAILED, search.status(), search.metrics(),</span>
-<span class="fc" id="L433">                search.states().stream().map(SearchState::expression).toList(),</span>
-<span class="fc" id="L434">                List.of(), List.of(), null, CandidateValidationEvidence.empty(),</span>
-<span class="fc" id="L435">                HoldoutSummary.empty(), List.of(),</span>
+<span class="fc" id="L453">            return new RuntimeResult(</span>
+<span class="fc" id="L454">                id, RuntimeStatus.SEARCH_FAILED, search.status(), search.metrics(),</span>
+<span class="fc" id="L455">                search.states().stream().map(SearchState::expression).toList(),</span>
+<span class="fc" id="L456">                List.of(), List.of(), null, CandidateValidationEvidence.empty(),</span>
+<span class="fc" id="L457">                HoldoutSummary.empty(), List.of(),</span>
                 &quot;primitive search did not reach the concrete task target&quot;);
         }
 
@@ -443,10 +465,10 @@ public final class HiddenRulePilotRunner {
             CandidateValidationEvidence validation,
             List&lt;String&gt; stages
         ) {
-<span class="nc" id="L446">            return new RuntimeResult(</span>
-<span class="nc" id="L447">                id, RuntimeStatus.LEARNING_REJECTED, search.status(), search.metrics(),</span>
-<span class="nc" id="L448">                reached.path(), reached.appliedRuleIds(), reached.assumptions(), null,</span>
-<span class="nc" id="L449">                validation, HoldoutSummary.empty(), stages,</span>
+<span class="nc" id="L468">            return new RuntimeResult(</span>
+<span class="nc" id="L469">                id, RuntimeStatus.LEARNING_REJECTED, search.status(), search.metrics(),</span>
+<span class="nc" id="L470">                reached.path(), reached.appliedRuleIds(), reached.assumptions(), null,</span>
+<span class="nc" id="L471">                validation, HoldoutSummary.empty(), stages,</span>
                 &quot;macro learning rejected the path&quot;);
         }
 
@@ -459,17 +481,17 @@ public final class HiddenRulePilotRunner {
             List&lt;String&gt; stages,
             String reason
         ) {
-<span class="nc" id="L462">            CandidateSnapshot candidate = new CandidateSnapshot(</span>
-<span class="nc" id="L463">                learned.leftPattern(), learned.rightPattern(), learned.assumptions(),</span>
-<span class="nc" id="L464">                learned.confidenceScore(), &quot;&quot;, &quot;&quot;);</span>
-<span class="nc" id="L465">            return new RuntimeResult(</span>
-<span class="nc" id="L466">                id, RuntimeStatus.COMPILATION_REJECTED, search.status(), search.metrics(),</span>
-<span class="nc" id="L467">                reached.path(), reached.appliedRuleIds(), reached.assumptions(), candidate,</span>
-<span class="nc" id="L468">                validation, HoldoutSummary.empty(), stages, reason);</span>
+<span class="nc" id="L484">            CandidateSnapshot candidate = new CandidateSnapshot(</span>
+<span class="nc" id="L485">                learned.leftPattern(), learned.rightPattern(), learned.assumptions(),</span>
+<span class="nc" id="L486">                learned.confidenceScore(), &quot;&quot;, &quot;&quot;);</span>
+<span class="nc" id="L487">            return new RuntimeResult(</span>
+<span class="nc" id="L488">                id, RuntimeStatus.COMPILATION_REJECTED, search.status(), search.metrics(),</span>
+<span class="nc" id="L489">                reached.path(), reached.appliedRuleIds(), reached.assumptions(), candidate,</span>
+<span class="nc" id="L490">                validation, HoldoutSummary.empty(), stages, reason);</span>
         }
 
         public boolean frozen() {
-<span class="fc bfc" id="L472" title="All 2 branches covered.">            return status == RuntimeStatus.CANDIDATE_FROZEN;</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            return status == RuntimeStatus.CANDIDATE_FROZEN;</span>
         }
     }
 
@@ -477,26 +499,26 @@ public final class HiddenRulePilotRunner {
         List&lt;PositiveHoldoutResult&gt; positives,
         List&lt;NegativeHoldoutResult&gt; negatives
     ) {
-<span class="fc" id="L480">        public HoldoutSummary {</span>
-<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            positives = positives == null ? List.of() : List.copyOf(positives);</span>
-<span class="pc bpc" id="L482" title="1 of 2 branches missed.">            negatives = negatives == null ? List.of() : List.copyOf(negatives);</span>
-<span class="fc" id="L483">        }</span>
+<span class="fc" id="L502">        public HoldoutSummary {</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            positives = positives == null ? List.of() : List.copyOf(positives);</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">            negatives = negatives == null ? List.of() : List.copyOf(negatives);</span>
+<span class="fc" id="L505">        }</span>
 
         static HoldoutSummary empty() {
-<span class="fc" id="L486">            return new HoldoutSummary(List.of(), List.of());</span>
+<span class="fc" id="L508">            return new HoldoutSummary(List.of(), List.of());</span>
         }
 
         public boolean allPassed() {
-<span class="pc bpc" id="L490" title="1 of 2 branches missed.">            return positives.stream().allMatch(PositiveHoldoutResult::passed)</span>
-<span class="pc bpc" id="L491" title="1 of 2 branches missed.">                &amp;&amp; negatives.stream().allMatch(NegativeHoldoutResult::passed);</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">            return positives.stream().allMatch(PositiveHoldoutResult::passed)</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                &amp;&amp; negatives.stream().allMatch(NegativeHoldoutResult::passed);</span>
         }
 
         public long materialAblations() {
-<span class="fc" id="L495">            return positives.stream().filter(result -&gt; result.ablation().materialBenefit()).count();</span>
+<span class="fc" id="L517">            return positives.stream().filter(result -&gt; result.ablation().materialBenefit()).count();</span>
         }
     }
 
-<span class="fc" id="L499">    public record PositiveHoldoutResult(</span>
+<span class="fc" id="L521">    public record PositiveHoldoutResult(</span>
         String id,
         boolean directApplicationEquivalent,
         boolean baselineReached,
@@ -504,17 +526,17 @@ public final class HiddenRulePilotRunner {
         AblationEvidence ablation
     ) {
         public boolean passed() {
-<span class="pc bpc" id="L507" title="2 of 4 branches missed.">            return directApplicationEquivalent &amp;&amp; candidateReached;</span>
+<span class="pc bpc" id="L529" title="2 of 4 branches missed.">            return directApplicationEquivalent &amp;&amp; candidateReached;</span>
         }
     }
 
-<span class="fc" id="L511">    public record NegativeHoldoutResult(String id, boolean noApplication, int candidateCount) {</span>
+<span class="fc" id="L533">    public record NegativeHoldoutResult(String id, boolean noApplication, int candidateCount) {</span>
         public boolean passed() {
-<span class="fc" id="L513">            return noApplication;</span>
+<span class="fc" id="L535">            return noApplication;</span>
         }
     }
 
-<span class="fc" id="L517">    public record AblationEvidence(</span>
+<span class="fc" id="L539">    public record AblationEvidence(</span>
         boolean baselineReached,
         boolean candidateReached,
         int baselineExploredStates,
@@ -525,48 +547,48 @@ public final class HiddenRulePilotRunner {
         boolean materialBenefit
     ) {
         static AblationEvidence from(GoalSearchResult baseline, GoalSearchResult candidate) {
-<span class="fc" id="L528">            int baselineDepth = depth(baseline);</span>
-<span class="fc" id="L529">            int candidateDepth = depth(candidate);</span>
-<span class="fc" id="L530">            int baselineStates = baseline.metrics().exploredStates();</span>
-<span class="fc" id="L531">            int candidateStates = candidate.metrics().exploredStates();</span>
-<span class="pc bpc" id="L532" title="1 of 2 branches missed.">            double reduction = baselineStates == 0</span>
-<span class="nc" id="L533">                ? 0.0</span>
-<span class="fc" id="L534">                : (baselineStates - candidateStates) / (double) baselineStates;</span>
-<span class="pc bpc" id="L535" title="1 of 2 branches missed.">            boolean material = candidate.reached()</span>
-<span class="pc bpc" id="L536" title="2 of 10 branches missed.">                &amp;&amp; (!baseline.reached()</span>
+<span class="fc" id="L550">            int baselineDepth = depth(baseline);</span>
+<span class="fc" id="L551">            int candidateDepth = depth(candidate);</span>
+<span class="fc" id="L552">            int baselineStates = baseline.metrics().exploredStates();</span>
+<span class="fc" id="L553">            int candidateStates = candidate.metrics().exploredStates();</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">            double reduction = baselineStates == 0</span>
+<span class="nc" id="L555">                ? 0.0</span>
+<span class="fc" id="L556">                : (baselineStates - candidateStates) / (double) baselineStates;</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">            boolean material = candidate.reached()</span>
+<span class="pc bpc" id="L558" title="2 of 10 branches missed.">                &amp;&amp; (!baseline.reached()</span>
                     || reduction &gt;= 0.5
                     || baselineDepth &gt;= 0 &amp;&amp; candidateDepth &gt;= 0 &amp;&amp; candidateDepth &lt; baselineDepth);
-<span class="fc" id="L539">            return new AblationEvidence(</span>
-<span class="fc" id="L540">                baseline.reached(), candidate.reached(), baselineStates, candidateStates,</span>
+<span class="fc" id="L561">            return new AblationEvidence(</span>
+<span class="fc" id="L562">                baseline.reached(), candidate.reached(), baselineStates, candidateStates,</span>
                 baselineDepth, candidateDepth, reduction, material);
         }
 
         private static int depth(GoalSearchResult result) {
-<span class="fc bfc" id="L545" title="All 2 branches covered.">            return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
         }
     }
 
     private static final class RuntimeBlindKnownRules extends KnownRuleRepository {
         @Override
         public RuleStatus statusFor(String leftPattern, String rightPattern) {
-<span class="fc" id="L552">            return RuleStatus.NEW;</span>
+<span class="fc" id="L574">            return RuleStatus.NEW;</span>
         }
 
         @Override
         public double similarityToKnownRules(String leftPattern, String rightPattern) {
-<span class="nc" id="L557">            return 0.0;</span>
+<span class="nc" id="L579">            return 0.0;</span>
         }
 
         @Override
         public List&lt;KnownRule&gt; all() {
-<span class="nc" id="L562">            return List.of();</span>
+<span class="nc" id="L584">            return List.of();</span>
         }
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L567" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L568">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L589" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L590">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L570">    }</span>
+<span class="fc" id="L592">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -368,72 +368,86 @@ public record ExactRational(
 
     /** Explicitly rounded projection for numerical diagnostics, never equality. */
     public BigDecimal toBigDecimal(MathContext context) {
-<span class="nc" id="L371">        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);</span>
+<span class="fc" id="L371">        return new BigDecimal(numerator).divide(new BigDecimal(denominator), context);</span>
+    }
+
+    /** A decimal diagnostic retains its rounding policy and cannot be used as an exact AST leaf. */
+    public record DecimalApproximation(BigDecimal value, MathContext context) {
+<span class="fc" id="L376">        public DecimalApproximation {</span>
+<span class="fc" id="L377">            Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (context.getPrecision() == 0) throw new IllegalArgumentException(&quot;finite precision required&quot;);</span>
+<span class="fc" id="L379">            value = Objects.requireNonNull(value, &quot;value&quot;).round(context);</span>
+<span class="fc" id="L380">        }</span>
+    }
+
+    public DecimalApproximation approximate(MathContext context) {
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (context.getPrecision() == 0) throw new IllegalArgumentException(&quot;finite precision required&quot;);</span>
+<span class="fc" id="L385">        return new DecimalApproximation(toBigDecimal(context), context);</span>
     }
 
     /** A root exists here only when both integer components are perfect squares. */
     public Optional&lt;ExactRational&gt; sqrtExact() {
-<span class="fc" id="L376">        var owned = Arithmetic.observe(this, null, 4);</span>
-<span class="fc" id="L377">        Throwable primary = null;</span>
+<span class="fc" id="L390">        var owned = Arithmetic.observe(this, null, 4);</span>
+<span class="fc" id="L391">        Throwable primary = null;</span>
         try {
-<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (signum() &lt; 0) {</span>
-<span class="fc" id="L380">                return keep(owned, 3, Optional.empty());</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            if (signum() &lt; 0) {</span>
+<span class="fc" id="L394">                return keep(owned, 3, Optional.empty());</span>
             }
-<span class="fc" id="L382">            BigInteger[] top = keep(owned, 0, numerator.sqrtAndRemainder());</span>
-<span class="fc" id="L383">            BigInteger[] bottom = keep(owned, 1, denominator.sqrtAndRemainder());</span>
-<span class="pc bpc" id="L384" title="1 of 4 branches missed.">            if (top[1].signum() != 0 || bottom[1].signum() != 0) {</span>
-<span class="fc" id="L385">                return keep(owned, 3, Optional.empty());</span>
+<span class="fc" id="L396">            BigInteger[] top = keep(owned, 0, numerator.sqrtAndRemainder());</span>
+<span class="fc" id="L397">            BigInteger[] bottom = keep(owned, 1, denominator.sqrtAndRemainder());</span>
+<span class="pc bpc" id="L398" title="1 of 4 branches missed.">            if (top[1].signum() != 0 || bottom[1].signum() != 0) {</span>
+<span class="fc" id="L399">                return keep(owned, 3, Optional.empty());</span>
             }
-<span class="fc" id="L387">            var root = keep(owned, 2, new ExactRational(top[0], bottom[0]));</span>
-<span class="fc" id="L388">            return keep(owned, 3, Optional.of(root));</span>
-<span class="fc" id="L389">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L390">            primary = failure;</span>
-<span class="fc" id="L391">            throw failure;</span>
+<span class="fc" id="L401">            var root = keep(owned, 2, new ExactRational(top[0], bottom[0]));</span>
+<span class="fc" id="L402">            return keep(owned, 3, Optional.of(root));</span>
+<span class="fc" id="L403">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L404">            primary = failure;</span>
+<span class="fc" id="L405">            throw failure;</span>
         } finally {
-<span class="fc bfc" id="L393" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
     }
 
     @JsonValue
     public String canonicalText() {
-<span class="fc bfc" id="L399" title="All 2 branches covered.">        return isInteger()</span>
-<span class="fc" id="L400">            ? numerator.toString()</span>
-<span class="fc" id="L401">            : numerator + &quot;/&quot; + denominator;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        return isInteger()</span>
+<span class="fc" id="L414">            ? numerator.toString()</span>
+<span class="fc" id="L415">            : numerator + &quot;/&quot; + denominator;</span>
     }
 
     @Override
     public int compareTo(ExactRational other) {
-<span class="fc" id="L406">        var owned = Arithmetic.observe(this, other, 5);</span>
-<span class="fc" id="L407">        Throwable primary = null;</span>
+<span class="fc" id="L420">        var owned = Arithmetic.observe(this, other, 5);</span>
+<span class="fc" id="L421">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L409">            Objects.requireNonNull(other, &quot;other&quot;);</span>
-<span class="pc bpc" id="L410" title="1 of 4 branches missed.">            if (this == other || equals(other)) {</span>
-<span class="fc" id="L411">                return 0;</span>
+<span class="fc" id="L423">            Objects.requireNonNull(other, &quot;other&quot;);</span>
+<span class="pc bpc" id="L424" title="1 of 4 branches missed.">            if (this == other || equals(other)) {</span>
+<span class="fc" id="L425">                return 0;</span>
             }
-<span class="fc" id="L413">            BigInteger denominatorGcd = keep(owned, 0, denominator.gcd(other.denominator));</span>
-<span class="fc" id="L414">            BigInteger leftMultiplier = keep(owned, 1, other.denominator.divide(denominatorGcd));</span>
-<span class="fc" id="L415">            BigInteger left = keep(owned, 3, numerator.multiply(leftMultiplier));</span>
-<span class="fc" id="L416">            BigInteger rightMultiplier = keep(owned, 2, denominator.divide(denominatorGcd));</span>
-<span class="fc" id="L417">            BigInteger right = keep(owned, 4, other.numerator.multiply(rightMultiplier));</span>
-<span class="fc" id="L418">            return left.compareTo(right);</span>
-<span class="fc" id="L419">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L420">            primary = failure;</span>
-<span class="fc" id="L421">            throw failure;</span>
+<span class="fc" id="L427">            BigInteger denominatorGcd = keep(owned, 0, denominator.gcd(other.denominator));</span>
+<span class="fc" id="L428">            BigInteger leftMultiplier = keep(owned, 1, other.denominator.divide(denominatorGcd));</span>
+<span class="fc" id="L429">            BigInteger left = keep(owned, 3, numerator.multiply(leftMultiplier));</span>
+<span class="fc" id="L430">            BigInteger rightMultiplier = keep(owned, 2, denominator.divide(denominatorGcd));</span>
+<span class="fc" id="L431">            BigInteger right = keep(owned, 4, other.numerator.multiply(rightMultiplier));</span>
+<span class="fc" id="L432">            return left.compareTo(right);</span>
+<span class="fc" id="L433">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L434">            primary = failure;</span>
+<span class="fc" id="L435">            throw failure;</span>
         } finally {
-<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            if (owned != null) owned.close(primary);</span>
         }
     }
 
     /** Publishes a real temporary before a debit can fail; does not charge arithmetic again. */
     private static &lt;T&gt; T keep(Arithmetic owned, int slot, T value) {
-<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (owned != null) {</span>
-<span class="fc" id="L430">            Object previous = owned.temporaries[slot];</span>
-<span class="fc" id="L431">            owned.temporaries[slot] = value;</span>
-<span class="fc" id="L432">            try (var publication = RetainedOperation.retainCompleted(2, owned, previous)) {</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        if (owned != null) {</span>
+<span class="fc" id="L444">            Object previous = owned.temporaries[slot];</span>
+<span class="fc" id="L445">            owned.temporaries[slot] = value;</span>
+<span class="fc" id="L446">            try (var publication = RetainedOperation.retainCompleted(2, owned, previous)) {</span>
                 // Slot read/write and the old/new overlap are observer work, not another arithmetic debit.
-<span class="pc bpc" id="L434" title="1 of 2 branches missed.">            }</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            }</span>
         }
-<span class="fc" id="L436">        return value;</span>
+<span class="fc" id="L450">        return value;</span>
     }
 
     /** Fixed lexical scratch, absent for historical calls without a native observer. */
@@ -442,56 +456,56 @@ public record ExactRational(
         private final RetainedOperation.Frame inputs;
         private RetainedOperation.Frame frame;
 
-<span class="fc" id="L445">        private Arithmetic(int slots, RetainedOperation.Frame inputs) {</span>
-<span class="fc" id="L446">            temporaries = new Object[slots];</span>
-<span class="fc" id="L447">            this.inputs = inputs;</span>
-<span class="fc" id="L448">        }</span>
+<span class="fc" id="L459">        private Arithmetic(int slots, RetainedOperation.Frame inputs) {</span>
+<span class="fc" id="L460">            temporaries = new Object[slots];</span>
+<span class="fc" id="L461">            this.inputs = inputs;</span>
+<span class="fc" id="L462">        }</span>
 
         private static Arithmetic observe(Object left, Object right, int slots) {
-<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (!CONSTANTS_INITIALIZED) return null;</span>
-<span class="fc" id="L452">            var inputs = RetainedOperation.retain(left, right);</span>
-<span class="fc bfc" id="L453" title="All 2 branches covered.">            if (inputs == null) return null;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            if (!CONSTANTS_INITIALIZED) return null;</span>
+<span class="fc" id="L466">            var inputs = RetainedOperation.retain(left, right);</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            if (inputs == null) return null;</span>
             try {
-<span class="fc" id="L455">                var owned = new Arithmetic(slots, inputs);</span>
-<span class="fc" id="L456">                owned.frame = RetainedOperation.retainCompleted(2, owned);</span>
-<span class="fc" id="L457">                return owned;</span>
-<span class="fc" id="L458">            } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L459">                try { inputs.close(); }</span>
-<span class="nc" id="L460">                catch (RuntimeException | Error cleanup) {</span>
-<span class="nc bnc" id="L461" title="All 2 branches missed.">                    if (cleanup != failure) failure.addSuppressed(cleanup);</span>
-<span class="fc" id="L462">                }</span>
-<span class="fc" id="L463">                throw failure;</span>
+<span class="fc" id="L469">                var owned = new Arithmetic(slots, inputs);</span>
+<span class="fc" id="L470">                owned.frame = RetainedOperation.retainCompleted(2, owned);</span>
+<span class="fc" id="L471">                return owned;</span>
+<span class="fc" id="L472">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L473">                try { inputs.close(); }</span>
+<span class="nc" id="L474">                catch (RuntimeException | Error cleanup) {</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                    if (cleanup != failure) failure.addSuppressed(cleanup);</span>
+<span class="fc" id="L476">                }</span>
+<span class="fc" id="L477">                throw failure;</span>
             }
         }
 
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-<span class="fc" id="L468">            visitor.reference(temporaries);</span>
-<span class="fc" id="L469">            visitor.reference(inputs);</span>
-<span class="fc" id="L470">            visitor.reference(frame);</span>
-<span class="fc" id="L471">        }</span>
+<span class="fc" id="L482">            visitor.reference(temporaries);</span>
+<span class="fc" id="L483">            visitor.reference(inputs);</span>
+<span class="fc" id="L484">            visitor.reference(frame);</span>
+<span class="fc" id="L485">        }</span>
 
         private void close(Throwable primary) {
             try {
-<span class="fc" id="L475">                close(frame, primary);</span>
-<span class="fc" id="L476">            } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L477">                close(inputs, failure);</span>
-<span class="fc" id="L478">                throw failure;</span>
-<span class="fc" id="L479">            }</span>
-<span class="fc" id="L480">            close(inputs, primary);</span>
-<span class="fc" id="L481">        }</span>
+<span class="fc" id="L489">                close(frame, primary);</span>
+<span class="fc" id="L490">            } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L491">                close(inputs, failure);</span>
+<span class="fc" id="L492">                throw failure;</span>
+<span class="fc" id="L493">            }</span>
+<span class="fc" id="L494">            close(inputs, primary);</span>
+<span class="fc" id="L495">        }</span>
 
         private static void close(RetainedOperation.Frame frame, Throwable primary) {
-<span class="fc" id="L484">            try { frame.close(); }</span>
-<span class="fc" id="L485">            catch (RuntimeException | Error cleanup) {</span>
-<span class="fc bfc" id="L486" title="All 2 branches covered.">                if (primary == null) throw cleanup;</span>
-<span class="fc bfc" id="L487" title="All 2 branches covered.">                if (cleanup != primary) primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L488">            }</span>
-<span class="fc" id="L489">        }</span>
+<span class="fc" id="L498">            try { frame.close(); }</span>
+<span class="fc" id="L499">            catch (RuntimeException | Error cleanup) {</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">                if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">                if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L502">            }</span>
+<span class="fc" id="L503">        }</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L494">        return canonicalText();</span>
+<span class="fc" id="L508">        return canonicalText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkPublication.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkPublication.java</span></div><h1>ComparativeBenchmarkPublication.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+/** Stages and replaces a bundle while keeping the output directory itself in place. */
+final class ComparativeBenchmarkPublication {
+    private ComparativeBenchmarkPublication() {}
+
+    static void replace(Path output, StageWriter writer) throws IOException {
+<span class="fc" id="L17">        Files.createDirectories(output);</span>
+        // A single work directory excludes concurrent writers and lets all moves
+        // remain on the output filesystem, including when it is a Docker mount.
+<span class="fc" id="L20">        Path work = Files.createDirectory(output.resolve(&quot;.comparative-publication&quot;));</span>
+<span class="fc" id="L21">        var completed = new ArrayList&lt;Move&gt;();</span>
+        try {
+<span class="fc" id="L23">            Path staging = Files.createDirectory(work.resolve(&quot;next&quot;));</span>
+<span class="fc" id="L24">            Path backup = Files.createDirectory(work.resolve(&quot;previous&quot;));</span>
+<span class="fc" id="L25">            writer.write(staging);</span>
+
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (Path entry : children(output)) {</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">                if (!entry.equals(work)) {</span>
+<span class="fc" id="L29">                    move(entry, backup, completed);</span>
+                }
+<span class="fc" id="L31">            }</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            for (Path entry : children(staging)) {</span>
+<span class="fc" id="L33">                move(entry, output, completed);</span>
+<span class="fc" id="L34">            }</span>
+<span class="fc" id="L35">        } catch (IOException | RuntimeException failure) {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (restore(completed, failure)) {</span>
+                try {
+<span class="fc" id="L38">                    deleteTree(work);</span>
+<span class="fc" id="L39">                } catch (IOException cleanupFailure) {</span>
+<span class="fc" id="L40">                    failure.addSuppressed(cleanupFailure);</span>
+<span class="fc" id="L41">                }</span>
+            } else {
+<span class="nc" id="L43">                failure.addSuppressed(new IOException(&quot;Recovery files retained under &quot; + work));</span>
+            }
+<span class="fc" id="L45">            throw failure;</span>
+<span class="fc" id="L46">        }</span>
+<span class="fc" id="L47">        deleteTree(work);</span>
+<span class="fc" id="L48">    }</span>
+
+    private static void move(Path from, Path directory, List&lt;Move&gt; completed) throws IOException {
+<span class="fc" id="L51">        Path to = directory.resolve(from.getFileName());</span>
+<span class="fc" id="L52">        Files.move(from, to, ATOMIC_MOVE);</span>
+<span class="fc" id="L53">        completed.add(new Move(from, to));</span>
+<span class="fc" id="L54">    }</span>
+
+    private static boolean restore(List&lt;Move&gt; completed, Exception failure) {
+<span class="fc" id="L57">        boolean restored = true;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (Move move : completed.reversed()) {</span>
+            try {
+<span class="fc" id="L60">                Files.move(move.to(), move.from(), ATOMIC_MOVE);</span>
+<span class="nc" id="L61">            } catch (IOException | RuntimeException restoreFailure) {</span>
+<span class="nc" id="L62">                failure.addSuppressed(restoreFailure);</span>
+<span class="nc" id="L63">                restored = false;</span>
+<span class="fc" id="L64">            }</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">        return restored;</span>
+    }
+
+    private static List&lt;Path&gt; children(Path directory) throws IOException {
+<span class="fc" id="L70">        try (var paths = Files.list(directory)) {</span>
+<span class="fc" id="L71">            return paths.sorted().toList();</span>
+        }
+    }
+
+    private static void deleteTree(Path directory) throws IOException {
+<span class="fc" id="L76">        try (var paths = Files.walk(directory)) {</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {</span>
+<span class="fc" id="L78">                Files.delete(path);</span>
+<span class="fc" id="L79">            }</span>
+        }
+<span class="fc" id="L81">    }</span>
+
+    @FunctionalInterface
+    interface StageWriter {
+        void write(Path staging) throws IOException;
+    }
+
+<span class="fc" id="L88">    private record Move(Path from, Path to) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

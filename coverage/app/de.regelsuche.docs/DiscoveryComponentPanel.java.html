@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryComponentPanel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">DiscoveryComponentPanel.java</span></div><h1>DiscoveryComponentPanel.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.mining.DiscoveryDemos;
+import de.regelsuche.mining.DiscoverySettings;
+import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.HypothesisRefinementLoop;
+import de.regelsuche.mining.HypothesisRevision;
+import de.regelsuche.mining.InterestingnessRankingStrategy;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.RefinementStrategy;
+import de.regelsuche.mining.RuleCandidate;
+import de.regelsuche.mining.RuleCandidateMiner;
+import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleBudget;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleSearchResult;
+import de.regelsuche.validation.CounterexampleSearchService.HypothesisInput;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Four preregistered component arms on the same public historical observations. */
+<span class="nc" id="L38">public final class DiscoveryComponentPanel {</span>
+<span class="fc" id="L39">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L40">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();</span>
+    private static final String PLAN = &quot;67b8eb0345324b024adad2bfa92265ed3f556ba4&quot;;
+<span class="fc" id="L42">    enum Arm { PRODUCTION, NO_FAN_IN, NO_REFINEMENT, NO_NOVELTY_SCHEDULING }</span>
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (args.length != 1) throw new IllegalArgumentException(&quot;Expected destination JSON file&quot;);</span>
+<span class="fc" id="L46">        Path output = Path.of(args[0]).toAbsolutePath();</span>
+<span class="fc" id="L47">        var bytes = JSON.writeValueAsBytes(run());</span>
+<span class="fc" id="L48">        Files.createDirectories(output.getParent());</span>
+<span class="fc" id="L49">        Path temporary = Files.createTempFile(output.getParent(), &quot;components-&quot;, &quot;.json&quot;);</span>
+        try {
+<span class="fc" id="L51">            Files.write(temporary, bytes);</span>
+<span class="fc" id="L52">            Files.move(temporary, output, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);</span>
+<span class="fc" id="L53">        } finally { Files.deleteIfExists(temporary); }</span>
+<span class="fc" id="L54">    }</span>
+
+    static ObjectNode run() throws Exception {
+<span class="fc" id="L57">        var report = JSON.createObjectNode();</span>
+<span class="fc" id="L58">        report.put(&quot;schema&quot;, &quot;regelsuche.public-discovery-component-panel/v1&quot;);</span>
+<span class="fc" id="L59">        report.put(&quot;protocolCommit&quot;, PLAN);</span>
+<span class="fc" id="L60">        report.put(&quot;fixtureRevision&quot;, &quot;03b58d1dfdd9c5076622f1f9bf35dd9c618bf897&quot;);</span>
+<span class="fc" id="L61">        var observations = observations();</span>
+<span class="fc" id="L62">        var training = new ReferenceCampaignRunner().runTraining();</span>
+<span class="fc" id="L63">        var control = ReferenceCampaignRunner.initialLogChallenge(training);</span>
+<span class="fc" id="L64">        var inputs = report.putObject(&quot;inputs&quot;);</span>
+<span class="fc" id="L65">        inputs.set(&quot;formationObservations&quot;, JSON.valueToTree(observations));</span>
+<span class="fc" id="L66">        inputs.set(&quot;knownRuleCatalogue&quot;, JSON.valueToTree(new KnownRuleRepository().all()));</span>
+<span class="fc" id="L67">        inputs.set(&quot;miningSettings&quot;, JSON.valueToTree(DiscoverySettings.defaults()));</span>
+<span class="fc" id="L68">        inputs.set(&quot;historicalChallengeTraining&quot;, JSON.valueToTree(training));</span>
+<span class="fc" id="L69">        inputs.set(&quot;historicalChallenge&quot;, hypothesis(control));</span>
+<span class="fc" id="L70">        inputs.set(&quot;budgetPerChallenge&quot;, JSON.valueToTree(CounterexampleBudget.defaultBudget()));</span>
+        // No arm can consume more slots than there are public observation clusters (two per observation).
+<span class="fc" id="L72">        int candidateSlots = observations.size() * 2;</span>
+<span class="fc" id="L73">        inputs.put(&quot;candidateSlots&quot;, candidateSlots);</span>
+<span class="fc" id="L74">        inputs.put(&quot;separatePositiveControlSlots&quot;, 1);</span>
+<span class="fc" id="L75">        inputs.put(&quot;maxChallengesPerSlot&quot;, HypothesisRefinementLoop.DEFAULT_MAX_REVISIONS);</span>
+<span class="fc" id="L76">        inputs.put(&quot;terminalRechecksPerOccupiedSlot&quot;, 1);</span>
+<span class="fc" id="L77">        String inputHash = HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(JSON.writeValueAsBytes(inputs)));</span>
+<span class="fc" id="L78">        var arms = report.putObject(&quot;arms&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Arm arm : Arm.values()) {</span>
+<span class="fc" id="L80">            var row = arms.putObject(arm.name());</span>
+<span class="fc" id="L81">            row.put(&quot;inputSha256&quot;, inputHash);</span>
+<span class="fc" id="L82">            var miner = new RuleCandidateMiner(new KnownRuleRepository());</span>
+<span class="fc" id="L83">            var dispatches = row.putArray(&quot;miningDispatches&quot;);</span>
+<span class="fc" id="L84">            List&lt;RuleCandidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            List&lt;List&lt;SuccessfulTransformationPath&gt;&gt; groups = arm == Arm.NO_FAN_IN</span>
+<span class="fc" id="L86">                ? observations.stream().map(List::of).toList() : List.of(observations);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (var group : groups) {</span>
+<span class="fc" id="L88">                var mined = miner.mine(group);</span>
+<span class="fc" id="L89">                var dispatch = dispatches.addObject();</span>
+<span class="fc" id="L90">                dispatch.set(&quot;observationIds&quot;, JSON.valueToTree(group.stream().map(SuccessfulTransformationPath::id).toList()));</span>
+<span class="fc" id="L91">                dispatch.set(&quot;rawCandidates&quot;, JSON.valueToTree(mined));</span>
+<span class="fc" id="L92">                candidates.addAll(mined);</span>
+<span class="fc" id="L93">            }</span>
+<span class="fc" id="L94">            var similarities = new LinkedHashMap&lt;String, Double&gt;();</span>
+<span class="fc" id="L95">            var domains = new LinkedHashMap&lt;String, Set&lt;String&gt;&gt;();</span>
+<span class="fc" id="L96">            List&lt;HypothesisCandidate&gt; nominees = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (RuleCandidate candidate : candidates) {</span>
+<span class="fc" id="L98">                var hypothesis = HypothesisCandidate.from(candidate, 0, observations);</span>
+<span class="fc" id="L99">                nominees.add(hypothesis);</span>
+<span class="fc" id="L100">                similarities.put(hypothesis.id(), arm != Arm.NO_NOVELTY_SCHEDULING</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">                    &amp;&amp; candidate.status() != RuleStatus.NEW ? 1.0 : 0.0);</span>
+<span class="fc" id="L102">                var tags = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L103">                observations.stream().filter(p -&gt; candidate.supportingTransformationIds().contains(p.id()))</span>
+<span class="fc" id="L104">                    .forEach(p -&gt; {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                        for (String key : List.of(&quot;domain&quot;, &quot;category&quot;)) {</span>
+<span class="fc" id="L106">                            String tag = p.variableStructure().get(key);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">                            if (tag != null &amp;&amp; !tag.isBlank()) tags.add(tag);</span>
+<span class="fc" id="L108">                        }</span>
+<span class="fc" id="L109">                    });</span>
+<span class="fc" id="L110">                domains.put(hypothesis.id(), tags);</span>
+<span class="fc" id="L111">            }</span>
+<span class="fc" id="L112">            var ranking = new InterestingnessRankingStrategy().rank(nominees, similarities, domains);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (ranking.size() &gt; candidateSlots) throw new IllegalStateException(&quot;Candidate ceiling exceeded&quot;);</span>
+<span class="fc" id="L114">            row.set(&quot;projectSimilarityUsed&quot;, JSON.valueToTree(similarities));</span>
+<span class="fc" id="L115">            row.set(&quot;domainTagsUsed&quot;, JSON.valueToTree(domains));</span>
+<span class="fc" id="L116">            var queue = row.putArray(&quot;frozenSchedule&quot;);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (var ranked : ranking) {</span>
+<span class="fc" id="L118">                var item = queue.addObject();</span>
+<span class="fc" id="L119">                item.put(&quot;rank&quot;, queue.size());</span>
+<span class="fc" id="L120">                item.set(&quot;inputHypothesis&quot;, hypothesis(ranked.hypothesis()));</span>
+<span class="fc" id="L121">                item.set(&quot;productionScore&quot;, JSON.valueToTree(ranked.score()));</span>
+<span class="fc" id="L122">            }</span>
+<span class="fc" id="L123">            var prefixes = row.putArray(&quot;selectionAtSlotCeiling&quot;);</span>
+<span class="fc" id="L124">            var ids = ranking.stream().map(item -&gt; item.hypothesis().id()).toList();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (int limit = 0; limit &lt;= candidateSlots; limit++) {</span>
+<span class="fc" id="L126">                var prefix = prefixes.addObject();</span>
+<span class="fc" id="L127">                prefix.put(&quot;ceiling&quot;, limit);</span>
+<span class="fc" id="L128">                prefix.set(&quot;selectedCandidateIds&quot;, JSON.valueToTree(ids.subList(0, Math.min(limit, ids.size()))));</span>
+            }
+<span class="fc" id="L130">            var measured = row.putArray(&quot;challengesInFrozenOrder&quot;);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (var ranked : ranking) measured.add(challenge(ranked.hypothesis(), arm));</span>
+<span class="fc" id="L132">            row.put(&quot;unusedCandidateSlots&quot;, candidateSlots - ranking.size());</span>
+<span class="fc" id="L133">            row.set(&quot;separateHistoricalChallenge&quot;, challenge(control, arm));</span>
+        }
+<span class="fc" id="L135">        return report;</span>
+    }
+
+    private static ObjectNode hypothesis(HypothesisCandidate candidate) {
+<span class="fc" id="L139">        var value = JSON.createObjectNode();</span>
+<span class="fc" id="L140">        value.put(&quot;id&quot;, candidate.id()).put(&quot;left&quot;, candidate.leftPattern()).put(&quot;right&quot;, candidate.rightPattern());</span>
+<span class="fc" id="L141">        value.set(&quot;assumptions&quot;, JSON.valueToTree(candidate.assumptions()));</span>
+<span class="fc" id="L142">        value.set(&quot;supportingPaths&quot;, JSON.valueToTree(candidate.supportingPaths()));</span>
+<span class="fc" id="L143">        value.set(&quot;witnesses&quot;, JSON.valueToTree(candidate.supportingExpressions()));</span>
+<span class="fc" id="L144">        value.set(&quot;parameterRelations&quot;, JSON.valueToTree(candidate.parameterRelations()));</span>
+<span class="fc" id="L145">        value.set(&quot;expressionPlaceholders&quot;, JSON.valueToTree(candidate.expressionPlaceholders()));</span>
+<span class="fc" id="L146">        value.put(&quot;initialNoveltyScore&quot;, candidate.noveltyScore());</span>
+<span class="fc" id="L147">        value.put(&quot;initialProofStatus&quot;, candidate.proofStatus().name());</span>
+<span class="fc" id="L148">        return value;</span>
+    }
+
+    private static ObjectNode challenge(HypothesisCandidate candidate, Arm arm) {
+<span class="fc" id="L152">        var result = JSON.createObjectNode();</span>
+<span class="fc" id="L153">        result.put(&quot;candidateId&quot;, candidate.id());</span>
+<span class="fc" id="L154">        var records = result.putArray(&quot;challenges&quot;);</span>
+<span class="fc" id="L155">        var validator = new DeterministicCounterexampleSearchService();</span>
+<span class="fc" id="L156">        CounterexampleSearchService recorded = (input, budget) -&gt; {</span>
+<span class="fc" id="L157">            var observed = validator.search(input, budget);</span>
+<span class="fc" id="L158">            var record = records.addObject();</span>
+<span class="fc" id="L159">            record.set(&quot;input&quot;, JSON.valueToTree(input));</span>
+<span class="fc" id="L160">            record.set(&quot;budget&quot;, JSON.valueToTree(budget));</span>
+<span class="fc" id="L161">            record.set(&quot;result&quot;, verdict(observed));</span>
+<span class="fc" id="L162">            return observed;</span>
+        };
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        var strategies = arm == Arm.NO_REFINEMENT ? List.&lt;RefinementStrategy&gt;of() : HypothesisRefinementLoop.defaultStrategies();</span>
+<span class="fc" id="L165">        var outcome = new HypothesisRefinementLoop(recorded, strategies, HypothesisRefinementLoop.DEFAULT_MAX_REVISIONS).refine(candidate);</span>
+<span class="fc" id="L166">        var history = result.putArray(&quot;revisions&quot;);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (HypothesisRevision revision : outcome.revisionHistory()) {</span>
+<span class="fc" id="L168">            var row = history.addObject();</span>
+<span class="fc" id="L169">            row.put(&quot;id&quot;, revision.id()).put(&quot;parent&quot;, revision.parentId()).put(&quot;revision&quot;, revision.revisionIndex());</span>
+<span class="fc" id="L170">            row.put(&quot;left&quot;, revision.leftPattern()).put(&quot;right&quot;, revision.rightPattern());</span>
+<span class="fc" id="L171">            row.set(&quot;assumptions&quot;, JSON.valueToTree(revision.assumptions()));</span>
+<span class="fc" id="L172">            row.set(&quot;trigger&quot;, JSON.valueToTree(revision.triggerEvidence()));</span>
+<span class="fc" id="L173">            row.put(&quot;strategy&quot;, revision.refinementStrategyName()).put(&quot;status&quot;, revision.status().name());</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        var terminal = outcome.terminalRevision();</span>
+<span class="fc" id="L176">        var terminalInput = new HypothesisInput(terminal.id(), terminal.leftPattern(), terminal.rightPattern(), terminal.assumptions());</span>
+<span class="fc" id="L177">        result.put(&quot;unusedChallengeSlots&quot;, HypothesisRefinementLoop.DEFAULT_MAX_REVISIONS - records.size());</span>
+<span class="fc" id="L178">        result.set(&quot;terminalRecheck&quot;, verdict(validator.search(terminalInput, CounterexampleBudget.defaultBudget())));</span>
+<span class="fc" id="L179">        return result;</span>
+    }
+
+    private static ObjectNode verdict(CounterexampleSearchResult result) {
+<span class="fc" id="L183">        var value = JSON.createObjectNode();</span>
+<span class="fc" id="L184">        value.put(&quot;status&quot;, result.status().name());</span>
+<span class="fc" id="L185">        value.put(&quot;explanation&quot;, result.explanation());</span>
+<span class="fc" id="L186">        value.set(&quot;counterexample&quot;, JSON.valueToTree(result.counterexample().orElse(null)));</span>
+<span class="fc" id="L187">        value.set(&quot;sources&quot;, JSON.valueToTree(result.attemptedSources()));</span>
+<span class="fc" id="L188">        value.set(&quot;inferredAssumptions&quot;, JSON.valueToTree(result.inferredAssumptions()));</span>
+<span class="fc" id="L189">        var assumptions = value.putArray(&quot;typedAssumptions&quot;);</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (var inferred : result.typedAssumptions()) {</span>
+<span class="fc" id="L191">            ObjectNode entry = JSON.valueToTree(inferred);</span>
+            // The validator collects variable names from a set; only membership is evidential.
+<span class="fc" id="L193">            entry.set(&quot;affectedVariables&quot;, JSON.valueToTree(inferred.affectedVariables().stream().sorted().toList()));</span>
+<span class="fc" id="L194">            assumptions.add(entry);</span>
+<span class="fc" id="L195">        }</span>
+<span class="fc" id="L196">        return value;</span>
+    }
+
+    private static List&lt;SuccessfulTransformationPath&gt; observations() {
+<span class="fc" id="L200">        var paths = new ArrayList&lt;SuccessfulTransformationPath&gt;();</span>
+<span class="fc" id="L201">        var scorer = new ExpressionScorer();</span>
+<span class="fc" id="L202">        var validation = new SymPyEquivalenceService();</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (int offset : List.of(1, 3, 5)) {</span>
+<span class="fc" id="L204">            int b = 2 * offset, c = offset * offset;</span>
+<span class="fc" id="L205">            var examples = List.of(</span>
+<span class="fc" id="L206">                List.of(&quot;x^2 + &quot; + b + &quot;*x + &quot; + c, &quot;(x + &quot; + offset + &quot;)^2&quot;),</span>
+<span class="fc" id="L207">                List.of(&quot;x^2 - &quot; + b + &quot;*x + &quot; + c, &quot;(x - &quot; + offset + &quot;)^2&quot;),</span>
+<span class="fc" id="L208">                List.of(&quot;(x + &quot; + offset + &quot;)*(x - &quot; + offset + &quot;)&quot;, &quot;x^2 - &quot; + c),</span>
+<span class="fc" id="L209">                List.of(&quot;x^2 + &quot; + b + &quot;*x&quot;, &quot;(x + &quot; + offset + &quot;)^2 - &quot; + c));</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (var pair : examples) {</span>
+<span class="fc" id="L211">                String left = pair.getFirst(), right = pair.getLast();</span>
+<span class="fc" id="L212">                boolean verified = validation.areEquivalent(left, right);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                if (!verified) throw new IllegalStateException(&quot;Public polynomial observation failed validation: &quot; + pair);</span>
+<span class="fc" id="L214">                paths.add(new SuccessfulTransformationPath(null, left, right, pair, List.of(),</span>
+<span class="fc" id="L215">                    scorer.score(left), scorer.score(right), true, validation.evidence(left, right), Map.of(&quot;variable&quot;, &quot;x&quot;)));</span>
+<span class="fc" id="L216">            }</span>
+<span class="fc" id="L217">        }</span>
+<span class="fc" id="L218">        paths.addAll(DiscoveryDemos.rationalSimplificationExamples());</span>
+<span class="fc" id="L219">        return List.copyOf(paths);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

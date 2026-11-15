@@ -62,7 +62,7 @@ public final class ReferenceIndependentValidationHistoricalComparison {
 <span class="fc" id="L62">                    matched++;</span>
                 } else {
 <span class="fc" id="L64">                    nonReferenceReasons.merge(outcome.terminalReason(), 1, Math::addExact);</span>
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                    if (outcome.validation().intrinsicallyVerified()) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    if (outcome.validation().intrinsicallyVerified()) {</span>
 <span class="fc" id="L66">                        agreements++;</span>
                     }
 <span class="pc bpc" id="L68" title="1 of 2 branches missed.">                    if (label.oracleStatus().equals(&quot;NOT_RUN_REFERENCE_MISS&quot;)) {</span>

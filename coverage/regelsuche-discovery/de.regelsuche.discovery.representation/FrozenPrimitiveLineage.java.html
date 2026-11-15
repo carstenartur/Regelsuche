@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FrozenPrimitiveLineage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">FrozenPrimitiveLineage.java</span></div><h1>FrozenPrimitiveLineage.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.assumption.ExpressionDefinedness;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.knowledge.RuleStatus;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/** Replays trusted formation primitives, including occurrence choice and cumulative premises. */
+final class FrozenPrimitiveLineage {
+    private static final int MAX_REPLAY_TRANSITIONS = 4096;
+<span class="fc" id="L26">    private final ExpressionParser parser = new ExpressionParser();</span>
+    private final Map&lt;String, AstRewriteTransformationEngine&gt; engines;
+
+<span class="fc" id="L29">    FrozenPrimitiveLineage(List&lt;RewriteRule&gt; formationRules) {</span>
+<span class="fc" id="L30">        engines = formationRules.stream()</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            .filter(rule -&gt; rule.descriptor().status() == RuleStatus.VALIDATED)</span>
+<span class="fc" id="L32">            .filter(RewriteRule::isEquivalencePreservingByConstruction)</span>
+<span class="fc" id="L33">            .collect(Collectors.toUnmodifiableMap(RewriteRule::id,</span>
+<span class="fc" id="L34">                rule -&gt; new AstRewriteTransformationEngine(List.of(rule))));</span>
+<span class="fc" id="L35">    }</span>
+
+    boolean verifies(String source, String candidate, int depth, List&lt;String&gt; pathRuleIds,
+            List&lt;String&gt; primitiveRuleIds, List&lt;String&gt; initialAssumptions, List&lt;String&gt; assumptions, List&lt;String&gt; pathExpressions) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (!eligible(depth, pathRuleIds, primitiveRuleIds)) return false;</span>
+<span class="fc" id="L40">        var expected = pathExpressions.stream().map(parser::parseTerm).toList();</span>
+<span class="fc" id="L41">        Expr start = parser.parseTerm(source);</span>
+<span class="fc" id="L42">        Expr target = parser.parseTerm(candidate);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (!matchesEndpoints(expected, depth, start, target)) return false;</span>
+<span class="fc" id="L44">        Set&lt;String&gt; permitted = premises(assumptions);</span>
+<span class="fc" id="L45">        Set&lt;String&gt; initial = premises(initialAssumptions);</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        if (!permitted.containsAll(initial) || !definedUnder(start, permitted)) return false;</span>
+<span class="fc" id="L47">        var remaining = new Work();</span>
+<span class="fc" id="L48">        Set&lt;Node&gt; frontier = Set.of(new Node(source, initial));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; depth; i++) {</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            Expr required = expected.isEmpty() ? null : expected.get(i + 1);</span>
+<span class="fc" id="L51">            frontier = expand(frontier, pathRuleIds.get(i), required, permitted, remaining);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (frontier.isEmpty()) return false;</span>
+        }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        return frontier.stream().anyMatch(node -&gt; node.premises().equals(permitted)</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            &amp;&amp; parser.parseTerm(node.expression()).equals(target));</span>
+    }
+
+    private boolean eligible(int depth, List&lt;String&gt; pathRules, List&lt;String&gt; primitives) {
+<span class="pc bpc" id="L59" title="2 of 6 branches missed.">        return depth &gt; 0 &amp;&amp; depth == pathRules.size() &amp;&amp; pathRules.equals(primitives)</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            &amp;&amp; engines.keySet().containsAll(pathRules);</span>
+    }
+
+    private static boolean matchesEndpoints(List&lt;Expr&gt; path, int depth, Expr start, Expr end) {
+<span class="pc bpc" id="L64" title="3 of 8 branches missed.">        return path.isEmpty() || path.size() == depth + 1 &amp;&amp; path.getFirst().equals(start) &amp;&amp; path.getLast().equals(end);</span>
+    }
+
+    private static Set&lt;String&gt; premises(List&lt;String&gt; values) {
+<span class="fc" id="L68">        return Set.copyOf(AssumptionSignature.ofExpressions(values).normalizedAssumptions());</span>
+    }
+
+    private boolean definedUnder(Expr expression, Set&lt;String&gt; permitted) {
+<span class="fc" id="L72">        var requirements = new AssumptionContext();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        return ExpressionDefinedness.canElideWithoutDomainLoss(expression, requirements)</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">            &amp;&amp; requirements.snapshot().stream().allMatch(required -&gt; declared(required, permitted)</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                || required.kind() == Assumption.Kind.NON_ZERO</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                    &amp;&amp; provesNonZero(parser.parseTerm(required.symbols().getFirst()), permitted));</span>
+    }
+
+    private static boolean declared(Assumption assumption, Set&lt;String&gt; permitted) {
+<span class="fc" id="L80">        return permitted.contains(AssumptionSignature.normalizeExpression(assumption.expression()));</span>
+    }
+
+    private static boolean provesNonZero(Expr expression, Set&lt;String&gt; permitted) {
+<span class="pc bpc" id="L84" title="3 of 4 branches missed.">        if (expression instanceof NumberExpr number) return number.value().signum() != 0;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (declared(Assumption.nonZero(ExpressionFormatter.format(expression)), permitted)) return true;</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        return expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL</span>
+<span class="pc bpc" id="L87" title="1 of 6 branches missed.">            &amp;&amp; provesNonZero(binary.left(), permitted) &amp;&amp; provesNonZero(binary.right(), permitted);</span>
+    }
+
+    private Set&lt;Node&gt; expand(Set&lt;Node&gt; frontier, String rule, Expr required, Set&lt;String&gt; permitted, Work remaining) {
+<span class="fc" id="L91">        var next = new LinkedHashSet&lt;Node&gt;();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (var node : frontier) {</span>
+<span class="fc" id="L93">            var engine = engines.get(rule);</span>
+<span class="fc" id="L94">            var records = new ArrayList&lt;AstRewriteTransformationEngine.GeneratedTransformation&gt;();</span>
+<span class="fc" id="L95">            engine.transformWithOccurrences(node.expression(), records::add);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (!remaining.admit(records.size() + 1)) return Set.of();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (var generated : records) {</span>
+<span class="fc" id="L98">                var move = generated.transformation();</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">                if (!move.primitiveRuleIds().equals(List.of(rule)) || !move.equivalencePreservingByConstruction()) continue;</span>
+<span class="fc" id="L100">                Expr after = parser.parseTerm(move.transformedExpression());</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">                if (required != null &amp;&amp; !after.equals(required)) continue;</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">                if (!rebuilds(generated, engine.rules().getFirst(), after) || !definedUnder(after, permitted)) continue;</span>
+<span class="fc" id="L103">                var obligations = new LinkedHashSet&lt;&gt;(node.premises());</span>
+<span class="fc" id="L104">                obligations.addAll(premises(move.assumptions()));</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                if (permitted.containsAll(obligations)) next.add(new Node(move.transformedExpression(), Set.copyOf(obligations)));</span>
+<span class="fc" id="L106">            }</span>
+<span class="fc" id="L107">        }</span>
+<span class="fc" id="L108">        return next;</span>
+    }
+
+    private boolean rebuilds(AstRewriteTransformationEngine.GeneratedTransformation generated, RewriteRule rule, Expr after) {
+<span class="fc" id="L112">        Expr before = parser.parseTerm(generated.sourceExpression());</span>
+<span class="fc" id="L113">        var position = generated.position();</span>
+<span class="fc" id="L114">        var selected = position.selectAt(before).selectedSubtree();</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if (selected.isEmpty() || !rule.matches(selected.orElseThrow())) return false;</span>
+<span class="fc" id="L116">        var replaced = position.replaceAt(before, rule.apply(selected.orElseThrow())).rewrittenRoot();</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        return replaced.isPresent() &amp;&amp; sameGrouping(replaced.orElseThrow(), after);</span>
+    }
+
+    // The search formatter flattens nested sums and products. This comparison permits only their
+    // associative grouping and preserves operand order, multiplicity and all other operators.
+    boolean sameGrouping(Expr left, Expr right) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (left.equals(right)) return true;</span>
+<span class="pc bpc" id="L124" title="2 of 6 branches missed.">        if (!(left instanceof BinaryExpr a) || !(right instanceof BinaryExpr b) || a.operator() != b.operator()) return false;</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        if (a.operator() != BinaryOperator.ADD &amp;&amp; a.operator() != BinaryOperator.MUL) {</span>
+<span class="pc bpc" id="L126" title="3 of 4 branches missed.">            return sameGrouping(a.left(), b.left()) &amp;&amp; sameGrouping(a.right(), b.right());</span>
+        }
+<span class="fc" id="L128">        var lhs = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L129">        var rhs = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L130">        flatten(left, a.operator(), lhs);</span>
+<span class="fc" id="L131">        flatten(right, a.operator(), rhs);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (lhs.size() != rhs.size()) return false;</span>
+<span class="fc bfc" id="L133" title="All 4 branches covered.">        for (int i = 0; i &lt; lhs.size(); i++) if (!sameGrouping(lhs.get(i), rhs.get(i))) return false;</span>
+<span class="fc" id="L134">        return true;</span>
+    }
+
+    private static void flatten(Expr term, BinaryOperator operator, List&lt;Expr&gt; terms) {
+<span class="fc bfc" id="L138" title="All 4 branches covered.">        if (term instanceof BinaryExpr binary &amp;&amp; binary.operator() == operator) {</span>
+<span class="fc" id="L139">            flatten(binary.left(), operator, terms);</span>
+<span class="fc" id="L140">            flatten(binary.right(), operator, terms);</span>
+        } else {
+<span class="fc" id="L142">            terms.add(term);</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    boolean bindsSource(String source, List&lt;String&gt; path) {
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        return !path.isEmpty() &amp;&amp; sameGrouping(parser.parseTerm(source), parser.parseTerm(path.getFirst()));</span>
+    }
+
+    private static final class Work {
+        private int used;
+
+        boolean admit(int transitions) {
+<span class="fc" id="L154">            used += transitions;</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            return used &lt;= MAX_REPLAY_TRANSITIONS;</span>
+        }
+    }
+
+    static List&lt;String&gt; statePath(TargetFreeRepresentationSearch.State state,
+            Map&lt;String, TargetFreeRepresentationSearch.State&gt; byHash) {
+<span class="fc" id="L161">        var reverse = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L162">        var current = state;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (int depth = state.depth(); depth &gt;= 0; depth--) {</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">            if (current == null || current.depth() != depth) return List.of();</span>
+<span class="fc" id="L165">            reverse.add(current.expression());</span>
+<span class="fc" id="L166">            current = byHash.get(current.parentStateHash());</span>
+        }
+<span class="fc" id="L168">        return List.copyOf(reverse.reversed());</span>
+    }
+
+<span class="fc" id="L171">    private record Node(String expression, Set&lt;String&gt; premises) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

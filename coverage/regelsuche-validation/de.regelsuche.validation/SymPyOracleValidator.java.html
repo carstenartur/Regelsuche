@@ -6,28 +6,33 @@ import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 
 public class SymPyOracleValidator implements OracleValidator {
-<span class="nc" id="L9">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L9">    private final ExpressionParser parser = new ExpressionParser();</span>
     private final EquivalenceService equivalenceService;
 
     public SymPyOracleValidator() {
-<span class="nc" id="L13">        this(new SymPyEquivalenceService());</span>
-<span class="nc" id="L14">    }</span>
+<span class="fc" id="L13">        this(new SymPyEquivalenceService());</span>
+<span class="fc" id="L14">    }</span>
 
-<span class="nc" id="L16">    public SymPyOracleValidator(EquivalenceService equivalenceService) {</span>
-<span class="nc bnc" id="L17" title="All 2 branches missed.">        this.equivalenceService = equivalenceService == null ? new SymPyEquivalenceService() : equivalenceService;</span>
-<span class="nc" id="L18">    }</span>
+<span class="fc" id="L16">    public SymPyOracleValidator(EquivalenceService equivalenceService) {</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">        this.equivalenceService = equivalenceService == null ? new SymPyEquivalenceService() : equivalenceService;</span>
+<span class="fc" id="L18">    }</span>
 
     @Override
     public OracleValidation validateEquivalence(String leftExpression, String rightExpression) {
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (equivalenceService instanceof OracleValidator typedOracle) {</span>
+<span class="fc" id="L23">            return typedOracle.validateEquivalence(leftExpression, rightExpression);</span>
+        }
         try {
-<span class="nc" id="L23">            ExpressionFormatter.format(parser.parseTerm(leftExpression));</span>
-<span class="nc" id="L24">            ExpressionFormatter.format(parser.parseTerm(rightExpression));</span>
-<span class="nc" id="L25">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L26">            return OracleValidation.unavailable(&quot;oracle input could not be parsed&quot;);</span>
-<span class="nc" id="L27">        }</span>
-<span class="nc" id="L28">        boolean equivalent = equivalenceService.areEquivalent(leftExpression, rightExpression);</span>
-<span class="nc" id="L29">        String evidence = equivalenceService.evidence(leftExpression, rightExpression);</span>
-<span class="nc bnc" id="L30" title="All 2 branches missed.">        return equivalent ? OracleValidation.agrees(evidence) : OracleValidation.disagrees(evidence);</span>
+<span class="fc" id="L26">            ExpressionFormatter.format(parser.parseTerm(leftExpression));</span>
+<span class="fc" id="L27">            ExpressionFormatter.format(parser.parseTerm(rightExpression));</span>
+<span class="nc" id="L28">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L29">            return OracleValidation.unavailable(&quot;oracle input could not be parsed&quot;);</span>
+<span class="fc" id="L30">        }</span>
+<span class="fc" id="L31">        boolean equivalent = equivalenceService.areEquivalent(leftExpression, rightExpression);</span>
+<span class="fc" id="L32">        String evidence = equivalenceService.evidence(leftExpression, rightExpression);</span>
+        // A boolean backend has no typed certificate or counterexample.
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        return new OracleValidation(equivalent ? OracleValidationStatus.SAMPLE_AGREEMENT</span>
+<span class="pc" id="L35">            : OracleValidationStatus.SAMPLE_DISAGREEMENT, evidence);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

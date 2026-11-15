@@ -4,28 +4,31 @@ public interface OracleValidator {
     OracleValidation validateEquivalence(String leftExpression, String rightExpression);
 
     record OracleValidation(OracleValidationStatus status, String evidence) {
-<span class="nc" id="L7">        public OracleValidation {</span>
-<span class="nc bnc" id="L8" title="All 2 branches missed.">            status = status == null ? OracleValidationStatus.UNAVAILABLE : status;</span>
-<span class="nc bnc" id="L9" title="All 2 branches missed.">            evidence = evidence == null ? &quot;&quot; : evidence;</span>
-<span class="nc" id="L10">        }</span>
+<span class="fc" id="L7">        public OracleValidation {</span>
+<span class="pc bpc" id="L8" title="1 of 2 branches missed.">            status = status == null ? OracleValidationStatus.UNAVAILABLE : status;</span>
+<span class="pc bpc" id="L9" title="1 of 2 branches missed.">            evidence = evidence == null ? &quot;&quot; : evidence;</span>
+<span class="fc" id="L10">        }</span>
 
         public static OracleValidation agrees(String evidence) {
-<span class="nc" id="L13">            return new OracleValidation(OracleValidationStatus.AGREE, evidence);</span>
+<span class="fc" id="L13">            return new OracleValidation(OracleValidationStatus.AGREE, evidence);</span>
         }
 
         public static OracleValidation disagrees(String evidence) {
-<span class="nc" id="L17">            return new OracleValidation(OracleValidationStatus.DISAGREE, evidence);</span>
+<span class="fc" id="L17">            return new OracleValidation(OracleValidationStatus.DISAGREE, evidence);</span>
         }
 
         public static OracleValidation unavailable(String evidence) {
-<span class="nc" id="L21">            return new OracleValidation(OracleValidationStatus.UNAVAILABLE, evidence);</span>
+<span class="fc" id="L21">            return new OracleValidation(OracleValidationStatus.UNAVAILABLE, evidence);</span>
         }
     }
 
-<span class="nc" id="L25">    enum OracleValidationStatus {</span>
-<span class="nc" id="L26">        AGREE,</span>
-<span class="nc" id="L27">        DISAGREE,</span>
-<span class="nc" id="L28">        UNAVAILABLE</span>
+<span class="fc" id="L25">    enum OracleValidationStatus {</span>
+<span class="fc" id="L26">        AGREE,</span>
+<span class="fc" id="L27">        DISAGREE,</span>
+        /** A finite sample is diagnostic and carries no symbolic equality or refutation authority. */
+<span class="fc" id="L29">        SAMPLE_AGREEMENT,</span>
+<span class="fc" id="L30">        SAMPLE_DISAGREEMENT,</span>
+<span class="fc" id="L31">        UNAVAILABLE</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

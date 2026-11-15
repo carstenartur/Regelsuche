@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExactScalarWitnessSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-validation</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.validation</a> &gt; <span class="el_source">ExactScalarWitnessSearch.java</span></div><h1>ExactScalarWitnessSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.validation;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+/** A bounded, per-search checker for real scalar assignments in the rational arithmetic fragment. */
+final class ExactScalarWitnessSearch {
+<span class="fc" id="L22">    private static final Pattern RELATION = Pattern.compile(&quot;(.+?)\\s*(!=|&gt;=|&lt;=|=|&gt;|&lt;)\\s*(.+)&quot;);</span>
+<span class="fc" id="L23">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L24">    private final ExactParsedUnivariatePolynomialView arithmetic = new ExactParsedUnivariatePolynomialView();</span>
+    private final String left;
+    private final String right;
+    private final List&lt;String&gt; assumptions;
+<span class="fc" id="L28">    private final Map&lt;String, Optional&lt;Template&gt;&gt; templates = new HashMap&lt;&gt;();</span>
+    private boolean evaluated;
+
+<span class="fc" id="L31">    ExactScalarWitnessSearch(String left, String right, List&lt;String&gt; assumptions) {</span>
+<span class="fc" id="L32">        this.left = left;</span>
+<span class="fc" id="L33">        this.right = right;</span>
+<span class="fc" id="L34">        this.assumptions = assumptions.stream().map(AssumptionSignature::normalizeExpression).toList();</span>
+<span class="fc" id="L35">    }</span>
+
+    static boolean accepts(Expr expression) {
+<span class="fc" id="L38">        return expression instanceof NumberExpr || expression instanceof VariableExpr</span>
+<span class="pc bpc" id="L39" title="2 of 10 branches missed.">            || expression instanceof BinaryExpr binary &amp;&amp; accepts(binary.left()) &amp;&amp; accepts(binary.right());</span>
+    }
+
+    static String sampleText(double value, boolean rationalGrid) {
+<span class="fc bfc" id="L43" title="All 6 branches covered.">        if (rationalGrid &amp;&amp; Math.abs(value) == 2.0 / 3.0) return value &lt; 0 ? &quot;-2/3&quot; : &quot;2/3&quot;;</span>
+<span class="fc" id="L44">        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();</span>
+    }
+
+    boolean evaluated() {
+<span class="fc" id="L48">        return evaluated;</span>
+    }
+
+    boolean premisesSatisfied(Map&lt;String, String&gt; assignment) {
+<span class="fc" id="L52">        return assumptions.stream().allMatch(guard -&gt; satisfied(guard, assignment));</span>
+    }
+
+    Comparison compare(Map&lt;String, String&gt; assignment, List&lt;String&gt; labels, Runnable onAssignment) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!premisesSatisfied(assignment)) {</span>
+<span class="fc" id="L57">            return new Comparison(true, Optional.empty());</span>
+        }
+        // A rejected premise does not evaluate the source/candidate pair.
+<span class="fc" id="L60">        onAssignment.run();</span>
+<span class="fc" id="L61">        var first = evaluate(left, assignment);</span>
+<span class="fc" id="L62">        var second = evaluate(right, assignment);</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (first.isEmpty() || second.isEmpty()) return new Comparison(false, Optional.empty());</span>
+<span class="fc" id="L64">        evaluated = true;</span>
+<span class="fc" id="L65">        var a = first.orElseThrow();</span>
+<span class="fc" id="L66">        var b = second.orElseThrow();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        return new Comparison(true, a.equals(b) ? Optional.empty()</span>
+<span class="fc" id="L68">            : Optional.of(new CounterexampleSearchService.Counterexample(labels, a.canonicalText(), b.canonicalText())));</span>
+    }
+
+    private boolean satisfied(String predicate, Map&lt;String, String&gt; assignment) {
+<span class="fc" id="L72">        var relation = RELATION.matcher(predicate);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!relation.matches()) return false;</span>
+<span class="fc" id="L74">        var a = evaluate(relation.group(1), assignment);</span>
+<span class="fc" id="L75">        var b = evaluate(relation.group(3), assignment);</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (a.isEmpty() || b.isEmpty()) return false;</span>
+<span class="fc" id="L77">        int comparison = a.orElseThrow().compareTo(b.orElseThrow());</span>
+<span class="pc bpc" id="L78" title="4 of 7 branches missed.">        return switch (relation.group(2)) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            case &quot;!=&quot; -&gt; comparison != 0;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            case &quot;&gt;=&quot; -&gt; comparison &gt;= 0;</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            case &quot;&lt;=&quot; -&gt; comparison &lt;= 0;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            case &quot;&gt;&quot; -&gt; comparison &gt; 0;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            case &quot;&lt;&quot; -&gt; comparison &lt; 0;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            case &quot;=&quot; -&gt; comparison == 0;</span>
+<span class="nc" id="L85">            default -&gt; false;</span>
+        };
+    }
+
+    private Optional&lt;ExactRational&gt; evaluate(String source, Map&lt;String, String&gt; assignment) {
+<span class="fc" id="L90">        var template = templates.computeIfAbsent(source, this::parse);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (template.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L92">        return template.orElseThrow().instantiate(assignment, parser)</span>
+<span class="fc" id="L93">            .flatMap(term -&gt; arithmetic.analyze(term).polynomial())</span>
+<span class="fc" id="L94">            .filter(value -&gt; value.isConstant())</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            .map(value -&gt; value.isZero() ? ExactRational.ZERO : value.leadingCoefficient());</span>
+    }
+
+    private Optional&lt;Template&gt; parse(String source) {
+        try {
+<span class="fc" id="L100">            var term = parser.parseExactTerm(source);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (!accepts(term.expression())) return Optional.empty();</span>
+<span class="fc" id="L102">            var occurrences = new ArrayList&lt;Occurrence&gt;();</span>
+<span class="fc" id="L103">            collect(term, term.expression(), occurrences);</span>
+<span class="fc" id="L104">            return Optional.of(new Template(term, List.copyOf(occurrences)));</span>
+<span class="nc" id="L105">        } catch (IllegalArgumentException invalidPredicate) {</span>
+<span class="nc" id="L106">            return Optional.empty();</span>
+        }
+    }
+
+    private static void collect(ExactParsedTerm term, Expr expression, List&lt;Occurrence&gt; occurrences) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L112">            occurrences.add(new Occurrence(variable.name(), term.sourceRangeFor(variable).orElseThrow()));</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L114">            collect(term, binary.left(), occurrences);</span>
+<span class="fc" id="L115">            collect(term, binary.right(), occurrences);</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+<span class="fc" id="L119">    private record Occurrence(String name, ExactParsedTerm.SourceRange range) {}</span>
+
+<span class="fc" id="L121">    private record Template(ExactParsedTerm term, List&lt;Occurrence&gt; variables) {</span>
+        Optional&lt;ExactParsedTerm&gt; instantiate(Map&lt;String, String&gt; assignment, ExpressionParser parser) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (variables.isEmpty()) return Optional.of(term);</span>
+<span class="fc" id="L124">            var grounded = new StringBuilder();</span>
+<span class="fc" id="L125">            int start = 0;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            for (var variable : variables) {</span>
+<span class="fc" id="L127">                String value = assignment.get(variable.name());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (value == null) return Optional.empty();</span>
+<span class="fc" id="L129">                grounded.append(term.source(), start, variable.range().startInclusive());</span>
+<span class="fc" id="L130">                grounded.append('(').append(value).append(')');</span>
+<span class="fc" id="L131">                start = variable.range().endExclusive();</span>
+<span class="fc" id="L132">            }</span>
+<span class="fc" id="L133">            grounded.append(term.source(), start, term.source().length());</span>
+<span class="fc" id="L134">            return Optional.of(parser.parseExactTerm(grounded.toString()));</span>
+        }
+    }
+
+<span class="fc" id="L138">    record Comparison(boolean defined, Optional&lt;CounterexampleSearchService.Counterexample&gt; witness) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

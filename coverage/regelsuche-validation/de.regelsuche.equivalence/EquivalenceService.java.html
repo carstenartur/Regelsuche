@@ -4,7 +4,7 @@ public interface EquivalenceService {
     boolean areEquivalent(String leftExpression, String rightExpression);
 
     default String evidence(String leftExpression, String rightExpression) {
-<span class="nc bnc" id="L7" title="All 2 branches missed.">        return areEquivalent(leftExpression, rightExpression) ? &quot;equivalent&quot; : &quot;not equivalent&quot;;</span>
+<span class="pc bpc" id="L7" title="1 of 2 branches missed.">        return areEquivalent(leftExpression, rightExpression) ? &quot;equivalent&quot; : &quot;not equivalent&quot;;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

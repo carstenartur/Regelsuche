@@ -12,6 +12,7 @@ import de.regelsuche.input.InputType;
 import de.regelsuche.linalg.Matrix;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -32,136 +33,147 @@ import java.util.function.Consumer;
  */
 public class DeterministicCounterexampleSearchService implements CounterexampleSearchService {
     private static final double EPS = 1e-8;
-<span class="fc" id="L35">    private static final List&lt;Double&gt; EDGE_VALUES = List.of(0.0, 1.0, -1.0, 2.0, -2.0);</span>
-<span class="fc" id="L36">    private static final List&lt;Double&gt; RATIONAL_VALUES = List.of(0.5, -0.5, 2.0 / 3.0, -2.0 / 3.0);</span>
+<span class="fc" id="L36">    private static final List&lt;Double&gt; EDGE_VALUES = List.of(0.0, 1.0, -1.0, 2.0, -2.0);</span>
+<span class="fc" id="L37">    private static final List&lt;Double&gt; RATIONAL_VALUES = List.of(0.5, -0.5, 2.0 / 3.0, -2.0 / 3.0);</span>
 
-<span class="fc" id="L38">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L39">    private final ExpressionParser parser = new ExpressionParser();</span>
 
     private final Consumer&lt;String&gt; onAssignment;
 
     public DeterministicCounterexampleSearchService() {
-<span class="fc" id="L43">        this(source -&gt; {});</span>
-<span class="fc" id="L44">    }</span>
+<span class="fc" id="L44">        this(source -&gt; {});</span>
+<span class="fc" id="L45">    }</span>
 
     /** Observes each assignment actually evaluated, including the first refuting assignment. */
-<span class="fc" id="L47">    public DeterministicCounterexampleSearchService(Consumer&lt;String&gt; onAssignment) {</span>
-<span class="fc" id="L48">        this.onAssignment = Objects.requireNonNull(onAssignment, &quot;onAssignment&quot;);</span>
-<span class="fc" id="L49">    }</span>
+<span class="fc" id="L48">    public DeterministicCounterexampleSearchService(Consumer&lt;String&gt; onAssignment) {</span>
+<span class="fc" id="L49">        this.onAssignment = Objects.requireNonNull(onAssignment, &quot;onAssignment&quot;);</span>
+<span class="fc" id="L50">    }</span>
 
     @Override
     public CounterexampleSearchResult search(HypothesisInput hypothesis, CounterexampleBudget budget) {
         Expr left;
         Expr right;
         try {
-<span class="fc" id="L56">            left = parser.parse(new InputRequest(InputType.TERM, hypothesis.leftExpression())).terms().getFirst();</span>
-<span class="fc" id="L57">            right = parser.parse(new InputRequest(InputType.TERM, hypothesis.rightExpression())).terms().getFirst();</span>
-<span class="fc" id="L58">        } catch (RuntimeException ex) {</span>
-<span class="fc" id="L59">            return CounterexampleSearchResult.inconclusive(&quot;unsupported expression: &quot; + ex.getMessage());</span>
-<span class="fc" id="L60">        }</span>
+<span class="fc" id="L57">            left = parser.parse(new InputRequest(InputType.TERM, hypothesis.leftExpression())).terms().getFirst();</span>
+<span class="fc" id="L58">            right = parser.parse(new InputRequest(InputType.TERM, hypothesis.rightExpression())).terms().getFirst();</span>
+<span class="fc" id="L59">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L60">            return CounterexampleSearchResult.inconclusive(&quot;unsupported expression: &quot; + ex.getMessage());</span>
+<span class="fc" id="L61">        }</span>
 
-<span class="fc" id="L62">        List&lt;String&gt; attemptedSources = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L63">        Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; inferredAssumptions = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L64">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L65">        collectVariables(left, variables);</span>
-<span class="fc" id="L66">        collectVariables(right, variables);</span>
-<span class="fc" id="L67">        List&lt;String&gt; orderedVariables = new ArrayList&lt;&gt;(variables);</span>
-<span class="fc" id="L68">        List&lt;AssumptionGuard&gt; assumptionGuards = assumptionGuards(hypothesis.assumptions());</span>
+<span class="fc" id="L63">        List&lt;String&gt; attemptedSources = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L64">        Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; inferredAssumptions = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L65">        Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L66">        collectVariables(left, variables);</span>
+<span class="fc" id="L67">        collectVariables(right, variables);</span>
+<span class="fc" id="L68">        List&lt;String&gt; orderedVariables = new ArrayList&lt;&gt;(variables);</span>
+<span class="fc" id="L69">        var realWitnesses = new ExactScalarWitnessSearch(</span>
+<span class="fc" id="L70">            hypothesis.leftExpression(), hypothesis.rightExpression(), hypothesis.assumptions());</span>
+<span class="fc bfc" id="L71" title="All 4 branches covered.">        boolean exact = ExactScalarWitnessSearch.accepts(left) &amp;&amp; ExactScalarWitnessSearch.accepts(right);</span>
 
-<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (budget.includeBoundaryValues()) {</span>
-<span class="fc" id="L71">            String source = &quot;numeric-boundary-values&quot;;</span>
-<span class="fc" id="L72">            attemptedSources.add(source);</span>
-<span class="fc" id="L73">            Optional&lt;Counterexample&gt; edgeCounterexample = searchNumericAssignments(</span>
-                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, assumptionGuards, source
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (budget.includeBoundaryValues()) {</span>
+<span class="fc" id="L74">            String source = &quot;numeric-boundary-values&quot;;</span>
+<span class="fc" id="L75">            attemptedSources.add(source);</span>
+<span class="fc" id="L76">            Optional&lt;Counterexample&gt; edgeCounterexample = searchNumericAssignments(</span>
+                left, right, orderedVariables, EDGE_VALUES, inferredAssumptions, source, realWitnesses, exact
             );
-<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (edgeCounterexample.isPresent()) {</span>
-<span class="fc" id="L77">                return CounterexampleSearchResult.counterexampleFound(</span>
-<span class="fc" id="L78">                    edgeCounterexample.get(),</span>
-<span class="fc" id="L79">                    inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (edgeCounterexample.isPresent()) {</span>
+<span class="fc" id="L80">                return CounterexampleSearchResult.counterexampleFound(</span>
+<span class="fc" id="L81">                    edgeCounterexample.get(),</span>
+<span class="fc" id="L82">                    inferredAssumptionExpressions(inferredAssumptions),</span>
                     attemptedSources,
-<span class="fc" id="L81">                    typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L84">                    typedAssumptions(inferredAssumptions)</span>
                 );
             }
         }
 
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (budget.includeRationals()) {</span>
-<span class="fc" id="L87">            String source = &quot;rational-samples&quot;;</span>
-<span class="fc" id="L88">            attemptedSources.add(source);</span>
-<span class="fc" id="L89">            Optional&lt;Counterexample&gt; rationalCounterexample = searchNumericAssignments(</span>
-                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, assumptionGuards, source
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (budget.includeRationals()) {</span>
+<span class="fc" id="L90">            String source = &quot;rational-samples&quot;;</span>
+<span class="fc" id="L91">            attemptedSources.add(source);</span>
+<span class="fc" id="L92">            Optional&lt;Counterexample&gt; rationalCounterexample = searchNumericAssignments(</span>
+                left, right, orderedVariables, RATIONAL_VALUES, inferredAssumptions, source, realWitnesses, exact
             );
-<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (rationalCounterexample.isPresent()) {</span>
-<span class="fc" id="L93">                return CounterexampleSearchResult.counterexampleFound(</span>
-<span class="fc" id="L94">                    rationalCounterexample.get(),</span>
-<span class="fc" id="L95">                    inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (rationalCounterexample.isPresent()) {</span>
+<span class="fc" id="L96">                return CounterexampleSearchResult.counterexampleFound(</span>
+<span class="fc" id="L97">                    rationalCounterexample.get(),</span>
+<span class="fc" id="L98">                    inferredAssumptionExpressions(inferredAssumptions),</span>
                     attemptedSources,
-<span class="fc" id="L97">                    typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L100">                    typedAssumptions(inferredAssumptions)</span>
                 );
             }
         }
 
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (budget.maxNumericSamples() &gt; 0) {</span>
-<span class="fc" id="L103">            String source = &quot;numeric-random&quot;;</span>
-<span class="fc" id="L104">            attemptedSources.add(source);</span>
-<span class="fc" id="L105">            Random random = new Random(budget.randomSeed());</span>
-<span class="fc" id="L106">            List&lt;Double&gt; randomValues = new ArrayList&lt;&gt;(budget.maxNumericSamples());</span>
-<span class="fc bfc" id="L107" title="All 2 branches covered.">            for (int i = 0; i &lt; budget.maxNumericSamples(); i++) {</span>
-<span class="fc" id="L108">                randomValues.add(-5.0 + (10.0 * random.nextDouble()));</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (budget.maxNumericSamples() &gt; 0) {</span>
+<span class="fc" id="L106">            String source = &quot;numeric-random&quot;;</span>
+<span class="fc" id="L107">            attemptedSources.add(source);</span>
+<span class="fc" id="L108">            Random random = new Random(budget.randomSeed());</span>
+<span class="fc" id="L109">            List&lt;Double&gt; randomValues = new ArrayList&lt;&gt;(budget.maxNumericSamples());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (int i = 0; i &lt; budget.maxNumericSamples(); i++) {</span>
+<span class="fc" id="L111">                randomValues.add(-5.0 + (10.0 * random.nextDouble()));</span>
             }
-<span class="fc" id="L110">            Optional&lt;Counterexample&gt; randomCounterexample = searchNumericAssignments(</span>
-                left, right, orderedVariables, randomValues, inferredAssumptions, assumptionGuards, source
+<span class="fc" id="L113">            Optional&lt;Counterexample&gt; randomCounterexample = searchNumericAssignments(</span>
+                left, right, orderedVariables, randomValues, inferredAssumptions, source, realWitnesses, exact
             );
-<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (randomCounterexample.isPresent()) {</span>
-<span class="fc" id="L114">                return CounterexampleSearchResult.counterexampleFound(</span>
-<span class="fc" id="L115">                    randomCounterexample.get(),</span>
-<span class="fc" id="L116">                    inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (randomCounterexample.isPresent()) {</span>
+<span class="fc" id="L117">                return CounterexampleSearchResult.counterexampleFound(</span>
+<span class="fc" id="L118">                    randomCounterexample.get(),</span>
+<span class="fc" id="L119">                    inferredAssumptionExpressions(inferredAssumptions),</span>
                     attemptedSources,
-<span class="fc" id="L118">                    typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L121">                    typedAssumptions(inferredAssumptions)</span>
                 );
             }
         }
 
-<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        if (budget.includeMatrices() &amp;&amp; budget.maxMatrixDimension() &gt;= 2) {</span>
-<span class="fc" id="L124">            Optional&lt;Counterexample&gt; matrixCounterexample = tryMatrixCounterexample(</span>
+<span class="fc" id="L126">        boolean premiseFree = hypothesis.assumptions().isEmpty();</span>
+<span class="pc bpc" id="L127" title="1 of 6 branches missed.">        if (premiseFree &amp;&amp; budget.includeMatrices() &amp;&amp; budget.maxMatrixDimension() &gt;= 2) {</span>
+<span class="fc" id="L128">            Optional&lt;Counterexample&gt; matrixCounterexample = tryMatrixCounterexample(</span>
                 left, right, orderedVariables, attemptedSources
             );
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (matrixCounterexample.isPresent()) {</span>
-<span class="fc" id="L128">                return CounterexampleSearchResult.counterexampleFound(</span>
-<span class="fc" id="L129">                    matrixCounterexample.get(),</span>
-<span class="fc" id="L130">                    inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (matrixCounterexample.isPresent()) {</span>
+<span class="fc" id="L132">                return CounterexampleSearchResult.counterexampleFound(</span>
+<span class="fc" id="L133">                    matrixCounterexample.get(),</span>
+<span class="fc" id="L134">                    inferredAssumptionExpressions(inferredAssumptions),</span>
                     attemptedSources,
-<span class="fc" id="L132">                    typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L136">                    typedAssumptions(inferredAssumptions)</span>
                 );
             }
         }
 
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (budget.includeComplex()) {</span>
-<span class="fc" id="L138">            Optional&lt;Counterexample&gt; complexCounterexample = tryComplexCounterexample(</span>
-                left, right, orderedVariables, attemptedSources, assumptionGuards
+        // Keep the configured probes in the work ledger. A rounded complex
+        // probe cannot authorize a refutation in the exact scalar fragment.
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (budget.includeComplex()) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            Optional&lt;Counterexample&gt; complexCounterexample = tryComplexCounterexample(</span>
+                left, right, orderedVariables, attemptedSources, premiseFree, !exact
             );
-<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (complexCounterexample.isPresent()) {</span>
-<span class="fc" id="L142">                return CounterexampleSearchResult.counterexampleFound(</span>
-<span class="fc" id="L143">                    complexCounterexample.get(),</span>
-<span class="fc" id="L144">                    inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (complexCounterexample.isPresent()) {</span>
+<span class="fc" id="L148">                return CounterexampleSearchResult.counterexampleFound(</span>
+<span class="fc" id="L149">                    complexCounterexample.get(),</span>
+<span class="fc" id="L150">                    inferredAssumptionExpressions(inferredAssumptions),</span>
                     attemptedSources,
-<span class="fc" id="L146">                    typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L152">                    typedAssumptions(inferredAssumptions)</span>
                 );
             }
         }
 
-<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (attemptedSources.isEmpty()) {</span>
-<span class="fc" id="L152">            return new CounterexampleSearchResult(</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (attemptedSources.isEmpty()) {</span>
+<span class="fc" id="L158">            return new CounterexampleSearchResult(</span>
                 CounterexampleSearchService.Status.INCONCLUSIVE,
-<span class="fc" id="L154">                Optional.empty(),</span>
-<span class="fc" id="L155">                inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="fc" id="L160">                Optional.empty(),</span>
+<span class="fc" id="L161">                inferredAssumptionExpressions(inferredAssumptions),</span>
                 attemptedSources,
                 &quot;no executable counterexample source was available&quot;,
-<span class="fc" id="L158">                typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L164">                typedAssumptions(inferredAssumptions)</span>
             );
         }
-<span class="fc" id="L161">        return CounterexampleSearchResult.noCounterexampleFound(</span>
-<span class="fc" id="L162">            inferredAssumptionExpressions(inferredAssumptions),</span>
+<span class="pc bpc" id="L167" title="1 of 6 branches missed.">        if (exact &amp;&amp; !realWitnesses.evaluated() &amp;&amp; attemptedSources.stream().anyMatch(</span>
+<span class="pc bpc" id="L168" title="3 of 4 branches missed.">                name -&gt; name.startsWith(&quot;numeric-&quot;) || name.equals(&quot;rational-samples&quot;))) {</span>
+<span class="fc" id="L169">            return new CounterexampleSearchResult(CounterexampleSearchService.Status.INCONCLUSIVE,</span>
+<span class="fc" id="L170">                Optional.empty(), inferredAssumptionExpressions(inferredAssumptions), attemptedSources,</span>
+<span class="fc" id="L171">                &quot;no defined scalar pair within the exact arithmetic bounds&quot;, typedAssumptions(inferredAssumptions));</span>
+        }
+<span class="fc" id="L173">        return CounterexampleSearchResult.noCounterexampleFound(</span>
+<span class="fc" id="L174">            inferredAssumptionExpressions(inferredAssumptions),</span>
             attemptedSources,
-<span class="fc" id="L164">            typedAssumptions(inferredAssumptions)</span>
+<span class="fc" id="L176">            typedAssumptions(inferredAssumptions)</span>
         );
     }
 
@@ -171,55 +183,62 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         List&lt;String&gt; orderedVariables,
         List&lt;Double&gt; values,
         Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; inferredAssumptions,
-        List&lt;AssumptionGuard&gt; assumptionGuards,
-        String source
+        String source,
+        ExactScalarWitnessSearch realWitnesses,
+        boolean exact
     ) {
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
-<span class="nc" id="L178">            return Optional.empty();</span>
-        }
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (orderedVariables.isEmpty()) {</span>
-<span class="nc" id="L181">            onAssignment.accept(source);</span>
-<span class="nc" id="L182">            Evaluation leftEvaluation = evaluate(left, Map.of());</span>
-<span class="nc" id="L183">            Evaluation rightEvaluation = evaluate(right, Map.of());</span>
-<span class="nc bnc" id="L184" title="All 4 branches missed.">            if (leftEvaluation.defined() &amp;&amp; rightEvaluation.defined()) {</span>
-<span class="nc bnc" id="L185" title="All 2 branches missed.">                if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {</span>
-<span class="nc" id="L186">                    return Optional.of(new Counterexample(List.of(), leftEvaluation.value().asText(), rightEvaluation.value().asText()));</span>
-                }
-            }
-<span class="nc" id="L189">            return Optional.empty();</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (values.isEmpty()) return Optional.empty();</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (orderedVariables.isEmpty()) {</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (exact) return realWitnesses.compare(Map.of(), List.of(), () -&gt; onAssignment.accept(source)).witness();</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            return realWitnesses.premisesSatisfied(Map.of())</span>
+<span class="nc" id="L194">                ? numericWitness(left, right, Map.of(), List.of(), inferredAssumptions, source)</span>
+<span class="nc" id="L195">                : Optional.empty();</span>
         }
 
-<span class="fc" id="L192">        int assignmentCount = Math.max(values.size(), orderedVariables.size());</span>
-<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (int i = 0; i &lt; assignmentCount; i++) {</span>
-<span class="fc" id="L194">            Map&lt;String, RuntimeValue&gt; assignment = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L195">            List&lt;String&gt; assignmentText = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L196">            int j = 0;</span>
-<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (String variable : orderedVariables) {</span>
-<span class="fc" id="L198">                double value = values.get((i + j) % values.size());</span>
-<span class="fc" id="L199">                assignment.put(variable, RuntimeValue.scalar(value));</span>
-<span class="fc" id="L200">                assignmentText.add(variable + &quot;=&quot; + trimDouble(value));</span>
-<span class="fc" id="L201">                j++;</span>
-<span class="fc" id="L202">            }</span>
-<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (violatesAssumptions(assignment, assumptionGuards)) {</span>
-<span class="fc" id="L204">                continue;</span>
+<span class="fc" id="L198">        int assignmentCount = Math.max(values.size(), orderedVariables.size());</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int i = 0; i &lt; assignmentCount; i++) {</span>
+<span class="fc" id="L200">            Map&lt;String, RuntimeValue&gt; assignment = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L201">            Map&lt;String, String&gt; exactAssignment = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L202">            List&lt;String&gt; assignmentText = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L203">            int j = 0;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (String variable : orderedVariables) {</span>
+<span class="fc" id="L205">                double value = values.get((i + j) % values.size());</span>
+<span class="fc" id="L206">                assignment.put(variable, RuntimeValue.scalar(value));</span>
+<span class="fc" id="L207">                String text = ExactScalarWitnessSearch.sampleText(value, source.equals(&quot;rational-samples&quot;));</span>
+<span class="fc" id="L208">                exactAssignment.put(variable, text);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                assignmentText.add(variable + &quot;=&quot; + (exact ? text : trimDouble(value)));</span>
+<span class="fc" id="L210">                j++;</span>
+<span class="fc" id="L211">            }</span>
+            Optional&lt;Counterexample&gt; witness;
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (!exact) {</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (!realWitnesses.premisesSatisfied(exactAssignment)) continue;</span>
+<span class="fc" id="L215">                witness = numericWitness(left, right, assignment, assignmentText, inferredAssumptions, source);</span>
+            } else {
+<span class="fc" id="L217">                var result = realWitnesses.compare(exactAssignment, assignmentText, () -&gt; onAssignment.accept(source));</span>
+<span class="fc" id="L218">                witness = result.witness();</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                if (!result.defined()) {</span>
+                    // Preserve domain-obligation inference, without promoting a projected value to a witness.
+<span class="fc" id="L221">                    inferAssumptions(evaluate(left, assignment), inferredAssumptions, source);</span>
+<span class="fc" id="L222">                    inferAssumptions(evaluate(right, assignment), inferredAssumptions, source);</span>
+                }
             }
-<span class="fc" id="L206">            onAssignment.accept(source);</span>
-<span class="fc" id="L207">            Evaluation leftEvaluation = evaluate(left, assignment);</span>
-<span class="fc" id="L208">            Evaluation rightEvaluation = evaluate(right, assignment);</span>
-<span class="pc bpc" id="L209" title="1 of 4 branches missed.">            if (!leftEvaluation.defined() || !rightEvaluation.defined()) {</span>
-<span class="fc" id="L210">                inferAssumptions(leftEvaluation, inferredAssumptions, source);</span>
-<span class="fc" id="L211">                inferAssumptions(rightEvaluation, inferredAssumptions, source);</span>
-<span class="fc" id="L212">                continue;</span>
-            }
-<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (!leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {</span>
-<span class="fc" id="L215">                return Optional.of(new Counterexample(</span>
-                    assignmentText,
-<span class="fc" id="L217">                    leftEvaluation.value().asText(),</span>
-<span class="fc" id="L218">                    rightEvaluation.value().asText()</span>
-                ));
-            }
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (witness.isPresent()) return witness;</span>
         }
-<span class="fc" id="L222">        return Optional.empty();</span>
+<span class="fc" id="L227">        return Optional.empty();</span>
+    }
+
+    private Optional&lt;Counterexample&gt; numericWitness(Expr left, Expr right, Map&lt;String, RuntimeValue&gt; assignment,
+            List&lt;String&gt; labels, Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; inferredAssumptions, String source) {
+<span class="fc" id="L232">        onAssignment.accept(source);</span>
+<span class="fc" id="L233">        Evaluation a = evaluate(left, assignment);</span>
+<span class="fc" id="L234">        Evaluation b = evaluate(right, assignment);</span>
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">        if (!a.defined() || !b.defined()) {</span>
+<span class="fc" id="L236">            inferAssumptions(a, inferredAssumptions, source);</span>
+<span class="fc" id="L237">            inferAssumptions(b, inferredAssumptions, source);</span>
+<span class="fc" id="L238">            return Optional.empty();</span>
+        }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        return a.value().approximatelyEquals(b.value()) ? Optional.empty()</span>
+<span class="fc" id="L241">            : Optional.of(new Counterexample(labels, a.value().asText(), b.value().asText()));</span>
     }
 
     private Optional&lt;Counterexample&gt; tryComplexCounterexample(
@@ -227,45 +246,44 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         Expr right,
         List&lt;String&gt; orderedVariables,
         List&lt;String&gt; attemptedSources,
-        List&lt;AssumptionGuard&gt; assumptionGuards
+        boolean premiseFree,
+        boolean mayRefute
     ) {
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (orderedVariables.isEmpty()) {</span>
-<span class="nc" id="L233">            return Optional.empty();</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (orderedVariables.isEmpty()) {</span>
+<span class="nc" id="L253">            return Optional.empty();</span>
         }
-<span class="fc" id="L235">        attemptedSources.add(&quot;complex-samples&quot;);</span>
-<span class="fc" id="L236">        List&lt;Complex&gt; values = List.of(</span>
+<span class="fc" id="L255">        attemptedSources.add(&quot;complex-samples&quot;);</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (!premiseFree) return Optional.empty();</span>
+<span class="fc" id="L257">        List&lt;Complex&gt; values = List.of(</span>
             new Complex(0.0, 1.0),
             new Complex(0.0, -1.0),
             new Complex(-1.0, 1.0),
             new Complex(1.0, -1.0)
         );
-<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        for (int i = 0; i &lt; Math.max(values.size(), orderedVariables.size()); i++) {</span>
-<span class="fc" id="L243">            Map&lt;String, RuntimeValue&gt; assignment = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L244">            List&lt;String&gt; assignmentText = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L245">            int j = 0;</span>
-<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (String variable : orderedVariables) {</span>
-<span class="fc" id="L247">                Complex value = values.get((i + j) % values.size());</span>
-<span class="fc" id="L248">                assignment.put(variable, RuntimeValue.complex(value));</span>
-<span class="fc" id="L249">                assignmentText.add(variable + &quot;=&quot; + value.asText());</span>
-<span class="fc" id="L250">                j++;</span>
-<span class="fc" id="L251">            }</span>
-<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (violatesAssumptions(assignment, assumptionGuards)) {</span>
-<span class="nc" id="L253">                continue;</span>
-            }
-<span class="fc" id="L255">            onAssignment.accept(&quot;complex-samples&quot;);</span>
-<span class="fc" id="L256">            Evaluation leftEvaluation = evaluate(left, assignment);</span>
-<span class="fc" id="L257">            Evaluation rightEvaluation = evaluate(right, assignment);</span>
-<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (leftEvaluation.defined()</span>
-<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                &amp;&amp; rightEvaluation.defined()</span>
-<span class="fc bfc" id="L260" title="All 2 branches covered.">                &amp;&amp; !leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {</span>
-<span class="fc" id="L261">                return Optional.of(new Counterexample(</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (int i = 0; i &lt; Math.max(values.size(), orderedVariables.size()); i++) {</span>
+<span class="fc" id="L264">            Map&lt;String, RuntimeValue&gt; assignment = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L265">            List&lt;String&gt; assignmentText = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L266">            int j = 0;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            for (String variable : orderedVariables) {</span>
+<span class="fc" id="L268">                Complex value = values.get((i + j) % values.size());</span>
+<span class="fc" id="L269">                assignment.put(variable, RuntimeValue.complex(value));</span>
+<span class="fc" id="L270">                assignmentText.add(variable + &quot;=&quot; + value.asText());</span>
+<span class="fc" id="L271">                j++;</span>
+<span class="fc" id="L272">            }</span>
+<span class="fc" id="L273">            onAssignment.accept(&quot;complex-samples&quot;);</span>
+<span class="fc" id="L274">            Evaluation leftEvaluation = evaluate(left, assignment);</span>
+<span class="fc" id="L275">            Evaluation rightEvaluation = evaluate(right, assignment);</span>
+<span class="pc bpc" id="L276" title="1 of 4 branches missed.">            if (mayRefute &amp;&amp; leftEvaluation.defined()</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">                &amp;&amp; rightEvaluation.defined()</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                &amp;&amp; !leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {</span>
+<span class="fc" id="L279">                return Optional.of(new Counterexample(</span>
                     assignmentText,
-<span class="fc" id="L263">                    leftEvaluation.value().asText(),</span>
-<span class="fc" id="L264">                    rightEvaluation.value().asText()</span>
+<span class="fc" id="L281">                    leftEvaluation.value().asText(),</span>
+<span class="fc" id="L282">                    rightEvaluation.value().asText()</span>
                 ));
             }
         }
-<span class="nc" id="L268">        return Optional.empty();</span>
+<span class="fc" id="L286">        return Optional.empty();</span>
     }
 
     private Optional&lt;Counterexample&gt; tryMatrixCounterexample(
@@ -274,190 +292,216 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         List&lt;String&gt; orderedVariables,
         List&lt;String&gt; attemptedSources
     ) {
-<span class="fc bfc" id="L277" title="All 6 branches covered.">        if (orderedVariables.size() &lt; 2 || orderedVariables.stream().anyMatch(v -&gt; !isSingleUppercaseVariable(v))) {</span>
-<span class="fc" id="L278">            return Optional.empty();</span>
+<span class="fc bfc" id="L295" title="All 6 branches covered.">        if (orderedVariables.size() &lt; 2 || orderedVariables.stream().anyMatch(v -&gt; !isSingleUppercaseVariable(v))</span>
+<span class="pc bpc" id="L296" title="1 of 4 branches missed.">                || !acceptsExactMatrixProbe(left) || !acceptsExactMatrixProbe(right)) {</span>
+<span class="fc" id="L297">            return Optional.empty();</span>
         }
-<span class="fc" id="L280">        attemptedSources.add(&quot;matrix-non-commutative&quot;);</span>
-<span class="fc" id="L281">        Map&lt;String, RuntimeValue&gt; assignment = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L282">        assignment.put(orderedVariables.get(0), RuntimeValue.matrix(new Matrix(new double[][] {{1, 2}, {0, 1}})));</span>
-<span class="fc" id="L283">        assignment.put(orderedVariables.get(1), RuntimeValue.matrix(new Matrix(new double[][] {{1, 0}, {3, 1}})));</span>
-<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        for (int i = 2; i &lt; orderedVariables.size(); i++) {</span>
-<span class="nc" id="L285">            assignment.put(orderedVariables.get(i), RuntimeValue.matrix(new Matrix(new double[][] {{1, 0}, {0, 1}})));</span>
+<span class="fc" id="L299">        attemptedSources.add(&quot;matrix-non-commutative&quot;);</span>
+<span class="fc" id="L300">        Map&lt;String, RuntimeValue&gt; assignment = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L301">        assignment.put(orderedVariables.get(0), RuntimeValue.matrix(new Matrix(new double[][] {{1, 2}, {0, 1}})));</span>
+<span class="fc" id="L302">        assignment.put(orderedVariables.get(1), RuntimeValue.matrix(new Matrix(new double[][] {{1, 0}, {3, 1}})));</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        for (int i = 2; i &lt; orderedVariables.size(); i++) {</span>
+<span class="nc" id="L304">            assignment.put(orderedVariables.get(i), RuntimeValue.matrix(new Matrix(new double[][] {{1, 0}, {0, 1}})));</span>
         }
-<span class="fc" id="L287">        onAssignment.accept(&quot;matrix-non-commutative&quot;);</span>
-<span class="fc" id="L288">        Evaluation leftEvaluation = evaluate(left, assignment);</span>
-<span class="fc" id="L289">        Evaluation rightEvaluation = evaluate(right, assignment);</span>
-<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (leftEvaluation.defined()</span>
-<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            &amp;&amp; rightEvaluation.defined()</span>
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            &amp;&amp; !leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {</span>
-<span class="fc" id="L293">            return Optional.of(new Counterexample(</span>
-<span class="fc" id="L294">                orderedVariables.stream().map(v -&gt; v + &quot;=M&quot;).toList(),</span>
-<span class="fc" id="L295">                leftEvaluation.value().asText(),</span>
-<span class="fc" id="L296">                rightEvaluation.value().asText()</span>
+<span class="fc" id="L306">        onAssignment.accept(&quot;matrix-non-commutative&quot;);</span>
+<span class="fc" id="L307">        Evaluation leftEvaluation = evaluate(left, assignment);</span>
+<span class="fc" id="L308">        Evaluation rightEvaluation = evaluate(right, assignment);</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (leftEvaluation.defined()</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">            &amp;&amp; rightEvaluation.defined()</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            &amp;&amp; !leftEvaluation.value().approximatelyEquals(rightEvaluation.value())) {</span>
+<span class="fc" id="L312">            return Optional.of(new Counterexample(</span>
+<span class="fc" id="L313">                orderedVariables.stream().map(v -&gt; v + &quot;=M&quot;).toList(),</span>
+<span class="fc" id="L314">                leftEvaluation.value().asText(),</span>
+<span class="fc" id="L315">                rightEvaluation.value().asText()</span>
             ));
         }
-<span class="nc" id="L299">        return Optional.empty();</span>
+<span class="nc" id="L318">        return Optional.empty();</span>
+    }
+
+    // The fixed nonnegative integer fixtures have maximum row sum four.
+    // Up to 26 factors therefore leave every product and sum at most 2^52,
+    // within the exact integer range of the Matrix implementation.
+    private static boolean acceptsExactMatrixProbe(Expr expression) {
+<span class="fc" id="L325">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L326">        pending.push(expression);</span>
+<span class="fc" id="L327">        int factors = 0;</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L329">            Expr next = pending.pop();</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            if (next instanceof VariableExpr) {</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                if (++factors &gt; 26) return false;</span>
+<span class="pc bpc" id="L332" title="2 of 4 branches missed.">            } else if (next instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L333">                pending.push(binary.right());</span>
+<span class="fc" id="L334">                pending.push(binary.left());</span>
+            } else {
+<span class="nc" id="L336">                return false;</span>
+            }
+<span class="fc" id="L338">        }</span>
+<span class="fc" id="L339">        return true;</span>
     }
 
     private static boolean isSingleUppercaseVariable(String name) {
-<span class="pc bpc" id="L303" title="1 of 4 branches missed.">        return name.length() == 1 &amp;&amp; Character.isUpperCase(name.charAt(0));</span>
+<span class="pc bpc" id="L343" title="1 of 4 branches missed.">        return name.length() == 1 &amp;&amp; Character.isUpperCase(name.charAt(0));</span>
     }
 
     private void collectVariables(Expr expression, Set&lt;String&gt; variables) {
-<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
-<span class="fc" id="L308">            variables.add(variableExpr.name());</span>
-<span class="fc" id="L309">            return;</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L348">            variables.add(variableExpr.name());</span>
+<span class="fc" id="L349">            return;</span>
         }
-<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="fc" id="L312">            collectVariables(binaryExpr.left(), variables);</span>
-<span class="fc" id="L313">            collectVariables(binaryExpr.right(), variables);</span>
-<span class="fc" id="L314">            return;</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L352">            collectVariables(binaryExpr.left(), variables);</span>
+<span class="fc" id="L353">            collectVariables(binaryExpr.right(), variables);</span>
+<span class="fc" id="L354">            return;</span>
         }
-<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="fc bfc" id="L317" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="fc" id="L318">                collectVariables(argument, variables);</span>
-<span class="fc" id="L319">            }</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="fc" id="L358">                collectVariables(argument, variables);</span>
+<span class="fc" id="L359">            }</span>
         }
-<span class="fc" id="L321">    }</span>
+<span class="fc" id="L361">    }</span>
 
     private Evaluation evaluate(Expr expression, Map&lt;String, RuntimeValue&gt; variables) {
-<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="fc" id="L325">            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().toBigDecimal(java.math.MathContext.DECIMAL128).doubleValue()));</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L365">            return Evaluation.defined(RuntimeValue.scalar(numberExpr.value().approximate(java.math.MathContext.DECIMAL128).value().doubleValue()));</span>
         }
-<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
-<span class="fc" id="L328">            RuntimeValue value = variables.get(variableExpr.name());</span>
-<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            return value == null ? Evaluation.defined(RuntimeValue.scalar(0.0)) : Evaluation.defined(value);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L368">            RuntimeValue value = variables.get(variableExpr.name());</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            return value == null ? Evaluation.defined(RuntimeValue.scalar(0.0)) : Evaluation.defined(value);</span>
         }
-<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
-<span class="nc" id="L333">                return Evaluation.undefined(Set.of());</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
+<span class="nc" id="L373">                return Evaluation.undefined(Set.of());</span>
             }
-<span class="fc" id="L335">            Evaluation argument = evaluate(functionExpr.arguments().getFirst(), variables);</span>
-<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            if (!argument.defined()) {</span>
-<span class="nc" id="L337">                return Evaluation.undefined(argument.inferredAssumptions());</span>
+<span class="fc" id="L375">            Evaluation argument = evaluate(functionExpr.arguments().getFirst(), variables);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            if (!argument.defined()) {</span>
+<span class="nc" id="L377">                return Evaluation.undefined(argument.inferredAssumptions());</span>
             }
-<span class="fc bfc" id="L339" title="All 2 branches covered.">            if (argument.value().kind() == RuntimeValue.Kind.COMPLEX) {</span>
-<span class="fc" id="L340">                Complex z = argument.value().complex();</span>
-<span class="pc bpc" id="L341" title="2 of 3 branches missed.">                return switch (functionExpr.name()) {</span>
-<span class="fc" id="L342">                    case &quot;sqrt&quot; -&gt; Evaluation.defined(RuntimeValue.complex(z.sqrt()));</span>
-<span class="nc" id="L343">                    case &quot;abs&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(z.abs()));</span>
-<span class="nc" id="L344">                    default -&gt; Evaluation.undefined(Set.of());</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (argument.value().kind() == RuntimeValue.Kind.COMPLEX) {</span>
+<span class="fc" id="L380">                Complex z = argument.value().complex();</span>
+<span class="pc bpc" id="L381" title="1 of 3 branches missed.">                return switch (functionExpr.name()) {</span>
+<span class="fc" id="L382">                    case &quot;sqrt&quot; -&gt; Evaluation.defined(RuntimeValue.complex(z.sqrt()));</span>
+<span class="fc" id="L383">                    case &quot;abs&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(z.abs()));</span>
+<span class="nc" id="L384">                    default -&gt; Evaluation.undefined(Set.of());</span>
                 };
             }
-<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            if (argument.value().kind() != RuntimeValue.Kind.SCALAR) {</span>
-<span class="nc" id="L348">                return Evaluation.undefined(argument.inferredAssumptions());</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            if (argument.value().kind() != RuntimeValue.Kind.SCALAR) {</span>
+<span class="nc" id="L388">                return Evaluation.undefined(argument.inferredAssumptions());</span>
             }
-<span class="fc" id="L350">            double x = argument.value().scalar();</span>
-<span class="pc bpc" id="L351" title="7 of 9 branches missed.">            return switch (functionExpr.name()) {</span>
-<span class="nc" id="L352">                case &quot;sin&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.sin(x)));</span>
-<span class="nc" id="L353">                case &quot;cos&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.cos(x)));</span>
-<span class="nc" id="L354">                case &quot;tan&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.tan(x)));</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">                case &quot;log&quot; -&gt; x &lt;= 0</span>
-<span class="fc" id="L356">                    ? Evaluation.undefined(domainAssumption(functionExpr.arguments().getFirst(),</span>
+<span class="fc" id="L390">            double x = argument.value().scalar();</span>
+<span class="pc bpc" id="L391" title="5 of 9 branches missed.">            return switch (functionExpr.name()) {</span>
+<span class="nc" id="L392">                case &quot;sin&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.sin(x)));</span>
+<span class="nc" id="L393">                case &quot;cos&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.cos(x)));</span>
+<span class="nc" id="L394">                case &quot;tan&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.tan(x)));</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">                case &quot;log&quot; -&gt; x &lt;= 0</span>
+<span class="fc" id="L396">                    ? Evaluation.undefined(domainAssumption(functionExpr.arguments().getFirst(),</span>
                         CounterexampleSearchService.AssumptionKind.POSITIVE, &quot;&gt; 0&quot;))
-<span class="fc" id="L358">                    : Evaluation.defined(RuntimeValue.scalar(Math.log10(x)));</span>
-<span class="nc bnc" id="L359" title="All 2 branches missed.">                case &quot;ln&quot; -&gt; x &lt;= 0</span>
-<span class="nc" id="L360">                    ? Evaluation.undefined(domainAssumption(functionExpr.arguments().getFirst(),</span>
+<span class="fc" id="L398">                    : Evaluation.defined(RuntimeValue.scalar(Math.log10(x)));</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                case &quot;ln&quot; -&gt; x &lt;= 0</span>
+<span class="nc" id="L400">                    ? Evaluation.undefined(domainAssumption(functionExpr.arguments().getFirst(),</span>
                         CounterexampleSearchService.AssumptionKind.POSITIVE, &quot;&gt; 0&quot;))
-<span class="nc" id="L362">                    : Evaluation.defined(RuntimeValue.scalar(Math.log(x)));</span>
-<span class="fc bfc" id="L363" title="All 2 branches covered.">                case &quot;sqrt&quot; -&gt; x &lt; 0</span>
-<span class="fc" id="L364">                    ? Evaluation.undefined(domainAssumption(functionExpr.arguments().getFirst(),</span>
+<span class="nc" id="L402">                    : Evaluation.defined(RuntimeValue.scalar(Math.log(x)));</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                case &quot;sqrt&quot; -&gt; x &lt; 0</span>
+<span class="fc" id="L404">                    ? Evaluation.undefined(domainAssumption(functionExpr.arguments().getFirst(),</span>
                         CounterexampleSearchService.AssumptionKind.NON_NEGATIVE, &quot;&gt;= 0&quot;))
-<span class="fc" id="L366">                    : Evaluation.defined(RuntimeValue.scalar(Math.sqrt(x)));</span>
-<span class="nc" id="L367">                case &quot;exp&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.exp(x)));</span>
-<span class="nc" id="L368">                case &quot;abs&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.abs(x)));</span>
-<span class="nc" id="L369">                default -&gt; Evaluation.undefined(Set.of());</span>
+<span class="fc" id="L406">                    : Evaluation.defined(RuntimeValue.scalar(Math.sqrt(x)));</span>
+<span class="fc" id="L407">                case &quot;exp&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.exp(x)));</span>
+<span class="fc" id="L408">                case &quot;abs&quot; -&gt; Evaluation.defined(RuntimeValue.scalar(Math.abs(x)));</span>
+<span class="nc" id="L409">                default -&gt; Evaluation.undefined(Set.of());</span>
             };
         }
-<span class="fc" id="L372">        BinaryExpr binaryExpr = (BinaryExpr) expression;</span>
-<span class="fc" id="L373">        Evaluation left = evaluate(binaryExpr.left(), variables);</span>
-<span class="fc" id="L374">        Evaluation right = evaluate(binaryExpr.right(), variables);</span>
-<span class="pc bpc" id="L375" title="2 of 4 branches missed.">        if (!left.defined() || !right.defined()) {</span>
-<span class="nc" id="L376">            Set&lt;InferenceCandidate&gt; merged = new LinkedHashSet&lt;&gt;(left.inferredAssumptions());</span>
-<span class="nc" id="L377">            merged.addAll(right.inferredAssumptions());</span>
-<span class="nc" id="L378">            return Evaluation.undefined(merged);</span>
+<span class="fc" id="L412">        BinaryExpr binaryExpr = (BinaryExpr) expression;</span>
+<span class="fc" id="L413">        Evaluation left = evaluate(binaryExpr.left(), variables);</span>
+<span class="fc" id="L414">        Evaluation right = evaluate(binaryExpr.right(), variables);</span>
+<span class="pc bpc" id="L415" title="2 of 4 branches missed.">        if (!left.defined() || !right.defined()) {</span>
+<span class="nc" id="L416">            Set&lt;InferenceCandidate&gt; merged = new LinkedHashSet&lt;&gt;(left.inferredAssumptions());</span>
+<span class="nc" id="L417">            merged.addAll(right.inferredAssumptions());</span>
+<span class="nc" id="L418">            return Evaluation.undefined(merged);</span>
         }
-<span class="fc" id="L380">        RuntimeValue leftValue = left.value();</span>
-<span class="fc" id="L381">        RuntimeValue rightValue = right.value();</span>
-<span class="fc bfc" id="L382" title="All 5 branches covered.">        return switch (binaryExpr.operator()) {</span>
-<span class="fc" id="L383">            case ADD -&gt; add(leftValue, rightValue);</span>
-<span class="fc" id="L384">            case SUB -&gt; subtract(leftValue, rightValue);</span>
-<span class="fc" id="L385">            case MUL -&gt; multiply(leftValue, rightValue);</span>
-<span class="fc" id="L386">            case DIV -&gt; divide(leftValue, rightValue, binaryExpr.right());</span>
-<span class="fc" id="L387">            case POW -&gt; pow(leftValue, rightValue, binaryExpr.left());</span>
+<span class="fc" id="L420">        RuntimeValue leftValue = left.value();</span>
+<span class="fc" id="L421">        RuntimeValue rightValue = right.value();</span>
+<span class="fc bfc" id="L422" title="All 5 branches covered.">        return switch (binaryExpr.operator()) {</span>
+<span class="fc" id="L423">            case ADD -&gt; add(leftValue, rightValue);</span>
+<span class="fc" id="L424">            case SUB -&gt; subtract(leftValue, rightValue);</span>
+<span class="fc" id="L425">            case MUL -&gt; multiply(leftValue, rightValue);</span>
+<span class="fc" id="L426">            case DIV -&gt; divide(leftValue, rightValue, binaryExpr.right());</span>
+<span class="fc" id="L427">            case POW -&gt; pow(leftValue, rightValue, binaryExpr.left());</span>
         };
     }
 
     private Evaluation add(RuntimeValue left, RuntimeValue right) {
-<span class="pc bpc" id="L392" title="2 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
-<span class="fc" id="L393">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() + right.scalar()));</span>
+<span class="pc bpc" id="L432" title="1 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
+<span class="fc" id="L433">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() + right.scalar()));</span>
         }
-<span class="nc bnc" id="L395" title="All 4 branches missed.">        if (left.isNumeric() &amp;&amp; right.isNumeric()) {</span>
-<span class="nc" id="L396">            return Evaluation.defined(RuntimeValue.complex(left.asComplex().add(right.asComplex())));</span>
+<span class="pc bpc" id="L435" title="2 of 4 branches missed.">        if (left.isNumeric() &amp;&amp; right.isNumeric()) {</span>
+<span class="fc" id="L436">            return Evaluation.defined(RuntimeValue.complex(left.asComplex().add(right.asComplex())));</span>
         }
-<span class="nc" id="L398">        return Evaluation.undefined(Set.of());</span>
+<span class="nc" id="L438">        return Evaluation.undefined(Set.of());</span>
     }
 
     private Evaluation subtract(RuntimeValue left, RuntimeValue right) {
-<span class="pc bpc" id="L402" title="2 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
-<span class="fc" id="L403">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() - right.scalar()));</span>
+<span class="pc bpc" id="L442" title="1 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
+<span class="fc" id="L443">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() - right.scalar()));</span>
         }
-<span class="nc bnc" id="L405" title="All 4 branches missed.">        if (left.isNumeric() &amp;&amp; right.isNumeric()) {</span>
-<span class="nc" id="L406">            return Evaluation.defined(RuntimeValue.complex(left.asComplex().subtract(right.asComplex())));</span>
+<span class="pc bpc" id="L445" title="2 of 4 branches missed.">        if (left.isNumeric() &amp;&amp; right.isNumeric()) {</span>
+<span class="fc" id="L446">            return Evaluation.defined(RuntimeValue.complex(left.asComplex().subtract(right.asComplex())));</span>
         }
-<span class="nc" id="L408">        return Evaluation.undefined(Set.of());</span>
+<span class="nc" id="L448">        return Evaluation.undefined(Set.of());</span>
     }
 
     private Evaluation multiply(RuntimeValue left, RuntimeValue right) {
-<span class="pc bpc" id="L412" title="1 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
-<span class="fc" id="L413">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() * right.scalar()));</span>
+<span class="pc bpc" id="L452" title="1 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
+<span class="fc" id="L453">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() * right.scalar()));</span>
         }
-<span class="pc bpc" id="L415" title="3 of 4 branches missed.">        if (left.isNumeric() &amp;&amp; right.isNumeric()) {</span>
-<span class="nc" id="L416">            return Evaluation.defined(RuntimeValue.complex(left.asComplex().multiply(right.asComplex())));</span>
+<span class="pc bpc" id="L455" title="3 of 4 branches missed.">        if (left.isNumeric() &amp;&amp; right.isNumeric()) {</span>
+<span class="nc" id="L456">            return Evaluation.defined(RuntimeValue.complex(left.asComplex().multiply(right.asComplex())));</span>
         }
-<span class="pc bpc" id="L418" title="2 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.MATRIX &amp;&amp; right.kind() == RuntimeValue.Kind.MATRIX) {</span>
-<span class="fc" id="L419">            return Evaluation.defined(RuntimeValue.matrix(left.matrix().multiply(right.matrix())));</span>
+<span class="pc bpc" id="L458" title="2 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.MATRIX &amp;&amp; right.kind() == RuntimeValue.Kind.MATRIX) {</span>
+<span class="fc" id="L459">            return Evaluation.defined(RuntimeValue.matrix(left.matrix().multiply(right.matrix())));</span>
         }
-<span class="nc" id="L421">        return Evaluation.undefined(Set.of());</span>
+<span class="nc" id="L461">        return Evaluation.undefined(Set.of());</span>
     }
 
     private Evaluation divide(RuntimeValue left, RuntimeValue right, Expr denominatorExpr) {
-<span class="pc bpc" id="L425" title="2 of 4 branches missed.">        if (!left.isNumeric() || !right.isNumeric()) {</span>
-<span class="nc" id="L426">            return Evaluation.undefined(Set.of());</span>
+<span class="pc bpc" id="L465" title="2 of 4 branches missed.">        if (!left.isNumeric() || !right.isNumeric()) {</span>
+<span class="nc" id="L466">            return Evaluation.undefined(Set.of());</span>
         }
-<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (right.asComplex().abs() &lt;= EPS) {</span>
-<span class="fc" id="L429">            return Evaluation.undefined(nonZeroAssumption(denominatorExpr));</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (right.asComplex().abs() &lt;= EPS) {</span>
+<span class="fc" id="L469">            return Evaluation.undefined(nonZeroAssumption(denominatorExpr));</span>
         }
-<span class="pc bpc" id="L431" title="2 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
-<span class="fc" id="L432">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() / right.scalar()));</span>
+<span class="nc bnc" id="L471" title="All 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR &amp;&amp; right.kind() == RuntimeValue.Kind.SCALAR) {</span>
+<span class="nc" id="L472">            return Evaluation.defined(RuntimeValue.scalar(left.scalar() / right.scalar()));</span>
         }
-<span class="nc" id="L434">        return Evaluation.defined(RuntimeValue.complex(left.asComplex().divide(right.asComplex())));</span>
+<span class="nc" id="L474">        return Evaluation.defined(RuntimeValue.complex(left.asComplex().divide(right.asComplex())));</span>
     }
 
     private Evaluation pow(RuntimeValue left, RuntimeValue right, Expr baseExpr) {
-<span class="pc bpc" id="L438" title="2 of 4 branches missed.">        if (!left.isNumeric() || right.kind() != RuntimeValue.Kind.SCALAR) {</span>
-<span class="nc" id="L439">            return Evaluation.undefined(Set.of());</span>
+<span class="pc bpc" id="L478" title="2 of 4 branches missed.">        if (!left.isNumeric() || right.kind() != RuntimeValue.Kind.SCALAR) {</span>
+<span class="nc" id="L479">            return Evaluation.undefined(Set.of());</span>
         }
-<span class="pc bpc" id="L441" title="1 of 4 branches missed.">        if (left.kind() == RuntimeValue.Kind.COMPLEX &amp;&amp; right.scalar() == Math.rint(right.scalar())) {</span>
-<span class="fc" id="L442">            return Evaluation.defined(RuntimeValue.complex(left.complex().pow((int) right.scalar())));</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (left.kind() == RuntimeValue.Kind.COMPLEX) {</span>
+<span class="fc" id="L482">            double exponent = right.scalar();</span>
+<span class="pc bpc" id="L483" title="3 of 6 branches missed.">            if (exponent != Math.rint(exponent) || exponent &lt; Integer.MIN_VALUE || exponent &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L484">                return Evaluation.undefined(Set.of());</span>
+            }
+<span class="fc" id="L486">            return Evaluation.defined(RuntimeValue.complex(left.complex().pow((int) exponent)));</span>
         }
-<span class="pc bpc" id="L444" title="1 of 2 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR) {</span>
-<span class="fc bfc" id="L445" title="All 4 branches covered.">            if (left.scalar() &lt; 0.0 &amp;&amp; Math.abs(right.scalar() - Math.rint(right.scalar())) &gt; EPS) {</span>
-<span class="fc" id="L446">                return Evaluation.undefined(domainAssumption(</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">        if (left.kind() == RuntimeValue.Kind.SCALAR) {</span>
+<span class="fc bfc" id="L489" title="All 4 branches covered.">            if (left.scalar() &lt; 0.0 &amp;&amp; Math.abs(right.scalar() - Math.rint(right.scalar())) &gt; EPS) {</span>
+<span class="fc" id="L490">                return Evaluation.undefined(domainAssumption(</span>
                     baseExpr,
                     CounterexampleSearchService.AssumptionKind.NON_NEGATIVE,
                     &quot;&gt;= 0&quot;
                 ));
             }
-<span class="pc bpc" id="L452" title="1 of 4 branches missed.">            if (Math.abs(left.scalar()) &lt;= EPS &amp;&amp; right.scalar() &lt; 0.0) {</span>
-<span class="nc" id="L453">                return Evaluation.undefined(nonZeroAssumption(baseExpr));</span>
+<span class="pc bpc" id="L496" title="1 of 4 branches missed.">            if (Math.abs(left.scalar()) &lt;= EPS &amp;&amp; right.scalar() &lt; 0.0) {</span>
+<span class="nc" id="L497">                return Evaluation.undefined(nonZeroAssumption(baseExpr));</span>
             }
         }
-<span class="fc" id="L456">        double value = Math.pow(left.scalar(), right.scalar());</span>
-<span class="pc bpc" id="L457" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
-<span class="nc" id="L458">            return Evaluation.undefined(Set.of());</span>
+<span class="fc" id="L500">        double value = Math.pow(left.scalar(), right.scalar());</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
+<span class="nc" id="L502">            return Evaluation.undefined(Set.of());</span>
         }
-<span class="fc" id="L460">        return Evaluation.defined(RuntimeValue.scalar(value));</span>
+<span class="fc" id="L504">        return Evaluation.defined(RuntimeValue.scalar(value));</span>
     }
 
     private void inferAssumptions(
@@ -465,74 +509,22 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; inferredAssumptions,
         String source
     ) {
-<span class="fc bfc" id="L468" title="All 2 branches covered.">        for (InferenceCandidate candidate : evaluation.inferredAssumptions()) {</span>
-<span class="fc" id="L469">            inferredAssumptions.merge(candidate.normalizedPredicate(),</span>
-<span class="fc" id="L470">                typedAssumption(candidate, source),</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">        for (InferenceCandidate candidate : evaluation.inferredAssumptions()) {</span>
+<span class="fc" id="L513">            inferredAssumptions.merge(candidate.normalizedPredicate(),</span>
+<span class="fc" id="L514">                typedAssumption(candidate, source),</span>
                 this::mergeTypedAssumptions);
-<span class="fc" id="L472">        }</span>
-<span class="fc" id="L473">    }</span>
-
-    private List&lt;AssumptionGuard&gt; assumptionGuards(List&lt;String&gt; assumptions) {
-<span class="pc bpc" id="L476" title="1 of 4 branches missed.">        if (assumptions == null || assumptions.isEmpty()) {</span>
-<span class="fc" id="L477">            return List.of();</span>
-        }
-<span class="fc" id="L479">        List&lt;AssumptionGuard&gt; guards = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L480" title="All 2 branches covered.">        for (String assumption : AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions()) {</span>
-<span class="fc" id="L481">            guards.addAll(guardsFor(assumption));</span>
-<span class="fc" id="L482">        }</span>
-<span class="fc" id="L483">        return List.copyOf(guards);</span>
-    }
-
-    private boolean violatesAssumptions(Map&lt;String, RuntimeValue&gt; assignment, List&lt;AssumptionGuard&gt; guards) {
-<span class="fc bfc" id="L487" title="All 2 branches covered.">        for (AssumptionGuard guard : guards) {</span>
-<span class="fc" id="L488">            RuntimeValue value = assignment.get(guard.symbol());</span>
-<span class="pc bpc" id="L489" title="2 of 6 branches missed.">            if (value != null &amp;&amp; value.isNumeric() &amp;&amp; value.asComplex().abs() &lt;= EPS) {</span>
-<span class="pc bpc" id="L490" title="1 of 2 branches missed.">                if (guard.relation() == Relation.NON_ZERO) {</span>
-<span class="fc" id="L491">                    return true;</span>
-                }
-            }
-<span class="pc bpc" id="L494" title="2 of 4 branches missed.">            if (value != null &amp;&amp; value.kind() == RuntimeValue.Kind.COMPLEX</span>
-<span class="nc bnc" id="L495" title="All 4 branches missed.">                    &amp;&amp; (guard.relation() == Relation.POSITIVE || guard.relation() == Relation.NON_NEGATIVE)) {</span>
-<span class="nc" id="L496">                return true;</span>
-            }
-<span class="pc bpc" id="L498" title="2 of 4 branches missed.">            if (value != null &amp;&amp; value.kind() == RuntimeValue.Kind.SCALAR) {</span>
-<span class="fc" id="L499">                double scalar = value.scalar();</span>
-<span class="pc bpc" id="L500" title="3 of 4 branches missed.">                if (guard.relation() == Relation.POSITIVE &amp;&amp; scalar &lt;= 0.0) {</span>
-<span class="nc" id="L501">                    return true;</span>
-                }
-<span class="pc bpc" id="L503" title="3 of 4 branches missed.">                if (guard.relation() == Relation.NON_NEGATIVE &amp;&amp; scalar &lt; 0.0) {</span>
-<span class="nc" id="L504">                    return true;</span>
-                }
-            }
-<span class="fc" id="L507">        }</span>
-<span class="fc" id="L508">        return false;</span>
-    }
-
-    private List&lt;AssumptionGuard&gt; guardsFor(String assumption) {
-<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (assumption.endsWith(&quot; != 0&quot;)) {</span>
-<span class="fc" id="L513">            String left = assumption.substring(0, assumption.length() - &quot; != 0&quot;.length()).trim();</span>
-<span class="pc bpc" id="L514" title="1 of 2 branches missed.">            return left.isBlank() ? List.of() : List.of(new AssumptionGuard(left, Relation.NON_ZERO));</span>
-        }
-<span class="nc bnc" id="L516" title="All 2 branches missed.">        if (assumption.endsWith(&quot; &gt; 0&quot;)) {</span>
-<span class="nc" id="L517">            String left = assumption.substring(0, assumption.length() - &quot; &gt; 0&quot;.length()).trim();</span>
-<span class="nc bnc" id="L518" title="All 2 branches missed.">            return left.isBlank() ? List.of() : List.of(new AssumptionGuard(left, Relation.POSITIVE));</span>
-        }
-<span class="nc bnc" id="L520" title="All 2 branches missed.">        if (assumption.endsWith(&quot; &gt;= 0&quot;)) {</span>
-<span class="nc" id="L521">            String left = assumption.substring(0, assumption.length() - &quot; &gt;= 0&quot;.length()).trim();</span>
-<span class="nc bnc" id="L522" title="All 2 branches missed.">            return left.isBlank() ? List.of() : List.of(new AssumptionGuard(left, Relation.NON_NEGATIVE));</span>
-        }
-<span class="nc" id="L524">        return List.of();</span>
-    }
+<span class="fc" id="L516">        }</span>
+<span class="fc" id="L517">    }</span>
 
     private Set&lt;InferenceCandidate&gt; nonZeroAssumption(Expr expression) {
-<span class="fc" id="L528">        String subjectExpression = ExpressionFormatter.format(expression);</span>
-<span class="fc" id="L529">        Set&lt;String&gt; affectedVariables = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L530">        collectVariables(expression, affectedVariables);</span>
-<span class="fc" id="L531">        return Set.of(new InferenceCandidate(</span>
+<span class="fc" id="L520">        String subjectExpression = ExpressionFormatter.format(expression);</span>
+<span class="fc" id="L521">        Set&lt;String&gt; affectedVariables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L522">        collectVariables(expression, affectedVariables);</span>
+<span class="fc" id="L523">        return Set.of(new InferenceCandidate(</span>
             CounterexampleSearchService.AssumptionKind.NON_ZERO,
             subjectExpression,
-<span class="fc" id="L534">            AssumptionSignature.normalizeExpression(subjectExpression + &quot; != 0&quot;),</span>
-<span class="fc" id="L535">            Set.copyOf(affectedVariables)</span>
+<span class="fc" id="L526">            AssumptionSignature.normalizeExpression(subjectExpression + &quot; != 0&quot;),</span>
+<span class="fc" id="L527">            Set.copyOf(affectedVariables)</span>
         ));
     }
 
@@ -541,25 +533,25 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         CounterexampleSearchService.AssumptionKind kind,
         String relation
     ) {
-<span class="fc" id="L544">        String subjectExpression = ExpressionFormatter.format(expression);</span>
-<span class="fc" id="L545">        Set&lt;String&gt; affectedVariables = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L546">        collectVariables(expression, affectedVariables);</span>
-<span class="fc" id="L547">        return Set.of(new InferenceCandidate(</span>
+<span class="fc" id="L536">        String subjectExpression = ExpressionFormatter.format(expression);</span>
+<span class="fc" id="L537">        Set&lt;String&gt; affectedVariables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L538">        collectVariables(expression, affectedVariables);</span>
+<span class="fc" id="L539">        return Set.of(new InferenceCandidate(</span>
             kind,
             subjectExpression,
-<span class="fc" id="L550">            AssumptionSignature.normalizeExpression(subjectExpression + &quot; &quot; + relation),</span>
-<span class="fc" id="L551">            Set.copyOf(affectedVariables)</span>
+<span class="fc" id="L542">            AssumptionSignature.normalizeExpression(subjectExpression + &quot; &quot; + relation),</span>
+<span class="fc" id="L543">            Set.copyOf(affectedVariables)</span>
         ));
     }
 
     private CounterexampleSearchService.TypedAssumption typedAssumption(InferenceCandidate candidate, String source) {
-<span class="fc" id="L556">        return new CounterexampleSearchService.TypedAssumption(</span>
-<span class="fc" id="L557">            candidate.kind(),</span>
-<span class="fc" id="L558">            candidate.normalizedPredicate(),</span>
-<span class="fc" id="L559">            candidate.subjectExpression(),</span>
-<span class="fc" id="L560">            List.copyOf(candidate.affectedVariables()),</span>
-<span class="pc bpc" id="L561" title="2 of 4 branches missed.">            source == null || source.isBlank() ? List.of() : List.of(source),</span>
-<span class="fc" id="L562">            proofEncodings(candidate),</span>
+<span class="fc" id="L548">        return new CounterexampleSearchService.TypedAssumption(</span>
+<span class="fc" id="L549">            candidate.kind(),</span>
+<span class="fc" id="L550">            candidate.normalizedPredicate(),</span>
+<span class="fc" id="L551">            candidate.subjectExpression(),</span>
+<span class="fc" id="L552">            List.copyOf(candidate.affectedVariables()),</span>
+<span class="pc bpc" id="L553" title="2 of 4 branches missed.">            source == null || source.isBlank() ? List.of() : List.of(source),</span>
+<span class="fc" id="L554">            proofEncodings(candidate),</span>
             CounterexampleSearchService.AssumptionClassification.UNKNOWN
         );
     }
@@ -568,98 +560,98 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         CounterexampleSearchService.TypedAssumption left,
         CounterexampleSearchService.TypedAssumption right
     ) {
-<span class="fc" id="L571">        LinkedHashSet&lt;String&gt; variables = new LinkedHashSet&lt;&gt;(left.affectedVariables());</span>
-<span class="fc" id="L572">        variables.addAll(right.affectedVariables());</span>
-<span class="fc" id="L573">        LinkedHashSet&lt;String&gt; evidenceSources = new LinkedHashSet&lt;&gt;(left.evidenceSources());</span>
-<span class="fc" id="L574">        evidenceSources.addAll(right.evidenceSources());</span>
-<span class="fc" id="L575">        LinkedHashMap&lt;String, CounterexampleSearchService.ProofEncoding&gt; proofEncodings = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L576" title="All 2 branches covered.">        for (CounterexampleSearchService.ProofEncoding encoding : left.proofEncodings()) {</span>
-<span class="fc" id="L577">            proofEncodings.put(encoding.dialect(), encoding);</span>
-<span class="fc" id="L578">        }</span>
-<span class="fc bfc" id="L579" title="All 2 branches covered.">        for (CounterexampleSearchService.ProofEncoding encoding : right.proofEncodings()) {</span>
-<span class="fc" id="L580">            proofEncodings.put(encoding.dialect(), encoding);</span>
-<span class="fc" id="L581">        }</span>
-<span class="fc" id="L582">        return new CounterexampleSearchService.TypedAssumption(</span>
-<span class="fc" id="L583">            left.kind(),</span>
-<span class="fc" id="L584">            left.normalizedPredicate(),</span>
-<span class="fc" id="L585">            left.subjectExpression(),</span>
-<span class="fc" id="L586">            List.copyOf(variables),</span>
-<span class="fc" id="L587">            List.copyOf(evidenceSources),</span>
-<span class="fc" id="L588">            List.copyOf(proofEncodings.values()),</span>
-<span class="fc" id="L589">            left.classification()</span>
+<span class="fc" id="L563">        LinkedHashSet&lt;String&gt; variables = new LinkedHashSet&lt;&gt;(left.affectedVariables());</span>
+<span class="fc" id="L564">        variables.addAll(right.affectedVariables());</span>
+<span class="fc" id="L565">        LinkedHashSet&lt;String&gt; evidenceSources = new LinkedHashSet&lt;&gt;(left.evidenceSources());</span>
+<span class="fc" id="L566">        evidenceSources.addAll(right.evidenceSources());</span>
+<span class="fc" id="L567">        LinkedHashMap&lt;String, CounterexampleSearchService.ProofEncoding&gt; proofEncodings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">        for (CounterexampleSearchService.ProofEncoding encoding : left.proofEncodings()) {</span>
+<span class="fc" id="L569">            proofEncodings.put(encoding.dialect(), encoding);</span>
+<span class="fc" id="L570">        }</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        for (CounterexampleSearchService.ProofEncoding encoding : right.proofEncodings()) {</span>
+<span class="fc" id="L572">            proofEncodings.put(encoding.dialect(), encoding);</span>
+<span class="fc" id="L573">        }</span>
+<span class="fc" id="L574">        return new CounterexampleSearchService.TypedAssumption(</span>
+<span class="fc" id="L575">            left.kind(),</span>
+<span class="fc" id="L576">            left.normalizedPredicate(),</span>
+<span class="fc" id="L577">            left.subjectExpression(),</span>
+<span class="fc" id="L578">            List.copyOf(variables),</span>
+<span class="fc" id="L579">            List.copyOf(evidenceSources),</span>
+<span class="fc" id="L580">            List.copyOf(proofEncodings.values()),</span>
+<span class="fc" id="L581">            left.classification()</span>
         );
     }
 
     private List&lt;CounterexampleSearchService.ProofEncoding&gt; proofEncodings(InferenceCandidate candidate) {
-<span class="fc" id="L594">        List&lt;CounterexampleSearchService.ProofEncoding&gt; encodings = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L595">        String leanRelation = candidate.normalizedPredicate()</span>
-<span class="fc" id="L596">                .replace(&quot;&gt;=&quot;, &quot;≥&quot;)</span>
-<span class="fc" id="L597">                .replace(&quot;&lt;=&quot;, &quot;≤&quot;)</span>
-<span class="fc" id="L598">                .replace(&quot;!=&quot;, &quot;≠&quot;);</span>
-<span class="fc" id="L599">        encodings.add(new CounterexampleSearchService.ProofEncoding(&quot;lean&quot;, leanRelation));</span>
+<span class="fc" id="L586">        List&lt;CounterexampleSearchService.ProofEncoding&gt; encodings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L587">        String leanRelation = candidate.normalizedPredicate()</span>
+<span class="fc" id="L588">                .replace(&quot;&gt;=&quot;, &quot;≥&quot;)</span>
+<span class="fc" id="L589">                .replace(&quot;&lt;=&quot;, &quot;≤&quot;)</span>
+<span class="fc" id="L590">                .replace(&quot;!=&quot;, &quot;≠&quot;);</span>
+<span class="fc" id="L591">        encodings.add(new CounterexampleSearchService.ProofEncoding(&quot;lean&quot;, leanRelation));</span>
         try {
-<span class="fc" id="L601">            Expr subject = parser.parse(new InputRequest(InputType.TERM, candidate.subjectExpression())).terms().getFirst();</span>
-<span class="fc" id="L602">            String smtSubject = toSmt(subject);</span>
-<span class="pc bpc" id="L603" title="1 of 2 branches missed.">            if (!smtSubject.isBlank()) {</span>
-<span class="pc bpc" id="L604" title="1 of 4 branches missed.">                String smt = switch (candidate.kind()) {</span>
-<span class="fc" id="L605">                    case NON_ZERO, INVERTIBLE -&gt; &quot;(not (= &quot; + smtSubject + &quot; 0))&quot;;</span>
-<span class="fc" id="L606">                    case POSITIVE -&gt; &quot;(&gt; &quot; + smtSubject + &quot; 0)&quot;;</span>
-<span class="fc" id="L607">                    case NON_NEGATIVE -&gt; &quot;(&gt;= &quot; + smtSubject + &quot; 0)&quot;;</span>
-<span class="nc" id="L608">                    default -&gt; &quot;&quot;;</span>
+<span class="fc" id="L593">            Expr subject = parser.parse(new InputRequest(InputType.TERM, candidate.subjectExpression())).terms().getFirst();</span>
+<span class="fc" id="L594">            String smtSubject = toSmt(subject);</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">            if (!smtSubject.isBlank()) {</span>
+<span class="pc bpc" id="L596" title="1 of 4 branches missed.">                String smt = switch (candidate.kind()) {</span>
+<span class="fc" id="L597">                    case NON_ZERO, INVERTIBLE -&gt; &quot;(not (= &quot; + smtSubject + &quot; 0))&quot;;</span>
+<span class="fc" id="L598">                    case POSITIVE -&gt; &quot;(&gt; &quot; + smtSubject + &quot; 0)&quot;;</span>
+<span class="fc" id="L599">                    case NON_NEGATIVE -&gt; &quot;(&gt;= &quot; + smtSubject + &quot; 0)&quot;;</span>
+<span class="nc" id="L600">                    default -&gt; &quot;&quot;;</span>
                 };
-<span class="pc bpc" id="L610" title="1 of 2 branches missed.">                if (!smt.isBlank()) {</span>
-<span class="fc" id="L611">                    encodings.add(new CounterexampleSearchService.ProofEncoding(&quot;smtlib&quot;, smt));</span>
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">                if (!smt.isBlank()) {</span>
+<span class="fc" id="L603">                    encodings.add(new CounterexampleSearchService.ProofEncoding(&quot;smtlib&quot;, smt));</span>
                 }
             }
-<span class="nc" id="L614">        } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L606">        } catch (RuntimeException ignored) {</span>
             // Best-effort proof encodings only.
-<span class="fc" id="L616">        }</span>
-<span class="fc" id="L617">        return List.copyOf(encodings);</span>
+<span class="fc" id="L608">        }</span>
+<span class="fc" id="L609">        return List.copyOf(encodings);</span>
     }
 
     private String toSmt(Expr expression) {
-<span class="fc bfc" id="L621" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
-<span class="fc" id="L622">            var value = numberExpr.value();</span>
-<span class="pc bpc" id="L623" title="1 of 2 branches missed.">            String numerator = value.signum() &lt; 0 ? &quot;(- &quot; + value.numerator().abs() + &quot;)&quot;</span>
-<span class="fc" id="L624">                : value.numerator().toString();</span>
-<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            return value.isInteger() ? numerator : &quot;(/ &quot; + numerator + &quot; &quot; + value.denominator() + &quot;)&quot;;</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">        if (expression instanceof NumberExpr numberExpr) {</span>
+<span class="fc" id="L614">            var value = numberExpr.value();</span>
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">            String numerator = value.signum() &lt; 0 ? &quot;(- &quot; + value.numerator().abs() + &quot;)&quot;</span>
+<span class="fc" id="L616">                : value.numerator().toString();</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">            return value.isInteger() ? numerator : &quot;(/ &quot; + numerator + &quot; &quot; + value.denominator() + &quot;)&quot;;</span>
         }
-<span class="fc bfc" id="L627" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
-<span class="fc" id="L628">            return variableExpr.name();</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        if (expression instanceof VariableExpr variableExpr) {</span>
+<span class="fc" id="L620">            return variableExpr.name();</span>
         }
-<span class="pc bpc" id="L630" title="3 of 4 branches missed.">        if (expression instanceof FunctionExpr functionExpr &amp;&amp; functionExpr.arguments().size() == 1) {</span>
-<span class="nc" id="L631">            return &quot;(&quot; + functionExpr.name() + &quot; &quot; + toSmt(functionExpr.arguments().getFirst()) + &quot;)&quot;;</span>
+<span class="pc bpc" id="L622" title="3 of 4 branches missed.">        if (expression instanceof FunctionExpr functionExpr &amp;&amp; functionExpr.arguments().size() == 1) {</span>
+<span class="nc" id="L623">            return &quot;(&quot; + functionExpr.name() + &quot; &quot; + toSmt(functionExpr.arguments().getFirst()) + &quot;)&quot;;</span>
         }
-<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="pc bpc" id="L634" title="3 of 5 branches missed.">            String operator = switch (binaryExpr.operator()) {</span>
-<span class="nc" id="L635">                case ADD -&gt; &quot;+&quot;;</span>
-<span class="fc" id="L636">                case SUB -&gt; &quot;-&quot;;</span>
-<span class="nc" id="L637">                case MUL -&gt; &quot;*&quot;;</span>
-<span class="nc" id="L638">                case DIV -&gt; &quot;/&quot;;</span>
-<span class="fc" id="L639">                case POW -&gt; &quot;pow&quot;;</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="pc bpc" id="L626" title="3 of 5 branches missed.">            String operator = switch (binaryExpr.operator()) {</span>
+<span class="nc" id="L627">                case ADD -&gt; &quot;+&quot;;</span>
+<span class="fc" id="L628">                case SUB -&gt; &quot;-&quot;;</span>
+<span class="nc" id="L629">                case MUL -&gt; &quot;*&quot;;</span>
+<span class="nc" id="L630">                case DIV -&gt; &quot;/&quot;;</span>
+<span class="fc" id="L631">                case POW -&gt; &quot;pow&quot;;</span>
             };
-<span class="fc" id="L641">            return &quot;(&quot; + operator + &quot; &quot; + toSmt(binaryExpr.left()) + &quot; &quot; + toSmt(binaryExpr.right()) + &quot;)&quot;;</span>
+<span class="fc" id="L633">            return &quot;(&quot; + operator + &quot; &quot; + toSmt(binaryExpr.left()) + &quot; &quot; + toSmt(binaryExpr.right()) + &quot;)&quot;;</span>
         }
-<span class="nc" id="L643">        return &quot;&quot;;</span>
+<span class="nc" id="L635">        return &quot;&quot;;</span>
     }
 
     private List&lt;String&gt; inferredAssumptionExpressions(Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; assumptions) {
-<span class="fc" id="L647">        return assumptions.values().stream()</span>
-<span class="fc" id="L648">            .map(CounterexampleSearchService.TypedAssumption::normalizedPredicate)</span>
-<span class="fc" id="L649">            .toList();</span>
+<span class="fc" id="L639">        return assumptions.values().stream()</span>
+<span class="fc" id="L640">            .map(CounterexampleSearchService.TypedAssumption::normalizedPredicate)</span>
+<span class="fc" id="L641">            .toList();</span>
     }
 
     private List&lt;CounterexampleSearchService.TypedAssumption&gt; typedAssumptions(
         Map&lt;String, CounterexampleSearchService.TypedAssumption&gt; assumptions
     ) {
-<span class="fc" id="L655">        return List.copyOf(assumptions.values());</span>
+<span class="fc" id="L647">        return List.copyOf(assumptions.values());</span>
     }
 
     private static String trimDouble(double value) {
-<span class="pc bpc" id="L659" title="1 of 4 branches missed.">        if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
-<span class="fc" id="L660">            return Long.toString((long) value);</span>
+<span class="pc bpc" id="L651" title="2 of 6 branches missed.">        if (value &gt;= -0x1p63 &amp;&amp; value &lt; 0x1p63 &amp;&amp; value == Math.rint(value)) {</span>
+<span class="fc" id="L652">            return Long.toString((long) value);</span>
         }
-<span class="fc" id="L662">        return Double.toString(value);</span>
+<span class="fc" id="L654">        return Double.toString(value);</span>
     }
 
     private record Evaluation(
@@ -667,20 +659,20 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
         boolean defined,
         Set&lt;InferenceCandidate&gt; inferredAssumptions
     ) {
-<span class="fc" id="L670">        private Evaluation {</span>
-<span class="pc bpc" id="L671" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null ? Set.of() : Set.copyOf(inferredAssumptions);</span>
-<span class="fc" id="L672">        }</span>
+<span class="fc" id="L662">        private Evaluation {</span>
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null ? Set.of() : Set.copyOf(inferredAssumptions);</span>
+<span class="fc" id="L664">        }</span>
 
         static Evaluation defined(RuntimeValue value) {
-<span class="fc" id="L675">            return new Evaluation(value, true, Set.of());</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">            return value.finite() ? new Evaluation(value, true, Set.of()) : undefined(Set.of());</span>
         }
 
         static Evaluation undefined(Set&lt;InferenceCandidate&gt; inferredAssumptions) {
-<span class="fc" id="L679">            return new Evaluation(RuntimeValue.scalar(Double.NaN), false, inferredAssumptions);</span>
+<span class="fc" id="L671">            return new Evaluation(RuntimeValue.scalar(Double.NaN), false, inferredAssumptions);</span>
         }
     }
 
-<span class="fc" id="L683">    private record InferenceCandidate(</span>
+<span class="fc" id="L675">    private record InferenceCandidate(</span>
         CounterexampleSearchService.AssumptionKind kind,
         String subjectExpression,
         String normalizedPredicate,
@@ -688,136 +680,148 @@ public class DeterministicCounterexampleSearchService implements CounterexampleS
     ) {
     }
 
-<span class="fc" id="L691">    private enum Relation {</span>
-<span class="fc" id="L692">        NON_ZERO,</span>
-<span class="fc" id="L693">        POSITIVE,</span>
-<span class="fc" id="L694">        NON_NEGATIVE</span>
-    }
-
-<span class="fc" id="L697">    private record AssumptionGuard(String symbol, Relation relation) {</span>
-    }
-
-<span class="fc" id="L700">    private record RuntimeValue(Kind kind, double scalar, Matrix matrix, Complex complex) {</span>
-<span class="fc" id="L701">        enum Kind {</span>
-<span class="fc" id="L702">            SCALAR,</span>
-<span class="fc" id="L703">            MATRIX,</span>
-<span class="fc" id="L704">            COMPLEX</span>
+<span class="fc" id="L683">    private record RuntimeValue(Kind kind, double scalar, Matrix matrix, Complex complex) {</span>
+<span class="fc" id="L684">        enum Kind {</span>
+<span class="fc" id="L685">            SCALAR,</span>
+<span class="fc" id="L686">            MATRIX,</span>
+<span class="fc" id="L687">            COMPLEX</span>
         }
 
         static RuntimeValue scalar(double value) {
-<span class="fc" id="L708">            return new RuntimeValue(Kind.SCALAR, value, null, null);</span>
+<span class="fc" id="L691">            return new RuntimeValue(Kind.SCALAR, value, null, null);</span>
         }
 
         static RuntimeValue matrix(Matrix value) {
-<span class="fc" id="L712">            return new RuntimeValue(Kind.MATRIX, 0.0, value, null);</span>
+<span class="fc" id="L695">            return new RuntimeValue(Kind.MATRIX, 0.0, value, null);</span>
         }
 
         static RuntimeValue complex(Complex value) {
-<span class="fc" id="L716">            return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);</span>
+<span class="fc" id="L699">            return new RuntimeValue(Kind.COMPLEX, 0.0, null, value);</span>
+        }
+
+        boolean finite() {
+<span class="fc bfc" id="L703" title="All 3 branches covered.">            return switch (kind) {</span>
+<span class="fc" id="L704">                case SCALAR -&gt; Double.isFinite(scalar);</span>
+<span class="pc bpc" id="L705" title="2 of 4 branches missed.">                case COMPLEX -&gt; Double.isFinite(complex.real()) &amp;&amp; Double.isFinite(complex.imaginary());</span>
+                case MATRIX -&gt; {
+<span class="fc" id="L707">                    boolean finite = true;</span>
+<span class="pc bpc" id="L708" title="1 of 4 branches missed.">                    for (int row = 0; row &lt; matrix.rows() &amp;&amp; finite; row++) {</span>
+<span class="pc bpc" id="L709" title="1 of 4 branches missed.">                        for (int column = 0; column &lt; matrix.columns() &amp;&amp; finite; column++) {</span>
+<span class="fc" id="L710">                            finite = Double.isFinite(matrix.get(row, column));</span>
+                        }
+                    }
+<span class="fc" id="L713">                    yield finite;</span>
+                }
+            };
         }
 
         boolean isNumeric() {
-<span class="fc bfc" id="L720" title="All 4 branches covered.">            return kind == Kind.SCALAR || kind == Kind.COMPLEX;</span>
+<span class="fc bfc" id="L719" title="All 4 branches covered.">            return kind == Kind.SCALAR || kind == Kind.COMPLEX;</span>
         }
 
         Complex asComplex() {
-<span class="pc bpc" id="L724" title="1 of 2 branches missed.">            return kind == Kind.COMPLEX ? complex : new Complex(scalar, 0.0);</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">            return kind == Kind.COMPLEX ? complex : new Complex(scalar, 0.0);</span>
         }
 
         boolean approximatelyEquals(RuntimeValue other) {
-<span class="pc bpc" id="L728" title="1 of 2 branches missed.">            if (kind != other.kind) {</span>
-<span class="nc" id="L729">                return false;</span>
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">            if (kind != other.kind) {</span>
+<span class="nc" id="L728">                return false;</span>
             }
-<span class="fc bfc" id="L731" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
-<span class="pc bpc" id="L732" title="2 of 4 branches missed.">                if (!Double.isFinite(scalar) || !Double.isFinite(other.scalar)) {</span>
-<span class="nc" id="L733">                    return false;</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
+<span class="pc bpc" id="L731" title="2 of 4 branches missed.">                if (!Double.isFinite(scalar) || !Double.isFinite(other.scalar)) {</span>
+<span class="nc" id="L732">                    return false;</span>
                 }
-<span class="fc bfc" id="L735" title="All 2 branches covered.">                return Math.abs(scalar - other.scalar) &lt;= EPS;</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">                return Math.abs(scalar - other.scalar) &lt;= EPS;</span>
             }
-<span class="fc bfc" id="L737" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
-<span class="fc bfc" id="L738" title="All 2 branches covered.">                return complex.subtract(other.complex).abs() &lt;= EPS;</span>
+<span class="fc bfc" id="L736" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
+<span class="fc bfc" id="L737" title="All 2 branches covered.">                return complex.subtract(other.complex).abs() &lt;= EPS;</span>
             }
-<span class="fc" id="L740">            return matrix.equals(other.matrix);</span>
+<span class="fc" id="L739">            return matrix.equals(other.matrix);</span>
         }
 
         String asText() {
-<span class="fc bfc" id="L744" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
-<span class="fc" id="L745">                return trimDouble(scalar);</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">            if (kind == Kind.SCALAR) {</span>
+<span class="fc" id="L744">                return trimDouble(scalar);</span>
             }
-<span class="fc bfc" id="L747" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
-<span class="fc" id="L748">                return complex.asText();</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">            if (kind == Kind.COMPLEX) {</span>
+<span class="fc" id="L747">                return complex.asText();</span>
             }
-<span class="fc" id="L750">            StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
-<span class="fc bfc" id="L751" title="All 2 branches covered.">            for (int i = 0; i &lt; matrix.rows(); i++) {</span>
-<span class="fc bfc" id="L752" title="All 2 branches covered.">                if (i &gt; 0) {</span>
-<span class="fc" id="L753">                    builder.append(&quot;;&quot;);</span>
+<span class="fc" id="L749">            StringBuilder builder = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">            for (int i = 0; i &lt; matrix.rows(); i++) {</span>
+<span class="fc bfc" id="L751" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L752">                    builder.append(&quot;;&quot;);</span>
                 }
-<span class="fc bfc" id="L755" title="All 2 branches covered.">                for (int j = 0; j &lt; matrix.columns(); j++) {</span>
-<span class="fc bfc" id="L756" title="All 2 branches covered.">                    if (j &gt; 0) {</span>
-<span class="fc" id="L757">                        builder.append(&quot;,&quot;);</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">                for (int j = 0; j &lt; matrix.columns(); j++) {</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">                    if (j &gt; 0) {</span>
+<span class="fc" id="L756">                        builder.append(&quot;,&quot;);</span>
                     }
-<span class="fc" id="L759">                    builder.append(trimDouble(matrix.get(i, j)));</span>
+<span class="fc" id="L758">                    builder.append(trimDouble(matrix.get(i, j)));</span>
                 }
             }
-<span class="fc" id="L762">            return builder.append(&quot;]&quot;).toString();</span>
+<span class="fc" id="L761">            return builder.append(&quot;]&quot;).toString();</span>
         }
     }
 
-<span class="fc" id="L766">    private record Complex(double real, double imaginary) {</span>
+<span class="fc" id="L765">    private record Complex(double real, double imaginary) {</span>
         Complex add(Complex other) {
-<span class="nc" id="L768">            return new Complex(real + other.real, imaginary + other.imaginary);</span>
+<span class="fc" id="L767">            return new Complex(real + other.real, imaginary + other.imaginary);</span>
         }
 
         Complex subtract(Complex other) {
-<span class="fc" id="L772">            return new Complex(real - other.real, imaginary - other.imaginary);</span>
+<span class="fc" id="L771">            return new Complex(real - other.real, imaginary - other.imaginary);</span>
         }
 
         Complex multiply(Complex other) {
-<span class="fc" id="L776">            return new Complex(</span>
+<span class="fc" id="L775">            return new Complex(</span>
                 real * other.real - imaginary * other.imaginary,
                 real * other.imaginary + imaginary * other.real
             );
         }
 
         Complex divide(Complex other) {
-<span class="nc" id="L783">            double denominator = other.real * other.real + other.imaginary * other.imaginary;</span>
-<span class="nc" id="L784">            return new Complex(</span>
+<span class="fc" id="L782">            double denominator = other.real * other.real + other.imaginary * other.imaginary;</span>
+<span class="fc" id="L783">            return new Complex(</span>
                 (real * other.real + imaginary * other.imaginary) / denominator,
                 (imaginary * other.real - real * other.imaginary) / denominator
             );
         }
 
         Complex pow(int exponent) {
-<span class="pc bpc" id="L791" title="1 of 2 branches missed.">            if (exponent == 0) {</span>
-<span class="nc" id="L792">                return new Complex(1.0, 0.0);</span>
+<span class="fc" id="L790">            Complex one = new Complex(1.0, 0.0);</span>
+<span class="fc" id="L791">            Complex result = one;</span>
+<span class="fc bfc" id="L792" title="All 2 branches covered.">            Complex factor = exponent &lt; 0 ? one.divide(this) : this;</span>
+<span class="fc" id="L793">            long remaining = Math.abs((long) exponent);</span>
+<span class="fc bfc" id="L794" title="All 2 branches covered.">            while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L795" title="All 2 branches covered.">                if ((remaining &amp; 1) != 0) {</span>
+<span class="fc" id="L796">                    result = result.multiply(factor);</span>
+                }
+<span class="fc" id="L798">                remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L799" title="All 2 branches covered.">                if (remaining &gt; 0) {</span>
+<span class="fc" id="L800">                    factor = factor.multiply(factor);</span>
+                }
             }
-<span class="fc" id="L794">            Complex result = new Complex(1.0, 0.0);</span>
-<span class="fc" id="L795">            int count = Math.abs(exponent);</span>
-<span class="fc bfc" id="L796" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
-<span class="fc" id="L797">                result = result.multiply(this);</span>
-            }
-<span class="pc bpc" id="L799" title="1 of 2 branches missed.">            return exponent &lt; 0 ? new Complex(1.0, 0.0).divide(result) : result;</span>
+<span class="fc" id="L803">            return result;</span>
         }
 
         Complex sqrt() {
-<span class="fc" id="L803">            double magnitude = abs();</span>
-<span class="fc" id="L804">            double realPart = Math.sqrt((magnitude + real) / 2.0);</span>
-<span class="fc" id="L805">            double imaginaryPart = Math.copySign(Math.sqrt((magnitude - real) / 2.0), imaginary);</span>
-<span class="fc" id="L806">            return new Complex(realPart, imaginaryPart);</span>
+<span class="fc" id="L807">            double magnitude = abs();</span>
+<span class="fc" id="L808">            double realPart = Math.sqrt((magnitude + real) / 2.0);</span>
+<span class="fc" id="L809">            double imaginaryPart = Math.copySign(Math.sqrt((magnitude - real) / 2.0), imaginary);</span>
+<span class="fc" id="L810">            return new Complex(realPart, imaginaryPart);</span>
         }
 
         double abs() {
-<span class="fc" id="L810">            return Math.hypot(real, imaginary);</span>
+<span class="fc" id="L814">            return Math.hypot(real, imaginary);</span>
         }
 
         String asText() {
-<span class="pc bpc" id="L814" title="1 of 2 branches missed.">            if (Math.abs(imaginary) &lt;= EPS) {</span>
-<span class="nc" id="L815">                return trimDouble(real);</span>
+<span class="pc bpc" id="L818" title="1 of 2 branches missed.">            if (Math.abs(imaginary) &lt;= EPS) {</span>
+<span class="nc" id="L819">                return trimDouble(real);</span>
             }
-<span class="fc bfc" id="L817" title="All 2 branches covered.">            if (Math.abs(real) &lt;= EPS) {</span>
-<span class="fc" id="L818">                return trimDouble(imaginary) + &quot;i&quot;;</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            if (Math.abs(real) &lt;= EPS) {</span>
+<span class="fc" id="L822">                return trimDouble(imaginary) + &quot;i&quot;;</span>
             }
-<span class="fc bfc" id="L820" title="All 2 branches covered.">            return trimDouble(real) + (imaginary &lt; 0 ? &quot;&quot; : &quot;+&quot;) + trimDouble(imaginary) + &quot;i&quot;;</span>
+<span class="fc bfc" id="L824" title="All 2 branches covered.">            return trimDouble(real) + (imaginary &lt; 0 ? &quot;&quot; : &quot;+&quot;) + trimDouble(imaginary) + &quot;i&quot;;</span>
         }
     }
 }

@@ -190,19 +190,23 @@ public final class ReferenceIndependentCandidateValidationRunner {
 <span class="fc bfc" id="L190" title="All 2 branches covered.">        if (value.oracleStatus().equals(&quot;UNAVAILABLE&quot;)) {</span>
 <span class="fc" id="L191">            return &quot;UNSUPPORTED&quot;;</span>
         }
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (value.conditionalValidityUnresolved()) {</span>
-<span class="nc" id="L194">            return &quot;CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED&quot;;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (value.conditionalValidityUnresolved()) {</span>
+<span class="fc" id="L194">            return &quot;CONDITIONAL_ASSUMPTIONS_NOT_EVALUATED&quot;;</span>
         }
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        return value.intrinsicallyVerified() ? &quot;ORACLE_AGREE&quot;</span>
-<span class="nc bnc" id="L197" title="All 2 branches missed.">            : value.intrinsicallyRejected() ? &quot;REFUTED&quot; : &quot;UNRESOLVED&quot;;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        return value.intrinsicallyVerified() ? &quot;ORACLE_AGREE&quot;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            : value.intrinsicallyRejected() ? &quot;REFUTED&quot; : &quot;UNRESOLVED&quot;;</span>
     }
 
     static String strength(IntrinsicValidation value) {
-<span class="pc bpc" id="L201" title="1 of 3 branches missed.">        return switch (value.oracleEvidence()) {</span>
+<span class="pc bpc" id="L201" title="2 of 5 branches missed.">        return switch (value.oracleEvidence()) {</span>
             case &quot;validated by deterministic numeric samples&quot;,
 <span class="fc" id="L203">                 &quot;not equivalent under deterministic numeric samples&quot; -&gt; &quot;DETERMINISTIC_NUMERIC_SAMPLES&quot;;</span>
-<span class="nc" id="L204">            case &quot;matching normalized quadratic coefficients&quot; -&gt; &quot;NORMALIZED_QUADRATIC_COEFFICIENTS&quot;;</span>
-<span class="fc" id="L205">            default -&gt; &quot;NO_CLASSIFIED_INDEPENDENT_EQUALITY_EVIDENCE&quot;;</span>
+            case &quot;matching exact rational constants&quot;,
+<span class="nc" id="L205">                 &quot;different exact rational constants&quot; -&gt; &quot;EXACT_RATIONAL_CONSTANT_COMPARISON&quot;;</span>
+            case &quot;matching exact univariate polynomial normal forms&quot;,
+<span class="fc" id="L207">                 &quot;different exact univariate polynomial normal forms&quot; -&gt; &quot;EXACT_UNIVARIATE_POLYNOMIAL_COMPARISON&quot;;</span>
+<span class="nc" id="L208">            case &quot;matching normalized quadratic coefficients&quot; -&gt; &quot;NORMALIZED_QUADRATIC_COEFFICIENTS&quot;;</span>
+<span class="fc" id="L209">            default -&gt; &quot;NO_CLASSIFIED_INDEPENDENT_EQUALITY_EVIDENCE&quot;;</span>
         };
     }
 }

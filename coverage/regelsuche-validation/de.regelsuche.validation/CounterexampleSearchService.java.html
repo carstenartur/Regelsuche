@@ -26,13 +26,13 @@ public interface CounterexampleSearchService {
      * Backwards-compatible convenience API for callers that only have two expressions.
      */
     default Optional&lt;Counterexample&gt; search(String leftExpression, String rightExpression) {
-<span class="nc" id="L29">        HypothesisInput hypothesis = new HypothesisInput(</span>
+<span class="fc" id="L29">        HypothesisInput hypothesis = new HypothesisInput(</span>
             &quot;&quot;,
             leftExpression,
             rightExpression,
-<span class="nc" id="L33">            List.of()</span>
+<span class="fc" id="L33">            List.of()</span>
         );
-<span class="nc" id="L35">        return search(hypothesis, CounterexampleBudget.defaultBudget()).counterexample();</span>
+<span class="fc" id="L35">        return search(hypothesis, CounterexampleBudget.defaultBudget()).counterexample();</span>
     }
 
     /**
