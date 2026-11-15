@@ -440,7 +440,7 @@ public class CliRouter {
         }
 <span class="fc" id="L441">        String sub = args[0].toLowerCase(Locale.ROOT);</span>
 <span class="fc" id="L442">        String[] rest = Arrays.copyOfRange(args, 1, args.length);</span>
-<span class="pc bpc" id="L443" title="2 of 9 branches missed.">        return switch (sub) {</span>
+<span class="pc bpc" id="L443" title="1 of 9 branches missed.">        return switch (sub) {</span>
 <span class="fc" id="L444">            case &quot;list&quot; -&gt; runRulesList(rest);</span>
 <span class="fc" id="L445">            case &quot;packs&quot; -&gt; runRulesPacks(rest);</span>
 <span class="fc" id="L446">            case &quot;validate&quot; -&gt; runRulesValidate(rest);</span>
@@ -448,7 +448,7 @@ public class CliRouter {
 <span class="fc" id="L448">            case &quot;profiles&quot; -&gt; runRulesProfiles(rest);</span>
 <span class="fc" id="L449">            case &quot;import&quot; -&gt; runRulesImportCommand(rest);</span>
 <span class="fc" id="L450">            case &quot;export&quot; -&gt; runRulesExportCommand(rest);</span>
-<span class="nc" id="L451">            case &quot;debug&quot; -&gt; runRulesDebugCommand(rest);</span>
+<span class="fc" id="L451">            case &quot;debug&quot; -&gt; runRulesDebugCommand(rest);</span>
             default -&gt; {
 <span class="nc" id="L453">                out.println(&quot;Unknown rules command: &quot; + sub);</span>
 <span class="nc" id="L454">                yield 1;</span>
@@ -615,13 +615,13 @@ public class CliRouter {
     }
 
     private int runRulesDebugCommand(String[] args) {
-<span class="nc bnc" id="L618" title="All 2 branches missed.">        if (args.length == 0) {</span>
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
 <span class="nc" id="L619">            out.println(&quot;Usage: rules debug &lt;expression&gt; [--dir rules/]&quot;);</span>
 <span class="nc" id="L620">            return 1;</span>
         }
-<span class="nc" id="L622">        CliOptions options = CliOptions.parse(args);</span>
-<span class="nc" id="L623">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
-<span class="nc" id="L624">        return runRulesDebug(args[0], rulesDir);</span>
+<span class="fc" id="L622">        CliOptions options = CliOptions.parse(args);</span>
+<span class="fc" id="L623">        Path rulesDir = Paths.get(options.getOrDefault(&quot;dir&quot;, &quot;rules&quot;));</span>
+<span class="fc" id="L624">        return runRulesDebug(args[0], rulesDir);</span>
     }
 
     private int runInventory(String[] args) {
@@ -777,19 +777,19 @@ public class CliRouter {
             true,
 <span class="fc" id="L778">            java.util.Set.of(),</span>
 <span class="fc" id="L779">            java.util.Set.of(),</span>
-<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            profile.isBlank() ? null : profile</span>
+<span class="fc bfc" id="L780" title="All 2 branches covered.">            profile.isBlank() ? null : profile</span>
         ))) {
 <span class="fc" id="L782">            Files.createDirectories(outputDir);</span>
 <span class="fc" id="L783">            StringBuilder sb = new StringBuilder();</span>
 <span class="fc" id="L784">            sb.append(&quot;# Exported rules&quot;).append(System.lineSeparator());</span>
-<span class="pc bpc" id="L785" title="1 of 2 branches missed.">            if (!profile.isBlank()) {</span>
-<span class="nc" id="L786">                sb.append(&quot;# profile: &quot;).append(profile).append(System.lineSeparator());</span>
+<span class="fc bfc" id="L785" title="All 2 branches covered.">            if (!profile.isBlank()) {</span>
+<span class="fc" id="L786">                sb.append(&quot;# profile: &quot;).append(profile).append(System.lineSeparator());</span>
             }
 <span class="fc" id="L788">            sb.append(System.lineSeparator());</span>
 <span class="fc" id="L789">            int exported = 0;</span>
 <span class="fc bfc" id="L790" title="All 2 branches covered.">            for (de.regelsuche.plugin.RuleRegistry.RuleRegistration registration : runtime.ruleRegistry().registrations()) {</span>
-<span class="pc bpc" id="L791" title="1 of 2 branches missed.">                if (!registration.enabled()) {</span>
-<span class="nc" id="L792">                    continue;</span>
+<span class="fc bfc" id="L791" title="All 2 branches covered.">                if (!registration.enabled()) {</span>
+<span class="fc" id="L792">                    continue;</span>
                 }
 <span class="pc bpc" id="L794" title="1 of 2 branches missed.">                if (registration.rule() instanceof de.regelsuche.transform.PatternRewriteRule rule) {</span>
 <span class="fc" id="L795">                    appendExportedRule(</span>
@@ -808,8 +808,8 @@ public class CliRouter {
 <span class="fc" id="L808">            }</span>
             for (de.regelsuche.plugin.TransformationRegistry.TransformationRegistration registration
 <span class="fc bfc" id="L810" title="All 2 branches covered.">                : runtime.transformationRegistry().registrations()) {</span>
-<span class="pc bpc" id="L811" title="1 of 2 branches missed.">                if (!registration.enabled()) {</span>
-<span class="nc" id="L812">                    continue;</span>
+<span class="fc bfc" id="L811" title="All 2 branches covered.">                if (!registration.enabled()) {</span>
+<span class="fc" id="L812">                    continue;</span>
                 }
 <span class="pc bpc" id="L814" title="1 of 2 branches missed.">                if (registration.transformation() instanceof de.regelsuche.plugin.PatternBasedTransformation transformation) {</span>
 <span class="fc" id="L815">                    appendExportedRule(</span>
@@ -826,9 +826,9 @@ public class CliRouter {
 <span class="fc" id="L826">                    exported++;</span>
                 }
 <span class="fc" id="L828">            }</span>
-<span class="pc bpc" id="L829" title="1 of 2 branches missed.">            String filename = profile.isBlank()</span>
+<span class="fc bfc" id="L829" title="All 2 branches covered.">            String filename = profile.isBlank()</span>
 <span class="fc" id="L830">                ? &quot;exported-rules.regelsuche&quot;</span>
-<span class="pc" id="L831">                : &quot;exported-rules-&quot; + profile + &quot;.regelsuche&quot;;</span>
+<span class="fc" id="L831">                : &quot;exported-rules-&quot; + profile + &quot;.regelsuche&quot;;</span>
 <span class="fc" id="L832">            Path outFile = outputDir.resolve(filename);</span>
 <span class="fc" id="L833">            Files.writeString(outFile, sb.toString());</span>
 <span class="fc" id="L834">            out.println(&quot;Exported &quot; + exported + &quot; rules to &quot; + outFile.toAbsolutePath());</span>
@@ -841,48 +841,48 @@ public class CliRouter {
     }
 
     private int runRulesDebug(String expression, Path rulesDir) {
-<span class="nc" id="L844">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
-<span class="nc" id="L845">            Paths.get(&quot;plugins&quot;),</span>
+<span class="fc" id="L844">        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(</span>
+<span class="fc" id="L845">            Paths.get(&quot;plugins&quot;),</span>
             rulesDir,
             true,
-<span class="nc" id="L848">            java.util.Set.of(),</span>
-<span class="nc" id="L849">            java.util.Set.of()</span>
+<span class="fc" id="L848">            java.util.Set.of(),</span>
+<span class="fc" id="L849">            java.util.Set.of()</span>
         ))) {
-<span class="nc" id="L851">            de.regelsuche.plugin.PluginAwareAstRewriteTransformationEngine engine = runtime.createTransformationEngine();</span>
-<span class="nc" id="L852">            engine.enableDebugMode();</span>
-<span class="nc" id="L853">            engine.transform(expression);</span>
-<span class="nc" id="L854">            RuleDebugReport report = engine.lastDebugReport();</span>
-<span class="nc bnc" id="L855" title="All 2 branches missed.">            if (report == null) {</span>
+<span class="fc" id="L851">            de.regelsuche.plugin.PluginAwareAstRewriteTransformationEngine engine = runtime.createTransformationEngine();</span>
+<span class="fc" id="L852">            engine.enableDebugMode();</span>
+<span class="fc" id="L853">            engine.transform(expression);</span>
+<span class="fc" id="L854">            RuleDebugReport report = engine.lastDebugReport();</span>
+<span class="pc bpc" id="L855" title="1 of 2 branches missed.">            if (report == null) {</span>
 <span class="nc" id="L856">                out.println(&quot;No debug report generated for: &quot; + expression);</span>
 <span class="nc" id="L857">                return 1;</span>
             }
-<span class="nc" id="L859">            out.println(&quot;Debug report for: &quot; + report.expression());</span>
-<span class="nc" id="L860">            out.println(&quot;Total rule attempts: &quot; + report.totalAttempts());</span>
-<span class="nc" id="L861">            out.println(&quot;Successful applications: &quot; + report.successfulApplications());</span>
-<span class="nc" id="L862">            out.println(&quot;Growth limit rejections: &quot; + report.growthLimitRejections());</span>
-<span class="nc" id="L863">            out.println(&quot;Candidate limit rejections: &quot; + report.candidateLimitRejections());</span>
-<span class="nc" id="L864">            out.println(&quot;Disabled by config: &quot; + report.disabledByConfigRejections());</span>
-<span class="nc" id="L865">            out.println(&quot;Disabled by profile: &quot; + report.disabledByProfileRejections());</span>
-<span class="nc" id="L866">            out.println(&quot;Condition failed: &quot; + report.conditionFailedRejections());</span>
-<span class="nc" id="L867">            out.println(&quot;Cycle risk: &quot; + report.cycleRiskRejections());</span>
-<span class="nc bnc" id="L868" title="All 2 branches missed.">            if (!report.diagnostics().isEmpty()) {</span>
-<span class="nc" id="L869">                out.println();</span>
-<span class="nc" id="L870">                out.println(&quot;Diagnostics:&quot;);</span>
-<span class="nc" id="L871">                report.diagnostics().forEach(diagnostic -&gt; out.println(&quot;  &quot; + diagnostic));</span>
+<span class="fc" id="L859">            out.println(&quot;Debug report for: &quot; + report.expression());</span>
+<span class="fc" id="L860">            out.println(&quot;Total rule attempts: &quot; + report.totalAttempts());</span>
+<span class="fc" id="L861">            out.println(&quot;Successful applications: &quot; + report.successfulApplications());</span>
+<span class="fc" id="L862">            out.println(&quot;Growth limit rejections: &quot; + report.growthLimitRejections());</span>
+<span class="fc" id="L863">            out.println(&quot;Candidate limit rejections: &quot; + report.candidateLimitRejections());</span>
+<span class="fc" id="L864">            out.println(&quot;Disabled by config: &quot; + report.disabledByConfigRejections());</span>
+<span class="fc" id="L865">            out.println(&quot;Disabled by profile: &quot; + report.disabledByProfileRejections());</span>
+<span class="fc" id="L866">            out.println(&quot;Condition failed: &quot; + report.conditionFailedRejections());</span>
+<span class="fc" id="L867">            out.println(&quot;Cycle risk: &quot; + report.cycleRiskRejections());</span>
+<span class="pc bpc" id="L868" title="1 of 2 branches missed.">            if (!report.diagnostics().isEmpty()) {</span>
+<span class="fc" id="L869">                out.println();</span>
+<span class="fc" id="L870">                out.println(&quot;Diagnostics:&quot;);</span>
+<span class="fc" id="L871">                report.diagnostics().forEach(diagnostic -&gt; out.println(&quot;  &quot; + diagnostic));</span>
             }
-<span class="nc" id="L873">            out.println();</span>
-<span class="nc" id="L874">            out.println(&quot;Rule attempts (first 50):&quot;);</span>
-<span class="nc" id="L875">            report.attempts().stream().limit(50).forEach(attempt -&gt; {</span>
-<span class="nc bnc" id="L876" title="All 6 branches missed.">                String context = &quot;RUNTIME&quot;.equals(attempt.phase()) &amp;&amp; attempt.subtree() != null &amp;&amp; !attempt.subtree().isBlank()</span>
-<span class="nc" id="L877">                    ? &quot; [&quot; + attempt.subtree() + &quot;]&quot; : &quot;&quot;;</span>
-<span class="nc" id="L878">                out.printf(&quot;  %-40s %-8s %-25s %s%s%n&quot;,</span>
-<span class="nc" id="L879">                    attempt.ruleId(),</span>
-<span class="nc bnc" id="L880" title="All 2 branches missed.">                    attempt.matched() ? &quot;APPLIED&quot; : &quot;SKIP&quot;,</span>
-<span class="nc" id="L881">                    attempt.reason(),</span>
-<span class="nc" id="L882">                    attempt.detail(),</span>
+<span class="fc" id="L873">            out.println();</span>
+<span class="fc" id="L874">            out.println(&quot;Rule attempts (first 50):&quot;);</span>
+<span class="fc" id="L875">            report.attempts().stream().limit(50).forEach(attempt -&gt; {</span>
+<span class="pc bpc" id="L876" title="2 of 6 branches missed.">                String context = &quot;RUNTIME&quot;.equals(attempt.phase()) &amp;&amp; attempt.subtree() != null &amp;&amp; !attempt.subtree().isBlank()</span>
+<span class="fc" id="L877">                    ? &quot; [&quot; + attempt.subtree() + &quot;]&quot; : &quot;&quot;;</span>
+<span class="fc" id="L878">                out.printf(&quot;  %-40s %-8s %-25s %s%s%n&quot;,</span>
+<span class="fc" id="L879">                    attempt.ruleId(),</span>
+<span class="fc bfc" id="L880" title="All 2 branches covered.">                    attempt.matched() ? &quot;APPLIED&quot; : &quot;SKIP&quot;,</span>
+<span class="fc" id="L881">                    attempt.reason(),</span>
+<span class="fc" id="L882">                    attempt.detail(),</span>
                     context);
-<span class="nc" id="L884">            });</span>
-<span class="nc" id="L885">            return 0;</span>
+<span class="fc" id="L884">            });</span>
+<span class="fc" id="L885">            return 0;</span>
 <span class="nc" id="L886">        }</span>
     }
 

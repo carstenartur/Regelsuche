@@ -215,8 +215,8 @@ public record PluginSignatureManifest(
     }
 
     static String requireIdentifier(String value, String field) {
-<span class="pc bpc" id="L218" title="2 of 4 branches missed.">        if (value == null || !IDENTIFIER.matcher(value).matches()) {</span>
-<span class="nc" id="L219">            throw new IllegalArgumentException(field + &quot; is not a valid identifier&quot;);</span>
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">        if (value == null || !IDENTIFIER.matcher(value).matches()) {</span>
+<span class="fc" id="L219">            throw new IllegalArgumentException(field + &quot; is not a valid identifier&quot;);</span>
         }
 <span class="fc" id="L221">        return value;</span>
     }

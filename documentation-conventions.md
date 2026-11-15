@@ -80,6 +80,35 @@ Dateien unter `docs/generated/` und markierte Abschnitte werden aus Evidence
 oder Source Contracts erzeugt. Sie werden nicht manuell korrigiert. Fehler
 werden am Generator, an der Quelle oder am Verifier behoben.
 
+## Codeverweise im Strategien-Index
+
+Im [Strategien-Index](research/strategies.md) stehen Hypothese, Umsetzungsstand,
+Befund und Folgerung. Bei einem neuen oder geänderten Versuch den Eintrag im selben
+PR pflegen und auf den Bericht mit Vergleichsverfahren, Datensatz und
+Reproduktionsbefehl verweisen. Historische Messungen an einen Commit oder ein
+versioniertes Artefakt binden. Das Manuskript verweist auf diese Nachweise.
+
+Für eine **aktuelle** Implementierung oder Prüfung eine Zeile mit Dateipfad
+relativ zur Repo-Wurzel und der vollständigen, eindeutigen Deklaration ohne
+Einrückung hinzufügen. Das folgende Beispiel verlinkt den Einstieg der Zählerzustandssynthese.
+
+```text
+<!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/incremental/CounterStateSynthesis.java | public final class CounterStateSynthesis { -->
+```
+
+Vom Repository-Stamm aus die Links auflösen und prüfen:
+
+```bash
+java regelsuche-core/src/test/java/de/regelsuche/docs/StrategyCodeReferences.java --write
+java regelsuche-core/src/test/java/de/regelsuche/docs/StrategyCodeReferences.java --check
+```
+
+Der Generator ersetzt die Zeilennummer anhand der Deklaration im Checkout.
+Bei einer fehlenden Datei, umbenannten oder mehrdeutigen Deklaration die
+Markierung aktualisieren. Der reguläre JUnit-Lauf in `regelsuche-core` prüft
+die Links im Checkout auch in CI. Die Befunde und Commit-Links bleiben beim
+Aktualisieren der Zeilennummern erhalten.
+
 ## Quellen der Wahrheit
 
 | Information | Verbindliche Quelle |

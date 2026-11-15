@@ -24,6 +24,7 @@ aufgezeichnet werden.
 | 1: Evidenz lesen, 5 Minuten Zielzeit | Die Aufzeichnung ohne Hilfe öffnen, zur letzten primitiven Umformung navigieren und die tatsächlich ausgeführte Regel nennen. | Richtiger Regelname; kann die Person `oracleStatus=UNAVAILABLE` von einem formalen Beweis unterscheiden? Tastatur-/Downloadprobleme und Hilfen erfassen. |
 | 2: Release konsumieren, 15 Minuten Zielzeit | SDK 0.5.2 und vollständiges hello-rule-Verzeichnis beziehen; Prüfsummen prüfen, Maven-Paket bauen und CLI ausführen. | Zwei JUnit-Tests und erwartete CLI-Ausgabe; Installations-/Downloadzeit getrennt erfassen. DNS-/Repositoryfehler zählen als Abbruch mit konkreter Meldung. |
 | 3: Regelgrenze prüfen, 10 Minuten Zielzeit | Die Eingabe auf `x + 1` ändern oder den vorhandenen negativen Test erklären; begründen, was `replay=VERIFIED` aussagt. | Keine Umformung mit der Add-zero-Regel; kein pauschaler Beweisclaim für Plugin-Code. Fehlversuche und benötigte externe Hinweise erfassen. |
+| 4: Zwei öffentliche Vergleichsläufe lesen | Die [Vergleichsaufzeichnung](../app/src/main/resources/web/public-discovery-comparison.html) öffnen, je einen Composite-Faktor-Fall und eine zurückgehaltene Familie prüfen. | Kann die Person die reduzierten Suchzustände dem Rewrite zuordnen und im Transfer die native Regel nennen? Kann sie die Rolle der negativen Kontrollen erklären? |
 
 Zielzeiten sind Hypothesen für die Planung, keine gemessenen Erfolgsquoten.
 Das vorhandene tiefere Protokoll bleibt für Domain-Autoren relevant:

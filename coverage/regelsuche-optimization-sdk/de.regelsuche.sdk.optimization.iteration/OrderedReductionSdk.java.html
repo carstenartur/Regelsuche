@@ -2,6 +2,9 @@
 
 import de.regelsuche.ast.iteration.OrderedReduction;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.OrderedBlockAccumulator;
+import de.regelsuche.math.algorithms.iteration.OrderedBlockReductionPlan;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionKnowledge;
 import de.regelsuche.math.algorithms.iteration.OrderedReductionPlan;
 import de.regelsuche.math.algorithms.iteration.OrderedReductionSearch;
 import de.regelsuche.sdk.optimization.CancellationToken;
@@ -15,31 +18,73 @@ public final class OrderedReductionSdk {
 
     public static OrderedReductionSearch.Result search(OrderedReduction source, OptimizationBudget budget,
             CancellationToken cancellation) {
-<span class="nc" id="L18">        return OrderedReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+<span class="nc" id="L21">        return OrderedReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
     }
 
     public static OrderedReductionSearch.Result searchWindows(OrderedReduction source, OptimizationBudget budget,
             CancellationToken cancellation) {
-<span class="nc" id="L23">        return OrderedReductionSearch.searchWindows(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+<span class="nc" id="L26">        return OrderedReductionSearch.searchWindows(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionSearch.PointUpdateResult searchPointUpdates(OrderedReduction source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L31">        return OrderedReductionSearch.searchPointUpdates(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionKnowledge.Acquisition learnPointUpdateKnowledge(OrderedBlockReductionPlan.Verified example,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L36">        return OrderedReductionKnowledge.learn(example, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionKnowledge.Acquisition learnPairState(OrderedBlockReductionPlan.Verified example,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L41">        return OrderedReductionKnowledge.learnPairState(example, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionSearch.PointUpdateResult searchProjectedPointUpdates(OrderedReduction source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L46">        return OrderedReductionSearch.searchProjectedPointUpdates(source, limits(budget), budget.maximumStates(),</span>
+<span class="fc" id="L47">            cancellation::isCancelled);</span>
+    }
+
+    public static OrderedReductionSearch.PointUpdateResult searchPointUpdates(OrderedReduction source,
+            OrderedReductionKnowledge knowledge, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L52">        return OrderedReductionSearch.searchPointUpdates(source, knowledge, limits(budget), budget.maximumStates(),</span>
+<span class="fc" id="L53">            cancellation::isCancelled);</span>
+    }
+
+    public static OrderedBlockReductionPlan.Verification verifyPointUpdates(OrderedReduction source,
+            OrderedBlockReductionPlan plan, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L58">        return OrderedReductionSearch.verifyPointUpdates(source, plan, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedBlockAccumulator preparePointUpdates(OrderedBlockReductionPlan.Verified plan,
+            List&lt;? extends List&lt;BigInteger&gt;&gt; rows, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L63">        return plan.newAccumulator(rows, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static OrderedBlockAccumulator.Update replaceRow(OrderedBlockAccumulator session, int index,
+            List&lt;BigInteger&gt; row, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L68">        return session.replace(index, row, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static OrderedReductionPlan.Verification verify(OrderedReduction source, OrderedReductionPlan plan,
             boolean windows, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L28">        return OrderedReductionSearch.verify(source, plan, windows, limits(budget), cancellation::isCancelled);</span>
+<span class="nc" id="L73">        return OrderedReductionSearch.verify(source, plan, windows, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static OrderedReductionPlan.Evaluation evaluate(OrderedReductionPlan.Verified plan,
             List&lt;? extends List&lt;BigInteger&gt;&gt; rows, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L33">        return plan.evaluate(rows, limits(budget), cancellation::isCancelled);</span>
+<span class="nc" id="L78">        return plan.evaluate(rows, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static OrderedReductionPlan.Evaluation evaluateWindows(OrderedReductionPlan.Verified plan,
             List&lt;? extends List&lt;BigInteger&gt;&gt; rows, int width, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L38">        return plan.evaluateWindows(rows, width, limits(budget), cancellation::isCancelled);</span>
+<span class="nc" id="L83">        return plan.evaluateWindows(rows, width, limits(budget), cancellation::isCancelled);</span>
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="nc" id="L42">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L87">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

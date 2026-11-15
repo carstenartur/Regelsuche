@@ -43,7 +43,7 @@ final class RowMoments {
     }
 
     static BigInteger[] values(List&lt;BigInteger&gt; row, int columns, Work work) {
-<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (row == null || row.size() != columns) throw new Unavailable(&quot;ROW_DIMENSION&quot;);</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        if (row == null || row.size() != columns) throw new Unavailable(&quot;ROW_DIMENSION&quot;);</span>
 <span class="fc" id="L47">        var values = row.toArray(BigInteger[]::new);</span>
 <span class="fc bfc" id="L48" title="All 2 branches covered.">        for (var value : values) {</span>
 <span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (value == null) throw new Unavailable(&quot;MISSING_ROW_VALUE&quot;);</span>

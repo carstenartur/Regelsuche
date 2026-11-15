@@ -79,3 +79,27 @@ hashes and qualification limitations, then regenerate the HTML.
 The demo is ready to attach as one HTML file. A `github.com/.../blob/...html`
 link displays source on GitHub; it is not a hosted live demo. No new hosting,
 outreach messages or human trial is claimed here.
+
+
+## Recorded public discovery comparison
+
+The [comparison HTML](../../app/src/main/resources/web/public-discovery-comparison.html)
+also opens from the Workbench demo area and **Gespeicherte Runs**. Download the
+HTML and open it in your browser to inspect cases offline. It uses the public
+[composite-factor qualification](../../research/benchmarks/track-f-stage-allocation/qualification.json.gz)
+and [cross-family transfer](../../research/benchmarks/track-d-public-transfer/transfer-result.json)
+artifacts from the [benchmark comparison](../../paper/generated/public-discovery-comparisons.md).
+The qualification companion retains per-case outcomes and path lengths. The
+transfer artifact also retains step expressions and applied rule IDs. The
+page does no search or mathematical evaluation.
+
+Regenerate the Workbench page from the repository root and check its tracked
+copy:
+
+```bash
+python3 docs/demos/render-public-discovery-comparison.py
+python3 docs/demos/render-public-discovery-comparison.py --check
+```
+
+The generator checks the retained source hashes used by the manuscript and
+the qualification’s lineage bindings before rendering.

@@ -177,20 +177,18 @@ und berechnet unabhängig:
 - Request- und Receipt-Hashes;
 - Planreihenfolge und Root-Bindung.
 
-## Offener Umfang von #104
+## Testkatalog und Auslieferung
 
-Dieser Slice stellt noch keinen öffentlichen Dienst und keinen Package Manager
-dar. Der separate [Java-Distributionsclient](plugin-distribution-client.md)
-implementiert inzwischen begrenzte HTTPS-Abfragen und einen JAR-Package-Lifecycle
-mit obligatorischer externer Checkpoint-Authority. Offen bleiben insbesondere:
+Der [Java-Distributionsclient](plugin-distribution-client.md) verwendet begrenzte
+HTTPS-Abfragen und installiert JARs über eine externe Checkpoint-Authority.
+Die [Testinstallation](plugin-distribution-client.md#verification-of-the-test-installation)
+prüft unveränderliche signierte Indexrevisionen, Herkunftsbelege und den
+SPI-v2-Lebenszyklus. Regel- und Knowledge-Packs sind als eigene Artefaktarten im
+Index auffindbar. Die App aktiviert installierte Java-JARs über SPI v2.
 
-- gehosteter oder föderierter Transport signierter Indexrevisionen;
-- authentisierte Verteilung und Rotation von Curator-/Publisher-Keys;
-- authentisierter Revocation-Feed und optionales Transparenzprotokoll;
-- ein produktiv angebundener rollback-geschützter Checkpoint-Provider;
-- Runtime-Integration sowie Regel-/Knowledge-Pack-Installation;
-- Source-to-binary-Provenance-Attestierungen;
-- eigenständig veröffentlichte Beispielprojekte und Community-Einreichungen.
+Der [externe Ablauf](TODO-extern.md#öffentlicher-plugin-katalog) umfasst den
+gehosteten Transport, den Betrieb des Checkpoint-Providers, die Verteilung und
+Rotation von Vertrauensschlüsseln, Revocation und Community-Veröffentlichungen.
 
 Schemas:
 

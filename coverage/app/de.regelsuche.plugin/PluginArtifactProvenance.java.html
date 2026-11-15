@@ -81,7 +81,7 @@ public record PluginArtifactProvenance(
         }
 <span class="fc" id="L82">        var key = trustStore.findKey(publisherId, keyId)</span>
 <span class="fc" id="L83">            .orElseThrow(() -&gt; new SecurityException(&quot;unknown provenance publisher/key&quot;));</span>
-<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (key.revoked() || trustStore.isArtifactRevoked(artifactSha256)</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        if (key.revoked() || trustStore.isArtifactRevoked(artifactSha256)</span>
 <span class="pc bpc" id="L85" title="1 of 2 branches missed.">                || !algorithm.equals(key.algorithm())) {</span>
 <span class="fc" id="L86">            throw new SecurityException(&quot;provenance is revoked or uses an untrusted algorithm&quot;);</span>
         }
@@ -92,8 +92,8 @@ public record PluginArtifactProvenance(
 <span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!verifier.verify(Base64.getDecoder().decode(signatureBase64))) {</span>
 <span class="fc" id="L93">                throw new SecurityException(&quot;invalid provenance signature&quot;);</span>
             }
-<span class="nc" id="L95">        } catch (GeneralSecurityException failure) {</span>
-<span class="nc" id="L96">            throw new SecurityException(&quot;unable to verify provenance&quot;, failure);</span>
+<span class="fc" id="L95">        } catch (GeneralSecurityException failure) {</span>
+<span class="fc" id="L96">            throw new SecurityException(&quot;unable to verify provenance&quot;, failure);</span>
 <span class="fc" id="L97">        }</span>
 <span class="fc" id="L98">    }</span>
 

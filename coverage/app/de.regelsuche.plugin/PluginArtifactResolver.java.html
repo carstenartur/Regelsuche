@@ -90,9 +90,9 @@ import java.util.TreeMap;
 <span class="fc" id="L90">        versions = versions.stream()</span>
 <span class="fc" id="L91">            .filter(value -&gt; value.apiVersion().equals(request.apiVersion()))</span>
 <span class="fc" id="L92">            .toList();</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (versions.isEmpty()) {</span>
-<span class="nc" id="L94">            context.blockers.add(&quot;no-api-compatible-version:&quot; + request.apiVersion());</span>
-<span class="nc" id="L95">            return null;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (versions.isEmpty()) {</span>
+<span class="fc" id="L94">            context.blockers.add(&quot;no-api-compatible-version:&quot; + request.apiVersion());</span>
+<span class="fc" id="L95">            return null;</span>
         }
 <span class="fc" id="L97">        versions = versions.stream()</span>
 <span class="fc" id="L98">            .filter(value -&gt; value.capabilities().containsAll(</span>

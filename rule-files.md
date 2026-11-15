@@ -88,7 +88,9 @@ Ein Profil wird über `PluginRuntimeConfig#activeProfile` bzw. `rules list --pro
 aktiviert. Geladene Profile lassen sich mit `rules profiles` anzeigen; `rules profiles
 --profile <id>` markiert zusätzlich das aktive Profil.
 
-Beim Laden werden die DSL-Einträge in ein typisiertes internes Modell (`RuleFileParser`) überführt und anschließend als `PatternRewriteRule`/`RuleMacro`/`RuleProfile` registriert.
+Mit `RuleFileParser` aus der Plugin-API lassen sich die DSL-Einträge als
+typisierte Daten lesen. Die Laufzeit registriert sie als `PatternRewriteRule`,
+`RuleMacro` oder `RuleProfile`.
 
 ## Beispiel-Regelpakete
 
@@ -108,3 +110,44 @@ Jedes Paket bringt ein passendes Aktivierungsprofil mit und wird durch Tests in
 - `rules export --profile <id> [--dir <rules>] [--out <ziel>]` schreibt die aktuell aktiven Regeln als `.regelsuche`-Datei heraus.
 - `rules debug <ausdruck> [--dir <rules>]` führt die pluginbewusste Regel-Engine im Debug-Modus aus und zeigt Regelversuche, erfolgreiche Anwendungen sowie Rejektionen durch Wachstums- oder Kandidatenlimits.
   Zusätzlich werden Laufzeitdiagnosen als Rejektionsgründe sichtbar: `DISABLED_BY_CONFIG`, `DISABLED_BY_PROFILE`, `CONDITION_FAILED` und `CYCLE_RISK` erscheinen mit Kontext in der Diagnose- und Attempt-Ausgabe.
+
+### Portables Faktorisierungspaket mit 0.5.2
+
+Kopiere [factorization.regelsuche](../examples/factorization.regelsuche) und
+[factorization-export-profile.rules](../examples/factorization-export-profile.rules)
+in ein leeres Arbeitsverzeichnis. Mit Java 25 und der entpackten
+[Anwendungsdistribution 0.5.2](https://github.com/carstenartur/Regelsuche/releases/download/v0.5.2/regelsuche-0.5.2.zip)
+lässt sich das Paket über die veröffentlichte CLI verwenden.
+
+```bash
+CLI=/absoluter/pfad/regelsuche-0.5.2/bin/regelsuche
+sh "$CLI" rules validate factorization.regelsuche
+sh "$CLI" rules import factorization.regelsuche --into rules
+cmp factorization.regelsuche rules/factorization.regelsuche
+sh "$CLI" rules profiles --dir rules --profile factorization_basics
+
+sh "$CLI" rules import factorization-export-profile.rules --into rules
+sh "$CLI" rules export --dir rules --profile factorization_export --out exports
+EXPORT=exports/exported-rules-factorization_export.regelsuche
+sh "$CLI" rules validate "$EXPORT"
+sh "$CLI" rules import "$EXPORT" --into roundtrip
+cmp "$EXPORT" roundtrip/exported-rules-factorization_export.regelsuche
+sh "$CLI" rules list --dir roundtrip
+sh "$CLI" rules debug '2*x+3*x' --dir roundtrip
+```
+
+Das Exportprofil hält die zwei ausgewählten IDs samt ihren Vorwärts- und
+Rückwärtsrichtungen aktiv. Das Tag `community-factorization-template` begrenzt
+den Tag-Filter, und die Whitelist nimmt genau die beiden IDs auf. Das breitere
+Profil `factorization_basics` lässt auch eingebaute Regeln mit passenden Tags zu.
+Ein solcher Export kann beim Laden mit gleichnamigen eingebauten Regeln
+kollidieren.
+
+Im geprüften Linux-Lauf mit Java 25.0.5 und dem Anwendungs-ZIP mit SHA-256
+`fbe150fe751177d026d1a08d79ce5a81abbfb00e639e41bbe9a60a573d303cfc`
+meldete `rules list --dir roundtrip` alle vier Richtungen als aktiv aus der
+importierten Exportdatei. `rules debug` wendete `extract_common_factor.forward`
+auf `2*x+3*x` an. Der Export hatte SHA-256
+`25cbdf54786ca822a24820b9936ee6465b7c0b98307f05017e13e327ae16daa4`.
+Die [SDK-Qualifikation](released-sdk-maven-qualification.md#data-only-rule-package)
+prüft die Formatvorlagen mit der veröffentlichten Plugin-API.

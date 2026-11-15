@@ -56,6 +56,7 @@ and inspect the output of an external Java consumer running the released SDK.</p
 <a href="../start-here.md">English introduction</a><a href="../user-workflows.md">Explore derivations</a>
 <a href="../autonomous-discovery-walkthrough.md">Study learned reuse</a>
 <a href="../../regelsuche-optimization-sdk/README.md">Derive computation plans</a>
+<a href="https://raw.githubusercontent.com/carstenartur/Regelsuche/main/app/src/main/resources/web/public-discovery-comparison.html">Download and open the public benchmark comparison</a>
 </nav>
 </header>
 <section aria-labelledby="traceHeading">

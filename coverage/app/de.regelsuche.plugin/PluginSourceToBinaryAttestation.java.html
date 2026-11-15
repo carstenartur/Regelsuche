@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PluginSourceToBinaryAttestation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginSourceToBinaryAttestation.java</span></div><h1>PluginSourceToBinaryAttestation.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.interfaces.EdECPublicKey;
+import java.security.spec.EdECPoint;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/** Signed receipt from an independently trusted builder for one publisher assertion. */
+public record PluginSourceToBinaryAttestation(
+    String schema,
+    String provenanceContentHash,
+    String artifactIdentityHash,
+    String sourceSha256,
+    String buildRecipeSha256,
+    String rebuiltArtifactSha256,
+    String builderId,
+    String keyId,
+    String algorithm,
+    String signatureBase64
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-source-to-binary-attestation/v1&quot;;
+
+<span class="fc" id="L33">    public PluginSourceToBinaryAttestation {</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;unsupported source-to-binary attestation schema&quot;);</span>
+        }
+<span class="fc" id="L37">        provenanceContentHash = PluginSignatureManifest.requireSha256(provenanceContentHash, &quot;provenanceContentHash&quot;);</span>
+<span class="fc" id="L38">        artifactIdentityHash = PluginSignatureManifest.requireSha256(artifactIdentityHash, &quot;artifactIdentityHash&quot;);</span>
+<span class="fc" id="L39">        sourceSha256 = PluginSignatureManifest.requireSha256(sourceSha256, &quot;sourceSha256&quot;);</span>
+<span class="fc" id="L40">        buildRecipeSha256 = PluginSignatureManifest.requireSha256(buildRecipeSha256, &quot;buildRecipeSha256&quot;);</span>
+<span class="fc" id="L41">        rebuiltArtifactSha256 = PluginSignatureManifest.requireSha256(rebuiltArtifactSha256, &quot;rebuiltArtifactSha256&quot;);</span>
+<span class="fc" id="L42">        builderId = PluginSignatureManifest.requireIdentifier(builderId, &quot;builderId&quot;);</span>
+<span class="fc" id="L43">        keyId = PluginSignatureManifest.requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!PluginSignatureManifest.ALGORITHM.equals(algorithm)) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(&quot;unsupported source-to-binary signature algorithm&quot;);</span>
+        }
+<span class="fc" id="L47">        byte[] signature = Base64.getDecoder().decode(Objects.requireNonNull(signatureBase64, &quot;signatureBase64&quot;));</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (signature.length != 64 || !Base64.getEncoder().encodeToString(signature).equals(signatureBase64)) {</span>
+<span class="fc" id="L49">            throw new IllegalArgumentException(&quot;source-to-binary signature requires canonical Base64 of 64 bytes&quot;);</span>
+        }
+<span class="fc" id="L51">    }</span>
+
+    public static PluginSourceToBinaryAttestation read(byte[] bytes) {
+<span class="fc" id="L54">        JsonNode json = PluginDistributionJson.read(bytes, JsonNode.class);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!json.isObject()) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;source-to-binary attestation must be a JSON object&quot;);</span>
+        }
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (JsonNode value : json) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (!value.isTextual()) {</span>
+<span class="fc" id="L60">                throw new IllegalArgumentException(&quot;source-to-binary attestation fields must be JSON strings&quot;);</span>
+            }
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">        return PluginDistributionJson.read(bytes, PluginSourceToBinaryAttestation.class);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L67">        Map&lt;String, String&gt; payload = fields();</span>
+<span class="fc" id="L68">        payload.put(&quot;signatureBase64&quot;, signatureBase64);</span>
+<span class="fc" id="L69">        return PluginDistributionJson.canonical(payload);</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L73">        return PluginDistributionJson.hash(toCanonicalJson());</span>
+    }
+
+    /**
+     * Authenticates the exact publisher assertion and independent builder receipt.
+     * Supply the builder pin through local trust configuration. The caller
+     * supplies the actual archived source, recipe and independent build output.
+     * Verification reads these bytes without invoking build tools.
+     */
+    public void requireVerified(PluginArtifactIndex.Entry entry, PluginArtifactProvenance provenance,
+            PluginTrustStore publisherTrustStore, PluginTrustStore.PublisherKey pinnedBuilderKey,
+            byte[] sourceArchive, byte[] buildRecipe, byte[] rebuiltArtifact) {
+<span class="fc" id="L85">        Objects.requireNonNull(provenance, &quot;provenance&quot;).requireTrusted(entry, publisherTrustStore);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (!provenanceContentHash.equals(provenance.contentHash())</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                || !artifactIdentityHash.equals(entry.identityHash())</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                || !sourceSha256.equals(provenance.sourceSha256())</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                || !buildRecipeSha256.equals(provenance.buildRecipeSha256())</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                || !rebuiltArtifactSha256.equals(entry.artifactSha256())) {</span>
+<span class="fc" id="L91">            throw new SecurityException(&quot;attestation does not bind the selected entry and publisher assertion&quot;);</span>
+        }
+
+<span class="fc" id="L94">        requireTrustedBuilder(publisherTrustStore, pinnedBuilderKey);</span>
+<span class="fc" id="L95">        requireHash(sourceArchive, sourceSha256, &quot;source archive&quot;);</span>
+<span class="fc" id="L96">        requireHash(buildRecipe, buildRecipeSha256, &quot;build recipe&quot;);</span>
+<span class="fc" id="L97">        requireHash(rebuiltArtifact, rebuiltArtifactSha256, &quot;rebuilt artifact&quot;);</span>
+<span class="fc" id="L98">    }</span>
+
+    /** Each UTF-8 field name and value is preceded by a 32-bit big-endian byte count. */
+    public byte[] signedPayload() {
+        try {
+<span class="fc" id="L103">            var bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L104">            try (var output = new DataOutputStream(bytes)) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                for (var field : fields().entrySet()) {</span>
+<span class="fc" id="L106">                    write(output, field.getKey());</span>
+<span class="fc" id="L107">                    write(output, field.getValue());</span>
+<span class="fc" id="L108">                }</span>
+            }
+<span class="fc" id="L110">            return bytes.toByteArray();</span>
+<span class="nc" id="L111">        } catch (IOException impossible) {</span>
+<span class="nc" id="L112">            throw new IllegalStateException(&quot;cannot encode source-to-binary payload&quot;, impossible);</span>
+        }
+    }
+
+    private Map&lt;String, String&gt; fields() {
+<span class="fc" id="L117">        Map&lt;String, String&gt; fields = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L118">        fields.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L119">        fields.put(&quot;provenanceContentHash&quot;, provenanceContentHash);</span>
+<span class="fc" id="L120">        fields.put(&quot;artifactIdentityHash&quot;, artifactIdentityHash);</span>
+<span class="fc" id="L121">        fields.put(&quot;sourceSha256&quot;, sourceSha256);</span>
+<span class="fc" id="L122">        fields.put(&quot;buildRecipeSha256&quot;, buildRecipeSha256);</span>
+<span class="fc" id="L123">        fields.put(&quot;rebuiltArtifactSha256&quot;, rebuiltArtifactSha256);</span>
+<span class="fc" id="L124">        fields.put(&quot;builderId&quot;, builderId);</span>
+<span class="fc" id="L125">        fields.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L126">        fields.put(&quot;algorithm&quot;, algorithm);</span>
+<span class="fc" id="L127">        return fields;</span>
+    }
+
+    private static void write(DataOutputStream output, String value) throws IOException {
+<span class="fc" id="L131">        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L132">        output.writeInt(bytes.length);</span>
+<span class="fc" id="L133">        output.write(bytes);</span>
+<span class="fc" id="L134">    }</span>
+
+    private void requireTrustedBuilder(PluginTrustStore publisherTrustStore, PluginTrustStore.PublisherKey pin) {
+<span class="fc bfc" id="L137" title="All 6 branches covered.">        if (pin == null || pin.revoked() || !builderId.equals(pin.publisherId())</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">                || !keyId.equals(pin.keyId()) || !algorithm.equals(pin.algorithm())) {</span>
+<span class="fc" id="L139">            throw new SecurityException(&quot;attestation has no matching trusted builder pin&quot;);</span>
+        }
+<span class="fc" id="L141">        var builderKey = pin.publicKey();</span>
+<span class="fc" id="L142">        EdECPoint builderPoint = ed25519Point(builderKey);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (publisherTrustStore.hasPublisher(builderId) || publisherTrustStore.keys().stream()</span>
+<span class="fc" id="L144">                .map(PluginTrustStore.PublisherKey::publicKey)</span>
+<span class="fc" id="L145">                .map(PluginSourceToBinaryAttestation::ed25519Point)</span>
+<span class="fc bfc" id="L146" title="All 4 branches covered.">                .anyMatch(point -&gt; point.isXOdd() == builderPoint.isXOdd()</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                    &amp;&amp; point.getY().equals(builderPoint.getY()))) {</span>
+<span class="fc" id="L148">            throw new SecurityException(&quot;builder identity and key must be independent of the publisher trust store&quot;);</span>
+        }
+        try {
+<span class="fc" id="L151">            var verifier = Signature.getInstance(algorithm);</span>
+<span class="fc" id="L152">            verifier.initVerify(builderKey);</span>
+<span class="fc" id="L153">            verifier.update(signedPayload());</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (!verifier.verify(Base64.getDecoder().decode(signatureBase64))) {</span>
+<span class="fc" id="L155">                throw new SecurityException(&quot;invalid source-to-binary attestation signature&quot;);</span>
+            }
+<span class="nc" id="L157">        } catch (GeneralSecurityException failure) {</span>
+<span class="nc" id="L158">            throw new SecurityException(&quot;unable to verify source-to-binary attestation&quot;, failure);</span>
+<span class="fc" id="L159">        }</span>
+<span class="fc" id="L160">    }</span>
+
+    private static EdECPoint ed25519Point(PublicKey key) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (!(key instanceof EdECPublicKey ed25519)) {</span>
+<span class="nc" id="L164">            throw new SecurityException(&quot;Ed25519 provider did not expose the public key point&quot;);</span>
+        }
+<span class="fc" id="L166">        return ed25519.getPoint();</span>
+    }
+
+    private static void requireHash(byte[] bytes, String expected, String label) {
+<span class="fc bfc" id="L170" title="All 4 branches covered.">        if (bytes == null || !expected.equals(PluginArtifactVerifier.sha256(bytes))) {</span>
+<span class="fc" id="L171">            throw new SecurityException(label + &quot; bytes do not match the attestation&quot;);</span>
+        }
+<span class="fc" id="L173">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

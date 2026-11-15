@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OrderedPairStateProjection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">OrderedPairStateProjection.java</span></div><h1>OrderedPairStateProjection.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.FiniteIteration;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import static de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import static de.regelsuche.math.algorithms.iteration.OrderedBlockReductionPlan.Split;
+import static de.regelsuche.math.algorithms.iteration.OrderedBlockReductionPlan.WeightedSplit;
+import static de.regelsuche.math.algorithms.iteration.OrderedReductionPlan.Term;
+import static de.regelsuche.math.algorithms.iteration.PairReductionPlan.Moment;
+
+/** A candidate factorization of a triple summand into an adjacent pair and a row polynomial. */
+public record OrderedPairStateProjection(boolean pairFirst, List&lt;Term&gt; pairTerms, List&lt;RowTerm&gt; rowTerms) {
+<span class="fc" id="L26">    public OrderedPairStateProjection {</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">        if (pairTerms.size() &lt; 2 || rowTerms.isEmpty()</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">                || (long) pairTerms.size() * rowTerms.size() &gt; IterationPolynomial.MAX_TERMS) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;INVALID_PAIR_STATE_PROJECTION&quot;);</span>
+        }
+<span class="fc" id="L31">        pairTerms = List.copyOf(pairTerms);</span>
+<span class="fc" id="L32">        rowTerms = List.copyOf(rowTerms);</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (pairTerms.stream().anyMatch(term -&gt; term.factors().size() != 2)) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;PAIR_STATE_REQUIRES_TWO_SLOTS&quot;);</span>
+        }
+<span class="fc" id="L36">    }</span>
+
+    public record RowTerm(Moment factor, BigInteger coefficient) {
+<span class="fc" id="L39">        public RowTerm {</span>
+<span class="fc" id="L40">            Objects.requireNonNull(factor);</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">            if (coefficient.signum() == 0 || coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS) {</span>
+<span class="nc" id="L42">                throw new IllegalArgumentException(&quot;INVALID_ROW_COEFFICIENT&quot;);</span>
+            }
+<span class="fc" id="L44">        }</span>
+    }
+
+<span class="fc" id="L47">    record Kernel(List&lt;Term&gt; terms, Map&lt;List&lt;Moment&gt;, BigInteger&gt; coefficients, List&lt;List&lt;Moment&gt;&gt; statistics) {}</span>
+<span class="fc" id="L48">    record Match(OrderedPairStateProjection projection, List&lt;List&lt;Moment&gt;&gt; statistics) {}</span>
+<span class="fc" id="L49">    record Compiled(List&lt;WeightedSplit&gt; pair, List&lt;WeightedSplit&gt; total) {}</span>
+<span class="fc" id="L50">    private record Scale(BigInteger coefficient, int count) {}</span>
+
+    static Optional&lt;Kernel&gt; kernel(List&lt;Term&gt; terms, Work work) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (terms.size() &lt; 2) return Optional.empty();</span>
+<span class="fc" id="L54">        var canonical = new TreeMap&lt;List&lt;Moment&gt;, BigInteger&gt;(</span>
+<span class="fc" id="L55">            Comparator.&lt;List&lt;Moment&gt;, Moment&gt;comparing(List::getFirst).thenComparing(List::getLast));</span>
+<span class="fc" id="L56">        var statistics = new LinkedHashSet&lt;List&lt;Moment&gt;&gt;();</span>
+<span class="fc" id="L57">        BigInteger divisor = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (var term : terms) {</span>
+<span class="fc" id="L59">            work.charge(1L + term.factors().size());</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">            if (term.factors().size() != 2 || canonical.putIfAbsent(term.factors(), term.coefficient()) != null) {</span>
+<span class="nc" id="L61">                return Optional.empty();</span>
+            }
+<span class="fc" id="L63">            divisor = divisor.gcd(term.coefficient());</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (var moment : term.factors()) statistics.add(List.of(moment));</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (canonical.firstEntry().getValue().signum() &lt; 0) divisor = divisor.negate();</span>
+<span class="fc" id="L67">        var primitive = new LinkedHashMap&lt;List&lt;Moment&gt;, BigInteger&gt;();</span>
+<span class="fc" id="L68">        var pair = new ArrayList&lt;Term&gt;();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (var entry : canonical.entrySet()) {</span>
+<span class="fc" id="L70">            work.charge(1);</span>
+<span class="fc" id="L71">            var coefficient = entry.getValue().divide(divisor);</span>
+<span class="fc" id="L72">            primitive.put(entry.getKey(), coefficient);</span>
+<span class="fc" id="L73">            pair.add(new Term(coefficient, entry.getKey()));</span>
+<span class="fc" id="L74">        }</span>
+<span class="fc" id="L75">        return Optional.of(new Kernel(List.copyOf(pair), Collections.unmodifiableMap(primitive), List.copyOf(statistics)));</span>
+    }
+
+    static Optional&lt;Match&gt; reuse(OrderedReductionPlan reduction, Kernel kernel, Work work) {
+<span class="fc" id="L79">        work.charge(1);</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (reduction.lookups().size() != 2 || reduction.terms().size() % kernel.terms().size() != 0) {</span>
+<span class="nc" id="L81">            return Optional.empty();</span>
+        }
+<span class="fc" id="L83">        return fit(reduction, kernel, true, work).or(() -&gt; fit(reduction, kernel, false, work));</span>
+    }
+
+    static Optional&lt;Match&gt; infer(OrderedReductionPlan reduction, Work work) {
+<span class="fc" id="L87">        work.charge(1);</span>
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (reduction.lookups().size() != 2 || reduction.terms().size() &lt; 2) return Optional.empty();</span>
+<span class="fc" id="L89">        return infer(reduction, true, work).or(() -&gt; infer(reduction, false, work));</span>
+    }
+
+    private static Optional&lt;Match&gt; infer(OrderedReductionPlan reduction, boolean pairFirst, Work work) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        int outer = pairFirst ? 2 : 0;</span>
+<span class="fc" id="L94">        var first = reduction.terms().getFirst().factors().get(outer);</span>
+<span class="fc" id="L95">        var slice = new ArrayList&lt;Term&gt;();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (var term : reduction.terms()) {</span>
+<span class="fc" id="L97">            work.charge(1);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (term.factors().get(outer).equals(first)) {</span>
+<span class="fc" id="L99">                slice.add(new Term(term.coefficient(), pairOf(term, pairFirst)));</span>
+            }
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        return kernel(slice, work).flatMap(kernel -&gt; fit(reduction, kernel, pairFirst, work));</span>
+    }
+
+    private static Optional&lt;Match&gt; fit(OrderedReductionPlan reduction, Kernel kernel, boolean pairFirst, Work work) {
+<span class="fc" id="L106">        var scales = new LinkedHashMap&lt;Moment, Scale&gt;();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (var term : reduction.terms()) {</span>
+<span class="fc" id="L108">            work.charge(1L + term.factors().size());</span>
+<span class="fc" id="L109">            var coefficient = kernel.coefficients().get(pairOf(term, pairFirst));</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (coefficient == null) return Optional.empty();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            var outer = term.factors().get(pairFirst ? 2 : 0);</span>
+<span class="fc" id="L112">            var scale = scales.get(outer);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (scale == null) {</span>
+<span class="fc" id="L114">                var ratio = term.coefficient().divideAndRemainder(coefficient);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (ratio[1].signum() != 0) return Optional.empty();</span>
+<span class="fc" id="L116">                scales.put(outer, new Scale(ratio[0], 1));</span>
+<span class="fc" id="L117">            } else {</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                if (!scale.coefficient().multiply(coefficient).equals(term.coefficient())) return Optional.empty();</span>
+<span class="fc" id="L119">                scales.put(outer, new Scale(scale.coefficient(), scale.count() + 1));</span>
+            }
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        var row = new ArrayList&lt;RowTerm&gt;();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (var entry : scales.entrySet()) {</span>
+<span class="fc" id="L124">            work.charge(1);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (entry.getValue().count() != kernel.terms().size()) return Optional.empty();</span>
+<span class="fc" id="L126">            row.add(new RowTerm(entry.getKey(), entry.getValue().coefficient()));</span>
+<span class="fc" id="L127">        }</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (row.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L129">        var projection = new OrderedPairStateProjection(pairFirst, kernel.terms(), row);</span>
+<span class="fc" id="L130">        return projection.smallerStatistics(kernel.statistics(), work)</span>
+<span class="fc" id="L131">            .map(statistics -&gt; new Match(projection, statistics));</span>
+    }
+
+    private static List&lt;Moment&gt; pairOf(Term term, boolean pairFirst) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        return pairFirst ? term.factors().subList(0, 2) : term.factors().subList(1, 3);</span>
+    }
+
+    private Optional&lt;List&lt;List&lt;Moment&gt;&gt;&gt; smallerStatistics(List&lt;List&lt;Moment&gt;&gt; pairStatistics, Work work) {
+<span class="fc" id="L139">        work.charge(pairStatistics.size());</span>
+<span class="fc" id="L140">        var required = new LinkedHashSet&lt;&gt;(pairStatistics);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (var row : rowTerms) {</span>
+<span class="fc" id="L142">            work.charge(2);</span>
+<span class="fc" id="L143">            required.add(List.of(row.factor()));</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            for (var pair : pairTerms) {</span>
+<span class="fc" id="L145">                work.charge(3);</span>
+<span class="fc" id="L146">                required.add(otherPair(pair, row.factor()));</span>
+<span class="fc" id="L147">            }</span>
+<span class="fc" id="L148">        }</span>
+        // One new aggregate replaces the pair words that are no longer needed by the other cut.
+<span class="fc" id="L150">        int replaced = 0;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (var pair : pairTerms) {</span>
+<span class="fc" id="L152">            work.charge(3);</span>
+<span class="fc bfc" id="L153" title="All 4 branches covered.">            if (!required.contains(pair.factors()) &amp;&amp; ++replaced == 2) {</span>
+<span class="fc" id="L154">                return Optional.of(List.copyOf(required));</span>
+            }
+<span class="fc" id="L156">        }</span>
+<span class="fc" id="L157">        return Optional.empty();</span>
+    }
+
+    Compiled checkAndCompile(OrderedReductionPlan reduction, Map&lt;List&lt;Moment&gt;, Integer&gt; indices, Work work) {
+<span class="fc" id="L161">        work.charge(1);</span>
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">        if (reduction.lookups().size() != 2 || reduction.terms().size() != pairTerms.size() * rowTerms.size()) {</span>
+<span class="nc" id="L163">            throw new Unavailable(&quot;PAIR_STATE_IDENTITY_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L165">        var original = new HashMap&lt;List&lt;Moment&gt;, BigInteger&gt;();</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (var term : reduction.terms()) {</span>
+<span class="fc" id="L167">            work.charge(1L + term.factors().size());</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (original.putIfAbsent(term.factors(), term.coefficient()) != null) {</span>
+<span class="nc" id="L169">                throw new Unavailable(&quot;PAIR_STATE_IDENTITY_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">        var pairProgram = new ArrayList&lt;WeightedSplit&gt;();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (var pair : pairTerms) {</span>
+<span class="fc" id="L174">            int left = index(indices, List.of(pair.factors().getFirst()), work);</span>
+<span class="fc" id="L175">            int right = index(indices, List.of(pair.factors().getLast()), work);</span>
+<span class="fc" id="L176">            pairProgram.add(new WeightedSplit(pair.coefficient(), new Split(left, right)));</span>
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">        int pairIndex = indices.size();</span>
+<span class="fc" id="L179">        var totalProgram = new ArrayList&lt;WeightedSplit&gt;();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (var row : rowTerms) {</span>
+<span class="fc" id="L181">            int outer = index(indices, List.of(row.factor()), work);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            var sharedSplit = pairFirst ? new Split(pairIndex, outer) : new Split(outer, pairIndex);</span>
+<span class="fc" id="L183">            totalProgram.add(new WeightedSplit(row.coefficient(), sharedSplit));</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (var pair : pairTerms) {</span>
+                // Reconstruct the entire source product, independently of the matching procedure.
+<span class="fc" id="L186">                work.charge(3);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                var factors = pairFirst</span>
+<span class="fc" id="L188">                    ? List.of(pair.factors().getFirst(), pair.factors().getLast(), row.factor())</span>
+<span class="fc" id="L189">                    : List.of(row.factor(), pair.factors().getFirst(), pair.factors().getLast());</span>
+<span class="fc" id="L190">                var coefficient = pair.coefficient().multiply(row.coefficient());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (!coefficient.equals(original.remove(factors))) throw new Unavailable(&quot;PAIR_STATE_IDENTITY_MISMATCH&quot;);</span>
+<span class="fc" id="L192">                int mixed = index(indices, otherPair(pair, row.factor()), work);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                var endpoint = pairFirst ? pair.factors().getFirst() : pair.factors().getLast();</span>
+<span class="fc" id="L194">                int single = index(indices, List.of(endpoint), work);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                var split = pairFirst ? new Split(single, mixed) : new Split(mixed, single);</span>
+<span class="fc" id="L196">                totalProgram.add(new WeightedSplit(coefficient, split));</span>
+<span class="fc" id="L197">            }</span>
+<span class="fc" id="L198">        }</span>
+<span class="fc" id="L199">        return new Compiled(List.copyOf(pairProgram), List.copyOf(totalProgram));</span>
+    }
+
+    private List&lt;Moment&gt; otherPair(Term pair, Moment outer) {
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        return pairFirst ? List.of(pair.factors().getLast(), outer) : List.of(outer, pair.factors().getFirst());</span>
+    }
+
+    private static int index(Map&lt;List&lt;Moment&gt;, Integer&gt; indices, List&lt;Moment&gt; factors, Work work) {
+<span class="fc" id="L207">        work.charge(1L + factors.size());</span>
+<span class="fc" id="L208">        var index = indices.get(factors);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (index == null) throw new Unavailable(&quot;MISSING_BLOCK_STATISTIC&quot;);</span>
+<span class="fc" id="L210">        return index;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

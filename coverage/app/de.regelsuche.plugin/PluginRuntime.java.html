@@ -807,7 +807,7 @@ public final class PluginRuntime implements AutoCloseable {
 
     private boolean isRuleFile(Path path) {
 <span class="fc" id="L809">        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);</span>
-<span class="pc bpc" id="L810" title="3 of 4 branches missed.">        return name.endsWith(&quot;.regelsuche&quot;) || name.endsWith(&quot;.rules&quot;);</span>
+<span class="pc bpc" id="L810" title="1 of 4 branches missed.">        return name.endsWith(&quot;.regelsuche&quot;) || name.endsWith(&quot;.rules&quot;);</span>
     }
 
     private URL toUrl(Path path) {
