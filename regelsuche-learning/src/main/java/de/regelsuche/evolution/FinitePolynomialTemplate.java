@@ -56,6 +56,43 @@ public final class FinitePolynomialTemplate {
         return new FinitePolynomialTemplate(id, expression, domains, Origin.DECLARED_GRAMMAR, "", null);
     }
 
+    /**
+     * Forms a deterministic, target-free univariate monomial basis. Every
+     * coefficient is a finite exact hole; the existing polynomial solver
+     * verifies instantiated expressions against the source independently.
+     * Degree, coefficient domains and the Cartesian product are bounded
+     * before any search is admitted.
+     *
+     * <p>This creates an ansatz, not a proof, a learned tactic or a claim of
+     * discovering a factorization. In particular it never reads a target
+     * expression or a reference result.</p>
+     */
+    public static FinitePolynomialTemplate declaredUnivariateMonomialBasis(
+            String id, int maxDegree, int minCoefficient, int maxCoefficient) {
+        // The generic resolver currently admits at most eight finite holes.
+        // At least one nonconstant monomial is needed for the @v slot.
+        if (maxDegree < 1 || maxDegree > 7) {
+            throw new IllegalArgumentException("monomial degree must be in [1,7]");
+        }
+        if (minCoefficient > maxCoefficient) {
+            throw new IllegalArgumentException("empty coefficient domain");
+        }
+        var terms = new java.util.ArrayList<String>(maxDegree + 1);
+        var domains = new java.util.ArrayList<HoleDomain>(maxDegree + 1);
+        for (int degree = 0; degree <= maxDegree; degree++) {
+            String idPart = "coef" + degree;
+            domains.add(HoleDomain.integerRange(idPart, minCoefficient, maxCoefficient));
+            terms.add("${" + idPart + "}" + switch (degree) {
+                case 0 -> "";
+                case 1 -> "*@v";
+                default -> "*@v^" + degree;
+            });
+        }
+        // The constructor rejects an excessive Cartesian product (100000),
+        // keeping the exact solver and canonical formation bounded.
+        return declared(id, String.join(" + ", terms), domains);
+    }
+
     // Only a verifier-backed, privately issued LearnedPlan can supply this origin.
     static FinitePolynomialTemplate learned(LearnedPlan formation, int stageIndex) {
         Objects.requireNonNull(formation, "formation");
