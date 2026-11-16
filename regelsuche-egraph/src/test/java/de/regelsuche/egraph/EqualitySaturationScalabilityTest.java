@@ -165,6 +165,23 @@ class EqualitySaturationScalabilityTest {
     }
 
     @Test
+    void memoizationPreservesDistinctBindingsWhenPatternDisplaysCoincide() {
+        EGraph graph = new EGraph();
+        EClassId root = graph.addExpression(parse("f(x, y)"));
+        var first = PatternExpr.fn("f", PatternExpr.var("A], Placeholder[name=B"), PatternExpr.var("C"));
+        var second = PatternExpr.fn("f", PatternExpr.var("A"), PatternExpr.var("B], Placeholder[name=C"));
+        assertEquals(first.toString(), second.toString());
+
+        var matcher = new EGraphPatternMatcher(graph);
+        matcher.matchAll("same-rule", first, List.of(root));
+        var expected = matcher.matchInClass(second, root).getFirst();
+        var result = matcher.matchAll("same-rule", second, List.of(root)).getFirst();
+        assertEquals(expected, result.bindings());
+        matcher.matchAll("same-rule", second, List.of(root));
+        assertEquals(1L, matcher.stats().matcherCacheHits());
+    }
+
+    @Test
     void matchBindingsAreImmutableForPublicAndMemoizedResults() {
         EGraph eGraph = new EGraph();
         EClassId root = eGraph.addExpression(parse("a + b"));
