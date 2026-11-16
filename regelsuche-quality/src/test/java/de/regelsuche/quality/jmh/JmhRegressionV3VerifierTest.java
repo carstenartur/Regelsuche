@@ -46,6 +46,42 @@ class JmhRegressionV3VerifierTest {
     }
 
 
+    @Test
+    void activeSixWarmupMainRetainsAllThreeDecisionOutcomes()
+            throws Exception {
+        Fixture fixture = fixture(
+            "config/quality/jmh-regression-policy-more-warmup-v1.json",
+            "config/quality/jmh-regression-decision-policy-more-warmup-v1.json");
+        Path output = temporary.resolve("active/report.json");
+        String[] args = {fixture.root().toString(),
+            fixture.resultPath().toString(), fixture.thresholdPath().toString(),
+            fixture.decisionPath().toString(), output.toString(),
+            temporary.resolve("active/report.md").toString()};
+        check(fixture);
+        JmhRegressionV3Main.main(args);
+        assertEquals("PASSED", JSON.readTree(output.toFile())
+            .path("status").asText());
+
+        ObjectNode metric = (ObjectNode) fixture.rows().get(0)
+            .path("primaryMetric");
+        double maximum = fixture.thresholds().path("benchmarks")
+            .get(0).path("maximumAllowedScore").asDouble();
+        metric.put("score", maximum + 0.2);
+        metric.put("scoreError", 0.3);
+        check(fixture);
+        assertThrows(IllegalStateException.class,
+            () -> JmhRegressionV3Main.main(args));
+        assertEquals("INCONCLUSIVE", JSON.readTree(output.toFile())
+            .path("status").asText());
+
+        metric.put("scoreError", 0);
+        check(fixture);
+        assertThrows(IllegalStateException.class,
+            () -> JmhRegressionV3Main.main(args));
+        assertEquals("FAILED", JSON.readTree(output.toFile())
+            .path("status").asText());
+    }
+
     /**
      * Source: CI 43806895498, artifact 14199503763 (jmh-verification),
      * sha256:9f81c50e5cb16fe0d6930e5fc9c0a0dd530bfc2810868e2608a96c53cb799e12.
