@@ -97,8 +97,7 @@ public final class LeanSolverBackend implements SolverBackend {
             issues, material.mapping());
         Path directory = null;
         try {
-            Files.createDirectories(evidenceRoot);
-            directory = Files.createTempDirectory(evidenceRoot, "lean-");
+            directory = newEvidenceDirectory("lean-");
             Files.writeString(directory.resolve("obligation.json"), obligation.toCanonicalJson());
             Files.writeString(directory.resolve("translation.json"), translation.toCanonicalJson());
             if (!supported) return finish(obligation, translation, ResultStatus.UNSUPPORTED,
@@ -108,33 +107,31 @@ public final class LeanSolverBackend implements SolverBackend {
                 return finish(obligation, translation, ResultStatus.ERROR,
                     "a pinned Lean project and lake-manifest.json are required", "", directory);
             String before = configurationHash();
+            var environment = pinnedEnvironment();
             Files.copy(project.resolve("lean-toolchain"), directory.resolve("lean-toolchain"));
             Files.copy(project.resolve("lake-manifest.json"), directory.resolve("lake-manifest.json"));
-            ProcessOutput version = run(List.of("--version"), directory, "version");
+            ProcessOutput version = version(directory);
             if (!version.success() || !version.stdout().startsWith("Lean (version "))
                 return finish(obligation, translation, version.timedOut() ? ResultStatus.TIMEOUT : ResultStatus.ERROR,
                     "Lean toolchain version could not be established", "", directory);
             String nonce = UUID.randomUUID().toString().replace("-", "");
             String source = renderer.source(obligation, nonce);
             Files.writeString(directory.resolve("proof.lean"), source);
-            ProcessOutput proof = run(List.of("--root=" + directory, "-o", directory.resolve("proof.olean").toString(),
-                directory.resolve("proof.lean").toString()), directory, "proof");
+            ProcessOutput proof = compile(directory);
             if (!proof.success()) return finish(obligation, translation,
                 proof.timedOut() ? ResultStatus.TIMEOUT : proof.outputLimit() ? ResultStatus.ERROR : ResultStatus.UNKNOWN,
                 "Lean did not produce a checked theorem; inspect retained diagnostics", "", directory);
             String audit = checkedAudit(proof.stdout(), obligation.contentHash(), nonce);
-            if (!before.equals(configurationHash()) || !Files.isRegularFile(directory.resolve("proof.olean")))
+            if (!before.equals(configurationHash()) || !environment.equals(pinnedEnvironment())
+                    || !environment.pinsMatch(directory) || !Files.isRegularFile(directory.resolve("proof.olean")))
                 throw new IOException("toolchain changed or compiled proof missing");
             Files.writeString(directory.resolve("audit.json"), audit);
             Files.writeString(directory.resolve("semantics.txt"),
                 "The theorem is conditional on exactly the declared premises.\n"
                 + "Assumption satisfiability is NOT established by proving an implication.\n"
                 + "Only generated code in a trusted pinned Lean/mathlib installation is accepted.\n");
-            String compiled = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                .digest(Files.readAllBytes(directory.resolve("proof.olean"))));
-            String manifest = "obligation=" + obligation.contentHash() + "\nsource=" + SolverIr.sha256(source)
-                + "\ncompiled=sha256:" + compiled + "\naudit=" + SolverIr.sha256(audit)
-                + "\nconfiguration=" + before + "\nversion=" + version.stdout().strip() + "\n";
+            String manifest = certificate(obligation, source, compiledHash(directory), audit, before,
+                version.stdout(), environment);
             Files.writeString(directory.resolve("certificate.txt"), manifest);
             return finish(obligation, translation, ResultStatus.CONFIRMED,
                 "Lean checked the requested theorem and standard-axiom closure; premises remain explicit",
@@ -150,14 +147,26 @@ public final class LeanSolverBackend implements SolverBackend {
     }
 
     static String checkedAudit(String stdout, String hash, String nonce) throws IOException {
+        return checkedProcessAudit(stdout, hash, nonce).text();
+    }
+
+    static AuditDocument checkedProcessAudit(String stdout, String hash, String nonce) throws IOException {
         List<String> lines = stdout.lines().filter(l -> l.startsWith(AUDIT)).toList();
         if (lines.size() != 1) throw new IOException("missing or ambiguous kernel audit");
-        String text = lines.get(0).substring(AUDIT.length());
+        return checkedAuditDocument(lines.getFirst().substring(AUDIT.length()), hash, nonce);
+    }
+
+    record AuditDocument(String text, String nonce, Set<String> axioms) { }
+
+    static AuditDocument checkedAuditDocument(String text, String hash, String expectedNonce) throws IOException {
         JsonNode json = new ObjectMapper().readTree(text);
+        String nonce = json == null ? "" : json.path("nonce").asText();
+        if ((expectedNonce != null && !expectedNonce.equals(nonce)) || !nonce.matches("[0-9a-f]{32}"))
+            throw new IOException("wrong audit nonce");
+        if (!json.path("nonce").isTextual()) throw new IOException("expected textual audit nonce");
         if (!json.isObject() || json.size() != 5
                 || !json.path("schema").asText().equals("regelsuche.lean-audit/v1")
                 || !json.path("obligationHash").asText().equals(hash)
-                || !json.path("nonce").asText().equals(nonce)
                 || !json.path("theorem").asText().equals("regelsuche_bound")
                 || !json.path("axioms").isArray()) throw new IOException("wrong audit binding");
         Set<String> seen = new java.util.HashSet<>();
@@ -165,7 +174,53 @@ public final class LeanSolverBackend implements SolverBackend {
             if (!axiom.isTextual() || !AXIOMS.contains(axiom.asText()) || !seen.add(axiom.asText()))
                 throw new IOException("unapproved or duplicated proof axiom");
         }
-        return text;
+        return new AuditDocument(text, nonce, Set.copyOf(seen));
+    }
+
+    static String compiledHash(Path directory) throws IOException {
+        try (var proof = Files.newInputStream(directory.resolve("proof.olean"))) {
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            proof.transferTo(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest));
+            return "sha256:" + java.util.HexFormat.of().formatHex(digest.digest());
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    static String certificate(Obligation obligation, String source, String compiledHash, String audit,
+                              String configurationHash, String version, PinnedEnvironment environment) {
+        return "obligation=" + obligation.contentHash() + "\nsource=" + SolverIr.sha256(source)
+            + "\ncompiled=" + compiledHash + "\naudit=" + SolverIr.sha256(audit)
+            + "\nconfiguration=" + configurationHash + "\nversion=" + version.strip()
+            + "\nproject=" + environment.projectHash() + "\ntoolchain=" + environment.toolchainHash()
+            + "\ndependencies=" + environment.dependencyHash() + "\n";
+    }
+
+    record PinnedEnvironment(String projectHash, String toolchainHash, String dependencyHash) {
+        boolean pinsMatch(Path directory) throws IOException {
+            return toolchainHash.equals(SolverIr.sha256(Files.readString(directory.resolve("lean-toolchain"))))
+                && dependencyHash.equals(SolverIr.sha256(Files.readString(directory.resolve("lake-manifest.json"))));
+        }
+    }
+
+    PinnedEnvironment pinnedEnvironment() throws IOException {
+        return new PinnedEnvironment(SolverIr.sha256(project.toRealPath().toString()),
+            SolverIr.sha256(Files.readString(project.resolve("lean-toolchain"))),
+            SolverIr.sha256(Files.readString(project.resolve("lake-manifest.json"))));
+    }
+
+    Path newEvidenceDirectory(String prefix) throws IOException {
+        Files.createDirectories(evidenceRoot);
+        return Files.createTempDirectory(evidenceRoot, prefix);
+    }
+
+    ProcessOutput version(Path directory) throws Exception {
+        return run(List.of("--version"), directory, "version");
+    }
+
+    ProcessOutput compile(Path directory) throws Exception {
+        return run(List.of("--root=" + directory, "-o", directory.resolve("proof.olean").toString(),
+            directory.resolve("proof.lean").toString()), directory, "proof");
     }
     private Attempt finish(Obligation o, SolverTranslation t, ResultStatus status,
                            String message, String hash, Path directory) throws IOException {

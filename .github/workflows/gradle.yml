@@ -288,7 +288,7 @@ jobs:
         with: { distribution: temurin, java-version: '25', verify-signature: true }
       - name: Retain the exact proof-authority source
         run: git archive --format=zip --output=/tmp/checked-proof-source.zip HEAD
-      - name: Install the pinned Lean and mathlib reference environment
+      - name: Install the pinned Lean and mathlib reference projects
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends curl z3 zstd
@@ -298,6 +298,17 @@ jobs:
           MATHLIB_NO_CACHE_ON_UPDATE=1 lake update
           lake exe cache get
           lake env lean --version
+          rebuild_project="$RUNNER_TEMP/regelsuche-lean-rebuild"
+          mkdir -p "$rebuild_project"
+          cp lean-toolchain lakefile.toml "$rebuild_project/"
+          (
+            cd "$rebuild_project"
+            MATHLIB_NO_CACHE_ON_UPDATE=1 lake update
+            cmp lake-manifest.json "$REGELSUCHE_LEAN_PROJECT/lake-manifest.json"
+            lake exe cache get
+            lake env lean --version
+          )
+          printf 'REGELSUCHE_LEAN_REBUILD_PROJECT=%s\n' "$rebuild_project" >> "$GITHUB_ENV"
           printf '%s\n' "$lean_bin" >> "$GITHUB_PATH"
       - name: Check native contracts and actual application proof admission
         run: >-
@@ -317,6 +328,7 @@ jobs:
             app/target/checked-proof/
             app/target/surefire-reports/
             .ci/lean-proof/lake-manifest.json
+            ${{ runner.temp }}/regelsuche-lean-rebuild/lake-manifest.json
           if-no-files-found: error
 
   verification:

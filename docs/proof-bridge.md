@@ -59,6 +59,25 @@ premises. Their satisfiability is **not** established by proving the implication
 The closed theorem currently concerns the supported real-expression fragment,
 not arbitrary quantified sets, infinite sums or limit theorems.
 
+### Independent rebuild of retained Lean source
+
+`LeanEvidenceRebuilder.rebuild` takes the exact expected `SolverIr.Obligation`,
+the trusted original `SolverExecution.result().certificateHash()`, and the
+retained attempt directory. The original certificate binds the project
+location by hash and both pin files separately. The rebuilder checks the
+retained artifact hashes, reconstructs the exact source using the audit nonce,
+and compiles it in a fresh output directory with a separate prepared Lean
+project. Both pin files and the observed tool version must match. The fresh
+kernel audit must bind the same theorem and report the same transitive axiom
+set. The rebuilt `.olean` is hashed separately.
+
+`rebuild.txt` binds the original and rebuilt certificate hashes. A rebuild
+receipt does not participate in proof admission or cache status. The caller
+must prepare and trust the second Lean/mathlib installation. Distinct project
+locations and matching pins do not attest the installed binaries or package
+files. Previously retained certificates lack the three environment fields and
+need a fresh original execution before they can be rebuilt.
+
 ## SMT: no opaque analytic fallback
 
 `SmtProofBridge` uses `SmtProofArtifacts` and the existing lossless
@@ -129,6 +148,12 @@ existing CI workflow installs the reference tools and retains their evidence.
 It supplements the unchanged complete Gradle, Maven, benchmark and Docker
 authorities rather than replacing them. Compiler warnings, skipped real-tool
 tests outside that job, and unrelated failures are not successful validation.
+
+The separate-project rebuild test in `CheckedLeanRealTest` also needs
+`REGELSUCHE_LEAN_REBUILD_PROJECT` set to a second provisioned project with
+byte-identical `lean-toolchain` and `lake-manifest.json` pins. The checked-proof
+job provisions both projects through Lake and uses its shared build-artifact
+cache. Each project has its own package checkout and build directory.
 
 See [Proof Workbench](proof-workbench.md), [Solver IR](solver-neutral-ir.md) and
 [Solver portfolio](solver-portfolio.md) for the existing orchestration contracts.

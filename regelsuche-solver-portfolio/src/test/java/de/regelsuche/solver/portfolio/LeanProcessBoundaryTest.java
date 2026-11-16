@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -37,7 +38,10 @@ class LeanProcessBoundaryTest {
             .digest(Files.readAllBytes(directory.resolve("proof.olean"))));
         String manifest = "obligation=" + request.contentHash() + "\nsource=" + SolverIr.sha256(source)
             + "\ncompiled=sha256:" + compiledHash + "\naudit=" + SolverIr.sha256(audit)
-            + "\nconfiguration=" + configuration + "\nversion=Lean (version transport-fixture)\n";
+            + "\nconfiguration=" + configuration + "\nversion=Lean (version transport-fixture)"
+            + "\nproject=" + SolverIr.sha256(temp.toRealPath().toString())
+            + "\ntoolchain=" + SolverIr.sha256("test-toolchain\n")
+            + "\ndependencies=" + SolverIr.sha256("{}\n") + "\n";
         assertEquals(manifest, Files.readString(directory.resolve("certificate.txt")));
         assertEquals(SolverIr.sha256(manifest), result.certificateHash());
         assertTrue(Files.readString(directory.resolve("proof.stderr")).endsWith("proof diagnostic\n"));
@@ -90,11 +94,73 @@ class LeanProcessBoundaryTest {
         }
     }
 
+    @Test void rebuildRerunsRetainedSourceAndIssuesSeparateReceipt() throws Exception {
+        var expected = CheckedLeanProofTest.obligation("a/b*b", "a", "b != 0");
+        var original = backend(temp.resolve("original"), "complete").executeWithEvidence(expected);
+        String certificate = original.execution().result().certificateHash();
+        var rebuild = new LeanEvidenceRebuilder(backend(temp.resolve("other"), "different-compiled"));
+        var receipt = rebuild.rebuild(expected, certificate, original.directory());
+        assertEquals(-1, Files.mismatch(original.directory().resolve("proof.lean"), receipt.directory().resolve("proof.lean")));
+        assertNotEquals(-1, Files.mismatch(original.directory().resolve("proof.olean"), receipt.directory().resolve("proof.olean")));
+        assertEquals(-1, Files.mismatch(original.directory().resolve("audit.json"), receipt.directory().resolve("audit.json")));
+        String rebuiltCertificate = Files.readString(receipt.directory().resolve("certificate.txt"));
+        String retainedReceipt = Files.readString(receipt.directory().resolve("rebuild.txt"));
+        assertEquals("regelsuche.lean-evidence-rebuild/v1\noriginal=" + certificate
+            + "\nrebuild=" + SolverIr.sha256(rebuiltCertificate) + "\n", retainedReceipt);
+        assertEquals(SolverIr.sha256(retainedReceipt), receipt.receiptHash());
+    }
+
+    @Test void rebuildRejectsChangedPremisesCertificateBundleAndEnvironment() throws Exception {
+        var expected = CheckedLeanProofTest.obligation("a/b*b", "a", "b != 0");
+        Path originalProject = temp.resolve("original");
+        var originalBackend = backend(originalProject, "complete");
+        var original = originalBackend.executeWithEvidence(expected);
+        String certificate = original.execution().result().certificateHash();
+        Path otherProject = temp.resolve("other");
+        var rebuild = new LeanEvidenceRebuilder(backend(otherProject, "complete"));
+        assertThrows(IOException.class, () -> rebuild.rebuild(CheckedLeanProofTest.obligation("a/b*b", "a", "b > 0"),
+            certificate, original.directory()));
+        assertThrows(IOException.class, () -> rebuild.rebuild(expected, SolverIr.sha256("borrowed"), original.directory()));
+        assertThrows(IOException.class, () -> new LeanEvidenceRebuilder(originalBackend)
+            .rebuild(expected, certificate, original.directory()));
+
+        for (String file : List.of("proof.lean", "proof.olean", "audit.json", "proof.stdout", "certificate.txt", "lake-manifest.json")) {
+            Path changed = original.directory().resolve(file);
+            String before = Files.readString(changed);
+            Files.writeString(changed, "changed\n");
+            assertThrows(IOException.class, () -> rebuild.rebuild(expected, certificate, original.directory()), file);
+            Files.writeString(changed, before);
+        }
+        Files.writeString(otherProject.resolve("lake-manifest.json"), "{\"different\":true}\n");
+        assertThrows(IOException.class, () -> rebuild.rebuild(expected, certificate, original.directory()));
+        assertFalse(Files.exists(otherProject.resolve("evidence-complete")), "preflight must not invoke Lean");
+    }
+
+    @Test void rebuildRejectsDifferentVersionAxiomsOrInvalidFreshProof() throws Exception {
+        var expected = CheckedLeanProofTest.obligation("x", "x");
+        var original = backend(temp.resolve("original"), "complete").executeWithEvidence(expected);
+        for (String mode : List.of("different-version", "different-axioms", "stale-audit", "missing-compiled",
+                "changed-configuration", "changed-source")) {
+            Path otherProject = temp.resolve(mode);
+            var rebuild = new LeanEvidenceRebuilder(backend(otherProject, mode));
+            assertThrows(IOException.class, () -> rebuild.rebuild(expected, original.execution().result().certificateHash(),
+                original.directory()), mode);
+            try (var files = Files.walk(otherProject)) {
+                assertTrue(files.noneMatch(file -> file.getFileName().toString().equals("rebuild.txt")), mode);
+            }
+        }
+    }
+
     private LeanSolverBackend backend(String mode) throws Exception {
-        Files.writeString(temp.resolve("lean-toolchain"), "test-toolchain\n");
-        Files.writeString(temp.resolve("lake-manifest.json"), "{}\n");
+        return backend(temp, mode);
+    }
+
+    private LeanSolverBackend backend(Path project, String mode) throws Exception {
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("lean-toolchain"), "test-toolchain\n");
+        Files.writeString(project.resolve("lake-manifest.json"), "{}\n");
         Path classes = Path.of(ToolchainFixture.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-        return new LeanSolverBackend(temp, temp.resolve("evidence-" + mode),
+        return new LeanSolverBackend(project, project.resolve("evidence-" + mode),
             List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp",
                 classes.toString(), ToolchainFixture.class.getName(), mode), Duration.ofSeconds(3));
     }
@@ -112,7 +178,11 @@ class LeanProcessBoundaryTest {
             boolean version = args[1].equals("--version");
             if (mode.equals(version ? "version-timeout" : "proof-timeout")) Thread.sleep(30_000);
             if (version) {
-                System.out.println(mode.equals("invalid-version") ? "not Lean" : "Lean (version transport-fixture)");
+                System.out.println(switch (mode) {
+                    case "invalid-version" -> "not Lean";
+                    case "different-version" -> "Lean (version different-fixture)";
+                    default -> "Lean (version transport-fixture)";
+                });
                 return;
             }
             System.err.println("proof diagnostic");
@@ -127,10 +197,13 @@ class LeanProcessBoundaryTest {
             String text = Files.readString(source);
             String hash = binding(text, "obligationHash");
             String nonce = mode.equals("stale-audit") ? "stale" : binding(text, "nonce");
-            if (!mode.equals("missing-compiled")) Files.writeString(source.resolveSibling("proof.olean"), "fixture bytes");
+            if (!mode.equals("missing-compiled")) Files.writeString(source.resolveSibling("proof.olean"),
+                mode.equals("different-compiled") ? "other fixture bytes" : "fixture bytes");
             if (mode.equals("changed-configuration")) Files.writeString(Path.of("lean-toolchain"), "changed\n");
+            if (mode.equals("changed-source")) Files.writeString(source, text + "\n-- changed during invocation\n");
+            String axiom = mode.equals("different-axioms") ? "Quot.sound" : "propext";
             System.out.println("REGELSUCHE_LEAN_AUDIT {\"schema\":\"regelsuche.lean-audit/v1\",\"obligationHash\":\""
-                + hash + "\",\"nonce\":\"" + nonce + "\",\"theorem\":\"regelsuche_bound\",\"axioms\":[\"propext\"]}");
+                + hash + "\",\"nonce\":\"" + nonce + "\",\"theorem\":\"regelsuche_bound\",\"axioms\":[\"" + axiom + "\"]}");
         }
         private static String binding(String source, String field) {
             var matcher = Pattern.compile("\\(\"" + field + "\", toJson \"([^\"]+)\"\\)").matcher(source);

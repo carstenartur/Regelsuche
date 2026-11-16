@@ -3,6 +3,7 @@ package de.regelsuche.solver.portfolio;
 import static org.junit.jupiter.api.Assertions.*;
 import de.regelsuche.solver.ir.*;
 import de.regelsuche.solver.ir.SolverIr.*;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -30,6 +31,31 @@ class CheckedLeanRealTest {
                     "obligation.json","translation.json","result.json","execution.json",
                     "version.stdout","proof.stdout","proof.stderr","lean-toolchain","lake-manifest.json"))
                 assertTrue(Files.exists(attempt.directory().resolve(name)),name);
+        }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "REGELSUCHE_LEAN_REBUILD_PROJECT", matches = ".+")
+    void rebuildsAnAnalyticTheoremInASeparatePinnedProject() throws Exception {
+        var expected = CheckedLeanProofTest.obligation("exp(log(x))", "x", "x > 0");
+        var original = backend().executeWithEvidence(expected);
+        assertEquals(ResultStatus.CONFIRMED, original.execution().result().status(), diagnostics(original.directory()));
+        String originalCertificate = original.execution().result().certificateHash();
+        var rebuild = new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")), root());
+        var receipt = rebuild.rebuild(expected, originalCertificate, original.directory());
+        assertEquals(SolverIr.sha256(Files.readString(receipt.directory().resolve("rebuild.txt"))), receipt.receiptHash());
+        assertEquals(-1, Files.mismatch(original.directory().resolve("proof.lean"), receipt.directory().resolve("proof.lean")));
+        assertTrue(Files.size(receipt.directory().resolve("proof.olean")) > 0);
+        var changedPremise = CheckedLeanProofTest.obligation("exp(log(x))", "x", "x >= 0");
+        assertThrows(IOException.class, () -> rebuild.rebuild(changedPremise, originalCertificate, original.directory()));
+
+        Path source = original.directory().resolve("proof.lean");
+        String genuine = Files.readString(source);
+        try {
+            Files.writeString(source, genuine + "\n-- edited after certification\n");
+            assertThrows(IOException.class, () -> rebuild.rebuild(expected, originalCertificate, original.directory()));
+        } finally {
+            Files.writeString(source, genuine);
         }
     }
     @Test void boundedTacticFailureIsNotARefutation() {
