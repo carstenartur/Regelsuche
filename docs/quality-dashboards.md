@@ -26,10 +26,10 @@ assembly adapter uses a separate execution-data store per module: tests of an
 application must not silently change a dependency module's canonical coverage.
 JaCoCo itself owns analysis and all HTML/XML rendering. The renderer runtime is
 retained under `build/reports/quality/coverage-report-runtime` in the existing
-verification artifact alongside the Java coverage decision. Local Gradle and
-cross-authority CI invoke the same decision and write the v1 JSON and Markdown
-reports. Convergence uses the retained runtime without repeating tests or
-resolving dependencies.
+verification artifact for HTML/XML rendering. Local Gradle and the
+`verify-cross-authority-coverage` Maven profile invoke the same Java decision
+and write the v1 JSON and Markdown reports. The Maven profile verifies the
+retained JaCoCo inputs without repeating the measured tests.
 
 The decision requires one top-level line counter and one branch counter in
 each unnamespaced JaCoCo `report`, with explicit nonnegative counts. Invalid
@@ -101,7 +101,7 @@ interpretation is delegated to a GitHub Action.
 1. Gradle, isolated JMH, isolated SymPy runtime, complete Maven/Docker and the
    external polynomial comparison execute their checkout-owned commands.
 2. Required `verification` rejects failed authorities, joins the coverage
-   inputs, reruns the unchanged coverage verifier, renders the complete JaCoCo
+   inputs, runs the coverage verifier through Maven, renders the complete JaCoCo
    site, and collects the complete
    [quality acceptance evidence](quality-acceptance-evidence.md).
 3. `publish-pages` downloads the retained outputs, combines `docs/` and `public/`, and

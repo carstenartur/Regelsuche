@@ -351,10 +351,8 @@ jobs:
           path: .
       - name: Verify complete cross-authority coverage
         run: >-
-          python3 -B scripts/verify-cross-authority-coverage.py
-          --root "$PWD"
-          --isolated-report
-          build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
+          -Pverify-cross-authority-coverage -DskipTests verify
       - name: Generate complete standard JaCoCo coverage report
         run: >-
           python3 -B scripts/generate-ci-pages.py --coverage-only

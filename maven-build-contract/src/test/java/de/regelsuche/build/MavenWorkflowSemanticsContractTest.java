@@ -104,7 +104,6 @@ class MavenWorkflowSemanticsContractTest {
     // Transitional host drivers are frozen, not blessed as Maven authority.
     // Each retained line may occur at most once and can disappear during migration.
     private static final Set<String> LEGACY_PYTHON_RUN_LINES = Set.of(
-        "python3 -B scripts/verify-cross-authority-coverage.py",
         "python3 -B scripts/generate-ci-pages.py --coverage-only",
         "python3 -B scripts/collect-quality-acceptance-evidence.py",
         "python3 -B scripts/run-jmh-precision-study-v1.py",
@@ -248,7 +247,7 @@ class MavenWorkflowSemanticsContractTest {
     void workflowHostRuntimeInventoryRejectsNewAndDuplicateDrivers() {
         MergeGovernance governance = validGovernance();
         String workflow = validWorkflow();
-        String allowed = "python3 -B scripts/verify-cross-authority-coverage.py";
+        String allowed = "python3 -B scripts/generate-ci-pages.py --coverage-only";
 
         assertNoViolation(
             workflow + "\n          " + allowed + "\n",
@@ -256,6 +255,7 @@ class MavenWorkflowSemanticsContractTest {
             "undeclared-host-runtime"
         );
         for (String forbidden : List.of(
+                "python3 -B scripts/verify-cross-authority-coverage.py",
                 "python3 -B scripts/new-check.py",
                 "/usr/bin/python3 -B scripts/new-check.py",
                 "env python3 -c 'print(1)'",
