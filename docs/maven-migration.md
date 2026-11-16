@@ -70,6 +70,16 @@ harnesses have **not** migrated. Missing, inconclusive and failed data
 remain non-green. This is a measured step toward Maven ownership,
 not evidence that `mvn verify` has replaced all CI decision paths.
 
+## Split CI coverage decision (issue #749)
+
+The required `verification` job uses the `verify-cross-authority-coverage`
+Maven profile and Failsafe to join the isolated SymPy JaCoCo XML and apply the
+existing coverage policy to all retained module reports. It writes the
+canonical JSON and Markdown consumed by the existing coverage publisher and
+evidence collector. The Gradle/SymPy measurements and Pages renderer remain
+part of the current CI workflow. See the
+[coverage evidence replay command](quality-acceptance-evidence.md#ci-retention-and-remaining-acceptance).
+
 ## Transitional verification
 
 Until all modules and evidence gates have moved, the existing Gradle `check`

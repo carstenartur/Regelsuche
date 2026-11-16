@@ -21,7 +21,7 @@ class IsolatedCoverageInputTest {
     private static final Path CANONICAL = Path.of("regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml");
     @TempDir Path directory;
 
-    /** Optional Maven entry point for a fresh downloaded CI evidence tree. */
+    /** Maven entry point for the CI join and replay of its retained coverage inputs. */
     @Test
     @EnabledIfSystemProperty(named = "regelsuche.coverage.isolatedReport", matches = ".*")
     void verifyRetainedSplitCoverage() {

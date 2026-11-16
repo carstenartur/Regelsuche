@@ -92,8 +92,10 @@ class CoveragePagesContractTest {
         int start = workflow.indexOf("\n  verification:");
         int end = workflow.indexOf("\n  publish-pages:", start);
         String verification = workflow.substring(start, end);
-        assertTrue(verification.indexOf("Verify complete cross-authority coverage")
-            < verification.indexOf("scripts/generate-ci-pages.py --coverage-only"));
+        int coverageGate = verification.indexOf("mvn --batch-mode --no-transfer-progress -pl regelsuche-quality\n"
+            + "          -Pverify-cross-authority-coverage -DskipTests verify");
+        assertTrue(coverageGate >= 0);
+        assertTrue(coverageGate < verification.indexOf("scripts/generate-ci-pages.py --coverage-only"));
         assertTrue(verification.contains("--sympy-inputs"));
         assertTrue(verification.contains("public/coverage/**"));
         assertFalse(workflow.contains("NativeCodeCoverage"));

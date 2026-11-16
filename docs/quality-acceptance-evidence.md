@@ -69,9 +69,9 @@ collector does not invent a combined duration or test count across those jobs.
 ## CI retention and remaining acceptance
 
 The existing `gradle.yml` required `verification` job downloads the Gradle,
-isolated JMH and SymPy artifacts from the same workflow run. The launcher checks the retained JARs before starting the Java process.
-The quality runtime joins the isolated SymPy XML with
-`CoverageRegressionMain --isolated-report`. It rejects an occupied canonical
+isolated JMH and SymPy artifacts from the same workflow run. The Maven
+`verify-cross-authority-coverage` profile runs the Java verifier through
+Failsafe. The verifier joins the isolated SymPy XML, rejects an occupied canonical
 path and prints the SHA-256 of the byte-identical installed report before
 evaluating the existing coverage policy. The job then invokes the collector with
 `--require-complete`. The new `quality-acceptance-evidence` artifact contains
@@ -87,10 +87,14 @@ XML. The Java verifier writes the canonical SymPy input and coverage reports
 into that tree. An existing canonical SymPy XML is ambiguous and fails the join.
 
 ```bash
-mvn -pl regelsuche-quality -am verify \
+mvn -pl regelsuche-quality -Pverify-cross-authority-coverage -DskipTests verify \
   -Dregelsuche.coverage.evidenceRoot=/absolute/path/to/evidence-tree \
   -Dregelsuche.coverage.isolatedReport=build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
 ```
+
+The profile defaults to the isolated report path shown above and the current
+checkout as the evidence tree. `-DskipTests` skips the ordinary Surefire suite
+while the profile's Failsafe verification runs on the retained inputs.
 
 Historical charts and safe generation reuse have already been implemented and
 measured with the limits described in [performance history](performance-history.md)

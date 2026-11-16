@@ -36,7 +36,8 @@ SECTIONS = {
     "coverage": {
         "policyFiles": ["config/quality/coverage-policy.json"],
         "supportFiles": ["gradle/quality-gates.gradle", "regelsuche-quality/build.gradle",
-                         "scripts/verify-cross-authority-coverage.py",
+                         ".github/workflows/gradle.yml", "regelsuche-quality/pom.xml",
+                         "regelsuche-quality/src/test/java/de/regelsuche/quality/coverage/IsolatedCoverageInputTest.java",
                          "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/IsolatedCoverageInput.java",
                          "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoverageRegression.java",
                          "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoverageRegressionMain.java"]},
