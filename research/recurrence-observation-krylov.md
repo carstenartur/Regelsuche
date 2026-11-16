@@ -52,13 +52,84 @@ bis zu 128 binäre Potenzen innerhalb des Aufrufs.
 Jede Phase hat ein Arbeitsbudget und meldet den Verbrauch. Für eine
 gemeinsame Obergrenze erhält die nächste Phase jeweils den Rest des
 vorigen Aufrufs. Bei `BUDGET_INCONCLUSIVE` oder `ARITHMETIC_LIMIT`
-enthält der Bericht keinen Teilwert. Für rationale Koeffizienten
-und Zustandswerte gilt die Grenze des Übergangs von 128 gemäß
-`BigInteger.bitLength()`. Die Rechnung begrenzt Beträge normierter Zähler und
-Nenner auf 16.384 Bit. Vor der Zeilenreduktion werden die Nenner
+enthält der Bericht keinen Teilwert. Für rationale Übergangs- und Beobachtungskoeffizienten sowie Zustandswerte
+in `bind` gilt die Grenze von 128 gemäß `BigInteger.bitLength()`.
+Die Rechnung begrenzt Beträge normierter Zähler und Nenner auf 16.384 Bit. Vor der Zeilenreduktion werden die Nenner
 zeilenweise beseitigt und die Größen der ganzzahligen Minoren
 konservativ über die Zeilennormen abgeschätzt. Die Grenze kann daher
 auch bei kleinen Endwerten erreicht werden.
+
+## Wiederverwendung der Abfragen
+
+`VerifiedPlan.prepareQueries(indices, budget)` bereitet den Rest für jeden
+verschiedenen Index und die benötigten ersten Beobachtungsformen
+$P\circ T^i$ vor. `PreparedQueries.valuesFor(initialState, budget)` wertet
+diese Formen für einen neuen Start aus und liefert die Werte in der
+ursprünglichen Reihenfolge einschließlich Wiederholungen. Die
+vorbereiteten Formen und Indexkoeffizienten sind unabhängig vom
+Anfangszustand. Die Formen werden anhand exakter Trajektorien an
+denselben Stützstellen wie die Rekurrenz geprüft. Bei diesem Einstieg
+gelten für Anfangswerte dieselben 16.384 Bit wie für die
+Rechenoperationen.
+
+Für $T(a,b)=(b,a+b)$, $P(a,b)=a$, die Indexfolge 2000, 1729, 2000,
+1729, 2000 und vier verschiedene Starts benötigt die vorbereitete
+Variante 1.129 Arbeitseinheiten. Wiederholtes Binden und
+Auswerten desselben zuvor geprüften Plans benötigt 4.175. Beide
+Gesamtwerte enthalten die einmalige Herleitung mit Prüfung und
+liefern exakt dieselben 20 Antworten. Der Reproduktionsbefehl unten
+gibt beide Werte aus.
+
+## Automatische Wahl für lineare Beobachtungen
+
+`AffineObservationEvaluation.prepareIndexed` bereitet eine Liste von
+Abfragen an einen festen rational-affinen Übergang vor. Der direkte
+Pfad beschränkt sich auf die Koordinaten, von denen die Beobachtung
+abhängt. Er teilt binäre Matrixpotenzen und die aufbereiteten
+Beobachtungszeilen über die Indizes und Anfangszustände. Er verwendet
+gemeinsame Nenner, soweit sie innerhalb der arithmetischen Grenze
+liegen. Bei zu großen gemeinsamen Nennern rechnet er mit einzeln
+normalisierten Brüchen. Wenn eine große Abfrageliste oder viele erwartete Starts eine Reduktion plausibel
+machen, prüft der Kern bei zwei oder drei relevanten Koordinaten, ob
+eine skalare Rekurrenz der Ordnung eins passt. Eine solche Reduktion
+nutzt die geprüfte Krylov-Herleitung und die vorbereiteten Indizes.
+Die Auswahlphase verbraucht höchstens ein Achtel der ihr verbleibenden
+Arbeit. Ihre Kosten erscheinen auch bei einem erfolglosen Versuch in
+der Arbeitsbilanz.
+
+`AffineObservationEvaluation.prepareTrace` nutzt dieselben typisierten
+Beobachtungen für [wechselnde Übergänge](switched-observation.md).
+Der direkte Plan hält nur erreichbare Koordinaten aus der
+Abhängigkeitsanalyse. Wenn die erwartete Ereigniszahl den
+Herleitungsaufwand rechtfertigt, erhält die Zustandsreduktion ein
+Teilbudget aus der nach direkter Vorbereitung verbleibenden Arbeit.
+Bei Erfolg mit kleinerem Zustand liefert der Einstieg den unabhängig
+geprüften Plan. Beide Pfade bieten dieselben Operationen für Bindung
+und Ereignisläufe.
+
+Im Vergleich mit drei einzelnen und einem Lauf mit 512 wechselnden
+Ereignissen liefern alle drei Strategien dieselben exakten Ergebnisse
+wie die fortgeschriebene Originaltrajektorie. Jeder Lauf erhält eine
+Million Arbeitseinheiten für Auswahl, Vorbereitung, Prüfung, Bindung
+und Auswertung.
+
+| Strategie | Gesamtarbeit |
+|---|---:|
+| Automatische Wahl | 7.565 |
+| Durchgängig direkte Rechnung | 14.774 |
+| Durchgängige Zustandsreduktion | 8.674 |
+
+Das Panel nutzt ein konstruiertes Federsystem. Die erwartete
+Ereigniszahl und die Zahl der Starts beeinflussen die Wahl. Die
+unabhängige Ergebnisprüfung im Test verwendet den ursprünglichen
+Übergang. Der automatische Pfad wird auch auf langen festen
+Indexstapeln, nicht reduzierbarer Kopplung und knappen Budgets geprüft.
+
+```bash
+mvn -B -pl regelsuche-math-algorithms -am \
+  -Dtest=AffineObservationEvaluationTest,RecurrenceObservationKrylovTest \
+  -Dsurefire.failIfNoSpecifiedTests=false -DaffineEvaluation.printWork=true test
+```
 
 ## Arbeitsvergleich
 

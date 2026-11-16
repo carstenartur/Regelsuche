@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineObservationEvaluation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">AffineObservationEvaluation.java</span></div><h1>AffineObservationEvaluation.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.math.algorithms.linalg.AffineObservationReduction.checkCoefficients;
+import static de.regelsuche.math.algorithms.linalg.AffineObservationReduction.checkInputs;
+import static de.regelsuche.math.algorithms.linalg.AffineObservationReduction.measured;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.addProduct;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.checked;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.multiply;
+
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.AffineObservationReduction.Observation;
+import de.regelsuche.math.algorithms.linalg.AffineObservationReduction.Result;
+import de.regelsuche.math.algorithms.linalg.AffineObservationReduction.Transition;
+import de.regelsuche.math.algorithms.linalg.AffineObservationReduction.VerifiedPlan;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Exhausted;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.ArithmeticLimit;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeSet;
+
+/** Selects and prepares an exact computation for the supplied observation workload. */
+public final class AffineObservationEvaluation {
+    // The preparation hint changes strategy only. Both routes return the same exact values.
+    private static final int INDEXED_REDUCTION_SETUP_ESTIMATE = 384;
+    private static final int PROBE_BUDGET_DIVISOR = 8;
+
+    private AffineObservationEvaluation() { }
+
+<span class="fc" id="L36">    public enum Strategy { DIRECT, REDUCED }</span>
+
+    /**
+     * Prepares an immutable batch for a fixed transition. Query indices may repeat and
+     * appear in any order. Expected starts helps decide whether to try a scalar
+     * recurrence. Bind and evaluate each start with the remaining budget when sharing
+     * one budget over all phases.
+     */
+    public static Result&lt;IndexedPlan&gt; prepareIndexed(Transition transition, Observation observation,
+            List&lt;BigInteger&gt; indices, int expectedStarts, Budget budget) {
+<span class="fc" id="L46">        return prepareIndexed(transition, observation, indices, expectedStarts, budget, true);</span>
+    }
+
+    static Result&lt;IndexedPlan&gt; prepareIndexed(Transition transition, Observation observation,
+            List&lt;BigInteger&gt; indices, int expectedStarts, Budget budget, boolean allowReduction) {
+<span class="fc" id="L51">        Objects.requireNonNull(indices, &quot;indices&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (expectedStarts &lt; 0) throw new IllegalArgumentException(&quot;expected starts must be nonnegative&quot;);</span>
+<span class="fc" id="L53">        var transitions = List.of(transition);</span>
+<span class="fc" id="L54">        var observations = List.of(observation);</span>
+<span class="fc" id="L55">        int dimension = transition.linear().columns();</span>
+<span class="fc" id="L56">        return measured(budget, work -&gt; {</span>
+<span class="fc" id="L57">            work.add(1L + indices.size());</span>
+<span class="fc" id="L58">            var requested = List.copyOf(indices);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (BigInteger index : requested) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                if (index.signum() &lt; 0) throw new IllegalArgumentException(&quot;index must be nonnegative&quot;);</span>
+<span class="fc" id="L61">            }</span>
+<span class="fc" id="L62">            checkInputs(transitions, observations, dimension, work);</span>
+<span class="fc" id="L63">            var dependencies = coordinates(transitions, observations, dimension, work);</span>
+<span class="pc bpc" id="L64" title="1 of 6 branches missed.">            if (allowReduction &amp;&amp; dimension &lt;= 3 &amp;&amp; dependencies.size() &gt; 1) {</span>
+<span class="fc" id="L65">                var batch = tryIndexedReduction(transition, observation, requested, dependencies.size(), expectedStarts, work);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                if (batch != null) {</span>
+<span class="fc" id="L67">                    return new IndexedPlan(dimension, Strategy.REDUCED, (initial, remaining) -&gt;</span>
+<span class="fc" id="L68">                        completedBatch(batch.valuesFor(initial.values(), new Budget(remaining.remaining())), remaining));</span>
+                }
+            }
+<span class="fc" id="L71">            var direct = DirectIndexedObservation.prepare(transition, observation, requested, dependencies, work);</span>
+<span class="fc" id="L72">            return new IndexedPlan(dimension, Strategy.DIRECT, direct::valuesFor);</span>
+        });
+    }
+
+    /** Prepared queries are immutable and can be executed for concurrent, independent starts. */
+    public static final class IndexedPlan {
+        private final int dimension;
+        private final Strategy strategy;
+        private final IndexEvaluation evaluation;
+
+<span class="fc" id="L82">        private IndexedPlan(int dimension, Strategy strategy, IndexEvaluation evaluation) {</span>
+<span class="fc" id="L83">            this.dimension = dimension;</span>
+<span class="fc" id="L84">            this.strategy = strategy;</span>
+<span class="fc" id="L85">            this.evaluation = evaluation;</span>
+<span class="fc" id="L86">        }</span>
+
+        public Strategy strategy() {
+<span class="fc" id="L89">            return strategy;</span>
+        }
+
+        public Result&lt;List&lt;Rational&gt;&gt; valuesFor(ExactVector initialState, Budget budget) {
+<span class="fc" id="L93">            Objects.requireNonNull(initialState, &quot;initialState&quot;);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (initialState.dimension() != dimension) throw new IllegalArgumentException(&quot;initial state dimension mismatch&quot;);</span>
+<span class="fc" id="L95">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L96">                checkCoefficients(initialState.values(), work);</span>
+<span class="fc" id="L97">                return evaluation.evaluate(initialState, work);</span>
+            });
+        }
+    }
+
+    @FunctionalInterface
+    private interface IndexEvaluation {
+        List&lt;Rational&gt; evaluate(ExactVector initialState, Work work);
+    }
+
+<span class="fc" id="L107">    public record TracePlan(Strategy strategy, VerifiedPlan plan) { }</span>
+
+    /**
+     * Prepares a reusable event plan. Expected events is a workload hint. The resulting
+     * plan accepts any valid sequence of labelled transitions, and exposes the same
+     * bind, advance, observe and trace methods for either strategy.
+     */
+    public static Result&lt;TracePlan&gt; prepareTrace(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations,
+            int expectedEvents, Budget budget) {
+<span class="fc" id="L116">        Objects.requireNonNull(transitions, &quot;transitions&quot;);</span>
+<span class="fc" id="L117">        Objects.requireNonNull(observations, &quot;observations&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (observations.isEmpty()) throw new IllegalArgumentException(&quot;at least one observation is required&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (expectedEvents &lt; 0) throw new IllegalArgumentException(&quot;expected events must be nonnegative&quot;);</span>
+<span class="fc" id="L120">        return measured(budget, work -&gt; {</span>
+<span class="fc" id="L121">            work.add(1L + transitions.size() + observations.size());</span>
+<span class="fc" id="L122">            var maps = List.copyOf(transitions);</span>
+<span class="fc" id="L123">            var outputs = List.copyOf(observations);</span>
+<span class="fc" id="L124">            int dimension = outputs.getFirst().weights().dimension();</span>
+<span class="fc" id="L125">            checkInputs(maps, outputs, dimension, work);</span>
+<span class="fc" id="L126">            var dependencies = coordinates(maps, outputs, dimension, work);</span>
+<span class="fc" id="L127">            var direct = AffineObservationReduction.coordinatePlan(maps, outputs, dependencies, dimension, work);</span>
+<span class="fc" id="L128">            int width = dependencies.size();</span>
+<span class="fc" id="L129">            long setupEstimate = 6L * maps.size() * (dimension + 1L) * width * width;</span>
+<span class="fc" id="L130">            long potentialSaving = (long) expectedEvents * width * Math.max(0, width - outputs.size());</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">            if (setupEstimate &gt; 0 &amp;&amp; potentialSaving &gt;= setupEstimate</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                    &amp;&amp; work.remaining() &gt;= PROBE_BUDGET_DIVISOR) {</span>
+<span class="fc" id="L133">                int available = work.remaining() / PROBE_BUDGET_DIVISOR;</span>
+<span class="fc" id="L134">                var reduced = AffineObservationReduction.prepare(maps, outputs,</span>
+<span class="fc" id="L135">                    new Budget((int) Math.min(setupEstimate, available)));</span>
+<span class="fc" id="L136">                work.add(reduced.work().consumedWorkUnits());</span>
+<span class="fc" id="L137">                var plan = reduced.value().orElse(null);</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">                if (plan != null &amp;&amp; plan.reducedDimension() &lt; width) return new TracePlan(Strategy.REDUCED, plan);</span>
+            }
+<span class="fc" id="L140">            return new TracePlan(Strategy.DIRECT, direct);</span>
+        });
+    }
+
+    private static boolean worthTryingIndexed(List&lt;BigInteger&gt; indices, int width, int expectedStarts, Work work) {
+<span class="pc bpc" id="L145" title="2 of 4 branches missed.">        if (indices.isEmpty() || work.remaining() &lt; INDEXED_REDUCTION_SETUP_ESTIMATE) return false;</span>
+        // Estimate only the powers and pullbacks that could be shared across the batch.
+<span class="fc" id="L147">        int maximumBits = 0;</span>
+<span class="fc" id="L148">        long projections = 0;</span>
+<span class="fc" id="L149">        var distinct = new TreeSet&lt;BigInteger&gt;((left, right) -&gt; DirectIndexedObservation.compareIndices(left, right, work));</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (var index : indices) {</span>
+<span class="fc" id="L151">            work.add(1L + index.bitLength() / Long.SIZE);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (distinct.add(index)) {</span>
+<span class="fc" id="L153">                maximumBits = Math.max(maximumBits, index.bitLength());</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                if (index.signum() &gt; 0) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                    projections += distinct.contains(index.subtract(BigInteger.ONE)) ? 1 : index.bitCount();</span>
+                }
+            }
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        long setup = ((long) Math.max(0, maximumBits - 1) * width + projections) * width * width;</span>
+<span class="fc" id="L160">        long evaluation = (long) indices.size() * (width - 1) * expectedStarts;</span>
+<span class="pc bpc" id="L161" title="1 of 4 branches missed.">        return setup &gt;= INDEXED_REDUCTION_SETUP_ESTIMATE</span>
+            || evaluation &gt;= INDEXED_REDUCTION_SETUP_ESTIMATE - setup;
+    }
+
+    private static RecurrenceObservationKrylov.PreparedQueries tryIndexedReduction(Transition transition,
+            Observation observation, List&lt;BigInteger&gt; indices, int width, int expectedStarts, Work work) {
+        // Keep the exact scalar attempt bounded, including preparing all requested indices.
+<span class="fc" id="L168">        var probe = new Work(work.remaining() / PROBE_BUDGET_DIVISOR);</span>
+        try {
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (!worthTryingIndexed(indices, width, expectedStarts, probe)</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    || !isScalarObservation(transition, observation, probe)) return null;</span>
+<span class="fc" id="L172">            var recurrence = new RecurrenceInvariantSynthesis.Transition(transition.linear(), transition.offset());</span>
+<span class="fc" id="L173">            var coefficients = observation.weights().values();</span>
+<span class="fc" id="L174">            var polynomial = Polynomial.constant(observation.offset());</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            for (int i = 0; i &lt; coefficients.size(); i++) {</span>
+<span class="fc" id="L176">                probe.add(1);</span>
+<span class="fc" id="L177">                polynomial = polynomial.add(Polynomial.term(Monomial.variable(&quot;x&quot; + i), coefficients.get(i)));</span>
+            }
+<span class="fc" id="L179">            var verified = RecurrenceObservationKrylov.prepare(recurrence, polynomial, new Budget(probe.remaining()));</span>
+<span class="fc" id="L180">            probe.add(verified.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">            if (verified.value().isEmpty() || verified.value().orElseThrow().order() != 1) return null;</span>
+<span class="fc" id="L182">            var batch = verified.value().orElseThrow().prepareQueries(indices, new Budget(probe.remaining()));</span>
+<span class="fc" id="L183">            probe.add(batch.work().consumedWorkUnits());</span>
+<span class="fc" id="L184">            return batch.value().orElse(null);</span>
+<span class="nc" id="L185">        } catch (Exhausted | ArithmeticLimit limit) {</span>
+<span class="nc" id="L186">            return null;</span>
+        } finally {
+<span class="fc" id="L188">            work.add(probe.ledger().consumedWorkUnits());</span>
+        }
+    }
+
+    private static boolean isScalarObservation(Transition transition, Observation observation, Work work) {
+<span class="fc" id="L193">        var weights = observation.weights().values();</span>
+<span class="fc" id="L194">        int dimension = weights.size();</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (!fitsRecurrenceInput(weights, work) || !fitsRecurrenceInput(transition.offset().values(), work)</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                || !fitsRecurrenceInput(List.of(observation.offset()), work)) return false;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (var row : transition.linear().rows()) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!fitsRecurrenceInput(row, work)) return false;</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        int pivot = 0;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        while (weights.get(pivot).isZero()) {</span>
+<span class="nc" id="L202">            work.add(1);</span>
+<span class="nc" id="L203">            pivot++;</span>
+        }
+<span class="fc" id="L205">        var ratio = checked(pullbackCoefficient(transition, weights, pivot, work).divide(weights.get(pivot)));</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (int column = 0; column &lt; dimension; column++) {</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (column != pivot &amp;&amp; !pullbackCoefficient(transition, weights, column, work)</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    .equals(multiply(ratio, weights.get(column), work))) return false;</span>
+        }
+<span class="fc" id="L210">        var offset = observation.offset();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) offset = addProduct(offset, weights.get(row), transition.offset().get(row), work);</span>
+<span class="fc" id="L212">        return offset.equals(multiply(ratio, observation.offset(), work));</span>
+    }
+
+    private static Rational pullbackCoefficient(Transition transition, List&lt;Rational&gt; weights, int column, Work work) {
+<span class="fc" id="L216">        var total = Rational.ZERO;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int row = 0; row &lt; weights.size(); row++) {</span>
+<span class="fc" id="L218">            total = addProduct(total, weights.get(row), transition.linear().get(row, column), work);</span>
+        }
+<span class="fc" id="L220">        return total;</span>
+    }
+
+    private static boolean fitsRecurrenceInput(List&lt;Rational&gt; row, Work work) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (var value : row) {</span>
+<span class="fc" id="L225">            work.add(1);</span>
+<span class="pc bpc" id="L226" title="2 of 4 branches missed.">            if (value.numerator().bitLength() &gt; 128 || value.denominator().bitLength() &gt; 128) return false;</span>
+<span class="fc" id="L227">        }</span>
+<span class="fc" id="L228">        return true;</span>
+    }
+
+    private static List&lt;Rational&gt; completedBatch(RecurrenceObservationKrylov.Result&lt;List&lt;Rational&gt;&gt; result, Work work) {
+<span class="fc" id="L232">        work.add(result.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L233" title="2 of 3 branches missed.">        return switch (result.status()) {</span>
+<span class="fc" id="L234">            case COMPLETE -&gt; result.value().orElseThrow();</span>
+<span class="nc" id="L235">            case BUDGET_INCONCLUSIVE -&gt; throw new Exhausted();</span>
+<span class="nc" id="L236">            case ARITHMETIC_LIMIT -&gt; throw new ArithmeticLimit();</span>
+        };
+    }
+
+    private static List&lt;Integer&gt; coordinates(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations,
+            int dimension, Work work) {
+<span class="fc" id="L242">        work.add(dimension);</span>
+<span class="fc" id="L243">        var used = new boolean[dimension];</span>
+<span class="fc" id="L244">        var coordinates = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (var observation : observations) collect(observation.weights().values(), used, coordinates, work);</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (int i = 0; i &lt; coordinates.size(); i++) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            for (var transition : transitions) collect(transition.linear().rows().get(coordinates.get(i)),</span>
+                used, coordinates, work);
+        }
+<span class="fc" id="L250">        return List.copyOf(coordinates);</span>
+    }
+
+    private static void collect(List&lt;Rational&gt; weights, boolean[] used, List&lt;Integer&gt; coordinates, Work work) {
+<span class="fc" id="L254">        work.add(1L + weights.size());</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int i = 0; i &lt; weights.size(); i++) {</span>
+<span class="fc bfc" id="L256" title="All 4 branches covered.">            if (!used[i] &amp;&amp; !weights.get(i).isZero()) {</span>
+<span class="fc" id="L257">                used[i] = true;</span>
+<span class="fc" id="L258">                coordinates.add(i);</span>
+            }
+        }
+<span class="fc" id="L261">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

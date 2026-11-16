@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearIterationAdapter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">LinearIterationAdapter.java</span></div><h1>LinearIterationAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.iteration.IntegerArithmetic;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.LinearIteration.State;
+import de.regelsuche.math.algorithms.iteration.LinearIteration.Update;
+import de.regelsuche.math.algorithms.iteration.LinearIteration.UpdateOrder;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
+import de.regelsuche.symbol.SymbolId;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Set;
+
+/** Maps the SDK's public transport records to the mathematical implementation. */
+final class LinearIterationAdapter {
+    private LinearIterationAdapter() {}
+
+    static de.regelsuche.math.algorithms.iteration.LinearIteration source(SymbolId index, Expr indexStart,
+            BigInteger indexStep, Expr count, List&lt;LinearIteration.State&gt; states, Set&lt;SymbolId&gt; parameters,
+            List&lt;LinearIteration.Update&gt; updates, LinearIteration.UpdateOrder order, IntegerArithmetic arithmetic) {
+<span class="fc" id="L22">        return new de.regelsuche.math.algorithms.iteration.LinearIteration(index, indexStart, indexStep, count,</span>
+<span class="fc" id="L23">            states.stream().map(state -&gt; new State(state.symbol(), state.initial())).toList(), parameters,</span>
+<span class="fc" id="L24">            updates.stream().map(update -&gt; new Update(update.state(), update.expression())).toList(),</span>
+<span class="fc" id="L25">            UpdateOrder.valueOf(order.name()), arithmetic);</span>
+    }
+
+    static de.regelsuche.math.algorithms.iteration.LinearIterationOptimizer.Candidate candidate(
+            LinearIterationOptimizer.Candidate candidate) {
+<span class="fc" id="L30">        return new de.regelsuche.math.algorithms.iteration.LinearIterationOptimizer.Candidate(</span>
+<span class="fc" id="L31">            candidate.source().mathSource(), candidate.transition().mathTransition(), candidate.work());</span>
+    }
+
+    static IterationLimits limits(OptimizationBudget budget) {
+<span class="fc" id="L35">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

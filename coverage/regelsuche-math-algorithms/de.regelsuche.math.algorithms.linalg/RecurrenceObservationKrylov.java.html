@@ -13,16 +13,19 @@ import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
 import de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.ArithmeticLimit;
+import de.regelsuche.math.algorithms.linalg.RecurrenceObservationProof.OrbitForm;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Function;
 
 /** A checked minimal scalar recurrence for a particular observation of an affine transition. */
@@ -31,18 +34,18 @@ public final class RecurrenceObservationKrylov {
 
     private RecurrenceObservationKrylov() { }
 
-<span class="fc" id="L34">    public enum Status { COMPLETE, BUDGET_INCONCLUSIVE, ARITHMETIC_LIMIT }</span>
+<span class="fc" id="L37">    public enum Status { COMPLETE, BUDGET_INCONCLUSIVE, ARITHMETIC_LIMIT }</span>
 
     /** An exhausted or arithmetic-limited phase never publishes a partial value. */
     public record Result&lt;T&gt;(Status status, Optional&lt;T&gt; value, WorkLedger work) {
-<span class="fc" id="L38">        public Result {</span>
-<span class="fc" id="L39">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L40">            Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc" id="L41">            Objects.requireNonNull(work, &quot;work&quot;);</span>
-<span class="pc bpc" id="L42" title="1 of 4 branches missed.">            if ((status == Status.COMPLETE) != value.isPresent()) {</span>
-<span class="nc" id="L43">                throw new IllegalArgumentException(&quot;only a complete result has a value&quot;);</span>
+<span class="fc" id="L41">        public Result {</span>
+<span class="fc" id="L42">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L43">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L44">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">            if ((status == Status.COMPLETE) != value.isPresent()) {</span>
+<span class="nc" id="L46">                throw new IllegalArgumentException(&quot;only a complete result has a value&quot;);</span>
             }
-<span class="fc" id="L45">        }</span>
+<span class="fc" id="L48">        }</span>
     }
 
     /**
@@ -52,17 +55,18 @@ public final class RecurrenceObservationKrylov {
      * denominator magnitudes to 16,384 bits and preflight the RREF intermediate sizes.
      */
     public static Result&lt;VerifiedPlan&gt; prepare(Transition transition, Polynomial observation, Budget budget) {
-<span class="fc" id="L55">        Objects.requireNonNull(transition, &quot;transition&quot;);</span>
-<span class="fc" id="L56">        Objects.requireNonNull(observation, &quot;observation&quot;);</span>
-<span class="fc" id="L57">        return measured(budget, work -&gt; {</span>
-<span class="fc" id="L58">            int dimension = transition.linear().columns();</span>
-<span class="fc" id="L59">            int degree = checkedDegree(observation, dimension, work);</span>
-<span class="fc" id="L60">            var coefficients = firstDependence(transition, observation, degree, work);</span>
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (!RecurrenceObservationProof.verify(transition, observation, degree, coefficients, work)) {</span>
-<span class="nc" id="L62">                throw new IllegalStateException(&quot;independent trajectory proof rejected the coefficient dependence&quot;);</span>
+<span class="fc" id="L58">        Objects.requireNonNull(transition, &quot;transition&quot;);</span>
+<span class="fc" id="L59">        Objects.requireNonNull(observation, &quot;observation&quot;);</span>
+<span class="fc" id="L60">        return measured(budget, work -&gt; {</span>
+<span class="fc" id="L61">            int dimension = transition.linear().columns();</span>
+<span class="fc" id="L62">            int degree = checkedDegree(observation, dimension, work);</span>
+<span class="fc" id="L63">            var dependence = firstDependence(transition, observation, degree, work);</span>
+<span class="fc" id="L64">            var coefficients = dependence.coefficients();</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (!RecurrenceObservationProof.verify(transition, observation, degree, coefficients, work)) {</span>
+<span class="nc" id="L66">                throw new IllegalStateException(&quot;independent trajectory proof rejected the coefficient dependence&quot;);</span>
             }
-<span class="fc" id="L64">            work.add(1L + coefficients.size());</span>
-<span class="fc" id="L65">            return new VerifiedPlan(transition, observation, coefficients);</span>
+<span class="fc" id="L68">            work.add(1L + coefficients.size());</span>
+<span class="fc" id="L69">            return new VerifiedPlan(transition, observation, dependence);</span>
         });
     }
 
@@ -71,41 +75,152 @@ public final class RecurrenceObservationKrylov {
         private final Transition transition;
         private final Polynomial observation;
         private final List&lt;Rational&gt; coefficients;
+        private final List&lt;Monomial&gt; basis;
+        private final List&lt;Rational[]&gt; columns;
 
-<span class="fc" id="L75">        private VerifiedPlan(Transition transition, Polynomial observation, List&lt;Rational&gt; coefficients) {</span>
-<span class="fc" id="L76">            this.transition = transition;</span>
-<span class="fc" id="L77">            this.observation = observation;</span>
-<span class="fc" id="L78">            this.coefficients = List.copyOf(coefficients);</span>
-<span class="fc" id="L79">        }</span>
+<span class="fc" id="L81">        private VerifiedPlan(Transition transition, Polynomial observation, Dependence dependence) {</span>
+<span class="fc" id="L82">            this.transition = transition;</span>
+<span class="fc" id="L83">            this.observation = observation;</span>
+<span class="fc" id="L84">            this.coefficients = List.copyOf(dependence.coefficients());</span>
+<span class="fc" id="L85">            this.basis = dependence.basis();</span>
+<span class="fc" id="L86">            this.columns = dependence.columns();</span>
+<span class="fc" id="L87">        }</span>
 
         public int order() {
-<span class="fc" id="L82">            return coefficients.size();</span>
+<span class="fc" id="L90">            return coefficients.size();</span>
         }
 
         /** In ascending order: a(n + r) = c[0]·a(n) + … + c[r−1]·a(n + r−1). */
         public List&lt;Rational&gt; coefficients() {
-<span class="fc" id="L87">            return coefficients;</span>
+<span class="fc" id="L95">            return coefficients;</span>
         }
 
         /** Binds the first r values, all under the supplied budget. */
         public Result&lt;BoundPlan&gt; bind(List&lt;Rational&gt; initialState, Budget budget) {
-<span class="fc" id="L92">            Objects.requireNonNull(initialState, &quot;initialState&quot;);</span>
-<span class="fc" id="L93">            int dimension = transition.linear().columns();</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (initialState.size() != dimension) throw new IllegalArgumentException(&quot;initial state dimension mismatch&quot;);</span>
-<span class="fc" id="L95">            return measured(budget, work -&gt; {</span>
-<span class="fc" id="L96">                work.add(dimension);</span>
-<span class="fc" id="L97">                var state = List.copyOf(initialState);</span>
-<span class="fc" id="L98">                state.forEach(RecurrenceInvariantSupport::requireBounded);</span>
-<span class="fc" id="L99">                var values = new ArrayList&lt;Rational&gt;(order());</span>
-<span class="fc" id="L100">                boolean allZero = true;</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">                for (int i = 0; i &lt; order(); i++) {</span>
-<span class="fc" id="L102">                    var value = RecurrenceObservationProof.evaluate(observation, state, work);</span>
-<span class="fc" id="L103">                    values.add(value);</span>
-<span class="fc" id="L104">                    allZero &amp;= value.isZero();</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">                    if (i + 1 &lt; order()) state = RecurrenceObservationProof.advance(transition, state, work);</span>
+<span class="fc" id="L100">            int dimension = transition.linear().columns();</span>
+<span class="fc" id="L101">            requireInitialDimension(initialState, dimension);</span>
+<span class="fc" id="L102">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L103">                var state = snapshotState(initialState, dimension, work);</span>
+<span class="fc" id="L104">                state.forEach(RecurrenceInvariantSupport::requireBounded);</span>
+<span class="fc" id="L105">                var values = new ArrayList&lt;Rational&gt;(order());</span>
+<span class="fc" id="L106">                boolean allZero = true;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                for (int i = 0; i &lt; order(); i++) {</span>
+<span class="fc" id="L108">                    var value = RecurrenceObservationProof.evaluate(observation, state, work);</span>
+<span class="fc" id="L109">                    values.add(value);</span>
+<span class="fc" id="L110">                    allZero &amp;= value.isZero();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                    if (i + 1 &lt; order()) state = RecurrenceObservationProof.advance(transition, state, work);</span>
                 }
-<span class="fc" id="L107">                work.add(1L + values.size());</span>
-<span class="fc" id="L108">                return new BoundPlan(coefficients, List.copyOf(values), allZero);</span>
+<span class="fc" id="L113">                work.add(1L + values.size());</span>
+<span class="fc" id="L114">                return new BoundPlan(coefficients, List.copyOf(values), allZero);</span>
+            });
+        }
+
+        /**
+         * Prepares one exact recurrence remainder for each distinct requested index and checks
+         * the observation forms with a nonzero weight. The batch preserves order and duplicates.
+         */
+        public Result&lt;PreparedQueries&gt; prepareQueries(List&lt;BigInteger&gt; indices, Budget budget) {
+<span class="fc" id="L123">            Objects.requireNonNull(indices, &quot;indices&quot;);</span>
+<span class="fc" id="L124">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L125">                int dimension = transition.linear().columns();</span>
+<span class="fc" id="L126">                work.add(1L + indices.size() + order());</span>
+<span class="fc" id="L127">                var requestOrder = new ArrayList&lt;Integer&gt;(indices.size());</span>
+<span class="fc" id="L128">                var remainders = new ArrayList&lt;Rational[]&gt;();</span>
+<span class="fc" id="L129">                var needed = new boolean[order()];</span>
+<span class="fc" id="L130">                var powers = new ArrayList&lt;Rational[]&gt;();</span>
+                // Charge comparisons even for very large indices and adversarial request orders.
+<span class="fc" id="L132">                var distinct = new TreeMap&lt;BigInteger, Integer&gt;((left, right) -&gt; {</span>
+<span class="fc" id="L133">                    work.add(1L + Math.min(left.bitLength(), right.bitLength()) / Integer.SIZE);</span>
+<span class="fc" id="L134">                    return left.compareTo(right);</span>
+                });
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                for (var index : indices) {</span>
+<span class="fc" id="L137">                    requireIndex(index);</span>
+<span class="fc" id="L138">                    var position = distinct.get(index);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                    if (position == null) {</span>
+<span class="fc" id="L140">                        work.add(1);</span>
+<span class="fc" id="L141">                        position = remainders.size();</span>
+<span class="fc" id="L142">                        var remainder = indexRemainder(index, coefficients, powers, work);</span>
+<span class="fc" id="L143">                        work.add(remainder.length);</span>
+<span class="fc bfc" id="L144" title="All 4 branches covered.">                        for (int i = 0; i &lt; remainder.length; i++) needed[i] |= !remainder[i].isZero();</span>
+<span class="fc" id="L145">                        remainders.add(remainder);</span>
+<span class="fc" id="L146">                        distinct.put(index, position);</span>
+                    }
+<span class="fc" id="L148">                    requestOrder.add(position);</span>
+<span class="fc" id="L149">                }</span>
+<span class="fc" id="L150">                var forms = observationForms(needed, work);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                if (!RecurrenceObservationProof.verifyForms(transition, observation, forms, work)) {</span>
+<span class="nc" id="L152">                    throw new IllegalStateException(&quot;independent trajectory proof rejected a prepared observation form&quot;);</span>
+                }
+<span class="fc" id="L154">                work.add(1L + remainders.size() + requestOrder.size());</span>
+<span class="fc" id="L155">                return new PreparedQueries(dimension, forms, List.copyOf(remainders), List.copyOf(requestOrder));</span>
+            });
+        }
+
+        private List&lt;OrbitForm&gt; observationForms(boolean[] needed, Work work) {
+<span class="fc" id="L160">            work.add(1L + needed.length);</span>
+<span class="fc" id="L161">            var forms = new ArrayList&lt;OrbitForm&gt;();</span>
+<span class="fc bfc" id="L162" title="All 4 branches covered.">            if (needed.length &gt; 0 &amp;&amp; needed[0]) forms.add(new OrbitForm(0, observation));</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (int i = 1; i &lt; needed.length; i++) {</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                if (!needed[i]) continue;</span>
+<span class="fc" id="L165">                var column = columns.get(i);</span>
+<span class="fc" id="L166">                var form = Polynomial.zero();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                for (int j = 0; j &lt; basis.size(); j++) {</span>
+<span class="fc" id="L168">                    work.add(1);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                    if (column[j].isZero()) continue;</span>
+<span class="fc" id="L170">                    work.add(1L + form.termCount());</span>
+<span class="fc" id="L171">                    form = form.add(Polynomial.term(basis.get(j), column[j]));</span>
+                }
+<span class="fc" id="L173">                forms.add(new OrbitForm(i, form));</span>
+            }
+<span class="fc" id="L175">            work.add(forms.size());</span>
+<span class="fc" id="L176">            return List.copyOf(forms);</span>
+        }
+    }
+
+    /** Immutable index batch reusable for any admissible initial state of its verified plan. */
+    public static final class PreparedQueries {
+        private final int dimension;
+        private final List&lt;OrbitForm&gt; forms;
+        private final List&lt;Rational[]&gt; remainders;
+        private final List&lt;Integer&gt; requestOrder;
+
+        private PreparedQueries(int dimension, List&lt;OrbitForm&gt; forms, List&lt;Rational[]&gt; remainders,
+<span class="fc" id="L188">                List&lt;Integer&gt; requestOrder) {</span>
+<span class="fc" id="L189">            this.dimension = dimension;</span>
+<span class="fc" id="L190">            this.forms = forms;</span>
+<span class="fc" id="L191">            this.remainders = remainders;</span>
+<span class="fc" id="L192">            this.requestOrder = requestOrder;</span>
+<span class="fc" id="L193">        }</span>
+
+        /**
+         * Evaluates the prepared forms at the supplied start and returns values in request order.
+         * The coordinates, like the evaluation arithmetic, are bounded to 16,384 bits.
+         */
+        public Result&lt;List&lt;Rational&gt;&gt; valuesFor(List&lt;Rational&gt; initialState, Budget budget) {
+<span class="fc" id="L200">            requireInitialDimension(initialState, dimension);</span>
+<span class="fc" id="L201">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L202">                var state = snapshotState(initialState, dimension, work);</span>
+<span class="fc" id="L203">                state.forEach(RecurrenceObservationArithmetic::checked);</span>
+<span class="fc" id="L204">                work.add(1L + requestOrder.size());</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                if (forms.isEmpty()) return Collections.nCopies(requestOrder.size(), Rational.ZERO);</span>
+<span class="fc" id="L206">                int order = remainders.getFirst().length;</span>
+<span class="fc" id="L207">                work.add(order);</span>
+<span class="fc" id="L208">                var base = new ArrayList&lt;&gt;(Collections.nCopies(order, Rational.ZERO));</span>
+<span class="fc" id="L209">                boolean allZero = true;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                for (var form : forms) {</span>
+<span class="fc" id="L211">                    var value = RecurrenceObservationProof.evaluate(form.observation(), state, work);</span>
+<span class="fc" id="L212">                    base.set(form.index(), value);</span>
+<span class="fc" id="L213">                    allZero &amp;= value.isZero();</span>
+<span class="fc" id="L214">                }</span>
+
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (allZero) return Collections.nCopies(requestOrder.size(), Rational.ZERO);</span>
+<span class="fc" id="L217">                work.add(remainders.size());</span>
+<span class="fc" id="L218">                var distinctValues = new ArrayList&lt;Rational&gt;(remainders.size());</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                for (var remainder : remainders) distinctValues.add(dot(remainder, base, work));</span>
+<span class="fc" id="L220">                var values = new ArrayList&lt;Rational&gt;(requestOrder.size());</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                for (int position : requestOrder) values.add(distinctValues.get(position));</span>
+<span class="fc" id="L222">                work.add(values.size());</span>
+<span class="fc" id="L223">                return List.copyOf(values);</span>
             });
         }
     }
@@ -116,231 +231,281 @@ public final class RecurrenceObservationKrylov {
         private final List&lt;Rational&gt; base;
         private final boolean allZero;
 
-<span class="fc" id="L119">        private BoundPlan(List&lt;Rational&gt; relation, List&lt;Rational&gt; base, boolean allZero) {</span>
-<span class="fc" id="L120">            this.relation = relation;</span>
-<span class="fc" id="L121">            this.base = base;</span>
-<span class="fc" id="L122">            this.allZero = allZero;</span>
-<span class="fc" id="L123">        }</span>
+<span class="fc" id="L234">        private BoundPlan(List&lt;Rational&gt; relation, List&lt;Rational&gt; base, boolean allZero) {</span>
+<span class="fc" id="L235">            this.relation = relation;</span>
+<span class="fc" id="L236">            this.base = base;</span>
+<span class="fc" id="L237">            this.allZero = allZero;</span>
+<span class="fc" id="L238">        }</span>
 
         public Result&lt;Rational&gt; valueAt(BigInteger index, Budget budget) {
-<span class="fc" id="L126">            requireIndex(index);</span>
-<span class="fc" id="L127">            return measured(budget, work -&gt; query(index, new ArrayList&lt;&gt;(), 0, work));</span>
+<span class="fc" id="L241">            requireIndex(index);</span>
+<span class="fc" id="L242">            return measured(budget, work -&gt; query(index, new ArrayList&lt;&gt;(), 0, work));</span>
         }
 
         /** Returns values in request order under one budget and shares binary powers within the batch. */
         public Result&lt;List&lt;Rational&gt;&gt; valuesAt(List&lt;BigInteger&gt; indices, Budget budget) {
-<span class="fc" id="L132">            Objects.requireNonNull(indices, &quot;indices&quot;);</span>
-<span class="fc" id="L133">            return measured(budget, work -&gt; {</span>
-<span class="fc" id="L134">                work.add(1);</span>
-<span class="fc" id="L135">                var values = new ArrayList&lt;Rational&gt;();</span>
-<span class="fc" id="L136">                var powers = new ArrayList&lt;Rational[]&gt;();</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">                for (BigInteger index : indices) {</span>
-<span class="fc" id="L138">                    requireIndex(index);</span>
-<span class="fc" id="L139">                    values.add(query(index, powers, CACHED_POWER_LIMIT, work));</span>
-<span class="fc" id="L140">                }</span>
-<span class="fc" id="L141">                work.add(values.size());</span>
-<span class="fc" id="L142">                return List.copyOf(values);</span>
+<span class="fc" id="L247">            Objects.requireNonNull(indices, &quot;indices&quot;);</span>
+<span class="fc" id="L248">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L249">                work.add(1);</span>
+<span class="fc" id="L250">                var values = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc" id="L251">                var powers = new ArrayList&lt;Rational[]&gt;();</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                for (BigInteger index : indices) {</span>
+<span class="fc" id="L253">                    requireIndex(index);</span>
+<span class="fc" id="L254">                    values.add(query(index, powers, CACHED_POWER_LIMIT, work));</span>
+<span class="fc" id="L255">                }</span>
+<span class="fc" id="L256">                work.add(values.size());</span>
+<span class="fc" id="L257">                return List.copyOf(values);</span>
             });
         }
 
         private Rational query(BigInteger index, List&lt;Rational[]&gt; powers, int cacheLimit, Work work) {
-<span class="fc" id="L147">            work.add(1);</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (allZero) return Rational.ZERO;</span>
-<span class="fc" id="L149">            int order = relation.size();</span>
-<span class="fc bfc" id="L150" title="All 4 branches covered.">            if (index.bitLength() &lt; Integer.SIZE &amp;&amp; index.intValue() &lt; order) return base.get(index.intValue());</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (order == 1) {</span>
-<span class="fc" id="L152">                var ratio = relation.getFirst();</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                if (ratio.isZero()) return Rational.ZERO;</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">                if (ratio.isOne()) return base.getFirst();</span>
-<span class="fc bfc" id="L155" title="All 2 branches covered.">                if (ratio.equals(Rational.NEGATIVE_ONE)) {</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">                    return index.testBit(0) ? base.getFirst().negate() : base.getFirst();</span>
+<span class="fc" id="L262">            work.add(1);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (allZero) return Rational.ZERO;</span>
+<span class="fc" id="L264">            int order = relation.size();</span>
+<span class="fc bfc" id="L265" title="All 4 branches covered.">            if (index.bitLength() &lt; Integer.SIZE &amp;&amp; index.intValue() &lt; order) return base.get(index.intValue());</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (order == 1) {</span>
+<span class="fc" id="L267">                var weight = trivialOrderOneWeight(index, relation.getFirst());</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">                if (weight != null) {</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                    if (weight.isZero()) return Rational.ZERO;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                    return weight.isOne() ? base.getFirst() : base.getFirst().negate();</span>
                 }
             }
 
-<span class="fc" id="L160">            Rational[] power = null;</span>
-<span class="fc" id="L161">            Rational[] remainder = null;</span>
-<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (int bit = 0; bit &lt; index.bitLength(); bit++) {</span>
-<span class="fc" id="L163">                work.add(1);</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">                if (bit &lt; powers.size()) {</span>
-<span class="fc" id="L165">                    power = powers.get(bit);</span>
-                } else {
-<span class="fc bfc" id="L167" title="All 2 branches covered.">                    power = bit == 0 ? firstPower(work) : multiplyModulo(power, power, relation, work);</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">                    if (bit &lt; cacheLimit) powers.add(power);</span>
-                }
-<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (index.testBit(bit)) {</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">                    remainder = remainder == null ? power : multiplyModulo(remainder, power, relation, work);</span>
-                }
-            }
-<span class="fc" id="L174">            var result = Rational.ZERO;</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">            for (int i = 0; i &lt; order; i++) result = addProduct(result, remainder[i], base.get(i), work);</span>
-<span class="fc" id="L176">            return result;</span>
+<span class="fc" id="L274">            return dot(powerRemainder(index, relation, powers, cacheLimit, work), base, work);</span>
         }
+    }
 
-        private Rational[] firstPower(Work work) {
-<span class="fc" id="L180">            var power = zeros(relation.size(), work);</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (power.length == 1) power[0] = relation.getFirst();</span>
-<span class="fc" id="L182">            else power[1] = Rational.ONE;</span>
-<span class="fc" id="L183">            return power;</span>
+    private static Rational[] indexRemainder(BigInteger index, List&lt;Rational&gt; relation,
+            List&lt;Rational[]&gt; powers, Work work) {
+<span class="fc" id="L280">        int order = relation.size();</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (order == 0) return zeros(0, work);</span>
+<span class="fc bfc" id="L282" title="All 4 branches covered.">        if (index.bitLength() &lt; Integer.SIZE &amp;&amp; index.intValue() &lt; order) {</span>
+<span class="fc" id="L283">            var remainder = zeros(order, work);</span>
+<span class="fc" id="L284">            remainder[index.intValue()] = Rational.ONE;</span>
+<span class="fc" id="L285">            return remainder;</span>
         }
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (order == 1) {</span>
+<span class="fc" id="L288">            var weight = trivialOrderOneWeight(index, relation.getFirst());</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (weight != null) {</span>
+<span class="fc" id="L290">                work.add(1);</span>
+<span class="fc" id="L291">                return new Rational[] {weight};</span>
+            }
+        }
+<span class="fc" id="L294">        return powerRemainder(index, relation, powers, CACHED_POWER_LIMIT, work);</span>
+    }
+
+    private static Rational trivialOrderOneWeight(BigInteger index, Rational ratio) {
+<span class="fc bfc" id="L298" title="All 4 branches covered.">        if (ratio.isZero() || ratio.isOne()) return ratio;</span>
+<span class="fc bfc" id="L299" title="All 4 branches covered.">        if (ratio.equals(Rational.NEGATIVE_ONE)) return index.testBit(0) ? Rational.NEGATIVE_ONE : Rational.ONE;</span>
+<span class="fc" id="L300">        return null;</span>
+    }
+
+    private static Rational[] powerRemainder(BigInteger index, List&lt;Rational&gt; relation,
+            List&lt;Rational[]&gt; powers, int cacheLimit, Work work) {
+<span class="fc" id="L305">        Rational[] power = null;</span>
+<span class="fc" id="L306">        Rational[] remainder = null;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        for (int bit = 0; bit &lt; index.bitLength(); bit++) {</span>
+<span class="fc" id="L308">            work.add(1);</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (bit &lt; powers.size()) {</span>
+<span class="fc" id="L310">                power = powers.get(bit);</span>
+            } else {
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                power = bit == 0 ? firstPower(relation, work) : multiplyModulo(power, power, relation, work);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">                if (bit &lt; cacheLimit) powers.add(power);</span>
+            }
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (index.testBit(bit)) {</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                remainder = remainder == null ? power : multiplyModulo(remainder, power, relation, work);</span>
+            }
+        }
+<span class="fc" id="L319">        return remainder;</span>
+    }
+
+    private static Rational[] firstPower(List&lt;Rational&gt; relation, Work work) {
+<span class="fc" id="L323">        var power = zeros(relation.size(), work);</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (power.length == 1) power[0] = relation.getFirst();</span>
+<span class="fc" id="L325">        else power[1] = Rational.ONE;</span>
+<span class="fc" id="L326">        return power;</span>
+    }
+
+    private static Rational dot(Rational[] weights, List&lt;Rational&gt; base, Work work) {
+<span class="fc" id="L330">        var result = Rational.ZERO;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        for (int i = 0; i &lt; weights.length; i++) result = addProduct(result, weights[i], base.get(i), work);</span>
+<span class="fc" id="L332">        return result;</span>
     }
 
     private static int checkedDegree(Polynomial observation, int dimension, Work work) {
-<span class="fc" id="L188">        var basis = RecurrenceInvariantSupport.basis(dimension, 2);</span>
-<span class="fc" id="L189">        work.add(1L + basis.size());</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (observation.termCount() &gt; basis.size()) throw new IllegalArgumentException(&quot;too many observation monomials&quot;);</span>
-<span class="fc" id="L191">        int degree = 0;</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (var term : observation.terms().entrySet()) {</span>
-<span class="fc" id="L193">            work.add(1L + basis.size());</span>
+<span class="fc" id="L336">        var basis = RecurrenceInvariantSupport.basis(dimension, 2);</span>
+<span class="fc" id="L337">        work.add(1L + basis.size());</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (observation.termCount() &gt; basis.size()) throw new IllegalArgumentException(&quot;too many observation monomials&quot;);</span>
+<span class="fc" id="L339">        int degree = 0;</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        for (var term : observation.terms().entrySet()) {</span>
+<span class="fc" id="L341">            work.add(1L + basis.size());</span>
             // Check membership before summing exponents, even for malformed enormous powers.
-<span class="fc bfc" id="L195" title="All 2 branches covered.">            if (!basis.contains(term.getKey())) throw new IllegalArgumentException(&quot;observation outside the degree-two basis&quot;);</span>
-<span class="fc" id="L196">            RecurrenceInvariantSupport.requireBounded(term.getValue());</span>
-<span class="fc" id="L197">            degree = Math.max(degree, term.getKey().totalDegree());</span>
-<span class="fc" id="L198">        }</span>
-<span class="fc" id="L199">        return degree;</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (!basis.contains(term.getKey())) throw new IllegalArgumentException(&quot;observation outside the degree-two basis&quot;);</span>
+<span class="fc" id="L344">            RecurrenceInvariantSupport.requireBounded(term.getValue());</span>
+<span class="fc" id="L345">            degree = Math.max(degree, term.getKey().totalDegree());</span>
+<span class="fc" id="L346">        }</span>
+<span class="fc" id="L347">        return degree;</span>
     }
 
-    private static List&lt;Rational&gt; firstDependence(Transition transition, Polynomial observation, int degree, Work work) {
-<span class="fc bfc" id="L203" title="All 4 branches covered.">        if (degree == 0) return observation.isZero() ? List.of() : List.of(Rational.ONE);</span>
+    /** Owns the coefficient vectors for the independent columns used before the first dependence. */
+<span class="fc" id="L351">    private record Dependence(List&lt;Rational&gt; coefficients, List&lt;Monomial&gt; basis, List&lt;Rational[]&gt; columns) { }</span>
 
-<span class="fc" id="L205">        var basis = RecurrenceInvariantSupport.basis(transition.linear().columns(), degree);</span>
-<span class="fc" id="L206">        var positions = new HashMap&lt;Monomial, Integer&gt;();</span>
-<span class="fc" id="L207">        work.add(basis.size());</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) positions.put(basis.get(i), i);</span>
-<span class="fc" id="L209">        var images = RecurrenceInvariantSupport.liftedImages(transition, basis, work);</span>
-<span class="fc" id="L210">        var first = zeros(basis.size(), work);</span>
-<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (var term : observation.terms().entrySet()) {</span>
-<span class="fc" id="L212">            work.add(1);</span>
-<span class="fc" id="L213">            first[positions.get(term.getKey())] = term.getValue();</span>
-<span class="fc" id="L214">        }</span>
-<span class="fc" id="L215">        var columns = new ArrayList&lt;Rational[]&gt;();</span>
-<span class="fc" id="L216">        columns.add(first);</span>
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        for (int order = 1; order &lt;= basis.size(); order++) {</span>
-<span class="fc" id="L218">            columns.add(compose(columns.getLast(), basis, positions, images, work));</span>
-<span class="fc" id="L219">            var dependence = dependence(columns, basis, work);</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (dependence.isPresent()) return dependence.orElseThrow();</span>
+    private static Dependence firstDependence(Transition transition, Polynomial observation, int degree, Work work) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (degree == 0) {</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            return new Dependence(observation.isZero() ? List.of() : List.of(Rational.ONE), List.of(), List.of());</span>
         }
-<span class="nc" id="L222">        throw new IllegalStateException(&quot;bounded polynomial space must have a dependence&quot;);</span>
+<span class="fc" id="L357">        var basis = RecurrenceInvariantSupport.basis(transition.linear().columns(), degree);</span>
+<span class="fc" id="L358">        var positions = new HashMap&lt;Monomial, Integer&gt;();</span>
+<span class="fc" id="L359">        work.add(basis.size());</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) positions.put(basis.get(i), i);</span>
+<span class="fc" id="L361">        var images = RecurrenceInvariantSupport.liftedImages(transition, basis, work);</span>
+<span class="fc" id="L362">        var first = zeros(basis.size(), work);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (var term : observation.terms().entrySet()) {</span>
+<span class="fc" id="L364">            work.add(1);</span>
+<span class="fc" id="L365">            first[positions.get(term.getKey())] = term.getValue();</span>
+<span class="fc" id="L366">        }</span>
+<span class="fc" id="L367">        var columns = new ArrayList&lt;Rational[]&gt;();</span>
+<span class="fc" id="L368">        columns.add(first);</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        for (int order = 1; order &lt;= basis.size(); order++) {</span>
+<span class="fc" id="L370">            columns.add(compose(columns.getLast(), basis, positions, images, work));</span>
+<span class="fc" id="L371">            var dependence = dependence(columns, basis, work);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (dependence.isPresent()) {</span>
+<span class="fc" id="L373">                columns.removeLast();</span>
+<span class="fc" id="L374">                return new Dependence(dependence.orElseThrow(), basis, columns);</span>
+            }
+        }
+<span class="nc" id="L377">        throw new IllegalStateException(&quot;bounded polynomial space must have a dependence&quot;);</span>
     }
 
     private static Rational[] compose(Rational[] previous, List&lt;Monomial&gt; basis, Map&lt;Monomial, Integer&gt; positions,
             Map&lt;Monomial, Polynomial&gt; images, Work work) {
-<span class="fc" id="L227">        var next = zeros(basis.size(), work);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (int col = 0; col &lt; previous.length; col++) {</span>
-<span class="fc" id="L229">            work.add(1);</span>
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (previous[col].isZero()) continue;</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">            for (var term : images.get(basis.get(col)).terms().entrySet()) {</span>
-<span class="fc" id="L232">                int row = positions.get(term.getKey());</span>
-<span class="fc" id="L233">                next[row] = addProduct(next[row], previous[col], term.getValue(), work);</span>
-<span class="fc" id="L234">            }</span>
+<span class="fc" id="L382">        var next = zeros(basis.size(), work);</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (int col = 0; col &lt; previous.length; col++) {</span>
+<span class="fc" id="L384">            work.add(1);</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (previous[col].isZero()) continue;</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            for (var term : images.get(basis.get(col)).terms().entrySet()) {</span>
+<span class="fc" id="L387">                int row = positions.get(term.getKey());</span>
+<span class="fc" id="L388">                next[row] = addProduct(next[row], previous[col], term.getValue(), work);</span>
+<span class="fc" id="L389">            }</span>
         }
-<span class="fc" id="L236">        return next;</span>
+<span class="fc" id="L391">        return next;</span>
     }
 
     private static Optional&lt;List&lt;Rational&gt;&gt; dependence(List&lt;Rational[]&gt; columns, List&lt;Monomial&gt; basis, Work work) {
-<span class="fc" id="L240">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
-<span class="fc" id="L241">        var origins = new ArrayList&lt;RowOrigin&gt;();</span>
-<span class="fc" id="L242">        long minorBits = 0;</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (int row = 0; row &lt; basis.size(); row++) {</span>
-<span class="fc" id="L244">            work.add(1);</span>
-<span class="fc" id="L245">            var values = new ArrayList&lt;Rational&gt;();</span>
-<span class="fc" id="L246">            var denominator = BigInteger.ONE;</span>
-<span class="fc" id="L247">            boolean nonzero = false;</span>
-<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (var column : columns) {</span>
-<span class="fc" id="L249">                work.add(1);</span>
-<span class="fc" id="L250">                var value = column[row];</span>
-<span class="fc" id="L251">                values.add(value);</span>
-<span class="fc bfc" id="L252" title="All 2 branches covered.">                nonzero |= !value.isZero();</span>
-<span class="fc" id="L253">                var divisor = value.denominator();</span>
-<span class="fc bfc" id="L254" title="All 4 branches covered.">                if (!divisor.equals(BigInteger.ONE) &amp;&amp; !divisor.equals(denominator)) {</span>
-<span class="fc" id="L255">                    work.add(3);</span>
-<span class="fc" id="L256">                    denominator = checked(denominator.divide(denominator.gcd(divisor)).multiply(divisor));</span>
+<span class="fc" id="L395">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc" id="L396">        var origins = new ArrayList&lt;RowOrigin&gt;();</span>
+<span class="fc" id="L397">        long minorBits = 0;</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">        for (int row = 0; row &lt; basis.size(); row++) {</span>
+<span class="fc" id="L399">            work.add(1);</span>
+<span class="fc" id="L400">            var values = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc" id="L401">            var denominator = BigInteger.ONE;</span>
+<span class="fc" id="L402">            boolean nonzero = false;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            for (var column : columns) {</span>
+<span class="fc" id="L404">                work.add(1);</span>
+<span class="fc" id="L405">                var value = column[row];</span>
+<span class="fc" id="L406">                values.add(value);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                nonzero |= !value.isZero();</span>
+<span class="fc" id="L408">                var divisor = value.denominator();</span>
+<span class="fc bfc" id="L409" title="All 4 branches covered.">                if (!divisor.equals(BigInteger.ONE) &amp;&amp; !divisor.equals(denominator)) {</span>
+<span class="fc" id="L410">                    work.add(3);</span>
+<span class="fc" id="L411">                    denominator = checked(denominator.divide(denominator.gcd(divisor)).multiply(divisor));</span>
                 }
-<span class="fc" id="L258">            }</span>
-<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (!nonzero) continue;</span>
-<span class="fc" id="L260">            int rowBits = 0;</span>
-<span class="fc bfc" id="L261" title="All 2 branches covered.">            for (int col = 0; col &lt; values.size(); col++) {</span>
-<span class="fc" id="L262">                work.add(1);</span>
-<span class="fc" id="L263">                var value = values.get(col);</span>
-<span class="fc bfc" id="L264" title="All 4 branches covered.">                if (!denominator.equals(BigInteger.ONE) &amp;&amp; !value.isZero()) {</span>
-<span class="fc" id="L265">                    work.add(3);</span>
-<span class="fc" id="L266">                    var integer = checked(value.numerator().multiply(denominator.divide(value.denominator())));</span>
-<span class="fc" id="L267">                    value = new Rational(integer, BigInteger.ONE);</span>
-<span class="fc" id="L268">                    values.set(col, value);</span>
+<span class="fc" id="L413">            }</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">            if (!nonzero) continue;</span>
+<span class="fc" id="L415">            int rowBits = 0;</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            for (int col = 0; col &lt; values.size(); col++) {</span>
+<span class="fc" id="L417">                work.add(1);</span>
+<span class="fc" id="L418">                var value = values.get(col);</span>
+<span class="fc bfc" id="L419" title="All 4 branches covered.">                if (!denominator.equals(BigInteger.ONE) &amp;&amp; !value.isZero()) {</span>
+<span class="fc" id="L420">                    work.add(3);</span>
+<span class="fc" id="L421">                    var integer = checked(value.numerator().multiply(denominator.divide(value.denominator())));</span>
+<span class="fc" id="L422">                    value = new Rational(integer, BigInteger.ONE);</span>
+<span class="fc" id="L423">                    values.set(col, value);</span>
                 }
-<span class="fc" id="L270">                rowBits = Math.max(rowBits, magnitudeBits(value.numerator()));</span>
+<span class="fc" id="L425">                rowBits = Math.max(rowBits, magnitudeBits(value.numerator()));</span>
             }
             // A row of at most eleven integers has Euclidean norm below 2^(rowBits + 2).
             // After row scaling, pivoted Gauss-Jordan entries are ratios of integer minors.
             // Four minor sizes plus a carry also bound temporary products and sums.
-<span class="fc" id="L275">            minorBits += rowBits + 2L;</span>
-<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (4 * minorBits + 1 &gt; MAX_RATIONAL_BITS) throw new ArithmeticLimit();</span>
-<span class="fc" id="L277">            rows.add(values);</span>
-<span class="fc" id="L278">            origins.add(new RowOrigin(row, &quot;coefficient of &quot; + basis.get(row).key()));</span>
+<span class="fc" id="L430">            minorBits += rowBits + 2L;</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (4 * minorBits + 1 &gt; MAX_RATIONAL_BITS) throw new ArithmeticLimit();</span>
+<span class="fc" id="L432">            rows.add(values);</span>
+<span class="fc" id="L433">            origins.add(new RowOrigin(row, &quot;coefficient of &quot; + basis.get(row).key()));</span>
         }
 
-<span class="fc" id="L281">        int width = columns.size();</span>
-<span class="fc" id="L282">        var names = new ArrayList&lt;String&gt;(width);</span>
-<span class="fc" id="L283">        work.add(1L + width);</span>
-<span class="fc bfc" id="L284" title="All 2 branches covered.">        for (int i = 0; i &lt; width; i++) names.add(&quot;k&quot; + i);</span>
-<span class="fc" id="L285">        var result = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), names, origins,</span>
-<span class="fc" id="L286">            new Budget(work.remaining()));</span>
-<span class="fc" id="L287">        work.add(result.work().consumedWorkUnits());</span>
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (result.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE) throw new RecurrenceInvariantSupport.Exhausted();</span>
-<span class="pc" id="L289">        var reduction = result.reduction().orElseThrow(() -&gt; new IllegalStateException(&quot;Krylov reduction failed&quot;));</span>
-<span class="fc" id="L290">        work.add(1L + 2L * rows.size() * width + reduction.rowOperations().size() + width);</span>
-<span class="fc" id="L291">        var nullspace = reduction.nullspaceBasis();</span>
-<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (nullspace.isEmpty()) return Optional.empty();</span>
-<span class="pc bpc" id="L293" title="2 of 4 branches missed.">        if (nullspace.size() != 1 || !nullspace.getFirst().get(width - 1).isOne()) {</span>
-<span class="nc" id="L294">            throw new IllegalStateException(&quot;first dependence must have a unique monic last coefficient&quot;);</span>
+<span class="fc" id="L436">        int width = columns.size();</span>
+<span class="fc" id="L437">        var names = new ArrayList&lt;String&gt;(width);</span>
+<span class="fc" id="L438">        work.add(1L + width);</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        for (int i = 0; i &lt; width; i++) names.add(&quot;k&quot; + i);</span>
+<span class="fc" id="L440">        var result = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), names, origins,</span>
+<span class="fc" id="L441">            new Budget(work.remaining()));</span>
+<span class="fc" id="L442">        work.add(result.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        if (result.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE) throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc" id="L444">        var reduction = result.reduction().orElseThrow(() -&gt; new IllegalStateException(&quot;Krylov reduction failed&quot;));</span>
+<span class="fc" id="L445">        work.add(1L + 2L * rows.size() * width + reduction.rowOperations().size() + width);</span>
+<span class="fc" id="L446">        var nullspace = reduction.nullspaceBasis();</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (nullspace.isEmpty()) return Optional.empty();</span>
+<span class="pc bpc" id="L448" title="2 of 4 branches missed.">        if (nullspace.size() != 1 || !nullspace.getFirst().get(width - 1).isOne()) {</span>
+<span class="nc" id="L449">            throw new IllegalStateException(&quot;first dependence must have a unique monic last coefficient&quot;);</span>
         }
-<span class="fc" id="L296">        var relation = new ArrayList&lt;Rational&gt;(width - 1);</span>
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (int i = 0; i &lt; width - 1; i++) {</span>
-<span class="fc" id="L298">            work.add(1);</span>
-<span class="fc" id="L299">            relation.add(checked(nullspace.getFirst().get(i).negate()));</span>
+<span class="fc" id="L451">        var relation = new ArrayList&lt;Rational&gt;(width - 1);</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        for (int i = 0; i &lt; width - 1; i++) {</span>
+<span class="fc" id="L453">            work.add(1);</span>
+<span class="fc" id="L454">            relation.add(checked(nullspace.getFirst().get(i).negate()));</span>
         }
-<span class="fc" id="L301">        return Optional.of(relation);</span>
+<span class="fc" id="L456">        return Optional.of(relation);</span>
     }
 
     private static Rational[] multiplyModulo(Rational[] left, Rational[] right, List&lt;Rational&gt; relation, Work work) {
-<span class="fc" id="L305">        int order = relation.size();</span>
-<span class="fc" id="L306">        var product = zeros(2 * order - 1, work);</span>
-<span class="fc bfc" id="L307" title="All 2 branches covered.">        for (int i = 0; i &lt; order; i++) {</span>
-<span class="fc" id="L308">            work.add(1);</span>
-<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (left[i].isZero()) continue;</span>
-<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (int j = 0; j &lt; order; j++) product[i + j] = addProduct(product[i + j], left[i], right[j], work);</span>
+<span class="fc" id="L460">        int order = relation.size();</span>
+<span class="fc" id="L461">        var product = zeros(2 * order - 1, work);</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        for (int i = 0; i &lt; order; i++) {</span>
+<span class="fc" id="L463">            work.add(1);</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (left[i].isZero()) continue;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            for (int j = 0; j &lt; order; j++) product[i + j] = addProduct(product[i + j], left[i], right[j], work);</span>
         }
-<span class="fc bfc" id="L312" title="All 2 branches covered.">        for (int degree = product.length - 1; degree &gt;= order; degree--) {</span>
-<span class="fc" id="L313">            work.add(1);</span>
-<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (product[degree].isZero()) continue;</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">            for (int i = 0; i &lt; order; i++) {</span>
-<span class="fc" id="L316">                int target = degree - order + i;</span>
-<span class="fc" id="L317">                product[target] = addProduct(product[target], product[degree], relation.get(i), work);</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        for (int degree = product.length - 1; degree &gt;= order; degree--) {</span>
+<span class="fc" id="L468">            work.add(1);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            if (product[degree].isZero()) continue;</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">            for (int i = 0; i &lt; order; i++) {</span>
+<span class="fc" id="L471">                int target = degree - order + i;</span>
+<span class="fc" id="L472">                product[target] = addProduct(product[target], product[degree], relation.get(i), work);</span>
             }
         }
-<span class="fc" id="L320">        work.add(order);</span>
-<span class="fc" id="L321">        return Arrays.copyOf(product, order);</span>
+<span class="fc" id="L475">        work.add(order);</span>
+<span class="fc" id="L476">        return Arrays.copyOf(product, order);</span>
     }
 
     private static Rational[] zeros(int size, Work work) {
-<span class="fc" id="L325">        work.add(size);</span>
-<span class="fc" id="L326">        var values = new Rational[size];</span>
-<span class="fc" id="L327">        Arrays.fill(values, Rational.ZERO);</span>
-<span class="fc" id="L328">        return values;</span>
+<span class="fc" id="L480">        work.add(size);</span>
+<span class="fc" id="L481">        var values = new Rational[size];</span>
+<span class="fc" id="L482">        Arrays.fill(values, Rational.ZERO);</span>
+<span class="fc" id="L483">        return values;</span>
     }
 
     private static void requireIndex(BigInteger index) {
-<span class="fc" id="L332">        Objects.requireNonNull(index, &quot;index&quot;);</span>
-<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (index.signum() &lt; 0) throw new IllegalArgumentException(&quot;index must be nonnegative&quot;);</span>
-<span class="fc" id="L334">    }</span>
+<span class="fc" id="L487">        Objects.requireNonNull(index, &quot;index&quot;);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        if (index.signum() &lt; 0) throw new IllegalArgumentException(&quot;index must be nonnegative&quot;);</span>
+<span class="fc" id="L489">    }</span>
+
+    private static void requireInitialDimension(List&lt;Rational&gt; initialState, int dimension) {
+<span class="fc" id="L492">        Objects.requireNonNull(initialState, &quot;initialState&quot;);</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (initialState.size() != dimension) throw new IllegalArgumentException(&quot;initial state dimension mismatch&quot;);</span>
+<span class="fc" id="L494">    }</span>
+
+    private static List&lt;Rational&gt; snapshotState(List&lt;Rational&gt; initialState, int dimension, Work work) {
+<span class="fc" id="L497">        work.add(dimension);</span>
+<span class="fc" id="L498">        return List.copyOf(initialState);</span>
+    }
 
     private static &lt;T&gt; Result&lt;T&gt; measured(Budget budget, Function&lt;Work, T&gt; action) {
-<span class="fc" id="L337">        var work = new Work(Objects.requireNonNull(budget, &quot;budget&quot;).maxWorkUnits());</span>
+<span class="fc" id="L502">        var work = new Work(Objects.requireNonNull(budget, &quot;budget&quot;).maxWorkUnits());</span>
         try {
-<span class="fc" id="L339">            return new Result&lt;&gt;(Status.COMPLETE, Optional.of(action.apply(work)), work.ledger());</span>
-<span class="fc" id="L340">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
-<span class="fc" id="L341">            return new Result&lt;&gt;(Status.BUDGET_INCONCLUSIVE, Optional.empty(), work.ledger());</span>
-<span class="fc" id="L342">        } catch (ArithmeticLimit limit) {</span>
-<span class="fc" id="L343">            return new Result&lt;&gt;(Status.ARITHMETIC_LIMIT, Optional.empty(), work.ledger());</span>
+<span class="fc" id="L504">            return new Result&lt;&gt;(Status.COMPLETE, Optional.of(action.apply(work)), work.ledger());</span>
+<span class="fc" id="L505">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L506">            return new Result&lt;&gt;(Status.BUDGET_INCONCLUSIVE, Optional.empty(), work.ledger());</span>
+<span class="fc" id="L507">        } catch (ArithmeticLimit limit) {</span>
+<span class="fc" id="L508">            return new Result&lt;&gt;(Status.ARITHMETIC_LIMIT, Optional.empty(), work.ledger());</span>
         }
     }
 }

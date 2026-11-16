@@ -222,148 +222,186 @@ public final class AffineObservationReduction {
 <span class="fc" id="L222">        return plan;</span>
     }
 
-    private static void checkInputs(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations, int dimension, Work work) {
-<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (var transition : transitions) {</span>
-<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (transition.linear().columns() != dimension) throw new IllegalArgumentException(&quot;transition dimension mismatch&quot;);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">            for (var row : transition.linear().rows()) checkCoefficients(row, work);</span>
-<span class="fc" id="L229">            checkCoefficients(transition.offset().values(), work);</span>
-<span class="fc" id="L230">        }</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (var observation : observations) {</span>
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (observation.weights().dimension() != dimension) throw new IllegalArgumentException(&quot;observation dimension mismatch&quot;);</span>
-<span class="fc" id="L233">            work.add(1);</span>
-<span class="fc" id="L234">            checked(observation.offset());</span>
-<span class="fc" id="L235">            checkCoefficients(observation.weights().values(), work);</span>
-<span class="fc" id="L236">        }</span>
-<span class="fc" id="L237">    }</span>
+    /** Restricts to a coordinate set closed under every supplied transition. */
+    static VerifiedPlan coordinatePlan(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations,
+            List&lt;Integer&gt; coordinates, int dimension, Work work) {
+<span class="fc" id="L228">        work.add(1L + coordinates.size() + observations.size() + transitions.size());</span>
+<span class="fc" id="L229">        var basis = new ArrayList&lt;ExactVector&gt;();</span>
+<span class="fc" id="L230">        var projection = new ArrayList&lt;SparseAffineForm&gt;();</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int coordinate : coordinates) {</span>
+<span class="fc" id="L232">            work.add(1L + dimension);</span>
+<span class="fc" id="L233">            var row = new ArrayList&lt;&gt;(Collections.nCopies(dimension, Rational.ZERO));</span>
+<span class="fc" id="L234">            row.set(coordinate, Rational.ONE);</span>
+<span class="fc" id="L235">            basis.add(new ExactVector(row));</span>
+<span class="fc" id="L236">            projection.add(new SparseAffineForm(List.of(new SparseAffineForm.Term(coordinate, Rational.ONE)),</span>
+                Rational.ZERO));
+<span class="fc" id="L238">        }</span>
+<span class="fc" id="L239">        var outputs = new ArrayList&lt;SparseAffineForm&gt;();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (var observation : observations) {</span>
+<span class="fc" id="L241">            outputs.add(coordinateForm(observation.weights().values(), observation.offset(), coordinates, work));</span>
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">        var updates = new ArrayList&lt;Update&gt;();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (var transition : transitions) {</span>
+<span class="fc" id="L245">            var rows = new ArrayList&lt;SparseAffineForm&gt;();</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (int coordinate : coordinates) {</span>
+<span class="fc" id="L247">                rows.add(coordinateForm(transition.linear().rows().get(coordinate),</span>
+<span class="fc" id="L248">                    transition.offset().get(coordinate), coordinates, work));</span>
+<span class="fc" id="L249">            }</span>
+<span class="fc" id="L250">            updates.add(Update.compile(rows, outputs, work));</span>
+<span class="fc" id="L251">        }</span>
+<span class="fc" id="L252">        return new VerifiedPlan(dimension, List.copyOf(basis), List.copyOf(projection),</span>
+<span class="fc" id="L253">            List.copyOf(updates), List.copyOf(outputs));</span>
+    }
 
-    private static void checkCoefficients(List&lt;Rational&gt; coefficients, Work work) {
-<span class="fc" id="L240">        work.add(coefficients.size());</span>
-<span class="fc" id="L241">        coefficients.forEach(RecurrenceObservationArithmetic::checked);</span>
-<span class="fc" id="L242">    }</span>
+    private static SparseAffineForm coordinateForm(List&lt;Rational&gt; weights, Rational offset,
+            List&lt;Integer&gt; coordinates, Work work) {
+<span class="fc" id="L258">        work.add(1L + coordinates.size());</span>
+<span class="fc" id="L259">        var restricted = coordinates.stream().map(weights::get).toList();</span>
+<span class="fc" id="L260">        return SparseAffineForm.compile(restricted, offset, work);</span>
+    }
+
+    static void checkInputs(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations, int dimension, Work work) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (var transition : transitions) {</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (transition.linear().columns() != dimension) throw new IllegalArgumentException(&quot;transition dimension mismatch&quot;);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            for (var row : transition.linear().rows()) checkCoefficients(row, work);</span>
+<span class="fc" id="L267">            checkCoefficients(transition.offset().values(), work);</span>
+<span class="fc" id="L268">        }</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (var observation : observations) {</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (observation.weights().dimension() != dimension) throw new IllegalArgumentException(&quot;observation dimension mismatch&quot;);</span>
+<span class="fc" id="L271">            work.add(1);</span>
+<span class="fc" id="L272">            checked(observation.offset());</span>
+<span class="fc" id="L273">            checkCoefficients(observation.weights().values(), work);</span>
+<span class="fc" id="L274">        }</span>
+<span class="fc" id="L275">    }</span>
+
+    static void checkCoefficients(List&lt;Rational&gt; coefficients, Work work) {
+<span class="fc" id="L278">        work.add(coefficients.size());</span>
+<span class="fc" id="L279">        coefficients.forEach(RecurrenceObservationArithmetic::checked);</span>
+<span class="fc" id="L280">    }</span>
 
     private static List&lt;Rational&gt; pullback(List&lt;Rational&gt; form, ExactMatrix linear, Work work) {
-<span class="fc" id="L245">        work.add(form.size());</span>
-<span class="fc" id="L246">        var result = new ArrayList&lt;Rational&gt;(form.size());</span>
-<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (int column = 0; column &lt; form.size(); column++) {</span>
-<span class="fc" id="L248">            var weight = Rational.ZERO;</span>
-<span class="fc bfc" id="L249" title="All 2 branches covered.">            for (int row = 0; row &lt; form.size(); row++) {</span>
-<span class="fc" id="L250">                weight = addProduct(weight, form.get(row), linear.get(row, column), work);</span>
+<span class="fc" id="L283">        work.add(form.size());</span>
+<span class="fc" id="L284">        var result = new ArrayList&lt;Rational&gt;(form.size());</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (int column = 0; column &lt; form.size(); column++) {</span>
+<span class="fc" id="L286">            var weight = Rational.ZERO;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            for (int row = 0; row &lt; form.size(); row++) {</span>
+<span class="fc" id="L288">                weight = addProduct(weight, form.get(row), linear.get(row, column), work);</span>
             }
-<span class="fc" id="L252">            result.add(weight);</span>
+<span class="fc" id="L290">            result.add(weight);</span>
         }
-<span class="fc" id="L254">        return result;</span>
+<span class="fc" id="L292">        return result;</span>
     }
 
     private static SparseAffineForm represent(List&lt;Rational&gt; weights, Rational offset, List&lt;BasisRow&gt; rows, Work work) {
-<span class="fc" id="L258">        work.add(1L + weights.size());</span>
-<span class="fc" id="L259">        var residual = new ArrayList&lt;&gt;(weights);</span>
-<span class="fc" id="L260">        var coordinates = new ArrayList&lt;Rational&gt;();</span>
-<span class="fc bfc" id="L261" title="All 2 branches covered.">        for (var row : rows) {</span>
-<span class="fc" id="L262">            work.add(1);</span>
-<span class="fc" id="L263">            var factor = residual.get(row.pivot());</span>
-<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (factor.isZero()) {</span>
-<span class="fc" id="L265">                coordinates.add(Rational.ZERO);</span>
-<span class="fc" id="L266">                continue;</span>
+<span class="fc" id="L296">        work.add(1L + weights.size());</span>
+<span class="fc" id="L297">        var residual = new ArrayList&lt;&gt;(weights);</span>
+<span class="fc" id="L298">        var coordinates = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L300">            work.add(1);</span>
+<span class="fc" id="L301">            var factor = residual.get(row.pivot());</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            if (factor.isZero()) {</span>
+<span class="fc" id="L303">                coordinates.add(Rational.ZERO);</span>
+<span class="fc" id="L304">                continue;</span>
             }
-<span class="fc" id="L268">            var lead = row.weights().get(row.pivot());</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">            if (!lead.isOne()) {</span>
-<span class="fc" id="L270">                work.add(1);</span>
-<span class="fc" id="L271">                factor = checked(factor.divide(lead));</span>
+<span class="fc" id="L306">            var lead = row.weights().get(row.pivot());</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (!lead.isOne()) {</span>
+<span class="fc" id="L308">                work.add(1);</span>
+<span class="fc" id="L309">                factor = checked(factor.divide(lead));</span>
             }
-<span class="fc" id="L273">            coordinates.add(factor);</span>
-<span class="fc bfc" id="L274" title="All 2 branches covered.">            for (int i = 0; i &lt; residual.size(); i++) {</span>
-<span class="fc" id="L275">                work.add(1);</span>
-<span class="fc" id="L276">                var coefficient = row.weights().get(i);</span>
-<span class="fc bfc" id="L277" title="All 4 branches covered.">                if (!coefficient.isZero() &amp;&amp; i != row.pivot()) {</span>
-<span class="fc" id="L278">                    var product = multiply(coefficient, factor, work);</span>
-<span class="fc" id="L279">                    work.add(1);</span>
-<span class="fc" id="L280">                    residual.set(i, checked(residual.get(i).subtract(product)));</span>
+<span class="fc" id="L311">            coordinates.add(factor);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            for (int i = 0; i &lt; residual.size(); i++) {</span>
+<span class="fc" id="L313">                work.add(1);</span>
+<span class="fc" id="L314">                var coefficient = row.weights().get(i);</span>
+<span class="fc bfc" id="L315" title="All 4 branches covered.">                if (!coefficient.isZero() &amp;&amp; i != row.pivot()) {</span>
+<span class="fc" id="L316">                    var product = multiply(coefficient, factor, work);</span>
+<span class="fc" id="L317">                    work.add(1);</span>
+<span class="fc" id="L318">                    residual.set(i, checked(residual.get(i).subtract(product)));</span>
                 }
             }
-<span class="fc" id="L283">            residual.set(row.pivot(), Rational.ZERO);</span>
-<span class="fc" id="L284">        }</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (int pivot = 0; pivot &lt; residual.size(); pivot++) {</span>
-<span class="fc" id="L286">            work.add(1);</span>
-<span class="fc bfc" id="L287" title="All 2 branches covered.">            if (residual.get(pivot).isZero()) continue;</span>
-<span class="fc" id="L288">            work.add(1L + residual.size());</span>
+<span class="fc" id="L321">            residual.set(row.pivot(), Rational.ZERO);</span>
+<span class="fc" id="L322">        }</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (int pivot = 0; pivot &lt; residual.size(); pivot++) {</span>
+<span class="fc" id="L324">            work.add(1);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            if (residual.get(pivot).isZero()) continue;</span>
+<span class="fc" id="L326">            work.add(1L + residual.size());</span>
             // Keep the residual's scale so an independent observation is a state slot directly.
-<span class="fc" id="L290">            rows.add(new BasisRow(pivot, new ExactVector(residual)));</span>
-<span class="fc" id="L291">            coordinates.add(Rational.ONE);</span>
-<span class="fc" id="L292">            break;</span>
+<span class="fc" id="L328">            rows.add(new BasisRow(pivot, new ExactVector(residual)));</span>
+<span class="fc" id="L329">            coordinates.add(Rational.ONE);</span>
+<span class="fc" id="L330">            break;</span>
         }
-<span class="fc" id="L294">        return SparseAffineForm.compile(coordinates, offset, work);</span>
+<span class="fc" id="L332">        return SparseAffineForm.compile(coordinates, offset, work);</span>
     }
 
     private static boolean verify(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations, VerifiedPlan plan, Work work) {
-<span class="fc" id="L298">        int dimension = plan.sourceDimension();</span>
-<span class="fc" id="L299">        work.add(dimension);</span>
-<span class="fc" id="L300">        var sample = new ArrayList&lt;&gt;(Collections.nCopies(dimension, Rational.ZERO));</span>
-<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (int column = -1; column &lt; dimension; column++) {</span>
-<span class="fc" id="L302">            work.add(1);</span>
-<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (column &gt; 0) sample.set(column - 1, Rational.ZERO);</span>
-<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (column &gt;= 0) sample.set(column, Rational.ONE);</span>
-<span class="fc" id="L305">            var reduced = evaluateAll(plan.projection, sample, work);</span>
-<span class="fc bfc" id="L306" title="All 2 branches covered.">            for (int row = 0; row &lt; plan.basis.size(); row++) {</span>
-<span class="fc" id="L307">                work.add(1);</span>
-<span class="fc bfc" id="L308" title="All 2 branches covered.">                var coefficient = column &lt; 0 ? Rational.ZERO : plan.basis.get(row).get(column);</span>
-<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                if (!coefficient.equals(reduced.get(row))) return false;</span>
+<span class="fc" id="L336">        int dimension = plan.sourceDimension();</span>
+<span class="fc" id="L337">        work.add(dimension);</span>
+<span class="fc" id="L338">        var sample = new ArrayList&lt;&gt;(Collections.nCopies(dimension, Rational.ZERO));</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (int column = -1; column &lt; dimension; column++) {</span>
+<span class="fc" id="L340">            work.add(1);</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">            if (column &gt; 0) sample.set(column - 1, Rational.ZERO);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">            if (column &gt;= 0) sample.set(column, Rational.ONE);</span>
+<span class="fc" id="L343">            var reduced = evaluateAll(plan.projection, sample, work);</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            for (int row = 0; row &lt; plan.basis.size(); row++) {</span>
+<span class="fc" id="L345">                work.add(1);</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                var coefficient = column &lt; 0 ? Rational.ZERO : plan.basis.get(row).get(column);</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                if (!coefficient.equals(reduced.get(row))) return false;</span>
             }
-<span class="fc" id="L311">            var output = evaluateAll(plan.outputs, reduced, work);</span>
-<span class="fc bfc" id="L312" title="All 2 branches covered.">            for (int row = 0; row &lt; observations.size(); row++) {</span>
-<span class="fc" id="L313">                work.add(1);</span>
-<span class="fc" id="L314">                var observation = observations.get(row);</span>
-<span class="fc" id="L315">                var expected = observation.offset();</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">                if (column &gt;= 0) expected = add(expected, observation.weights().get(column), work);</span>
-<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                if (!expected.equals(output.get(row))) return false;</span>
+<span class="fc" id="L349">            var output = evaluateAll(plan.outputs, reduced, work);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            for (int row = 0; row &lt; observations.size(); row++) {</span>
+<span class="fc" id="L351">                work.add(1);</span>
+<span class="fc" id="L352">                var observation = observations.get(row);</span>
+<span class="fc" id="L353">                var expected = observation.offset();</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                if (column &gt;= 0) expected = add(expected, observation.weights().get(column), work);</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                if (!expected.equals(output.get(row))) return false;</span>
             }
-<span class="fc bfc" id="L319" title="All 2 branches covered.">            for (int label = 0; label &lt; transitions.size(); label++) {</span>
-<span class="fc" id="L320">                var transition = transitions.get(label);</span>
-<span class="fc" id="L321">                var image = transition.offset().values();</span>
-<span class="fc bfc" id="L322" title="All 2 branches covered.">                if (column &gt;= 0) {</span>
-<span class="fc" id="L323">                    work.add(dimension);</span>
-<span class="fc" id="L324">                    var shifted = new ArrayList&lt;Rational&gt;(dimension);</span>
-<span class="fc bfc" id="L325" title="All 2 branches covered.">                    for (int row = 0; row &lt; dimension; row++) {</span>
-<span class="fc" id="L326">                        shifted.add(add(image.get(row), transition.linear().get(row, column), work));</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            for (int label = 0; label &lt; transitions.size(); label++) {</span>
+<span class="fc" id="L358">                var transition = transitions.get(label);</span>
+<span class="fc" id="L359">                var image = transition.offset().values();</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">                if (column &gt;= 0) {</span>
+<span class="fc" id="L361">                    work.add(dimension);</span>
+<span class="fc" id="L362">                    var shifted = new ArrayList&lt;Rational&gt;(dimension);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                    for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L364">                        shifted.add(add(image.get(row), transition.linear().get(row, column), work));</span>
                     }
-<span class="fc" id="L328">                    image = shifted;</span>
+<span class="fc" id="L366">                    image = shifted;</span>
                 }
-<span class="fc" id="L330">                var expected = projectDirectly(plan.basis, image, work);</span>
-<span class="fc" id="L331">                work.add(1L + reduced.size());</span>
-<span class="fc" id="L332">                var actual = new ArrayList&lt;&gt;(reduced);</span>
-<span class="fc" id="L333">                plan.updates.get(label).apply(actual, work);</span>
-<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                if (!equal(expected, actual, work)) return false;</span>
+<span class="fc" id="L368">                var expected = projectDirectly(plan.basis, image, work);</span>
+<span class="fc" id="L369">                work.add(1L + reduced.size());</span>
+<span class="fc" id="L370">                var actual = new ArrayList&lt;&gt;(reduced);</span>
+<span class="fc" id="L371">                plan.updates.get(label).apply(actual, work);</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                if (!equal(expected, actual, work)) return false;</span>
             }
         }
-<span class="fc" id="L337">        return true;</span>
+<span class="fc" id="L375">        return true;</span>
     }
 
     private static List&lt;Rational&gt; projectDirectly(List&lt;ExactVector&gt; basis, List&lt;Rational&gt; state, Work work) {
-<span class="fc" id="L341">        work.add(basis.size());</span>
-<span class="fc" id="L342">        var projected = new ArrayList&lt;Rational&gt;(basis.size());</span>
-<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (var form : basis) {</span>
-<span class="fc" id="L344">            var value = Rational.ZERO;</span>
-<span class="fc bfc" id="L345" title="All 2 branches covered.">            for (int i = 0; i &lt; state.size(); i++) value = addProduct(value, form.get(i), state.get(i), work);</span>
-<span class="fc" id="L346">            projected.add(value);</span>
-<span class="fc" id="L347">        }</span>
-<span class="fc" id="L348">        return projected;</span>
+<span class="fc" id="L379">        work.add(basis.size());</span>
+<span class="fc" id="L380">        var projected = new ArrayList&lt;Rational&gt;(basis.size());</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        for (var form : basis) {</span>
+<span class="fc" id="L382">            var value = Rational.ZERO;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            for (int i = 0; i &lt; state.size(); i++) value = addProduct(value, form.get(i), state.get(i), work);</span>
+<span class="fc" id="L384">            projected.add(value);</span>
+<span class="fc" id="L385">        }</span>
+<span class="fc" id="L386">        return projected;</span>
     }
 
     private static boolean equal(List&lt;Rational&gt; expected, List&lt;Rational&gt; actual, Work work) {
-<span class="fc" id="L352">        work.add(1L + expected.size());</span>
-<span class="fc" id="L353">        return expected.equals(actual);</span>
+<span class="fc" id="L390">        work.add(1L + expected.size());</span>
+<span class="fc" id="L391">        return expected.equals(actual);</span>
     }
 
-    private static &lt;T&gt; Result&lt;T&gt; measured(Budget budget, Function&lt;Work, T&gt; phase) {
-<span class="fc" id="L357">        var work = new Work(Objects.requireNonNull(budget, &quot;budget&quot;).maxWorkUnits());</span>
+    static &lt;T&gt; Result&lt;T&gt; measured(Budget budget, Function&lt;Work, T&gt; phase) {
+<span class="fc" id="L395">        var work = new Work(Objects.requireNonNull(budget, &quot;budget&quot;).maxWorkUnits());</span>
         try {
-<span class="fc" id="L359">            return new Result&lt;&gt;(Status.COMPLETE, Optional.of(phase.apply(work)), work.ledger());</span>
-<span class="fc" id="L360">        } catch (Exhausted exhausted) {</span>
-<span class="fc" id="L361">            return new Result&lt;&gt;(Status.BUDGET_INCONCLUSIVE, Optional.empty(), work.ledger());</span>
-<span class="fc" id="L362">        } catch (ArithmeticLimit tooLarge) {</span>
-<span class="fc" id="L363">            return new Result&lt;&gt;(Status.ARITHMETIC_LIMIT, Optional.empty(), work.ledger());</span>
+<span class="fc" id="L397">            return new Result&lt;&gt;(Status.COMPLETE, Optional.of(phase.apply(work)), work.ledger());</span>
+<span class="fc" id="L398">        } catch (Exhausted exhausted) {</span>
+<span class="fc" id="L399">            return new Result&lt;&gt;(Status.BUDGET_INCONCLUSIVE, Optional.empty(), work.ledger());</span>
+<span class="fc" id="L400">        } catch (ArithmeticLimit tooLarge) {</span>
+<span class="fc" id="L401">            return new Result&lt;&gt;(Status.ARITHMETIC_LIMIT, Optional.empty(), work.ledger());</span>
         }
     }
 
-<span class="fc" id="L367">    private record BasisRow(int pivot, ExactVector weights) { }</span>
+<span class="fc" id="L405">    private record BasisRow(int pivot, ExactVector weights) { }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

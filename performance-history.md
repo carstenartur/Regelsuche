@@ -43,6 +43,32 @@ This keeps the historical v2 verifier and its reports unchanged and reproducible
 
 Measurement precision remains visible independently of the gate outcome. When `currentScoreError >= currentScore`, v3 retains the benchmark as `LOW_PRECISION` in JSON and Markdown evidence. A low-precision row whose point estimate remains below the ratchet can still pass the regression gate, but it is **not** evidence that performance is proven unchanged. If its point estimate exceeds the ratchet it is at least `INCONCLUSIVE`, and therefore fails closed. The rule remains a finite shared-runner ratchet and does not establish cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty.
 
+### Java/Maven v3 parity candidate (not yet the active gate)
+
+The Java quality module now contains a **parallel**, fail-closed v3
+verifier, `JmhRegressionV3Verifier`, and the entrypoint
+`JmhRegressionV3Main`. It reads the actual v3 decision policy, binds the
+exact v2 policy by its Git-blob SHA-1 and checkout-relative path, and checks
+the entire declared JMH inventory and execution metadata. A Maven/JUnit replay
+can be requested after independently producing a real JMH result:
+
+```bash
+mvn -pl regelsuche-quality -am \
+  -Dregelsuche.jmh.regressionResult=/absolute/path/to/jmh-result.json \
+  verify
+```
+
+Reports from this optional replay go to
+`regelsuche-quality/target/reports/quality/jmh-regression-v3/`.
+`PASSED` succeeds; `INCONCLUSIVE`, `FAILED` and malformed evidence fail.
+The Java JUnit controls use all 29 actual policy entries and exercise exact
+boundaries, uncertainty overlap, material regressions, low precision,
+inventory drift, malformed numbers and policy substitution. This is a
+**migration intermediate**: the active Gradle/Python verifier is unchanged
+until Java/Python result parity on captured real runs, negative-result
+equivalence and a clean Maven/Failsafe reproduction are verified. No claim
+of a completed Maven-only lifecycle is made.
+
 The [finite JMH precision study](jmh-precision-study.md) preregisters a separate,
 bounded comparison of execution protocols for issue #981. It leaves this v3
 authority and the historical v2/v3 evidence unchanged. A production protocol

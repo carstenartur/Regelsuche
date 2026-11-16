@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DirectIndexedObservation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">DirectIndexedObservation.java</span></div><h1>DirectIndexedObservation.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.MAX_RATIONAL_BITS;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.checked;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.AffineObservationReduction.Observation;
+import de.regelsuche.math.algorithms.linalg.AffineObservationReduction.Transition;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.ArithmeticLimit;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Compiles projected rows once using integer numerators and shared denominators. */
+final class DirectIndexedObservation {
+    private final List&lt;Integer&gt; coordinates;
+    private final boolean hasConstant;
+    private final List&lt;Row&gt; projections;
+    private final List&lt;Integer&gt; requestOrder;
+
+    private DirectIndexedObservation(List&lt;Integer&gt; coordinates, boolean hasConstant, List&lt;Row&gt; projections,
+<span class="fc" id="L28">            List&lt;Integer&gt; requestOrder) {</span>
+<span class="fc" id="L29">        this.coordinates = coordinates;</span>
+<span class="fc" id="L30">        this.hasConstant = hasConstant;</span>
+<span class="fc" id="L31">        this.projections = projections;</span>
+<span class="fc" id="L32">        this.requestOrder = requestOrder;</span>
+<span class="fc" id="L33">    }</span>
+
+    static DirectIndexedObservation prepare(Transition transition, Observation observation, List&lt;BigInteger&gt; indices,
+            List&lt;Integer&gt; coordinates, Work work) {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        boolean hasConstant = !observation.offset().isZero();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int coordinate : coordinates) {</span>
+<span class="fc" id="L39">            work.add(1);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            hasConstant |= !transition.offset().get(coordinate).isZero();</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        var weights = project(observation.weights(), coordinates, hasConstant, observation.offset(), work);</span>
+<span class="fc" id="L43">        var scaled = tryScaleRow(weights, work);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        Row row = scaled != null ? scaled : new RationalRow(weights);</span>
+<span class="fc" id="L45">        work.add(1L + indices.size());</span>
+<span class="fc" id="L46">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc" id="L47">        var requestOrder = new ArrayList&lt;Integer&gt;(indices.size());</span>
+<span class="fc" id="L48">        var positions = new IdentityHashMap&lt;Row, Integer&gt;();</span>
+<span class="fc" id="L49">        var projected = new TreeMap&lt;BigInteger, Row&gt;((left, right) -&gt; compareIndices(left, right, work));</span>
+<span class="fc" id="L50">        projected.put(BigInteger.ZERO, row);</span>
+<span class="fc" id="L51">        var powers = new ArrayList&lt;Matrix&gt;();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (BigInteger index : indices) {</span>
+<span class="fc" id="L53">            work.add(1);</span>
+<span class="fc bfc" id="L54" title="All 6 branches covered.">            if (!coordinates.isEmpty() &amp;&amp; index.signum() &gt; 0 &amp;&amp; powers.isEmpty()) {</span>
+<span class="fc" id="L55">                powers.add(scaleMatrix(transition, coordinates, hasConstant, work));</span>
+            }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            var projection = coordinates.isEmpty() ? row : rowAt(index, projected, powers, work);</span>
+<span class="fc" id="L58">            var position = positions.get(projection);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (position == null) {</span>
+<span class="fc" id="L60">                work.add(1);</span>
+<span class="fc" id="L61">                position = rows.size();</span>
+<span class="fc" id="L62">                rows.add(projection);</span>
+<span class="fc" id="L63">                positions.put(projection, position);</span>
+            }
+<span class="fc" id="L65">            requestOrder.add(position);</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        work.add(1L + rows.size() + requestOrder.size());</span>
+<span class="fc" id="L68">        return new DirectIndexedObservation(coordinates, hasConstant, List.copyOf(rows), List.copyOf(requestOrder));</span>
+    }
+
+    List&lt;Rational&gt; valuesFor(ExactVector initialState, Work work) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (requestOrder.isEmpty()) return List.of();</span>
+<span class="fc" id="L73">        var initial = project(initialState, coordinates, hasConstant, Rational.ONE, work);</span>
+<span class="fc" id="L74">        var scaled = tryScaleRow(initial, work);</span>
+<span class="fc" id="L75">        work.add(1L + projections.size());</span>
+<span class="fc" id="L76">        var distinct = new ArrayList&lt;Rational&gt;(projections.size());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (var row : projections) {</span>
+<span class="fc" id="L78">            work.add(1);</span>
+<span class="fc bfc" id="L79" title="All 4 branches covered.">            distinct.add(scaled != null &amp;&amp; row instanceof ScaledRow projection</span>
+<span class="fc" id="L80">                ? scaledDot(projection, scaled, work) : dot(fractions(row, work), initial, work));</span>
+<span class="fc" id="L81">        }</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (requestOrder.size() == projections.size()) return List.copyOf(distinct);</span>
+<span class="fc" id="L83">        work.add(1L + requestOrder.size());</span>
+<span class="fc" id="L84">        var results = new ArrayList&lt;Rational&gt;(requestOrder.size());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (int position : requestOrder) results.add(distinct.get(position));</span>
+<span class="fc" id="L86">        return List.copyOf(results);</span>
+    }
+
+    private static Rational scaledDot(ScaledRow row, ScaledRow initial, Work work) {
+<span class="fc" id="L90">        var sum = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; row.entries().length; i++) sum = addProduct(sum, row.entries()[i], initial.entries()[i], work);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        return sum.signum() == 0 ? Rational.ZERO</span>
+<span class="fc" id="L93">            : checked(new Rational(sum, multiply(row.denominator(), initial.denominator(), work)));</span>
+    }
+
+    private static Rational dot(List&lt;Rational&gt; row, List&lt;Rational&gt; initial, Work work) {
+<span class="fc" id="L97">        var sum = Rational.ZERO;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (int i = 0; i &lt; row.size(); i++) {</span>
+<span class="fc" id="L99">            sum = RecurrenceObservationArithmetic.addProduct(sum, row.get(i), initial.get(i), work);</span>
+        }
+<span class="fc" id="L101">        return sum;</span>
+    }
+
+    private static ScaledRow tryScaleRow(List&lt;Rational&gt; values, Work work) {
+        try {
+<span class="fc" id="L106">            return scaleRow(values, work);</span>
+<span class="fc" id="L107">        } catch (ArithmeticLimit doesNotShareDenominator) {</span>
+            // Individual coordinates can fit even when a common denominator is too large.
+<span class="fc" id="L109">            return null;</span>
+        }
+    }
+
+    private static ScaledRow scaleRow(List&lt;Rational&gt; values, Work work) {
+<span class="fc" id="L114">        var denominator = commonDenominator(values, BigInteger.ONE, work);</span>
+<span class="fc" id="L115">        return new ScaledRow(scale(values, denominator, work), denominator);</span>
+    }
+
+    static int compareIndices(BigInteger left, BigInteger right, Work work) {
+<span class="fc" id="L119">        work.add(1L + Math.min(left.bitLength(), right.bitLength()) / Integer.SIZE);</span>
+<span class="fc" id="L120">        return left.compareTo(right);</span>
+    }
+
+    private static Row rowAt(BigInteger index, Map&lt;BigInteger, Row&gt; projected, List&lt;Matrix&gt; powers,
+            Work work) {
+        // Prefer an already prepared adjacent prefix. Otherwise clear set bits until a known row is reached.
+<span class="fc" id="L126">        work.add(1);</span>
+<span class="fc" id="L127">        var row = projected.get(index);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (row != null) return row;</span>
+<span class="fc" id="L129">        var missing = new ArrayList&lt;ProjectionStep&gt;();</span>
+<span class="fc" id="L130">        var prefix = index;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        while (row == null) {</span>
+<span class="fc" id="L132">            work.add(1L + prefix.bitLength() / Long.SIZE);</span>
+<span class="fc" id="L133">            var previous = prefix.subtract(BigInteger.ONE);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            int power = projected.containsKey(previous) ? 0 : prefix.bitLength() - 1;</span>
+<span class="fc" id="L135">            missing.add(new ProjectionStep(prefix, power));</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            prefix = power == 0 ? previous : prefix.clearBit(power);</span>
+<span class="fc" id="L137">            row = projected.get(prefix);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (var step : missing.reversed()) {</span>
+<span class="fc" id="L140">            var power = powerAt(step.power(), powers, work);</span>
+<span class="fc" id="L141">            row = project(row, power, work);</span>
+<span class="fc" id="L142">            work.add(1);</span>
+<span class="fc" id="L143">            projected.put(step.index(), row);</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">        return row;</span>
+    }
+
+    private static Matrix powerAt(int bit, List&lt;Matrix&gt; powers, Work work) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        while (powers.size() &lt;= bit) {</span>
+<span class="fc" id="L150">            work.add(1);</span>
+<span class="fc" id="L151">            powers.add(square(powers.getLast(), work));</span>
+        }
+<span class="fc" id="L153">        work.add(1);</span>
+<span class="fc" id="L154">        return powers.get(bit);</span>
+    }
+
+    private static Row project(Row row, Matrix power, Work work) {
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        if (row instanceof ScaledRow scaledRow &amp;&amp; power instanceof ScaledMatrix scaledPower) {</span>
+<span class="fc" id="L159">            var product = multiplyRow(scaledRow.entries(), scaledPower.entries(), work);</span>
+<span class="fc" id="L160">            var denominator = multiply(scaledRow.denominator(), scaledPower.denominator(), work);</span>
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">            if (!product.nearLimit() &amp;&amp; denominator.bitLength() &lt;= MAX_RATIONAL_BITS) {</span>
+<span class="fc" id="L162">                return new ScaledRow(product.entries(), denominator);</span>
+            }
+            try {
+<span class="nc" id="L165">                var normalized = normalize(denominator, new BigInteger[][] {product.entries()}, work);</span>
+<span class="nc" id="L166">                return new ScaledRow(product.entries(), normalized);</span>
+<span class="nc" id="L167">            } catch (ArithmeticLimit sharedScaleTooLarge) {</span>
+                // The matrix and input row are still available in their original representation.
+            }
+        }
+<span class="fc" id="L171">        return new RationalRow(multiplyFractions(fractions(row, work), fractions(power, work), work));</span>
+    }
+
+    private static Matrix square(Matrix power, Work work) {
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (power instanceof ScaledMatrix scaled) {</span>
+<span class="fc" id="L176">            work.add(scaled.entries().length);</span>
+<span class="fc" id="L177">            var squared = new BigInteger[scaled.entries().length][];</span>
+<span class="fc" id="L178">            boolean nearLimit = false;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            for (int i = 0; i &lt; squared.length; i++) {</span>
+<span class="fc" id="L180">                var product = multiplyRow(scaled.entries()[i], scaled.entries(), work);</span>
+<span class="fc" id="L181">                squared[i] = product.entries();</span>
+<span class="fc" id="L182">                nearLimit |= product.nearLimit();</span>
+            }
+<span class="fc" id="L184">            var denominator = multiply(scaled.denominator(), scaled.denominator(), work);</span>
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">            if (!nearLimit &amp;&amp; denominator.bitLength() &lt;= MAX_RATIONAL_BITS) {</span>
+<span class="fc" id="L186">                return new ScaledMatrix(squared, denominator);</span>
+            }
+            try {
+<span class="fc" id="L189">                var normalized = normalize(denominator, squared, work);</span>
+<span class="fc" id="L190">                return new ScaledMatrix(squared, normalized);</span>
+<span class="fc" id="L191">            } catch (ArithmeticLimit sharedScaleTooLarge) {</span>
+                // Retry using individually normalized entries under the remaining work.
+            }
+        }
+<span class="fc" id="L195">        var previous = fractions(power, work);</span>
+<span class="fc" id="L196">        work.add(previous.size());</span>
+<span class="fc" id="L197">        var squared = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="pc bnc" id="L198" title="All 2 branches missed.">        for (var row : previous) squared.add(multiplyFractions(row, previous, work));</span>
+<span class="nc" id="L199">        return new RationalMatrix(squared);</span>
+    }
+
+    private static List&lt;Rational&gt; multiplyFractions(List&lt;Rational&gt; row, List&lt;List&lt;Rational&gt;&gt; matrix, Work work) {
+<span class="fc" id="L203">        work.add(row.size());</span>
+<span class="fc" id="L204">        var result = new ArrayList&lt;Rational&gt;(row.size());</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (int column = 0; column &lt; row.size(); column++) {</span>
+<span class="fc" id="L206">            var total = Rational.ZERO;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            for (int i = 0; i &lt; row.size(); i++) {</span>
+<span class="fc" id="L208">                total = RecurrenceObservationArithmetic.addProduct(total, row.get(i), matrix.get(i).get(column), work);</span>
+            }
+<span class="fc" id="L210">            result.add(total);</span>
+        }
+<span class="fc" id="L212">        return result;</span>
+    }
+
+    private static List&lt;Rational&gt; fractions(Row row, Work work) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        return switch (row) {</span>
+<span class="fc" id="L217">            case RationalRow exact -&gt; exact.entries();</span>
+<span class="fc" id="L218">            case ScaledRow scaled -&gt; fractions(scaled.entries(), scaled.denominator(), work);</span>
+        };
+    }
+
+    private static List&lt;List&lt;Rational&gt;&gt; fractions(Matrix matrix, Work work) {
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (matrix instanceof RationalMatrix exact) return exact.rows();</span>
+<span class="fc" id="L224">        var scaled = (ScaledMatrix) matrix;</span>
+<span class="fc" id="L225">        work.add(scaled.entries().length);</span>
+<span class="fc" id="L226">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (var row : scaled.entries()) rows.add(fractions(row, scaled.denominator(), work));</span>
+<span class="fc" id="L228">        return rows;</span>
+    }
+
+    private static List&lt;Rational&gt; fractions(BigInteger[] entries, BigInteger denominator, Work work) {
+<span class="fc" id="L232">        work.add(entries.length);</span>
+<span class="fc" id="L233">        var row = new ArrayList&lt;Rational&gt;(entries.length);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        for (var entry : entries) row.add(new Rational(entry, denominator));</span>
+<span class="fc" id="L235">        return row;</span>
+    }
+
+    /**
+     * Normalize a fresh product before checking representation size. The temporary
+     * entries are sums of at most Integer.MAX_VALUE products of two bounded integers.
+     */
+    private static BigInteger normalize(BigInteger denominator, BigInteger[][] entries, Work work) {
+<span class="fc" id="L243">        var divisor = denominator;</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (var row : entries) {</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            for (var value : row) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                if (divisor.equals(BigInteger.ONE)) break;</span>
+<span class="fc" id="L247">                work.add(1);</span>
+<span class="fc" id="L248">                divisor = divisor.gcd(value);</span>
+            }
+        }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        boolean reduce = !divisor.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (var row : entries) {</span>
+<span class="fc" id="L253">            work.add(row.length);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (int i = 0; i &lt; row.length; i++) {</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                row[i] = checked(reduce ? row[i].divide(divisor) : row[i]);</span>
+            }
+        }
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        return checked(reduce ? denominator.divide(divisor) : denominator);</span>
+    }
+
+    private static RowProduct multiplyRow(BigInteger[] row, BigInteger[][] matrix, Work work) {
+<span class="fc" id="L262">        work.add(row.length);</span>
+<span class="fc" id="L263">        var result = new BigInteger[row.length];</span>
+<span class="fc" id="L264">        boolean nearLimit = false;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (int column = 0; column &lt; row.length; column++) {</span>
+<span class="fc" id="L266">            var sum = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            for (int i = 0; i &lt; row.length; i++) sum = addProduct(sum, row[i], matrix[i][column], work);</span>
+<span class="fc" id="L268">            result[column] = sum;</span>
+            // At the boundary check the absolute magnitude, including negative powers of two.
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            nearLimit |= sum.bitLength() &gt;= MAX_RATIONAL_BITS;</span>
+        }
+<span class="fc" id="L272">        return new RowProduct(result, nearLimit);</span>
+    }
+
+    private static Matrix scaleMatrix(Transition transition, List&lt;Integer&gt; coordinates, boolean hasConstant,
+            Work work) {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        int width = coordinates.size() + (hasConstant ? 1 : 0);</span>
+<span class="fc" id="L278">        work.add(width);</span>
+<span class="fc" id="L279">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;(width);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        for (int coordinate : coordinates) {</span>
+<span class="fc" id="L281">            work.add(width);</span>
+<span class="fc" id="L282">            var row = new ArrayList&lt;Rational&gt;(width);</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            for (int column : coordinates) row.add(transition.linear().get(coordinate, column));</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            if (hasConstant) row.add(transition.offset().get(coordinate));</span>
+<span class="fc" id="L285">            rows.add(row);</span>
+<span class="fc" id="L286">        }</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (hasConstant) {</span>
+<span class="fc" id="L288">            work.add(width);</span>
+<span class="fc" id="L289">            var row = new ArrayList&lt;&gt;(Collections.nCopies(width - 1, Rational.ZERO));</span>
+<span class="fc" id="L290">            row.add(Rational.ONE);</span>
+<span class="fc" id="L291">            rows.add(row);</span>
+        }
+        try {
+<span class="fc" id="L294">            var denominator = BigInteger.ONE;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            for (var row : rows) denominator = commonDenominator(row, denominator, work);</span>
+<span class="fc" id="L296">            work.add(width);</span>
+<span class="fc" id="L297">            var entries = new BigInteger[width][];</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            for (int i = 0; i &lt; width; i++) entries[i] = scale(rows.get(i), denominator, work);</span>
+<span class="fc" id="L299">            return new ScaledMatrix(entries, denominator);</span>
+<span class="fc" id="L300">        } catch (ArithmeticLimit sharedScaleTooLarge) {</span>
+<span class="fc" id="L301">            return new RationalMatrix(rows);</span>
+        }
+    }
+
+    private static List&lt;Rational&gt; project(ExactVector vector, List&lt;Integer&gt; coordinates, boolean hasConstant,
+            Rational constant, Work work) {
+<span class="fc" id="L307">        work.add(1L + coordinates.size());</span>
+<span class="fc" id="L308">        var values = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (int coordinate : coordinates) values.add(vector.get(coordinate));</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (hasConstant) values.add(constant);</span>
+<span class="fc" id="L311">        return values;</span>
+    }
+
+    private static BigInteger commonDenominator(List&lt;Rational&gt; values, BigInteger denominator, Work work) {
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        for (var value : values) {</span>
+<span class="fc" id="L316">            work.add(1);</span>
+<span class="fc" id="L317">            var divisor = value.denominator();</span>
+<span class="fc bfc" id="L318" title="All 4 branches covered.">            if (divisor.equals(BigInteger.ONE) || divisor.equals(denominator)) continue;</span>
+<span class="fc" id="L319">            work.add(2);</span>
+<span class="fc" id="L320">            denominator = checked(multiply(denominator, divisor.divide(denominator.gcd(divisor)), work));</span>
+<span class="fc" id="L321">        }</span>
+<span class="fc" id="L322">        return denominator;</span>
+    }
+
+    private static BigInteger[] scale(List&lt;Rational&gt; values, BigInteger denominator, Work work) {
+<span class="fc" id="L326">        work.add(values.size());</span>
+<span class="fc" id="L327">        var entries = new BigInteger[values.size()];</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="fc" id="L329">            var value = values.get(i);</span>
+<span class="fc" id="L330">            var numerator = value.numerator();</span>
+<span class="fc bfc" id="L331" title="All 4 branches covered.">            if (numerator.signum() != 0 &amp;&amp; !denominator.equals(value.denominator())) {</span>
+<span class="fc" id="L332">                work.add(1);</span>
+<span class="fc" id="L333">                numerator = checked(multiply(numerator, denominator.divide(value.denominator()), work));</span>
+            }
+<span class="fc" id="L335">            entries[i] = numerator;</span>
+        }
+<span class="fc" id="L337">        return entries;</span>
+    }
+
+    private static BigInteger addProduct(BigInteger total, BigInteger left, BigInteger right, Work work) {
+<span class="fc" id="L341">        work.add(1);</span>
+<span class="fc bfc" id="L342" title="All 4 branches covered.">        if (left.signum() == 0 || right.signum() == 0) return total;</span>
+<span class="fc" id="L343">        var product = multiply(left, right, work);</span>
+<span class="fc" id="L344">        work.add(1);</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        return total.signum() == 0 ? product : total.add(product);</span>
+    }
+
+    private static BigInteger multiply(BigInteger left, BigInteger right, Work work) {
+<span class="fc" id="L349">        work.add(1);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (left.equals(BigInteger.ONE)) return right;</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (right.equals(BigInteger.ONE)) return left;</span>
+<span class="fc" id="L352">        return left.multiply(right);</span>
+    }
+
+<span class="fc" id="L355">    private record RowProduct(BigInteger[] entries, boolean nearLimit) { }</span>
+<span class="fc" id="L356">    private record ProjectionStep(BigInteger index, int power) { }</span>
+    private sealed interface Row permits ScaledRow, RationalRow { }
+<span class="fc" id="L358">    private record RationalRow(List&lt;Rational&gt; entries) implements Row { }</span>
+<span class="fc" id="L359">    private record ScaledRow(BigInteger[] entries, BigInteger denominator) implements Row { }</span>
+    private sealed interface Matrix permits ScaledMatrix, RationalMatrix { }
+<span class="fc" id="L361">    private record RationalMatrix(List&lt;List&lt;Rational&gt;&gt; rows) implements Matrix { }</span>
+<span class="fc" id="L362">    private record ScaledMatrix(BigInteger[][] entries, BigInteger denominator) implements Matrix { }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
