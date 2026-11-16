@@ -52,7 +52,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
-/** App-level Seed → Discovery → Replay → Persistence workflow. */
+/** Reproduces scientific seed runs with the app's discovery and persistence components. */
 public final class ScientificDiscoveryWorkflow implements AutoCloseable {
     private static final Instant FIXED_INSTANT = Instant.EPOCH;
 

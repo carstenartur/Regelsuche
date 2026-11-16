@@ -377,13 +377,9 @@ Default-Enablement und Tags. Die aktuelle Reihenfolge ist deterministisch:
 4. `hypothesis_telescoping_fraction` — standardmäßig aktiviert;
 5. `hypothesis_rationalize_denominator` — standardmäßig aktiviert.
 
-`DiscoveryEngineFactory` komponiert Engines immer in der Reihenfolge
-**base rewrite → hypothesis operators → learned macro moves**. Dadurch muss der
-Workflow nicht mehr wissen, welche Operator-Klassen direkt zu instanziieren sind,
-und neue Varianten lassen sich über Optionen statt über verstreute Konstruktoren
-steuern. Das senkt die kognitive Last, weil Profilwahl, Operatorliste und
-Engine-Reihenfolge jeweils genau eine Zuständigkeit haben. Die Factory lernt oder
-promotet keine Makros; das ist ausschließlich Orchestrierungslogik.
+Für die App-Tests komponiert `DiscoveryEngineFactory` Engines in der Reihenfolge
+**base rewrite → hypothesis operators → learned macro moves**. Die Operatorwahl
+erfolgt über Optionen. Lernen und Promotion gehören zur Workflow-Orchestrierung.
 
 Neue Hypothesenoperatoren werden so ergänzt:
 
