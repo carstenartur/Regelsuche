@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -127,9 +128,10 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
     ) throws IOException {
         String revision = requireRevision(repositoryRevision);
         Path root = requireDirectory(repositoryRoot, "repositoryRoot");
-        RunSnapshot first = readRun(hostA, revision);
-        RunSnapshot second = readRun(hostB, revision);
-        RunSnapshot container = readRun(containerRun, revision);
+        PlanArtifact expectedPlan = TargetFreeHeldOutMatrixRunner.createPlan(revision);
+        RunSnapshot first = readRun(hostA, expectedPlan);
+        RunSnapshot second = readRun(hostB, expectedPlan);
+        RunSnapshot container = readRun(containerRun, expectedPlan);
         requireSameBytes(first, second, "host-repeat");
         requireSameBytes(first, container, "host-container");
 
@@ -203,7 +205,7 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
         return ReproductionReceipt.create(content);
     }
 
-    private static RunSnapshot readRun(Path directory, String revision)
+    private static RunSnapshot readRun(Path directory, PlanArtifact expectedPlan)
             throws IOException {
         Path root = requireDirectory(directory, "runDirectory");
         if (Files.isSymbolicLink(root)) {
@@ -239,66 +241,67 @@ public final class TargetFreeHeldOutContainerReproductionVerifier {
         QualificationArtifact qualification =
             QualificationArtifact.fromCanonicalJson(text(bytes.get(
                 TargetFreeHeldOutMatrixRunner.QUALIFICATION_FILE_NAME)));
-        validateRun(revision, plan, freeze, qualification);
+        validateRun(expectedPlan, plan, freeze, qualification);
         return new RunSnapshot(bytes, plan, freeze, qualification);
     }
 
     private static void validateRun(
-        String revision,
+        PlanArtifact expectedPlan,
         PlanArtifact plan,
         FreezeArtifact freeze,
         QualificationArtifact qualification
     ) {
+        if (!plan.equals(expectedPlan)) {
+            throw new IllegalArgumentException("held-out plan differs from preregistration");
+        }
+        TargetFreeHeldOutMatrixRunner.requireFreezeAuthority(plan, freeze);
         PlanContent planContent = plan.content();
-        FreezeContent freezeContent = freeze.content();
-        QualificationContent qualificationContent = qualification.content();
-        if (!revision.equals(planContent.repositoryRevision())
-                || !revision.equals(freezeContent.repositoryRevision())
-                || !revision.equals(
-                    qualificationContent.repositoryRevision())) {
-            throw new IllegalArgumentException(
-                "held-out artifacts bind different repository revisions");
-        }
-        if (!TargetFreeHeldOutMatrixRunner.QUALIFICATION_NOT_DISCLOSED
-                .equals(planContent.qualificationDisclosure())
-                || !TargetFreeHeldOutMatrixRunner.QUALIFICATION_NOT_DISCLOSED
-                    .equals(freezeContent.qualificationDisclosure())
-                || !TargetFreeHeldOutMatrixRunner.QUALIFICATION_DISCLOSED
-                    .equals(qualificationContent.qualificationDisclosure())) {
-            throw new IllegalArgumentException(
-                "held-out qualification disclosure boundary differs");
-        }
-        if (planContent.cases().size() != 6
-                || planContent.policies().size() != 4
-                || !planContent.workMatching().checkpoints().equals(
-                    List.of(8, 16, 32, 64, 128, 256))
-                || planContent.rows().size() != 144
-                || freezeContent.rows().size() != 144
-                || qualificationContent.rows().size() != 144
-                || freezeContent.matchedWorkGroups().size() != 36
-                || qualificationContent.comparisons().size() != 36) {
-            throw new IllegalArgumentException(
-                "held-out matrix dimensions differ from the freeze");
-        }
-        List<String> planIds = planContent.rows().stream()
-            .map(PlanRow::configurationId).toList();
-        List<String> freezeIds = freezeContent.rows().stream()
-            .map(FreezeRow::configurationId).toList();
-        List<String> qualificationIds = qualificationContent.rows().stream()
-            .map(QualificationRow::configurationId).toList();
-        if (new HashSet<>(planIds).size() != 144
-                || !planIds.equals(freezeIds)
-                || !planIds.equals(qualificationIds)) {
-            throw new IllegalArgumentException(
-                "held-out configuration identities differ or repeat");
-        }
-        if (!freezeContent.planHash().equals(plan.contentHash())
-                || !qualificationContent.planHash().equals(
-                    plan.contentHash())
-                || !qualificationContent.candidateFreezeHash().equals(
-                    freeze.contentHash())) {
+        QualificationContent result = qualification.content();
+        if (!result.repositoryRevision().equals(planContent.repositoryRevision())
+                || !result.planHash().equals(plan.contentHash())
+                || !result.candidateFreezeHash().equals(freeze.contentHash())
+                || !result.qualificationResource().equals(planContent.qualificationResource())
+                || !result.qualificationHash().equals(planContent.qualificationHash())
+                || result.qualificationByteLength() != planContent.qualificationByteLength()) {
             throw new IllegalArgumentException(
                 "held-out plan/freeze/qualification binding differs");
+        }
+        List<FreezeRow> frozenRows = freeze.content().rows();
+        for (int index = 0; index < frozenRows.size(); index++) {
+            requireFrozenRow(frozenRows.get(index), result.rows().get(index));
+        }
+    }
+
+    private static void requireFrozenRow(FreezeRow frozen, QualificationRow assessed) {
+        if (assessed.sequence() != frozen.sequence()
+                || !assessed.configurationId().equals(frozen.configurationId())
+                || !assessed.caseId().equals(frozen.caseId())
+                || !assessed.policyId().equals(frozen.policyId())
+                || assessed.checkpoint() != frozen.checkpoint()
+                || !assessed.freezeStatus().equals(frozen.status())
+                || !assessed.candidateBatchHash().equals(frozen.candidateBatchHash())
+                || !assessed.candidateSetHash().equals(frozen.candidateSetHash())
+                || !assessed.candidateFreezeReceiptHash().equals(frozen.candidateFreezeReceiptHash())
+                || !assessed.workLedgerHash().equals(frozen.work().contentHash())
+                || !assessed.classificationCatalogHash().equals(frozen.postFreezeCatalogCommitment())
+                || assessed.candidates().size() != frozen.candidates().size()) {
+            throw new IllegalArgumentException(
+                "qualification differs from frozen row: " + frozen.configurationId());
+        }
+        List<CandidateEvidence> candidates = frozen.candidates().stream()
+            .sorted(Comparator.comparing(CandidateEvidence::candidateHash)).toList();
+        for (int index = 0; index < candidates.size(); index++) {
+            CandidateEvidence original = candidates.get(index);
+            CandidateQualification projected = assessed.candidates().get(index);
+            if (!projected.candidateHash().equals(original.candidateHash())
+                    || !projected.expression().equals(original.expression())
+                    || !projected.assumptions().equals(original.assumptions())
+                    || projected.depth() != original.depth()
+                    || !projected.pathRuleIds().equals(original.pathRuleIds())
+                    || projected.temporaryComplexityIncrease() != original.temporaryComplexityIncrease()) {
+                throw new IllegalArgumentException(
+                    "qualification differs from frozen candidate: " + original.candidateHash());
+            }
         }
     }
 

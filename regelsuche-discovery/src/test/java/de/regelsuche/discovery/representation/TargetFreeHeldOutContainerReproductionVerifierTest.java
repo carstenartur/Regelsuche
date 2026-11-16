@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.discovery.representation.TargetFreeHeldOutContainerReproductionVerifier.ReproductionReceipt;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -74,6 +75,54 @@ class TargetFreeHeldOutContainerReproductionVerifierTest {
             "{}",
             StandardCharsets.UTF_8);
         assertThrows(IllegalArgumentException.class, () -> verify(fixture));
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.MINUTES)
+    void rejectsIdenticalRehashedEvidenceWithUnboundRoots(
+        @TempDir Path temporary
+    ) throws Exception {
+        Fixture fixture = fixture(temporary);
+        String freezeName = TargetFreeHeldOutMatrixRunner.FREEZE_FILE_NAME;
+        String qualificationName = TargetFreeHeldOutMatrixRunner.QUALIFICATION_FILE_NAME;
+        String freezeJson = Files.readString(fixture.hostA().resolve(freezeName));
+        String qualificationJson = Files.readString(fixture.hostA().resolve(qualificationName));
+        var json = TargetFreeHeldOutMatrixRunner.JSON;
+
+        var freeze = (ObjectNode) json.readTree(freezeJson).get("content");
+        freeze.put("formationHash", IMAGE_ID);
+        var reboundFreeze = FreezeArtifact.create(json.treeToValue(freeze, FreezeContent.class));
+        var qualification = (ObjectNode) json.readTree(qualificationJson).get("content");
+        qualification.put("candidateFreezeHash", reboundFreeze.contentHash());
+        var reboundQualification = QualificationArtifact.create(
+            json.treeToValue(qualification, QualificationContent.class));
+        replaceInAllRuns(fixture, freezeName, reboundFreeze.toCanonicalJson());
+        replaceInAllRuns(fixture, qualificationName, reboundQualification.toCanonicalJson());
+        assertThrows(IllegalArgumentException.class, () -> verify(fixture));
+
+        replaceInAllRuns(fixture, freezeName, freezeJson);
+        qualification.put("candidateFreezeHash", FreezeArtifact.fromCanonicalJson(freezeJson).contentHash());
+        var rows = qualification.get("rows");
+        var first = (ObjectNode) rows.get(0);
+        String originalWork = first.get("workLedgerHash").textValue();
+        first.put("workLedgerHash", rows.get(1).get("workLedgerHash").textValue());
+        reboundQualification = QualificationArtifact.create(json.treeToValue(qualification, QualificationContent.class));
+        replaceInAllRuns(fixture, qualificationName, reboundQualification.toCanonicalJson());
+        assertThrows(IllegalArgumentException.class, () -> verify(fixture));
+
+        first.put("workLedgerHash", originalWork);
+        var candidate = (ObjectNode) first.get("candidates").get(0);
+        candidate.put("expression", candidate.get("expression").textValue() + " + 0");
+        reboundQualification = QualificationArtifact.create(json.treeToValue(qualification, QualificationContent.class));
+        replaceInAllRuns(fixture, qualificationName, reboundQualification.toCanonicalJson());
+        assertThrows(IllegalArgumentException.class, () -> verify(fixture));
+    }
+
+    private static void replaceInAllRuns(Fixture fixture, String name, String content)
+            throws IOException {
+        for (Path directory : List.of(fixture.hostA(), fixture.hostB(), fixture.container())) {
+            Files.writeString(directory.resolve(name), content, StandardCharsets.UTF_8);
+        }
     }
 
     private static ReproductionReceipt verify(Fixture fixture)

@@ -17,6 +17,16 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Quellenbindung der zurückgehaltenen Darstellungsmatrix
+
+- **Hypothese.** Eine geprüfte Bindung an den Versuchsplan und die eingefrorenen Kandidaten verhindert, dass drei bytegleiche Kopien eine fachlich falsch zugeordnete Auswertung bestätigen.
+- **Umsetzungsstand.** Der Matrixläufer prüft die Bindung vor der Qualifikation. Der Reproduktionsprüfer gleicht den Plan mit der Präregistrierung und jede Auswertung mit dem eingefrorenen Lauf ab.
+- **Befund.** Im bestehenden Panel mit 144 Zeilen weist der Prüfer neu gehashte Kopien mit veränderter Formation, einem fremden Arbeitsnachweis oder einem abweichenden Kandidatenausdruck ab. [Daten, Prüfgrenzen und Reproduktion](../target-free-held-out-container-reproduction.md)
+- **Folgerung.** Den Prüfpfad bei weiteren Vergleichsläufen wiederverwenden. Für die historische Kalibrierung fehlen weiterhin eingefrorene Nachweise für Archiv- und Rangstufen.
+
+- [`TargetFreeHeldOutMatrixRunner.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeHeldOutMatrixRunner.java#L44) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeHeldOutMatrixRunner.java | public final class TargetFreeHeldOutMatrixRunner { -->
+- [`TargetFreeHeldOutContainerReproductionVerifierTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeHeldOutContainerReproductionVerifierTest.java#L20) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeHeldOutContainerReproductionVerifierTest.java | class TargetFreeHeldOutContainerReproductionVerifierTest { -->
+
 ## Gelernte Brücke zur Faktorisierung
 
 - **Hypothese.** Eine aus zwei Koeffizientenreihen gelernte Brücke spart Sucharbeit in zurückgehaltenen Aufgabenfamilien.
