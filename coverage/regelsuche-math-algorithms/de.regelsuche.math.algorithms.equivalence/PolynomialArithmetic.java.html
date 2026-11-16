@@ -41,8 +41,8 @@ final class PolynomialArithmetic {
 <span class="fc" id="L41">        Optional&lt;Polynomial&gt; parsed = parseUncached(expression);</span>
 <span class="fc" id="L42">        synchronized (parseCache) {</span>
 <span class="fc" id="L43">            Optional&lt;Polynomial&gt; cached = parseCache.get(expression);</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (cached != null) {</span>
-<span class="nc" id="L45">                return cached;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc" id="L45">                return cached;</span>
             }
 <span class="fc" id="L47">            parseCache.put(expression, parsed);</span>
 <span class="fc bfc" id="L48" title="All 2 branches covered.">            while (parseCache.size() &gt; parseCacheCapacity) {</span>
