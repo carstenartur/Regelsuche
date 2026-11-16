@@ -24,12 +24,11 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
-    systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
+    finalizedBy tasks.named('jacocoTestReport')
     inputs.files(
         rootProject.file('config/benchmarks/external-recurrence-observations-v1.json'),
         rootProject.file('docs/research/external-recurrence-observations-v1/work.tsv')
     ).withPathSensitivity(PathSensitivity.RELATIVE)
-    finalizedBy tasks.named('jacocoTestReport')
 }
 
 jacoco {
