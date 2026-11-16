@@ -168,82 +168,70 @@ public class GoalAwareMacroMoveSelector {
             + exposureBonus;
     }
 
-    /**
-     * Heuristic goal-alignment check.
-     *
-     * &lt;p&gt;A rule is considered goal-aligned when the structural skeleton of
-     * its left pattern shares operator tokens or named identifiers with the
-     * current expression. Pure integer literals are excluded to avoid
-     * spurious matches (every expression &quot;contains&quot; the number 1 or 2).&lt;/p&gt;
-     */
-    private boolean isGoalAligned(ReusableRule rule, String currentExpression) {
-<span class="nc bnc" id="L180" title="All 2 branches missed.">        return structuralOverlap(rule.leftPattern(), currentExpression) &gt; 0;</span>
-    }
-
     private int structuralOverlap(String pattern, String expression) {
-<span class="pc bpc" id="L184" title="4 of 8 branches missed.">        if (pattern == null || pattern.isBlank() || expression == null || expression.isBlank()) {</span>
-<span class="nc" id="L185">            return 0;</span>
+<span class="pc bpc" id="L172" title="4 of 8 branches missed.">        if (pattern == null || pattern.isBlank() || expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L173">            return 0;</span>
         }
-<span class="fc" id="L187">        Set&lt;String&gt; expressionTokens = tokens(expression);</span>
-<span class="fc" id="L188">        int matches = 0;</span>
-<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (String token : tokens(pattern)) {</span>
-<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (expressionTokens.contains(token)) {</span>
-<span class="fc" id="L191">                matches++;</span>
+<span class="fc" id="L175">        Set&lt;String&gt; expressionTokens = tokens(expression);</span>
+<span class="fc" id="L176">        int matches = 0;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (String token : tokens(pattern)) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (expressionTokens.contains(token)) {</span>
+<span class="fc" id="L179">                matches++;</span>
             }
-<span class="fc" id="L193">        }</span>
-<span class="fc" id="L194">        return matches;</span>
+<span class="fc" id="L181">        }</span>
+<span class="fc" id="L182">        return matches;</span>
     }
 
     private int namedStructuralOverlap(String pattern, String expression) {
-<span class="fc" id="L198">        Set&lt;String&gt; expressionTokens = tokens(expression);</span>
-<span class="fc" id="L199">        int matches = 0;</span>
-<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (String token : tokens(pattern)) {</span>
-<span class="fc bfc" id="L201" title="All 4 branches covered.">            if (!token.startsWith(&quot;op:&quot;) &amp;&amp; expressionTokens.contains(token)) {</span>
-<span class="fc" id="L202">                matches++;</span>
+<span class="fc" id="L186">        Set&lt;String&gt; expressionTokens = tokens(expression);</span>
+<span class="fc" id="L187">        int matches = 0;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (String token : tokens(pattern)) {</span>
+<span class="fc bfc" id="L189" title="All 4 branches covered.">            if (!token.startsWith(&quot;op:&quot;) &amp;&amp; expressionTokens.contains(token)) {</span>
+<span class="fc" id="L190">                matches++;</span>
             }
-<span class="fc" id="L204">        }</span>
-<span class="fc" id="L205">        return matches;</span>
+<span class="fc" id="L192">        }</span>
+<span class="fc" id="L193">        return matches;</span>
     }
 
     private boolean exposesNewApplicableRules(ReusableRule rule, String currentExpression) {
-<span class="fc" id="L209">        Set&lt;String&gt; current = tokens(currentExpression);</span>
-<span class="fc" id="L210">        Set&lt;String&gt; produced = tokens(rule.rightPattern());</span>
-<span class="fc" id="L211">        produced.removeAll(current);</span>
-<span class="fc bfc" id="L212" title="All 2 branches covered.">        return !produced.isEmpty();</span>
+<span class="fc" id="L197">        Set&lt;String&gt; current = tokens(currentExpression);</span>
+<span class="fc" id="L198">        Set&lt;String&gt; produced = tokens(rule.rightPattern());</span>
+<span class="fc" id="L199">        produced.removeAll(current);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        return !produced.isEmpty();</span>
     }
 
     private boolean hasNamedTokens(String expression) {
-<span class="fc bfc" id="L216" title="All 2 branches covered.">        return tokens(expression).stream().anyMatch(token -&gt; !token.startsWith(&quot;op:&quot;));</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        return tokens(expression).stream().anyMatch(token -&gt; !token.startsWith(&quot;op:&quot;));</span>
     }
 
     private Set&lt;String&gt; tokens(String expression) {
-<span class="fc" id="L220">        Set&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (String operator : List.of(&quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;/&quot;, &quot;^&quot;)) {</span>
-<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (expression.contains(operator)) {</span>
-<span class="fc" id="L223">                result.add(&quot;op:&quot; + operator);</span>
+<span class="fc" id="L208">        Set&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (String operator : List.of(&quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;/&quot;, &quot;^&quot;)) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (expression.contains(operator)) {</span>
+<span class="fc" id="L211">                result.add(&quot;op:&quot; + operator);</span>
             }
-<span class="fc" id="L225">        }</span>
+<span class="fc" id="L213">        }</span>
         // Extract significant tokens from pattern (operators and named identifiers only).
-<span class="fc" id="L227">        String[] tokens = expression.split(&quot;[\\s()^+\\-*/,]+&quot;);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (String token : tokens) {</span>
-<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (token.isEmpty()) {</span>
-<span class="fc" id="L230">                continue;</span>
+<span class="fc" id="L215">        String[] tokens = expression.split(&quot;[\\s()^+\\-*/,]+&quot;);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (String token : tokens) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (token.isEmpty()) {</span>
+<span class="fc" id="L218">                continue;</span>
             }
             // Skip single-uppercase-letter placeholders (A, B, C, ...) and N\d+ placeholders.
-<span class="pc bpc" id="L233" title="1 of 4 branches missed.">            if (token.matches(&quot;[A-Z]&quot;) || token.matches(&quot;N\\d+&quot;)) {</span>
-<span class="nc" id="L234">                continue;</span>
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">            if (token.matches(&quot;[A-Z]&quot;) || token.matches(&quot;N\\d+&quot;)) {</span>
+<span class="nc" id="L222">                continue;</span>
             }
             // Skip pure integer literals — they appear in almost any expression and cause
             // false-positive goal-alignment matches.
-<span class="fc bfc" id="L238" title="All 2 branches covered.">            if (token.matches(&quot;-?\\d+&quot;)) {</span>
-<span class="fc" id="L239">                continue;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (token.matches(&quot;-?\\d+&quot;)) {</span>
+<span class="fc" id="L227">                continue;</span>
             }
-<span class="fc" id="L241">            result.add(token);</span>
+<span class="fc" id="L229">            result.add(token);</span>
         }
-<span class="fc" id="L243">        return result;</span>
+<span class="fc" id="L231">        return result;</span>
     }
 
-<span class="fc" id="L246">    public record ScoredMacroMove(ReusableRule rule, double score) {</span>
+<span class="fc" id="L234">    public record ScoredMacroMove(ReusableRule rule, double score) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

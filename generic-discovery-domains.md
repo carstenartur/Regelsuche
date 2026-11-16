@@ -71,9 +71,9 @@ kanonisch äquivalente, als semantikerhaltend markierte Rewrite-Spur. Das
 Certificate trägt daher ausdrücklich die Stärke
 `VALIDATION_EVIDENCE_NOT_FORMAL_PROOF`.
 
-Dieser Slice ersetzt den App-Level-`ScientificDiscoveryWorkflow` noch nicht.
-Er stellt den Adapter und byte-deterministische Charakterisierung bereit, auf
-denen die schrittweise Portierung bestehender Kampagnen aufbauen kann.
+Der Adapter und die byte-deterministische Charakterisierung dienen als Grundlage
+für die Portierung bestehender Kampagnen. Der `ScientificDiscoveryWorkflow`
+reproduziert kuratierte Seed-Läufe in den App-Tests.
 
 ## Zweite Domäne: endliche Differenzen
 

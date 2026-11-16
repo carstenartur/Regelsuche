@@ -67,10 +67,10 @@ verification cost is -1, not zero.
 
 `MoveProviders.from` exposes the base engine and individual hypotheses instead
 of executing the old wrapper's global append limit. Inventory macro wrappers
-expose the same provider contract. `DiscoveryEngineFactory.createMoveEngine`
-uses this common boundary and a caller-supplied policy; its experimental engine
-rejects the PRODUCTION phase pending the separate #745 qualification. The old
-engine entry points remain the historical/production controls until that gate.
+expose the same provider contract. In app test support,
+`DiscoveryEngineFactory.createMoveEngine` uses this boundary and a caller-supplied
+policy. The experimental engine rejects the `PRODUCTION` phase pending #745
+qualification. The existing engine entry points serve as comparison controls.
 Opaque engines do not assert complete successor enumeration.
 
 The `ReusableRule` value object now belongs to Learning, with its existing Java

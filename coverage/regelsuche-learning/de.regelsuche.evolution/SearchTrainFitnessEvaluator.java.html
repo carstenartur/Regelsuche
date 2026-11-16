@@ -244,24 +244,18 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             false);
     }
 
-    private EvolutionTrainSearchSuite.TrainCase requireTrainCase(
-        EvolutionTrainSearchSuite.TrainCase trainCase
-    ) {
-<span class="nc" id="L250">        return Objects.requireNonNull(trainCase, &quot;trainCase&quot;);</span>
-    }
-
     private SearchHeuristic effectiveHeuristic(EvolutionGenome genome) {
-<span class="fc" id="L254">        SearchHeuristic configured = suite.heuristic();</span>
-<span class="fc" id="L255">        return new SearchHeuristic(</span>
-<span class="fc" id="L256">            Math.min(configured.maxDepth(),</span>
-<span class="fc" id="L257">                genome.budget().maxApplicationsPerPath()),</span>
-<span class="fc" id="L258">            configured.maxVisitedExpressions(),</span>
-<span class="fc" id="L259">            configured.significantImprovementThreshold(),</span>
-<span class="fc" id="L260">            Math.min(configured.maxExpandingSteps(),</span>
-<span class="fc" id="L261">                genome.budget().maxApplicationsPerPath()),</span>
-<span class="fc" id="L262">            Math.min(configured.maxCandidatesPerState(),</span>
-<span class="fc" id="L263">                genome.budget().maxCandidatesPerState()),</span>
-<span class="fc" id="L264">            configured.beamWidth());</span>
+<span class="fc" id="L248">        SearchHeuristic configured = suite.heuristic();</span>
+<span class="fc" id="L249">        return new SearchHeuristic(</span>
+<span class="fc" id="L250">            Math.min(configured.maxDepth(),</span>
+<span class="fc" id="L251">                genome.budget().maxApplicationsPerPath()),</span>
+<span class="fc" id="L252">            configured.maxVisitedExpressions(),</span>
+<span class="fc" id="L253">            configured.significantImprovementThreshold(),</span>
+<span class="fc" id="L254">            Math.min(configured.maxExpandingSteps(),</span>
+<span class="fc" id="L255">                genome.budget().maxApplicationsPerPath()),</span>
+<span class="fc" id="L256">            Math.min(configured.maxCandidatesPerState(),</span>
+<span class="fc" id="L257">                genome.budget().maxCandidatesPerState()),</span>
+<span class="fc" id="L258">            configured.beamWidth());</span>
     }
 
     static GoalSearchResult search(
@@ -270,144 +264,144 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
         String target,
         SearchHeuristic heuristic
     ) {
-<span class="fc" id="L273">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L267">        SearchProblem problem = new SearchProblem(</span>
             input,
             engine,
             new ExpressionScorer(),
             new ExpressionCanonicalizer(),
             heuristic)
-<span class="fc" id="L279">            .withTarget(SearchTarget.syntaxExact(target));</span>
-<span class="fc" id="L280">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+<span class="fc" id="L273">            .withTarget(SearchTarget.syntaxExact(target));</span>
+<span class="fc" id="L274">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
     }
 
     private Map&lt;FitnessComponent, Integer&gt; components(
         EvolutionGenome genome,
         List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements
     ) {
-<span class="fc" id="L287">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+<span class="fc" id="L281">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
             new EnumMap&lt;&gt;(FitnessComponent.class);
-<span class="fc" id="L289">        int caseCount = suite.cases().size();</span>
-<span class="fc" id="L290">        int candidateReached = (int) measurements.stream()</span>
-<span class="fc" id="L291">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::candidateReached)</span>
-<span class="fc" id="L292">            .count();</span>
-<span class="fc" id="L293">        int newlySolved = (int) measurements.stream()</span>
-<span class="fc" id="L294">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::newlySolved)</span>
-<span class="fc" id="L295">            .count();</span>
-<span class="fc" id="L296">        result.put(FitnessComponent.SUPPORT, permille(candidateReached, caseCount));</span>
-<span class="fc" id="L297">        result.put(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,</span>
-<span class="fc" id="L298">            permille(newlySolved, caseCount));</span>
-<span class="fc" id="L299">        result.put(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,</span>
-<span class="fc" id="L300">            pairedDepthReduction(measurements));</span>
-<span class="fc" id="L301">        result.put(FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,</span>
-<span class="fc" id="L302">            pairedStateReduction(measurements));</span>
-<span class="fc" id="L303">        result.put(FitnessComponent.ASSUMPTION_SIMPLICITY,</span>
-<span class="fc" id="L304">            assumptionSimplicity(genome));</span>
-<span class="fc" id="L305">        result.put(FitnessComponent.CANDIDATE_COMPLEXITY,</span>
-<span class="fc" id="L306">            candidateSimplicity(genome));</span>
-<span class="fc" id="L307">        result.put(FitnessComponent.PROOF_COST_PROXY,</span>
-<span class="fc" id="L308">            proofCostProxy(genome));</span>
-<span class="fc" id="L309">        return result;</span>
+<span class="fc" id="L283">        int caseCount = suite.cases().size();</span>
+<span class="fc" id="L284">        int candidateReached = (int) measurements.stream()</span>
+<span class="fc" id="L285">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::candidateReached)</span>
+<span class="fc" id="L286">            .count();</span>
+<span class="fc" id="L287">        int newlySolved = (int) measurements.stream()</span>
+<span class="fc" id="L288">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::newlySolved)</span>
+<span class="fc" id="L289">            .count();</span>
+<span class="fc" id="L290">        result.put(FitnessComponent.SUPPORT, permille(candidateReached, caseCount));</span>
+<span class="fc" id="L291">        result.put(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,</span>
+<span class="fc" id="L292">            permille(newlySolved, caseCount));</span>
+<span class="fc" id="L293">        result.put(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,</span>
+<span class="fc" id="L294">            pairedDepthReduction(measurements));</span>
+<span class="fc" id="L295">        result.put(FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,</span>
+<span class="fc" id="L296">            pairedStateReduction(measurements));</span>
+<span class="fc" id="L297">        result.put(FitnessComponent.ASSUMPTION_SIMPLICITY,</span>
+<span class="fc" id="L298">            assumptionSimplicity(genome));</span>
+<span class="fc" id="L299">        result.put(FitnessComponent.CANDIDATE_COMPLEXITY,</span>
+<span class="fc" id="L300">            candidateSimplicity(genome));</span>
+<span class="fc" id="L301">        result.put(FitnessComponent.PROOF_COST_PROXY,</span>
+<span class="fc" id="L302">            proofCostProxy(genome));</span>
+<span class="fc" id="L303">        return result;</span>
     }
 
     private Map&lt;FitnessComponent, Integer&gt; zeroComponents() {
-<span class="nc" id="L313">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+<span class="nc" id="L307">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
             new EnumMap&lt;&gt;(FitnessComponent.class);
-<span class="nc" id="L315">        requiredComponents.forEach(component -&gt; result.put(component, 0));</span>
-<span class="nc" id="L316">        return result;</span>
+<span class="nc" id="L309">        requiredComponents.forEach(component -&gt; result.put(component, 0));</span>
+<span class="nc" id="L310">        return result;</span>
     }
 
     private static int pairedDepthReduction(
         List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements
     ) {
-<span class="fc" id="L322">        long baseline = 0;</span>
-<span class="fc" id="L323">        long delta = 0;</span>
-<span class="fc bfc" id="L324" title="All 2 branches covered.">        for (EvolutionTrainFitnessEvidence.CaseMeasurement item : measurements) {</span>
-<span class="pc bpc" id="L325" title="1 of 4 branches missed.">            if (item.baselineReached() &amp;&amp; item.candidateReached()) {</span>
-<span class="fc" id="L326">                baseline += Math.max(1, item.baselinePathLength());</span>
-<span class="fc" id="L327">                delta += (long) item.baselinePathLength()</span>
-<span class="fc" id="L328">                    - item.candidatePathLength();</span>
+<span class="fc" id="L316">        long baseline = 0;</span>
+<span class="fc" id="L317">        long delta = 0;</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (EvolutionTrainFitnessEvidence.CaseMeasurement item : measurements) {</span>
+<span class="pc bpc" id="L319" title="1 of 4 branches missed.">            if (item.baselineReached() &amp;&amp; item.candidateReached()) {</span>
+<span class="fc" id="L320">                baseline += Math.max(1, item.baselinePathLength());</span>
+<span class="fc" id="L321">                delta += (long) item.baselinePathLength()</span>
+<span class="fc" id="L322">                    - item.candidatePathLength();</span>
             }
-<span class="fc" id="L330">        }</span>
-<span class="fc" id="L331">        return normalizedDelta(delta, baseline);</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">        return normalizedDelta(delta, baseline);</span>
     }
 
     private static int pairedStateReduction(
         List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements
     ) {
-<span class="fc" id="L337">        long baseline = 0;</span>
-<span class="fc" id="L338">        long delta = 0;</span>
-<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (EvolutionTrainFitnessEvidence.CaseMeasurement item : measurements) {</span>
-<span class="pc bpc" id="L340" title="1 of 4 branches missed.">            if (item.baselineReached() &amp;&amp; item.candidateReached()) {</span>
-<span class="fc" id="L341">                baseline += Math.max(1L, item.baselineExploredStates());</span>
-<span class="fc" id="L342">                delta += item.baselineExploredStates()</span>
-<span class="fc" id="L343">                    - item.candidateExploredStates();</span>
+<span class="fc" id="L331">        long baseline = 0;</span>
+<span class="fc" id="L332">        long delta = 0;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        for (EvolutionTrainFitnessEvidence.CaseMeasurement item : measurements) {</span>
+<span class="pc bpc" id="L334" title="1 of 4 branches missed.">            if (item.baselineReached() &amp;&amp; item.candidateReached()) {</span>
+<span class="fc" id="L335">                baseline += Math.max(1L, item.baselineExploredStates());</span>
+<span class="fc" id="L336">                delta += item.baselineExploredStates()</span>
+<span class="fc" id="L337">                    - item.candidateExploredStates();</span>
             }
-<span class="fc" id="L345">        }</span>
-<span class="fc" id="L346">        return normalizedDelta(delta, baseline);</span>
+<span class="fc" id="L339">        }</span>
+<span class="fc" id="L340">        return normalizedDelta(delta, baseline);</span>
     }
 
     private static int assumptionSimplicity(EvolutionGenome genome) {
-<span class="fc" id="L350">        int assumptions = genome.rewrites().stream()</span>
-<span class="fc" id="L351">            .mapToInt(gene -&gt; gene.assumptions().size())</span>
-<span class="fc" id="L352">            .sum();</span>
-<span class="fc" id="L353">        return inverseBudgetScore(</span>
-<span class="fc" id="L354">            assumptions, genome.budget().maxProgramLength());</span>
+<span class="fc" id="L344">        int assumptions = genome.rewrites().stream()</span>
+<span class="fc" id="L345">            .mapToInt(gene -&gt; gene.assumptions().size())</span>
+<span class="fc" id="L346">            .sum();</span>
+<span class="fc" id="L347">        return inverseBudgetScore(</span>
+<span class="fc" id="L348">            assumptions, genome.budget().maxProgramLength());</span>
     }
 
     private static int candidateSimplicity(EvolutionGenome genome) {
-<span class="fc" id="L358">        int nodes = genome.rewrites().stream()</span>
-<span class="fc" id="L359">            .mapToInt(gene -&gt;</span>
-<span class="fc" id="L360">                EvolutionGenomeCompiler.nodeCount(</span>
-<span class="fc" id="L361">                    EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()))</span>
-<span class="fc" id="L362">                + EvolutionGenomeCompiler.nodeCount(</span>
-<span class="fc" id="L363">                    EvolutionGenomeCompiler.parsePattern(gene.targetPattern())))</span>
-<span class="fc" id="L364">            .sum();</span>
-<span class="fc" id="L365">        return inverseBudgetScore(nodes, genome.budget().maxAstNodes());</span>
+<span class="fc" id="L352">        int nodes = genome.rewrites().stream()</span>
+<span class="fc" id="L353">            .mapToInt(gene -&gt;</span>
+<span class="fc" id="L354">                EvolutionGenomeCompiler.nodeCount(</span>
+<span class="fc" id="L355">                    EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()))</span>
+<span class="fc" id="L356">                + EvolutionGenomeCompiler.nodeCount(</span>
+<span class="fc" id="L357">                    EvolutionGenomeCompiler.parsePattern(gene.targetPattern())))</span>
+<span class="fc" id="L358">            .sum();</span>
+<span class="fc" id="L359">        return inverseBudgetScore(nodes, genome.budget().maxAstNodes());</span>
     }
 
     private static int proofCostProxy(EvolutionGenome genome) {
-<span class="fc" id="L369">        int obligations = genome.rewrites().stream()</span>
-<span class="fc" id="L370">            .mapToInt(gene -&gt; gene.evidenceObligations().size())</span>
-<span class="fc" id="L371">            .sum();</span>
-<span class="fc" id="L372">        int denominator = Math.max(1,</span>
-<span class="fc" id="L373">            genome.budget().maxProgramLength() * 5);</span>
-<span class="fc" id="L374">        return inverseBudgetScore(obligations, denominator);</span>
+<span class="fc" id="L363">        int obligations = genome.rewrites().stream()</span>
+<span class="fc" id="L364">            .mapToInt(gene -&gt; gene.evidenceObligations().size())</span>
+<span class="fc" id="L365">            .sum();</span>
+<span class="fc" id="L366">        int denominator = Math.max(1,</span>
+<span class="fc" id="L367">            genome.budget().maxProgramLength() * 5);</span>
+<span class="fc" id="L368">        return inverseBudgetScore(obligations, denominator);</span>
     }
 
     private static int inverseBudgetScore(long used, long budget) {
-<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (budget &lt;= 0) {</span>
-<span class="nc" id="L379">            return 0;</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">        if (budget &lt;= 0) {</span>
+<span class="nc" id="L373">            return 0;</span>
         }
-<span class="fc" id="L381">        long penalty = Math.min(1000L, used * 1000L / budget);</span>
-<span class="fc" id="L382">        return Math.toIntExact(1000L - penalty);</span>
+<span class="fc" id="L375">        long penalty = Math.min(1000L, used * 1000L / budget);</span>
+<span class="fc" id="L376">        return Math.toIntExact(1000L - penalty);</span>
     }
 
     private static int permille(long numerator, long denominator) {
-<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        return denominator &lt;= 0</span>
-<span class="nc" id="L387">            ? 0</span>
-<span class="fc" id="L388">            : clamp(Math.toIntExact(numerator * 1000L / denominator));</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        return denominator &lt;= 0</span>
+<span class="nc" id="L381">            ? 0</span>
+<span class="fc" id="L382">            : clamp(Math.toIntExact(numerator * 1000L / denominator));</span>
     }
 
     private static int normalizedDelta(long delta, long baseline) {
-<span class="fc bfc" id="L392" title="All 2 branches covered.">        return baseline &lt;= 0</span>
-<span class="fc" id="L393">            ? 0</span>
-<span class="fc" id="L394">            : clamp(Math.toIntExact(delta * 1000L / baseline));</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        return baseline &lt;= 0</span>
+<span class="fc" id="L387">            ? 0</span>
+<span class="fc" id="L388">            : clamp(Math.toIntExact(delta * 1000L / baseline));</span>
     }
 
     private static int clamp(int value) {
-<span class="fc" id="L398">        return Math.max(-1000, Math.min(1000, value));</span>
+<span class="fc" id="L392">        return Math.max(-1000, Math.min(1000, value));</span>
     }
 
     private static int depth(GoalSearchResult result) {
-<span class="fc bfc" id="L402" title="All 2 branches covered.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
     }
 
     private static String stableFailure(Throwable failure) {
-<span class="fc" id="L406">        String message = failure.getMessage();</span>
-<span class="fc" id="L407">        return failure.getClass().getSimpleName()</span>
-<span class="pc bpc" id="L408" title="2 of 4 branches missed.">            + (message == null || message.isBlank()</span>
-<span class="nc" id="L409">                ? &quot;&quot;</span>
-<span class="fc" id="L410">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
+<span class="fc" id="L400">        String message = failure.getMessage();</span>
+<span class="fc" id="L401">        return failure.getClass().getSimpleName()</span>
+<span class="pc bpc" id="L402" title="2 of 4 branches missed.">            + (message == null || message.isBlank()</span>
+<span class="nc" id="L403">                ? &quot;&quot;</span>
+<span class="fc" id="L404">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
     }
 
     @FunctionalInterface

@@ -34,7 +34,10 @@ Zentrale Bausteine:
 - **Layer 6 – Reporting/Gallery:** Reports rendern ausschließlich
   `DiscoveryTrace`-/Replay-Evidence und Descriptor-Metadaten, keine hart
   codierten Seed-Sonderfälle. Public Evidence bleibt ein eigener Gate-Schritt.
-- `ScientificDiscoveryWorkflow` bootet die produktive App-Wiring-Schicht und führt reproduzierbare Discovery-Läufe aus.
+- Der CLI-Befehl `discover` startet `RuleDiscoveryService`. `domains` und die
+  Discovery-Domänen der Web-Workbench verwenden die Discovery-SDK-Fassade.
+- `ScientificDiscoveryWorkflow` verbindet in den App-Tests Suche, Validierung,
+  Replay und Persistenz für reproduzierbare Läufe mit kuratierten Seeds.
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
 - `PathReplayDto` und die Web-Workbench liefern das interaktive Schritt-für-Schritt-Replay inklusive Makrozügen, Domänenkarten und Proof-Status.
@@ -55,8 +58,8 @@ Zentrale Bausteine:
 - `DiscoveryOptions` liegt in `de.regelsuche.discovery` und aggregiert
   `DiscoveryEngineOptions` (Hypothesenoperatoren, Makro-Reuse, Tiefe/Budget) und
   `DiscoveryLearningOptions` (Makro-Lernen, Validierung generierter Instanzen,
-  Promotion). `DiscoveryEngineFactory` konsumiert nur Engine-Optionen und führt
-  kein Lernen aus.
+  Promotion). In den App-Tests verwendet `DiscoveryEngineFactory` die
+  Engine-Optionen zur Komposition der Transformationsengine.
 - `de.regelsuche.search.index.RuleCandidateIndex` erweitert den bisherigen
   `TermRuleIndex`-Pfad um `CandidateSet`, `SearchContext`, `CandidateBudget`
   und detaillierte `IndexMetrics`. `RootSymbolTermRuleIndex` bleibt die
