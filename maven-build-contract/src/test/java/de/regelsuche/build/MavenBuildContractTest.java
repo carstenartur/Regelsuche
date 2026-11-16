@@ -63,6 +63,10 @@ class MavenBuildContractTest {
         "executable", "argument", "command", "commandlineArgs",
         "commandLineArgs"
     );
+    private static final Set<String> COMMAND_ATTRIBUTE_NAMES = Set.of(
+        "executable", "interpreter", "shell", "command",
+        "commandlineArgs", "commandLineArgs"
+    );
     private static final Map<String, String> REQUIRED_PROPERTIES = Map.ofEntries(
         Map.entry("maven.compiler.release", "25"),
         Map.entry("maven.minimum.version", "3.9.9"),
@@ -207,6 +211,39 @@ class MavenBuildContractTest {
     }
 
     @Test
+    void commandScannerRejectsRuntimeHiddenInXmlAttributes(
+            @TempDir Path temporary) throws Exception {
+        // Maven's Ant integration represents an executable as an XML
+        // attribute, not the element text inspected by the original guard.
+        for (String invocation : List.of(
+                "<exec executable=\"/usr/bin/python3\"/>",
+                "<exec executable=\"node.exe\"/>",
+                "<script interpreter=\"/opt/bin/bash\"/>",
+                "<tool command=\"env python3 verify.py\"/>")) {
+            Path pom = temporary.resolve("pom.xml");
+            Files.writeString(pom, syntheticPom(
+                "<configuration><target>" + invocation
+                    + "</target></configuration>"));
+            AssertionError failure = assertThrows(
+                AssertionError.class,
+                () -> assertNoForbiddenCommandElements(parse(pom), pom),
+                invocation);
+            assertTrue(failure.getMessage().contains("host runtime"),
+                failure::getMessage);
+        }
+    }
+
+    @Test
+    void commandScannerAllowsOrdinaryXmlAttributes(
+            @TempDir Path temporary) throws Exception {
+        Path pom = temporary.resolve("pom.xml");
+        Files.writeString(pom, syntheticPom(
+            "<configuration><target><exec executable=\"java\"/>"
+                + "</target></configuration>"));
+        assertNoForbiddenCommandElements(parse(pom), pom);
+    }
+
+    @Test
     void pluginScannerRejectsUnversionedExecPlugin(
             @TempDir Path temporary) throws Exception {
         Path pom = temporary.resolve("pom.xml");
@@ -240,15 +277,42 @@ class MavenBuildContractTest {
                 elementName
             );
             for (int index = 0; index < elements.getLength(); index++) {
-                for (String token : commandTokens(
-                        elements.item(index).getTextContent())) {
-                    assertFalse(
-                        FORBIDDEN_HOST_RUNTIMES.contains(token),
-                        () -> pom + " invokes forbidden host runtime " + token
-                            + " through <" + elementName + ">"
+                assertNoHostRuntime(
+                    elements.item(index).getTextContent(),
+                    pom,
+                    "<" + elementName + ">"
+                );
+            }
+        }
+
+        // Ant-style plugin configurations use attributes such as
+        // <exec executable="python3"/>. A text-only scan misses them.
+        NodeList allElements = document.getElementsByTagName("*");
+        for (int index = 0; index < allElements.getLength(); index++) {
+            org.w3c.dom.Element element =
+                (org.w3c.dom.Element) allElements.item(index);
+            for (String attribute : COMMAND_ATTRIBUTE_NAMES) {
+                if (element.hasAttribute(attribute)) {
+                    assertNoHostRuntime(
+                        element.getAttribute(attribute),
+                        pom,
+                        "<" + element.getTagName() + " @" + attribute + ">"
                     );
                 }
             }
+        }
+    }
+
+    private static void assertNoHostRuntime(
+            String command,
+            Path pom,
+            String source) {
+        for (String token : commandTokens(command)) {
+            assertFalse(
+                FORBIDDEN_HOST_RUNTIMES.contains(token),
+                () -> pom + " invokes forbidden host runtime " + token
+                    + " through " + source
+            );
         }
     }
 
