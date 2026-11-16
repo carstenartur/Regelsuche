@@ -1,0 +1,62 @@
+{
+  "schema": "regelsuche.recurrence-proof-selection/v1",
+  "goal": "Find one checked nonconstant law in either evolution sign within the declared total degree. Compare the paid automatic catalog with the same native first-law solver.",
+  "acquisitionBudget": 500000,
+  "requestBudget": 100000,
+  "queryIndices": [0, 1, 2, 7, 31],
+  "prefixRounds": [1, 4, 8, 16],
+  "sources": {
+    "oscillator": "https://www.cfca.nao.ac.jp/~tito/ndyn/pdfproc/proc_CeleMechNbodyDyn2001Kusatsu.pdf",
+    "cat": "https://www.scholarpedia.org/article/Cat_map",
+    "integrator": "Three coupled coordinates, with the unit Jordan matrix for a discrete integrator chain. Offsets and starts are fixed by this protocol."
+  },
+  "matrices": {
+    "oscillator": [["16/25", "3/5"], ["-3/5", "1"]],
+    "cat": [["2", "1"], ["1", "1"]],
+    "negative-cat": [["-2", "-1"], ["-1", "-1"]],
+    "integrator": [["1", "1", "0"], ["0", "1", "1"], ["0", "0", "1"]],
+    "expanding": [["2", "0"], ["0", "3"]]
+  },
+  "lessons": [
+    {"matrix": "oscillator", "degree": 2, "offset": ["0", "0"], "initial": ["2", "3"]},
+    {"matrix": "cat", "degree": 2, "offset": ["0", "0"], "initial": ["1", "3"]},
+    {"matrix": "integrator", "degree": 1, "offset": ["0", "0", "0"], "initial": ["2", "-3", "4"]}
+  ],
+  "validation": [
+    {"matrix": "negative-cat", "degree": 2, "offset": ["0", "0"], "initial": ["3", "4"]},
+    {"matrix": "oscillator", "degree": 2, "offset": ["24/25", "3/5"], "initial": ["2", "-1"]},
+    {"matrix": "integrator", "degree": 1, "offset": ["-1", "2", "0"], "initial": ["1", "3", "2"]}
+  ],
+  "queries": [
+    {
+      "id": "shifted-oscillator", "matrix": "oscillator", "degree": 2,
+      "offset": ["33/25", "6/5"], "offsetStep": ["-21/25", "3/5"],
+      "initial": ["7", "11"], "initialStep": ["1", "-2"],
+      "solved": true, "reused": true
+    },
+    {
+      "id": "negated-cat", "matrix": "negative-cat", "degree": 2,
+      "offset": ["0", "0"], "offsetStep": ["0", "0"],
+      "initial": ["2", "5"], "initialStep": ["2", "1"],
+      "solved": true, "reused": true
+    },
+    {
+      "id": "shifted-integrator", "matrix": "integrator", "degree": 1,
+      "offset": ["-3", "-2", "0"], "offsetStep": ["1", "-1", "0"],
+      "initial": ["2", "3", "4"], "initialStep": ["3", "-1", "1"],
+      "solved": true, "reused": true
+    },
+    {
+      "id": "integrator-with-drift", "matrix": "integrator", "degree": 1,
+      "offset": ["0", "0", "1"], "offsetStep": ["2", "-1", "0"],
+      "initial": ["1", "2", "3"], "initialStep": ["1", "1", "1"],
+      "solved": false, "reused": false
+    },
+    {
+      "id": "unrelated-expanding", "matrix": "expanding", "degree": 2,
+      "offset": ["0", "0"], "offsetStep": ["0", "0"],
+      "initial": ["3", "5"], "initialStep": ["1", "3"],
+      "solved": false, "reused": false
+    }
+  ]
+}

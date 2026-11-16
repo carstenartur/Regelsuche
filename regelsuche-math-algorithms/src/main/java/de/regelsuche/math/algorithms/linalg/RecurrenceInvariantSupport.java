@@ -6,6 +6,7 @@ import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,19 +78,57 @@ final class RecurrenceInvariantSupport {
 
         var images = new HashMap<Monomial, Polynomial>();
         for (var monomial : basis) {
-            var image = Polynomial.constant(Rational.ONE);
-            work.add(1L + dimension);
-            for (int i = 0; i < dimension; i++) {
-                int power = monomial.exponentOf(variables.get(i));
-                var coordinateImage = coordinateImages.get(i);
-                for (int j = 0; j < power; j++) {
-                    work.add(1L + (long) image.termCount() * coordinateImage.termCount());
-                    image = image.multiply(coordinateImage);
-                }
-            }
-            images.put(monomial, image);
+            images.put(monomial, liftedMonomial(monomial, variables, coordinateImages, work));
         }
         return Map.copyOf(images);
+    }
+
+    private static Polynomial liftedMonomial(Monomial monomial, List<String> variables,
+            List<Polynomial> coordinateImages, Work work) {
+        var image = Polynomial.constant(Rational.ONE);
+        work.add(1L + variables.size());
+        for (int i = 0; i < variables.size(); i++) {
+            int power = monomial.exponentOf(variables.get(i));
+            var coordinateImage = coordinateImages.get(i);
+            for (int j = 0; j < power; j++) {
+                work.add(1L + (long) image.termCount() * coordinateImage.termCount());
+                image = image.multiply(coordinateImage);
+            }
+        }
+        return image;
+    }
+
+    static Polynomial translate(Polynomial polynomial, List<Rational> shift, Work work) {
+        var variables = variables(shift.size());
+        var images = new ArrayList<Polynomial>();
+        for (int i = 0; i < shift.size(); i++) {
+            work.add(2);
+            images.add(Polynomial.variable(variables.get(i)).add(Polynomial.constant(shift.get(i).negate())));
+        }
+        work.add(polynomial.termCount());
+        var monomials = polynomial.terms().keySet().stream().sorted(Comparator.comparing(Monomial::key)).toList();
+        var translated = Polynomial.zero();
+        for (var monomial : monomials) {
+            var image = liftedMonomial(monomial, variables, images, work);
+            work.add(1L + translated.termCount() + 2L * image.termCount());
+            translated = translated.add(image.multiply(polynomial.terms().get(monomial)));
+        }
+        return translated;
+    }
+
+    static Rational evaluate(Polynomial polynomial, List<Rational> state, Work work) {
+        var variables = variables(state.size());
+        var total = Rational.ZERO;
+        for (var term : polynomial.terms().entrySet()) {
+            var value = term.getValue();
+            work.add(1L + state.size() + term.getKey().totalDegree());
+            for (int coordinate = 0; coordinate < state.size(); coordinate++) {
+                int exponent = term.getKey().exponentOf(variables.get(coordinate));
+                for (int i = 0; i < exponent; i++) value = value.multiply(state.get(coordinate));
+            }
+            total = total.add(value);
+        }
+        return total;
     }
 
     /** Simultaneous substitution, never sequential textual replacement of variable names. */

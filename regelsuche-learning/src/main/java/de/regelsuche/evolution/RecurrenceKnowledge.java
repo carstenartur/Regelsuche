@@ -38,53 +38,99 @@ public final class RecurrenceKnowledge {
         public Update { training = List.copyOf(training); validation = List.copyOf(validation); }
         public boolean promoted() { return reason == CumulativeTaskKnowledge.Decision.PROMOTED; }
     }
-    /** Only proposals are persisted. Every use and every load rechecks the caller-bound mathematics. */
-    record Entry(Transition transition, int degree, Proposal proposal, Optional<VerifiedFamily> family) {
-        Entry(Transition transition, int degree, Proposal proposal) { this(transition, degree, proposal, Optional.empty()); }
+    /** Proposals define the snapshot identity. The prepared proof is issued again on loading. */
+    record Entry(Transition transition, int degree, Proposal proposal, Optional<VerifiedFamily> family,
+            Optional<VerifiedLaw> anchorProof) {
+        Entry(Transition transition, int degree, Proposal proposal) {
+            this(transition, degree, proposal, Optional.empty(), Optional.empty());
+        }
         Entry {
             Objects.requireNonNull(transition); Objects.requireNonNull(proposal); Objects.requireNonNull(family);
+            Objects.requireNonNull(anchorProof);
             if (degree < 1 || degree > 2) throw new IllegalArgumentException("invalid recurrence degree");
             if (family.isPresent() && (family.get().degree()!=degree
                     || !family.get().first().equals(new Anchor(transition,proposal))))
                 throw new IllegalArgumentException("family anchor mismatch");
+            anchorProof.ifPresent(law -> {
+                if (family.isPresent() || !law.certifies(transition, proposal) || law.degree() > degree) {
+                    throw new IllegalArgumentException("retained proof does not match its anchor");
+                }
+            });
         }
         static Entry fromFamily(VerifiedFamily family) {
-            return new Entry(family.first().transition(),family.degree(),family.first().proposal(),Optional.of(family));
+            return new Entry(family.first().transition(),family.degree(),family.first().proposal(),
+                Optional.of(family),Optional.empty());
+        }
+        Entry retain(VerifiedLaw law) {
+            return new Entry(transition, degree, proposal, family, Optional.of(law));
         }
         boolean applies(Request task) {
             return degree <= task.degree() && (family.isEmpty() ? transition.equals(task.transition()) : family.get().matches(task.transition()));
         }
+        @Override public boolean equals(Object other) {
+            return other instanceof Entry entry && degree == entry.degree && transition.equals(entry.transition)
+                && proposal.equals(entry.proposal) && family.equals(entry.family);
+        }
+        @Override public int hashCode() {
+            return Objects.hash(transition, degree, proposal, family);
+        }
     }
 
+    private record Resolution(Execution execution, Entry anchor) {}
+
     static Execution execute(String id, List<Entry> catalog, Request task, CumulativeTaskKnowledge.Strategy strategy) {
+        return resolve(id, catalog, task, strategy).execution();
+    }
+
+    private static Resolution resolve(String id, List<Entry> catalog, Request task, CumulativeTaskKnowledge.Strategy strategy) {
         Objects.requireNonNull(task); Objects.requireNonNull(strategy);
         var paid = new Meter(task.budget().maxWorkUnits());
         try {
             if (strategy != CumulativeTaskKnowledge.Strategy.BASELINE) {
-                for (var entry : catalog) {
-                    paid.add(2L + task.transition().linear().columns() * task.transition().linear().columns());
-                    if (!entry.applies(task)) continue;
-                    var proof = verifyEntry(entry, task, new Budget(paid.remaining()));
-                    paid.add(proof.work().consumedWorkUnits());
-                    if (proof.law().isPresent()) return receipt(id, Outcome.VERIFIED, proof.law(), paid, true);
-                    if (proof.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();
-                }
+                var reused = reuse(id, catalog, task, paid);
+                if (reused.isPresent()) return reused.orElseThrow();
             }
-            var result = new RecurrenceInvariantSynthesis().solve(new Request(task.transition(), task.initialState(),
+            var result = new RecurrenceInvariantSynthesis().solveFirst(new Request(task.transition(), task.initialState(),
                 task.degree(), new Budget(paid.remaining())));
             paid.add(result.work().consumedWorkUnits());
-            return receipt(id, outcome(result), result.laws().stream().findFirst(), paid, false);
+            return new Resolution(receipt(id, outcome(result), result.law(), paid, false), null);
         } catch (Limit exhausted) {
-            return receipt(id, Outcome.BUDGET_INCONCLUSIVE, Optional.empty(), paid, false);
+            return new Resolution(receipt(id, Outcome.BUDGET_INCONCLUSIVE, Optional.empty(), paid, false), null);
         }
     }
-    private static RecurrenceInvariantVerifier.Verification verifyEntry(Entry entry, Request task, Budget budget) {
-        var verifier=new RecurrenceInvariantVerifier();
-        // A family already carries its independently checked universal step.
-        // Source specialization and the new base case remain paid and checked.
+
+    private static Optional<Resolution> reuse(String id, List<Entry> catalog, Request task, Meter paid) {
+        var verifier = new RecurrenceInvariantVerifier();
+        int dimension = task.transition().linear().columns();
+        for (var entry : catalog) {
+            paid.add(2L + dimension * dimension);
+            if (!entry.applies(task)) continue;
+            var law = pay(verifyEntry(verifier, entry, task, new Budget(paid.remaining())), paid);
+            if (law.isPresent()) return Optional.of(new Resolution(receipt(id, Outcome.VERIFIED, law, paid, true), entry));
+        }
+        for (var entry : catalog) {
+            paid.add(1);
+            if (entry.degree() > task.degree() || entry.anchorProof().isEmpty()) continue;
+            var law = pay(verifier.transport(entry.anchorProof().orElseThrow(), task.transition(),
+                task.initialState(), new Budget(paid.remaining())), paid);
+            if (law.isPresent()) return Optional.of(new Resolution(receipt(id, Outcome.VERIFIED, law, paid, true), entry));
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<VerifiedLaw> pay(RecurrenceInvariantVerifier.Verification proof, Meter meter) {
+        meter.add(proof.work().consumedWorkUnits());
+        if (proof.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE) throw new Limit();
+        return proof.law();
+    }
+
+    private static RecurrenceInvariantVerifier.Verification verifyEntry(RecurrenceInvariantVerifier verifier,
+            Entry entry, Request task, Budget budget) {
         if (entry.family().isPresent())
-            return verifier.verifyFamily(entry.family().get(),task.transition(),task.initialState(),budget);
-        return verifier.verify(task.transition(),entry.proposal(),task.initialState(),budget);
+            return verifier.verifyFamily(entry.family().orElseThrow(), task.transition(), task.initialState(), budget);
+        if (entry.anchorProof().isPresent())
+            return verifier.transport(entry.anchorProof().orElseThrow(), task.transition(), task.initialState(), budget);
+        return verifier.verify(task.transition(), entry.proposal(), task.initialState(), budget);
     }
 
     /** One bounded, symbolically proved family per generation; validation never enters its formation. */
@@ -123,7 +169,7 @@ public final class RecurrenceKnowledge {
         if (!hasUnseenValidation(entry,catalog,validation,progress.meter)) return Optional.empty();
         var candidate=new ArrayList<>(catalog);
         addCandidate(candidate,entry,progress.meter);
-        return validate(id,catalog,candidate,validation,progress) ? Optional.of(candidate) : Optional.empty();
+        return validate(id,catalog,candidate,List.of(entry),validation,progress) ? Optional.of(candidate) : Optional.empty();
     }
     private static boolean alreadyCovered(List<Entry> catalog, Entry a, Entry b, Meter work) {
         for (var entry : catalog) {
@@ -143,11 +189,11 @@ public final class RecurrenceKnowledge {
         return false;
     }
 
-    private static Outcome outcome(RecurrenceInvariantSynthesis.Report result) {
+    private static Outcome outcome(RecurrenceInvariantSynthesis.FirstLaw result) {
         return switch (result.status()) {
             case BUDGET_INCONCLUSIVE -> Outcome.BUDGET_INCONCLUSIVE;
             case UNSUPPORTED -> Outcome.UNSUPPORTED;
-            case COMPLETE -> result.laws().isEmpty() ? Outcome.NO_LAW_IN_ANSATZ : Outcome.VERIFIED;
+            case COMPLETE -> result.law().isEmpty() ? Outcome.NO_LAW_IN_ANSATZ : Outcome.VERIFIED;
         };
     }
     private static Execution receipt(String id, Outcome outcome, Optional<VerifiedLaw> law, Meter work, boolean reused) {
@@ -155,7 +201,7 @@ public final class RecurrenceKnowledge {
             outcome, law, work.used, reused);
     }
 
-    /** Validation is separate by initial-state task; reuse deliberately transfers across initial states. */
+    /** Each added proof has to be selected on a separate validation request. */
     static Update learn(CumulativeTaskKnowledge owner, List<Entry> catalog, List<Request> lessonInput,
             List<Request> validationInput, Budget budget) {
         var lessons = bounded(lessonInput); var validation = bounded(validationInput);
@@ -166,9 +212,8 @@ public final class RecurrenceKnowledge {
             progress.split = progress.meter.used;
             learnLessons(owner.id(), catalog, candidate, lessons, progress);
             if (candidate.equals(catalog)) return finish(owner, catalog, CumulativeTaskKnowledge.Decision.NO_NEW_LAW, progress);
-            boolean covered = candidate.stream().filter(e -> !catalog.contains(e))
-                .allMatch(e -> validation.stream().anyMatch(e::applies));
-            boolean benefit = covered && validate(owner.id(), catalog, candidate, validation, progress);
+            boolean benefit = validate(owner.id(), catalog, candidate, candidate.subList(catalog.size(), candidate.size()),
+                validation, progress);
             return finish(owner, benefit ? candidate : catalog, benefit ? CumulativeTaskKnowledge.Decision.PROMOTED
                 : CumulativeTaskKnowledge.Decision.NO_VALIDATED_BENEFIT, progress);
         } catch (Limit exhausted) {
@@ -181,11 +226,12 @@ public final class RecurrenceKnowledge {
     private static void learnLessons(String id, List<Entry> parent, List<Entry> candidate,
             List<Request> lessons, Progress progress) {
         for (var task : lessons) {
-            var run = runPaid(id, parent, task, progress.meter);
+            var run = runPaid(id, parent, task, progress.meter).execution();
             progress.training.add(run); progress.lessons += run.totalWork();
             if (progress.meter.remaining() == 0 && !run.solved()) throw new Limit();
             if (!run.solved() || run.reused()) continue;
-            var entry = new Entry(task.transition(), task.degree(), run.law().orElseThrow().proposal());
+            var law = run.law().orElseThrow();
+            var entry = new Entry(task.transition(), task.degree(), law.proposal()).retain(law);
             if (candidate.contains(entry)) continue;
             addCandidate(candidate, entry, progress.meter);
         }
@@ -196,28 +242,33 @@ public final class RecurrenceKnowledge {
         if (!RecurrenceKnowledgeCodec.fitsPayload(candidate, work::add)) throw new Limit();
     }
     private static boolean validate(String id, List<Entry> parent, List<Entry> candidate,
-            List<Request> tasks, Progress progress) {
+            List<Entry> added, List<Request> tasks, Progress progress) {
         long oldWork = 0, newWork = 0;
         boolean safe = true, moreSolved = false;
+        progress.meter.add(added.size());
+        var uncovered = new ArrayList<>(added);
         for (var task : tasks) {
-            var before = runPaid(id, parent, task, progress.meter);
+            var before = runPaid(id, parent, task, progress.meter).execution();
             progress.validationWork += before.totalWork();
-            var after = runPaid(id, candidate, task, progress.meter);
+            var selected = runPaid(id, candidate, task, progress.meter);
+            var after = selected.execution();
             progress.validationWork += after.totalWork();
             progress.validation.add(new Validation(task, before, after));
             if (progress.meter.remaining() == 0 && !after.solved()) throw new Limit();
+            progress.meter.add(uncovered.size());
+            uncovered.remove(selected.anchor());
             safe &= !before.solved() || after.solved();
             moreSolved |= !before.solved() && after.solved();
             oldWork += before.totalWork(); newWork += after.totalWork();
         }
-        return safe && (moreSolved || newWork < oldWork);
+        return uncovered.isEmpty() && safe && (moreSolved || newWork < oldWork);
     }
-    private static Execution runPaid(String id, List<Entry> catalog, Request task, Meter acquisition) {
+    private static Resolution runPaid(String id, List<Entry> catalog, Request task, Meter acquisition) {
         if (acquisition.remaining() == 0) throw new Limit();
         var bounded = new Request(task.transition(), task.initialState(), task.degree(),
             new Budget(Math.min(task.budget().maxWorkUnits(), acquisition.remaining())));
-        var run = execute(id, catalog, bounded, CumulativeTaskKnowledge.Strategy.AUTOMATIC);
-        acquisition.add(run.totalWork());
+        var run = resolve(id, catalog, bounded, CumulativeTaskKnowledge.Strategy.AUTOMATIC);
+        acquisition.add(run.execution().totalWork());
         return run;
     }
     private static Update finish(CumulativeTaskKnowledge owner, List<Entry> catalog,
