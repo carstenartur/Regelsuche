@@ -1,5 +1,9 @@
 package de.regelsuche.build;
 
+import static de.regelsuche.build.MavenPomTestSupport.directChild;
+import static de.regelsuche.build.MavenPomTestSupport.directChildText;
+import static de.regelsuche.build.MavenPomTestSupport.directChildTexts;
+import static de.regelsuche.build.MavenPomTestSupport.parse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -15,6 +19,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 
 class MavenParallelVerificationWorkflowContractTest {
   private static final ObjectMapper YAML = new ObjectMapper(YAMLFactory.builder()
@@ -22,6 +28,12 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final String PLAYWRIGHT_VERSION = "1.65.0";
   private static final String FULL_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
+  private static final String COVERAGE_PROFILE = "verify-cross-authority-coverage";
+  private static final String COVERAGE_MAVEN_COMMAND =
+      "mvn --batch-mode --no-transfer-progress -pl regelsuche-quality"
+          + " -P" + COVERAGE_PROFILE + " -DskipTests verify";
+  private static final String COVERAGE_STEP = "Verify complete cross-authority coverage";
+  private static final String ISOLATED_COVERAGE_REPORT = "regelsuche.coverage.isolatedReport";
   private static final String COVERAGE_MAIN =
       "de.regelsuche.quality.coverage.CoverageRegressionMain";
 
@@ -33,8 +45,6 @@ class MavenParallelVerificationWorkflowContractTest {
         ".github/workflows/gradle.yml"));
     String coverageGate = Files.readString(root.resolve(
         "gradle/quality-gates.gradle"));
-    String coverageConvergence = Files.readString(root.resolve(
-        "scripts/verify-cross-authority-coverage.py"));
     String gradle = section(
         workflow,
         "  gradle-verification:\n",
@@ -164,43 +174,28 @@ class MavenParallelVerificationWorkflowContractTest {
     int rejection = convergence.indexOf(
         "- name: Reject incomplete verification authority");
     int checkout = convergence.indexOf("- uses: actions/checkout@");
-    int coverage = convergence.indexOf(
-        "python3 -B scripts/verify-cross-authority-coverage.py");
-    assertTrue(rejection >= 0 && checkout > rejection && coverage > checkout,
-        "cross-authority coverage may run only after every required producer passed");
+    int coverage = convergence.indexOf("- name: " + COVERAGE_STEP);
+    int sympyDownload = convergence.indexOf("- name: Download isolated SymPy coverage evidence");
+    assertTrue(rejection >= 0 && checkout > rejection && sympyDownload > checkout
+        && coverage > sympyDownload,
+        "coverage must follow successful producers, checkout and the isolated evidence download");
+    JsonNode coverageStep = YAML.readTree(workflow).path("jobs").path("verification").path("steps")
+        .valueStream().filter(step -> COVERAGE_STEP.equals(step.path("name").asText()))
+        .findFirst().orElseThrow();
+    assertEquals(COVERAGE_MAVEN_COMMAND, coverageStep.path("run").asText().strip());
+    assertFalse(coverageStep.has("if"), "the coverage decision must run for every converged authority set");
+    assertFalse(coverageStep.has("continue-on-error"), "a failed coverage decision must fail convergence");
     assertTrue(convergence.contains("'repository-verification'"));
     assertTrue(convergence.contains("name: sympy-runtime-verification"));
     assertTrue(convergence.contains(
         "path: build/authority-evidence/sympy"));
-    assertTrue(convergence.contains(
-        "build/authority-evidence/sympy/regelsuche-math-sympy/"
-            + "build/reports/jacoco/test/jacocoTestReport.xml"));
-    assertTrue(convergence.contains("--root \"$PWD\""));
-    assertTrue(convergence.contains("--isolated-report"));
     assertFalse(convergence.contains("test -f"),
         "evidence assertions must remain checkout-owned");
     assertFalse(convergence.contains("test ! -e"),
         "staleness assertions must remain checkout-owned");
     assertFalse(convergence.contains("install -D"),
         "evidence joining must remain checkout-owned");
-    assertFalse(coverageConvergence.contains("shutil.copyfile("),
-        "the Python launcher must not install the canonical report");
-    assertTrue(coverageConvergence.contains("\"--isolated-report\""),
-        "the isolated evidence must be handed to the Java verifier");
-    assertTrue(coverageConvergence.contains("str(isolated)"),
-        "the Java verifier must receive the caller-supplied isolated report");
     assertTrue(coverageGate.contains("mainClass = '" + COVERAGE_MAIN + "'"));
-    assertTrue(coverageConvergence.contains("COVERAGE_MAIN = \"" + COVERAGE_MAIN + "\""),
-        "local and converged coverage must use the same Java decision");
-    assertTrue(coverageConvergence.contains(
-        "COVERAGE_RUNTIME = Path(\"build/reports/quality/coverage-report-runtime\")"));
-    assertTrue(coverageConvergence.contains(
-        "classpath = _coverage_classpath(root)"));
-    assertTrue(compact(coverageConvergence).contains(
-        "subprocess.run( [ \"java\", \"-cp\", classpath, COVERAGE_MAIN,"
-            + " \"--root\", str(root), \"--isolated-report\", str(isolated),"
-            + " ], cwd=root, check=True, )"),
-        "convergence must run the retained Java runtime and propagate a failing decision");
     assertTrue(convergence.contains("name: coverage-verification"));
     assertTrue(convergence.contains(
         "needs.sympy-runtime-verification.result == 'success'"),
@@ -208,7 +203,8 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(convergence.contains("if-no-files-found: error"),
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
-    assertFalse(convergence.contains("mvn "));
+    assertEquals(1, occurrences(convergence, "mvn "),
+        "convergence must run only the focused Maven coverage verification");
 
     assertTrue(publication.contains("needs: verification"),
         "publication must wait for all converged authorities");
@@ -225,6 +221,38 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void coverageJoinUsesTheSameJavaDecisionWithMandatoryFailsafeReplay() throws Exception {
+    Path root = repositoryRoot();
+    Element pom = parse(root.resolve("regelsuche-quality/pom.xml")).getDocumentElement();
+    Element profile = requiredChild(directChild(pom, "profiles"), "profile", "id", COVERAGE_PROFILE);
+    assertEquals("build/authority-evidence/sympy/regelsuche-math-sympy/"
+            + "build/reports/jacoco/test/jacocoTestReport.xml",
+        directChildText(directChild(profile, "properties"), ISOLATED_COVERAGE_REPORT));
+    Element plugins = directChild(directChild(profile, "build"), "plugins");
+    Element failsafe = requiredChild(plugins, "plugin", "artifactId", "maven-failsafe-plugin");
+    Element execution = requiredChild(directChild(failsafe, "executions"),
+        "execution", "id", "verify-retained-split-coverage");
+    assertEquals(List.of("integration-test", "verify"), directChildTexts(directChild(execution, "goals"), "goal"));
+
+    Element configuration = directChild(execution, "configuration");
+    assertEquals("de.regelsuche.quality.coverage.IsolatedCoverageInputTest#verifyRetainedSplitCoverage",
+        directChildText(configuration, "test"));
+    assertEquals("false", directChildText(configuration, "skipTests"));
+    assertEquals("true", directChildText(configuration, "failIfNoTests"));
+    assertEquals("true", directChildText(configuration, "failIfNoSpecifiedTests"));
+    Element properties = directChild(configuration, "systemPropertyVariables");
+    assertEquals("${maven.multiModuleProjectDirectory}", directChildText(properties, "regelsuche.repositoryRoot"));
+    assertEquals("${" + ISOLATED_COVERAGE_REPORT + "}", directChildText(properties, ISOLATED_COVERAGE_REPORT));
+
+    String replay = compact(Files.readString(root.resolve(
+        "regelsuche-quality/src/test/java/de/regelsuche/quality/coverage/IsolatedCoverageInputTest.java")));
+    assertTrue(replay.contains("assertEquals(0, CoverageRegressionMain.run(new String[]{\"--root\", root,"
+        + " \"--isolated-report\", System.getProperty(\"" + ISOLATED_COVERAGE_REPORT
+        + "\")}, System.out, System.err));"),
+        "the Maven replay must pass the isolated report to the shared Java verifier and reject a nonzero exit");
   }
 
   @Test
@@ -384,6 +412,17 @@ class MavenParallelVerificationWorkflowContractTest {
 
   private static String compact(String text) {
     return text.replaceAll("\\s+", " ").trim();
+  }
+
+  private static Element requiredChild(Element parent, String tag, String key, String value) {
+    assertNotNull(parent, "missing parent for " + tag + " " + value);
+    for (Node child = parent.getFirstChild(); child != null; child = child.getNextSibling()) {
+      if (child instanceof Element element && tag.equals(element.getLocalName())
+          && value.equals(directChildText(element, key))) {
+        return element;
+      }
+    }
+    throw new AssertionError("missing " + tag + " " + value);
   }
 
   private static int occurrences(String text, String value) {
