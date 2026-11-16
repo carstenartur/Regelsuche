@@ -101,6 +101,23 @@ class MavenWorkflowSemanticsContractTest {
         "(?:\\bciCheck\\b|\\$\\{?REGELSUCHE_CI_TASK\\}?)"
     );
 
+    // Transitional host drivers are frozen, not blessed as Maven authority.
+    // Each retained line may occur at most once and can disappear during migration.
+    private static final Set<String> LEGACY_PYTHON_RUN_LINES = Set.of(
+        "python3 -B scripts/verify-cross-authority-coverage.py",
+        "python3 -B scripts/generate-ci-pages.py --coverage-only",
+        "python3 -B scripts/collect-quality-acceptance-evidence.py",
+        "python3 -B scripts/run-jmh-precision-study-v1.py",
+        "python3 -B scripts/report-jmh-precision-study-v1.py",
+        "python3 -B scripts/run-jmh-precision-study-v2.py",
+        "python3 -B scripts/report-jmh-precision-study-v2.py"
+    );
+    private static final Pattern DIRECT_HOST_INTERPRETER = Pattern.compile(
+        "(?<![A-Za-z0-9_.-])"
+            + "(?:python(?:3(?:\\.\\d+)?)?|node|npm|npx|perl|ruby"
+            + "|pwsh|powershell)(?=\\s+)"
+    );
+
     @Test
     void repositoryWorkflowsSatisfyTheCheckoutOwnedContract()
             throws IOException {
@@ -211,6 +228,42 @@ class MavenWorkflowSemanticsContractTest {
         expectInvalid(
             () -> verifyClassification(policy, List.of("gradle.yml")),
             "unclassified=[] stale=[release.yml]"
+        );
+    }
+
+    @Test
+    void workflowHostRuntimeInventoryRejectsNewAndDuplicateDrivers() {
+        MergeGovernance governance = validGovernance();
+        String workflow = validWorkflow();
+        String allowed = "python3 -B scripts/verify-cross-authority-coverage.py";
+
+        assertNoViolation(
+            workflow + "\n          " + allowed + "\n",
+            governance,
+            "undeclared-host-runtime"
+        );
+        for (String forbidden : List.of(
+                "python3 -B scripts/new-check.py",
+                "/usr/bin/python3 -B scripts/new-check.py",
+                "env python3 -c 'print(1)'",
+                "node scripts/new-check.mjs",
+                "npm test",
+                "- run: " + allowed)) {
+            assertViolation(
+                workflow + "\n          " + forbidden + "\n",
+                governance,
+                "undeclared-host-runtime"
+            );
+        }
+        assertViolation(
+            workflow + "\n          " + allowed + "\n          " + allowed + "\n",
+            governance,
+            "undeclared-host-runtime"
+        );
+        assertNoViolation(
+            workflow + "\n          # python3 -B scripts/new-check.py\n",
+            governance,
+            "undeclared-host-runtime"
         );
     }
 
@@ -569,6 +622,7 @@ class MavenWorkflowSemanticsContractTest {
     ) {
         List<String> lines = text.lines().toList();
         List<Violation> violations = new ArrayList<>();
+        Set<String> retainedLegacyCommands = new TreeSet<>();
 
         for (int index = 0; index < lines.size(); index++) {
             String line = lines.get(index);
@@ -583,6 +637,20 @@ class MavenWorkflowSemanticsContractTest {
                 }
             }
             String stripped = line.strip();
+            // The workflow still contains explicitly retained Python jobs.
+            // Detect new host interpreters (including -B and absolute paths)
+            // and duplicate invocations of a grandfathered command.
+            if (!stripped.startsWith("#")
+                    && DIRECT_HOST_INTERPRETER.matcher(line).find()
+                    && (!LEGACY_PYTHON_RUN_LINES.contains(stripped)
+                        || !retainedLegacyCommands.add(stripped))) {
+                violations.add(new Violation(
+                    workflow,
+                    index + 1,
+                    "undeclared-host-runtime",
+                    stripped
+                ));
+            }
             if (ASSERTION_PREFIXES.stream().anyMatch(
                     stripped::startsWith)) {
                 violations.add(new Violation(
