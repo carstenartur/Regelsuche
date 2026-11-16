@@ -1,0 +1,75 @@
+{
+  "schema": "regelsuche.switched-observation/v1",
+  "maximumWorkPerRun": 1000000,
+  "evaluation": {
+    "seeds": [131, 617],
+    "lengths": [1, 32, 256, 1024],
+    "eventRule": "32-bit LCG: seed as unsigned word, state <- 1664525*state + 1013904223 (mod 2^32), use its top bit as the zero-based transition index",
+    "queries": "evaluate all supplied observations immediately after each event, in event order",
+    "minimumSavingPercent": 20,
+    "qualificationLength": 1024,
+    "criterion": "Identical exact outputs on all prefixes. For each target on both seeds at qualificationLength, derive at least one additional state form, reduce dimension, and save at least 20% of total metered work against the cheapest of the direct comparisons that apply.",
+    "accounting": "Cold preparation (including exact proof where applicable), initial-state binding, every update and every output. Equal total budget for each approach, no reuse between runs. A full-dimensional search still pays its preparation before using the direct comparison.",
+    "directComparisons": [
+      "Sparse coordinate evolution after reverse dependency closure across all given labels and observations. Precompiles zeros away, skips unit products, and shares the initial binding and prepared maps within each trajectory.",
+      "For the spring target, also evolve the four physical coordinates using a shared spring impulse from the published splitting motif and the exact parameters specified below."
+    ]
+  },
+  "cases": [
+    {
+      "id": "switched-markov",
+      "kind": "target",
+      "source": "https://doi.org/10.2307/3215235",
+      "provenance": "Constructed six-state discrete probability transport using strong lumpability as a model motif. Two different column-stochastic kernels use the same three class memberships and different within-class transport. No partition or aggregate transition is supplied to the search.",
+      "initial": "1/21 2/21 3/21 4/21 5/21 6/21",
+      "observations": [{"weights": "0 0 1 1 0 0", "offset": "0"}],
+      "transitions": [
+        {
+          "matrixDenominator": 32,
+          "rows": ["4 8 6 2 1 3", "10 6 3 7 4 2", "7 3 5 11 4 8", "3 7 12 6 7 3", "3 5 2 4 12 7", "5 3 4 2 4 9"],
+          "offset": "0 0 0 0 0 0"
+        },
+        {
+          "matrixDenominator": 32,
+          "rows": ["9 3 5 10 3 1", "3 9 11 6 1 3", "1 3 2 4 13 7", "4 2 5 3 5 11", "11 6 3 7 4 6", "4 9 6 2 6 4"],
+          "offset": "0 0 0 0 0 0"
+        }
+      ]
+    },
+    {
+      "id": "spring-center",
+      "kind": "target",
+      "source": "https://doi.org/10.1017/S0962492902000144",
+      "provenance": "Constructed equal-mass Hooke pair in physical coordinates, using the drift and kick maps of splitting methods as separate event labels. The external impulse is uniform. The input to search consists only of the expanded affine maps and the center position observation.",
+      "initial": "-2 3 1 -1/2",
+      "observations": [{"weights": "1/2 1/2 0 0", "offset": "0"}],
+      "springReference": {"stiffness": "1/2", "externalImpulse": "1/3"},
+      "transitions": [
+        {"rows": ["1 0 1 0", "0 1 0 1", "0 0 1 0", "0 0 0 1"], "offset": "0 0 0 0"},
+        {"rows": ["1 0 0 0", "0 1 0 0", "-1/2 1/2 1 0", "1/2 -1/2 0 1"], "offset": "0 0 1/3 1/3"}
+      ]
+    },
+    {
+      "id": "detuned-spring",
+      "kind": "control",
+      "provenance": "The second coordinate receives only half of the opposite spring impulse. The formerly hidden relative motion affects the observation.",
+      "initial": "-2 3 1 -1/2",
+      "observations": [{"weights": "1/2 1/2 0 0", "offset": "0"}],
+      "transitions": [
+        {"rows": ["1 0 1 0", "0 1 0 1", "0 0 1 0", "0 0 0 1"], "offset": "0 0 0 0"},
+        {"rows": ["1 0 0 0", "0 1 0 0", "-1/2 1/2 1 0", "1/4 -1/4 0 1"], "offset": "0 0 1/3 1/3"}
+      ]
+    },
+    {
+      "id": "coordinate-only",
+      "kind": "control",
+      "provenance": "Only the first coordinate is needed even by direct sparse evaluation. Hidden coordinates undergo coupled changes.",
+      "initial": "-2 3 1 -1/2",
+      "observations": [{"weights": "1 0 0 0", "offset": "0"}],
+      "transitions": [
+        {"rows": ["1 0 0 0", "1 0 1 0", "0 1 1 0", "0 0 1 1"], "offset": "1 0 0 0"},
+        {"rows": ["3/4 0 0 0", "0 1 0 1", "1 0 1 0", "1 2 0 1"], "offset": "0 0 0 0"}
+      ]
+    }
+  ]
+}
