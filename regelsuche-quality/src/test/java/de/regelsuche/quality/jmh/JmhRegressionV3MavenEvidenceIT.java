@@ -9,7 +9,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * Optional read-only Maven replay of externally produced JMH results. The
  * JMH producer is not silently replaced or skipped by this verification.
  */
-@EnabledIfSystemProperty(named = "regelsuche.jmh.regressionResult", matches = ".+")
+@EnabledIfSystemProperty(named = "regelsuche.jmh.regressionOutput", matches = ".+")
 class JmhRegressionV3MavenEvidenceIT {
     @Test
     void verifyTheActualResultAgainstTheFrozenCheckoutPolicy()
