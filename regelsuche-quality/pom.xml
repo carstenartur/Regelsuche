@@ -97,5 +97,33 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>verify-jmh-regression-v3-result</id>
+      <activation><property><name>regelsuche.jmh.regressionResult</name></property></activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>verify-retained-jmh-regression-v3</id>
+                <phase>verify</phase>
+                <goals><goal>test</goal></goals>
+                <configuration>
+                  <test>de.regelsuche.quality.jmh.JmhRegressionV3MavenEvidenceIT</test>
+                  <skipTests>false</skipTests>
+                  <failIfNoTests>true</failIfNoTests>
+                  <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+                  <systemPropertyVariables combine.children="append">
+                    <regelsuche.jmh.regressionOutput>${project.build.directory}/reports/quality/jmh-regression-v3</regelsuche.jmh.regressionOutput>
+                  </systemPropertyVariables>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 </project>
