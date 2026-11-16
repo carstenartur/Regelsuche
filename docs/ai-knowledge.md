@@ -172,6 +172,23 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after verified affine observation evaluation (2026-11-16)
+
+The reference is clean main `e1a36d34f6d3652df05b95fc5fd0e8d416b5e301`.
+All seven verification authorities, the aggregate `Checkout-local ciCheck`
+and report publication passed. The pinned extractor measured 802120 context
+units, up 14940 from 787180 within the unchanged allowance of 15000. The
+[acceptance record](../ai-knowledge/baseline-history/2026-11-16-main-e1a36d3/provenance.json)
+binds the clean checkout and all 287 indexed file lengths and SHA-256 hashes.
+[Main CI](https://github.com/carstenartur/Regelsuche/actions/runs/43834020999)
+
+The earlier [PR #1274 run](https://github.com/carstenartur/Regelsuche/actions/runs/43848888062)
+measured 802960 context units. Its [rejected trend](../ai-knowledge/baseline-history/2026-11-16-main-e1a36d3/rejected-trend.json)
+records an increase of 15780 against the previous reference. Replaying the
+pinned trend check on that measurement against the accepted main snapshot
+passes at an increase of 840. Only the accepted main measurement supplies
+baseline values.
+
 ### Accepted main after the Track F integration (2026-11-15)
 
 The reference is clean main `f7f244c4488ea09413861028e956c97c18a6fed9`.
