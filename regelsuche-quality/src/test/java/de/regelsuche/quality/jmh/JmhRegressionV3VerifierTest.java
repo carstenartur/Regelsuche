@@ -154,6 +154,29 @@ class JmhRegressionV3VerifierTest {
             .getMessage().contains("invalid JSON"));
     }
 
+    @Test
+    void reportsMissingUnitsAndRejectsAliasedReportOutputs()
+            throws Exception {
+        Fixture fixture = fixture();
+        ObjectNode metric = (ObjectNode) fixture.rows().get(0)
+            .path("primaryMetric");
+        metric.remove("scoreUnit");
+        assertEquals("FAILED", check(fixture).status());
+        metric.put("scoreUnit", fixture.thresholds().path("benchmarks")
+            .get(0).path("unit").asText());
+        Files.writeString(fixture.resultPath(),
+            JSON.writeValueAsString(fixture.rows()));
+        IllegalArgumentException alias = assertThrows(
+            IllegalArgumentException.class, () -> JmhRegressionV3Main.main(
+                new String[] { fixture.root().toString(),
+                    fixture.resultPath().toString(),
+                    fixture.thresholdPath().toString(),
+                    fixture.decisionPath().toString(),
+                    fixture.resultPath().toString(),
+                    temporary.resolve("report.md").toString() }));
+        assertTrue(alias.getMessage().contains("aliases retained source"));
+    }
+
     private JmhRegressionV3Verifier.Result check(Fixture fixture)
             throws Exception {
         Files.writeString(fixture.resultPath(),
