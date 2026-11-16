@@ -88,6 +88,11 @@ PR pflegen und auf den Bericht mit Vergleichsverfahren, Datensatz und
 Reproduktionsbefehl verweisen. Historische Messungen an einen Commit oder ein
 versioniertes Artefakt binden. Das Manuskript verweist auf diese Nachweise.
 
+Bei einem wichtigen Fehlversuch festhalten, mit welchen Eingaben und
+gegenüber welcher Vergleichsrechnung die Hypothese scheiterte. Wenn Aufbereitung,
+Prüfung oder Fehlversuche die Bilanz ändern, die Kosten getrennt angeben.
+Die Folgerung beschreibt, was einen erneuten Versuch begründen würde.
+
 Für eine **aktuelle** Implementierung oder Prüfung eine Zeile mit Dateipfad
 relativ zur Repo-Wurzel und der vollständigen, eindeutigen Deklaration ohne
 Einrückung hinzufügen. Das folgende Beispiel verlinkt den Einstieg der Zählerzustandssynthese.

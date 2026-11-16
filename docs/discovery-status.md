@@ -1,6 +1,6 @@
 # Discovery- und Forschungsstand
 
-**Stand: 10. November 2026**
+**Stand: 16. November 2026**
 
 Regelsuche untersucht symbolische Suche, den Erwerb und die Wiederverwendung
 geprüften Wissens sowie mathematisch geprüfte Optimierungen. Diese Übersicht
@@ -9,10 +9,11 @@ und wissenschaftliche Fragen, die weitere Studien benötigen. Die
 [Forschungsmethodik](research-methodology.md) beschreibt diese Trennung und die
 Rolle externer Referenzverfahren.
 
-[Regelsuche 0.5.2](releases/0.5.2.md) wurde am 7. November 2026 veröffentlicht.
-Diese Seite berücksichtigt auch den neueren Hauptzweig bis einschließlich
-8. November. Dessen Ergänzungen gehören nicht automatisch zu den unveränderten
-Release-Artefakten von 0.5.2.
+Für den veröffentlichten Umfang gilt der [Release-Bericht zu Regelsuche 0.5.2](releases/0.5.2.md)
+vom 7. November 2026. Die neueren Befunde dieser Übersicht sind mit dem
+[Hauptzweig bei `b7669e2`](https://github.com/carstenartur/Regelsuche/tree/b7669e2ffd9d8b07e75d1215f83d55374f848fe8)
+abgeglichen. Die [Architekturübersicht](architecture.md#suche-lernen-und-geprüfte-rechenpläne)
+zeigt die zugehörigen Aufrufpfade.
 
 ## Zusammenfassung
 
@@ -66,6 +67,35 @@ Batch-Inversion unterstützt zwei bis 64 Ausgaben mit einer Inversion und
 Diese Operationszahlen sind keine gemessenen Laufzeitfaktoren.
 
 ## Ausgeführte begrenzte Lern- und Kostenversuche
+
+### Neuere Rechenpläne und Lernbefunde
+
+| Verfahren im Hauptzweig | Befund und Reichweite |
+| --- | --- |
+| Geprüfter Blockzustand für Punktänderungen | Auf 100.000 Zeilen liefern acht Punktänderungen die exakten Werte der linearen Delta-Referenz. Der Baum benötigt je Änderung 17 Blockkombinationen nach dem einmaligen Aufbau. [Versuch](research/ordered-block-reductions.md) |
+| Übernahme eines geprüften Paarzustands in Dreiersummen | Bei bereits vorhandenem Paarplan sinkt die Planungsarbeit von 11.200 auf 10.889 Einheiten. Der Kaltstart kostet 85 Einheiten mehr. Beide Verfahren verwenden dieselbe Gruppierung und haben gleiche Baumkosten. [Versuch](research/pair-state-transfer.md) |
+| Vorgegebener Zwischenzustand als Kontrolle | Bei den Java-Aufgaben sinkt der Aufwand um 24 von 7.412 Einheiten. Die stärkere direkte Rekurrenzsuche benötigt 13.968 Einheiten. Der Hinweis spart auf dieser Basis 4,27 Prozent, solange seine Extraktion und Prüfung gratis sind. Mit beiden Kosten steigt sein Aufwand auf 17.078 Einheiten. [Versuch](research/state-choice-oracle.md) |
+| Rekurrenzgesetze automatisch auswählen und übertragen | Auf 80 Anfragen aus fünf wiederholten Vorlagen sinkt die logische Arbeit bei gleichen geprüften Ergebnissen von 70.336 auf 39.774 Einheiten. Erwerb, Laden und Fehlversuche sind enthalten. Bei fünf Anfragen gewinnt der direkte Solver. [Versuch](research/recurrence-proof-selection.md) |
+| Minimale skalare Rekurrenz für eine Beobachtung | Alle Werte stimmen mit der direkten binären Potenzierung überein. Eine der vier Aufgaben profitiert im Stapel, die drei anderen sind direkt günstiger. [Versuch](research/recurrence-observation-krylov.md) |
+
+Für wechselnde Ereignisse liegt ein eigener Entwurf mit exakter
+Beobachtungsreduktion vor. Er leitet die Zustandsformen aus den Übergängen
+und der gewünschten Ausgabe ab. Die Arbeitsvorteile sind in konstruierten
+Modellen für Markov-Transport und Federschwerpunkt bei langen Folgen
+gemessen. [PR #1267](https://github.com/carstenartur/Regelsuche/pull/1267) ·
+[Versuch](https://github.com/carstenartur/Regelsuche/blob/8f6a0cdf9cd0f426a412335a102c11710dbba6a0/docs/research/switched-observation.md)
+
+Ein weiterer Vergleich untersucht feste Modelle aus veröffentlichten
+Quellen. Er hält unter anderem fest, wann sich ein bereits geprüfter
+Beobachtungsplan gegenüber erneuter Herleitung lohnt und welche Kosten
+die direkte Matrixrechnung auf denselben Aufträgen hat. [PR #1271 und Studie](https://github.com/carstenartur/Regelsuche/pull/1271)
+
+Der [Strategien-Index](research/strategies.md) verbindet diese Befunde mit den
+aktuellen Implementierungen und Tests. Das [Manuskript](../paper/README.md)
+führt seine eigene gebundene Evidenz. Die hier aufgeführten neueren
+Entwicklungsversuche bilden eine Grundlage für eine gesonderte Untersuchung,
+wann sich exakte Zustandsreduktion oder die Übernahme eines bewiesenen
+Gesetzes einschließlich ihrer Vorbereitung amortisieren.
 
 ### Drei kumulative Wissensgenerationen
 

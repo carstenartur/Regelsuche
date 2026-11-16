@@ -153,6 +153,11 @@ Generationen und gemessene Übernahmeentscheidungen. Im zugehörigen
 amortisiert sich der zusätzliche Lernversuch gegenüber der bestehenden
 persistenten Sitzung noch nicht.
 
+Der [aktuelle Forschungsstand](docs/discovery-status.md#neuere-rechenpläne-und-lernbefunde)
+führt auch die Vergleiche zu Punktänderungen, Rekurrenztransfer und
+Beobachtungsplänen. Der [Strategien-Index](docs/research/strategies.md)
+verbindet die Befunde einschließlich der Fehlversuche mit Code und Tests.
+
 ### Strukturelle Aufgaben und historische Beispiele
 
 Der gemeinsame Aufgabensolver kann eine nichttriviale Faktorisierung oder eine

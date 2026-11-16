@@ -7,6 +7,9 @@ historische Berichte und Rohdaten unverändert auffindbar. Den Quellstand
 eines Versuchs nennt sein Protokoll. Das [wissenschaftliche Manuskript](../../paper/README.md)
 führt die belegten Aussagen und ihre Reproduktion.
 
+Für die Aufrufpfade in Java, Workbench und SDK gibt es einen eigenen Abschnitt
+in der [Architekturübersicht](../architecture.md#suche-lernen-und-geprüfte-rechenpläne).
+
 Der **Umsetzungsstand** beschreibt, wo eine Strategie ausführbar ist. Der
 **Befund** beschreibt die Wirkung im genannten Versuch und unter dessen
 Bedingungen. Beide Angaben bei einer Änderung im selben PR aktualisieren.
