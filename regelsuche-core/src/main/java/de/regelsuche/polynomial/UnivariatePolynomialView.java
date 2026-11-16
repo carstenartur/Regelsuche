@@ -356,6 +356,29 @@ public final class UnivariatePolynomialView<C> {
             throw new ArithmeticException(
                 "polynomial division by zero");
         }
+        return divideAndRemainder(divisor, work, stage, field);
+    }
+
+    /** Divides by a monic polynomial over the coefficient ring. */
+    public DivisionResult<C> divideAndRemainderMonic(
+        UnivariatePolynomialView<C> divisor,
+        PolynomialWorkSink work,
+        String stage
+    ) {
+        requireSameRing(divisor);
+        if (divisor.isZero()
+                || !ring.coefficientDomain().isOne(divisor.leadingCoefficient())) {
+            throw new IllegalArgumentException("polynomial divisor must be monic");
+        }
+        return divideAndRemainder(divisor, work, stage, null);
+    }
+
+    private DivisionResult<C> divideAndRemainder(
+        UnivariatePolynomialView<C> divisor,
+        PolynomialWorkSink work,
+        String stage,
+        ExactField<C> field
+    ) {
         if (isZero() || degree() < divisor.degree()) {
             return new DivisionResult<>(
                 zero(ring),
@@ -380,18 +403,18 @@ public final class UnivariatePolynomialView<C> {
         while (remainderDegree >= divisor.degree()) {
             consume(work, iterationStage, 1);
             int shift = remainderDegree - divisor.degree();
-            consume(work, divisionStage, 1);
-            C scale;
-            if (reuseInverse) {
-                // Lazy initialization stays after both existing budget charges.
-                if (inverse == null) {
-                    inverse = field.divide(field.one(), divisor.leadingCoefficient());
+            C scale = remainder.get(remainderDegree);
+            if (field != null) {
+                consume(work, divisionStage, 1);
+                if (reuseInverse) {
+                    // Lazy initialization stays after both existing budget charges.
+                    if (inverse == null) {
+                        inverse = field.divide(field.one(), divisor.leadingCoefficient());
+                    }
+                    scale = field.multiply(scale, inverse);
+                } else {
+                    scale = field.divide(scale, divisor.leadingCoefficient());
                 }
-                scale = field.multiply(remainder.get(remainderDegree), inverse);
-            } else {
-                scale = field.divide(
-                    remainder.get(remainderDegree),
-                    divisor.leadingCoefficient());
             }
             quotient.set(
                 shift,

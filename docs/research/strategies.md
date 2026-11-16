@@ -103,6 +103,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`OrderedPairStateProjection.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateProjection.java#L25) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateProjection.java | public record OrderedPairStateProjection(boolean pairFirst, List<Term> pairTerms, List<RowTerm> rowTerms) { -->
 - [`OrderedPairStateTransferTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateTransferTest.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateTransferTest.java | class OrderedPairStateTransferTest { -->
 
+## Gemeinsamer Faktor für quadratische und kubische Nenner
+
+- **Hypothese.** Für zwei monische Nenner (X = D^2) und (Y = D^3) lässt sich (D) durch die Division (Y / X) herleiten und anhand beider Potenzen prüfen.
+- **Umsetzungsstand.** Der Java-Kern stellt die Herleitung, die gesonderte Koeffizientenprüfung und den Vorschlag eines exakten Modulus für reelle Koeffizienten über das Optimierungs-SDK bereit. Für den Modulusvorschlag begrenzt die Herleitung die Bitlänge der ganzzahligen Zwischenwerte.
+- **Befund.** Die Herleitung stimmt mit den ausmultiplizierten Referenzkoeffizienten für einen 381-Bit-Modulus und dessen quadratische Erweiterung überein. Tests verwerfen falsche Nenner, auch wenn die Division aufgeht, und prüfen den Abbruch bei ausgeschöpftem Arbeitsbudget. Bei ganzzahligen Resten liefert ihr größter gemeinsamer Teiler einen für genau diesen Modulus nachgeprüften Vorschlag. Die Tests führen beide Rechenwege mit `./mvnw -pl regelsuche-math-algorithms -am -Dtest=RationalDenominatorReductionTest -Dsurefire.failIfNoSpecifiedTests=false test` aus.
+- **Folgerung.** Bei Java-Quellen die Herkunft der Nenner und den Laufzeitmodulus prüfen. Die Laufzeitwirkung gegen beide ursprünglichen Nennerauswertungen messen.
+
+- [`RationalDenominatorReduction.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/RationalDenominatorReduction.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/RationalDenominatorReduction.java | public final class RationalDenominatorReduction { -->
+- [`RationalDenominatorReductionTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/polynomial/RationalDenominatorReductionTest.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/polynomial/RationalDenominatorReductionTest.java | class RationalDenominatorReductionTest { -->
+
 ## Vorgegebener Zustand als Kontrolle für eingesparte Suche
 
 - **Hypothese.** Ein vorgegebener, prüfbarer Zwischenzustand ersetzt bei gleicher Ergebnisqualität mindestens 20 Prozent bezahlte Arbeit.
