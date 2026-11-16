@@ -14,7 +14,7 @@ Wichtige Klassen:
 - `ScientificSeedCorpora`
 - `SeedExpression`
 - `DeterministicDiscoveryExperimentRunner`
-- `ScientificDiscoveryWorkflow`
+- `ScientificDiscoveryWorkflow` im App-Testcode für die Reproduktion der Seed-Läufe
 
 Typische Kommandos:
 

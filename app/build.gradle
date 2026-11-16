@@ -117,8 +117,8 @@ sourceSets {
     dockerE2eTest {
         java.srcDir 'src/dockerE2eTest/java'
         resources.srcDir 'src/dockerE2eTest/resources'
-        compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
-        runtimeClasspath += sourceSets.main.output + configurations.runtimeClasspath
+        compileClasspath += sourceSets.main.output + sourceSets.test.output + configurations.runtimeClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output + configurations.runtimeClasspath
     }
 }
 
