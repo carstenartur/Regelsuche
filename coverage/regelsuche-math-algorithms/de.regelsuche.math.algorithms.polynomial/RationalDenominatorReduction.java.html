@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalDenominatorReduction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">RationalDenominatorReduction.java</span></div><h1>RationalDenominatorReduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigIntegerDomain;
+import de.regelsuche.polynomial.CoefficientDomain;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialVariable;
+import de.regelsuche.polynomial.PolynomialWorkSink;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Derives and verifies a common base for monic square and cube denominators. */
+public final class RationalDenominatorReduction {
+<span class="fc" id="L16">    private static final Coefficient ZERO = new Coefficient(BigInteger.ZERO, BigInteger.ZERO);</span>
+<span class="fc" id="L17">    private static final Coefficient ONE = new Coefficient(BigInteger.ONE, BigInteger.ZERO);</span>
+<span class="fc" id="L18">    private static final List&lt;PolynomialVariable&gt; VARIABLE = List.of(new PolynomialVariable(&quot;x&quot;));</span>
+    private static final int MAX_INFERENCE_BITS = 16_384;
+    private static final String WORK = &quot;rational-denominator.&quot;;
+
+    private RationalDenominatorReduction() {}
+
+    /** Represents {@code real + imaginary * u}, with {@code u^2 = -1}. */
+    public record Coefficient(BigInteger real, BigInteger imaginary) {
+<span class="fc" id="L26">        public Coefficient {</span>
+<span class="fc" id="L27">            Objects.requireNonNull(real, &quot;real&quot;);</span>
+<span class="fc" id="L28">            Objects.requireNonNull(imaginary, &quot;imaginary&quot;);</span>
+<span class="fc" id="L29">        }</span>
+    }
+
+    /** The ascending coefficients of the proposed denominator, including its leading one. */
+    public record Plan(List&lt;Coefficient&gt; denominator) {
+<span class="fc" id="L34">        public Plan {</span>
+<span class="fc" id="L35">            denominator = List.copyOf(denominator);</span>
+<span class="fc" id="L36">        }</span>
+    }
+
+    /** A plan valid for an inferred modulus. A consumer must check equality with its runtime modulus. */
+    public record GuardedPlan(BigInteger modulus, Plan plan) {
+<span class="fc" id="L41">        public GuardedPlan {</span>
+<span class="fc" id="L42">            Objects.requireNonNull(modulus, &quot;modulus&quot;);</span>
+<span class="fc" id="L43">            Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L44">        }</span>
+    }
+
+    /**
+     * Divides {@code yDenominator} by {@code xDenominator} and checks that the
+     * quotient gives both input denominators when squared and cubed.
+     * Inputs use ascending coefficients and a literal leading one. Lower
+     * coefficients may be signed integer representatives modulo {@code modulus}.
+     * A rejected charge from {@code work} propagates to the caller.
+     */
+    public static Optional&lt;Plan&gt; discover(List&lt;Coefficient&gt; xDenominator, List&lt;Coefficient&gt; yDenominator,
+            BigInteger modulus, PolynomialWorkSink work) {
+<span class="fc" id="L56">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L57">        int degree = commonDegree(xDenominator, yDenominator);</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">        if (degree &lt; 1 || modulus.compareTo(BigInteger.ONE) &lt;= 0) {</span>
+<span class="fc" id="L59">            return Optional.empty();</span>
+        }
+<span class="fc" id="L61">        work.consume(WORK + &quot;inputs&quot;, (long) xDenominator.size() + yDenominator.size());</span>
+<span class="fc" id="L62">        var ring = ring(new QuadraticResidueDomain(modulus));</span>
+<span class="fc" id="L63">        var x = UnivariatePolynomialView.of(ring, xDenominator);</span>
+<span class="fc" id="L64">        var y = UnivariatePolynomialView.of(ring, yDenominator);</span>
+<span class="fc" id="L65">        var division = y.divideAndRemainderMonic(x, work, WORK + &quot;quotient&quot;);</span>
+<span class="fc" id="L66">        var denominator = division.quotient();</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">        if (!division.remainder().isZero() || !identitiesHold(x, y, denominator, work)) {</span>
+<span class="fc" id="L68">            return Optional.empty();</span>
+        }
+<span class="fc" id="L70">        return Optional.of(new Plan(denominator.coefficients()));</span>
+    }
+
+    /** Replays the square and cube identities directly from the supplied plan and input coefficients. */
+    public static boolean verify(List&lt;Coefficient&gt; xDenominator, List&lt;Coefficient&gt; yDenominator,
+            BigInteger modulus, Plan plan, PolynomialWorkSink work) {
+<span class="fc" id="L76">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L77">        int degree = commonDegree(xDenominator, yDenominator);</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (degree &lt; 1 || modulus.compareTo(BigInteger.ONE) &lt;= 0</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">                || plan.denominator().size() != degree + 1 || !isMonic(plan.denominator())) {</span>
+<span class="fc" id="L80">            return false;</span>
+        }
+<span class="fc" id="L82">        work.consume(WORK + &quot;inputs&quot;, (long) xDenominator.size() + yDenominator.size() + plan.denominator().size());</span>
+<span class="fc" id="L83">        var ring = ring(new QuadraticResidueDomain(modulus));</span>
+<span class="fc" id="L84">        return identitiesHold(UnivariatePolynomialView.of(ring, xDenominator),</span>
+<span class="fc" id="L85">            UnivariatePolynomialView.of(ring, yDenominator),</span>
+<span class="fc" id="L86">            UnivariatePolynomialView.of(ring, plan.denominator()), work);</span>
+    }
+
+    /**
+     * Proposes a modulus for real coefficients by taking the GCD of the integer
+     * coefficient residuals. The input identities may also hold for divisors of
+     * the proposal. The returned plan has been checked for the proposed modulus.
+     */
+    public static Optional&lt;GuardedPlan&gt; inferModulus(List&lt;Coefficient&gt; xDenominator, List&lt;Coefficient&gt; yDenominator,
+            PolynomialWorkSink work) {
+<span class="fc" id="L96">        Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L97">        int degree = commonDegree(xDenominator, yDenominator);</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (degree &lt; 1 || !fitsIntegerInference(xDenominator, yDenominator, degree, work)) {</span>
+<span class="fc" id="L99">            return Optional.empty();</span>
+        }
+<span class="fc" id="L101">        var ring = ring(BigIntegerDomain.INSTANCE);</span>
+<span class="fc" id="L102">        var x = UnivariatePolynomialView.of(ring, xDenominator.stream().map(Coefficient::real).toList());</span>
+<span class="fc" id="L103">        var y = UnivariatePolynomialView.of(ring, yDenominator.stream().map(Coefficient::real).toList());</span>
+        // Monic division commutes with reduction modulo every candidate modulus.
+<span class="fc" id="L105">        var quotient = y.divideAndRemainderMonic(x, work, WORK + &quot;integer-quotient&quot;).quotient();</span>
+<span class="fc" id="L106">        var square = quotient.multiply(quotient, work, WORK + &quot;integer-square&quot;);</span>
+<span class="fc" id="L107">        var cube = square.multiply(quotient, work, WORK + &quot;integer-cube&quot;);</span>
+<span class="fc" id="L108">        var xResidual = x.subtract(square, work, WORK + &quot;square-residual&quot;);</span>
+<span class="fc" id="L109">        var yResidual = y.subtract(cube, work, WORK + &quot;cube-residual&quot;);</span>
+<span class="fc" id="L110">        BigInteger modulus = gcdCoefficients(yResidual, gcdCoefficients(xResidual, BigInteger.ZERO, work), work);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (modulus.compareTo(BigInteger.ONE) &lt;= 0) {</span>
+<span class="fc" id="L112">            return Optional.empty();</span>
+        }
+<span class="fc" id="L114">        return discover(xDenominator, yDenominator, modulus, work).map(plan -&gt; new GuardedPlan(modulus, plan));</span>
+    }
+
+    private static boolean fitsIntegerInference(List&lt;Coefficient&gt; x, List&lt;Coefficient&gt; y, int degree,
+            PolynomialWorkSink work) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (inferenceBitBound(degree, 1) &gt; MAX_INFERENCE_BITS) {</span>
+<span class="nc" id="L120">            return false;</span>
+        }
+<span class="fc" id="L122">        work.consume(WORK + &quot;integer-inputs&quot;, (long) x.size() + y.size());</span>
+<span class="fc" id="L123">        long xBits = realBitLength(x);</span>
+<span class="fc" id="L124">        long yBits = realBitLength(y);</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        return xBits &gt;= 0 &amp;&amp; yBits &gt;= 0</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            &amp;&amp; inferenceBitBound(degree, Math.max(xBits, yBits)) &lt;= MAX_INFERENCE_BITS;</span>
+    }
+
+    private static long realBitLength(List&lt;Coefficient&gt; coefficients) {
+<span class="fc" id="L130">        long bits = 0;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (Coefficient coefficient : coefficients) {</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (coefficient.imaginary().signum() != 0) {</span>
+<span class="fc" id="L133">                return -1;</span>
+            }
+<span class="fc" id="L135">            BigInteger real = coefficient.real();</span>
+            // For negative BigIntegers, bitLength omits the sign bit.
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            bits = Math.max(bits, (long) real.bitLength() + (real.signum() &lt; 0 ? 1 : 0));</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return bits;</span>
+    }
+
+    private static long inferenceBitBound(int degree, long inputBits) {
+        // Each quotient step adds at most inputBits + 1 bits to a coefficient.
+        // The cube sums at most (degree + 1)^2 such triple products per coefficient.
+<span class="fc" id="L145">        long quotientBits = inputBits + (degree + 1L) * (inputBits + 1);</span>
+<span class="fc" id="L146">        int countBits = Integer.SIZE - Integer.numberOfLeadingZeros(degree + 1);</span>
+<span class="fc" id="L147">        return 3 * quotientBits + 2L * countBits + 1;</span>
+    }
+
+    private static BigInteger gcdCoefficients(UnivariatePolynomialView&lt;BigInteger&gt; residual,
+            BigInteger gcd, PolynomialWorkSink work) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (BigInteger coefficient : residual.coefficients()) {</span>
+<span class="fc" id="L153">            work.consume(WORK + &quot;residual-gcd&quot;, 1);</span>
+<span class="fc" id="L154">            gcd = gcd.gcd(coefficient);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (BigInteger.ONE.equals(gcd)) {</span>
+<span class="fc" id="L156">                break;</span>
+            }
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        return gcd;</span>
+    }
+
+    private static boolean identitiesHold(UnivariatePolynomialView&lt;Coefficient&gt; x,
+            UnivariatePolynomialView&lt;Coefficient&gt; y, UnivariatePolynomialView&lt;Coefficient&gt; denominator,
+            PolynomialWorkSink work) {
+<span class="fc" id="L165">        var square = denominator.multiply(denominator, work, WORK + &quot;square&quot;);</span>
+<span class="fc" id="L166">        work.consume(WORK + &quot;compare-square&quot;, x.coefficientCount());</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (!x.coefficients().equals(square.coefficients())) {</span>
+<span class="fc" id="L168">            return false;</span>
+        }
+<span class="fc" id="L170">        var cube = square.multiply(denominator, work, WORK + &quot;cube&quot;);</span>
+<span class="fc" id="L171">        work.consume(WORK + &quot;compare-cube&quot;, y.coefficientCount());</span>
+<span class="fc" id="L172">        return y.coefficients().equals(cube.coefficients());</span>
+    }
+
+    private static int commonDegree(List&lt;Coefficient&gt; x, List&lt;Coefficient&gt; y) {
+<span class="fc" id="L176">        int degree = y.size() - x.size();</span>
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">        return degree &gt; 0 &amp;&amp; x.size() == 2L * degree + 1 &amp;&amp; y.size() == 3L * degree + 1</span>
+<span class="fc bfc" id="L178" title="All 6 branches covered.">                &amp;&amp; isMonic(x) &amp;&amp; isMonic(y) ? degree : -1;</span>
+    }
+
+    private static boolean isMonic(List&lt;Coefficient&gt; coefficients) {
+<span class="fc" id="L182">        return ONE.equals(coefficients.getLast());</span>
+    }
+
+    private static &lt;C&gt; PolynomialRing&lt;C&gt; ring(CoefficientDomain&lt;C&gt; domain) {
+<span class="fc" id="L186">        return new PolynomialRing&lt;&gt;(domain, VARIABLE, PolynomialRing.MonomialOrder.LEXICOGRAPHIC);</span>
+    }
+
+<span class="fc" id="L189">    private record QuadraticResidueDomain(BigInteger modulus) implements CoefficientDomain&lt;Coefficient&gt; {</span>
+<span class="nc" id="L190">        @Override public String id() { return &quot;quadratic-residue(-1,&quot; + modulus + ')'; }</span>
+<span class="nc" id="L191">        @Override public BigInteger characteristic() { return modulus; }</span>
+<span class="fc" id="L192">        @Override public Coefficient zero() { return ZERO; }</span>
+<span class="fc" id="L193">        @Override public Coefficient one() { return ONE; }</span>
+<span class="fc" id="L194">        @Override public Coefficient fromInteger(BigInteger value) { return new Coefficient(value.mod(modulus), BigInteger.ZERO); }</span>
+
+        @Override
+        public Coefficient canonical(Coefficient value) {
+<span class="fc" id="L198">            return reduce(value.real(), value.imaginary());</span>
+        }
+
+        @Override
+        public Coefficient add(Coefficient left, Coefficient right) {
+<span class="fc" id="L203">            return reduce(left.real().add(right.real()), left.imaginary().add(right.imaginary()));</span>
+        }
+
+        @Override
+        public Coefficient negate(Coefficient value) {
+<span class="fc" id="L208">            return reduce(value.real().negate(), value.imaginary().negate());</span>
+        }
+
+        @Override
+        public Coefficient multiply(Coefficient left, Coefficient right) {
+<span class="fc" id="L213">            BigInteger realProduct = left.real().multiply(right.real());</span>
+<span class="fc bfc" id="L214" title="All 4 branches covered.">            if (left.imaginary().signum() == 0 &amp;&amp; right.imaginary().signum() == 0) {</span>
+<span class="fc" id="L215">                return fromInteger(realProduct);</span>
+            }
+<span class="fc" id="L217">            return reduce(realProduct.subtract(left.imaginary().multiply(right.imaginary())),</span>
+<span class="fc" id="L218">                left.real().multiply(right.imaginary()).add(left.imaginary().multiply(right.real())));</span>
+        }
+
+        @Override
+        public boolean isZero(Coefficient value) {
+<span class="fc" id="L223">            return ZERO.equals(value);</span>
+        }
+
+        @Override
+        public String canonicalText(Coefficient value) {
+<span class="nc" id="L228">            Coefficient canonical = canonical(value);</span>
+<span class="nc" id="L229">            return canonical.real() + &quot;,&quot; + canonical.imaginary();</span>
+        }
+
+        @Override
+        public int bitLength(Coefficient value) {
+<span class="nc" id="L234">            Coefficient canonical = canonical(value);</span>
+<span class="nc" id="L235">            return Math.max(canonical.real().bitLength(), canonical.imaginary().bitLength());</span>
+        }
+
+        private Coefficient reduce(BigInteger real, BigInteger imaginary) {
+<span class="fc" id="L239">            return new Coefficient(real.mod(modulus), imaginary.mod(modulus));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
