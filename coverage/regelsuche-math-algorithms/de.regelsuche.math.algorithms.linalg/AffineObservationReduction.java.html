@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineObservationReduction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">AffineObservationReduction.java</span></div><h1>AffineObservationReduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.add;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.addProduct;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.checked;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.multiply;
+import static de.regelsuche.math.algorithms.linalg.SparseAffineForm.evaluateAll;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Exhausted;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.ArithmeticLimit;
+import de.regelsuche.math.algorithms.linalg.SparseAffineForm.Update;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import de.regelsuche.representation.RepresentationBridge.WorkLedger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+
+/** Derives an exact minimal affine-linear state for fixed observations of labelled affine maps over Q. */
+public final class AffineObservationReduction {
+    private AffineObservationReduction() { }
+
+    public record Transition(ExactMatrix linear, ExactVector offset) {
+<span class="fc" id="L30">        public Transition {</span>
+<span class="fc" id="L31">            Objects.requireNonNull(linear, &quot;linear&quot;);</span>
+<span class="fc" id="L32">            Objects.requireNonNull(offset, &quot;offset&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">            if (linear.rowCount() != linear.columns() || offset.dimension() != linear.rowCount()) {</span>
+<span class="fc" id="L34">                throw new IllegalArgumentException(&quot;transition must be square with a matching offset&quot;);</span>
+            }
+<span class="fc" id="L36">        }</span>
+    }
+
+    public record Observation(ExactVector weights, Rational offset) {
+<span class="fc" id="L40">        public Observation {</span>
+<span class="fc" id="L41">            Objects.requireNonNull(weights, &quot;weights&quot;);</span>
+<span class="fc" id="L42">            Objects.requireNonNull(offset, &quot;offset&quot;);</span>
+<span class="fc" id="L43">        }</span>
+    }
+
+<span class="fc" id="L46">    public enum Status { COMPLETE, BUDGET_INCONCLUSIVE, ARITHMETIC_LIMIT }</span>
+
+    /** Only a completed phase publishes its value. Work includes any unsuccessful attempt. */
+    public record Result&lt;T&gt;(Status status, Optional&lt;T&gt; value, WorkLedger work) {
+<span class="fc" id="L50">        public Result {</span>
+<span class="fc" id="L51">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L52">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc" id="L53">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">            if ((status == Status.COMPLETE) != value.isPresent()) {</span>
+<span class="nc" id="L55">                throw new IllegalArgumentException(&quot;only a complete result has a value&quot;);</span>
+            }
+<span class="fc" id="L57">        }</span>
+    }
+
+    /**
+     * Closes the nonconstant observation forms under pullback by every transition.
+     * Each inserted row is a residual of an observation or a pullback of an earlier row.
+     * Its new pivot makes it independent. Any closed observation space must contain
+     * every one of these rows. Offsets are known constants and require no state slot.
+     *
+     * &lt;p&gt;Transition indices follow input list order. Observations must be nonempty.
+     * The exact arithmetic uses the recurrence observation module's rational size bound.
+     * Preparation checks the resulting affine identities at zero and each unit vector.
+     * To share a budget across phases, pass the previous phase's remaining work as the next budget.&lt;/p&gt;
+     */
+    public static Result&lt;VerifiedPlan&gt; prepare(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations,
+            Budget budget) {
+<span class="fc" id="L73">        Objects.requireNonNull(transitions, &quot;transitions&quot;);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(observations, &quot;observations&quot;);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (observations.isEmpty()) throw new IllegalArgumentException(&quot;at least one observation is required&quot;);</span>
+<span class="fc" id="L76">        return measured(budget, work -&gt; {</span>
+<span class="fc" id="L77">            work.add(1L + transitions.size() + observations.size());</span>
+<span class="fc" id="L78">            return derive(List.copyOf(transitions), List.copyOf(observations), work);</span>
+        });
+    }
+
+    /** A preparation can be reused for any initial state in the source coordinates. */
+    public static final class VerifiedPlan {
+        private final int sourceDimension;
+        private final List&lt;ExactVector&gt; basis;
+        private final List&lt;SparseAffineForm&gt; projection;
+        private final List&lt;Update&gt; updates;
+        private final List&lt;SparseAffineForm&gt; outputs;
+
+        private VerifiedPlan(int sourceDimension, List&lt;ExactVector&gt; basis, List&lt;SparseAffineForm&gt; projection,
+<span class="fc" id="L91">                List&lt;Update&gt; updates, List&lt;SparseAffineForm&gt; outputs) {</span>
+<span class="fc" id="L92">            this.sourceDimension = sourceDimension;</span>
+<span class="fc" id="L93">            this.basis = basis;</span>
+<span class="fc" id="L94">            this.projection = projection;</span>
+<span class="fc" id="L95">            this.updates = updates;</span>
+<span class="fc" id="L96">            this.outputs = outputs;</span>
+<span class="fc" id="L97">        }</span>
+
+        public int sourceDimension() {
+<span class="fc" id="L100">            return sourceDimension;</span>
+        }
+
+        public int reducedDimension() {
+<span class="fc" id="L104">            return basis.size();</span>
+        }
+
+        /** The state coordinates are the values of these linear forms, in discovery order. */
+        public List&lt;ExactVector&gt; basis() {
+<span class="fc" id="L109">            return basis;</span>
+        }
+
+        public Result&lt;BoundState&gt; bind(ExactVector state, Budget budget) {
+<span class="fc" id="L113">            Objects.requireNonNull(state, &quot;state&quot;);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (state.dimension() != sourceDimension) throw new IllegalArgumentException(&quot;initial state dimension mismatch&quot;);</span>
+<span class="fc" id="L115">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L116">                checkCoefficients(state.values(), work);</span>
+<span class="fc" id="L117">                return new BoundState(this, evaluateAll(projection, state.values(), work));</span>
+            });
+        }
+    }
+
+    /** Immutable state of a verified plan. A failed or successful query leaves this instance reusable. */
+    public static final class BoundState {
+        private final VerifiedPlan plan;
+        private final List&lt;Rational&gt; state;
+
+<span class="fc" id="L127">        private BoundState(VerifiedPlan plan, List&lt;Rational&gt; state) {</span>
+<span class="fc" id="L128">            this.plan = plan;</span>
+<span class="fc" id="L129">            this.state = state;</span>
+<span class="fc" id="L130">        }</span>
+
+        public Result&lt;List&lt;Rational&gt;&gt; observe(Budget budget) {
+<span class="fc" id="L133">            return measured(budget, work -&gt; evaluateAll(plan.outputs, state, work));</span>
+        }
+
+        public Result&lt;BoundState&gt; advance(int transition, Budget budget) {
+<span class="fc" id="L137">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L138">                work.add(1L + state.size());</span>
+<span class="fc" id="L139">                var next = new ArrayList&lt;&gt;(state);</span>
+<span class="fc" id="L140">                update(transition, work).apply(next, work);</span>
+<span class="fc" id="L141">                return new BoundState(plan, next);</span>
+            });
+        }
+
+        /**
+         * Reads each label once in event order and returns observations immediately after each event.
+         * Retrying after failure with a single-use source requires replaying the source from the start.
+         */
+        public Result&lt;Trace&gt; trace(Iterable&lt;Integer&gt; transitions, Budget budget) {
+<span class="fc" id="L150">            Objects.requireNonNull(transitions, &quot;transitions&quot;);</span>
+<span class="fc" id="L151">            return measured(budget, work -&gt; {</span>
+<span class="fc" id="L152">                work.add(1L + state.size());</span>
+<span class="fc" id="L153">                var current = new ArrayList&lt;&gt;(state);</span>
+<span class="fc" id="L154">                var observations = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc" id="L155">                List&lt;Rational&gt; lastOutput = null;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                for (int transition : transitions) {</span>
+<span class="fc" id="L157">                    work.add(1);</span>
+<span class="fc" id="L158">                    var update = update(transition, work);</span>
+<span class="fc" id="L159">                    update.apply(current, work);</span>
+<span class="fc bfc" id="L160" title="All 4 branches covered.">                    if (lastOutput == null || update.affectsOutputs()) {</span>
+<span class="fc" id="L161">                        lastOutput = evaluateAll(plan.outputs, current, work);</span>
+                    }
+<span class="fc" id="L163">                    observations.add(lastOutput);</span>
+<span class="fc" id="L164">                }</span>
+<span class="fc" id="L165">                work.add(1L + observations.size());</span>
+<span class="fc" id="L166">                return new Trace(new BoundState(plan, current), observations);</span>
+            });
+        }
+
+        private Update update(int transition, Work work) {
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">            if (transition &lt; 0 || transition &gt;= plan.updates.size()) {</span>
+<span class="fc" id="L172">                throw new IllegalArgumentException(&quot;unknown transition index: &quot; + transition);</span>
+            }
+<span class="fc" id="L174">            work.add(1);</span>
+<span class="fc" id="L175">            return plan.updates.get(transition);</span>
+        }
+    }
+
+    /** Observations in event order, and the state from which the next event can run. */
+    public record Trace(BoundState finalState, List&lt;List&lt;Rational&gt;&gt; observations) {
+<span class="fc" id="L181">        public Trace {</span>
+<span class="fc" id="L182">            Objects.requireNonNull(finalState, &quot;finalState&quot;);</span>
+<span class="fc" id="L183">            observations = observations.stream().map(List::copyOf).toList();</span>
+<span class="fc" id="L184">        }</span>
+    }
+
+    private static VerifiedPlan derive(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations, Work work) {
+<span class="fc" id="L188">        int dimension = observations.getFirst().weights().dimension();</span>
+<span class="fc" id="L189">        checkInputs(transitions, observations, dimension, work);</span>
+<span class="fc" id="L190">        var rows = new ArrayList&lt;BasisRow&gt;();</span>
+<span class="fc" id="L191">        var outputs = new ArrayList&lt;SparseAffineForm&gt;(observations.size());</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (var observation : observations) {</span>
+<span class="fc" id="L193">            outputs.add(represent(observation.weights().values(), observation.offset(), rows, work));</span>
+<span class="fc" id="L194">        }</span>
+
+<span class="fc" id="L196">        var updates = new ArrayList&lt;List&lt;SparseAffineForm&gt;&gt;(transitions.size());</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (int label = 0; label &lt; transitions.size(); label++) updates.add(new ArrayList&lt;&gt;());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int row = 0; row &lt; rows.size(); row++) {</span>
+<span class="fc" id="L199">            var form = rows.get(row).weights().values();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (int label = 0; label &lt; transitions.size(); label++) {</span>
+<span class="fc" id="L201">                var transition = transitions.get(label);</span>
+<span class="fc" id="L202">                var image = pullback(form, transition.linear(), work);</span>
+<span class="fc" id="L203">                var bias = Rational.ZERO;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="fc" id="L205">                    bias = addProduct(bias, form.get(i), transition.offset().get(i), work);</span>
+                }
+<span class="fc" id="L207">                updates.get(label).add(represent(image, bias, rows, work));</span>
+            }
+        }
+
+<span class="fc" id="L211">        work.add(1L + rows.size() + outputs.size() + (long) rows.size() * updates.size());</span>
+<span class="fc" id="L212">        var basis = rows.stream().map(BasisRow::weights).toList();</span>
+<span class="fc" id="L213">        var projection = new ArrayList&lt;SparseAffineForm&gt;(basis.size());</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (var vector : basis) projection.add(SparseAffineForm.compile(vector.values(), Rational.ZERO, work));</span>
+<span class="fc" id="L215">        var preparedUpdates = new ArrayList&lt;Update&gt;(updates.size());</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (var update : updates) preparedUpdates.add(Update.compile(update, outputs, work));</span>
+<span class="fc" id="L217">        var plan = new VerifiedPlan(dimension, basis, List.copyOf(projection),</span>
+<span class="fc" id="L218">            List.copyOf(preparedUpdates), List.copyOf(outputs));</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (!verify(transitions, observations, plan, work)) {</span>
+<span class="nc" id="L220">            throw new IllegalStateException(&quot;independent affine observation proof rejected the derived state&quot;);</span>
+        }
+<span class="fc" id="L222">        return plan;</span>
+    }
+
+    private static void checkInputs(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations, int dimension, Work work) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (var transition : transitions) {</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (transition.linear().columns() != dimension) throw new IllegalArgumentException(&quot;transition dimension mismatch&quot;);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            for (var row : transition.linear().rows()) checkCoefficients(row, work);</span>
+<span class="fc" id="L229">            checkCoefficients(transition.offset().values(), work);</span>
+<span class="fc" id="L230">        }</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (var observation : observations) {</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (observation.weights().dimension() != dimension) throw new IllegalArgumentException(&quot;observation dimension mismatch&quot;);</span>
+<span class="fc" id="L233">            work.add(1);</span>
+<span class="fc" id="L234">            checked(observation.offset());</span>
+<span class="fc" id="L235">            checkCoefficients(observation.weights().values(), work);</span>
+<span class="fc" id="L236">        }</span>
+<span class="fc" id="L237">    }</span>
+
+    private static void checkCoefficients(List&lt;Rational&gt; coefficients, Work work) {
+<span class="fc" id="L240">        work.add(coefficients.size());</span>
+<span class="fc" id="L241">        coefficients.forEach(RecurrenceObservationArithmetic::checked);</span>
+<span class="fc" id="L242">    }</span>
+
+    private static List&lt;Rational&gt; pullback(List&lt;Rational&gt; form, ExactMatrix linear, Work work) {
+<span class="fc" id="L245">        work.add(form.size());</span>
+<span class="fc" id="L246">        var result = new ArrayList&lt;Rational&gt;(form.size());</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        for (int column = 0; column &lt; form.size(); column++) {</span>
+<span class="fc" id="L248">            var weight = Rational.ZERO;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            for (int row = 0; row &lt; form.size(); row++) {</span>
+<span class="fc" id="L250">                weight = addProduct(weight, form.get(row), linear.get(row, column), work);</span>
+            }
+<span class="fc" id="L252">            result.add(weight);</span>
+        }
+<span class="fc" id="L254">        return result;</span>
+    }
+
+    private static SparseAffineForm represent(List&lt;Rational&gt; weights, Rational offset, List&lt;BasisRow&gt; rows, Work work) {
+<span class="fc" id="L258">        work.add(1L + weights.size());</span>
+<span class="fc" id="L259">        var residual = new ArrayList&lt;&gt;(weights);</span>
+<span class="fc" id="L260">        var coordinates = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L262">            work.add(1);</span>
+<span class="fc" id="L263">            var factor = residual.get(row.pivot());</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (factor.isZero()) {</span>
+<span class="fc" id="L265">                coordinates.add(Rational.ZERO);</span>
+<span class="fc" id="L266">                continue;</span>
+            }
+<span class="fc" id="L268">            var lead = row.weights().get(row.pivot());</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            if (!lead.isOne()) {</span>
+<span class="fc" id="L270">                work.add(1);</span>
+<span class="fc" id="L271">                factor = checked(factor.divide(lead));</span>
+            }
+<span class="fc" id="L273">            coordinates.add(factor);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            for (int i = 0; i &lt; residual.size(); i++) {</span>
+<span class="fc" id="L275">                work.add(1);</span>
+<span class="fc" id="L276">                var coefficient = row.weights().get(i);</span>
+<span class="fc bfc" id="L277" title="All 4 branches covered.">                if (!coefficient.isZero() &amp;&amp; i != row.pivot()) {</span>
+<span class="fc" id="L278">                    var product = multiply(coefficient, factor, work);</span>
+<span class="fc" id="L279">                    work.add(1);</span>
+<span class="fc" id="L280">                    residual.set(i, checked(residual.get(i).subtract(product)));</span>
+                }
+            }
+<span class="fc" id="L283">            residual.set(row.pivot(), Rational.ZERO);</span>
+<span class="fc" id="L284">        }</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        for (int pivot = 0; pivot &lt; residual.size(); pivot++) {</span>
+<span class="fc" id="L286">            work.add(1);</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            if (residual.get(pivot).isZero()) continue;</span>
+<span class="fc" id="L288">            work.add(1L + residual.size());</span>
+            // Keep the residual's scale so an independent observation is a state slot directly.
+<span class="fc" id="L290">            rows.add(new BasisRow(pivot, new ExactVector(residual)));</span>
+<span class="fc" id="L291">            coordinates.add(Rational.ONE);</span>
+<span class="fc" id="L292">            break;</span>
+        }
+<span class="fc" id="L294">        return SparseAffineForm.compile(coordinates, offset, work);</span>
+    }
+
+    private static boolean verify(List&lt;Transition&gt; transitions, List&lt;Observation&gt; observations, VerifiedPlan plan, Work work) {
+<span class="fc" id="L298">        int dimension = plan.sourceDimension();</span>
+<span class="fc" id="L299">        work.add(dimension);</span>
+<span class="fc" id="L300">        var sample = new ArrayList&lt;&gt;(Collections.nCopies(dimension, Rational.ZERO));</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (int column = -1; column &lt; dimension; column++) {</span>
+<span class="fc" id="L302">            work.add(1);</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (column &gt; 0) sample.set(column - 1, Rational.ZERO);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (column &gt;= 0) sample.set(column, Rational.ONE);</span>
+<span class="fc" id="L305">            var reduced = evaluateAll(plan.projection, sample, work);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            for (int row = 0; row &lt; plan.basis.size(); row++) {</span>
+<span class="fc" id="L307">                work.add(1);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                var coefficient = column &lt; 0 ? Rational.ZERO : plan.basis.get(row).get(column);</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                if (!coefficient.equals(reduced.get(row))) return false;</span>
+            }
+<span class="fc" id="L311">            var output = evaluateAll(plan.outputs, reduced, work);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            for (int row = 0; row &lt; observations.size(); row++) {</span>
+<span class="fc" id="L313">                work.add(1);</span>
+<span class="fc" id="L314">                var observation = observations.get(row);</span>
+<span class="fc" id="L315">                var expected = observation.offset();</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                if (column &gt;= 0) expected = add(expected, observation.weights().get(column), work);</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                if (!expected.equals(output.get(row))) return false;</span>
+            }
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            for (int label = 0; label &lt; transitions.size(); label++) {</span>
+<span class="fc" id="L320">                var transition = transitions.get(label);</span>
+<span class="fc" id="L321">                var image = transition.offset().values();</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">                if (column &gt;= 0) {</span>
+<span class="fc" id="L323">                    work.add(dimension);</span>
+<span class="fc" id="L324">                    var shifted = new ArrayList&lt;Rational&gt;(dimension);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                    for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L326">                        shifted.add(add(image.get(row), transition.linear().get(row, column), work));</span>
+                    }
+<span class="fc" id="L328">                    image = shifted;</span>
+                }
+<span class="fc" id="L330">                var expected = projectDirectly(plan.basis, image, work);</span>
+<span class="fc" id="L331">                work.add(1L + reduced.size());</span>
+<span class="fc" id="L332">                var actual = new ArrayList&lt;&gt;(reduced);</span>
+<span class="fc" id="L333">                plan.updates.get(label).apply(actual, work);</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                if (!equal(expected, actual, work)) return false;</span>
+            }
+        }
+<span class="fc" id="L337">        return true;</span>
+    }
+
+    private static List&lt;Rational&gt; projectDirectly(List&lt;ExactVector&gt; basis, List&lt;Rational&gt; state, Work work) {
+<span class="fc" id="L341">        work.add(basis.size());</span>
+<span class="fc" id="L342">        var projected = new ArrayList&lt;Rational&gt;(basis.size());</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        for (var form : basis) {</span>
+<span class="fc" id="L344">            var value = Rational.ZERO;</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">            for (int i = 0; i &lt; state.size(); i++) value = addProduct(value, form.get(i), state.get(i), work);</span>
+<span class="fc" id="L346">            projected.add(value);</span>
+<span class="fc" id="L347">        }</span>
+<span class="fc" id="L348">        return projected;</span>
+    }
+
+    private static boolean equal(List&lt;Rational&gt; expected, List&lt;Rational&gt; actual, Work work) {
+<span class="fc" id="L352">        work.add(1L + expected.size());</span>
+<span class="fc" id="L353">        return expected.equals(actual);</span>
+    }
+
+    private static &lt;T&gt; Result&lt;T&gt; measured(Budget budget, Function&lt;Work, T&gt; phase) {
+<span class="fc" id="L357">        var work = new Work(Objects.requireNonNull(budget, &quot;budget&quot;).maxWorkUnits());</span>
+        try {
+<span class="fc" id="L359">            return new Result&lt;&gt;(Status.COMPLETE, Optional.of(phase.apply(work)), work.ledger());</span>
+<span class="fc" id="L360">        } catch (Exhausted exhausted) {</span>
+<span class="fc" id="L361">            return new Result&lt;&gt;(Status.BUDGET_INCONCLUSIVE, Optional.empty(), work.ledger());</span>
+<span class="fc" id="L362">        } catch (ArithmeticLimit tooLarge) {</span>
+<span class="fc" id="L363">            return new Result&lt;&gt;(Status.ARITHMETIC_LIMIT, Optional.empty(), work.ledger());</span>
+        }
+    }
+
+<span class="fc" id="L367">    private record BasisRow(int pivot, ExactVector weights) { }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
