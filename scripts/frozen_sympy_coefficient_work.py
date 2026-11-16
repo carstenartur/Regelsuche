@@ -1,7 +1,8 @@
-"""Coefficient-operation metering for four univariate kernels in the pinned SymPy.
+"""Coefficient-operation metering for univariate kernels in the pinned SymPy.
 
-This development component covers multiplication and squaring in dense and
-prime-field coefficient arrays. It does not issue a full factorization ledger.
+This component covers multiplication and squaring in dense and prime-field
+arrays and coefficient updates in prime-field division. Domain inversion is
+charged at entry, without a ledger for the implementation of the inverse.
 Use one isolated Python process per measured row.
 """
 
@@ -35,18 +36,19 @@ class CoefficientWork:
 
 
 OPERATORS = {"iadd": operator.iadd, "mul": operator.mul,
-             "square": operator.pow, "mod": operator.mod}
+             "square": operator.pow, "mod": operator.mod,
+             "isub": operator.isub, "imul": operator.imul,
+             "invert": lambda invert, args: invert(*args)}
 PINS = {
     "densearith": ("eb007a0c958a341d1103b4dd83b8cc81120446365db40a77d8e421210eb0995e", ("dup_mul", "dup_sqr")),
-    "galoistools": ("67779dfc0d0da218fd473b8cde4a26efe6b2e0c9f3207a69c2057642938db93a", ("gf_mul", "gf_sqr")),
+    "galoistools": ("67779dfc0d0da218fd473b8cde4a26efe6b2e0c9f3207a69c2057642938db93a",
+                    ("gf_mul", "gf_sqr", "gf_div")),
 }
 
 
 def instrument(kernel):
     name = kernel.__name__
     source = inspect.getsource(kernel)
-    coefficient = "c" if name == "dup_sqr" else "coeff"
-    rhs = "g[i - j]" if name.endswith("_mul") else "f[i - j]"
 
     def measured(op, left, right):
         return f"_regelsuche_coefficient_op('{name}', '{op}', {left}, {right})"
@@ -57,12 +59,20 @@ def instrument(kernel):
             raise ValueError(f"unexpected {name} coefficient operation: {line}")
         source = source.replace(line, replacement)
 
-    product = measured("mul", "f[j]", rhs)
-    replace(f"{coefficient} += f[j]*{rhs}", f"{coefficient} = " + measured("iadd", coefficient, product))
-    if name.endswith("_sqr"):
-        replace(f"{coefficient} += {coefficient}", f"{coefficient} = " + measured("iadd", coefficient, coefficient))
-        square = measured("square", "elem", "2")
-        replace(f"{coefficient} += elem**2", f"{coefficient} = " + measured("iadd", coefficient, square))
+    if name == "gf_div":
+        replace("inv = K.invert(g[0], p)", "inv = " + measured("invert", "K.invert", "(g[0], p)"))
+        product = measured("mul", "h[i + j - dg]", "g[dg - j]")
+        replace("coeff -= h[i + j - dg] * g[dg - j]", "coeff = " + measured("isub", "coeff", product))
+        replace("coeff *= inv", "coeff = " + measured("imul", "coeff", "inv"))
+    else:
+        coefficient = "c" if name == "dup_sqr" else "coeff"
+        rhs = "g[i - j]" if name.endswith("_mul") else "f[i - j]"
+        product = measured("mul", "f[j]", rhs)
+        replace(f"{coefficient} += f[j]*{rhs}", f"{coefficient} = " + measured("iadd", coefficient, product))
+        if name.endswith("_sqr"):
+            replace(f"{coefficient} += {coefficient}", f"{coefficient} = " + measured("iadd", coefficient, coefficient))
+            square = measured("square", "elem", "2")
+            replace(f"{coefficient} += elem**2", f"{coefficient} = " + measured("iadd", coefficient, square))
     if name.startswith("gf_"):
         replace("h[i] = coeff % p", "h[i] = " + measured("mod", "coeff", "p"))
     namespace = {}

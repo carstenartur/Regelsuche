@@ -49,26 +49,43 @@ def observed(call, request, limit):
     return {"result": result, "status": "COMPLETED", "used": work.used, "stages": dict(work.stages)}
 
 
-def check_exact_kernel_prefix():
-    from sympy import ZZ
-    from sympy.polys.densearith import dup_mul, dup_sqr
-    from sympy.polys.galoistools import gf_mul, gf_sqr
-
-    # 2x2 coefficients yield four products, four accumulated sums and three reductions.
-    calls = ["mul", "iadd", "mod", "mul", "iadd", "mul", "iadd", "mod", "mul", "iadd", "mod"]
+def check_exact_prefix(kernel, arguments, expected_value, calls):
+    stage = f"sympy.{kernel.__name__}."
     for cap in range(len(calls) + 1):
         work = CoefficientWork(cap)
         try:
             with measure_coefficient_kernels(work):
-                value = gf_mul([1, 2], [3, 4], 5, ZZ)
+                value = kernel(*arguments)
         except OperationLimit as exhausted:
-            require(cap < len(calls) and str(exhausted) == f"sympy.gf_mul.{calls[cap]}",
+            require(cap < len(calls) and str(exhausted) == stage + calls[cap],
                     "incorrect first refused operation")
         else:
-            require(cap == len(calls) and value == [3, 0, 3], "wrong result or missing budget stop")
-        expected = {f"sympy.gf_mul.{op}": calls[:cap].count(op) for op in set(calls[:cap])}
+            require(cap == len(calls) and value == expected_value, "wrong result or missing budget stop")
+        expected = {stage + op: calls[:cap].count(op) for op in set(calls[:cap])}
         require(dict(work.stages) == expected and work.used == cap, "incorrect charged prefix")
-        require(gf_mul([1, 2], [3, 4], 5, ZZ) == [3, 0, 3], "kernel not restored after measurement")
+        require(kernel(*arguments) == expected_value, "kernel not restored after measurement")
+
+
+def check_exact_kernel_prefix():
+    from sympy import ZZ
+    from sympy.polys.densearith import dup_mul, dup_sqr
+    from sympy.polys.galoistools import gf_div, gf_mul, gf_sqr
+
+    # 2x2 coefficients yield four products, four accumulated sums and three reductions.
+    check_exact_prefix(gf_mul, ([1, 2], [3, 4], 5, ZZ), [3, 0, 3],
+                       ["mul", "iadd", "mod", "mul", "iadd", "mul", "iadd", "mod", "mul", "iadd", "mod"])
+    # (2*x**2 + 3) = (2*x + 1)*(x + 2) + 1 modulo 5.
+    check_exact_prefix(gf_div, ([2, 0, 3], [2, 1], 5, ZZ), ([1, 2], [1]),
+                       ["invert", "imul", "mod", "mul", "isub", "imul", "mod", "mul", "isub", "mod"])
+
+    with measure_coefficient_kernels(CoefficientWork(0)):
+        require(gf_div([2], [2, 1], 5, ZZ) == ([], [2]), "short dividend used coefficient work")
+        try:
+            gf_div([2], [], 5, ZZ)
+        except ZeroDivisionError:
+            pass
+        else:
+            raise ValueError("empty divisor did not raise")
 
     cases = [
         (dup_mul, ([1, 2], [3, 4], ZZ), [3, 10, 8], {"mul": 4, "iadd": 4}),
@@ -94,6 +111,18 @@ def check_exact_kernel_prefix():
         require(str(exhausted) == "sympy.gf_mul.mul", "wrong zero-budget refusal")
     else:
         raise ValueError("zero-budget multiplication was not refused")
+
+    class CheckedDomain:
+        def invert(self, left, right):
+            raise AssertionError("refused inversion executed")
+
+    try:
+        with measure_coefficient_kernels(CoefficientWork(0)):
+            gf_div([2, 0, 3], [2, 1], 5, CheckedDomain())
+    except OperationLimit as exhausted:
+        require(str(exhausted) == "sympy.gf_div.invert", "wrong zero-budget division refusal")
+    else:
+        raise ValueError("zero-budget inversion was not refused")
 
 
 def run(plan, checkout):
@@ -125,13 +154,15 @@ def run(plan, checkout):
             else:
                 require(partial == complete, "exact ceiling changed the result")
         rows.append({"publicRequest": request, "observation": complete, "exhaustedPrefixes": exhausted_prefixes})
-    require(rows[0]["observation"]["used"] == 0 < rows[1]["observation"]["used"],
-            "the public controls must distinguish kernel coverage")
+    require(all(row["observation"]["stages"].get("sympy.gf_div.invert", 0) > 0 for row in rows),
+            "both public controls must exercise prime-field division")
+    require(rows[0]["observation"]["used"] < rows[1]["observation"]["used"],
+            "the public controls must distinguish coefficient work")
     return {"schema": "regelsuche.sympy-coefficient-kernel-development/v1",
             "runtimeId": authority["runtimeId"], "bridgeSha256": authority["bridgeSha256"],
             "planSha256": authority["planSha256"], "meterSha256": hashlib.sha256(
                 Path(__file__).with_name("frozen_sympy_coefficient_work.py").read_bytes()).hexdigest(),
-            "coverage": ["dup_mul", "dup_sqr", "gf_mul", "gf_sqr"],
+            "coverage": ["dup_mul", "dup_sqr", "gf_mul", "gf_sqr", "gf_div"],
             "completeBackendWork": False, "studyRowsExecuted": 0, "publicCases": rows}
 
 
