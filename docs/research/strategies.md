@@ -183,3 +183,14 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`AffineObservationEvaluation.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluation.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluation.java | public final class AffineObservationEvaluation { -->
 - [`AffineObservationEvaluationTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluationTest.java#L26) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluationTest.java | class AffineObservationEvaluationTest { -->
+
+## Gewichtete projektive Übergaben
+
+- **Hypothese.** Haben die Nenner eines rationalen Zustands eine gemeinsame Basis, kann ein nachfolgender Rechenschritt Zähler und Basis übernehmen. An einer affinen Ausgabegrenze reicht eine Inversion für alle Koordinaten.
+- **Umsetzungsstand.** Der Java-Kern sucht eine Basis in expliziten Produkten und Potenzen der Ausgangsnenner und prüft auch vorgegebene Kandidaten. Er prüft die Identitäten und die gemeinsame Einheitenbedingung mit exakten ganzzahligen Polynomnormalformen. Der SDK-Einstieg übernimmt Budget und Abbruchsignal.
+- **Befund.** Im [Vektormodell](projective-handoffs.md) mit drei Koordinaten und Gewichten 1, 2 und 4 liefert die affine Ausgabe mit einer Inversion dieselben exakten Werte wie drei einzelne Divisionen. Die modellierte Kette spart vier von fünf Inversionen und kostet zusätzlich 13 Multiplikationen und zwei Einheitenprüfungen.
+- **Folgerung.** Inversionsersparnis und Gesamtkosten getrennt bewerten. Für eine Übernahme über Methodengrenzen muss der Aufrufer zeigen, dass der folgende Schritt den projektiven Zustand verarbeitet und der ursprüngliche Singularitätspfad erhalten bleibt.
+
+- [`ProjectiveHandoff.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoff.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoff.java | public final class ProjectiveHandoff { -->
+- [`ProjectiveHandoffSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/iteration/ProjectiveHandoffSdk.java#L11) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/iteration/ProjectiveHandoffSdk.java | public final class ProjectiveHandoffSdk { -->
+- [`ProjectiveHandoffTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoffTest.java#L19) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoffTest.java | class ProjectiveHandoffTest { -->

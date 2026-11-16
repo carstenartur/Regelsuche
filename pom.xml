@@ -152,6 +152,8 @@
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-release</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-benchmarks</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-app</artifactId><version>${project.version}</version></dependency>
+      <!-- Test sources are managed independently of the production JAR. -->
+      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-app</artifactId><version>${project.version}</version><type>test-jar</type></dependency>
       <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-integration-tests</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>

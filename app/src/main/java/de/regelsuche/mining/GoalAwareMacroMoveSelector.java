@@ -168,18 +168,6 @@ public class GoalAwareMacroMoveSelector {
             + exposureBonus;
     }
 
-    /**
-     * Heuristic goal-alignment check.
-     *
-     * <p>A rule is considered goal-aligned when the structural skeleton of
-     * its left pattern shares operator tokens or named identifiers with the
-     * current expression. Pure integer literals are excluded to avoid
-     * spurious matches (every expression "contains" the number 1 or 2).</p>
-     */
-    private boolean isGoalAligned(ReusableRule rule, String currentExpression) {
-        return structuralOverlap(rule.leftPattern(), currentExpression) > 0;
-    }
-
     private int structuralOverlap(String pattern, String expression) {
         if (pattern == null || pattern.isBlank() || expression == null || expression.isBlank()) {
             return 0;

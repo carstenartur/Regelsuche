@@ -107,10 +107,9 @@ Reports entstehen aus Discovery-Läufen, deren Engine über `DiscoveryOptions` u
 
 Die `HypothesisOperatorRegistry` liefert stabile Rule-IDs, Display-Namen, Familien
 und Tags für Reports und hält die Operator-Reihenfolge zentral.
-`DiscoveryEngineFactory` dokumentiert und erzwingt
-die deterministische Komposition **base rewrite → hypothesis operators → learned
-macro moves**. Lernen und Promotion gehören zur Workflow-Orchestrierung und werden
-über `DiscoveryLearningOptions` gesteuert, nicht über die Engine-Factory.
+Für Replay-Tests komponiert `DiscoveryEngineFactory` die Engine in der Reihenfolge
+**base rewrite → hypothesis operators → learned macro moves**.
+`DiscoveryLearningOptions` steuert Lernen und Promotion im Workflow.
 
 Eine neue Gallery wird nur ergänzt, wenn ein echtes Replay mit passenden Rule-IDs
 vorliegt. Für neue Operatoren gilt: erst `HypothesisOperator` implementieren, dann

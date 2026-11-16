@@ -47,7 +47,7 @@ Record in `de.regelsuche.mining` mit:
 
 In-Memory-Implementierung des `HypothesisRepository`-Ports für Tests und lokale Läufe.
 
-### `HypothesisPromotionPipeline` (neu, in app)
+### `HypothesisPromotionPipeline` in den App-Tests
 
 Orchestriert den vollständigen Pipeline-Durchlauf:
 1. Mining via `RuleCandidateMiner`
@@ -149,8 +149,8 @@ Der portable Experiment-Kern liegt in `:regelsuche-experiments`:
 - `DeterministicDiscoveryExperimentRunner` sortiert Seeds deterministisch,
   erzwingt ein globales Budget und kann Seeds parallel auswerten, ohne die
   Report-Reihenfolge zu verändern.
-- `ScientificDiscoveryWorkflow` (app) bootet die produktive
-  `PersistenceContext`-Komposition im In-Memory-, JSON- oder
+- `ScientificDiscoveryWorkflow` startet für die App-Tests den
+  `PersistenceContext` im In-Memory-, JSON- oder
   PostgreSQL-Hybrid-Modus und führt den kompletten Pfad
   **Seed → Discovery/Search/Validation → Replay → Persistenz → Report** aus.
 - `DiscoveryReplayArtifactWriter` schreibt CI-taugliche Replay-Artefakte:

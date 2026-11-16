@@ -86,6 +86,14 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
+        <!-- Integration tests consume the scientific workflow from test sources,
+             never from the distributable application's main JAR. -->
+        <executions>
+          <execution>
+            <id>attach-test-support-for-failsafe</id>
+            <goals><goal>test-jar</goal></goals>
+          </execution>
+        </executions>
         <configuration>
           <archive>
             <manifest>

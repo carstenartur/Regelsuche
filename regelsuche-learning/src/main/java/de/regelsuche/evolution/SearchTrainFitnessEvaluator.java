@@ -244,12 +244,6 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             false);
     }
 
-    private EvolutionTrainSearchSuite.TrainCase requireTrainCase(
-        EvolutionTrainSearchSuite.TrainCase trainCase
-    ) {
-        return Objects.requireNonNull(trainCase, "trainCase");
-    }
-
     private SearchHeuristic effectiveHeuristic(EvolutionGenome genome) {
         SearchHeuristic configured = suite.heuristic();
         return new SearchHeuristic(
