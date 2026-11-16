@@ -13,7 +13,7 @@
 <main class="sdk-domain-workbench">
   <section class="card" aria-labelledby="retainedDomainTitle">
     <h2 id="retainedDomainTitle">Gespeicherte Sequenz-Exporte</h2>
-    <p>Die vier Originaldateien der eingebauten Domäne integer-sequence-finite-difference@v1 gemeinsam auswählen. Der Import prüft die Bindung an die Quelle; er führt keine Suche aus.</p>
+    <p>Die vier Originaldateien eines Laufs für endliche Differenzen oder lineare Rekurrenzen gemeinsam auswählen. Der Import prüft die Quellenbindung, ohne die Suche erneut auszuführen.</p>
     <label class="field">Export importieren
       <input id="importDomainExport" type="file" multiple accept=".json,application/json">
     </label>
@@ -33,6 +33,13 @@
     <p>Replay verwendet dieselben Startdaten und Budgets. Es verursacht zusätzliche Arbeit; die gespeicherten Zähler bleiben unverändert.</p>
     <button id="replayDomainExport" type="button" disabled>Vollständige Evidence reproduzieren</button>
     <p id="retainedDomainReplayStatus" role="status" aria-live="polite"></p>
+  </section>
+  <section class="card" id="retainedDomainValidation" hidden>
+    <h2>Gespeicherte Folgenglieder unabhängig prüfen</h2>
+    <p>Die Prüfung führt die Quelle erneut aus und prüft den ausgewählten Kandidaten anhand der beobachteten und zurückgehaltenen Folgenglieder. Das Ergebnis gilt für diese endlichen Daten.</p>
+    <button id="validateDomainExport" type="button" disabled>Endliche Daten prüfen</button>
+    <p id="retainedDomainValidationStatus" role="status" aria-live="polite"></p>
+    <a id="downloadDomainValidationReceipt" hidden download>Prüfbeleg herunterladen</a>
   </section>
   <form id="domainForm" class="card">
     <h2>Neue Suche mit einer installierten Domäne</h2>
