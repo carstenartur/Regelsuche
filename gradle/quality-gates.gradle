@@ -156,29 +156,33 @@ def testJmhMoreWarmupPolicy = tasks.register('testJmhMoreWarmupPolicy', Exec) {
     }
 }
 
-def verifyJmhRegression = tasks.register('verifyJmhRegression', Exec) {
+// The historical Python v3 verifier remains a comparison harness. The live
+// quality decision executes the same checked Java/JUnit policy used by Maven;
+// a missing, inconclusive or failed measurement must fail this JavaExec task.
+def verifyJmhRegression = tasks.register('verifyJmhRegression', JavaExec) {
     group = 'verification'
-    description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks under the v3 uncertainty-aware decision authority.'
-    dependsOn 'prepareVerificationEnvironment', ':app:jmh', 'verifyJmhBenchmark', testJmhRegressionVerifier, testJmhMoreWarmupPolicy
+    description = 'Fails on missing, undeclared, contract-drifted or materially slower JMH benchmarks using the checked Java v3 decision.'
+    dependsOn ':regelsuche-quality:classes', ':app:jmh', 'verifyJmhBenchmark',
+        testJmhRegressionVerifier, testJmhMoreWarmupPolicy
     mustRunAfter ':app:jmh'
     workingDir qualityRepositoryRoot
+    classpath = coverageQualityProject.files(coverageRuntimeClasspath)
+    mainClass = 'de.regelsuche.quality.jmh.JmhRegressionV3Main'
+    javaLauncher = coverageQualityProject.extensions.getByType(JavaToolchainService).launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
     inputs.file qualityRepositoryRoot.file('config/quality/jmh-regression-policy-more-warmup-v1.json')
     inputs.file qualityRepositoryRoot.file('config/quality/jmh-regression-decision-policy-more-warmup-v1.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-jmh-regression-v3.py')
     inputs.file qualityRepositoryRoot.file('app/build/reports/jmh/result.json')
     outputs.file layout.buildDirectory.file('reports/quality/jmh-regression-report.json')
     outputs.file layout.buildDirectory.file('reports/quality/jmh-regression-report.md')
     outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            'scripts/verify-jmh-regression-v3.py',
-            '--repository-root', qualityRepositoryRoot.asFile.absolutePath,
-            '--result', qualityRepositoryRoot.file('app/build/reports/jmh/result.json').asFile.absolutePath,
-            '--threshold-policy', qualityRepositoryRoot.file('config/quality/jmh-regression-policy-more-warmup-v1.json').asFile.absolutePath,
-            '--decision-policy', qualityRepositoryRoot.file('config/quality/jmh-regression-decision-policy-more-warmup-v1.json').asFile.absolutePath,
-            '--json-output', qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.json').asFile.absolutePath,
-            '--markdown-output', qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.md').asFile.absolutePath
-    }
+    args qualityRepositoryRoot.asFile.absolutePath,
+        qualityRepositoryRoot.file('app/build/reports/jmh/result.json').asFile.absolutePath,
+        qualityRepositoryRoot.file('config/quality/jmh-regression-policy-more-warmup-v1.json').asFile.absolutePath,
+        qualityRepositoryRoot.file('config/quality/jmh-regression-decision-policy-more-warmup-v1.json').asFile.absolutePath,
+        qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.json').asFile.absolutePath,
+        qualityRepositoryRoot.file('build/reports/quality/jmh-regression-report.md').asFile.absolutePath
 }
 
 def reportSlowTests = tasks.register('reportSlowTests') {
