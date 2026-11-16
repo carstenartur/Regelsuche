@@ -222,7 +222,45 @@ public final class AffineObservationReduction {
         return plan;
     }
 
-    private static void checkInputs(List<Transition> transitions, List<Observation> observations, int dimension, Work work) {
+    /** Restricts to a coordinate set closed under every supplied transition. */
+    static VerifiedPlan coordinatePlan(List<Transition> transitions, List<Observation> observations,
+            List<Integer> coordinates, int dimension, Work work) {
+        work.add(1L + coordinates.size() + observations.size() + transitions.size());
+        var basis = new ArrayList<ExactVector>();
+        var projection = new ArrayList<SparseAffineForm>();
+        for (int coordinate : coordinates) {
+            work.add(1L + dimension);
+            var row = new ArrayList<>(Collections.nCopies(dimension, Rational.ZERO));
+            row.set(coordinate, Rational.ONE);
+            basis.add(new ExactVector(row));
+            projection.add(new SparseAffineForm(List.of(new SparseAffineForm.Term(coordinate, Rational.ONE)),
+                Rational.ZERO));
+        }
+        var outputs = new ArrayList<SparseAffineForm>();
+        for (var observation : observations) {
+            outputs.add(coordinateForm(observation.weights().values(), observation.offset(), coordinates, work));
+        }
+        var updates = new ArrayList<Update>();
+        for (var transition : transitions) {
+            var rows = new ArrayList<SparseAffineForm>();
+            for (int coordinate : coordinates) {
+                rows.add(coordinateForm(transition.linear().rows().get(coordinate),
+                    transition.offset().get(coordinate), coordinates, work));
+            }
+            updates.add(Update.compile(rows, outputs, work));
+        }
+        return new VerifiedPlan(dimension, List.copyOf(basis), List.copyOf(projection),
+            List.copyOf(updates), List.copyOf(outputs));
+    }
+
+    private static SparseAffineForm coordinateForm(List<Rational> weights, Rational offset,
+            List<Integer> coordinates, Work work) {
+        work.add(1L + coordinates.size());
+        var restricted = coordinates.stream().map(weights::get).toList();
+        return SparseAffineForm.compile(restricted, offset, work);
+    }
+
+    static void checkInputs(List<Transition> transitions, List<Observation> observations, int dimension, Work work) {
         for (var transition : transitions) {
             if (transition.linear().columns() != dimension) throw new IllegalArgumentException("transition dimension mismatch");
             for (var row : transition.linear().rows()) checkCoefficients(row, work);
@@ -236,7 +274,7 @@ public final class AffineObservationReduction {
         }
     }
 
-    private static void checkCoefficients(List<Rational> coefficients, Work work) {
+    static void checkCoefficients(List<Rational> coefficients, Work work) {
         work.add(coefficients.size());
         coefficients.forEach(RecurrenceObservationArithmetic::checked);
     }
@@ -353,7 +391,7 @@ public final class AffineObservationReduction {
         return expected.equals(actual);
     }
 
-    private static <T> Result<T> measured(Budget budget, Function<Work, T> phase) {
+    static <T> Result<T> measured(Budget budget, Function<Work, T> phase) {
         var work = new Work(Objects.requireNonNull(budget, "budget").maxWorkUnits());
         try {
             return new Result<>(Status.COMPLETE, Optional.of(phase.apply(work)), work.ledger());

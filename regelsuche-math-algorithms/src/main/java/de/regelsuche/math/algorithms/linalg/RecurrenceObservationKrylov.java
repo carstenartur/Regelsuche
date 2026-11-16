@@ -13,16 +13,19 @@ import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
 import de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.ArithmeticLimit;
+import de.regelsuche.math.algorithms.linalg.RecurrenceObservationProof.OrbitForm;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Function;
 
 /** A checked minimal scalar recurrence for a particular observation of an affine transition. */
@@ -57,12 +60,13 @@ public final class RecurrenceObservationKrylov {
         return measured(budget, work -> {
             int dimension = transition.linear().columns();
             int degree = checkedDegree(observation, dimension, work);
-            var coefficients = firstDependence(transition, observation, degree, work);
+            var dependence = firstDependence(transition, observation, degree, work);
+            var coefficients = dependence.coefficients();
             if (!RecurrenceObservationProof.verify(transition, observation, degree, coefficients, work)) {
                 throw new IllegalStateException("independent trajectory proof rejected the coefficient dependence");
             }
             work.add(1L + coefficients.size());
-            return new VerifiedPlan(transition, observation, coefficients);
+            return new VerifiedPlan(transition, observation, dependence);
         });
     }
 
@@ -71,11 +75,15 @@ public final class RecurrenceObservationKrylov {
         private final Transition transition;
         private final Polynomial observation;
         private final List<Rational> coefficients;
+        private final List<Monomial> basis;
+        private final List<Rational[]> columns;
 
-        private VerifiedPlan(Transition transition, Polynomial observation, List<Rational> coefficients) {
+        private VerifiedPlan(Transition transition, Polynomial observation, Dependence dependence) {
             this.transition = transition;
             this.observation = observation;
-            this.coefficients = List.copyOf(coefficients);
+            this.coefficients = List.copyOf(dependence.coefficients());
+            this.basis = dependence.basis();
+            this.columns = dependence.columns();
         }
 
         public int order() {
@@ -89,12 +97,10 @@ public final class RecurrenceObservationKrylov {
 
         /** Binds the first r values, all under the supplied budget. */
         public Result<BoundPlan> bind(List<Rational> initialState, Budget budget) {
-            Objects.requireNonNull(initialState, "initialState");
             int dimension = transition.linear().columns();
-            if (initialState.size() != dimension) throw new IllegalArgumentException("initial state dimension mismatch");
+            requireInitialDimension(initialState, dimension);
             return measured(budget, work -> {
-                work.add(dimension);
-                var state = List.copyOf(initialState);
+                var state = snapshotState(initialState, dimension, work);
                 state.forEach(RecurrenceInvariantSupport::requireBounded);
                 var values = new ArrayList<Rational>(order());
                 boolean allZero = true;
@@ -106,6 +112,115 @@ public final class RecurrenceObservationKrylov {
                 }
                 work.add(1L + values.size());
                 return new BoundPlan(coefficients, List.copyOf(values), allZero);
+            });
+        }
+
+        /**
+         * Prepares one exact recurrence remainder for each distinct requested index and checks
+         * the observation forms with a nonzero weight. The batch preserves order and duplicates.
+         */
+        public Result<PreparedQueries> prepareQueries(List<BigInteger> indices, Budget budget) {
+            Objects.requireNonNull(indices, "indices");
+            return measured(budget, work -> {
+                int dimension = transition.linear().columns();
+                work.add(1L + indices.size() + order());
+                var requestOrder = new ArrayList<Integer>(indices.size());
+                var remainders = new ArrayList<Rational[]>();
+                var needed = new boolean[order()];
+                var powers = new ArrayList<Rational[]>();
+                // Charge comparisons even for very large indices and adversarial request orders.
+                var distinct = new TreeMap<BigInteger, Integer>((left, right) -> {
+                    work.add(1L + Math.min(left.bitLength(), right.bitLength()) / Integer.SIZE);
+                    return left.compareTo(right);
+                });
+                for (var index : indices) {
+                    requireIndex(index);
+                    var position = distinct.get(index);
+                    if (position == null) {
+                        work.add(1);
+                        position = remainders.size();
+                        var remainder = indexRemainder(index, coefficients, powers, work);
+                        work.add(remainder.length);
+                        for (int i = 0; i < remainder.length; i++) needed[i] |= !remainder[i].isZero();
+                        remainders.add(remainder);
+                        distinct.put(index, position);
+                    }
+                    requestOrder.add(position);
+                }
+                var forms = observationForms(needed, work);
+                if (!RecurrenceObservationProof.verifyForms(transition, observation, forms, work)) {
+                    throw new IllegalStateException("independent trajectory proof rejected a prepared observation form");
+                }
+                work.add(1L + remainders.size() + requestOrder.size());
+                return new PreparedQueries(dimension, forms, List.copyOf(remainders), List.copyOf(requestOrder));
+            });
+        }
+
+        private List<OrbitForm> observationForms(boolean[] needed, Work work) {
+            work.add(1L + needed.length);
+            var forms = new ArrayList<OrbitForm>();
+            if (needed.length > 0 && needed[0]) forms.add(new OrbitForm(0, observation));
+            for (int i = 1; i < needed.length; i++) {
+                if (!needed[i]) continue;
+                var column = columns.get(i);
+                var form = Polynomial.zero();
+                for (int j = 0; j < basis.size(); j++) {
+                    work.add(1);
+                    if (column[j].isZero()) continue;
+                    work.add(1L + form.termCount());
+                    form = form.add(Polynomial.term(basis.get(j), column[j]));
+                }
+                forms.add(new OrbitForm(i, form));
+            }
+            work.add(forms.size());
+            return List.copyOf(forms);
+        }
+    }
+
+    /** Immutable index batch reusable for any admissible initial state of its verified plan. */
+    public static final class PreparedQueries {
+        private final int dimension;
+        private final List<OrbitForm> forms;
+        private final List<Rational[]> remainders;
+        private final List<Integer> requestOrder;
+
+        private PreparedQueries(int dimension, List<OrbitForm> forms, List<Rational[]> remainders,
+                List<Integer> requestOrder) {
+            this.dimension = dimension;
+            this.forms = forms;
+            this.remainders = remainders;
+            this.requestOrder = requestOrder;
+        }
+
+        /**
+         * Evaluates the prepared forms at the supplied start and returns values in request order.
+         * The coordinates, like the evaluation arithmetic, are bounded to 16,384 bits.
+         */
+        public Result<List<Rational>> valuesFor(List<Rational> initialState, Budget budget) {
+            requireInitialDimension(initialState, dimension);
+            return measured(budget, work -> {
+                var state = snapshotState(initialState, dimension, work);
+                state.forEach(RecurrenceObservationArithmetic::checked);
+                work.add(1L + requestOrder.size());
+                if (forms.isEmpty()) return Collections.nCopies(requestOrder.size(), Rational.ZERO);
+                int order = remainders.getFirst().length;
+                work.add(order);
+                var base = new ArrayList<>(Collections.nCopies(order, Rational.ZERO));
+                boolean allZero = true;
+                for (var form : forms) {
+                    var value = RecurrenceObservationProof.evaluate(form.observation(), state, work);
+                    base.set(form.index(), value);
+                    allZero &= value.isZero();
+                }
+
+                if (allZero) return Collections.nCopies(requestOrder.size(), Rational.ZERO);
+                work.add(remainders.size());
+                var distinctValues = new ArrayList<Rational>(remainders.size());
+                for (var remainder : remainders) distinctValues.add(dot(remainder, base, work));
+                var values = new ArrayList<Rational>(requestOrder.size());
+                for (int position : requestOrder) values.add(distinctValues.get(position));
+                work.add(values.size());
+                return List.copyOf(values);
             });
         }
     }
@@ -149,39 +264,72 @@ public final class RecurrenceObservationKrylov {
             int order = relation.size();
             if (index.bitLength() < Integer.SIZE && index.intValue() < order) return base.get(index.intValue());
             if (order == 1) {
-                var ratio = relation.getFirst();
-                if (ratio.isZero()) return Rational.ZERO;
-                if (ratio.isOne()) return base.getFirst();
-                if (ratio.equals(Rational.NEGATIVE_ONE)) {
-                    return index.testBit(0) ? base.getFirst().negate() : base.getFirst();
+                var weight = trivialOrderOneWeight(index, relation.getFirst());
+                if (weight != null) {
+                    if (weight.isZero()) return Rational.ZERO;
+                    return weight.isOne() ? base.getFirst() : base.getFirst().negate();
                 }
             }
 
-            Rational[] power = null;
-            Rational[] remainder = null;
-            for (int bit = 0; bit < index.bitLength(); bit++) {
+            return dot(powerRemainder(index, relation, powers, cacheLimit, work), base, work);
+        }
+    }
+
+    private static Rational[] indexRemainder(BigInteger index, List<Rational> relation,
+            List<Rational[]> powers, Work work) {
+        int order = relation.size();
+        if (order == 0) return zeros(0, work);
+        if (index.bitLength() < Integer.SIZE && index.intValue() < order) {
+            var remainder = zeros(order, work);
+            remainder[index.intValue()] = Rational.ONE;
+            return remainder;
+        }
+        if (order == 1) {
+            var weight = trivialOrderOneWeight(index, relation.getFirst());
+            if (weight != null) {
                 work.add(1);
-                if (bit < powers.size()) {
-                    power = powers.get(bit);
-                } else {
-                    power = bit == 0 ? firstPower(work) : multiplyModulo(power, power, relation, work);
-                    if (bit < cacheLimit) powers.add(power);
-                }
-                if (index.testBit(bit)) {
-                    remainder = remainder == null ? power : multiplyModulo(remainder, power, relation, work);
-                }
+                return new Rational[] {weight};
             }
-            var result = Rational.ZERO;
-            for (int i = 0; i < order; i++) result = addProduct(result, remainder[i], base.get(i), work);
-            return result;
         }
+        return powerRemainder(index, relation, powers, CACHED_POWER_LIMIT, work);
+    }
 
-        private Rational[] firstPower(Work work) {
-            var power = zeros(relation.size(), work);
-            if (power.length == 1) power[0] = relation.getFirst();
-            else power[1] = Rational.ONE;
-            return power;
+    private static Rational trivialOrderOneWeight(BigInteger index, Rational ratio) {
+        if (ratio.isZero() || ratio.isOne()) return ratio;
+        if (ratio.equals(Rational.NEGATIVE_ONE)) return index.testBit(0) ? Rational.NEGATIVE_ONE : Rational.ONE;
+        return null;
+    }
+
+    private static Rational[] powerRemainder(BigInteger index, List<Rational> relation,
+            List<Rational[]> powers, int cacheLimit, Work work) {
+        Rational[] power = null;
+        Rational[] remainder = null;
+        for (int bit = 0; bit < index.bitLength(); bit++) {
+            work.add(1);
+            if (bit < powers.size()) {
+                power = powers.get(bit);
+            } else {
+                power = bit == 0 ? firstPower(relation, work) : multiplyModulo(power, power, relation, work);
+                if (bit < cacheLimit) powers.add(power);
+            }
+            if (index.testBit(bit)) {
+                remainder = remainder == null ? power : multiplyModulo(remainder, power, relation, work);
+            }
         }
+        return remainder;
+    }
+
+    private static Rational[] firstPower(List<Rational> relation, Work work) {
+        var power = zeros(relation.size(), work);
+        if (power.length == 1) power[0] = relation.getFirst();
+        else power[1] = Rational.ONE;
+        return power;
+    }
+
+    private static Rational dot(Rational[] weights, List<Rational> base, Work work) {
+        var result = Rational.ZERO;
+        for (int i = 0; i < weights.length; i++) result = addProduct(result, weights[i], base.get(i), work);
+        return result;
     }
 
     private static int checkedDegree(Polynomial observation, int dimension, Work work) {
@@ -199,9 +347,13 @@ public final class RecurrenceObservationKrylov {
         return degree;
     }
 
-    private static List<Rational> firstDependence(Transition transition, Polynomial observation, int degree, Work work) {
-        if (degree == 0) return observation.isZero() ? List.of() : List.of(Rational.ONE);
+    /** Owns the coefficient vectors for the independent columns used before the first dependence. */
+    private record Dependence(List<Rational> coefficients, List<Monomial> basis, List<Rational[]> columns) { }
 
+    private static Dependence firstDependence(Transition transition, Polynomial observation, int degree, Work work) {
+        if (degree == 0) {
+            return new Dependence(observation.isZero() ? List.of() : List.of(Rational.ONE), List.of(), List.of());
+        }
         var basis = RecurrenceInvariantSupport.basis(transition.linear().columns(), degree);
         var positions = new HashMap<Monomial, Integer>();
         work.add(basis.size());
@@ -217,7 +369,10 @@ public final class RecurrenceObservationKrylov {
         for (int order = 1; order <= basis.size(); order++) {
             columns.add(compose(columns.getLast(), basis, positions, images, work));
             var dependence = dependence(columns, basis, work);
-            if (dependence.isPresent()) return dependence.orElseThrow();
+            if (dependence.isPresent()) {
+                columns.removeLast();
+                return new Dependence(dependence.orElseThrow(), basis, columns);
+            }
         }
         throw new IllegalStateException("bounded polynomial space must have a dependence");
     }
@@ -331,6 +486,16 @@ public final class RecurrenceObservationKrylov {
     private static void requireIndex(BigInteger index) {
         Objects.requireNonNull(index, "index");
         if (index.signum() < 0) throw new IllegalArgumentException("index must be nonnegative");
+    }
+
+    private static void requireInitialDimension(List<Rational> initialState, int dimension) {
+        Objects.requireNonNull(initialState, "initialState");
+        if (initialState.size() != dimension) throw new IllegalArgumentException("initial state dimension mismatch");
+    }
+
+    private static List<Rational> snapshotState(List<Rational> initialState, int dimension, Work work) {
+        work.add(dimension);
+        return List.copyOf(initialState);
     }
 
     private static <T> Result<T> measured(Budget budget, Function<Work, T> action) {

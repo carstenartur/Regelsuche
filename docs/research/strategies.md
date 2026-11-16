@@ -133,11 +133,11 @@ Lerner und Strategieauswahl im aktuellen Checkout
 ## Minimale Rekurrenz für eine Beobachtung
 
 - **Hypothese.** Ein kleiner Krylov-Raum der Zielbeobachtung kann den Aufwand für weit entfernte Abfrageindizes senken.
-- **Umsetzungsstand.** Der Java-Kern bestimmt und prüft die universell minimale Ordnung für rationale affine Übergänge mit bis zu drei Koordinaten und Beobachtungen bis Gesamtgrad zwei. Der geprüfte Plan kann für verschiedene Anfangszustände gebunden werden.
+- **Umsetzungsstand.** Der Java-Kern bestimmt und prüft die universell minimale Ordnung für rationale affine Übergänge mit bis zu drei Koordinaten und Beobachtungen bis Gesamtgrad zwei. Der geprüfte Plan kann für verschiedene Anfangszustände gebunden werden und dieselben vorbereiteten Indizes und Beobachtungsformen wiederverwenden.
 - **Befund.** Alle acht Läufe liefern dieselben exakten Werte wie binäre affine Potenzierung mit Wiederverwendung im Stapel. Die Beobachtung der Ordnung eins spart bei 24 Abfragen 89,3 Prozent. Bei den drei anderen Aufgaben kostet direkte Rechnung weniger. [Vergleich und Reproduktion](recurrence-observation-krylov.md)
-- **Folgerung.** Die Aufbereitung anhand der erkennbaren Struktur der Beobachtung und der zu erwartenden Anfragen auswählen.
+- **Folgerung.** Die automatische Wahl und das Teilen der Indexarbeit anhand der erwarteten Anfragen auswerten.
 
-- [`RecurrenceObservationKrylov.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java | public final class RecurrenceObservationKrylov { -->
+- [`RecurrenceObservationKrylov.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java | public final class RecurrenceObservationKrylov { -->
 - [`RecurrenceObservationComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java#L33) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java | class RecurrenceObservationComparisonTest { -->
 
 ## Automatisch hergeleitete Zustände für wechselnde Übergänge
@@ -150,3 +150,13 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`AffineObservationReduction.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationReduction.java#L26) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationReduction.java | public final class AffineObservationReduction { -->
 - [`AffineObservationReductionTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationReductionTest.java#L21) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationReductionTest.java | class AffineObservationReductionTest { -->
 - [`AffineObservationComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationComparisonTest.java#L36) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationComparisonTest.java | class AffineObservationComparisonTest { -->
+
+## Budgetierte Wahl zwischen direkter Auswertung und Zustandsreduktion
+
+- **Hypothese.** Die Abhängigkeiten der Beobachtung und die erwartete Zahl der Ereignisse oder Abfragen reichen aus, um manche kostspieligen und wenig ergiebigen Herleitungen zu vermeiden.
+- **Umsetzungsstand.** Der Java-Kern wählt für affine Beobachtungen zwischen direkter Rechnung und geprüfter Reduktion. Bei festen indizierten Abfragen teilt er direkte Matrixprojektionen oder Rekurrenzreste über Anfangszustände.
+- **Befund.** Auf drei kurzen und einem langen Lauf mit wechselnden Übergängen benötigt die automatische Wahl 7.565 Arbeitseinheiten. Durchgängig direkte Rechnung benötigt 14.774 und durchgängige Zustandsreduktion 8.674. Alle Ausgaben stimmen exakt überein. [Aufgabenprofil und Reproduktion](recurrence-observation-krylov.md#automatische-wahl-für-lineare-beobachtungen)
+- **Folgerung.** Die Auswahlkosten auf verschiedenen Arbeitslasten prüfen, insbesondere bei unbekanntem Anfragehorizont und wenig reduzierbaren Zuständen.
+
+- [`AffineObservationEvaluation.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluation.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluation.java | public final class AffineObservationEvaluation { -->
+- [`AffineObservationEvaluationTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluationTest.java#L26) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationEvaluationTest.java | class AffineObservationEvaluationTest { -->
