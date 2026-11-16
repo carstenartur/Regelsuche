@@ -57,7 +57,11 @@ class JmhRegressionV3VerifierTest {
     @Test
     void comparesActualCapturedJmhScoresWithPythonV3Report()
             throws Exception {
-        Fixture fixture = fixture();
+        // Compare the captured six-warmup run against the policy that
+        // generated the retained Python report, not the two-warmup v3 policy.
+        Fixture fixture = fixture(
+            "config/quality/jmh-regression-policy-more-warmup-v1.json",
+            "config/quality/jmh-regression-decision-policy-more-warmup-v1.json");
         double[][] captured = {
             {1.5995228268335471, 0.3559137335375816},
             {7.1812426172696293, 1.1158911616215206},
@@ -98,6 +102,8 @@ class JmhRegressionV3VerifierTest {
             ((ObjectNode) fixture.rows().get(i)).put("jdkVersion", "25.0.5");
         }
         JmhRegressionV3Verifier.Result result = check(fixture);
+        assertEquals("188fe77d58c519fe0b5beeaf1cd22ce1c8b1916d",
+            result.json().path("thresholdPolicyGitBlobSha1").asText());
         assertEquals("PASSED", result.status());
         assertEquals(29, result.json().path("benchmarkCount").asInt());
         assertEquals(0, result.json().path("lowPrecisionCount").asInt());
@@ -266,14 +272,18 @@ class JmhRegressionV3VerifierTest {
     }
 
     private Fixture fixture() throws Exception {
+        return fixture("config/quality/jmh-regression-policy-v2.json",
+            "config/quality/jmh-regression-decision-policy-v3.json");
+    }
+
+    private Fixture fixture(String thresholdRelativePath, String decisionRelativePath)
+            throws Exception {
         String property = System.getProperty("regelsuche.repositoryRoot");
         assertFalse(property == null || property.isBlank(),
             "Maven must supply the repository root");
         Path root = Path.of(property).toRealPath();
-        Path thresholdsPath = root.resolve(
-            "config/quality/jmh-regression-policy-v2.json");
-        Path decisionPath = root.resolve(
-            "config/quality/jmh-regression-decision-policy-v3.json");
+        Path thresholdsPath = root.resolve(thresholdRelativePath);
+        Path decisionPath = root.resolve(decisionRelativePath);
         JsonNode thresholds = JSON.readTree(thresholdsPath.toFile());
         JsonNode execution = thresholds.path("execution");
         ArrayNode rows = JSON.createArrayNode();
