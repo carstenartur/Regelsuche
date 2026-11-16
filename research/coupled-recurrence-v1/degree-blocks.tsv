@@ -1,0 +1,7 @@
+case	family	budget	status	fixed	alternating	formation	proof	query	total	lawsAndValues
+symplectic-euler	oscillator	100000	COMPLETE	1	0	2790	651	6	3447	FIXED x0^2 - 1/2*x0*x1 + x1^2 @ 10,10,10,10,10,10
+symplectic-euler-shifted	oscillator	100000	COMPLETE	1	0	4708	1143	6	5857	FIXED -2/9*x0^2 + 1/9*x0*x1 - 2/9*x1^2 + x0 - 2/3*x1 @ -20/9,-20/9,-20/9,-20/9,-20/9,-20/9
+cayley-rotation	cayley	100000	COMPLETE	3	0	9087	3107	18	12212	FIXED x0 + 2*x1 + 3*x2 @ 8,8,8,8,8,8 | FIXED x0^2 - 1/2*x0*x1 + 5/8*x1^2 - 3/4*x0*x2 - 3/2*x1*x2 @ 197/8,197/8,197/8,197/8,197/8,197/8 | FIXED x0^2 + x1^2 + x2^2 @ 29,29,29,29,29,29
+cayley-rotoreflection	cayley	100000	COMPLETE	2	1	9255	3167	18	12440	FIXED x0^2 - 1/2*x0*x1 + 5/8*x1^2 - 3/4*x0*x2 - 3/2*x1*x2 @ 197/8,197/8,197/8,197/8,197/8,197/8 | FIXED x0^2 + x1^2 + x2^2 @ 29,29,29,29,29,29 | ALTERNATING x0 + 2*x1 + 3*x2 @ 8,-8,8,-8,8,-8
+cayley-axial-drift	cayley	100000	COMPLETE	1	0	14567	2188	6	16761	FIXED x0^2 - 4/13*x0*x1 + 10/13*x1^2 - 6/13*x0*x2 - 12/13*x1*x2 + 5/13*x2^2 @ 342/13,342/13,342/13,342/13,342/13,342/13
+tribonacci	tribonacci	100000	COMPLETE	0	0	6992	0	0	6992	-

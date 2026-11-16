@@ -183,7 +183,7 @@ public final class RecurrenceKnowledge {
 <span class="fc bfc" id="L183" title="All 2 branches covered.">        for (var task : lessons) {</span>
 <span class="fc" id="L184">            var run = runPaid(id, parent, task, progress.meter);</span>
 <span class="fc" id="L185">            progress.training.add(run); progress.lessons += run.totalWork();</span>
-<span class="fc bfc" id="L186" title="All 4 branches covered.">            if (progress.meter.remaining() == 0 &amp;&amp; !run.solved()) throw new Limit();</span>
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">            if (progress.meter.remaining() == 0 &amp;&amp; !run.solved()) throw new Limit();</span>
 <span class="fc bfc" id="L187" title="All 4 branches covered.">            if (!run.solved() || run.reused()) continue;</span>
 <span class="fc" id="L188">            var entry = new Entry(task.transition(), task.degree(), run.law().orElseThrow().proposal());</span>
 <span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (candidate.contains(entry)) continue;</span>

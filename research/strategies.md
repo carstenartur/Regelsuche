@@ -97,6 +97,25 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Befund.** Die Java-Läufe sparen 24 von 7.412 Einheiten. Die direkte Gradaufteilung senkt den Rekurrenzaufwand von 25.930 auf 13.968 Einheiten. Auf dieser Basis spart der vorhandene Hinweis 4,27 Prozent. Einschließlich seiner Eingangsprüfung und Extraktion kostet er 17.078 Einheiten. [Protokoll, Arbeitsbelege und Reproduktion](state-choice-oracle.md)
 - **Folgerung.** Gradgetrennte direkte Suche als Vergleichsgrundlage verwenden. Für Lernversuche unabhängig ausgewählte, gekoppelte Aufgaben heranziehen, bei denen dieser direkte Vergleich erhebliche Sucharbeit übrig lässt.
 
-- [`RecurrenceInvariantSynthesis.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesis.java#L26) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesis.java | public final class RecurrenceInvariantSynthesis { -->
+- [`RecurrenceInvariantSynthesis.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesis.java#L28) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesis.java | public final class RecurrenceInvariantSynthesis { -->
 - [`OrderedStateChoiceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedStateChoiceExperimentTest.java#L25) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedStateChoiceExperimentTest.java | class OrderedStateChoiceExperimentTest { -->
 - [`RecurrenceStateChoiceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceStateChoiceExperimentTest.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceStateChoiceExperimentTest.java | class RecurrenceStateChoiceExperimentTest { -->
+
+## Gradaufteilung in der vollständigen Rekurrenzsuche
+
+- **Hypothese.** Bei linearen Übergängen ohne Verschiebung lassen sich die Gradblöcke unabhängig lösen und anschließend in der bisherigen Reihenfolge ausgeben.
+- **Umsetzungsstand.** Der reguläre Aufruf durchsucht alle nichtkonstanten Grade für beide Vorzeichen. Affine Übergänge mit Verschiebung behalten den gekoppelten Ansatzraum.
+- **Befund.** Ein Budget von 10.000 Einheiten genügt für alle fünf Gesetze des dreidimensionalen Vergleichsfalls. Der frühere Aufruf benötigt 11.686 Einheiten.
+- **Folgerung.** Die vollständige Gradaufteilung dient als Referenz für Vergleiche zur weiteren Reduktion von Koeffizienten- und Prüfarbeit. [Festgelegte gekoppelte Aufgaben](../../config/benchmarks/coupled-recurrence-v1.json)
+
+- [`RecurrenceInvariantSynthesisTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesisTest.java#L20) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceInvariantSynthesisTest.java | class RecurrenceInvariantSynthesisTest { -->
+
+## Direkte Koeffizientenmatrix und Übernahme bewiesener Rekurrenzgesetze
+
+- **Hypothese.** Typisierte Monombilder verringern die Bildung der Koeffizientensysteme. Ein exakt passender Übergangswechsel erlaubt die Wiederverwendung des Beweises.
+- **Umsetzungsstand.** Der reguläre Aufruf bildet die Matrix direkt und prüft jedes Ergebnis unabhängig. Verschiebung und Vorzeichenwechsel wurden mit festen Ankerzuordnungen im Test ausgewertet.
+- **Befund.** Die Gesamtarbeit der sechs gekoppelten Aufgaben sinkt von 57.709 auf 23.068 Einheiten. Der Transferversuch kommt bei denselben neun Gesetzen auf 16.225 Einheiten einschließlich der Anker und der erfolglosen Zuordnungen. [Aufgaben, Protokoll und Reproduktion](coupled-recurrence-synthesis.md)
+- **Folgerung.** Die Kosten automatischer Ankerzuordnung gegen die direkte Matrixbildung prüfen. Für konkrete Beobachtungen den minimalen Rekurrenzzustand aus den Monombildern bestimmen.
+
+- [`CoupledRecurrenceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceExperimentTest.java#L28) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceExperimentTest.java | class CoupledRecurrenceExperimentTest { -->
+- [`CoupledRecurrenceTransferExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceTransferExperimentTest.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceTransferExperimentTest.java | class CoupledRecurrenceTransferExperimentTest { -->

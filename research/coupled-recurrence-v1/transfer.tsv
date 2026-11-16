@@ -1,0 +1,7 @@
+case	anchor	route	direct	preparation	rechecked	proofTransfer
+symplectic-euler	-	DIRECT_ANCHOR	1192	0	1192	1192
+cayley-rotation	-	DIRECT_ANCHOR	5190	0	5190	5190
+symplectic-euler-shifted	symplectic-euler	TRANSLATION	2522	321	1470	350
+cayley-rotoreflection	cayley-rotation	SIGN_REVERSAL	5258	286	3471	367
+cayley-axial-drift	cayley-rotation	DIRECT_FALLBACK	7044	206	7250	7250
+tribonacci	cayley-rotation	DIRECT_FALLBACK	1862	14	1876	1876
