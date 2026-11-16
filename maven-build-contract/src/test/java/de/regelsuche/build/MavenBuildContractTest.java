@@ -67,6 +67,12 @@ class MavenBuildContractTest {
         "executable", "interpreter", "shell", "command",
         "commandlineArgs", "commandLineArgs"
     );
+    private static final Set<String> EXECUTABLE_ATTRIBUTE_NAMES = Set.of(
+        "executable", "interpreter", "shell", "command"
+    );
+    private static final Set<String> DECLARED_JDK_EXECUTABLES = Set.of(
+        "java", "javac"
+    );
     private static final Map<String, String> REQUIRED_PROPERTIES = Map.ofEntries(
         Map.entry("maven.compiler.release", "25"),
         Map.entry("maven.minimum.version", "3.9.9"),
@@ -219,7 +225,9 @@ class MavenBuildContractTest {
                 "<exec executable=\"/usr/bin/python3\"/>",
                 "<exec executable=\"node.exe\"/>",
                 "<script interpreter=\"/opt/bin/bash\"/>",
-                "<tool command=\"env python3 verify.py\"/>")) {
+                "<tool command=\"env python3 verify.py\"/>",
+                "<exec executable=\"${host.runner}\"/>",
+                "<exec executable=\"git\"/>")) {
             Path pom = temporary.resolve("pom.xml");
             Files.writeString(pom, syntheticPom(
                 "<configuration><target>" + invocation
@@ -293,11 +301,20 @@ class MavenBuildContractTest {
                 (org.w3c.dom.Element) allElements.item(index);
             for (String attribute : COMMAND_ATTRIBUTE_NAMES) {
                 if (element.hasAttribute(attribute)) {
-                    assertNoHostRuntime(
-                        element.getAttribute(attribute),
-                        pom,
-                        "<" + element.getTagName() + " @" + attribute + ">"
-                    );
+                    String value = element.getAttribute(attribute);
+                    String source = "<" + element.getTagName() + " @"
+                        + attribute + ">";
+                    assertNoHostRuntime(value, pom, source);
+                    // No dynamically resolved or undeclared host executable:
+                    // otherwise a Maven POM could silently add a new required
+                    // runtime without changing the explicit denylist.
+                    if (EXECUTABLE_ATTRIBUTE_NAMES.contains(attribute)) {
+                        assertTrue(
+                            DECLARED_JDK_EXECUTABLES.contains(value.strip()),
+                            () -> pom + " invokes undeclared host runtime "
+                                + value + " through " + source
+                        );
+                    }
                 }
             }
         }
