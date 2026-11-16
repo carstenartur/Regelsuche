@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceObservationArithmetic.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">RecurrenceObservationArithmetic.java</span></div><h1>RecurrenceObservationArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import java.math.BigInteger;
+
+final class RecurrenceObservationArithmetic {
+    static final int MAX_RATIONAL_BITS = 16_384;
+
+    private RecurrenceObservationArithmetic() { }
+
+    static Rational addProduct(Rational total, Rational left, Rational right, Work work) {
+<span class="fc" id="L13">        work.add(1);</span>
+<span class="fc bfc" id="L14" title="All 4 branches covered.">        if (left.isZero() || right.isZero()) return total;</span>
+<span class="fc" id="L15">        return add(total, multiply(left, right, work), work);</span>
+    }
+
+    static Rational add(Rational left, Rational right, Work work) {
+<span class="fc" id="L19">        work.add(1);</span>
+<span class="fc" id="L20">        return checked(left.add(right));</span>
+    }
+
+    static Rational multiply(Rational left, Rational right, Work work) {
+<span class="fc" id="L24">        work.add(1);</span>
+        // Integer products have no cancellations. Other operations can at most double
+        // the bounded operand sizes before normalization.
+<span class="fc bfc" id="L27" title="All 4 branches covered.">        if (left.denominator().equals(BigInteger.ONE) &amp;&amp; right.denominator().equals(BigInteger.ONE)</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">                &amp;&amp; magnitudeBits(left.numerator()) + magnitudeBits(right.numerator()) - 1 &gt; MAX_RATIONAL_BITS) {</span>
+<span class="fc" id="L29">            throw new ArithmeticLimit();</span>
+        }
+<span class="fc" id="L31">        return checked(left.multiply(right));</span>
+    }
+
+    static Rational checked(Rational value) {
+<span class="fc" id="L35">        checked(value.numerator());</span>
+<span class="fc" id="L36">        checked(value.denominator());</span>
+<span class="fc" id="L37">        return value;</span>
+    }
+
+    static BigInteger checked(BigInteger value) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (magnitudeBits(value) &gt; MAX_RATIONAL_BITS) throw new ArithmeticLimit();</span>
+<span class="fc" id="L42">        return value;</span>
+    }
+
+    static int magnitudeBits(BigInteger value) {
+<span class="fc" id="L46">        return value.abs().bitLength();</span>
+    }
+
+<span class="fc" id="L49">    static final class ArithmeticLimit extends RuntimeException {</span>
+        private static final long serialVersionUID = 1L;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

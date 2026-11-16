@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RecurrenceObservationProof.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">RecurrenceObservationProof.java</span></div><h1>RecurrenceObservationProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.add;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.addProduct;
+import static de.regelsuche.math.algorithms.linalg.RecurrenceObservationArithmetic.multiply;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSupport.Work;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/** Checks values along exact trajectories independently of the lifted coefficient matrix. */
+final class RecurrenceObservationProof {
+    private RecurrenceObservationProof() { }
+
+    static boolean verify(Transition transition, Polynomial observation, int degree, List&lt;Rational&gt; coefficients, Work work) {
+<span class="fc" id="L20">        int dimension = transition.linear().columns();</span>
+<span class="fc" id="L21">        var origin = sample(dimension, work);</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (!holds(transition, observation, coefficients, origin, work)) return false;</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (degree == 0) return true;</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="fc" id="L25">            var axis = sample(dimension, work);</span>
+<span class="fc" id="L26">            axis.set(i, Rational.ONE);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (!holds(transition, observation, coefficients, axis, work)) return false;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (degree == 1) continue;</span>
+<span class="fc" id="L29">            axis.set(i, Rational.of(2));</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            if (!holds(transition, observation, coefficients, axis, work)) return false;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (int j = i + 1; j &lt; dimension; j++) {</span>
+<span class="fc" id="L32">                var pair = sample(dimension, work);</span>
+<span class="fc" id="L33">                pair.set(i, Rational.ONE);</span>
+<span class="fc" id="L34">                pair.set(j, Rational.ONE);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                if (!holds(transition, observation, coefficients, pair, work)) return false;</span>
+            }
+        }
+<span class="fc" id="L38">        return true;</span>
+    }
+
+    private static List&lt;Rational&gt; sample(int dimension, Work work) {
+<span class="fc" id="L42">        work.add(1L + dimension);</span>
+<span class="fc" id="L43">        return new ArrayList&lt;&gt;(Collections.nCopies(dimension, Rational.ZERO));</span>
+    }
+
+    private static boolean holds(Transition transition, Polynomial observation, List&lt;Rational&gt; coefficients,
+            List&lt;Rational&gt; state, Work work) {
+<span class="fc" id="L48">        var sum = Rational.ZERO;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (Rational coefficient : coefficients) {</span>
+<span class="fc" id="L50">            sum = addProduct(sum, coefficient, evaluate(observation, state, work), work);</span>
+<span class="fc" id="L51">            state = advance(transition, state, work);</span>
+<span class="fc" id="L52">        }</span>
+<span class="fc" id="L53">        work.add(1);</span>
+<span class="fc" id="L54">        return evaluate(observation, state, work).equals(sum);</span>
+    }
+
+    static Rational evaluate(Polynomial observation, List&lt;Rational&gt; state, Work work) {
+<span class="fc" id="L58">        work.add(1);</span>
+<span class="fc" id="L59">        var sum = Rational.ZERO;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (var term : observation.terms().entrySet()) {</span>
+<span class="fc" id="L61">            work.add(1);</span>
+<span class="fc" id="L62">            var value = term.getValue();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            for (var variable : term.getKey().powers().entrySet()) {</span>
+<span class="fc" id="L64">                work.add(1);</span>
+<span class="fc" id="L65">                var coordinate = state.get(variable.getKey().charAt(1) - '0');</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                for (int exponent = 0; exponent &lt; variable.getValue(); exponent++) {</span>
+<span class="fc" id="L67">                    value = multiply(value, coordinate, work);</span>
+                }
+<span class="fc" id="L69">            }</span>
+<span class="fc" id="L70">            sum = add(sum, value, work);</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        return sum;</span>
+    }
+
+    static List&lt;Rational&gt; advance(Transition transition, List&lt;Rational&gt; state, Work work) {
+<span class="fc" id="L76">        var next = new ArrayList&lt;Rational&gt;(state.size());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int row = 0; row &lt; state.size(); row++) {</span>
+<span class="fc" id="L78">            work.add(1);</span>
+<span class="fc" id="L79">            var value = transition.offset().get(row);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            for (int column = 0; column &lt; state.size(); column++) {</span>
+<span class="fc" id="L81">                value = addProduct(value, transition.linear().get(row, column), state.get(column), work);</span>
+            }
+<span class="fc" id="L83">            next.add(value);</span>
+        }
+<span class="fc" id="L85">        return next;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

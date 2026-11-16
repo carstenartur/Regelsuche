@@ -18,7 +18,7 @@ final class RecurrenceInvariantSupport {
 
     static void requireBounded(Rational number) {
 <span class="fc" id="L20">        Objects.requireNonNull(number, &quot;coefficient&quot;);</span>
-<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (number.numerator().bitLength() &gt; 128 || number.denominator().bitLength() &gt; 128)</span>
+<span class="fc bfc" id="L21" title="All 4 branches covered.">        if (number.numerator().bitLength() &gt; 128 || number.denominator().bitLength() &gt; 128)</span>
 <span class="fc" id="L22">            throw new IllegalArgumentException(&quot;recurrence inputs are limited to 128-bit exact coefficients&quot;);</span>
 <span class="fc" id="L23">    }</span>
 
