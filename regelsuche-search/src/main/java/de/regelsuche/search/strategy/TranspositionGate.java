@@ -62,6 +62,15 @@ public final class TranspositionGate {
             SearchState state,
             String pathId,
             List<String> compatibleIdentityHashes) {
+        return evaluate(memory, state, pathId, compatibleIdentityHashes, true);
+    }
+
+    static Verdict evaluate(
+            SearchMemory memory,
+            SearchState state,
+            String pathId,
+            List<String> compatibleIdentityHashes,
+            boolean pruneFromHistory) {
         if (memory == null) {
             return Verdict.KEEP;
         }
@@ -90,7 +99,7 @@ public final class TranspositionGate {
             now
         );
 
-        if (existing == null) {
+        if (!pruneFromHistory || existing == null) {
             memory.table().record(candidate);
             return Verdict.KEEP;
         }

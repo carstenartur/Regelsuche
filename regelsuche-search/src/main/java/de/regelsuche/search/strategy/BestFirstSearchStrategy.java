@@ -148,11 +148,15 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         if (current.depth() == 0 || problem.memory() == null) {
             return false;
         }
+        // The durable entry summarizes mathematical values across searches. An
+        // exact goal still needs this run's concrete state and continuations.
+        boolean pruneFromHistory = problem.target() == null || problem.target().relation() != TargetRelation.SYNTAX_EXACT;
         if (TranspositionGate.evaluate(
                 problem.memory(),
                 current,
                 current.canonicalHash() + "#" + current.depth(),
-                List.of(frame.identity().legacyHash(current.expression())))
+                List.of(frame.identity().legacyHash(current.expression())),
+                pruneFromHistory)
                 != TranspositionGate.Verdict.PRUNE) {
             return false;
         }

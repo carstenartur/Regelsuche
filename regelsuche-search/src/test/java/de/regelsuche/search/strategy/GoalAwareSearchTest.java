@@ -10,6 +10,7 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.scoring.cost.StructuralCostModel;
 import de.regelsuche.scoring.cost.TransformationGoal;
 import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
@@ -181,6 +182,72 @@ class GoalAwareSearchTest {
         assertFalse(result.reached());
         assertEquals(1, result.bestDistance());
         assertEquals("x * z + x * y", result.bestState().expression());
+    }
+
+    @Test
+    void repeatedExactSearchReconstructsTheWholePathWithSharedMemory() {
+        var engine = new AstRewriteTransformationEngine();
+        var memory = new SearchMemory();
+        String source = "(x + 0) * 1";
+        var problem = baseProblem(source, expression -> {
+            String rule = expression.equals(source) ? "ast_multiply_one_right" : "ast_add_zero_right";
+            return engine.transform(expression).stream().filter(move -> move.rule().equals(rule)).toList();
+        }, 2, 8, 4).withMemory(memory).withTarget(SearchProblem.SearchTarget.syntaxExact("x"));
+
+        var strategy = new BestFirstSearchStrategy();
+        var first = strategy.searchWithDiagnostics(problem);
+        assertTrue(first.reached(), first.toString());
+        assertEquals(List.of(source, "x + 0", "x"), first.reachedState().path());
+        var repeated = strategy.searchWithDiagnostics(problem);
+        assertTrue(repeated.reached(), repeated.toString());
+        assertEquals(first.reachedState(), repeated.reachedState());
+        assertEquals(0, repeated.metrics().transpositionPrunes());
+        assertTrue(memory.decisions().isEmpty());
+        assertTrue(memory.table().lookup(repeated.reachedState().canonicalHash()).orElseThrow().visitCount() >= 2);
+    }
+
+    @Test
+    void sharedMemoryDoesNotSubstituteAnAcEquivalentGoalOrStopItsContinuation() {
+        var memory = new SearchMemory();
+        var problem = baseProblem("a + b + 0", expression -> switch (expression) {
+            case "a + b + 0" -> List.of(new Transformation("normalize", "a + b"),
+                new Transformation("normalize", "b + a"));
+            case "b + a" -> List.of(new Transformation("normalize", "b + 0 + a"));
+            default -> List.of();
+        }, 2, 8, 1).withMemory(memory);
+        var strategy = new BestFirstSearchStrategy();
+        var first = strategy.searchWithDiagnostics(problem.withTarget(SearchProblem.SearchTarget.syntaxExact("a + b")));
+        assertTrue(first.reached(), first.toString());
+        var second = strategy.searchWithDiagnostics(problem.withTarget(
+            SearchProblem.SearchTarget.syntaxExact("b + a").continueAfterReached()));
+        assertTrue(second.reached(), second.toString());
+        assertEquals(first.reachedState().canonicalHash(), second.reachedState().canonicalHash());
+        assertEquals("b + a", second.reachedState().expression());
+        assertEquals(List.of("a + b + 0", "b + a", "b + 0 + a"),
+            second.states().stream().map(SearchState::expression).toList());
+    }
+
+    @Test
+    void exactSearchObservationsRemainSeparateUnderDifferentAssumptions() {
+        var memory = new SearchMemory();
+        var target = SearchProblem.SearchTarget.syntaxExact("x");
+        var guarded = baseProblem("x * y / y", expression -> List.of(new Transformation("reduce", "x", RewriteKind.NORMALIZE,
+            false, 0, true, "guarded-reduce", List.of("y != 0"))), 1, 8, 4).withMemory(memory).withTarget(target);
+        var unconditional = baseProblem("x + 0", expression -> List.of(new Transformation("reduce", "x")), 1, 8, 4)
+            .withMemory(memory).withTarget(target);
+
+        var strategy = new BestFirstSearchStrategy();
+        var first = strategy.searchWithDiagnostics(guarded);
+        var second = strategy.searchWithDiagnostics(unconditional);
+        var repeated = strategy.searchWithDiagnostics(guarded);
+        assertTrue(first.reached());
+        assertTrue(second.reached());
+        assertTrue(repeated.reached());
+        assertFalse(first.reachedState().assumptions().isEmpty());
+        assertTrue(second.reachedState().assumptions().isEmpty());
+        assertEquals(first.reachedState(), repeated.reachedState());
+        assertEquals(2, memory.table().size());
+        assertEquals(List.of(1, 2), memory.table().entries().stream().map(entry -> entry.visitCount()).sorted().toList());
     }
 
     @Test
