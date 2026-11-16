@@ -37,11 +37,15 @@ final class MoveSearchVisits<S extends SearchExecution.Position<?>> implements d
         this.charge = Objects.requireNonNull(charge);
     }
 
-    MoveSearch.Decision rejection(S state, long theoryWork) {
+    boolean stateLocal() { return stateLocal; }
+
+    MoveSearch.Decision rejection(S state, long theoryWork, long remaining) {
         var proposed = new Label<>(state, theoryWork);
         if (!stateLocal) return live.contains(proposed) ? MoveSearch.Decision.DUPLICATE : null;
+        if (remaining-- <= 0) return MoveSearch.Decision.WORK_LIMIT;
         charge.accept(1);
         for (var admitted : positions.getOrDefault(Position.of(state), List.of())) {
+            if (remaining-- <= 0) return MoveSearch.Decision.WORK_LIMIT;
             charge.accept(1);
             if (admitted.noMoreExpensiveThan(proposed)) {
                 return admitted.equals(proposed) ? MoveSearch.Decision.DUPLICATE : MoveSearch.Decision.DOMINATED;
@@ -50,24 +54,43 @@ final class MoveSearchVisits<S extends SearchExecution.Position<?>> implements d
         return null;
     }
 
-    void add(S state, long theoryWork) {
+    boolean add(S state, long theoryWork, long remaining) {
         var admitted = new Label<>(state, theoryWork);
         if (stateLocal) {
+            if (remaining-- <= 0) return false;
             charge.accept(1);
-            var alternatives = positions.computeIfAbsent(Position.of(state), ignored -> new ArrayList<>());
-            var iterator = alternatives.iterator();
-            while (iterator.hasNext()) {
-                charge.accept(1);
-                var previous = iterator.next();
-                if (admitted.noMoreExpensiveThan(previous)) {
-                    iterator.remove();
-                    live.remove(previous);
-                    charge.accept(1);
-                }
+            Position position = Position.of(state);
+            var alternatives = positions.get(position);
+            if (alternatives == null) {
+                alternatives = new ArrayList<>();
+                positions.put(position, alternatives);
+            } else if (!removeDominated(admitted, alternatives, remaining)) {
+                return false;
             }
             alternatives.add(admitted);
         }
         live.add(admitted);
+        return true;
+    }
+
+    private boolean removeDominated(Label<S> admitted, List<Label<S>> alternatives, long remaining) {
+        // Establish the complete replacement and afford all removals before
+        // invalidating old frontier tickets or publishing the new label.
+        List<Integer> dominated = List.of();
+        for (int i = 0; i < alternatives.size(); i++) {
+            if (remaining-- <= 0) return false;
+            charge.accept(1);
+            if (admitted.noMoreExpensiveThan(alternatives.get(i))) {
+                if (dominated.isEmpty()) dominated = new ArrayList<>();
+                dominated.add(i);
+            }
+        }
+        if (remaining < dominated.size()) return false;
+        for (int i = dominated.size() - 1; i >= 0; i--) {
+            charge.accept(1);
+            live.remove(alternatives.remove(dominated.get(i).intValue()));
+        }
+        return true;
     }
 
     /** Invalidated tickets must not open or resume a picker, or consume another state slot. */

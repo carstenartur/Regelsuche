@@ -71,6 +71,34 @@ class MoveSearchDominanceTest {
             SearchContinuationContract.DECLARED_STATE_LOCAL));
     }
 
+    @Test void aVerifiedMoveCannotEnterTheIndexAfterItsWorkAllowanceIsSpent() {
+        var search = new MoveSearch();
+        var contract = SearchContinuationContract.DECLARED_STATE_LOCAL;
+        var funded = search.search(oneMoveProblem(1000), contract);
+        assertTrue(funded.reached());
+        assertEquals(1, funded.metrics().firstHitPrimitiveDepth());
+        assertEquals(List.of("b"), funded.witness().stream().map(step -> step.target().expression()).toList());
+
+        // The full run has four units after verification: index insertion, parent
+        // requeue, goal ticket removal and goal index membership check.
+        long allowance = funded.metrics().totalWork() - 4;
+        var limited = search.search(oneMoveProblem(allowance), contract);
+        assertEquals(MoveSearch.Outcome.WORK_EXHAUSTED, limited.outcome());
+        assertEquals(allowance, limited.metrics().totalWork());
+        assertEquals(MoveSearch.Decision.WORK_LIMIT, limited.events().getFirst().decision());
+        assertTrue(limited.events().getFirst().verification().accepted());
+        assertTrue(limited.stateAssessments().keySet().stream().noneMatch(state -> state.expression().equals("b")));
+    }
+
+    private static MoveSearch.Problem oneMoveProblem(long work) {
+        var descriptor = new MoveProvider.Descriptor("one", "one", SearchMove.SourceKind.PRIMITIVE,
+            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, "fixture");
+        var provider = new EngineMoveProvider(descriptor, source -> source.equals("root")
+            ? List.of(new Transformation("one", "b")) : List.of(), true);
+        return new MoveSearch.Problem("root", MoveContext.frozen("b"), List.of(provider), MovePriorityPolicy.INVENTORY_ORDER,
+            GRAPH, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(2, 2, 0, 10, work));
+    }
+
     private static java.util.Set<String> expressions(MoveSearch.Result result) {
         return result.reachedStates().stream().map(MoveState::expression).collect(java.util.stream.Collectors.toSet());
     }
