@@ -139,3 +139,14 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`RecurrenceObservationKrylov.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java | public final class RecurrenceObservationKrylov { -->
 - [`RecurrenceObservationComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java#L33) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java | class RecurrenceObservationComparisonTest { -->
+
+## Automatisch hergeleitete Zustände für wechselnde Übergänge
+
+- **Hypothese.** Der unter allen erlaubten Übergängen abgeschlossene Beobachtungsraum liefert in zwei Aufgabenfamilien mindestens 20 Prozent weniger Gesamtarbeit als direkte Auswertung.
+- **Umsetzungsstand.** Der Java-Kern leitet aus rationalen affinen Übergängen und Beobachtungen eine minimale affine Zustandszusammenfassung ab. Er prüft jeden Übergang und jede Beobachtung exakt und verwendet den Plan für beliebige Ereignisfolgen und Anfangszustände.
+- **Befund.** Bei 1.024 Ereignissen sinkt die Dimension für Markov-Transport von sechs auf drei und für den Schwerpunkt eines Federsystems von vier auf zwei. Einschließlich Herleitung, Prüfung, Bindung und Ausgaben sinkt die Arbeit um rund 68 beziehungsweise 28 Prozent. Bei einem Ereignis und in den beiden Kontrollen ist die direkte Rechnung günstiger. [Versuchsaufbau und Rohdaten](switched-observation.md)
+- **Folgerung.** Die Amortisierung auf unabhängig kuratierten Anwendungen prüfen und vor der Herleitung mit direkter Koordinatenabhängigkeit und erwarteter Abfragelänge abschätzen.
+
+- [`AffineObservationReduction.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationReduction.java#L26) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/AffineObservationReduction.java | public final class AffineObservationReduction { -->
+- [`AffineObservationReductionTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationReductionTest.java#L21) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationReductionTest.java | class AffineObservationReductionTest { -->
+- [`AffineObservationComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationComparisonTest.java#L36) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/AffineObservationComparisonTest.java | class AffineObservationComparisonTest { -->

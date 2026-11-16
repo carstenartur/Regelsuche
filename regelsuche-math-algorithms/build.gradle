@@ -24,6 +24,10 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'regelsuche.repositoryRoot', rootProject.projectDir.absolutePath
+    inputs.files(rootProject.file('config/benchmarks/switched-observation-v1.json'),
+        rootProject.file('docs/research/switched-observation/work.tsv'))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     finalizedBy tasks.named('jacocoTestReport')
 }
 
