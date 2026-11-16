@@ -117,118 +117,15 @@ public final class JmhRegressionV3Verifier {
                 "duplicate threshold: " + name);
         }
 
-        ArrayNode results = array(read(resultPath), "JMH result");
-        Map<String, JsonNode> current = new TreeMap<>();
-        for (JsonNode item : results) {
-            ObjectNode row = object(item, "JMH row");
-            String name = text(row, "benchmark");
-            require(current.putIfAbsent(name, row) == null,
-                "duplicate result: " + name);
-        }
-        Set<String> missing = new TreeSet<>(byName.keySet());
-        missing.removeAll(current.keySet());
-        Set<String> unexpected = new TreeSet<>(current.keySet());
-        unexpected.removeAll(byName.keySet());
-
-        List<String> violations = new ArrayList<>();
-        List<String> inconclusiveReasons = new ArrayList<>();
-        List<String> lowPrecision = new ArrayList<>();
-        List<String> inconclusiveNames = new ArrayList<>();
-        if (!missing.isEmpty()) {
-            violations.add("missing benchmarks: " + String.join(", ", missing));
-        }
-        if (!unexpected.isEmpty()) {
-            violations.add("undeclared benchmarks: "
-                + String.join(", ", unexpected));
-        }
-
-        JsonNode jdk = execution.path("jdkMajor");
-        require(jdk.isIntegralNumber(), "execution.jdkMajor must be integer");
-        String jdkMajor = jdk.asText();
-        ArrayNode rows = JSON.createArrayNode();
-        StringBuilder markdown = new StringBuilder();
-        markdown.append("# JMH regression gate v3\n\n");
-        for (String name : byName.keySet()) {
-            if (!current.containsKey(name)) {
-                continue;
-            }
-            JsonNode policy = byName.get(name);
-            JsonNode row = current.get(name);
-            JsonNode metric = object(row.path("primaryMetric"),
-                name + ": primaryMetric");
-            double score = positive(metric.path("score"), name + " score");
-            double error = nonnegative(metric.path("scoreError"),
-                name + " scoreError");
-            JsonNode rawUnit = metric.path("scoreUnit");
-            String unit = rawUnit.isMissingNode() || rawUnit.isNull()
-                ? "None" : rawUnit.asText();
-            double maximum = policy.path("maximumAllowedScore").doubleValue();
-            double baseline = policy.path("baselineScore").doubleValue();
-            double decisionScore = Math.max(0, score - error);
-            double tolerance = Math.max(1e-12, maximum * 1e-12);
-            boolean imprecise = error >= score;
-            if (imprecise) {
-                lowPrecision.add(name);
-            }
-            List<String> rowFailures = new ArrayList<>();
-            List<String> rowUnknown = new ArrayList<>();
-            check(rowFailures, row, execution, "jmhVersion", "JMH version");
-            check(rowFailures, row, execution, "mode", "mode");
-            check(rowFailures, row, execution, "forks", "forks");
-            check(rowFailures, row, execution,
-                "warmupIterations", "warmup iterations");
-            check(rowFailures, row, execution,
-                "measurementIterations", "measurement iterations");
-            if (!unit.equals(text(policy, "unit"))) {
-                rowFailures.add("unit differs: expected " + text(policy, "unit")
-                    + ", found " + unit);
-            }
-            String actualJdk = row.path("jdkVersion").isMissingNode()
-                ? "" : row.path("jdkVersion").asText();
-            if (!actualJdk.equals(jdkMajor)
-                && !actualJdk.startsWith(jdkMajor + ".")) {
-                rowFailures.add("JDK major differs: expected " + jdkMajor
-                    + ", found " + actualJdk);
-            }
-            if (decisionScore > maximum + tolerance) {
-                rowFailures.add(String.format(java.util.Locale.ROOT,
-                    "decision score %.9f %s (score %.9f - scoreError %.9f) "
-                        + "exceeds %.9f %s",
-                    decisionScore, unit, score, error, maximum, unit));
-            } else if (score > maximum + tolerance) {
-                String reason = String.format(java.util.Locale.ROOT,
-                    "point estimate %.9f %s exceeds %.9f %s, but decision "
-                        + "score %.9f %s does not; measurement is inconclusive "
-                        + "and requires fresh evidence",
-                    score, unit, maximum, unit, decisionScore, unit);
-                rowUnknown.add(reason);
-                inconclusiveNames.add(name);
-                inconclusiveReasons.add(name + ": " + reason);
-            }
-            for (String failure : rowFailures) {
-                violations.add(name + ": " + failure);
-            }
-            String status = !rowFailures.isEmpty() ? "FAILED"
-                : !rowUnknown.isEmpty() ? "INCONCLUSIVE" : "PASSED";
-            ObjectNode result = rows.addObject();
-            result.put("benchmark", name);
-            result.put("family", text(policy, "family"));
-            result.put("unit", unit);
-            result.put("baselineScore", baseline);
-            result.put("baselineScoreError",
-                policy.path("baselineScoreError").doubleValue());
-            result.put("currentScore", score);
-            result.put("currentScoreError", error);
-            result.put("decisionScore", decisionScore);
-            result.put("maximumAllowedScore", maximum);
-            result.put("rawRegressionPercent", round6(100 * (score / baseline - 1)));
-            result.put("decisionRegressionPercent",
-                round6(100 * (decisionScore / baseline - 1)));
-            result.put("precisionStatus", imprecise ? "LOW_PRECISION" : "MEASURED");
-            result.put("status", status);
-            setArray(result.putArray("violations"), rowFailures);
-            setArray(result.putArray("inconclusiveReasons"), rowUnknown);
-        }
+        Evaluation evaluated = evaluate(resultPath, byName, execution);
+        ArrayNode rows = evaluated.rows();
+        Set<String> missing = evaluated.missing();
+        Set<String> unexpected = evaluated.unexpected();
+        List<String> violations = evaluated.violations();
+        List<String> inconclusiveReasons = evaluated.inconclusiveReasons();
+        List<String> lowPrecision = evaluated.lowPrecision();
+        List<String> inconclusiveNames = evaluated.inconclusiveNames();
+        StringBuilder markdown = new StringBuilder("# JMH regression gate v3\n\n");
 
         String status = !violations.isEmpty() ? "FAILED"
             : !inconclusiveReasons.isEmpty() ? "INCONCLUSIVE" : "PASSED";
@@ -297,6 +194,144 @@ public final class JmhRegressionV3Verifier {
         appendReasons(markdown, "Violations", violations);
         return new Result(status, report, markdown.toString());
     }
+
+    private static Evaluation evaluate(
+        Path resultPath, Map<String, JsonNode> byName, JsonNode execution
+    ) throws IOException {
+        ArrayNode results = array(read(resultPath), "JMH result");
+        Map<String, JsonNode> current = new TreeMap<>();
+        for (JsonNode item : results) {
+            ObjectNode row = object(item, "JMH row");
+            String name = text(row, "benchmark");
+            require(current.putIfAbsent(name, row) == null,
+                "duplicate result: " + name);
+        }
+        Set<String> missing = new TreeSet<>(byName.keySet());
+        missing.removeAll(current.keySet());
+        Set<String> unexpected = new TreeSet<>(current.keySet());
+        unexpected.removeAll(byName.keySet());
+        List<String> violations = new ArrayList<>();
+        List<String> inconclusiveReasons = new ArrayList<>();
+        List<String> lowPrecision = new ArrayList<>();
+        List<String> inconclusiveNames = new ArrayList<>();
+        if (!missing.isEmpty()) {
+            violations.add("missing benchmarks: " + String.join(", ", missing));
+        }
+        if (!unexpected.isEmpty()) {
+            violations.add("undeclared benchmarks: "
+                + String.join(", ", unexpected));
+        }
+        JsonNode jdk = execution.path("jdkMajor");
+        require(jdk.isIntegralNumber(), "execution.jdkMajor must be integer");
+        String jdkMajor = jdk.asText();
+        ArrayNode rows = JSON.createArrayNode();
+        for (String name : byName.keySet()) {
+            if (!current.containsKey(name)) {
+                continue;
+            }
+            RowResult result = evaluateRow(name, byName.get(name),
+                current.get(name), execution, jdkMajor);
+            rows.add(result.result());
+            if (result.lowPrecision()) {
+                lowPrecision.add(name);
+            }
+            for (String failure : result.failures()) {
+                violations.add(name + ": " + failure);
+            }
+            for (String reason : result.inconclusive()) {
+                inconclusiveNames.add(name);
+                inconclusiveReasons.add(name + ": " + reason);
+            }
+        }
+        return new Evaluation(rows, missing, unexpected, violations,
+            inconclusiveReasons, lowPrecision, inconclusiveNames);
+    }
+
+    private static RowResult evaluateRow(
+        String name, JsonNode policy, JsonNode row,
+        JsonNode execution, String jdkMajor
+    ) {
+        JsonNode policy = byName.get(name);
+        JsonNode row = current.get(name);
+        JsonNode metric = object(row.path("primaryMetric"),
+            name + ": primaryMetric");
+        double score = positive(metric.path("score"), name + " score");
+        double error = nonnegative(metric.path("scoreError"),
+            name + " scoreError");
+        JsonNode rawUnit = metric.path("scoreUnit");
+        String unit = rawUnit.isMissingNode() || rawUnit.isNull()
+            ? "None" : rawUnit.asText();
+        double maximum = policy.path("maximumAllowedScore").doubleValue();
+        double baseline = policy.path("baselineScore").doubleValue();
+        double decisionScore = Math.max(0, score - error);
+        double tolerance = Math.max(1e-12, maximum * 1e-12);
+        boolean imprecise = error >= score;
+        List<String> rowFailures = new ArrayList<>();
+        List<String> rowUnknown = new ArrayList<>();
+        check(rowFailures, row, execution, "jmhVersion", "JMH version");
+        check(rowFailures, row, execution, "mode", "mode");
+        check(rowFailures, row, execution, "forks", "forks");
+        check(rowFailures, row, execution,
+            "warmupIterations", "warmup iterations");
+        check(rowFailures, row, execution,
+            "measurementIterations", "measurement iterations");
+        if (!unit.equals(text(policy, "unit"))) {
+            rowFailures.add("unit differs: expected " + text(policy, "unit")
+                + ", found " + unit);
+        }
+        String actualJdk = row.path("jdkVersion").isMissingNode()
+            ? "" : row.path("jdkVersion").asText();
+        if (!actualJdk.equals(jdkMajor)
+            && !actualJdk.startsWith(jdkMajor + ".")) {
+            rowFailures.add("JDK major differs: expected " + jdkMajor
+                + ", found " + actualJdk);
+        }
+        if (decisionScore > maximum + tolerance) {
+            rowFailures.add(String.format(java.util.Locale.ROOT,
+                "decision score %.9f %s (score %.9f - scoreError %.9f) "
+                    + "exceeds %.9f %s",
+                decisionScore, unit, score, error, maximum, unit));
+        } else if (score > maximum + tolerance) {
+            String reason = String.format(java.util.Locale.ROOT,
+                "point estimate %.9f %s exceeds %.9f %s, but decision "
+                    + "score %.9f %s does not; measurement is inconclusive "
+                    + "and requires fresh evidence",
+                score, unit, maximum, unit, decisionScore, unit);
+            rowUnknown.add(reason);
+        }
+        String status = !rowFailures.isEmpty() ? "FAILED"
+            : !rowUnknown.isEmpty() ? "INCONCLUSIVE" : "PASSED";
+        ObjectNode result = JSON.createObjectNode();
+        result.put("benchmark", name);
+        result.put("family", text(policy, "family"));
+        result.put("unit", unit);
+        result.put("baselineScore", baseline);
+        result.put("baselineScoreError",
+            policy.path("baselineScoreError").doubleValue());
+        result.put("currentScore", score);
+        result.put("currentScoreError", error);
+        result.put("decisionScore", decisionScore);
+        result.put("maximumAllowedScore", maximum);
+        result.put("rawRegressionPercent", round6(100 * (score / baseline - 1)));
+        result.put("decisionRegressionPercent",
+            round6(100 * (decisionScore / baseline - 1)));
+        result.put("precisionStatus", imprecise ? "LOW_PRECISION" : "MEASURED");
+        result.put("status", status);
+        setArray(result.putArray("violations"), rowFailures);
+        setArray(result.putArray("inconclusiveReasons"), rowUnknown);
+        return new RowResult(result, rowFailures, rowUnknown, imprecise);
+    }
+
+    private record RowResult(
+        ObjectNode result, List<String> failures, List<String> inconclusive,
+        boolean lowPrecision
+    ) { }
+
+    private record Evaluation(
+        ArrayNode rows, Set<String> missing, Set<String> unexpected,
+        List<String> violations, List<String> inconclusiveReasons,
+        List<String> lowPrecision, List<String> inconclusiveNames
+    ) { }
 
     public record Result(String status, ObjectNode json, String markdown) {
         public void write(Path jsonPath, Path markdownPath) throws IOException {
