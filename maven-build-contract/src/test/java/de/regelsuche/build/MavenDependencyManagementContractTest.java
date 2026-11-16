@@ -120,6 +120,11 @@ class MavenDependencyManagementContractTest {
         "org.testcontainers:testcontainers-bom",
         "${testcontainers.version}");
 
+    Element testJar = managedDependencies.get("de.regelsuche:regelsuche-app:test-jar");
+    assertNotNull(testJar, "app test sources must be centrally versioned");
+    assertEquals("${project.version}", directChildText(testJar, "version"));
+    assertEquals("test-jar", directChildText(testJar, "type"));
+
     Map<String, Element> managedPlugins = managedPlugins(parent);
     for (String coordinate : MANAGED_PLUGINS) {
       Element plugin = managedPlugins.get(coordinate);
@@ -161,7 +166,7 @@ class MavenDependencyManagementContractTest {
                   + coordinate);
           if (!isBomManaged(coordinate)) {
             assertNotNull(
-                managedDependencies.get(coordinate),
+                managedDependencies.get(managedDependencyKey(dependency)),
                 () -> relative
                     + " uses an unmanaged dependency: "
                     + coordinate);
@@ -227,7 +232,7 @@ class MavenDependencyManagementContractTest {
     assertNotNull(dependencies, "missing managed dependencies");
     return uniqueByCoordinate(
         directChildren(dependencies, "dependency"),
-        MavenDependencyManagementContractTest::dependencyCoordinate,
+        MavenDependencyManagementContractTest::managedDependencyKey,
         "managed dependency");
   }
 
@@ -295,6 +300,13 @@ class MavenDependencyManagementContractTest {
     return requiredChildText(dependency, "groupId")
         + ":"
         + requiredChildText(dependency, "artifactId");
+  }
+
+  private static String managedDependencyKey(Element dependency) {
+    String coordinate = dependencyCoordinate(dependency);
+    // Maven treats the test-jar as distinct from the production artifact.
+    return "test-jar".equals(directChildText(dependency, "type"))
+        ? coordinate + ":test-jar" : coordinate;
   }
 
   private static String pluginCoordinate(Element plugin) {
