@@ -159,7 +159,9 @@ public final class JmhRegressionV3Verifier {
             double score = positive(metric.path("score"), name + " score");
             double error = nonnegative(metric.path("scoreError"),
                 name + " scoreError");
-            String unit = text(metric, "scoreUnit");
+            JsonNode rawUnit = metric.path("scoreUnit");
+            String unit = rawUnit.isMissingNode() || rawUnit.isNull()
+                ? "None" : rawUnit.asText();
             double maximum = policy.path("maximumAllowedScore").doubleValue();
             double baseline = policy.path("baselineScore").doubleValue();
             double decisionScore = Math.max(0, score - error);
