@@ -24,11 +24,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Independent Java candidate for the existing Python JMH-v3 decision.
+ * Java/JUnit JMH-v3 decision authority used by the Gradle compatibility gate
+ * and by read-only Maven evidence replay.
  *
- * <p>This does not replace the live Gradle gate until the reports and all
- * negative controls have been compared. It intentionally reads the immutable
- * v2 thresholds, rather than defining another baseline or tolerance.
+ * <p>The historical Python verifier remains a separately testable comparison
+ * control. This implementation reads content-bound v2 thresholds, rather
+ * than defining another baseline or tolerance.
  */
 public final class JmhRegressionV3Verifier {
     static final String DECISION_SCHEMA =
