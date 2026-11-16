@@ -1,6 +1,7 @@
 package de.regelsuche.quality.jmh;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -19,6 +20,21 @@ public final class JmhRegressionV3Main {
                 "expected <repository root> <JMH results> <v2 thresholds> "
                     + "<v3 decision policy> <JSON output> <Markdown output>"
             );
+        }
+        // Retained measurements and versioned policies must remain read-only.
+        Path[] sources = { Path.of(args[1]), Path.of(args[2]), Path.of(args[3]) };
+        Path[] outputs = { Path.of(args[4]), Path.of(args[5]) };
+        if (samePath(outputs[0], outputs[1])) {
+            throw new IllegalArgumentException("JMH output paths alias each other");
+        }
+        for (Path output : outputs) {
+            for (Path source : sources) {
+                if (samePath(output, source)) {
+                    throw new IllegalArgumentException(
+                        "JMH report output aliases retained source: " + source
+                    );
+                }
+            }
         }
         JmhRegressionV3Verifier.Result result =
             new JmhRegressionV3Verifier().verify(
@@ -40,5 +56,14 @@ public final class JmhRegressionV3Main {
                     + "; retained report: " + args[4]
             );
         }
+    }
+
+    private static boolean samePath(Path left, Path right) throws IOException {
+        if (left.toAbsolutePath().normalize().equals(
+                right.toAbsolutePath().normalize())) {
+            return true;
+        }
+        return Files.exists(left) && Files.exists(right)
+            && Files.isSameFile(left, right);
     }
 }
