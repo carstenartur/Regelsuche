@@ -6,6 +6,7 @@ import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.representation.RepresentationBridge.WorkLedger;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,127 +17,165 @@ final class RecurrenceInvariantSupport {
     private RecurrenceInvariantSupport() { }
 
     static void requireBounded(Rational number) {
-<span class="fc" id="L19">        Objects.requireNonNull(number, &quot;coefficient&quot;);</span>
-<span class="pc bpc" id="L20" title="1 of 4 branches missed.">        if (number.numerator().bitLength() &gt; 128 || number.denominator().bitLength() &gt; 128)</span>
-<span class="fc" id="L21">            throw new IllegalArgumentException(&quot;recurrence inputs are limited to 128-bit exact coefficients&quot;);</span>
-<span class="fc" id="L22">    }</span>
+<span class="fc" id="L20">        Objects.requireNonNull(number, &quot;coefficient&quot;);</span>
+<span class="pc bpc" id="L21" title="1 of 4 branches missed.">        if (number.numerator().bitLength() &gt; 128 || number.denominator().bitLength() &gt; 128)</span>
+<span class="fc" id="L22">            throw new IllegalArgumentException(&quot;recurrence inputs are limited to 128-bit exact coefficients&quot;);</span>
+<span class="fc" id="L23">    }</span>
 
     static List&lt;String&gt; variables(int dimension) {
-<span class="fc" id="L25">        var variables = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L26" title="All 2 branches covered.">        for (int i = 0; i &lt; dimension; i++) variables.add(&quot;x&quot; + i);</span>
-<span class="fc" id="L27">        return List.copyOf(variables);</span>
+<span class="fc" id="L26">        var variables = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (int i = 0; i &lt; dimension; i++) variables.add(&quot;x&quot; + i);</span>
+<span class="fc" id="L28">        return List.copyOf(variables);</span>
     }
 
     static List&lt;Monomial&gt; basis(int dimension, int degree) {
-<span class="fc" id="L31">        var result = new ArrayList&lt;Monomial&gt;();</span>
-<span class="fc" id="L32">        result.add(Monomial.constant());</span>
-<span class="fc" id="L33">        var variables = variables(dimension);</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (String variable : variables) result.add(Monomial.variable(variable));</span>
-<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (degree == 2) {</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">            for (int i = 0; i &lt; dimension; i++)</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">                for (int j = i; j &lt; dimension; j++)</span>
-<span class="fc" id="L38">                    result.add(Monomial.variable(variables.get(i)).multiply(Monomial.variable(variables.get(j))));</span>
+<span class="fc" id="L32">        var result = new ArrayList&lt;Monomial&gt;();</span>
+<span class="fc" id="L33">        result.add(Monomial.constant());</span>
+<span class="fc" id="L34">        var variables = variables(dimension);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (String variable : variables) result.add(Monomial.variable(variable));</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (degree == 2) {</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (int i = 0; i &lt; dimension; i++)</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                for (int j = i; j &lt; dimension; j++)</span>
+<span class="fc" id="L39">                    result.add(Monomial.variable(variables.get(i)).multiply(Monomial.variable(variables.get(j))));</span>
         }
-<span class="fc" id="L40">        return List.copyOf(result);</span>
+<span class="fc" id="L41">        return List.copyOf(result);</span>
     }
 
     static List&lt;String&gt; images(RecurrenceInvariantSynthesis.Transition transition, Work work) {
-<span class="fc" id="L44">        int dimension = transition.linear().columns();</span>
-<span class="fc" id="L45">        var result = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
-<span class="fc" id="L47">            StringBuilder image = new StringBuilder(&quot;(&quot; + transition.offset().get(row) + &quot;)&quot;);</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (int column = 0; column &lt; dimension; column++) {</span>
-<span class="fc" id="L49">                work.add(1);</span>
-<span class="fc" id="L50">                image.append(&quot;+(&quot;).append(transition.linear().get(row, column)).append(&quot;)*x&quot;).append(column);</span>
+<span class="fc" id="L45">        int dimension = transition.linear().columns();</span>
+<span class="fc" id="L46">        var result = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L48">            StringBuilder image = new StringBuilder(&quot;(&quot; + transition.offset().get(row) + &quot;)&quot;);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (int column = 0; column &lt; dimension; column++) {</span>
+<span class="fc" id="L50">                work.add(1);</span>
+<span class="fc" id="L51">                image.append(&quot;+(&quot;).append(transition.linear().get(row, column)).append(&quot;)*x&quot;).append(column);</span>
             }
-<span class="fc" id="L52">            result.add(image.toString());</span>
+<span class="fc" id="L53">            result.add(image.toString());</span>
         }
-<span class="fc" id="L54">        return List.copyOf(result);</span>
+<span class="fc" id="L55">        return List.copyOf(result);</span>
     }
 
     /** Exact images of the coefficient basis, shared by both evolution signs. */
     static Map&lt;Monomial, Polynomial&gt; liftedImages(RecurrenceInvariantSynthesis.Transition transition,
             List&lt;Monomial&gt; basis, Work work) {
-<span class="fc" id="L60">        int dimension = transition.linear().columns();</span>
-<span class="fc" id="L61">        var variables = variables(dimension);</span>
-<span class="fc" id="L62">        var coordinates = variables.stream().map(Monomial::variable).toList();</span>
-<span class="fc" id="L63">        work.add(dimension);</span>
-<span class="fc" id="L64">        var coordinateImages = new ArrayList&lt;Polynomial&gt;(dimension);</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
-<span class="fc" id="L66">            work.add(1);</span>
-<span class="fc" id="L67">            var polynomial = Polynomial.constant(transition.offset().get(row));</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">            for (int col = 0; col &lt; dimension; col++) {</span>
-<span class="fc" id="L69">                work.add(1);</span>
-<span class="fc" id="L70">                var coefficient = transition.linear().get(row, col);</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">                if (coefficient.isZero()) continue;</span>
-<span class="fc" id="L72">                work.add(1L + polynomial.termCount());</span>
-<span class="fc" id="L73">                polynomial = polynomial.add(Polynomial.term(coordinates.get(col), coefficient));</span>
+<span class="fc" id="L61">        int dimension = transition.linear().columns();</span>
+<span class="fc" id="L62">        var variables = variables(dimension);</span>
+<span class="fc" id="L63">        var coordinates = variables.stream().map(Monomial::variable).toList();</span>
+<span class="fc" id="L64">        work.add(dimension);</span>
+<span class="fc" id="L65">        var coordinateImages = new ArrayList&lt;Polynomial&gt;(dimension);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L67">            work.add(1);</span>
+<span class="fc" id="L68">            var polynomial = Polynomial.constant(transition.offset().get(row));</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (int col = 0; col &lt; dimension; col++) {</span>
+<span class="fc" id="L70">                work.add(1);</span>
+<span class="fc" id="L71">                var coefficient = transition.linear().get(row, col);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                if (coefficient.isZero()) continue;</span>
+<span class="fc" id="L73">                work.add(1L + polynomial.termCount());</span>
+<span class="fc" id="L74">                polynomial = polynomial.add(Polynomial.term(coordinates.get(col), coefficient));</span>
             }
-<span class="fc" id="L75">            coordinateImages.add(polynomial);</span>
+<span class="fc" id="L76">            coordinateImages.add(polynomial);</span>
         }
 
-<span class="fc" id="L78">        var images = new HashMap&lt;Monomial, Polynomial&gt;();</span>
-<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (var monomial : basis) {</span>
-<span class="fc" id="L80">            var image = Polynomial.constant(Rational.ONE);</span>
-<span class="fc" id="L81">            work.add(1L + dimension);</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int i = 0; i &lt; dimension; i++) {</span>
-<span class="fc" id="L83">                int power = monomial.exponentOf(variables.get(i));</span>
-<span class="fc" id="L84">                var coordinateImage = coordinateImages.get(i);</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">                for (int j = 0; j &lt; power; j++) {</span>
-<span class="fc" id="L86">                    work.add(1L + (long) image.termCount() * coordinateImage.termCount());</span>
-<span class="fc" id="L87">                    image = image.multiply(coordinateImage);</span>
-                }
+<span class="fc" id="L79">        var images = new HashMap&lt;Monomial, Polynomial&gt;();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (var monomial : basis) {</span>
+<span class="fc" id="L81">            images.put(monomial, liftedMonomial(monomial, variables, coordinateImages, work));</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        return Map.copyOf(images);</span>
+    }
+
+    private static Polynomial liftedMonomial(Monomial monomial, List&lt;String&gt; variables,
+            List&lt;Polynomial&gt; coordinateImages, Work work) {
+<span class="fc" id="L88">        var image = Polynomial.constant(Rational.ONE);</span>
+<span class="fc" id="L89">        work.add(1L + variables.size());</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 0; i &lt; variables.size(); i++) {</span>
+<span class="fc" id="L91">            int power = monomial.exponentOf(variables.get(i));</span>
+<span class="fc" id="L92">            var coordinateImage = coordinateImages.get(i);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (int j = 0; j &lt; power; j++) {</span>
+<span class="fc" id="L94">                work.add(1L + (long) image.termCount() * coordinateImage.termCount());</span>
+<span class="fc" id="L95">                image = image.multiply(coordinateImage);</span>
             }
-<span class="fc" id="L90">            images.put(monomial, image);</span>
-<span class="fc" id="L91">        }</span>
-<span class="fc" id="L92">        return Map.copyOf(images);</span>
+        }
+<span class="fc" id="L98">        return image;</span>
+    }
+
+    static Polynomial translate(Polynomial polynomial, List&lt;Rational&gt; shift, Work work) {
+<span class="fc" id="L102">        var variables = variables(shift.size());</span>
+<span class="fc" id="L103">        var images = new ArrayList&lt;Polynomial&gt;();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int i = 0; i &lt; shift.size(); i++) {</span>
+<span class="fc" id="L105">            work.add(2);</span>
+<span class="fc" id="L106">            images.add(Polynomial.variable(variables.get(i)).add(Polynomial.constant(shift.get(i).negate())));</span>
+        }
+<span class="fc" id="L108">        work.add(polynomial.termCount());</span>
+<span class="fc" id="L109">        var monomials = polynomial.terms().keySet().stream().sorted(Comparator.comparing(Monomial::key)).toList();</span>
+<span class="fc" id="L110">        var translated = Polynomial.zero();</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (var monomial : monomials) {</span>
+<span class="fc" id="L112">            var image = liftedMonomial(monomial, variables, images, work);</span>
+<span class="fc" id="L113">            work.add(1L + translated.termCount() + 2L * image.termCount());</span>
+<span class="fc" id="L114">            translated = translated.add(image.multiply(polynomial.terms().get(monomial)));</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        return translated;</span>
+    }
+
+    static Rational evaluate(Polynomial polynomial, List&lt;Rational&gt; state, Work work) {
+<span class="nc" id="L120">        var variables = variables(state.size());</span>
+<span class="nc" id="L121">        var total = Rational.ZERO;</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        for (var term : polynomial.terms().entrySet()) {</span>
+<span class="nc" id="L123">            var value = term.getValue();</span>
+<span class="nc" id="L124">            work.add(1L + state.size() + term.getKey().totalDegree());</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            for (int coordinate = 0; coordinate &lt; state.size(); coordinate++) {</span>
+<span class="nc" id="L126">                int exponent = term.getKey().exponentOf(variables.get(coordinate));</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                for (int i = 0; i &lt; exponent; i++) value = value.multiply(state.get(coordinate));</span>
+            }
+<span class="nc" id="L129">            total = total.add(value);</span>
+<span class="nc" id="L130">        }</span>
+<span class="nc" id="L131">        return total;</span>
     }
 
     /** Simultaneous substitution, never sequential textual replacement of variable names. */
     static String monomial(Monomial monomial, List&lt;String&gt; images, Work work) {
-<span class="fc" id="L97">        var result = new StringBuilder(&quot;1&quot;);</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (int i = 0; i &lt; images.size(); i++) {</span>
-<span class="fc" id="L99">            work.add(1);</span>
-<span class="fc" id="L100">            int power = monomial.exponentOf(&quot;x&quot; + i);</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (power != 0) result.append(&quot;*(&quot;).append(images.get(i)).append(&quot;)^&quot;).append(power);</span>
+<span class="fc" id="L136">        var result = new StringBuilder(&quot;1&quot;);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (int i = 0; i &lt; images.size(); i++) {</span>
+<span class="fc" id="L138">            work.add(1);</span>
+<span class="fc" id="L139">            int power = monomial.exponentOf(&quot;x&quot; + i);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (power != 0) result.append(&quot;*(&quot;).append(images.get(i)).append(&quot;)^&quot;).append(power);</span>
         }
-<span class="fc" id="L103">        work.add(result.length());</span>
-<span class="fc" id="L104">        return result.toString();</span>
+<span class="fc" id="L142">        work.add(result.length());</span>
+<span class="fc" id="L143">        return result.toString();</span>
     }
 
     static Polynomial substitute(Polynomial polynomial, List&lt;String&gt; images, Work work) {
-<span class="fc" id="L108">        var result = Polynomial.zero();</span>
+<span class="fc" id="L147">        var result = Polynomial.zero();</span>
         // Project each monomial separately; do not raise the existing syntax guard for a large substitution.
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (var monomial : polynomial.terms().keySet().stream().sorted(java.util.Comparator.comparing(Monomial::key)).toList()) {</span>
-<span class="fc" id="L111">            String term = &quot;(&quot; + polynomial.terms().get(monomial) + &quot;)*(&quot; + monomial(monomial, images, work) + &quot;)&quot;;</span>
-<span class="fc" id="L112">            var projected = project(term, work);</span>
-<span class="fc" id="L113">            work.add(1L + result.termCount() + projected.termCount());</span>
-<span class="fc" id="L114">            result = result.add(projected);</span>
-<span class="fc" id="L115">        }</span>
-<span class="fc" id="L116">        return result;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (var monomial : polynomial.terms().keySet().stream().sorted(java.util.Comparator.comparing(Monomial::key)).toList()) {</span>
+<span class="fc" id="L150">            String term = &quot;(&quot; + polynomial.terms().get(monomial) + &quot;)*(&quot; + monomial(monomial, images, work) + &quot;)&quot;;</span>
+<span class="fc" id="L151">            var projected = project(term, work);</span>
+<span class="fc" id="L152">            work.add(1L + result.termCount() + projected.termCount());</span>
+<span class="fc" id="L153">            result = result.add(projected);</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        return result;</span>
     }
 
     static Polynomial project(String expression, Work work) {
-<span class="fc" id="L120">        work.add(expression.length());</span>
-<span class="fc" id="L121">        return new ExactPolynomialAnalysis(work::add).normalForm(expression);</span>
+<span class="fc" id="L159">        work.add(expression.length());</span>
+<span class="fc" id="L160">        return new ExactPolynomialAnalysis(work::add).normalForm(expression);</span>
     }
 
     static final class Work {
         private final int configured;
         private int consumed;
-<span class="fc" id="L127">        Work(int configured) { this.configured = configured; }</span>
+<span class="fc" id="L166">        Work(int configured) { this.configured = configured; }</span>
         void add(long units) {
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (units &gt; configured - consumed) {</span>
-<span class="fc" id="L131">                consumed = configured;</span>
-<span class="fc" id="L132">                throw new Exhausted();</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (units &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (units &gt; configured - consumed) {</span>
+<span class="fc" id="L170">                consumed = configured;</span>
+<span class="fc" id="L171">                throw new Exhausted();</span>
             }
-<span class="fc" id="L134">            consumed += (int) units;</span>
-<span class="fc" id="L135">        }</span>
-<span class="fc" id="L136">        int remaining() { return configured - consumed; }</span>
-<span class="fc" id="L137">        WorkLedger ledger() { return WorkLedger.of(configured, consumed); }</span>
+<span class="fc" id="L173">            consumed += (int) units;</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        int remaining() { return configured - consumed; }</span>
+<span class="fc" id="L176">        WorkLedger ledger() { return WorkLedger.of(configured, consumed); }</span>
     }
 
-<span class="fc" id="L140">    static final class Exhausted extends RuntimeException { }</span>
+<span class="fc" id="L179">    static final class Exhausted extends RuntimeException { }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

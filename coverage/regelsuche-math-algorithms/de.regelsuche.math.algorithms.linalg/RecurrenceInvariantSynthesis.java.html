@@ -78,248 +78,268 @@ import java.util.Optional;
     /** A first-law result, or a bounded miss after searching the entire declared ansatz. */
 <span class="fc" id="L79">    record FirstLawReport(Status status, Optional&lt;VerifiedLaw&gt; law, boolean usedSupport, WorkLedger work) {}</span>
 
+    /** Result for the goal of finding any one verified nonconstant law. */
+    public record FirstLaw(Status status, Optional&lt;VerifiedLaw&gt; law, WorkLedger work) {
+<span class="nc" id="L83">        public FirstLaw {</span>
+<span class="nc" id="L84">            Objects.requireNonNull(status);</span>
+<span class="nc" id="L85">            Objects.requireNonNull(law);</span>
+<span class="nc" id="L86">            Objects.requireNonNull(work);</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">            if (status != Status.COMPLETE &amp;&amp; law.isPresent()) throw new IllegalArgumentException(&quot;unproved first law&quot;);</span>
+<span class="nc" id="L88">        }</span>
+    }
+
     public Report solve(Request request) {
-<span class="fc" id="L82">        Objects.requireNonNull(request, &quot;request&quot;);</span>
-<span class="fc" id="L83">        var work = new Work(request.budget().maxWorkUnits());</span>
-<span class="fc" id="L84">        var laws = new ArrayList&lt;VerifiedLaw&gt;();</span>
+<span class="fc" id="L92">        return solveTyped(request, false);</span>
+    }
+
+    public FirstLaw solveFirst(Request request) {
+<span class="nc" id="L96">        var result = solveTyped(request, true);</span>
+<span class="nc" id="L97">        return new FirstLaw(result.status(), result.laws().stream().findFirst(), result.work());</span>
+    }
+
+    private Report solveTyped(Request request, boolean firstOnly) {
+<span class="fc" id="L101">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L102">        var work = new Work(request.budget().maxWorkUnits());</span>
+<span class="fc" id="L103">        var laws = new ArrayList&lt;VerifiedLaw&gt;();</span>
         try {
-<span class="fc" id="L86">            int dimension = request.transition().linear().columns();</span>
-<span class="fc" id="L87">            var basis = RecurrenceInvariantSupport.basis(dimension, request.degree());</span>
-<span class="fc" id="L88">            work.add(basis.size());</span>
-<span class="fc" id="L89">            var blocks = coefficientBlocks(request, basis, work);</span>
-<span class="fc" id="L90">            var images = RecurrenceInvariantSupport.liftedImages(request.transition(), basis, work);</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (Evolution evolution : Evolution.values()) {</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">                for (var block : blocks) {</span>
-<span class="fc" id="L93">                    solveLiftedBlock(request, block, images, evolution, laws, work);</span>
-<span class="fc" id="L94">                }</span>
+<span class="fc" id="L105">            int dimension = request.transition().linear().columns();</span>
+<span class="fc" id="L106">            var basis = RecurrenceInvariantSupport.basis(dimension, request.degree());</span>
+<span class="fc" id="L107">            work.add(basis.size());</span>
+<span class="fc" id="L108">            var blocks = coefficientBlocks(request, basis, work);</span>
+<span class="fc" id="L109">            var images = RecurrenceInvariantSupport.liftedImages(request.transition(), basis, work);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (Evolution evolution : Evolution.values()) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                for (var block : blocks) {</span>
+<span class="fc" id="L112">                    solveLiftedBlock(request, block, images, evolution, laws, firstOnly, work);</span>
+<span class="pc bpc" id="L113" title="3 of 4 branches missed.">                    if (firstOnly &amp;&amp; !laws.isEmpty()) return new Report(Status.COMPLETE, laws, work.ledger());</span>
+<span class="fc" id="L114">                }</span>
             }
-<span class="fc" id="L96">            return new Report(Status.COMPLETE, laws, work.ledger());</span>
-<span class="fc" id="L97">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
-<span class="fc" id="L98">            return new Report(Status.BUDGET_INCONCLUSIVE, List.of(), work.ledger());</span>
-<span class="fc" id="L99">        } catch (Unsupported unsupported) {</span>
-<span class="fc" id="L100">            return new Report(Status.UNSUPPORTED, List.of(), work.ledger());</span>
+<span class="fc" id="L116">            return new Report(Status.COMPLETE, laws, work.ledger());</span>
+<span class="fc" id="L117">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L118">            return new Report(Status.BUDGET_INCONCLUSIVE, List.of(), work.ledger());</span>
+<span class="fc" id="L119">        } catch (Unsupported unsupported) {</span>
+<span class="fc" id="L120">            return new Report(Status.UNSUPPORTED, List.of(), work.ledger());</span>
         }
     }
 
     FirstLawReport findFirst(Request request) {
-<span class="fc" id="L105">        return findFirst(request, List.of());</span>
+<span class="fc" id="L125">        return findFirst(request, List.of());</span>
     }
 
     /** Tries untrusted coefficient-free support first and pays for a miss before ordinary search. */
     FirstLawReport findFirst(Request request, List&lt;Monomial&gt; support) {
-<span class="fc" id="L110">        return findFirst(request, support, false);</span>
+<span class="fc" id="L130">        return findFirst(request, support, false);</span>
     }
 
     /** First-law control that partitions the ansatz by degree for homogeneous transitions. */
     FirstLawReport findFirstWithHomogeneousBlocks(Request request, List&lt;Monomial&gt; support) {
-<span class="fc" id="L115">        return findFirst(request, support, true);</span>
+<span class="fc" id="L135">        return findFirst(request, support, true);</span>
     }
 
     private FirstLawReport findFirst(Request request, List&lt;Monomial&gt; support, boolean separateDegrees) {
-<span class="fc" id="L119">        var work = new Work(request.budget().maxWorkUnits());</span>
-<span class="fc" id="L120">        var laws = new ArrayList&lt;VerifiedLaw&gt;();</span>
+<span class="fc" id="L139">        var work = new Work(request.budget().maxWorkUnits());</span>
+<span class="fc" id="L140">        var laws = new ArrayList&lt;VerifiedLaw&gt;();</span>
         try {
-<span class="fc" id="L122">            var basis = RecurrenceInvariantSupport.basis(request.transition().linear().columns(), request.degree());</span>
-<span class="fc" id="L123">            work.add(basis.size());</span>
-<span class="fc" id="L124">            var images = RecurrenceInvariantSupport.images(request.transition(), work);</span>
-<span class="fc bfc" id="L125" title="All 4 branches covered.">            boolean homogeneous = separateDegrees &amp;&amp; isHomogeneous(request.transition(), work);</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (!support.isEmpty()) {</span>
-<span class="fc" id="L127">                var columns = supportColumns(basis, support, work);</span>
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (!columns.isEmpty()) {</span>
+<span class="fc" id="L142">            var basis = RecurrenceInvariantSupport.basis(request.transition().linear().columns(), request.degree());</span>
+<span class="fc" id="L143">            work.add(basis.size());</span>
+<span class="fc" id="L144">            var images = RecurrenceInvariantSupport.images(request.transition(), work);</span>
+<span class="fc bfc" id="L145" title="All 4 branches covered.">            boolean homogeneous = separateDegrees &amp;&amp; isHomogeneous(request.transition(), work);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (!support.isEmpty()) {</span>
+<span class="fc" id="L147">                var columns = supportColumns(basis, support, work);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (!columns.isEmpty()) {</span>
                     try {
-<span class="fc" id="L130">                        solveFirstInBasis(request, basis, columns, images, homogeneous, laws, work);</span>
-<span class="nc" id="L131">                    } catch (Unsupported unsupported) {</span>
+<span class="fc" id="L150">                        solveFirstInBasis(request, basis, columns, images, homogeneous, laws, work);</span>
+<span class="nc" id="L151">                    } catch (Unsupported unsupported) {</span>
                         // The restricted attempt can fail its representation guard independently of the full search.
-<span class="fc" id="L133">                    }</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">                    if (!laws.isEmpty()) {</span>
-<span class="fc" id="L135">                        return new FirstLawReport(Status.COMPLETE, Optional.of(laws.getFirst()), true, work.ledger());</span>
+<span class="fc" id="L153">                    }</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                    if (!laws.isEmpty()) {</span>
+<span class="fc" id="L155">                        return new FirstLawReport(Status.COMPLETE, Optional.of(laws.getFirst()), true, work.ledger());</span>
                     }
                 }
             }
-<span class="fc" id="L139">            solveFirstInBasis(request, basis, basis, images, homogeneous, laws, work);</span>
-<span class="fc" id="L140">            return new FirstLawReport(Status.COMPLETE, laws.stream().findFirst(), false, work.ledger());</span>
-<span class="fc" id="L141">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
-<span class="fc" id="L142">            return new FirstLawReport(Status.BUDGET_INCONCLUSIVE, Optional.empty(), false, work.ledger());</span>
-<span class="nc" id="L143">        } catch (Unsupported unsupported) {</span>
-<span class="nc" id="L144">            return new FirstLawReport(Status.UNSUPPORTED, Optional.empty(), false, work.ledger());</span>
+<span class="fc" id="L159">            solveFirstInBasis(request, basis, basis, images, homogeneous, laws, work);</span>
+<span class="fc" id="L160">            return new FirstLawReport(Status.COMPLETE, laws.stream().findFirst(), false, work.ledger());</span>
+<span class="fc" id="L161">        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {</span>
+<span class="fc" id="L162">            return new FirstLawReport(Status.BUDGET_INCONCLUSIVE, Optional.empty(), false, work.ledger());</span>
+<span class="nc" id="L163">        } catch (Unsupported unsupported) {</span>
+<span class="nc" id="L164">            return new FirstLawReport(Status.UNSUPPORTED, Optional.empty(), false, work.ledger());</span>
         }
     }
 
     private static boolean isHomogeneous(Transition transition, Work work) {
-<span class="fc" id="L149">        var offset = transition.offset().values();</span>
-<span class="fc" id="L150">        work.add(offset.size());</span>
-<span class="fc" id="L151">        return offset.stream().allMatch(Rational::isZero);</span>
+<span class="fc" id="L169">        var offset = transition.offset().values();</span>
+<span class="fc" id="L170">        work.add(offset.size());</span>
+<span class="fc" id="L171">        return offset.stream().allMatch(Rational::isZero);</span>
     }
 
     private static List&lt;List&lt;Monomial&gt;&gt; coefficientBlocks(Request request, List&lt;Monomial&gt; basis, Work work) {
-<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (!isHomogeneous(request.transition(), work)) return List.of(basis);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (!isHomogeneous(request.transition(), work)) return List.of(basis);</span>
         // Linear substitutions preserve total degree. The constant block cannot yield a law.
-<span class="fc" id="L157">        var blocks = new ArrayList&lt;List&lt;Monomial&gt;&gt;(request.degree());</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (int degree = 1; degree &lt;= request.degree(); degree++) {</span>
-<span class="fc" id="L159">            blocks.add(monomialsOfDegree(basis, degree, work));</span>
+<span class="fc" id="L177">        var blocks = new ArrayList&lt;List&lt;Monomial&gt;&gt;(request.degree());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (int degree = 1; degree &lt;= request.degree(); degree++) {</span>
+<span class="fc" id="L179">            blocks.add(monomialsOfDegree(basis, degree, work));</span>
         }
-<span class="fc" id="L161">        return blocks;</span>
+<span class="fc" id="L181">        return blocks;</span>
     }
 
     private static List&lt;Monomial&gt; monomialsOfDegree(List&lt;Monomial&gt; basis, int degree, Work work) {
-<span class="fc" id="L165">        work.add(basis.size());</span>
-<span class="fc bfc" id="L166" title="All 2 branches covered.">        return basis.stream().filter(monomial -&gt; monomial.totalDegree() == degree).toList();</span>
+<span class="fc" id="L185">        work.add(basis.size());</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        return basis.stream().filter(monomial -&gt; monomial.totalDegree() == degree).toList();</span>
     }
 
     private static void solveFirstInBasis(Request request, List&lt;Monomial&gt; basis, List&lt;Monomial&gt; columns,
             List&lt;String&gt; images, boolean homogeneous, List&lt;VerifiedLaw&gt; laws, Work work) {
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (!homogeneous) {</span>
-<span class="fc" id="L172">            solveSigns(request, basis, columns, images, laws, true, work);</span>
-<span class="fc" id="L173">            return;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (!homogeneous) {</span>
+<span class="fc" id="L192">            solveSigns(request, basis, columns, images, laws, true, work);</span>
+<span class="fc" id="L193">            return;</span>
         }
         // Linear substitutions preserve total degree, so each nonconstant degree is an independent block.
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        boolean restricted = columns != basis;</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (restricted) work.add(columns.size());</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">        var support = restricted ? new HashSet&lt;&gt;(columns) : null;</span>
-<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int degree = request.degree(); degree &gt;= 1; degree--) {</span>
-<span class="fc" id="L180">            var rows = monomialsOfDegree(basis, degree, work);</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (support != null) work.add(rows.size());</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">            var selected = support == null ? rows : rows.stream().filter(support::contains).toList();</span>
-<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if (!selected.isEmpty()) {</span>
-<span class="fc" id="L184">                solveSigns(request, rows, selected, images, laws, true, work);</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">                if (!laws.isEmpty()) return;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        boolean restricted = columns != basis;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (restricted) work.add(columns.size());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        var support = restricted ? new HashSet&lt;&gt;(columns) : null;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int degree = request.degree(); degree &gt;= 1; degree--) {</span>
+<span class="fc" id="L200">            var rows = monomialsOfDegree(basis, degree, work);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (support != null) work.add(rows.size());</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            var selected = support == null ? rows : rows.stream().filter(support::contains).toList();</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            if (!selected.isEmpty()) {</span>
+<span class="fc" id="L204">                solveSigns(request, rows, selected, images, laws, true, work);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                if (!laws.isEmpty()) return;</span>
             }
         }
-<span class="fc" id="L188">    }</span>
+<span class="fc" id="L208">    }</span>
 
     private static List&lt;Monomial&gt; supportColumns(List&lt;Monomial&gt; basis, List&lt;Monomial&gt; support, Work work) {
-<span class="fc" id="L191">        work.add(1);</span>
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (support.size() &gt;= basis.size()) return List.of();</span>
-<span class="fc" id="L193">        work.add((long) support.size() + basis.size());</span>
-<span class="fc" id="L194">        var offered = new HashSet&lt;&gt;(support);</span>
-<span class="fc" id="L195">        var ordered = basis.stream().filter(offered::contains).toList();</span>
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        return ordered.size() == support.size() ? ordered : List.of();</span>
+<span class="fc" id="L211">        work.add(1);</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (support.size() &gt;= basis.size()) return List.of();</span>
+<span class="fc" id="L213">        work.add((long) support.size() + basis.size());</span>
+<span class="fc" id="L214">        var offered = new HashSet&lt;&gt;(support);</span>
+<span class="fc" id="L215">        var ordered = basis.stream().filter(offered::contains).toList();</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        return ordered.size() == support.size() ? ordered : List.of();</span>
     }
 
     private static void solveLiftedBlock(Request request, List&lt;Monomial&gt; block, Map&lt;Monomial, Polynomial&gt; images,
-            Evolution evolution, List&lt;VerifiedLaw&gt; laws, Work work) {
-<span class="fc" id="L201">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;(block.size());</span>
-<span class="fc" id="L202">        var variables = new ArrayList&lt;String&gt;(block.size());</span>
-<span class="fc" id="L203">        var origins = new ArrayList&lt;RowOrigin&gt;(block.size());</span>
-<span class="fc" id="L204">        var multiplier = Rational.of(evolution.multiplier());</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (int row = 0; row &lt; block.size(); row++) {</span>
-<span class="fc" id="L206">            var monomial = block.get(row);</span>
-<span class="fc" id="L207">            work.add(3);</span>
-<span class="fc" id="L208">            variables.add(&quot;k&quot; + row);</span>
-<span class="fc" id="L209">            origins.add(new RowOrigin(row, &quot;coefficient of &quot; + monomial.key()));</span>
-<span class="fc" id="L210">            var coefficients = new ArrayList&lt;Rational&gt;(block.size());</span>
-<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (int column = 0; column &lt; block.size(); column++) {</span>
-<span class="fc" id="L212">                work.add(1);</span>
-<span class="fc" id="L213">                var coefficient = images.get(block.get(column)).terms().getOrDefault(monomial, Rational.ZERO);</span>
-<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (row == column) {</span>
-<span class="fc" id="L215">                    work.add(1);</span>
-<span class="fc" id="L216">                    coefficient = coefficient.subtract(multiplier);</span>
+            Evolution evolution, List&lt;VerifiedLaw&gt; laws, boolean firstOnly, Work work) {
+<span class="fc" id="L221">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;(block.size());</span>
+<span class="fc" id="L222">        var variables = new ArrayList&lt;String&gt;(block.size());</span>
+<span class="fc" id="L223">        var origins = new ArrayList&lt;RowOrigin&gt;(block.size());</span>
+<span class="fc" id="L224">        var multiplier = Rational.of(evolution.multiplier());</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int row = 0; row &lt; block.size(); row++) {</span>
+<span class="fc" id="L226">            var monomial = block.get(row);</span>
+<span class="fc" id="L227">            work.add(3);</span>
+<span class="fc" id="L228">            variables.add(&quot;k&quot; + row);</span>
+<span class="fc" id="L229">            origins.add(new RowOrigin(row, &quot;coefficient of &quot; + monomial.key()));</span>
+<span class="fc" id="L230">            var coefficients = new ArrayList&lt;Rational&gt;(block.size());</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            for (int column = 0; column &lt; block.size(); column++) {</span>
+<span class="fc" id="L232">                work.add(1);</span>
+<span class="fc" id="L233">                var coefficient = images.get(block.get(column)).terms().getOrDefault(monomial, Rational.ZERO);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                if (row == column) {</span>
+<span class="fc" id="L235">                    work.add(1);</span>
+<span class="fc" id="L236">                    coefficient = coefficient.subtract(multiplier);</span>
                 }
-<span class="fc" id="L218">                coefficients.add(coefficient);</span>
+<span class="fc" id="L238">                coefficients.add(coefficient);</span>
             }
-<span class="fc" id="L220">            rows.add(coefficients);</span>
+<span class="fc" id="L240">            rows.add(coefficients);</span>
         }
-<span class="fc" id="L222">        var reduced = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), variables, origins,</span>
-<span class="fc" id="L223">            new Budget(work.remaining()));</span>
-<span class="fc" id="L224">        admitReduction(request, block, evolution, reduced, laws, false, work);</span>
-<span class="fc" id="L225">    }</span>
+<span class="fc" id="L242">        var reduced = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), variables, origins,</span>
+<span class="fc" id="L243">            new Budget(work.remaining()));</span>
+<span class="fc" id="L244">        admitReduction(request, block, evolution, reduced, laws, firstOnly, work);</span>
+<span class="fc" id="L245">    }</span>
 
     private static void solveSigns(Request request, List&lt;Monomial&gt; rows, List&lt;Monomial&gt; columns, List&lt;String&gt; images,
             List&lt;VerifiedLaw&gt; laws, boolean firstOnly, Work work) {
-<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (Evolution evolution : Evolution.values()) {</span>
-<span class="fc" id="L230">            solveSign(request, rows, columns, images, evolution, laws, firstOnly, work);</span>
-<span class="pc bpc" id="L231" title="1 of 4 branches missed.">            if (firstOnly &amp;&amp; !laws.isEmpty()) return;</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        for (Evolution evolution : Evolution.values()) {</span>
+<span class="fc" id="L250">            solveSign(request, rows, columns, images, evolution, laws, firstOnly, work);</span>
+<span class="pc bpc" id="L251" title="1 of 4 branches missed.">            if (firstOnly &amp;&amp; !laws.isEmpty()) return;</span>
         }
-<span class="fc" id="L233">    }</span>
+<span class="fc" id="L253">    }</span>
 
     private static void solveSign(Request request, List&lt;Monomial&gt; rows, List&lt;Monomial&gt; columns, List&lt;String&gt; images,
             Evolution evolution, List&lt;VerifiedLaw&gt; laws, boolean firstOnly, Work work) {
-<span class="fc" id="L237">        var equations = coefficientEquations(rows, columns, images, evolution, work);</span>
-<span class="fc" id="L238">        var matrix = new LinearSystemRepresentationBridge().analyze(equations, new Budget(work.remaining()));</span>
-<span class="fc" id="L239">        work.add(matrix.work().consumedWorkUnits());</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (matrix.status() == RepresentationBridge.Status.BUDGET_INCONCLUSIVE)</span>
-<span class="fc" id="L241">            throw new RecurrenceInvariantSupport.Exhausted();</span>
-<span class="pc" id="L242">        var system = matrix.representation().orElseThrow(() -&gt; new IllegalStateException(&quot;affine coefficient bridge failed&quot;));</span>
-<span class="fc" id="L243">        var reduced = new ExactRrefSolver().solve(system, new Budget(work.remaining()));</span>
-<span class="fc" id="L244">        admitReduction(request, columns, evolution, reduced, laws, firstOnly, work);</span>
-<span class="fc" id="L245">    }</span>
+<span class="fc" id="L257">        var equations = coefficientEquations(rows, columns, images, evolution, work);</span>
+<span class="fc" id="L258">        var matrix = new LinearSystemRepresentationBridge().analyze(equations, new Budget(work.remaining()));</span>
+<span class="fc" id="L259">        work.add(matrix.work().consumedWorkUnits());</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (matrix.status() == RepresentationBridge.Status.BUDGET_INCONCLUSIVE)</span>
+<span class="fc" id="L261">            throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc" id="L262">        var system = matrix.representation().orElseThrow(() -&gt; new IllegalStateException(&quot;affine coefficient bridge failed&quot;));</span>
+<span class="fc" id="L263">        var reduced = new ExactRrefSolver().solve(system, new Budget(work.remaining()));</span>
+<span class="fc" id="L264">        admitReduction(request, columns, evolution, reduced, laws, firstOnly, work);</span>
+<span class="fc" id="L265">    }</span>
 
     private static void admitReduction(Request request, List&lt;Monomial&gt; columns, Evolution evolution,
             ExactRrefSolver.Result reduced, List&lt;VerifiedLaw&gt; laws, boolean firstOnly, Work work) {
-<span class="fc" id="L249">        work.add(reduced.work().consumedWorkUnits());</span>
-<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (reduced.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE)</span>
-<span class="nc" id="L251">            throw new RecurrenceInvariantSupport.Exhausted();</span>
-<span class="pc" id="L252">        var reduction = reduced.reduction().orElseThrow(() -&gt; new IllegalStateException(&quot;coefficient reduction failed&quot;));</span>
-<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (var vector : reduction.nullspaceBasis()) {</span>
-<span class="fc" id="L254">            var polynomial = reconstruct(columns, reduction.variables(), vector, work);</span>
-<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (polynomial.totalDegree() == 0) continue;</span>
-<span class="fc" id="L256">            String text = polynomial.toCanonicalString();</span>
+<span class="fc" id="L269">        work.add(reduced.work().consumedWorkUnits());</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (reduced.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE)</span>
+<span class="nc" id="L271">            throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc" id="L272">        var reduction = reduced.reduction().orElseThrow(() -&gt; new IllegalStateException(&quot;coefficient reduction failed&quot;));</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        for (var vector : reduction.nullspaceBasis()) {</span>
+<span class="fc" id="L274">            var polynomial = reconstruct(columns, reduction.variables(), vector, work);</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (polynomial.totalDegree() == 0) continue;</span>
+<span class="fc" id="L276">            String text = polynomial.toCanonicalString();</span>
             // Keep the representation guard; never silently drop a direction while claiming COMPLETE.
-<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (text.length() &gt; MAX_PROPOSAL_LENGTH) throw new Unsupported();</span>
-<span class="fc" id="L259">            admit(request, new Proposal(text, evolution), laws, work);</span>
-<span class="fc bfc" id="L260" title="All 2 branches covered.">            if (firstOnly) return;</span>
-<span class="fc" id="L261">        }</span>
-<span class="fc" id="L262">    }</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (text.length() &gt; MAX_PROPOSAL_LENGTH) throw new Unsupported();</span>
+<span class="fc" id="L279">            admit(request, new Proposal(text, evolution), laws, work);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (firstOnly) return;</span>
+<span class="fc" id="L281">        }</span>
+<span class="fc" id="L282">    }</span>
 
     private static List&lt;Equation&gt; coefficientEquations(List&lt;Monomial&gt; rows, List&lt;Monomial&gt; coefficientBasis,
             List&lt;String&gt; images,
             Evolution evolution, Work work) {
-<span class="fc" id="L267">        var columns = new ArrayList&lt;Polynomial&gt;();</span>
-<span class="fc" id="L268">        var original = RecurrenceInvariantSupport.variables(images.size());</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (var monomial : coefficientBasis) {</span>
-<span class="fc" id="L270">            String before = RecurrenceInvariantSupport.monomial(monomial, original, work);</span>
-<span class="fc" id="L271">            String after = RecurrenceInvariantSupport.monomial(monomial, images, work);</span>
-<span class="fc" id="L272">            columns.add(RecurrenceInvariantSupport.project(&quot;(&quot; + after + &quot;)-(&quot; + evolution.multiplier() + &quot;)*(&quot; + before + &quot;)&quot;, work));</span>
-<span class="fc" id="L273">        }</span>
-<span class="fc" id="L274">        var equations = new ArrayList&lt;Equation&gt;();</span>
-<span class="fc" id="L275">        var parser = new ExpressionParser();</span>
-<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (var monomial : rows) {</span>
-<span class="fc" id="L277">            var left = new StringBuilder(&quot;0&quot;);</span>
-<span class="fc bfc" id="L278" title="All 2 branches covered.">            for (int column = 0; column &lt; coefficientBasis.size(); column++) {</span>
-<span class="fc" id="L279">                work.add(1);</span>
-<span class="fc" id="L280">                Rational coefficient = columns.get(column).terms().getOrDefault(monomial, Rational.ZERO);</span>
+<span class="fc" id="L287">        var columns = new ArrayList&lt;Polynomial&gt;();</span>
+<span class="fc" id="L288">        var original = RecurrenceInvariantSupport.variables(images.size());</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        for (var monomial : coefficientBasis) {</span>
+<span class="fc" id="L290">            String before = RecurrenceInvariantSupport.monomial(monomial, original, work);</span>
+<span class="fc" id="L291">            String after = RecurrenceInvariantSupport.monomial(monomial, images, work);</span>
+<span class="fc" id="L292">            columns.add(RecurrenceInvariantSupport.project(&quot;(&quot; + after + &quot;)-(&quot; + evolution.multiplier() + &quot;)*(&quot; + before + &quot;)&quot;, work));</span>
+<span class="fc" id="L293">        }</span>
+<span class="fc" id="L294">        var equations = new ArrayList&lt;Equation&gt;();</span>
+<span class="fc" id="L295">        var parser = new ExpressionParser();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        for (var monomial : rows) {</span>
+<span class="fc" id="L297">            var left = new StringBuilder(&quot;0&quot;);</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            for (int column = 0; column &lt; coefficientBasis.size(); column++) {</span>
+<span class="fc" id="L299">                work.add(1);</span>
+<span class="fc" id="L300">                Rational coefficient = columns.get(column).terms().getOrDefault(monomial, Rational.ZERO);</span>
                 // Keep zero*coefficient-variable: the bridge must retain unconstrained columns.
-<span class="fc" id="L282">                left.append(&quot;+(&quot;).append(coefficient).append(&quot;)*k&quot;).append(column);</span>
+<span class="fc" id="L302">                left.append(&quot;+(&quot;).append(coefficient).append(&quot;)*k&quot;).append(column);</span>
             }
-<span class="fc" id="L284">            work.add(left.length());</span>
-<span class="fc" id="L285">            equations.add(new Equation(parser.parseExactTerm(left.toString()).expression(), parser.parseExactTerm(&quot;0&quot;).expression()));</span>
-<span class="fc" id="L286">        }</span>
-<span class="fc" id="L287">        return List.copyOf(equations);</span>
+<span class="fc" id="L304">            work.add(left.length());</span>
+<span class="fc" id="L305">            equations.add(new Equation(parser.parseExactTerm(left.toString()).expression(), parser.parseExactTerm(&quot;0&quot;).expression()));</span>
+<span class="fc" id="L306">        }</span>
+<span class="fc" id="L307">        return List.copyOf(equations);</span>
     }
 
     private static Polynomial reconstruct(List&lt;Monomial&gt; basis, List&lt;String&gt; variables, ExactVector vector, Work work) {
-<span class="fc" id="L291">        var coefficients = new ArrayList&lt;Rational&gt;();</span>
-<span class="fc bfc" id="L292" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
-<span class="fc" id="L293">            work.add(variables.size());</span>
-<span class="fc" id="L294">            coefficients.add(vector.get(variables.indexOf(&quot;k&quot; + i)));</span>
+<span class="fc" id="L311">        var coefficients = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc" id="L313">            work.add(variables.size());</span>
+<span class="fc" id="L314">            coefficients.add(vector.get(variables.indexOf(&quot;k&quot; + i)));</span>
         }
-<span class="fc bfc" id="L296" title="All 2 branches covered.">        Rational first = coefficients.stream().filter(value -&gt; !value.isZero()).findFirst().orElseThrow();</span>
-<span class="fc" id="L297">        var result = Polynomial.zero();</span>
-<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
-<span class="fc" id="L299">            work.add(1L + result.termCount());</span>
-<span class="fc" id="L300">            result = result.add(Polynomial.term(basis.get(i), coefficients.get(i).divide(first)));</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        Rational first = coefficients.stream().filter(value -&gt; !value.isZero()).findFirst().orElseThrow();</span>
+<span class="fc" id="L317">        var result = Polynomial.zero();</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc" id="L319">            work.add(1L + result.termCount());</span>
+<span class="fc" id="L320">            result = result.add(Polynomial.term(basis.get(i), coefficients.get(i).divide(first)));</span>
         }
-<span class="fc" id="L302">        return result;</span>
+<span class="fc" id="L322">        return result;</span>
     }
 
     private static void admit(Request request, Proposal proposal, List&lt;VerifiedLaw&gt; laws, Work work) {
-<span class="fc" id="L306">        var checked = new RecurrenceInvariantVerifier().verify(request.transition(), proposal,</span>
-<span class="fc" id="L307">            request.initialState(), new Budget(work.remaining()));</span>
-<span class="fc" id="L308">        work.add(checked.work().consumedWorkUnits());</span>
-<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE)</span>
-<span class="fc" id="L310">            throw new RecurrenceInvariantSupport.Exhausted();</span>
-<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.UNSUPPORTED) throw new Unsupported();</span>
-<span class="pc" id="L312">        laws.add(checked.law().orElseThrow(() -&gt; new IllegalStateException(&quot;synthesized law failed independent identity check&quot;)));</span>
-<span class="fc" id="L313">    }</span>
+<span class="fc" id="L326">        var checked = new RecurrenceInvariantVerifier().verify(request.transition(), proposal,</span>
+<span class="fc" id="L327">            request.initialState(), new Budget(work.remaining()));</span>
+<span class="fc" id="L328">        work.add(checked.work().consumedWorkUnits());</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.BUDGET_INCONCLUSIVE)</span>
+<span class="fc" id="L330">            throw new RecurrenceInvariantSupport.Exhausted();</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (checked.outcome() == RecurrenceInvariantVerifier.Outcome.UNSUPPORTED) throw new Unsupported();</span>
+<span class="pc" id="L332">        laws.add(checked.law().orElseThrow(() -&gt; new IllegalStateException(&quot;synthesized law failed independent identity check&quot;)));</span>
+<span class="fc" id="L333">    }</span>
 
     private static final class Unsupported extends RuntimeException { }
 
     static List&lt;Rational&gt; checkedInitial(Transition source, List&lt;Rational&gt; initial) {
-<span class="fc" id="L318">        Objects.requireNonNull(initial, &quot;initialState&quot;);</span>
-<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (initial.size() != source.linear().columns()) throw new IllegalArgumentException(&quot;initial-state dimension mismatch&quot;);</span>
-<span class="fc" id="L320">        var values = List.copyOf(initial);</span>
-<span class="fc" id="L321">        values.forEach(RecurrenceInvariantSupport::requireBounded);</span>
-<span class="fc" id="L322">        return values;</span>
+<span class="fc" id="L338">        Objects.requireNonNull(initial, &quot;initialState&quot;);</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (initial.size() != source.linear().columns()) throw new IllegalArgumentException(&quot;initial-state dimension mismatch&quot;);</span>
+<span class="fc" id="L340">        var values = List.copyOf(initial);</span>
+<span class="fc" id="L341">        values.forEach(RecurrenceInvariantSupport::requireBounded);</span>
+<span class="fc" id="L342">        return values;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
