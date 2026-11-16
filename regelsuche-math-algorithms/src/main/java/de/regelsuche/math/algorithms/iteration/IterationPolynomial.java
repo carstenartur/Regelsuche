@@ -139,6 +139,10 @@ public final class IterationPolynomial {
     public static IterationPolynomial parse(Expr expression, Set<SymbolId> allowed, boolean integers, int degree, Work w) {
         return parse(expression,allowed,integers,false,degree,w,1,new int[]{0});
     }
+    static IterationPolynomial parseIntegralWithPowers(Expr expression, Set<SymbolId> allowed, Work work) {
+        return parse(expression, allowed, true, true, work.maximumDegree, work, 1, new int[]{0});
+    }
+
     static IterationPolynomial parsePairSummand(PairReduction source, Work work) {
         var allowed = new HashSet<SymbolId>();
         for (var column : source.columns()) {
