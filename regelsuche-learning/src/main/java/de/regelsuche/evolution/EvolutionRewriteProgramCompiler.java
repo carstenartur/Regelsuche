@@ -327,7 +327,7 @@ public final class EvolutionRewriteProgramCompiler {
                 candidate.toTransformation().estimatedCostDelta()
                     <= requirement.threshold();
             case MAX_PRIMITIVE_STEPS -> candidate ->
-                candidate.steps().size() <= requirement.threshold();
+                candidate.executionWork().primitiveRewrites() <= requirement.threshold();
         };
     }
 
