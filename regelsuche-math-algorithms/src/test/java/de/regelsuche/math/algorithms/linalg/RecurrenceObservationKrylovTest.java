@@ -15,9 +15,11 @@ import de.regelsuche.math.algorithms.linalg.RecurrenceObservationKrylov.Result;
 import de.regelsuche.math.algorithms.linalg.RecurrenceObservationKrylov.Status;
 import de.regelsuche.representation.RepresentationBridge.Budget;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 class RecurrenceObservationKrylovTest {
@@ -66,9 +68,11 @@ class RecurrenceObservationKrylovTest {
         var plan = complete(RecurrenceObservationKrylov.prepare(transition, X, BUDGET));
         assertEquals(2, plan.order());
         assertEquals(values(0, 0), plan.coefficients());
-        var bound = complete(plan.bind(values(2, 3), BUDGET));
-        assertEquals(List.of(Rational.of(2), new Rational(BigInteger.valueOf(3), BigInteger.TWO), Rational.ZERO),
-            complete(bound.valuesAt(List.of(BigInteger.ZERO, BigInteger.ONE, HUGE), BUDGET)));
+        var start = values(2, 3);
+        var indices = List.of(BigInteger.ZERO, BigInteger.ONE, HUGE);
+        var expected = List.of(Rational.of(2), new Rational(BigInteger.valueOf(3), BigInteger.TWO), Rational.ZERO);
+        assertEquals(expected, complete(complete(plan.bind(start, BUDGET)).valuesAt(indices, BUDGET)));
+        assertEquals(expected, complete(complete(plan.prepareQueries(indices, BUDGET)).valuesFor(start, BUDGET)));
     }
 
     @Test void zeroAndNonzeroConstantHaveTheirOwnMinimalOrders() {
@@ -88,10 +92,15 @@ class RecurrenceObservationKrylovTest {
         var transition = transition(new long[][] {{2, 0, 0}, {0, 3, 0}, {0, 0, 5}}, 0, 0, 0);
         var plan = complete(RecurrenceObservationKrylov.prepare(transition, allMonomials(), BUDGET));
         assertEquals(10, plan.order());
-        var bound = complete(plan.bind(values(1, 1, 1), BUDGET));
+        var start = values(1, 1, 1);
+        var index = BigInteger.valueOf(21);
+        var bound = complete(plan.bind(start, BUDGET));
         var known = Arrays.stream(new long[] {1, 2, 3, 5, 4, 6, 10, 9, 15, 25})
             .mapToObj(value -> BigInteger.valueOf(value).pow(21)).reduce(BigInteger.ZERO, BigInteger::add);
-        assertEquals(new Rational(known, BigInteger.ONE), complete(bound.valueAt(BigInteger.valueOf(21), BUDGET)));
+        var expected = new Rational(known, BigInteger.ONE);
+        assertEquals(expected, complete(bound.valueAt(index, BUDGET)));
+        var queries = complete(plan.prepareQueries(List.of(index), BUDGET));
+        assertEquals(List.of(expected), complete(queries.valuesFor(start, BUDGET)));
     }
 
     @Test void trajectoryProofRejectsFalseRelationsThatFitTheLinearSamples() {
@@ -103,6 +112,18 @@ class RecurrenceObservationKrylovTest {
         // The same false recurrence for xy vanishes along both axes but misses (1,1).
         var identity = transition(new long[][] {{1, 0}, {0, 1}}, 0, 0);
         assertFalse(RecurrenceObservationProof.verify(identity, X.multiply(Y), 2, values(0),
+            new RecurrenceInvariantSupport.Work(BUDGET.maxWorkUnits())));
+    }
+
+    @Test void trajectoryProofRejectsAFalseCachedOrbitFormThatFitsBothAxes() {
+        var transition = transition(new long[][] {{1, 0}, {0, 1}}, 1, 0);
+        var observation = X.pow(2).add(Y);
+        var second = X.add(Polynomial.constant(Rational.of(2))).pow(2).add(Y);
+        assertTrue(RecurrenceObservationProof.verifyForms(transition, observation,
+            List.of(new RecurrenceObservationProof.OrbitForm(2, second)),
+            new RecurrenceInvariantSupport.Work(BUDGET.maxWorkUnits())));
+        assertFalse(RecurrenceObservationProof.verifyForms(transition, observation,
+            List.of(new RecurrenceObservationProof.OrbitForm(2, second.add(X.multiply(Y)))),
             new RecurrenceInvariantSupport.Work(BUDGET.maxWorkUnits())));
     }
 
@@ -152,6 +173,123 @@ class RecurrenceObservationKrylovTest {
         assertTrue(excessive.work().remainingWorkUnits() > 0);
     }
 
+    @Test void preparedQueriesRetainIndexOrderForIndependentRationalStarts() {
+        var transition = transition(new long[][] {{1}}, 1);
+        var observation = X.pow(2).add(X).add(Polynomial.constant(Rational.ONE));
+        var plan = complete(RecurrenceObservationKrylov.prepare(transition, observation, BUDGET));
+        var indices = List.of(HUGE, BigInteger.ONE, BigInteger.ZERO, BigInteger.TWO, HUGE, BigInteger.valueOf(5));
+        var mutableIndices = new ArrayList<>(indices);
+        var queries = complete(plan.prepareQueries(mutableIndices, BUDGET));
+        mutableIndices.clear();
+
+        var half = new Rational(BigInteger.ONE, BigInteger.TWO);
+        for (var start : List.of(Rational.of(2), Rational.of(-3), half)) {
+            var expected = indices.stream().map(index -> {
+                var x = start.add(new Rational(index, BigInteger.ONE));
+                return x.multiply(x).add(x).add(Rational.ONE);
+            }).toList();
+            var answers = complete(queries.valuesFor(List.of(start), BUDGET));
+            assertEquals(expected, answers);
+            assertThrows(UnsupportedOperationException.class, () -> answers.set(0, Rational.ZERO));
+        }
+    }
+
+    @Test void indexPreparationAmortizesAcrossStartsAndDoesNotRepeatDuplicateExponentiation() {
+        var transition = transition(new long[][] {{0, 1}, {1, 1}}, 0, 0);
+        var verified = RecurrenceObservationKrylov.prepare(transition, X, BUDGET);
+        var plan = complete(verified);
+        var setupBudget = new Budget(verified.work().remainingWorkUnits());
+        var first = BigInteger.valueOf(2000);
+        var second = BigInteger.valueOf(1729);
+        var unique = plan.prepareQueries(List.of(first, second), setupBudget);
+        var indices = List.of(first, second, first, second, first);
+        var prepared = plan.prepareQueries(indices, setupBudget);
+        var queries = complete(prepared);
+        assertTrue(prepared.work().consumedWorkUnits() < unique.work().consumedWorkUnits() + 50);
+
+        int repeatedWork = verified.work().consumedWorkUnits();
+        int preparedWork = repeatedWork + prepared.work().consumedWorkUnits();
+        for (var state : List.of(values(0, 1), values(2, 3), values(5, 8), values(13, 21))) {
+            var bound = plan.bind(state, new Budget(BUDGET.maxWorkUnits() - repeatedWork));
+            var oldAnswers = complete(bound).valuesAt(indices, new Budget(bound.work().remainingWorkUnits()));
+            var newAnswers = queries.valuesFor(state, new Budget(BUDGET.maxWorkUnits() - preparedWork));
+            assertEquals(complete(oldAnswers), complete(newAnswers));
+            repeatedWork += bound.work().consumedWorkUnits() + oldAnswers.work().consumedWorkUnits();
+            preparedWork += newAnswers.work().consumedWorkUnits();
+        }
+        assertTrue(preparedWork < repeatedWork, preparedWork + " work units vs " + repeatedWork);
+        if (Boolean.getBoolean("affineEvaluation.printWork")) {
+            System.out.println("indexed prepared=" + preparedWork + " rebound=" + repeatedWork);
+        }
+    }
+
+    @Test void preparedQueriesRespectBudgetsAndNeverPublishPartialValues() {
+        var plan = complete(RecurrenceObservationKrylov.prepare(transition(new long[][] {{2}}, 0), X, BUDGET));
+        var indices = List.of(BigInteger.ZERO, BigInteger.valueOf(16_383));
+        var prepared = plan.prepareQueries(indices, BUDGET);
+        var queries = complete(prepared);
+        var answers = queries.valuesFor(values(1), BUDGET);
+        assertEquals(List.of(Rational.ONE, new Rational(BigInteger.ONE.shiftLeft(16_383), BigInteger.ONE)),
+            complete(answers));
+
+        assertExhausted(plan.prepareQueries(indices, before(prepared)));
+        assertExhausted(queries.valuesFor(values(1), before(answers)));
+        assertEquals(Status.COMPLETE, plan.prepareQueries(indices, exact(prepared)).status());
+        assertEquals(Status.COMPLETE, queries.valuesFor(values(1), exact(answers)).status());
+        assertArithmeticLimited(plan.prepareQueries(List.of(BigInteger.TEN, HUGE), BUDGET));
+        assertArithmeticLimited(queries.valuesFor(values(2), BUDGET));
+        assertEquals(complete(answers), complete(queries.valuesFor(values(1), BUDGET)));
+    }
+
+    @Test void preparedQueriesHandleAnEmptyBatchAndBothKindsOfZero() {
+        var transition = transition(new long[][] {{-1}}, 0);
+        var zero = complete(RecurrenceObservationKrylov.prepare(transition, Polynomial.zero(), BUDGET));
+        var sign = complete(RecurrenceObservationKrylov.prepare(transition, X, BUDGET));
+        var indices = List.of(HUGE.add(BigInteger.ONE), BigInteger.ZERO, HUGE, BigInteger.ONE);
+        var zeroQueries = complete(zero.prepareQueries(indices, BUDGET));
+        assertEquals(values(0, 0, 0, 0), complete(zeroQueries.valuesFor(values(1), BUDGET)));
+
+        var queries = complete(sign.prepareQueries(indices, BUDGET));
+        assertEquals(values(0, 0, 0, 0), complete(queries.valuesFor(values(0), BUDGET)));
+        assertEquals(values(-3, 3, 3, -3), complete(queries.valuesFor(values(3), BUDGET)));
+        var empty = complete(sign.prepareQueries(List.of(), BUDGET));
+        assertEquals(List.of(), complete(empty.valuesFor(values(3), BUDGET)));
+        assertThrows(IllegalArgumentException.class, () -> empty.valuesFor(values(3, 4), BUDGET));
+        assertThrows(IllegalArgumentException.class, () -> sign.prepareQueries(
+            List.of(BigInteger.ZERO, BigInteger.valueOf(-1)), BUDGET));
+    }
+
+    @Test void preparedQueriesAcceptAnyStartWithinTheirExactArithmeticLimit() {
+        var plan = complete(RecurrenceObservationKrylov.prepare(transition(new long[][] {{-1}}, 0), X, BUDGET));
+        var queries = complete(plan.prepareQueries(List.of(BigInteger.ZERO, BigInteger.ONE), BUDGET));
+        var largeStart = List.of(new Rational(BigInteger.ONE.shiftLeft(128), BigInteger.ONE));
+        assertEquals(List.of(largeStart.getFirst(), largeStart.getFirst().negate()),
+            complete(queries.valuesFor(largeStart, BUDGET)));
+        assertThrows(IllegalArgumentException.class, () -> plan.bind(largeStart, BUDGET));
+
+        var oversized = BigInteger.ONE.shiftLeft(16_384);
+        assertArithmeticLimited(queries.valuesFor(List.of(new Rational(oversized, BigInteger.ONE)), BUDGET));
+        assertArithmeticLimited(queries.valuesFor(List.of(new Rational(BigInteger.ONE, oversized)), BUDGET));
+    }
+
+    @Test void preparedQueriesSkipOrbitFormsWithZeroWeightAtEveryRequestedIndex() {
+        var transition = transition(new long[][] {{0, 0}, {0, 0}}, 0, 0);
+        var plan = complete(RecurrenceObservationKrylov.prepare(transition, X.add(Y), BUDGET));
+        var indices = IntStream.rangeClosed(1, 24).mapToObj(BigInteger::valueOf).toList();
+        var startCoordinate = new Rational(BigInteger.ONE.shiftLeft(16_383), BigInteger.ONE);
+        var start = List.of(startCoordinate, startCoordinate);
+
+        var future = complete(plan.prepareQueries(indices, BUDGET));
+        assertEquals(values(new long[24]), complete(future.valuesFor(start, BUDGET)));
+        var includingOrigin = complete(plan.prepareQueries(List.of(BigInteger.ONE, BigInteger.ZERO), BUDGET));
+        assertArithmeticLimited(includingOrigin.valuesFor(start, BUDGET));
+
+        var nilpotent = transition(new long[][] {{0, 1}, {0, 0}}, 0, 0);
+        var orderTwo = complete(RecurrenceObservationKrylov.prepare(nilpotent, X.add(Y), BUDGET));
+        var onlySecondForm = complete(orderTwo.prepareQueries(List.of(BigInteger.ONE, BigInteger.TWO), BUDGET));
+        assertEquals(List.of(startCoordinate, Rational.ZERO), complete(onlySecondForm.valuesFor(start, BUDGET)));
+    }
+
     @Test void denseCoefficientFormationRespectsTheRrefSizeGuard() {
         var powerOfTwo = BigInteger.ONE.shiftLeft(127);
         var diagonal = List.of(1L, 3L, 5L).stream()
@@ -182,6 +320,12 @@ class RecurrenceObservationKrylovTest {
         assertEquals(Status.BUDGET_INCONCLUSIVE, result.status());
         assertFalse(result.value().isPresent());
         assertEquals(0, result.work().remainingWorkUnits());
+    }
+
+    private static void assertArithmeticLimited(Result<?> result) {
+        assertEquals(Status.ARITHMETIC_LIMIT, result.status());
+        assertTrue(result.value().isEmpty());
+        assertTrue(result.work().remainingWorkUnits() > 0);
     }
 
     private static List<Rational> values(long... entries) {

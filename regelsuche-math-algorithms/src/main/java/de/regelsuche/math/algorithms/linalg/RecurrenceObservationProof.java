@@ -11,28 +11,41 @@ import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transit
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Predicate;
 
 /** Checks values along exact trajectories independently of the lifted coefficient matrix. */
 final class RecurrenceObservationProof {
     private RecurrenceObservationProof() { }
 
+    record OrbitForm(int index, Polynomial observation) { }
+
     static boolean verify(Transition transition, Polynomial observation, int degree, List<Rational> coefficients, Work work) {
-        int dimension = transition.linear().columns();
-        var origin = sample(dimension, work);
-        if (!holds(transition, observation, coefficients, origin, work)) return false;
+        return verifyAtSamples(transition.linear().columns(), degree, work,
+            state -> holds(transition, observation, coefficients, state, work));
+    }
+
+    static boolean verifyForms(Transition transition, Polynomial observation, List<OrbitForm> forms, Work work) {
+        if (forms.isEmpty()) return true;
+        work.add(observation.termCount());
+        return verifyAtSamples(transition.linear().columns(), observation.totalDegree(), work,
+            initial -> formsHold(transition, observation, forms, initial, work));
+    }
+
+    private static boolean verifyAtSamples(int dimension, int degree, Work work, Predicate<List<Rational>> check) {
+        if (!check.test(sample(dimension, work))) return false;
         if (degree == 0) return true;
         for (int i = 0; i < dimension; i++) {
             var axis = sample(dimension, work);
             axis.set(i, Rational.ONE);
-            if (!holds(transition, observation, coefficients, axis, work)) return false;
+            if (!check.test(axis)) return false;
             if (degree == 1) continue;
             axis.set(i, Rational.of(2));
-            if (!holds(transition, observation, coefficients, axis, work)) return false;
+            if (!check.test(axis)) return false;
             for (int j = i + 1; j < dimension; j++) {
                 var pair = sample(dimension, work);
                 pair.set(i, Rational.ONE);
                 pair.set(j, Rational.ONE);
-                if (!holds(transition, observation, coefficients, pair, work)) return false;
+                if (!check.test(pair)) return false;
             }
         }
         return true;
@@ -52,6 +65,21 @@ final class RecurrenceObservationProof {
         }
         work.add(1);
         return evaluate(observation, state, work).equals(sum);
+    }
+
+    private static boolean formsHold(Transition transition, Polynomial observation, List<OrbitForm> forms,
+            List<Rational> initial, Work work) {
+        var state = initial;
+        int index = 0;
+        for (var form : forms) {
+            while (index < form.index()) {
+                state = advance(transition, state, work);
+                index++;
+            }
+            work.add(1);
+            if (!evaluate(observation, state, work).equals(evaluate(form.observation(), initial, work))) return false;
+        }
+        return true;
     }
 
     static Rational evaluate(Polynomial observation, List<Rational> state, Work work) {
