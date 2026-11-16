@@ -15,6 +15,9 @@ import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Require;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Requirement;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
+import de.regelsuche.search.program.RewriteCandidate;
+import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.search.program.RewriteProgramInterpreter;
 import de.regelsuche.transform.PatternRewriteRule;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
@@ -89,6 +92,32 @@ class EvolutionRewriteProgramCompilerTest {
             candidate.ruleIds());
         assertEquals(2, candidate.executionWork().primitiveRewrites());
         assertEquals(2, candidate.primitiveRuleIds().size());
+    }
+
+    @Test
+    void primitiveRequirementCountsTheRetainedStepsOfAComposedTransformation() {
+        String input = "(x * 1) + 0";
+        var composed = new RewriteCandidate("composed", input, "x", List.of(
+            new Transformation("mul_one", "x + 0"), new Transformation("add_zero", "x")))
+            .toTransformation();
+        assertEquals(2, composed.executionWork().primitiveRewrites());
+        EvolutionGenome genome = normalizationGenome();
+        for (int bound : List.of(1, 2)) {
+            var plan = EvolutionRewriteProgramPlan.create(genome,
+                new Require("bounded", new Source("source", List.of("mul_one")),
+                    Requirement.maxPrimitiveSteps(bound)), 4, 4);
+            var compiled = (RewriteProgram.Require) new EvolutionRewriteProgramCompiler()
+                .compile(genome, plan).program();
+            var source = new RewriteProgram.Source(compiled.body().metadata(), ignored -> List.of(composed));
+            var program = new RewriteProgram.Require(compiled.metadata(), source,
+                compiled.conditionDescription(), compiled.condition());
+
+            var execution = new RewriteProgramInterpreter().execute(program, input);
+            assertEquals(bound == 2 ? 1 : 0, execution.candidates().size());
+            if (bound == 2) {
+                assertEquals(List.of("mul_one", "add_zero"), execution.candidates().getFirst().primitiveRuleIds());
+            }
+        }
     }
 
     @Test

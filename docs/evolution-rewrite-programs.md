@@ -85,6 +85,10 @@ Supported hard requirements are deliberately finite and reviewable:
 - maximum estimated cost delta;
 - maximum primitive step count.
 
+The primitive step ceiling counts the retained primitive applications in a
+candidate. A composed transformation therefore uses the full budget of its
+primitive lineage. Exact-theory work has its own counters.
+
 Supported priorities are:
 
 - estimated cost, then rule identity;
