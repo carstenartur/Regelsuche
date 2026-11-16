@@ -85,6 +85,11 @@ Modellen für Markov-Transport und Federschwerpunkt bei langen Folgen
 gemessen. [PR #1267](https://github.com/carstenartur/Regelsuche/pull/1267) ·
 [Versuch](https://github.com/carstenartur/Regelsuche/blob/8f6a0cdf9cd0f426a412335a102c11710dbba6a0/docs/research/switched-observation.md)
 
+Ein weiterer Vergleich untersucht feste Modelle aus veröffentlichten
+Quellen. Er hält unter anderem fest, wann sich ein bereits geprüfter
+Beobachtungsplan gegenüber erneuter Herleitung lohnt und welche Kosten
+die direkte Matrixrechnung auf denselben Aufträgen hat. [PR #1271 und Studie](https://github.com/carstenartur/Regelsuche/pull/1271)
+
 Der [Strategien-Index](research/strategies.md) verbindet diese Befunde mit den
 aktuellen Implementierungen und Tests. Das [Manuskript](../paper/README.md)
 führt seine eigene gebundene Evidenz. Die hier aufgeführten neueren
