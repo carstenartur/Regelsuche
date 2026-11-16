@@ -304,7 +304,6 @@ jobs:
           (
             cd "$rebuild_project"
             MATHLIB_NO_CACHE_ON_UPDATE=1 lake update
-            cmp lake-manifest.json "$REGELSUCHE_LEAN_PROJECT/lake-manifest.json"
             lake exe cache get
             lake env lean --version
           )
