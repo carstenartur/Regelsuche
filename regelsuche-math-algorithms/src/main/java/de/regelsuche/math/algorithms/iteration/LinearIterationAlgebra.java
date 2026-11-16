@@ -1,35 +1,44 @@
-package de.regelsuche.sdk.optimization.iteration;
+package de.regelsuche.math.algorithms.iteration;
 
 import de.regelsuche.ast.*;
 import de.regelsuche.ast.iteration.IntegerArithmetic;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.symbol.SymbolId;
-import de.regelsuche.sdk.optimization.*;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
 import java.math.BigInteger;
 import java.util.*;
-import static de.regelsuche.sdk.optimization.iteration.LinearIteration.*;
+import java.util.function.BooleanSupplier;
+import static de.regelsuche.math.algorithms.iteration.LinearIteration.*;
 
 /** Bounded integer polynomial primitives; shared arithmetic, never candidate search. */
 final class LinearIterationAlgebra {
     private LinearIterationAlgebra() {}
-    static final class Unavailable extends RuntimeException {
-        Unavailable(String reason) { super(reason); }
-    }
     static final class Work {
-        final OptimizationBudget budget;
-        final CancellationToken cancellation;
-        final long start=System.nanoTime(),timeout;
-        long used;
-        Work(OptimizationBudget b,CancellationToken c) {
-            budget=Objects.requireNonNull(b); cancellation=Objects.requireNonNull(c);
-            timeout=b.timeoutMillis()>Long.MAX_VALUE/1_000_000 ? Long.MAX_VALUE:b.timeoutMillis()*1_000_000;
+        final IterationLimits limits;
+        final int maximumDimension;
+        private final IterationPolynomial.Work meter;
+
+        Work(IterationLimits limits, int maximumDimension, BooleanSupplier cancellation) {
+            if (maximumDimension < 1) {
+                throw new IllegalArgumentException("INVALID_AUGMENTED_DIMENSION_LIMIT");
+            }
+            this.limits = Objects.requireNonNull(limits);
+            this.maximumDimension = maximumDimension;
+            meter = new IterationPolynomial.Work(limits, cancellation, MAX_INDEX_DEGREE);
         }
-        void charge() { charge(1); }
-        void charge(long n) {
-            if(cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw new Unavailable("CANCELLED");
-            if(n>budget.maximumWork()-used || System.nanoTime()-start>=timeout) throw new Unavailable("WORK_LIMIT");
-            used+=n;
+
+        long used() {
+            return meter.used();
         }
+
+        void charge() {
+            charge(1);
+        }
+
+        void charge(long units) {
+            meter.charge(units);
+        }
+
         BigInteger checked(BigInteger n) { charge(); if(n.abs().bitLength()>MAX_BITS) throw new Unavailable("VALUE_LIMIT"); return n; }
         BigInteger add(BigInteger a,BigInteger b,IntegerArithmetic ring) {
             charge();
@@ -61,7 +70,7 @@ final class LinearIterationAlgebra {
             if(indexDegree>MAX_INDEX_DEGREE || parameterDegree>MAX_PARAMETER_DEGREE || stateDegree>1) throw new Unavailable("DEGREE_LIMIT");
             if(stateDegree>0 && indexDegree>0) throw new Unavailable("INDEX_DEPENDENT_STATE_COEFFICIENT");
             if(coefficient.signum()==0) map.remove(m); else map.put(m,coefficient);
-            if(map.size()>Math.min(MAX_TERMS,work.budget.maximumStates())) throw new Unavailable("TERM_LIMIT");
+            if(map.size()>Math.min(MAX_TERMS,work.limits.maximumTerms())) throw new Unavailable("TERM_LIMIT");
         }
         Poly add(Poly other) {
             var out=new LinkedHashMap<>(terms); work.charge(terms.size());
