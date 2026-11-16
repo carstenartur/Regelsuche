@@ -118,6 +118,19 @@ class MavenWorkflowSemanticsContractTest {
             + "|pwsh|powershell)(?=\\s+)"
     );
 
+    // No new Python/Node/Perl/PowerShell host drivers may enter the release
+    // workflow while migration to Maven/Java is still incomplete. These
+    // exact existing commands are transitional, not approved build authority.
+    private static final Set<String> LEGACY_RELEASE_HOST_COMMANDS = Set.of(
+        "python3 .github/scripts/update-release-metadata.py \\",
+        "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release",
+        "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check",
+        "python3 -B scripts/package-student-sdk.py \\",
+        "python3 -B scripts/package-optimization-sdk.py \\",
+        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\"",
+        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\" --check"
+    );
+
     @Test
     void repositoryWorkflowsSatisfyTheCheckoutOwnedContract()
             throws IOException {
@@ -268,6 +281,34 @@ class MavenWorkflowSemanticsContractTest {
     }
 
     @Test
+    void releaseWorkflowHostRuntimeInventoryRejectsNewAndDuplicateDrivers() {
+        String command =
+            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check";
+        String release = "jobs:\n  release:\n    steps:\n      - run: |\n          "
+            + command + "\n";
+
+        assertFalse(hasCategory(scanPlatformHostRuntimes("release.yml", release),
+            "undeclared-host-runtime"));
+        assertFalse(hasCategory(scanPlatformHostRuntimes("release.yml",
+            release + "          # node scripts/ignored.mjs\n"),
+            "undeclared-host-runtime"));
+        for (String extra : List.of(
+                command,
+                "python3 -B scripts/undeclared-release.py",
+                "/usr/bin/python3 -B scripts/undeclared-release.py",
+                "env python3 -B scripts/undeclared-release.py",
+                "node scripts/undeclared-release.mjs",
+                "npm run release",
+                "pwsh scripts/undeclared-release.ps1")) {
+            String changed = release + "          " + extra + "\n";
+            assertTrue(hasCategory(scanPlatformHostRuntimes(
+                "release.yml", changed), "undeclared-host-runtime"), extra);
+        }
+        assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml",
+            release + "      - run: npm test\n"), "undeclared-host-runtime"));
+    }
+
+    @Test
     void workflowTextGuardRejectsEveryForbiddenSemantic() {
         Map<String, String> samples = new LinkedHashMap<>();
         samples.put(
@@ -388,6 +429,15 @@ class MavenWorkflowSemanticsContractTest {
                     StandardCharsets.UTF_8
                 ),
                 governance
+            ));
+        }
+        for (String workflow : policy.platformWorkflows()) {
+            violations.addAll(scanPlatformHostRuntimes(
+                workflow,
+                Files.readString(
+                    workflows.resolve(workflow),
+                    StandardCharsets.UTF_8
+                )
             ));
         }
         if (!violations.isEmpty()) {
@@ -720,6 +770,38 @@ class MavenWorkflowSemanticsContractTest {
                 "required-check-create-collision",
                 "verification job must give create events a distinct check name: "
                     + expectedJobName
+            ));
+        }
+        return List.copyOf(violations);
+    }
+
+    private static List<Violation> scanPlatformHostRuntimes(
+        String workflow,
+        String text
+    ) {
+        List<String> lines = text.lines().toList();
+        List<Violation> violations = new ArrayList<>();
+        Set<String> alreadyUsed = new TreeSet<>();
+        for (String command : workflowRunCommands(lines)) {
+            if (!DIRECT_HOST_INTERPRETER.matcher(command).find()) {
+                continue;
+            }
+            if (LEGACY_RELEASE_HOST_COMMANDS.contains(command)
+                    && alreadyUsed.add(command)) {
+                continue;
+            }
+            int lineNumber = 1;
+            for (int index = 0; index < lines.size(); index++) {
+                if (lines.get(index).contains(command)) {
+                    lineNumber = index + 1;
+                    break;
+                }
+            }
+            violations.add(new Violation(
+                workflow,
+                lineNumber,
+                "undeclared-host-runtime",
+                command
             ));
         }
         return List.copyOf(violations);
