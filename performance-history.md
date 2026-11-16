@@ -31,7 +31,17 @@ Every table and chart uses **milliseconds per operation (`ms/op`)**. Lower value
 
 ### Active regression decision authority
 
-The active checkout-owned `verifyJmhRegression` task uses the versioned v3 decision authority in `scripts/verify-jmh-regression-v3.py` and `config/quality/jmh-regression-decision-policy-v3.json`. It deliberately reuses the frozen benchmark inventory and finite family thresholds from `config/quality/jmh-regression-policy-v2.json` without changing them. The v3 policy binds that exact threshold file by repository-relative path, schema and Git blob identity; both policy files are LF-normalized so the content identity remains stable across supported checkouts.
+The active checkout-owned `verifyJmhRegression` task now executes the
+Java `JmhRegressionV3Main` via a pinned JDK 25 `JavaExec` adapter.
+Its source of authority is the Java/JUnit `JmhRegressionV3Verifier`;
+the original `scripts/verify-jmh-regression-v3.py` remains a retained
+comparison control, **not** the live Gradle decision. The active
+six-warmup execution policy is bound by
+`config/quality/jmh-regression-policy-more-warmup-v1.json` and
+`config/quality/jmh-regression-decision-policy-more-warmup-v1.json`.
+The original two-warmup v2/v3 policies remain available for exact historical
+replay. Both six-warmup and historical versions retain the same finite v2
+benchmark ceilings, and the selected policy is content-bound to its Git blob.
 
 For average-time measurements, v3 records `decisionScore = max(0, currentScore - currentScoreError)` but does not turn uncertainty overlap into a passing result. The outcome is deliberately three-way and fail-closed:
 
@@ -43,14 +53,13 @@ This keeps the historical v2 verifier and its reports unchanged and reproducible
 
 Measurement precision remains visible independently of the gate outcome. When `currentScoreError >= currentScore`, v3 retains the benchmark as `LOW_PRECISION` in JSON and Markdown evidence. A low-precision row whose point estimate remains below the ratchet can still pass the regression gate, but it is **not** evidence that performance is proven unchanged. If its point estimate exceeds the ratchet it is at least `INCONCLUSIVE`, and therefore fails closed. The rule remains a finite shared-runner ratchet and does not establish cross-hardware absolute performance or statistical significance beyond the recorded JMH uncertainty.
 
-### Java/Maven v3 parity candidate (not yet the active gate)
+### Java/Maven decision replay and remaining migration
 
-The Java quality module now contains a **parallel**, fail-closed v3
-verifier, `JmhRegressionV3Verifier`, and the entrypoint
-`JmhRegressionV3Main`. It reads the actual v3 decision policy, binds the
-exact v2 policy by its Git-blob SHA-1 and checkout-relative path, and checks
-the entire declared JMH inventory and execution metadata. A Maven/JUnit replay
-can be requested after independently producing a real JMH result:
+The Java quality module uses `JmhRegressionV3Verifier` and
+`JmhRegressionV3Main` for the active regression decision. Maven/JUnit
+can independently replay **already produced** results; it does not silently
+run JMH, replace the separate producer or reclassify unavailable
+infrastructure. For the active six-warmup result and decision policy:
 
 ```bash
 mvn -pl regelsuche-quality -am \
@@ -58,16 +67,19 @@ mvn -pl regelsuche-quality -am \
   verify
 ```
 
-Reports from this optional replay go to
+Reports from that optional Maven replay go to
 `regelsuche-quality/target/reports/quality/jmh-regression-v3/`.
-`PASSED` succeeds; `INCONCLUSIVE`, `FAILED` and malformed evidence fail.
-The Java JUnit controls use all 29 actual policy entries and exercise exact
-boundaries, uncertainty overlap, material regressions, low precision,
-inventory drift, malformed numbers and policy substitution. This is a
-**migration intermediate**: the active Gradle/Python verifier is unchanged
-until Java/Python result parity on captured real runs, negative-result
-equivalence and a clean Maven/Failsafe reproduction are verified. No claim
-of a completed Maven-only lifecycle is made.
+`PASSED` succeeds; `INCONCLUSIVE`, `FAILED` and malformed evidence
+fail closed. The JUnit controls cover all 29 real captured benchmark scores
+and uncertainty measurements against the corresponding historical Python
+Markdown SHA-256, plus boundary, inventory, drift and policy-substitution
+controls. The preceding Python synthetic characterizations remain available
+during migration, and the producer still runs through Gradle.
+
+**This is a decision-path migration, not a completed Maven-only lifecycle.**
+A complete raw-result parity replay, isolated Maven/Failsafe execution,
+remaining authority-bearing host-script removal and fresh clean-checkout plus
+pinned-container qualification remain outstanding under #749.
 
 The [finite JMH precision study](jmh-precision-study.md) preregisters a separate,
 bounded comparison of execution protocols for issue #981. It leaves this v3
