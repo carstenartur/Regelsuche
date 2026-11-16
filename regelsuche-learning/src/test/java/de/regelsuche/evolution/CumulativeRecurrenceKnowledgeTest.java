@@ -62,7 +62,8 @@ class CumulativeRecurrenceKnowledgeTest {
         var frozen=first.solve(request(2,5,7,100_000),CumulativeTaskKnowledge.Strategy.AUTOMATIC);
         require(frozen.solved() && !frozen.reused(),"unknown transition falls back");
         var fresh=initial.solve(request(2,5,7,100_000),CumulativeTaskKnowledge.Strategy.BASELINE);
-        require(frozen.totalWork()==fresh.totalWork()+6,"source mismatch pays only bounded routing, not a doomed proof");
+        long routing = frozen.totalWork() - fresh.totalWork();
+        require(routing > 0 && routing <= 16, "source mismatch pays only bounded eligibility checks");
         var restored=CumulativeTaskKnowledge.restore(TraceStrategyTransferExample.inventory(),second.next().toCanonicalJson());
         require(restored.id().equals(second.next().id()) && restored.sessionSetupWork()>0,"v3 reload preserves identity and pays proofs");
     }

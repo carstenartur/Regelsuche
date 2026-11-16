@@ -12,6 +12,7 @@ import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Evoluti
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Proposal;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantVerifier.VerifiedLaw;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily;
 import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantFamily.Anchor;
 import de.regelsuche.representation.RepresentationBridge.Budget;
@@ -73,7 +74,8 @@ final class RecurrenceKnowledgeCodec {
                 var entry = readEntry(node, work);
                 if (entries.stream().anyMatch(e -> sameKey(e, entry)))
                     throw new IllegalArgumentException("duplicate recurrence key");
-                verify(entry, work); entries.add(entry);
+                var proof = verify(entry, work);
+                entries.add(entry.family().isPresent() ? entry : entry.retain(proof));
             }
             if (!encode(entries).equals(json)) throw new IllegalArgumentException("noncanonical recurrence catalog");
             return new Loaded(List.copyOf(entries), work[0]);
@@ -129,13 +131,14 @@ final class RecurrenceKnowledgeCodec {
         if (!node.isTextual()) throw new IllegalArgumentException("text required");
         return node.textValue();
     }
-    private static void verify(RecurrenceKnowledge.Entry entry, long[] work) {
+    private static VerifiedLaw verify(RecurrenceKnowledge.Entry entry, long[] work) {
         var initial = java.util.Collections.nCopies(entry.transition().linear().columns(), Rational.ZERO);
         var checked = new RecurrenceInvariantVerifier().verify(entry.transition(), entry.proposal(), initial, new Budget(200_000));
         work[0] = Math.addExact(work[0], checked.work().consumedWorkUnits());
-        if (checked.law().isEmpty()) throw new IllegalArgumentException("stored recurrence identity failed revalidation");
+        var law = checked.law().orElseThrow(() -> new IllegalArgumentException("stored recurrence identity failed revalidation"));
         var polynomial = new ExactPolynomialAnalysis(units -> work[0] = Math.addExact(work[0], units))
             .normalForm(entry.proposal().polynomial());
         if (polynomial.totalDegree() > entry.degree()) throw new IllegalArgumentException("stored degree bound is false");
+        return law;
     }
 }

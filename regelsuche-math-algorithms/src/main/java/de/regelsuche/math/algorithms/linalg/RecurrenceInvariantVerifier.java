@@ -27,15 +27,24 @@ public final class RecurrenceInvariantVerifier {
     /** Issuer-owned proof of P(T^n(initial)) = multiplier^n P(initial), for every n >= 0. */
     public static final class VerifiedLaw {
         private final Transition transition;
+        private final Proposal checkedProposal;
         private final Proposal proposal;
+        private final Polynomial polynomial;
         private final List<Rational> initialState;
         private final Rational initialValue;
-        private VerifiedLaw(Transition transition, Proposal proposal, List<Rational> initialState, Rational initialValue) {
-            this.transition = transition; this.proposal = proposal;
+        private VerifiedLaw(Transition transition, Proposal checkedProposal, Proposal proposal, Polynomial polynomial,
+                List<Rational> initialState, Rational initialValue) {
+            this.transition = transition; this.checkedProposal = checkedProposal; this.proposal = proposal;
+            this.polynomial = polynomial;
             this.initialState = List.copyOf(initialState); this.initialValue = initialValue;
         }
         public Transition transition() { return transition; }
         public Proposal proposal() { return proposal; }
+        public int degree() { return polynomial.totalDegree(); }
+        /** Recognizes the checked claim as well as its canonical output. */
+        public boolean certifies(Transition source, Proposal claim) {
+            return transition.equals(source) && (checkedProposal.equals(claim) || proposal.equals(claim));
+        }
         public List<Rational> initialState() { return initialState; }
         public Rational initialValue() { return initialValue; }
         /** Value of the proved invariant, NOT a closed form for each coordinate of the recurrence. */
@@ -52,6 +61,45 @@ public final class RecurrenceInvariantVerifier {
         var work = new Work(budget.maxWorkUnits());
         try {
             return check(source, proposal, initial, work);
+        } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
+            return withoutLaw(Outcome.BUDGET_INCONCLUSIVE, work);
+        } catch (IllegalArgumentException unsupported) {
+            return withoutLaw(Outcome.UNSUPPORTED, work);
+        }
+    }
+
+    /**
+     * Reuses an issued step proof after checking the relationship between the
+     * source and target transitions. The new initial value is computed exactly.
+     */
+    public Verification transport(VerifiedLaw anchor, Transition target, List<Rational> initialState, Budget budget) {
+        Objects.requireNonNull(anchor, "anchor");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(budget, "budget");
+        var initial = RecurrenceInvariantSynthesis.checkedInitial(target, initialState);
+        var work = new Work(budget.maxWorkUnits());
+        try {
+            var result = RecurrenceInvariantTransport.image(anchor.transition(), target, anchor.polynomial,
+                anchor.proposal().evolution(), work);
+            if (result.isEmpty()) return withoutLaw(Outcome.REJECTED, work);
+            var image = result.orElseThrow();
+            var polynomial = image.polynomial();
+            String text = anchor.proposal().polynomial();
+            if (polynomial != anchor.polynomial) {
+                text = polynomial.toCanonicalString();
+                work.add(text.length());
+                if (text.length() > RecurrenceInvariantSynthesis.MAX_PROPOSAL_LENGTH) {
+                    return withoutLaw(Outcome.UNSUPPORTED, work);
+                }
+                // The persisted proposal must also satisfy the exact parser's per-literal bounds.
+                if (!RecurrenceInvariantSupport.project(text, work).equals(polynomial)) {
+                    throw new IllegalStateException("transport changed the canonical polynomial on replay");
+                }
+            }
+            var initialValue = RecurrenceInvariantSupport.evaluate(polynomial, initial, work);
+            var proposal = new Proposal(text, image.evolution());
+            var law = new VerifiedLaw(target, proposal, proposal, polynomial, initial, initialValue);
+            return new Verification(Outcome.VERIFIED, Optional.of(law), work.ledger());
         } catch (RecurrenceInvariantSupport.Exhausted exhausted) {
             return withoutLaw(Outcome.BUDGET_INCONCLUSIVE, work);
         } catch (IllegalArgumentException unsupported) {
@@ -112,7 +160,7 @@ public final class RecurrenceInvariantVerifier {
         if (!value.variables().isEmpty()) throw new IllegalStateException("initial substitution did not eliminate all coordinates");
         Rational initialValue = value.isZero() ? Rational.ZERO : value.terms().values().iterator().next();
         var canonicalProposal = new Proposal(polynomial.toCanonicalString(), proposal.evolution());
-        var law = new VerifiedLaw(source, canonicalProposal, initial, initialValue);
+        var law = new VerifiedLaw(source, proposal, canonicalProposal, polynomial, initial, initialValue);
         return new Verification(Outcome.VERIFIED, Optional.of(law), work.ledger());
     }
 

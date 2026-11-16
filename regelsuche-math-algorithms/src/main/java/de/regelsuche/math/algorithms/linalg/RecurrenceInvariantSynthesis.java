@@ -78,7 +78,26 @@ public final class RecurrenceInvariantSynthesis {
     /** A first-law result, or a bounded miss after searching the entire declared ansatz. */
     record FirstLawReport(Status status, Optional<VerifiedLaw> law, boolean usedSupport, WorkLedger work) {}
 
+    /** Result for the goal of finding any one verified nonconstant law. */
+    public record FirstLaw(Status status, Optional<VerifiedLaw> law, WorkLedger work) {
+        public FirstLaw {
+            Objects.requireNonNull(status);
+            Objects.requireNonNull(law);
+            Objects.requireNonNull(work);
+            if (status != Status.COMPLETE && law.isPresent()) throw new IllegalArgumentException("unproved first law");
+        }
+    }
+
     public Report solve(Request request) {
+        return solveTyped(request, false);
+    }
+
+    public FirstLaw solveFirst(Request request) {
+        var result = solveTyped(request, true);
+        return new FirstLaw(result.status(), result.laws().stream().findFirst(), result.work());
+    }
+
+    private Report solveTyped(Request request, boolean firstOnly) {
         Objects.requireNonNull(request, "request");
         var work = new Work(request.budget().maxWorkUnits());
         var laws = new ArrayList<VerifiedLaw>();
@@ -90,7 +109,8 @@ public final class RecurrenceInvariantSynthesis {
             var images = RecurrenceInvariantSupport.liftedImages(request.transition(), basis, work);
             for (Evolution evolution : Evolution.values()) {
                 for (var block : blocks) {
-                    solveLiftedBlock(request, block, images, evolution, laws, work);
+                    solveLiftedBlock(request, block, images, evolution, laws, firstOnly, work);
+                    if (firstOnly && !laws.isEmpty()) return new Report(Status.COMPLETE, laws, work.ledger());
                 }
             }
             return new Report(Status.COMPLETE, laws, work.ledger());
@@ -197,7 +217,7 @@ public final class RecurrenceInvariantSynthesis {
     }
 
     private static void solveLiftedBlock(Request request, List<Monomial> block, Map<Monomial, Polynomial> images,
-            Evolution evolution, List<VerifiedLaw> laws, Work work) {
+            Evolution evolution, List<VerifiedLaw> laws, boolean firstOnly, Work work) {
         var rows = new ArrayList<List<Rational>>(block.size());
         var variables = new ArrayList<String>(block.size());
         var origins = new ArrayList<RowOrigin>(block.size());
@@ -221,7 +241,7 @@ public final class RecurrenceInvariantSynthesis {
         }
         var reduced = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), variables, origins,
             new Budget(work.remaining()));
-        admitReduction(request, block, evolution, reduced, laws, false, work);
+        admitReduction(request, block, evolution, reduced, laws, firstOnly, work);
     }
 
     private static void solveSigns(Request request, List<Monomial> rows, List<Monomial> columns, List<String> images,

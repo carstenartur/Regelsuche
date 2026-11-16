@@ -59,6 +59,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`TaskKnowledgeSelfImprover.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java#L17) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java | public final class TaskKnowledgeSelfImprover { -->
 - [`TaskKnowledgeSelfImproverTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeSelfImproverTest.java#L7) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeSelfImproverTest.java | class TaskKnowledgeSelfImproverTest { -->
 
+## Automatische Wahl bewiesener Rekurrenzgesetze
+
+- **Hypothese.** Der bestehende Wissenskatalog kann einen passenden Beweis für neue Übergänge wählen und gegenüber der direkten Suche Arbeit sparen.
+- **Umsetzungsstand.** Automatische Auswahl, exakte Prüfung von Verschiebung oder Vorzeichenwechsel und Neuprüfung beim Laden sind in der regulären Wissenssitzung verfügbar.
+- **Befund.** Bei 80 Anfragen werden alle 48 passenden Gesetze übertragen. Einschließlich Erwerb, Laden und Fehlversuchen sinkt der Aufwand von 70.336 auf 39.774 Einheiten. Bei fünf Anfragen übersteigen die Gesamtkosten die direkte Suche. [Vergleich und Reproduktion](recurrence-proof-selection.md)
+- **Folgerung.** Die beobachtete Mischung und die Anzahl nachfolgender Anfragen bestimmen, wann sich die Aufbereitung lohnt.
+
+- [`RecurrenceKnowledge.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/RecurrenceKnowledge.java#L19) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/RecurrenceKnowledge.java | public final class RecurrenceKnowledge { -->
+- [`RecurrenceProofSelectionComparisonTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/RecurrenceProofSelectionComparisonTest.java#L31) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/RecurrenceProofSelectionComparisonTest.java | class RecurrenceProofSelectionComparisonTest { -->
+
 ## Inkrementelle Zustände für Zählerbeobachter
 
 - **Hypothese.** Beobachtungen und erlaubte Änderungen reichen aus, um einen kleineren endlichen Zustand herzuleiten.
