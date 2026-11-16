@@ -34,7 +34,12 @@ Zentrale Bausteine:
 - **Layer 6 – Reporting/Gallery:** Reports rendern ausschließlich
   `DiscoveryTrace`-/Replay-Evidence und Descriptor-Metadaten, keine hart
   codierten Seed-Sonderfälle. Public Evidence bleibt ein eigener Gate-Schritt.
-- `ScientificDiscoveryWorkflow` bootet die produktive App-Wiring-Schicht und führt reproduzierbare Discovery-Läufe aus.
+- `RuleDiscoveryService` ist der Einstieg für Ausdrucks-Discovery in
+  CLI und Workbench. Beide verwenden für registrierte Domänen
+  `RegelsucheDiscovery` mit dem `DomainDiscoveryRunner`.
+- `ScientificDiscoveryWorkflow` bootet eine eigene App-Komposition für
+  reproduzierbare Discovery-Läufe. Aufrufe im Repository liegen in
+  Reproduktions-, Benchmark- und Docker-Tests. [Aufrufpfade](architecture.md#suche-lernen-und-geprüfte-rechenpläne)
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
 - `PathReplayDto` und die Web-Workbench liefern das interaktive Schritt-für-Schritt-Replay inklusive Makrozügen, Domänenkarten und Proof-Status.

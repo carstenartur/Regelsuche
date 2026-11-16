@@ -45,7 +45,8 @@ autoritative Verifikationsvertrag liegt im Checkout.
 - `regelsuche-egraph` — Equality-Saturation-Strukturen auf Basis des Core.
 - `regelsuche-optimization-sdk` — externe Java-Fassade für typisierte numerische
   Rechenpläne, unabhängige Prüfung und explizite Java-Zahlensemantik auf Search
-  und Math Algorithms; keine eigene zweite Suchmaschine.
+  und Math Algorithms. Die ganzzahlige Schleifenrekurrenz hat ihre Algebra,
+  Ausführung und Prüfung derzeit im SDK.
 - `regelsuche-search` — Suchprobleme, Strategien, Scoring, Budgets,
   Frontier-/Transposition-Memory und die Koordinatoren für direkte, exakte und
   lokal mustergerichtete Regelvorbereitung.
@@ -88,6 +89,53 @@ Backend darf nicht stillschweigend zusätzliche Semantik in den Kern einführen.
 
 `app` ist die äußere Hülle. Neue fachliche Logik soll nur dort verbleiben, wenn
 sie tatsächlich Laufzeitkomposition oder Infrastruktur ist.
+
+## Suche, Lernen und geprüfte Rechenpläne
+
+Die Aufrufer wählen den Einstieg anhand der Aufgabe. Bei der Ausdruckssuche
+ist ein ganzer Ausdruck der Zustand des Suchgraphen. Bei einem Rechenplan
+ist der Zustand die Information, die seine Ausführung zwischen zwei
+Schritten behalten muss. Bei einem Lernlauf entsteht aus geprüften
+Ergebnissen Wissen für spätere Aufrufe.
+
+| Aufgabe | Einstieg | Zusammenspiel |
+| --- | --- | --- |
+| Einen Ausdruck umformen | `regelsuche-core` und `regelsuche-search` | Der Kern liefert den Ausdrucksbaum, Regeln und Bindungen. Das Suchprofil bestimmt anwendbare Schritte, Kosten und Grenzen. Der aufgezeichnete Pfad kann mit seinen Annahmen wiederholt und geprüft werden. [Suchausführung und Replay](recorded-search-execution.md) |
+| Kandidaten entdecken | `RuleDiscoveryService` für Ausdrücke, `RegelsucheDiscovery` und `DomainDiscoveryRunner` für registrierte Domänen | CLI und Workbench wählen den jeweiligen Einstieg. Die Prüfung und Freigabe von Kandidaten folgt den Verträgen des gewählten Aufrufs. [Discovery-Domänen](generic-discovery-domains.md) |
+| Eine geordnete Summe oder ein Fenster berechnen | `OrderedReductionSearch` in `regelsuche-math-algorithms` | Der Aufrufer übergibt den typisierten Term und die Zeilenbedingungen. Die Suche leitet einen Plan mit Teilzuständen her und prüft dessen Beiträge und Indexgrenzen. Die Workbench ruft Summen- und Fensterpläne auf. `OrderedReductionSdk` bietet zusätzlich Punktänderungen und Paarzustandswissen an. [Blockzustände und Punktänderungen](research/ordered-block-reductions.md) |
+| Eine Rekurrenz untersuchen | `RecurrenceInvariantSynthesis` und `RecurrenceObservationKrylov` in `regelsuche-math-algorithms` | Die Invariantensynthese sucht Gesetze für den gegebenen Übergang. Der Krylov-Aufruf nimmt eine vorgegebene polynomiale Beobachtung und leitet für einen festen Übergang eine skalare Rekurrenz für Indexabfragen ab. Beide haben einen eigenen exakten Prüfschritt. [Synthese](research/coupled-recurrence-synthesis.md) · [Krylov-Plan](research/recurrence-observation-krylov.md) |
+| Eine ganzzahlige Schleifenrekurrenz ausführen | `LinearIterationOptimizer` in `regelsuche-optimization-sdk` | Der eigenständige Java-Consumer nutzt Synthese, Nachprüfung und Ausführung eines Plans. Die Implementierung im SDK behandelt exakte Ganzzahlrechnung und Java-Arithmetik mit Überlauf. [SDK-Verträge für Iterationen](../regelsuche-optimization-sdk/FINITE_SERIES.md) |
+| Geprüfte Lösungen wiederverwenden | `CumulativeTaskKnowledge` in `regelsuche-learning` | Bei einer Rekurrenzanfrage kann der Lernbestand ein geeignetes, bereits bewiesenes Gesetz auswählen und auf den neuen Übergang übertragen. Ein ausdrücklicher Lernbatch und separate Validierungsaufgaben entscheiden über neue Wissensgenerationen. Beim Laden werden Nachweise erneut geprüft. [Wissensgenerationen](research/cumulative-task-knowledge.md) · [Rekurrenztransfer](research/recurrence-proof-selection.md) |
+| Einen endlichen Zähler fortschreiben | `CounterStateSynthesis` in `regelsuche-search` | Aus Beobachtung und erlaubten Änderungen entsteht eine Übergangstabelle. Ein Prüfer vergleicht alle erlaubten Änderungen innerhalb der angegebenen Grenze. [Zählerzustand](derived-incremental-counter-states.md) |
+
+Beim Rekurrenztransfer bleibt der mathematische Solver im Algorithmenmodul.
+Das Lernmodul übernimmt Katalog, Auswahl, Zuordnung, Akzeptanzprüfung und
+erneutes Laden. Kann es einen Beweis übertragen, berechnet es den Anfangswert
+für die neue Anfrage. Bei Bedarf ruft es den direkten Solver mit dem
+verbleibenden Budget auf. Damit kann derselbe Solver als Vergleich und als
+Fallback dienen.
+
+```mermaid
+flowchart TD
+    request["Rekurrenzanfrage"] --> lookup["Geprüftes Gesetz im Katalog suchen"]
+    lookup -->|geeignetes Gesetz| transfer["Gesetz und Anfangswert prüfen"]
+    lookup -->|Suche mit Restbudget| direct["Gesetz direkt herleiten und prüfen"]
+    transfer --> result["Geprüftes Ergebnis"]
+    direct --> result
+```
+
+Der Krylov-Plan ist im Quellstand über die Java-API des Algorithmenmoduls
+ausführbar und durch gezielte Tests belegt. Die Zusagen zur Kompatibilität
+der veröffentlichten Java-Pakete stehen in der [SDK-API-Policy](java-sdk-api-policy.md).
+Die automatisiert überprüften Links zu Implementierung, Tests und früheren
+Vergleichen stehen im [Strategien-Index](research/strategies.md).
+
+Für die Wiederverwendung der ganzzahligen Schleifenrekurrenz über das
+Java-SDK hinaus gehört ihre Algebra in `regelsuche-math-algorithms`.
+`LinearIterationOptimizer` kann dann dort aufrufen, wie es
+`OrderedReductionSdk` bei geordneten Reduktionen bereits tut. Der
+Consumer-Vertrag muss dabei sowohl die exakte Zahlensemantik als auch
+die Java-Überlaufsemantik abdecken.
 
 ## Fachliches Ausführungsmodell
 
