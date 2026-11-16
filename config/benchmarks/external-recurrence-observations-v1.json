@@ -1,0 +1,93 @@
+{
+  "schema": "regelsuche.external-recurrence-observations/v1",
+  "implementationBase": "b7669e2ffd9d8b07e75d1215f83d55374f848fe8",
+  "selection": "The Land of Oz finite-step weather probabilities from Grinstead and Snell, and all three numerical Leslie matrix examples under Beispiele in section 5.3 of Weidl. Include every coordinate displayed by the sources and the Leslie total that Weidl also plots. Both source families fit the fixed three-coordinate Java API.",
+  "split": "For each model and scalar observation, serve the source example's disclosed initial state first. Then serve the three coordinate-pure starts in coordinate order. Oz's sources use each weather state as a start. Leslie's three single-cohort challenges are experiment inputs with the unchanged source population total of 300. The plan receives only the transition and scalar observation, even at acquisition. The split varies initial conditions within each public transition; no fitting or withholding at the model-family level occurs.",
+  "adaptation": "Use exact rational finite-step values throughout. Transpose the Oz source's row-stochastic matrix to act on column states. Use the Leslie matrices as published, including fractional model states, with no individual-count rounding or extinction truncation. Exact start-major query schedules and their reuse are the experiment workload.",
+  "workBudgetPerCompleteStreamAndArm": 1000000,
+  "workScope": "One equal cumulative logical work budget for each strategy on a scalar observation and horizon stream, from an empty strategy through all four starts. Charge native scaling, cache construction and accesses, binding and exact answer production; charge exact derivation and separate proof, binding and answering in both plan arms. Each arm starts from the same typed transition, observation and incoming requests. Fixture/protocol decoding, result validation and receipt writing belong to the evaluator.",
+  "arms": {
+    "direct": "Native exact dual matrix evaluation: scale input to integer numerators and shared denominators, use the previous projected row when the immediately preceding index is cached, otherwise compose by shared binary matrix powers and reuse projected rows at the same indices across initial states. Dot with each initial state and normalize once per output. No scalar dependence derivation.",
+    "fresh": "Use the existing exact Krylov preparation with its independent proof for each incoming initial state, then bind and answer its batch.",
+    "reused": "Pay for the same exact preparation and proof once and serve the first batch, then retain the verified plan in process for the same transition and observation, rebind for each later initial state, and answer its batch. Each bind uses the ordinary API; its binary powers are shared within that batch. No serialization, external certificate, cross-model selection or amortization outside the four actual requests."
+  },
+  "evaluation": "Check every exact answer against independent stepwise rational state propagation, and check the frozen source-derived anchors. Compare first request and whole stream logical work separately. Report each arm and direction; make no inferential or threshold claim. An exhausted or unsupported arm is a failed completion and must not be credited with savings for equal answers.",
+  "measurement": {
+    "warmupRepetitions": 6,
+    "measuredRepetitions": 13,
+    "ordering": "Rotate the three arms in protocol order on each repetition within each scalar observation and stream. Reset the strategy at the start of each repetition and arm. A single benchmark JVM, -Xms256m -Xmx256m -XX:+UseSerialGC.",
+    "time": "Monotonic elapsed nanoseconds for the complete four-request stream, including the instrumented lifecycle. Report median, minimum and maximum as descriptive observations.",
+    "memory": "Current-thread allocated bytes during the same scope using the HotSpot thread management interface. Report median, minimum and maximum. This measures allocation volume, not peak, live or retained heap, process RSS or other threads."
+  },
+  "streams": [
+    {"id": "short", "indices": [0, 1, 2, 3, 4, 5, 6]},
+    {"id": "sparse", "indices": [0, 1, 3, 6, 144, 17, 256, 32, 81, 192, 24, 129, 48, 257, 96, 12]}
+  ],
+  "initialPanels": {
+    "oz": {
+      "published": "1/3 1/3 1/3",
+      "challenge": ["1 0 0", "0 1 0", "0 0 1"]
+    },
+    "leslie": {
+      "published": "100 100 100",
+      "challenge": ["300 0 0", "0 300 0", "0 0 300"]
+    }
+  },
+  "models": [
+    {
+      "id": "oz",
+      "source": "https://math.dartmouth.edu/~prob/prob/prob.pdf",
+      "sourceLocation": "Charles M. Grinstead and J. Laurie Snell, Introduction to Probability, chapter 11, examples 11.1–11.3 and theorem 11.2, pages 406–410",
+      "initialPanel": "oz",
+      "coordinates": ["rain", "nice", "snow"],
+      "matrixRows": ["1/2 1/2 1/4", "1/4 0 1/4", "1/4 1/2 1/2"],
+      "observations": [
+        {"id": "rain", "coefficients": "1 0 0", "anchorAt": 3, "anchor": "77/192"},
+        {"id": "nice", "coefficients": "0 1 0", "anchorAt": 3, "anchor": "19/96"},
+        {"id": "snow", "coefficients": "0 0 1", "anchorAt": 3, "anchor": "77/192"}
+      ]
+    },
+    {
+      "id": "leslie-1",
+      "source": "https://repositum.tuwien.at/handle/20.500.12708/13203",
+      "sourceLocation": "Claudia Weidl, Einpopulationsmodelle in der mathematischen Ökologie (2012), chapter 5, Beispiel 1, pages 56–58, figure 5.4",
+      "initialPanel": "leslie",
+      "coordinates": ["age-1", "age-2", "age-3"],
+      "matrixRows": ["0 2 1", "1/2 0 0", "0 1/3 0"],
+      "observations": [
+        {"id": "total", "coefficients": "1 1 1", "anchorAt": 1, "anchor": "1150/3"},
+        {"id": "age-1", "coefficients": "1 0 0", "anchorAt": 1, "anchor": "300"},
+        {"id": "age-2", "coefficients": "0 1 0", "anchorAt": 1, "anchor": "50"},
+        {"id": "age-3", "coefficients": "0 0 1", "anchorAt": 1, "anchor": "100/3"}
+      ]
+    },
+    {
+      "id": "leslie-2",
+      "source": "https://repositum.tuwien.at/handle/20.500.12708/13203",
+      "sourceLocation": "Claudia Weidl, Einpopulationsmodelle in der mathematischen Ökologie (2012), chapter 5, Beispiel 2, pages 58–59, figure 5.6",
+      "initialPanel": "leslie",
+      "coordinates": ["age-1", "age-2", "age-3"],
+      "matrixRows": ["0 1 3", "1/2 0 0", "0 1/3 0"],
+      "observations": [
+        {"id": "total", "coefficients": "1 1 1", "anchorAt": 1, "anchor": "1450/3"},
+        {"id": "age-1", "coefficients": "1 0 0", "anchorAt": 1, "anchor": "400"},
+        {"id": "age-2", "coefficients": "0 1 0", "anchorAt": 1, "anchor": "50"},
+        {"id": "age-3", "coefficients": "0 0 1", "anchorAt": 1, "anchor": "100/3"}
+      ]
+    },
+    {
+      "id": "leslie-3",
+      "source": "https://repositum.tuwien.at/handle/20.500.12708/13203",
+      "sourceLocation": "Claudia Weidl, Einpopulationsmodelle in der mathematischen Ökologie (2012), chapter 5, Beispiel 3, pages 59–60, figure 5.8",
+      "initialPanel": "leslie",
+      "coordinates": ["age-1", "age-2", "age-3"],
+      "matrixRows": ["0 2 1", "1/3 0 0", "0 1/2 0"],
+      "observations": [
+        {"id": "total", "coefficients": "1 1 1", "anchorAt": 1, "anchor": "1150/3"},
+        {"id": "age-1", "coefficients": "1 0 0", "anchorAt": 1, "anchor": "300"},
+        {"id": "age-2", "coefficients": "0 1 0", "anchorAt": 1, "anchor": "100/3"},
+        {"id": "age-3", "coefficients": "0 0 1", "anchorAt": 1, "anchor": "50"}
+      ]
+    }
+  ]
+}
