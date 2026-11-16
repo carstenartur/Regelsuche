@@ -136,8 +136,11 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             root = problem.state(root.expression(), 0, 0, "", root.assumptions(), rootValue.capabilities().keySet(), 0);
             recordAssessment(assessments,root,rootValue);
             ledger.observe(root, MoveWitnessPath.root());
+            if (!visited.add(root, 0, budget.totalWork() - ledger.total())) {
+                stop(Outcome.WORK_EXHAUSTED);
+                return;
+            }
             frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.root(), rootValue), 0, serial[0]++));
-            visited.add(root, 0);
             problem.checkpoint();
         }
 
@@ -174,12 +177,11 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
             }
             var node = frontier.remove().node();active=node;
             ledger.search++;
-            boolean current = visited.current(node.state, node.theoryWork);
-            if (contract != SearchContinuationContract.PATH_SENSITIVE && ledger.total() > budget.totalWork()) {
+            if (contract != SearchContinuationContract.PATH_SENSITIVE && ledger.total() >= budget.totalWork()) {
                 stop(Outcome.WORK_EXHAUSTED);
                 return;
             }
-            if (!current) return;
+            if (!visited.current(node.state, node.theoryWork)) return;
             if (node.picker == null && !open(node)) return;
             recordExpansion(node, expand(problem, node, ledger, events, visited, frontier, serial, assessments));
         }
@@ -381,8 +383,11 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         SearchExecution.completed(1);
         boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;
         boolean objectiveWorkLimited = false;
+        if (decision == Decision.ENQUEUED && !visited.add(child, admission.theoryWork(), problem.budget().totalWork() - ledger.total())) {
+            decision = Decision.WORK_LIMIT;
+        }
         if (decision == Decision.ENQUEUED) {
-            visited.add(child, admission.theoryWork()); node.enqueued++; recordAssessment(assessments,child,admission.value());
+            node.enqueued++; recordAssessment(assessments,child,admission.value());
             var path = node.path.append(new SearchExecution.Step<>(node.state, child, move, verification));
             pending[2] = path;
             var successor = new Node(child, admission.theoryWork(), path, admission.value());
@@ -398,6 +403,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         events.add(new SearchExecution.Event<>(node.state, child, move, decision, verification));
         if (decision == Decision.WORK_LIMIT || objectiveWorkLimited) return Expansion.WORK_LIMIT;
         if (ledger.qualityReached()) return Expansion.MORE;
+        if (visited.stateLocal() && ledger.total() >= problem.budget().totalWork()) return Expansion.WORK_LIMIT;
         int stage = node.picker.nextStage();
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
         double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()
@@ -456,7 +462,7 @@ final class MoveSearchKernel<E,S extends SearchExecution.Position<E>,M extends S
         Decision decision = rejectBounds(problem, node, move, depth, theory, debt, ledger);
         if (decision != null) return admission(pending, child, theory, decision, null, value);
 
-        decision = visited.rejection(child, theory);
+        decision = visited.rejection(child, theory, problem.budget().totalWork() - ledger.total());
         if (decision == Decision.DUPLICATE) ledger.duplicates++;
         if (ledger.total() > problem.budget().totalWork()) decision = Decision.WORK_LIMIT;
         if (decision != null) return admission(pending, child, theory, decision, null, value);
