@@ -330,30 +330,43 @@ public final class TargetFreeHeldOutMatrixRunner {
         return QualificationArtifact.create(content);
     }
 
-    private static void requireFreezeAuthority(
+    static void requireFreezeAuthority(
         PlanArtifact plan,
         FreezeArtifact freeze
     ) {
+        PlanContent planContent = plan.content();
         FreezeContent content = freeze.content();
-        List<String> expected = plan.content().rows().stream()
-            .map(PlanRow::configurationId).toList();
-        List<String> actual = content.rows().stream()
-            .map(FreezeRow::configurationId).toList();
-        if (!content.repositoryRevision().equals(
-                plan.content().repositoryRevision())
+        if (!content.repositoryRevision().equals(planContent.repositoryRevision())
                 || !content.planHash().equals(plan.contentHash())
-                || !content.preregistrationHash().equals(
-                    plan.content().preregistrationHash())
-                || !content.formationHash().equals(
-                    plan.content().formationHash())
-                || !content.qualificationHash().equals(
-                    plan.content().qualificationHash())
+                || !content.preregistrationHash().equals(planContent.preregistrationHash())
+                || !content.formationHash().equals(planContent.formationHash())
+                || !content.qualificationHash().equals(planContent.qualificationHash())
+                || content.qualificationByteLength() != planContent.qualificationByteLength()
                 || !QUALIFICATION_NOT_DISCLOSED.equals(
                     content.qualificationDisclosure())
-                || !expected.equals(actual)
-                || content.rows().size() != 144) {
+                || content.rows().size() != planContent.rows().size()) {
             throw new IllegalArgumentException(
                 "candidate freeze is not the complete frozen authority");
+        }
+        Map<String, CaseSpec> cases = indexCases(planContent.cases());
+        Map<String, PolicySpec> policies = indexPolicies(planContent.policies());
+        for (int index = 0; index < planContent.rows().size(); index++) {
+            PlanRow expected = planContent.rows().get(index);
+            FreezeRow actual = content.rows().get(index);
+            if (actual.sequence() != expected.sequence()
+                    || !actual.configurationId().equals(expected.configurationId())
+                    || !actual.caseId().equals(expected.caseId())
+                    || !actual.policyId().equals(expected.policyId())
+                    || actual.checkpoint() != expected.checkpoint()
+                    || !actual.configuredBudget().equals(cases.get(expected.caseId()).budget())
+                    || actual.deterministicSeed() != policies.get(expected.policyId()).deterministicSeed()) {
+                throw new IllegalArgumentException(
+                    "candidate freeze row differs from plan: " + expected.configurationId());
+            }
+        }
+        if (!content.matchedWorkGroups().equals(
+                TargetFreeHeldOutQualifier.matchedWorkGroups(planContent, content.rows()))) {
+            throw new IllegalArgumentException("matched-work groups differ from frozen ledgers");
         }
     }
 
