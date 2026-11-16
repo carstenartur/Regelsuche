@@ -6,8 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
- * Optional read-only Maven replay of externally produced JMH results. The
- * JMH producer is not silently replaced or skipped by this verification.
+ * Optional read-only Maven replay of externally produced JMH results under
+ * the same active six-warmup policy as the checkout Gradle compatibility gate.
+ * The producer is not silently replaced or skipped by this verification.
  */
 @EnabledIfSystemProperty(named = "regelsuche.jmh.regressionOutput", matches = ".+")
 class JmhRegressionV3MavenEvidenceIT {
@@ -22,9 +23,9 @@ class JmhRegressionV3MavenEvidenceIT {
         JmhRegressionV3Main.main(new String[] {
             root.toString(),
             result.toString(),
-            root.resolve("config/quality/jmh-regression-policy-v2.json")
+            root.resolve("config/quality/jmh-regression-policy-more-warmup-v1.json")
                 .toString(),
-            root.resolve("config/quality/jmh-regression-decision-policy-v3.json")
+            root.resolve("config/quality/jmh-regression-decision-policy-more-warmup-v1.json")
                 .toString(),
             output.resolve("report.json").toString(),
             output.resolve("report.md").toString()
