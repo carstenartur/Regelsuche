@@ -262,13 +262,13 @@ public final class JmhRegressionV3Verifier {
             .append(claim).append("\n\n")
             .append("The frozen v2 benchmark inventory and finite thresholds "
                 + "remain unchanged and content-bound.\n\n")
-            .append("Decision statistic: \`").append(STATISTIC).append("\`.\n")
-            .append(" Failure condition: \`").append(FAILURE)
-                .append("\`; the exact boundary passes.\n")
-            .append(" Inconclusive condition: \`").append(INCONCLUSIVE)
-                .append("\`; inconclusive evidence fails closed.\n")
-            .append(" Low precision diagnostic: \`").append(PRECISION)
-                .append("\`.\n\n")
+            .append("Decision statistic: `").append(STATISTIC).append("`.\n")
+            .append(" Failure condition: `").append(FAILURE)
+                .append("`; the exact boundary passes.\n")
+            .append(" Inconclusive condition: `").append(INCONCLUSIVE)
+                .append("`; inconclusive evidence fails closed.\n")
+            .append(" Low precision diagnostic: `").append(PRECISION)
+                .append("`.\n\n")
             .append("Low-precision measurements: **").append(lowPrecision.size())
                 .append("**.\n")
             .append("Inconclusive measurements: **").append(inconclusiveNames.size())
@@ -278,7 +278,7 @@ public final class JmhRegressionV3Verifier {
             .append("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |\n");
         for (JsonNode row : rows) {
             markdown.append(String.format(java.util.Locale.ROOT,
-                "| \`%s\` | \`%s\` | %.6f | %.6f ± %.6f | %.6f | %.6f "
+                "| `%s` | `%s` | %.6f | %.6f ± %.6f | %.6f | %.6f "
                     + "| %+.2f%% | %s | %s |\n",
                 row.path("benchmark").asText(),
                 row.path("unit").asText(),
