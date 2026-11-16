@@ -60,6 +60,16 @@ mvn --batch-mode --no-transfer-progress \
 No GitHub API, Git checkout metadata or host-side interpreter is used by these
 commands.
 
+## JMH decision-path migration (issue #749)
+
+The active Gradle compatibility gate now invokes the Java/JUnit
+`JmhRegressionV3Main` on JDK 25 with the six-warmup v2/v3 policy pair.
+The historical Python verifier remains a synthetic comparison control;
+the JMH producer, several other quality gates and their host-side
+harnesses have **not** migrated. Missing, inconclusive and failed data
+remain non-green. This is a measured step toward Maven ownership,
+not evidence that `mvn verify` has replaced all CI decision paths.
+
 ## Transitional verification
 
 Until all modules and evidence gates have moved, the existing Gradle `check`
