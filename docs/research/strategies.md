@@ -130,6 +130,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`CoupledRecurrenceExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceExperimentTest.java#L28) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceExperimentTest.java | class CoupledRecurrenceExperimentTest { -->
 - [`CoupledRecurrenceTransferExperimentTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceTransferExperimentTest.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/CoupledRecurrenceTransferExperimentTest.java | class CoupledRecurrenceTransferExperimentTest { -->
 
+## Wiederverwendete Beobachtungspläne bei wechselndem Anfangszustand
+
+- **Hypothese.** Die einmalige geprüfte Herleitung kann sich bei mehreren Anfangszuständen einer festen Beobachtung amortisieren.
+- **Umsetzungsstand.** Vor dem Lauf festgeschriebener Java-Vergleich auf der Land-of-Oz-Markov-Kette und drei veröffentlichten Leslie-Matrizen. Die direkte Rechnung verwendet vorbereitete Beobachtungszeilen über die Starts hinweg.
+- **Befund.** In 30 vollständigen Strömen liefern alle drei Verfahren je 1.380 gleiche exakte Werte. Wiederverwendung senkt die Arbeit von 206.268 auf 116.208 Einheiten gegenüber erneuter Herleitung. Die direkte Rechnung benötigt insgesamt 42.564 Einheiten und ist in jedem Strom günstiger. Beim ersten verstreuten Schönwetterstapel liegt der Plan der Ordnung zwei vorn. [Protokoll, Arbeitsbelege, Laufzeit und Allokationen](external-recurrence-observations.md)
+- **Folgerung.** Bei wiederholten Indizes über verschiedene Starts muss der Vergleich die direkte Wiederverwendung von Matrixprojektionen einrechnen. Der Befund betrifft zwei veröffentlichte Modellfamilien und feste lineare Beobachtungen.
+
+- [`DirectLinearObservation.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/DirectLinearObservation.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/DirectLinearObservation.java | final class DirectLinearObservation { -->
+- [`ExternalRecurrenceObservationStudyTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/ExternalRecurrenceObservationStudyTest.java#L41) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/ExternalRecurrenceObservationStudyTest.java | class ExternalRecurrenceObservationStudyTest { -->
+
 ## Minimale Rekurrenz für eine Beobachtung
 
 - **Hypothese.** Ein kleiner Krylov-Raum der Zielbeobachtung kann den Aufwand für weit entfernte Abfrageindizes senken.
