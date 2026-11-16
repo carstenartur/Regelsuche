@@ -223,6 +223,11 @@ failure, budget or unresolved native guard keeps its own stop reason, and the
 reference rule IDs remain available. Exact native pattern matches still inspect
 alternative child e-nodes and can reach `FIX_POINT`.
 
+Native matcher memoization uses the rule identifier, structural pattern and
+canonical root class. Distinct placeholder names retain their own bindings
+even when the patterns have identical display text. An affected class or
+ancestor invalidates its cached matches when the graph changes.
+
 ## Conditional factor cancellation
 
 `saturateUnderAssumptions(input, assumptions, costOfNode)` takes an immutable

@@ -30,7 +30,7 @@ import java.util.Set;
  */
 public final class EGraphPatternMatcher {
 
-    private record MatchCacheKey(String patternId, String patternFingerprint, EClassId root) {
+    private record MatchCacheKey(String patternId, PatternExpr pattern, EClassId root) {
     }
 
     public record MatcherStats(
@@ -75,7 +75,7 @@ public final class EGraphPatternMatcher {
 
     /** Every {@link Match} of {@code pattern} anywhere in the graph. */
     public List<Match> matchAll(PatternExpr pattern) {
-        return matchAll(pattern.toString(), pattern, null);
+        return matchAll(null, pattern, null);
     }
 
     /** Every {@link Match} of {@code pattern} on the given candidate roots. */
@@ -192,7 +192,7 @@ public final class EGraphPatternMatcher {
     }
 
     private List<Map<String, EClassId>> matchInClassMemoized(String patternId, PatternExpr pattern, EClassId rootId) {
-        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId));
+        MatchCacheKey key = new MatchCacheKey(patternId, pattern, eGraph.find(rootId));
         List<Map<String, EClassId>> hit = matchCache.get(key);
         if (hit != null) {
             matcherCacheHits++;
