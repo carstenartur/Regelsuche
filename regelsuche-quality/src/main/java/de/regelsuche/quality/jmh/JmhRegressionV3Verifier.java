@@ -251,8 +251,6 @@ public final class JmhRegressionV3Verifier {
         String name, JsonNode policy, JsonNode row,
         JsonNode execution, String jdkMajor
     ) {
-        JsonNode policy = byName.get(name);
-        JsonNode row = current.get(name);
         JsonNode metric = object(row.path("primaryMetric"),
             name + ": primaryMetric");
         double score = positive(metric.path("score"), name + " score");
