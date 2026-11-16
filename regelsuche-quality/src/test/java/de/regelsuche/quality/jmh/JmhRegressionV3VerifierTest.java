@@ -45,6 +45,84 @@ class JmhRegressionV3VerifierTest {
         assertEquals(report.markdown(), Files.readString(markdown));
     }
 
+
+    /**
+     * Source: CI 43806895498, artifact 14199503763 (jmh-verification),
+     * sha256:9f81c50e5cb16fe0d6930e5fc9c0a0dd530bfc2810868e2608a96c53cb799e12.
+     * The genuine 29 JMH scores and error bars are replayed against the frozen
+     * policy metadata. The expected digest is of the actual Python v3 Markdown
+     * report in that artifact, not a Java-generated golden file.
+     * This numeric parity test does not replace full raw-result/Failsafe replay.
+     */
+    @Test
+    void comparesActualCapturedJmhScoresWithPythonV3Report()
+            throws Exception {
+        Fixture fixture = fixture();
+        double[][] captured = {
+            {1.5995228268335471, 0.3559137335375816},
+            {7.1812426172696293, 1.1158911616215206},
+            {4523.575835582189, 108.97048701307266},
+            {6.3763253955892649, 0.21214541999227948},
+            {1743.9356274170134, 91.714121905014864},
+            {512.97778592576583, 379.36938359822636},
+            {2.1505370342163408, 0.26105016592351049},
+            {60.553218779617652, 21.171351926534424},
+            {175.34965237909992, 11.764468742213968},
+            {1008.4048130328738, 43.683476696792646},
+            {19.869532143790849, 1.5620728612856685},
+            {0.47962747409635936, 0.015797353422123593},
+            {26.552663548582995, 7.0789054053500218},
+            {0.63327391414984036, 0.082071500956924573},
+            {0.17130763391884654, 0.0027308800067680577},
+            {2.7460749784708588e-05, 1.9619701187417114e-06},
+            {0.1813689383741606, 0.0070720834396827753},
+            {0.0010296486520054232, 0.00021805709787486302},
+            {0.00066511638976319805, 0.00016501993741563416},
+            {0.0048373425058469179, 2.1239169931469284e-05},
+            {0.0011218761104071278, 0.00011053175203673385},
+            {0.0010901526835401909, 0.00012754066505100284},
+            {0.0030393852223181291, 0.00021903591528957316},
+            {0.0011589655648462851, 0.0001183288294392515},
+            {0.0013372960794416691, 8.5358844429848831e-05},
+            {0.00053777527093593904, 6.4817382638064272e-05},
+            {0.11459372293133223, 0.049437886812933422},
+            {0.17714661775703353, 0.011385653933399614},
+            {0.0007219212237021532, 1.5932753867116548e-05}
+        };
+        assertEquals(fixture.rows().size(), captured.length);
+        for (int i = 0; i < captured.length; i++) {
+            ObjectNode metric = (ObjectNode) fixture.rows().get(i)
+                .path("primaryMetric");
+            metric.put("score", captured[i][0]);
+            metric.put("scoreError", captured[i][1]);
+            ((ObjectNode) fixture.rows().get(i)).put("jdkVersion", "25.0.5");
+        }
+        JmhRegressionV3Verifier.Result result = check(fixture);
+        assertEquals("PASSED", result.status());
+        assertEquals(29, result.json().path("benchmarkCount").asInt());
+        assertEquals(0, result.json().path("lowPrecisionCount").asInt());
+        assertEquals(0, result.json().path("inconclusiveCount").asInt());
+        byte[] text = result.markdown().getBytes(
+            java.nio.charset.StandardCharsets.UTF_8);
+        String digest = java.util.HexFormat.of().formatHex(
+            java.security.MessageDigest.getInstance("SHA-256").digest(text));
+        assertEquals(
+            "dca47799e786234b53470e2b7f5070676b0df6dc8edd829b132f919c2654b0d6",
+            digest, "Java Markdown must match the Python report of the genuine JMH numbers");
+
+        // Negative scenarios start from the same captured execution and
+        // must distinguish uncertainty from a real regression.
+        ObjectNode metric = (ObjectNode) fixture.rows().get(0)
+            .path("primaryMetric");
+        double limit = fixture.thresholds().path("benchmarks")
+            .get(0).path("maximumAllowedScore").asDouble();
+        metric.put("score", limit + 0.2);
+        metric.put("scoreError", 0.3);
+        assertEquals("INCONCLUSIVE", check(fixture).status());
+        metric.put("scoreError", 0.0);
+        assertEquals("FAILED", check(fixture).status());
+    }
+
     @Test
     void separatesPointEstimateAndUncertaintyWithoutWeakeningTheRatchet()
             throws Exception {
