@@ -72,6 +72,17 @@ class DomainExportWorkspaceBrowserTest {
         assertTrue(page.url().contains("export=" + firstId.substring(7)));
         page.locator("#replayDomainExport").click();
         page.waitForFunction("document.querySelector('#retainedDomainReplayStatus')?.dataset.status === 'IDENTICAL_CANONICAL_EVIDENCE'");
+        var validate = page.locator("#validateDomainExport");
+        assertEquals(1, validate.count(), "a retained export must expose the independent finite check");
+        validate.click();
+        waitForValidation("CONFIRMED_FINITE_DATA");
+        assertTrue(page.locator("#retainedDomainValidationStatus").textContent().contains("endlichen Daten"));
+        assertEquals("IDENTICAL_CANONICAL_EVIDENCE", page.locator("#retainedDomainReplayStatus").getAttribute("data-status"));
+        var receipt = page.locator("#downloadDomainValidationReceipt");
+        String receiptPath = receipt.getAttribute("href");
+        assertTrue(receiptPath.matches("/api/discovery-domains/exports/" + firstId.substring(7) + "/validate/[0-9a-f]{64}"));
+        var downloadedReceipt = page.waitForDownload(receipt::click);
+        assertArrayEquals(page.request().get(url(receiptPath)).body(), Files.readAllBytes(downloadedReceipt.path()));
         assertEquals(firstId, page.locator("#retainedDomainExportDetail").getAttribute("data-run-id"));
         var download = page.waitForDownload(() -> page.locator("[data-original-file='evidence.json']").click());
         Path downloaded = temporary.resolve("downloaded-evidence.json"); download.saveAs(downloaded);
@@ -116,6 +127,63 @@ class DomainExportWorkspaceBrowserTest {
         assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("REFUTED"));
     }
 
+    @Test void lateFiniteValidationCannotReplaceTheCurrentReceipt() throws Exception {
+        var repository = new DomainExportWorkspaceRepository(temporary.resolve("runs-domain-exports"));
+        repository.retain(export(temporary.resolve("first"), "observed=1,4,9,16;holdout=25,36"));
+        secondId = repository.retain(export(temporary.resolve("second"), "observed=1,4,9,16;holdout=26")).runId();
+        page.navigate(url("/static/discovery-domains.html#export=" + firstId.substring(7)));
+        waitFor(firstId);
+        String oldPath = "/api/discovery-domains/exports/" + firstId.substring(7) + "/validate";
+        page.evaluate("""
+            path => {
+                const original = window.fetch;
+                window.fetch = async (...args) => {
+                    const response = await original(...args);
+                    if (args[0] === path) {
+                        const read = response.text.bind(response);
+                        response.text = async () => { const text = await read(); window.oldValidationRead = true; return text; };
+                    }
+                    return response;
+                };
+            }
+            """, oldPath);
+        var pending = new java.util.concurrent.atomic.AtomicReference<Route>();
+        page.route("**" + oldPath, pending::set);
+        page.locator("#validateDomainExport").click();
+        page.waitForCondition(() -> pending.get() != null);
+        page.locator("[data-domain-export='" + secondId + "']").click();
+        waitFor(secondId);
+        assertFalse(page.locator("#downloadDomainValidationReceipt").isVisible());
+        page.locator("#validateDomainExport").click();
+        waitForValidation("NOT_EVALUATED_NO_SELECTED_CANDIDATE");
+        String currentPath = page.locator("#downloadDomainValidationReceipt").getAttribute("href");
+        assertTrue(currentPath.matches("/api/discovery-domains/exports/" + secondId.substring(7) + "/validate/[0-9a-f]{64}"));
+        var lateResponse = pending.get().fetch();
+        assertEquals(200, lateResponse.status());
+        assertNotEquals(lateResponse.headers().get("location"), currentPath);
+        pending.get().fulfill(new Route.FulfillOptions().setResponse(lateResponse));
+        page.waitForFunction("window.oldValidationRead === true");
+        assertEquals("NOT_EVALUATED_NO_SELECTED_CANDIDATE", page.locator("#retainedDomainValidationStatus").getAttribute("data-status"));
+        assertEquals(currentPath, page.locator("#downloadDomainValidationReceipt").getAttribute("href"));
+    }
+
+    @Test void rejectsAForeignReceiptLinkEvenWithAValidReceiptBody() throws Exception {
+        var repository = new DomainExportWorkspaceRepository(temporary.resolve("runs-domain-exports"));
+        repository.retain(export(temporary.resolve("first"), "observed=1,4,9,16;holdout=25,36"));
+        page.navigate(url("/static/discovery-domains.html#export=" + firstId.substring(7)));
+        waitFor(firstId);
+        page.route("**/validate", route -> {
+            var response = route.fetch();
+            var headers = new HashMap<>(response.headers());
+            headers.put("location", "https://example.invalid/foreign-receipt");
+            route.fulfill(new Route.FulfillOptions().setResponse(response).setHeaders(headers));
+        });
+        page.locator("#validateDomainExport").click();
+        page.waitForFunction("document.querySelector('#retainedDomainValidationStatus')?.textContent.startsWith('Prüfung fehlgeschlagen:')");
+        assertFalse(page.locator("#downloadDomainValidationReceipt").isVisible());
+        assertNull(page.locator("#downloadDomainValidationReceipt").getAttribute("href"));
+    }
+
     private DomainDiscoveryExportVerifier.VerifiedDomainExport export(Path path, String payload) {
         var domain = new FiniteDifferenceSequenceDomain();
         var evidence = new DomainDiscoveryRunner().run("sequence-browser-control", domain,
@@ -125,5 +193,8 @@ class DomainExportWorkspaceBrowserTest {
         return new DomainDiscoveryExportVerifier().requireVerified(path);
     }
     private void waitFor(String runId) { page.waitForFunction("id => document.querySelector('#retainedDomainExportDetail')?.dataset.runId === id", runId); }
+    private void waitForValidation(String status) {
+        page.waitForFunction("status => document.querySelector('#retainedDomainValidationStatus')?.dataset.status === status", status);
+    }
     private String url(String path) { return "http://127.0.0.1:" + server.boundPort() + path; }
 }

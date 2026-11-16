@@ -88,6 +88,20 @@
     const detail = element('retainedDomainExportDetail');
     const status = element('retainedDomainExportStatus');
     const replayStatus = element('retainedDomainReplayStatus');
+    const validationPanel = element('retainedDomainValidation');
+    const validateButton = element('validateDomainExport');
+    const validationStatus = element('retainedDomainValidationStatus');
+    const receiptLink = element('downloadDomainValidationReceipt');
+    const validationMessages = {
+        CONFIRMED_FINITE_DATA: 'Der Kandidat stimmt mit den gespeicherten endlichen Daten überein.',
+        REFUTED_FINITE_DATA: 'Ein gespeichertes Folgenglied widerlegt den Kandidaten.',
+        INVALID_WITNESS: 'Der gespeicherte Zeuge ist ungültig.',
+        INCONCLUSIVE: 'Die begrenzte Prüfung liefert kein abschließendes Ergebnis.',
+        NOT_EVALUATED_NO_SELECTED_CANDIDATE: 'Die Quelle enthält keinen ausgewählten Kandidaten zur Prüfung.',
+        UNSUPPORTED: 'Für diese Daten gibt es keine unterstützte unabhängige Prüfung.',
+        REPLAY_MISMATCH: 'Die erneute Ausführung reproduziert die gebundene Quelle nicht vollständig.',
+        TECHNICAL_FAILURE: 'Ein technischer Fehler hat die Prüfung abgebrochen.'
+    };
     let selected = null, selectionEpoch = 0, listEpoch = 0, offset = 0;
 
     function node(tag, text) {
@@ -141,12 +155,21 @@
         }
         return view;
     }
+    function clearValidation(message) {
+        receiptLink.hidden = true;
+        receiptLink.removeAttribute('href');
+        validationStatus.textContent = message;
+        delete validationStatus.dataset.status;
+    }
     function beginSelection() {
         const ticket = ++selectionEpoch;
         selected = null; detail.hidden = true; detail.replaceChildren(); delete detail.dataset.runId;
         element('retainedDomainReplay').hidden = true;
         element('replayDomainExport').disabled = true;
         replayStatus.textContent = ''; delete replayStatus.dataset.status;
+        validationPanel.hidden = true;
+        validateButton.disabled = true;
+        clearValidation('');
         markSelection();
         return ticket;
     }
@@ -206,6 +229,8 @@
         element('replayDomainExport').disabled = !view.replaySupported;
         replayStatus.textContent = view.replaySupported ? 'Noch kein Replay für diese Auswahl ausgeführt.'
             : 'Die Quelle überschreitet das begrenzte Replay-Budget. Die gespeicherten Daten bleiben lesbar.';
+        validationPanel.hidden = false;
+        validateButton.disabled = false;
         history.replaceState(null, '', `#export=${view.runId.slice(7)}`);
         status.textContent = 'Originalexport geladen. Die gespeicherte Quellenidentität bleibt unverändert.';
         markSelection();
@@ -286,6 +311,50 @@
             replayStatus.dataset.status = result.status;
         } catch (error) { if (ticket === selectionEpoch) replayStatus.textContent = `Replay fehlgeschlagen: ${error.message}`; }
         finally { if (ticket === selectionEpoch) element('replayDomainExport').disabled = false; }
+    });
+    validateButton.addEventListener('click', async () => {
+        const view = selected, ticket = selectionEpoch;
+        if (!view) return;
+        const actionPath = `${base}/${view.runId.slice(7)}/validate`;
+        validateButton.disabled = true;
+        clearValidation('Gespeicherte Folgenglieder werden geprüft …');
+        try {
+            const response = await fetch(actionPath, {method: 'POST', redirect: 'error', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({expectedWorkspaceHash: view.contentHash, expectedEvidenceHash: view.evidence.contentHash})});
+            const receipt = await readResponse(response);
+            if (ticket !== selectionEpoch) return;
+            const source = receipt.source;
+            if (receipt.schema !== 'regelsuche.domain-downstream-validation/v1' || !hashPattern.test(receipt.contentHash)
+                || receipt.consumerContract !== 'regelsuche.builtin-sequence-export-validation/v1'
+                || !Object.hasOwn(validationMessages, receipt.status) || source?.runId !== view.runId
+                || source.workspaceHash !== view.contentHash || source.evidenceHash !== view.evidence.contentHash
+                || source.domainId !== view.domainId || source.domainRevision !== view.domainRevision
+                || source.manifestHash !== view.manifest.contentHash || source.manifestByteHash !== view.verification.manifestByteHash
+                || source.descriptorHash !== view.manifest.domainDescriptorHash || source.seedHash !== view.inputHash
+                || source.handoffHash !== view.manifest.lifecycleHandoffHash
+                || source.verificationHash !== view.verification.contentHash || receipt.sourceOutcome !== view.evidence.outcome
+                || response.headers.get('X-Regelsuche-Run-Id') !== view.runId
+                || ['proofStatus', 'externalNoveltyStatus', 'promotionStatus', 'publicEvidenceStatus']
+                    .some(field => receipt[field] !== 'NOT_EVALUATED') || receipt.universalProofStatus !== 'NOT_PRODUCED') {
+                throw new Error('Der Prüfbeleg gehört nicht zur ausgewählten Quelle.');
+            }
+            const digest = receipt.contentHash.slice(7);
+            const receiptPath = `${actionPath}/${digest}`;
+            if (response.headers.get('ETag') !== `"${digest}"` || response.headers.get('Location') !== receiptPath) {
+                throw new Error('Der Download gehört nicht zur Identität des Prüfbelegs.');
+            }
+            const index = receipt.check?.firstCounterexampleIndex;
+            const counterexample = receipt.counterexampleStatus === 'FOUND' && Number.isSafeInteger(index) && index >= 0
+                ? ` Erstes Gegenbeispiel an Index ${index} (Startindex 0).` : '';
+            validationStatus.textContent = validationMessages[receipt.status] + counterexample;
+            validationStatus.dataset.status = receipt.status;
+            receiptLink.href = receiptPath;
+            receiptLink.hidden = false;
+        } catch (error) {
+            if (ticket === selectionEpoch) validationStatus.textContent = `Prüfung fehlgeschlagen: ${error.message}`;
+        } finally {
+            if (ticket === selectionEpoch) validateButton.disabled = false;
+        }
     });
     element('refreshDomainExports').addEventListener('click', refreshList);
     element('previousDomainExports').addEventListener('click', () => { offset = Math.max(0, offset - 25); refreshList(); });
