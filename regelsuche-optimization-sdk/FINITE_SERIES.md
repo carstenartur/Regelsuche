@@ -109,6 +109,12 @@ Here `a` is a nonzero rational constant; start is integer-valued and stride is a
 
 ## Linear state recurrences, geometric series and products
 
+The recurrence algorithms live in `de.regelsuche.math.algorithms.iteration`.
+Java callers can invoke search, verification and evaluation from
+`regelsuche-math-algorithms` with `IterationLimits`, an augmented dimension
+limit and a cancellation supplier. The SDK maps its existing public iteration
+records and budget to those calls.
+
 `LinearIteration` describes up to eight named state values, their incoming expressions,
 an index start and constant stride, an exact nonnegative count expression, invariant
 parameters, and either simultaneous or sequential assignments. Every state is assigned

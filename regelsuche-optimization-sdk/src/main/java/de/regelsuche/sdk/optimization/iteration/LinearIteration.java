@@ -1,68 +1,90 @@
 package de.regelsuche.sdk.optimization.iteration;
 
-import de.regelsuche.ast.*;
+import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.iteration.IntegerArithmetic;
 import de.regelsuche.symbol.SymbolId;
 import java.math.BigInteger;
-import java.util.*;
+import java.util.AbstractList;
+import java.util.List;
+import java.util.Objects;
+import java.util.RandomAccess;
+import java.util.Set;
 
 /** Scoped, finite, integer-ring state updates; count is a nonnegative mathematical integer. */
 public record LinearIteration(SymbolId index, Expr indexStart, BigInteger indexStep, Expr count,
         List<State> states, Set<SymbolId> parameters, List<Update> updates,
         UpdateOrder order, IntegerArithmetic arithmetic) {
-    public static final int MAX_STATES=8, MAX_PARAMETERS=16, MAX_INDEX_DEGREE=8,
-        MAX_PARAMETER_DEGREE=16, MAX_TERMS=256, MAX_NODES=2048, MAX_DEPTH=64, MAX_BITS=4096;
+    public static final int MAX_STATES = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_STATES;
+    public static final int MAX_PARAMETERS = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_PARAMETERS;
+    public static final int MAX_INDEX_DEGREE = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_INDEX_DEGREE;
+    public static final int MAX_PARAMETER_DEGREE = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_PARAMETER_DEGREE;
+    public static final int MAX_TERMS = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_TERMS;
+    public static final int MAX_NODES = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_NODES;
+    public static final int MAX_DEPTH = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_DEPTH;
+    public static final int MAX_BITS = de.regelsuche.math.algorithms.iteration.LinearIteration.MAX_BITS;
+
     public enum UpdateOrder { SIMULTANEOUS, SEQUENTIAL }
+
     public record State(SymbolId symbol, Expr initial) {
-        public State { Objects.requireNonNull(symbol); Objects.requireNonNull(initial); }
+        public State {
+            Objects.requireNonNull(symbol);
+            Objects.requireNonNull(initial);
+        }
     }
+
     public record Update(SymbolId state, Expr expression) {
-        public Update { Objects.requireNonNull(state); Objects.requireNonNull(expression); }
+        public Update {
+            Objects.requireNonNull(state);
+            Objects.requireNonNull(expression);
+        }
     }
+
     public LinearIteration {
-        Objects.requireNonNull(index); Objects.requireNonNull(indexStep);
-        Objects.requireNonNull(order); Objects.requireNonNull(arithmetic);
-        if(states.isEmpty() || states.size()>MAX_STATES || updates.size()!=states.size())
+        Objects.requireNonNull(index);
+        Objects.requireNonNull(indexStep);
+        Objects.requireNonNull(order);
+        Objects.requireNonNull(arithmetic);
+        // Check sizes before mapping the legacy records.
+        if (states.isEmpty() || states.size() > MAX_STATES || updates.size() != states.size()) {
             throw new IllegalArgumentException("STATE_DIMENSION");
-        if(parameters.size()>MAX_PARAMETERS) throw new IllegalArgumentException("PARAMETER_LIMIT");
-        states=List.copyOf(states); parameters=Set.copyOf(parameters); updates=List.copyOf(updates);
-        if(indexStep.signum()==0 || indexStep.abs().bitLength()>MAX_BITS) throw new IllegalArgumentException("INDEX_STEP");
-        var symbols=new HashSet<>(parameters);
-        if(!symbols.add(index)) throw new IllegalArgumentException("COLLIDING_BINDERS");
-        var assigned=new HashSet<SymbolId>();
-        for(var s:states) {
-            if(!symbols.add(s.symbol())) throw new IllegalArgumentException("COLLIDING_BINDERS");
-            assigned.add(s.symbol()); validate(s.initial(),parameters);
         }
-        validate(indexStart,parameters); validate(count,parameters);
-        for(var u:updates) {
-            if(!assigned.remove(u.state())) throw new IllegalArgumentException("INVALID_ASSIGNMENT");
-            validate(u.expression(),symbols);
+        if (parameters.size() > MAX_PARAMETERS) {
+            throw new IllegalArgumentException("PARAMETER_LIMIT");
         }
+        states = List.copyOf(states);
+        parameters = Set.copyOf(parameters);
+        updates = List.copyOf(updates);
+        var source = LinearIterationAdapter.source(index, indexStart, indexStep, count, states, parameters, updates, order, arithmetic);
+        states = new CheckedStates(states, source);
     }
-    static void validate(Expr expression, Set<SymbolId> allowed) {
-        record Node(Expr expression,int depth) {}
-        var pending=new ArrayDeque<Node>(); pending.push(new Node(Objects.requireNonNull(expression),1));
-        int nodes=0;
-        while(!pending.isEmpty()) {
-            var p=pending.pop();
-            if(++nodes>MAX_NODES || p.depth()>MAX_DEPTH) throw new IllegalArgumentException("EXPRESSION_LIMIT");
-            switch(p.expression()) {
-                case VariableExpr v -> {
-                    if(v.symbol().isEmpty() || (allowed!=null && !allowed.contains(v.symbol().orElseThrow())))
-                        throw new IllegalArgumentException("UNBOUND_SYMBOL");
-                }
-                case NumberExpr n -> {
-                    if(n.value().numerator().abs().bitLength()>MAX_BITS || n.value().denominator().bitLength()>MAX_BITS)
-                        throw new IllegalArgumentException("COEFFICIENT_LIMIT");
-                }
-                case BinaryExpr b -> { pending.push(new Node(b.left(),p.depth()+1)); pending.push(new Node(b.right(),p.depth()+1)); }
-                case FunctionExpr f -> {
-                    if(f.name().length()>128 || f.arguments().size()+pending.size()+nodes>MAX_NODES)
-                        throw new IllegalArgumentException("EXPRESSION_LIMIT");
-                    for(var a:f.arguments()) pending.push(new Node(a,p.depth()+1));
-                }
-            }
+
+    @Override
+    public List<State> states() {
+        return ((CheckedStates) states).values;
+    }
+
+    de.regelsuche.math.algorithms.iteration.LinearIteration mathSource() {
+        return ((CheckedStates) states).source;
+    }
+
+    // Keep the checked source with the immutable state component of the public record.
+    private static final class CheckedStates extends AbstractList<State> implements RandomAccess {
+        private final List<State> values;
+        private final de.regelsuche.math.algorithms.iteration.LinearIteration source;
+
+        private CheckedStates(List<State> values, de.regelsuche.math.algorithms.iteration.LinearIteration source) {
+            this.values = values;
+            this.source = source;
+        }
+
+        @Override
+        public State get(int index) {
+            return values.get(index);
+        }
+
+        @Override
+        public int size() {
+            return values.size();
         }
     }
 }

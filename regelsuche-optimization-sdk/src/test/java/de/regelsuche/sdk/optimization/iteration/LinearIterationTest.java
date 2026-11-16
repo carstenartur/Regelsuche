@@ -126,4 +126,23 @@ class LinearIterationTest {
         assertTrue(verifier.verify(source,new LinearIterationOptimizer.Candidate(source,c.transition(),Long.MIN_VALUE),B,CancellationToken.NONE).verified());
     }
 
+    @Test void reusesTheValidatedTransportAcrossCallsAndRechecksChangedInputs() {
+        var source = scalar(add(v(S), n(2)), n(3), IntegerArithmetic.EXACT);
+        var candidate = candidate(source);
+        var first = LinearIterationAdapter.candidate(candidate);
+        var second = LinearIterationAdapter.candidate(candidate);
+        assertSame(first.source(), second.source());
+        assertSame(first.transition(), second.transition());
+        var transition = candidate.transition();
+        assertThrows(NullPointerException.class, () -> source.states().contains(null));
+        assertThrows(UnsupportedOperationException.class, () -> transition.matrix().removeAll(List.of()));
+        assertThrows(UnsupportedOperationException.class, () -> transition.matrix().set(0, List.of(n(0), n(0))));
+        assertThrows(IllegalArgumentException.class, () -> new LinearTransition(transition.matrix(),
+            List.of(new VariableExpr("unbound"), n(1)), transition.stateCount(), transition.indexDegree()));
+        var changed = new LinearTransition(transition.matrix(), List.of(n(4), n(1)), 1, 0);
+        var forged = new LinearIterationOptimizer.Candidate(source, changed, 0);
+        assertEquals("INITIAL_MISMATCH", new LinearIterationVerifier()
+            .verify(source, forged, B, CancellationToken.NONE).reason());
+    }
+
 }
