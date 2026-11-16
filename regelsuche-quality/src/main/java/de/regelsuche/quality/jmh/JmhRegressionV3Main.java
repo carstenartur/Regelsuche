@@ -8,8 +8,10 @@ import java.nio.file.Path;
  * Java/JUnit-friendly entrypoint for replaying the exact v3 JMH regression
  * policy without a host Python interpreter.
  *
- * <p>This is a parallel qualification candidate, not yet the live CI
- * regression authority. Non-PASSED outcomes retain their reports and fail.
+ * <p>This is the active Gradle compatibility-gate decision as well as the
+ * Maven/JUnit replay authority. The producer and Python comparison controls
+ * remain separate until the full Maven-only build migration is qualified.
+ * Non-PASSED outcomes retain their reports and fail.
  */
 public final class JmhRegressionV3Main {
     private JmhRegressionV3Main() { }
