@@ -17,6 +17,18 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Endliche Überdeckungen durch aktivierte Kongruenzen
+
+- **Hypothese.** Eine normalisierte Vereinigung von Kongruenzklassen kann große endliche Progressionen exakt zählen und ihren kleinsten freien Wert bestimmen, ohne die Progression punktweise zu durchlaufen.
+- **Umsetzungsstand.** Der mathematische Kern stellt aktivierte Kongruenzen, allgemeine positive Schrittweiten, verallgemeinerten CRT, vorzeichenbehaftete Vereinigungen, Ressourcenbegrenzung und quellengebundene Zertifikatsprüfung bereit. Das Optimierungs-SDK reicht Anfrage, Budget und Abbruchsignal weiter. Anwendungen verantworten Herkunft und Vollständigkeit ihrer Regeln.
+- **Befund.** Der Prüfvergleich enumeriert kleine zufällige Anfragen unabhängig vom CRT-Verfahren. Die großen Kontrollen enthalten einen weit entfernten freien Wert unter einer Billion Indizes, ein überdecktes Intervall mit 10^100 Indizes und periodische Termine mit einer Aktivierungslücke. Geänderte Quellen, Terme, Anzahlen und Zeugen sowie ausgeschöpfte Budgets werden abgewiesen. [Mathematik, Vergleichsverfahren, Grenzen und Reproduktion](congruence-coverage.md)
+- **Folgerung.** Als gemeinsamen Rechenkern für modulare Siebe und periodische Sperren einsetzen. Greedy-Sättigungsdaten und Vermutungen bleiben im Primachsenraum-Consumer. Eine endliche Überdeckung begründet keine Aussage über alle Primzahlen; ungünstige Regelfamilien können die Termgrenze ausschöpfen.
+
+- [`CongruenceCoverage.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/CongruenceCoverage.java#L31) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/CongruenceCoverage.java | public final class CongruenceCoverage { -->
+- [`CongruenceCoverageTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/CongruenceCoverageTest.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/CongruenceCoverageTest.java | class CongruenceCoverageTest { -->
+- [`CongruenceCoverageSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdk.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdk.java | public final class CongruenceCoverageSdk { -->
+- [`CongruenceCoverageSdkTest.java`](../../regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdkTest.java#L13) <!-- strategy-code: regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdkTest.java | class CongruenceCoverageSdkTest { -->
+
 ## Quellenbindung der zurückgehaltenen Darstellungsmatrix
 
 - **Hypothese.** Eine geprüfte Bindung an den Versuchsplan und die eingefrorenen Kandidaten verhindert, dass drei bytegleiche Kopien eine fachlich falsch zugeordnete Auswertung bestätigen.
