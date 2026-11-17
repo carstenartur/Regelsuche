@@ -80,11 +80,16 @@ class MavenReleaseMetadataAlignmentTest {
                 && step.contains("-Dregelsuche.expectedDevelopmentVersion=")
                 && step.contains("mvn --batch-mode --no-transfer-progress"),
             "release verifier must run the existing Maven/JUnit authority");
-        require(step.contains("else\n"
+        require(step.contains("EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}"),
+            "release verifier must receive the actual tag-existence decision");
+        require(step.contains("if [[ \"$EXISTING_TAG\" != 'true' ]]; then\n"
+                + "              echo \"::error::Missing Maven release metadata verifier in a new release\" >&2\n"
+                + "              exit 1\n"
+                + "            fi\n"
                 + "            python3 .github/scripts/update-release-metadata.py "
                 + "\"$VERSION\" --check\n"
                 + "          fi"),
-            "old-tag compatibility fallback must remain restricted to missing verifier");
+            "missing Maven authority must fail closed on fresh releases and fall back only on old tags");
         require(step.indexOf("mvn --batch-mode") < step.indexOf("else\n"),
             "Maven must be the preferred verification path");
         String jdkHeading = "      - name: Set up JDK 25\n";
