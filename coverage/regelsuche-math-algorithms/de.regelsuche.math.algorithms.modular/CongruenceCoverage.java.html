@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CongruenceCoverage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">CongruenceCoverage.java</span></div><h1>CongruenceCoverage.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+import static java.math.BigInteger.ONE;
+import static java.math.BigInteger.ZERO;
+
+/**
+ * Exact finite coverage by congruence classes with inclusive activation thresholds.
+ *
+ * &lt;p&gt;A request examines {@code first + step * k}, {@code 0 &lt;= k &lt; count}. A rule
+ * covers a value {@code n} exactly when {@code n &gt;= activeFrom} and
+ * {@code n == residue (mod modulus)}. Origins, residues and thresholds may be signed.
+ * Generalized CRT and inclusion-exclusion operate on rays in index coordinates;
+ * no primality or coprimality assumptions are made.
+ *
+ * &lt;p&gt;The number of union terms can grow exponentially in the number of rules.
+ * Work, intermediate terms, integer size, cancellation and elapsed time are bounded.
+ * An unavailable result contains no certificate and asserts nothing about coverage.
+ * Certificates concern only the supplied finite request, never an infinite family.
+ */
+public final class CongruenceCoverage {
+    private CongruenceCoverage() {}
+
+    /** A congruence class active at and above {@code activeFrom}; modulus is positive. */
+    public record Rule(BigInteger modulus, BigInteger residue, BigInteger activeFrom) {
+<span class="fc" id="L36">        public Rule {</span>
+<span class="fc" id="L37">            Objects.requireNonNull(modulus);</span>
+<span class="fc" id="L38">            Objects.requireNonNull(residue);</span>
+<span class="fc" id="L39">            Objects.requireNonNull(activeFrom);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (modulus.signum() &lt;= 0) throw new IllegalArgumentException(&quot;INVALID_CONGRUENCE_MODULUS&quot;);</span>
+<span class="fc" id="L41">        }</span>
+    }
+
+    /** A finite increasing progression; step is positive and count is nonnegative. */
+    public record Progression(BigInteger first, BigInteger step, BigInteger count) {
+<span class="fc" id="L46">        public Progression {</span>
+<span class="fc" id="L47">            Objects.requireNonNull(first);</span>
+<span class="fc" id="L48">            Objects.requireNonNull(step);</span>
+<span class="fc" id="L49">            Objects.requireNonNull(count);</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">            if (step.signum() &lt;= 0 || count.signum() &lt; 0)</span>
+<span class="fc" id="L51">                throw new IllegalArgumentException(&quot;INVALID_COVERAGE_PROGRESSION&quot;);</span>
+<span class="fc" id="L52">        }</span>
+    }
+
+    /** Immutable input, with the original rule order preserved for deterministic work. */
+    public record Request(Progression progression, List&lt;Rule&gt; rules) {
+<span class="fc" id="L57">        public Request {</span>
+<span class="fc" id="L58">            Objects.requireNonNull(progression);</span>
+<span class="fc" id="L59">            rules = List.copyOf(rules);</span>
+<span class="fc" id="L60">        }</span>
+    }
+
+    /**
+     * A signed indicator term for indices {@code firstIndex + period * j}, {@code j &gt;= 0},
+     * clipped to the source count. A singleton uses that finite count as its period.
+     * This record is certificate data; constructing it does not establish its validity.
+     */
+    public record Term(BigInteger firstIndex, BigInteger period, BigInteger coefficient) {
+<span class="fc" id="L69">        public Term {</span>
+<span class="fc" id="L70">            Objects.requireNonNull(firstIndex);</span>
+<span class="fc" id="L71">            Objects.requireNonNull(period);</span>
+<span class="fc" id="L72">            Objects.requireNonNull(coefficient);</span>
+<span class="fc" id="L73">        }</span>
+    }
+
+    /**
+     * Replayable finite evidence. Terms are sorted by first index then period, with
+     * identical rays merged. {@code leastIndex} is empty precisely for complete coverage.
+     * Arbitrary constructed certificates must be checked with {@link #verify}.
+     */
+    public record Certificate(Request source, List&lt;Term&gt; terms, BigInteger coveredCount,
+            Optional&lt;BigInteger&gt; leastIndex) {
+<span class="fc" id="L83">        public Certificate {</span>
+<span class="fc" id="L84">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L85">            terms = List.copyOf(terms);</span>
+<span class="fc" id="L86">            Objects.requireNonNull(coveredCount);</span>
+<span class="fc" id="L87">            Objects.requireNonNull(leastIndex);</span>
+<span class="fc" id="L88">        }</span>
+    }
+
+<span class="fc" id="L91">    public enum Status { COMPLETE_COVER, FOUND_UNCOVERED, UNAVAILABLE }</span>
+
+    /** Completed results carry evidence; interrupted or bounded-out results carry none. */
+    public record Result(Status status, Optional&lt;Certificate&gt; certificate, String reason, long work) {
+<span class="fc" id="L95">        public Result {</span>
+<span class="fc" id="L96">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L97">            Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L98">            Objects.requireNonNull(reason);</span>
+<span class="pc bpc" id="L99" title="2 of 6 branches missed.">            if (work &lt; 0 || (status == Status.UNAVAILABLE) == certificate.isPresent())</span>
+<span class="nc" id="L100">                throw new IllegalArgumentException(&quot;INVALID_COVERAGE_RESULT&quot;);</span>
+<span class="fc" id="L101">        }</span>
+
+        /** The absolute progression value at the least uncovered index, when found. */
+        public Optional&lt;BigInteger&gt; leastUncovered() {
+<span class="fc" id="L105">            return certificate.flatMap(proof -&gt; proof.leastIndex().map(index -&gt;</span>
+<span class="fc" id="L106">                proof.source().progression().first().add(proof.source().progression().step().multiply(index))));</span>
+        }
+    }
+
+    /** A verifier failure, including resource exhaustion, never validates partial evidence. */
+<span class="fc" id="L111">    public record Verification(boolean valid, String reason, long work) {}</span>
+
+    /**
+     * Counts the union exactly and, if needed, locates its least missing index by prefix counts.
+     * {@code maximumTerms} bounds the terms in each union map, including intermediate merges.
+     * The old and new maps coexist while adding a rule. Integer magnitudes are limited by
+     * {@code MAX_RUNTIME_BITS}.
+     */
+    public static Result search(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L120">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L121">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L123">            validateInput(request, work);</span>
+<span class="fc" id="L124">            var terms = reconstruct(request, work);</span>
+<span class="fc" id="L125">            var count = request.progression().count();</span>
+<span class="fc" id="L126">            var covered = count(terms, count, work);</span>
+<span class="fc" id="L127">            Optional&lt;BigInteger&gt; least = Optional.empty();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!covered.equals(count)) {</span>
+<span class="fc" id="L129">                var index = leastMissing(terms, count, work);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                if (directlyCovered(request, index, work)) throw new Unavailable(&quot;INCONSISTENT_UNION&quot;);</span>
+<span class="fc" id="L131">                least = Optional.of(index);</span>
+            }
+<span class="fc" id="L133">            var proof = new Certificate(request, terms, covered, least);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            var status = least.isPresent() ? Status.FOUND_UNCOVERED : Status.COMPLETE_COVER;</span>
+<span class="fc" id="L135">            return new Result(status, Optional.of(proof), status.name(), work.used);</span>
+<span class="fc" id="L136">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L137">            return new Result(Status.UNAVAILABLE, Optional.empty(), unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    /**
+     * Rebuilds the entire union from the supplied request, compares the certificate terms
+     * and count, then checks the claimed witness directly and its preceding prefix exactly.
+     * It does not trust a search status, a claimed covered count, or an untested witness.
+     */
+    public static Verification verify(Request request, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L148">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L149">        Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L150">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L152">            validateInput(request, work);</span>
+<span class="fc" id="L153">            validateInput(certificate.source(), work);</span>
+<span class="fc" id="L154">            work.charge(1L + request.rules().size());</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (!request.equals(certificate.source())) return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc" id="L156">            validateCertificate(certificate, work);</span>
+<span class="fc" id="L157">            var terms = reconstruct(request, work);</span>
+<span class="fc" id="L158">            work.charge(1L + terms.size());</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (!terms.equals(certificate.terms())) return invalid(&quot;TERMS_MISMATCH&quot;, work);</span>
+<span class="fc" id="L160">            var size = request.progression().count();</span>
+<span class="fc" id="L161">            var covered = count(terms, size, work);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (!covered.equals(certificate.coveredCount())) return invalid(&quot;COVERED_COUNT_MISMATCH&quot;, work);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (covered.equals(size)) {</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                if (certificate.leastIndex().isPresent()) return invalid(&quot;LEAST_INDEX_MISMATCH&quot;, work);</span>
+            } else {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                if (certificate.leastIndex().isEmpty()) return invalid(&quot;LEAST_INDEX_MISMATCH&quot;, work);</span>
+<span class="fc" id="L167">                var index = certificate.leastIndex().orElseThrow();</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">                if (index.signum() &lt; 0 || index.compareTo(size) &gt;= 0</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                        || !count(terms, index, work).equals(index)</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                        || directlyCovered(request, index, work)) {</span>
+<span class="fc" id="L171">                    return invalid(&quot;LEAST_INDEX_MISMATCH&quot;, work);</span>
+                }
+            }
+<span class="fc" id="L174">            work.charge(1);</span>
+<span class="fc" id="L175">            return new Verification(true, &quot;VERIFIED&quot;, work.used);</span>
+<span class="fc" id="L176">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L177">            return invalid(unavailable.getMessage(), work);</span>
+        }
+    }
+
+    private static Verification invalid(String reason, Work work) {
+<span class="fc" id="L182">        return new Verification(false, reason, work.used);</span>
+    }
+
+    private static void validateInput(Request request, Work work) {
+<span class="fc" id="L186">        work.charge(1);</span>
+<span class="fc" id="L187">        var progression = request.progression();</span>
+<span class="fc" id="L188">        work.integer(progression.first());</span>
+<span class="fc" id="L189">        work.integer(progression.step());</span>
+<span class="fc" id="L190">        work.integer(progression.count());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (progression.count().signum() &gt; 0) {</span>
+<span class="fc" id="L192">            work.add(progression.first(), work.multiply(progression.step(), work.subtract(progression.count(), ONE)));</span>
+        }
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (var rule : request.rules()) {</span>
+<span class="fc" id="L195">            work.integer(rule.modulus());</span>
+<span class="fc" id="L196">            work.integer(rule.residue());</span>
+<span class="fc" id="L197">            work.integer(rule.activeFrom());</span>
+<span class="fc" id="L198">        }</span>
+<span class="fc" id="L199">    }</span>
+
+    private static void validateCertificate(Certificate certificate, Work work) {
+<span class="fc" id="L202">        work.terms(certificate.terms().size());</span>
+<span class="fc" id="L203">        work.integer(certificate.coveredCount());</span>
+<span class="fc" id="L204">        certificate.leastIndex().ifPresent(work::integer);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (var term : certificate.terms()) {</span>
+<span class="fc" id="L206">            work.integer(term.firstIndex());</span>
+<span class="fc" id="L207">            work.integer(term.period());</span>
+<span class="fc" id="L208">            work.integer(term.coefficient());</span>
+<span class="fc" id="L209">        }</span>
+<span class="fc" id="L210">    }</span>
+
+<span class="fc" id="L212">    private record Ray(BigInteger first, BigInteger period) {}</span>
+
+    private static List&lt;Term&gt; reconstruct(Request request, Work work) {
+<span class="fc" id="L215">        var terms = new LinkedHashMap&lt;Ray, BigInteger&gt;();</span>
+<span class="fc" id="L216">        var size = request.progression().count();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (size.signum() == 0) return List.of();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        for (var rule : request.rules()) {</span>
+<span class="fc" id="L219">            var ray = indexRay(request.progression(), rule, work);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (ray == null) continue;</span>
+<span class="fc" id="L221">            work.charge(1L + terms.size());</span>
+<span class="fc" id="L222">            var next = new LinkedHashMap&lt;&gt;(terms);</span>
+<span class="fc" id="L223">            merge(next, ray, ONE, work);</span>
+            // 1_(U union A) = 1_U + 1_A - 1_U * 1_A, including signed existing terms.
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            for (var entry : terms.entrySet()) {</span>
+<span class="fc" id="L226">                var intersection = intersect(entry.getKey(), ray, size, work);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                if (intersection != null) merge(next, intersection, work.negate(entry.getValue()), work);</span>
+<span class="fc" id="L228">            }</span>
+<span class="fc" id="L229">            terms = next;</span>
+<span class="fc" id="L230">        }</span>
+<span class="fc" id="L231">        var result = new ArrayList&lt;Term&gt;(terms.size());</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (var entry : terms.entrySet()) {</span>
+<span class="fc" id="L233">            work.charge(1);</span>
+<span class="fc" id="L234">            result.add(new Term(entry.getKey().first(), entry.getKey().period(), entry.getValue()));</span>
+<span class="fc" id="L235">        }</span>
+<span class="fc" id="L236">        result.sort((left, right) -&gt; {</span>
+<span class="fc" id="L237">            work.charge(1L + Work.words(left.firstIndex()) + Work.words(right.firstIndex())</span>
+<span class="fc" id="L238">                + Work.words(left.period()) + Work.words(right.period()));</span>
+<span class="fc" id="L239">            int first = left.firstIndex().compareTo(right.firstIndex());</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            return first != 0 ? first : left.period().compareTo(right.period());</span>
+        });
+<span class="fc" id="L242">        return List.copyOf(result);</span>
+    }
+
+    private static void merge(Map&lt;Ray, BigInteger&gt; terms, Ray ray, BigInteger coefficient, Work work) {
+<span class="fc" id="L246">        work.charge(1);</span>
+<span class="fc" id="L247">        var combined = work.add(terms.getOrDefault(ray, ZERO), coefficient);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (combined.signum() == 0) terms.remove(ray);</span>
+<span class="fc" id="L249">        else terms.put(ray, combined);</span>
+<span class="fc" id="L250">        work.terms(terms.size());</span>
+<span class="fc" id="L251">    }</span>
+
+    private static Ray indexRay(Progression progression, Rule rule, Work work) {
+<span class="fc" id="L254">        var divisor = work.gcd(progression.step(), rule.modulus());</span>
+<span class="fc" id="L255">        var difference = work.subtract(rule.residue(), progression.first());</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (work.mod(difference, divisor).signum() != 0) return null;</span>
+<span class="fc" id="L257">        var period = work.divide(rule.modulus(), divisor);</span>
+<span class="fc" id="L258">        var residue = ZERO;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (!period.equals(ONE)) {</span>
+<span class="fc" id="L260">            var inverse = work.inverse(work.mod(work.divide(progression.step(), divisor), period), period);</span>
+<span class="fc" id="L261">            residue = work.mod(work.multiply(work.mod(work.divide(difference, divisor), period), inverse), period);</span>
+        }
+<span class="fc" id="L263">        var threshold = work.ceilDivide(work.subtract(rule.activeFrom(), progression.first()), progression.step()).max(ZERO);</span>
+<span class="fc" id="L264">        return clipped(lift(residue, period, threshold, work), period, progression.count(), work);</span>
+    }
+
+    private static Ray intersect(Ray left, Ray right, BigInteger count, Work work) {
+<span class="fc" id="L268">        work.charge(1);</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (left.period().equals(count)) return singletonIntersection(left, right, work);</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (right.period().equals(count)) return singletonIntersection(right, left, work);</span>
+<span class="fc" id="L271">        var divisor = work.gcd(left.period(), right.period());</span>
+<span class="fc" id="L272">        var difference = work.subtract(right.first(), left.first());</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (work.mod(difference, divisor).signum() != 0) return null;</span>
+<span class="fc" id="L274">        var rightReduced = work.divide(right.period(), divisor);</span>
+<span class="fc" id="L275">        var period = work.multiply(left.period(), rightReduced);</span>
+<span class="fc" id="L276">        var shift = ZERO;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (!rightReduced.equals(ONE)) {</span>
+<span class="fc" id="L278">            var inverse = work.inverse(work.mod(work.divide(left.period(), divisor), rightReduced), rightReduced);</span>
+<span class="fc" id="L279">            shift = work.mod(work.multiply(work.mod(work.divide(difference, divisor), rightReduced), inverse), rightReduced);</span>
+        }
+<span class="fc" id="L281">        var first = work.add(left.first(), work.multiply(left.period(), shift));</span>
+<span class="fc" id="L282">        return clipped(lift(first, period, left.first().max(right.first()), work), period, count, work);</span>
+    }
+
+    private static Ray singletonIntersection(Ray singleton, Ray other, Work work) {
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        return singleton.first().compareTo(other.first()) &gt;= 0</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                &amp;&amp; work.mod(work.subtract(singleton.first(), other.first()), other.period()).signum() == 0</span>
+<span class="fc" id="L288">            ? singleton : null;</span>
+    }
+
+    private static BigInteger lift(BigInteger first, BigInteger period, BigInteger threshold, Work work) {
+<span class="fc" id="L292">        work.charge(1);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (first.compareTo(threshold) &gt;= 0) return first;</span>
+<span class="fc" id="L294">        return work.add(first, work.multiply(period, work.ceilDivide(work.subtract(threshold, first), period)));</span>
+    }
+
+    private static Ray clipped(BigInteger first, BigInteger period, BigInteger count, Work work) {
+<span class="fc" id="L298">        work.charge(1);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (first.compareTo(count) &gt;= 0) return null;</span>
+        // Equal singleton sets must merge even if their original moduli were different.
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        return new Ray(first, period.compareTo(work.subtract(count, first)) &gt;= 0 ? count : period);</span>
+    }
+
+    private static BigInteger count(List&lt;Term&gt; terms, BigInteger boundary, Work work) {
+<span class="fc" id="L305">        var sum = ZERO;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        for (var term : terms) {</span>
+<span class="fc" id="L307">            work.charge(1);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            if (boundary.compareTo(term.firstIndex()) &lt;= 0) continue;</span>
+<span class="fc" id="L309">            var occurrences = work.add(work.divide(work.subtract(work.subtract(boundary, ONE), term.firstIndex()),</span>
+<span class="fc" id="L310">                term.period()), ONE);</span>
+<span class="fc" id="L311">            sum = work.add(sum, work.multiply(occurrences, term.coefficient()));</span>
+<span class="fc" id="L312">        }</span>
+<span class="fc" id="L313">        work.charge(1);</span>
+<span class="pc bpc" id="L314" title="2 of 4 branches missed.">        if (sum.signum() &lt; 0 || sum.compareTo(boundary) &gt; 0) throw new Unavailable(&quot;INCONSISTENT_UNION&quot;);</span>
+<span class="fc" id="L315">        return sum;</span>
+    }
+
+    private static BigInteger leastMissing(List&lt;Term&gt; terms, BigInteger size, Work work) {
+<span class="fc" id="L319">        var low = ZERO;</span>
+<span class="fc" id="L320">        var high = work.subtract(size, ONE);</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        while (low.compareTo(high) &lt; 0) {</span>
+<span class="fc" id="L322">            var middle = work.add(low, work.divide(work.subtract(high, low), BigInteger.TWO));</span>
+<span class="fc" id="L323">            var prefix = work.add(middle, ONE);</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            if (count(terms, prefix, work).equals(prefix)) low = prefix;</span>
+<span class="fc" id="L325">            else high = middle;</span>
+<span class="fc" id="L326">        }</span>
+<span class="fc" id="L327">        return low;</span>
+    }
+
+    private static boolean directlyCovered(Request request, BigInteger index, Work work) {
+<span class="fc" id="L331">        var value = work.add(request.progression().first(), work.multiply(request.progression().step(), index));</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        for (var rule : request.rules()) {</span>
+<span class="fc" id="L333">            work.charge(1);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            if (value.compareTo(rule.activeFrom()) &gt;= 0</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">                    &amp;&amp; work.mod(work.subtract(value, rule.residue()), rule.modulus()).signum() == 0) return true;</span>
+<span class="fc" id="L336">        }</span>
+<span class="fc" id="L337">        return false;</span>
+    }
+
+    private static final class Unavailable extends RuntimeException {
+<span class="fc" id="L341">        private Unavailable(String reason) { super(reason, null, false, false); }</span>
+    }
+
+    /** Word-based accounting for this integer algorithm; no polynomial semantics are involved. */
+    private static final class Work {
+        private final IterationLimits limits;
+        private final BooleanSupplier cancellation;
+<span class="fc" id="L348">        private final long start = System.nanoTime();</span>
+        private final long timeout;
+        private long used;
+
+<span class="fc" id="L352">        private Work(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L353">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L354">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L355">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L356">        }</span>
+
+        private void charge(long amount) {
+<span class="pc bpc" id="L359" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">            if (System.nanoTime() - start &gt;= timeout) throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
+<span class="pc bpc" id="L361" title="1 of 4 branches missed.">            if (amount &lt; 0 || amount &gt; limits.maximumWork() - used) throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L362">            used += amount;</span>
+<span class="fc" id="L363">        }</span>
+
+<span class="fc" id="L365">        private static int bits(BigInteger value) { return value.abs().bitLength(); }</span>
+<span class="fc" id="L366">        private static long words(BigInteger value) { return 1L + bits(value) / 64L; }</span>
+
+        private BigInteger integer(BigInteger value) {
+<span class="fc" id="L369">            charge(words(value));</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">            if (bits(value) &gt; IterationLimits.MAX_RUNTIME_BITS) throw new Unavailable(&quot;RUNTIME_BIT_LIMIT&quot;);</span>
+<span class="fc" id="L371">            return value;</span>
+        }
+
+        private void terms(int count) {
+<span class="fc" id="L375">            charge(1);</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (count &gt; limits.maximumTerms()) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L377">        }</span>
+
+        private BigInteger add(BigInteger left, BigInteger right) {
+<span class="fc" id="L380">            charge(1L + Math.max(words(left), words(right)));</span>
+<span class="fc" id="L381">            return integer(left.add(right));</span>
+        }
+
+        private BigInteger subtract(BigInteger left, BigInteger right) {
+<span class="fc" id="L385">            charge(1L + Math.max(words(left), words(right)));</span>
+<span class="fc" id="L386">            return integer(left.subtract(right));</span>
+        }
+
+        private BigInteger negate(BigInteger value) {
+<span class="fc" id="L390">            charge(words(value));</span>
+<span class="fc" id="L391">            return integer(value.negate());</span>
+        }
+
+        private BigInteger multiply(BigInteger left, BigInteger right) {
+<span class="fc" id="L395">            charge(1L + words(left) * words(right));</span>
+<span class="fc bfc" id="L396" title="All 4 branches covered.">            if (left.signum() != 0 &amp;&amp; right.signum() != 0</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">                    &amp;&amp; (long) bits(left) + bits(right) &gt; IterationLimits.MAX_RUNTIME_BITS + 1L) {</span>
+<span class="fc" id="L398">                throw new Unavailable(&quot;RUNTIME_BIT_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L400">            return integer(left.multiply(right));</span>
+        }
+
+        private BigInteger divide(BigInteger left, BigInteger right) {
+<span class="fc" id="L404">            charge(1L + words(left) * words(right));</span>
+<span class="fc" id="L405">            return integer(left.divide(right));</span>
+        }
+
+        private BigInteger ceilDivide(BigInteger numerator, BigInteger denominator) {
+<span class="fc" id="L409">            var quotient = divide(numerator, denominator);</span>
+<span class="fc bfc" id="L410" title="All 4 branches covered.">            return numerator.signum() &gt; 0 &amp;&amp; mod(numerator, denominator).signum() != 0</span>
+<span class="fc" id="L411">                ? add(quotient, ONE) : quotient;</span>
+        }
+
+        private BigInteger mod(BigInteger value, BigInteger modulus) {
+<span class="fc" id="L415">            charge(1L + words(value) * words(modulus));</span>
+<span class="fc" id="L416">            return integer(value.mod(modulus));</span>
+        }
+
+        private BigInteger gcd(BigInteger left, BigInteger right) {
+<span class="fc" id="L420">            charge(1L + words(left) * words(right));</span>
+<span class="fc" id="L421">            return integer(left.gcd(right));</span>
+        }
+
+        private BigInteger inverse(BigInteger value, BigInteger modulus) {
+<span class="fc" id="L425">            charge(1L + words(value) * words(modulus));</span>
+<span class="fc" id="L426">            return integer(value.modInverse(modulus));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
