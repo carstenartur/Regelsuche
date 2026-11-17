@@ -92,47 +92,66 @@ public final class CoveragePages {
     }
 
     private static XmlCounts readXml(Path path, boolean readGroups) throws IOException {
-        var totals = new EnumMap<CounterEntity, Counter>(CounterEntity.class);
         var modules = new TreeMap<String, Map<CounterEntity, Counter>>();
         try (var input = Files.newInputStream(path)) {
             var reader = CoverageRegression.reportXmlFactory().createXMLStreamReader(input);
             try {
-                int depth = 0;
-                Map<CounterEntity, Counter> group = null;
-                while (reader.hasNext()) {
-                    int event = reader.next();
-                    if (event == XMLStreamConstants.END_ELEMENT) {
-                        if (depth-- == 2) group = null;
-                    } else if (event == XMLStreamConstants.START_ELEMENT) {
-                        depth++;
-                        if (depth == 1 && !isUnnamespaced(reader, "report")) {
-                            throw new IOException("JaCoCo XML must have an unnamespaced <report> root");
-                        }
-                        if (readGroups && depth == 2 && isUnnamespaced(reader, "group")) {
-                            group = new EnumMap<>(CounterEntity.class);
-                            String name = reader.getAttributeValue(null, "name");
-                            if (name == null || modules.putIfAbsent(name, group) != null) {
-                                throw new IOException("Invalid or duplicate JaCoCo group: " + name);
-                            }
-                        }
-                        if (isUnnamespaced(reader, "counter")) {
-                            if (depth == 2) {
-                                readCounter(reader, totals);
-                            } else if (depth == 3 && group != null) {
-                                readCounter(reader, group);
-                            }
-                        }
-                    }
+                if (!nextChild(reader) || !isUnnamespaced(reader, "report")) {
+                    throw new IOException("JaCoCo XML must have an unnamespaced <report> root");
                 }
+                var totals = readCounters(reader, readGroups ? modules : null);
+                while (reader.hasNext()) reader.next();
+                return new XmlCounts(totals, modules);
             } finally {
                 reader.close();
             }
         } catch (XMLStreamException failure) {
             throw new IOException("Cannot parse " + path + ": " + failure.getMessage(), failure);
         }
-        complete(totals);
-        modules.values().forEach(CoveragePages::complete);
-        return new XmlCounts(totals, modules);
+    }
+
+    private static Map<CounterEntity, Counter> readCounters(XMLStreamReader reader,
+            Map<String, Map<CounterEntity, Counter>> modules) throws IOException, XMLStreamException {
+        var counters = new EnumMap<CounterEntity, Counter>(CounterEntity.class);
+        while (nextChild(reader)) {
+            if (modules != null && isUnnamespaced(reader, "group")) {
+                readGroup(reader, modules);
+                continue;
+            }
+            if (isUnnamespaced(reader, "counter")) readCounter(reader, counters);
+            skipElement(reader);
+        }
+        complete(counters);
+        return counters;
+    }
+
+    private static void readGroup(XMLStreamReader reader, Map<String, Map<CounterEntity, Counter>> modules)
+            throws IOException, XMLStreamException {
+        String name = reader.getAttributeValue(null, "name");
+        if (name == null || modules.containsKey(name)) {
+            throw new IOException("Invalid or duplicate JaCoCo group: " + name);
+        }
+        modules.put(name, readCounters(reader, null));
+    }
+
+    private static boolean nextChild(XMLStreamReader reader) throws XMLStreamException {
+        while (reader.hasNext()) {
+            int event = reader.next();
+            if (event == XMLStreamConstants.START_ELEMENT) return true;
+            if (event == XMLStreamConstants.END_ELEMENT) return false;
+        }
+        return false;
+    }
+
+    private static void skipElement(XMLStreamReader reader) throws XMLStreamException {
+        int depth = 1;
+        while (depth > 0) {
+            switch (reader.next()) {
+                case XMLStreamConstants.START_ELEMENT -> depth++;
+                case XMLStreamConstants.END_ELEMENT -> depth--;
+                default -> { }
+            }
+        }
     }
 
     private static void readCounter(XMLStreamReader reader, Map<CounterEntity, Counter> counters)
