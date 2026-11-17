@@ -73,7 +73,10 @@ isolated JMH and SymPy artifacts from the same workflow run. The Maven
 `verify-cross-authority-coverage` profile runs the Java verifier through
 Failsafe. The verifier joins the isolated SymPy XML, rejects an occupied canonical
 path and prints the SHA-256 of the byte-identical installed report before
-evaluating the existing coverage policy. The job then invokes the collector with
+evaluating the existing coverage policy. With `-Dregelsuche.coverage.publish=true`,
+the same Failsafe execution also renders the standard JaCoCo pages from every
+module's retained execution data, classes and sources and verifies their counters
+against the canonical reports and gate. The job then invokes the collector with
 `--require-complete`. The new `quality-acceptance-evidence` artifact contains
 only the collector's output. The existing `repository-verification`,
 `jmh-verification`, `sympy-runtime-verification`, `coverage-verification` and
@@ -95,6 +98,9 @@ mvn -pl regelsuche-quality -Pverify-cross-authority-coverage -DskipTests verify 
 The profile defaults to the isolated report path shown above and the current
 checkout as the evidence tree. `-DskipTests` skips the ordinary Surefire suite
 while the profile's Failsafe verification runs on the retained inputs.
+To reproduce the coverage site as well, add `-Dregelsuche.coverage.publish=true`
+and include the `inputs` directories alongside the XML reports in the evidence
+tree, including the isolated SymPy report's sibling `inputs` directory.
 
 Historical charts and safe generation reuse have already been implemented and
 measured with the limits described in [performance history](performance-history.md)
