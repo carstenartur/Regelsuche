@@ -346,18 +346,32 @@ jobs:
         if: steps.release-state.outputs.publication_required == 'true'
         env:
           VERSION: ${{ steps.release-state.outputs.release_version }}
+          EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}
         run: |
           set -euo pipefail
-          NOTES="docs/releases/${VERSION}.md"
-          if [[ ! -s "$NOTES" ]]; then
-            echo "::error::Missing curated release notes: ${NOTES}"
-            exit 1
+          if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/MavenCuratedReleaseNotesTest.java ]]; then
+            # Current releases use the same Maven/JUnit authority as the build contract.
+            mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+              -Dtest=MavenCuratedReleaseNotesTest \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dregelsuche.expectedCuratedReleaseNotesVersion="$VERSION" test
+          else
+            # Historic-tag recovery only. Missing Java authority on a fresh release is fatal.
+            if [[ "$EXISTING_TAG" != 'true' ]]; then
+              echo "::error::Missing Maven curated release-notes verifier in a new release" >&2
+              exit 1
+            fi
+            NOTES="docs/releases/${VERSION}.md"
+            if [[ ! -s "$NOTES" ]]; then
+              echo "::error::Missing curated release notes: ${NOTES}"
+              exit 1
+            fi
+            if [[ "$(head -n 1 "$NOTES" | tr -d '\r')" != "# Regelsuche ${VERSION}" ]]; then
+              echo "::error::Curated release notes must start with '# Regelsuche ${VERSION}'"
+              exit 1
+            fi
+            git diff --check -- "$NOTES"
           fi
-          if [[ "$(head -n 1 "$NOTES" | tr -d '\r')" != "# Regelsuche ${VERSION}" ]]; then
-            echo "::error::Curated release notes must start with '# Regelsuche ${VERSION}'"
-            exit 1
-          fi
-          git diff --check -- "$NOTES"
 
       - name: Check Maven Central credentials
         if: >-
