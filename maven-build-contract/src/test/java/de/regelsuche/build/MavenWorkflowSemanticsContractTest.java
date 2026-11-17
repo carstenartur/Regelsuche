@@ -125,7 +125,7 @@ class MavenWorkflowSemanticsContractTest {
         "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check",
         "python3 -B scripts/package-student-sdk.py \\",
         "python3 -B scripts/package-optimization-sdk.py \\",
-        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\"",
+        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\""
     );
 
     @Test
