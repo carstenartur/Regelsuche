@@ -21,6 +21,15 @@ ordered tuples and the shared kernel's inversion plans, with independent checks 
 explicit limits. The standalone Java25 consumer exercises runtime polynomial and affine plans,
 including rejection of changed evidence.
 
+The current `0.5.4-SNAPSHOT` source also exposes
+`de.regelsuche.sdk.optimization.modular.CongruenceCoverageSdk` for exact
+coverage of finite arithmetic progressions by congruences with activation
+thresholds. The mathematics and certificate replay live in
+`regelsuche-math-algorithms`; the SDK forwards the request, work/state/time
+limits and cancellation token. See [the mathematical contract and
+reproduction](../docs/research/congruence-coverage.md), including the
+trillion-slot scheduling example and the limits of finite certificates.
+
 The Java 25 headless facade `de.regelsuche.sdk.optimization.ComputationOptimizer`
 uses the existing `JointPlanSearch`, `JointComputationPlan` and
 `PreparedJointComputation`. It does not contain an Eclipse adapter or a second
