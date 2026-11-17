@@ -24,9 +24,9 @@ import javax.xml.stream.XMLStreamReader;
 /** Evaluates the checkout policy against canonical JaCoCo XML measurements. */
 final class CoverageRegression {
     private static final Path REPORT = Path.of("build/reports/jacoco/test/jacocoTestReport.xml");
-    private static final String POLICY_SCHEMA = "regelsuche.quality.coverage-policy/v1";
-    private static final String REPORT_SCHEMA = "regelsuche.quality.coverage-report/v1";
-    private static final JsonMapper POLICY_JSON = JsonMapper.builder()
+    static final String POLICY_SCHEMA = "regelsuche.quality.coverage-policy/v1";
+    static final String REPORT_SCHEMA = "regelsuche.quality.coverage-report/v1";
+    static final JsonMapper COVERAGE_JSON = JsonMapper.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .build();
@@ -68,7 +68,7 @@ final class CoverageRegression {
     private static Policy readPolicy(Path path) throws IOException {
         JsonNode root;
         try {
-            root = POLICY_JSON.readTree(path.toFile());
+            root = COVERAGE_JSON.readTree(path.toFile());
         } catch (IOException error) {
             throw new IOException("cannot read policy " + path + ": " + error.getMessage(), error);
         }
@@ -119,13 +119,9 @@ final class CoverageRegression {
     }
 
     private static Counters readReport(Path path) throws IOException {
-        XMLInputFactory factory = XMLInputFactory.newFactory();
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-        factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         Map<String, Counter> counters = new TreeMap<>();
         try (var input = Files.newInputStream(path)) {
-            XMLStreamReader reader = factory.createXMLStreamReader(input);
+            XMLStreamReader reader = reportXmlFactory().createXMLStreamReader(input);
             try {
                 readTopLevelCounters(reader, counters);
             } finally {
@@ -167,7 +163,15 @@ final class CoverageRegression {
         }
     }
 
-    private static boolean isUnnamespaced(XMLStreamReader reader, String name) {
+    static XMLInputFactory reportXmlFactory() {
+        XMLInputFactory factory = XMLInputFactory.newFactory();
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        return factory;
+    }
+
+    static boolean isUnnamespaced(XMLStreamReader reader, String name) {
         String namespace = reader.getNamespaceURI();
         return (namespace == null || namespace.isEmpty()) && name.equals(reader.getLocalName());
     }
@@ -181,10 +185,10 @@ final class CoverageRegression {
         return new BigDecimal(value).setScale(scale, RoundingMode.HALF_EVEN);
     }
 
-    private record Counter(BigInteger missed, BigInteger covered) {
-        private static final Counter ZERO = new Counter(BigInteger.ZERO, BigInteger.ZERO);
+    record Counter(BigInteger missed, BigInteger covered) {
+        static final Counter ZERO = new Counter(BigInteger.ZERO, BigInteger.ZERO);
 
-        private static Counter read(XMLStreamReader reader, String kind) throws IOException {
+        static Counter read(XMLStreamReader reader, String kind) throws IOException {
             try {
                 BigInteger missed = count(reader, "missed");
                 BigInteger covered = count(reader, "covered");
@@ -205,11 +209,11 @@ final class CoverageRegression {
             return new BigInteger(value.strip());
         }
 
-        private Counter plus(Counter other) {
+        Counter plus(Counter other) {
             return new Counter(missed.add(other.missed), covered.add(other.covered));
         }
 
-        private double percent() {
+        double percent() {
             BigInteger total = missed.add(covered);
             return total.signum() == 0 ? 100.0 : 100.0 * covered.doubleValue() / total.doubleValue();
         }

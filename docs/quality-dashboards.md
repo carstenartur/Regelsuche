@@ -24,9 +24,9 @@ Each module retains its actual JaCoCo execution data, filtered class directories
 and source directories under `build/reports/jacoco/test/inputs`. The small Java
 assembly adapter uses a separate execution-data store per module: tests of an
 application must not silently change a dependency module's canonical coverage.
-JaCoCo itself owns analysis and all HTML/XML rendering. The renderer runtime is
-retained under `build/reports/quality/coverage-report-runtime` in the existing
-verification artifact for HTML/XML rendering. Local Gradle and the
+JaCoCo itself owns analysis and all HTML/XML rendering. The local Gradle task
+stages the renderer runtime under `build/reports/quality/coverage-report-runtime`.
+Local Gradle and the
 `verify-cross-authority-coverage` Maven profile invoke the same Java decision
 and write the v1 JSON and Markdown reports. The Maven profile verifies the
 retained JaCoCo inputs without repeating the measured tests.
@@ -43,9 +43,10 @@ duplicate or inconsistent modules abort publication. The badge explicitly report
 not an independent recursive sum of instruction counters. Its green colour means
 the existing repository and module coverage gates passed; no floor is lowered.
 
-In split CI, the Gradle producer generates test pages only. After the isolated
-SymPy report is joined, convergence renders and validates the complete coverage
-site once and retains it in `coverage-verification`, including `jacoco.xml`.
+In split CI, the Gradle producer generates test pages only. The Maven profile
+joins the isolated SymPy report and, with `-Dregelsuche.coverage.publish=true`,
+renders and validates the complete coverage site from the retained inputs.
+Convergence retains the site in `coverage-verification`, including `jacoco.xml`.
 Pages restores that complete site rather than publishing a producer's subset.
 
 Native GitHub coverage upload is not part of this report path or `ciCheck`.

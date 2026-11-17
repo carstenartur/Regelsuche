@@ -360,15 +360,10 @@ jobs:
         with:
           name: jmh-verification
           path: .
-      - name: Verify complete cross-authority coverage
+      - name: Verify complete cross-authority coverage and render standard JaCoCo pages
         run: >-
           mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
-          -Pverify-cross-authority-coverage -DskipTests verify
-      - name: Generate complete standard JaCoCo coverage report
-        run: >-
-          python3 -B scripts/generate-ci-pages.py --coverage-only
-          --sympy-inputs
-          build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/inputs
+          -Pverify-cross-authority-coverage -Dregelsuche.coverage.publish=true -DskipTests verify
       - name: Collect complete checkout-owned quality acceptance evidence
         id: acceptance_evidence
         run: >-

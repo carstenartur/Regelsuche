@@ -38,6 +38,8 @@ SECTIONS = {
         "supportFiles": ["gradle/quality-gates.gradle", "regelsuche-quality/build.gradle",
                          ".github/workflows/gradle.yml", "regelsuche-quality/pom.xml",
                          "regelsuche-quality/src/test/java/de/regelsuche/quality/coverage/IsolatedCoverageInputTest.java",
+                         "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoveragePages.java",
+                         "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/JacocoAggregateReport.java",
                          "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/IsolatedCoverageInput.java",
                          "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoverageRegression.java",
                          "regelsuche-quality/src/main/java/de/regelsuche/quality/coverage/CoverageRegressionMain.java"]},

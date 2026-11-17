@@ -2,15 +2,15 @@ package de.regelsuche.quality.coverage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,7 +33,7 @@ class CoveragePagesContractTest {
     @Test
     void publishesLineBadgeWithoutOverwritingStandardHtmlOrCountingNestedSummaries() throws Exception {
         fixture();
-        assertEquals(0, publish(), () -> readLog());
+        assertEquals("90.00", publish());
         assertEquals("standard JaCoCo", Files.readString(temporary.resolve("public/coverage/index.html")));
         JsonNode badge = JSON.readTree(temporary.resolve("public/coverage/badge.json").toFile());
         assertEquals("90.00%", badge.path("message").asText());
@@ -81,7 +81,7 @@ class CoveragePagesContractTest {
             default -> throw new IllegalArgumentException(defect);
         }
         Files.writeString(aggregate, xml);
-        assertTrue(publish() != 0, defect);
+        assertThrows(IOException.class, this::publish, defect);
         assertFalse(Files.exists(temporary.resolve("public/coverage/badge.json")), defect);
     }
 
@@ -93,10 +93,10 @@ class CoveragePagesContractTest {
         int end = workflow.indexOf("\n  publish-pages:", start);
         String verification = workflow.substring(start, end);
         int coverageGate = verification.indexOf("mvn --batch-mode --no-transfer-progress -pl regelsuche-quality\n"
-            + "          -Pverify-cross-authority-coverage -DskipTests verify");
+            + "          -Pverify-cross-authority-coverage -Dregelsuche.coverage.publish=true -DskipTests verify");
         assertTrue(coverageGate >= 0);
-        assertTrue(coverageGate < verification.indexOf("scripts/generate-ci-pages.py --coverage-only"));
-        assertTrue(verification.contains("--sympy-inputs"));
+        assertTrue(coverageGate < verification.indexOf("Collect complete checkout-owned quality acceptance evidence"));
+        assertFalse(verification.contains("scripts/generate-ci-pages.py"));
         assertTrue(verification.contains("public/coverage/**"));
         assertFalse(workflow.contains("NativeCodeCoverage"));
         assertFalse(workflow.contains("code-quality: write"));
@@ -125,28 +125,8 @@ class CoveragePagesContractTest {
         write(temporary.relativize(canonical()).toString(), "<report><package><counter type=\"INSTRUCTION\" missed=\"900\" covered=\"0\"/></package>" + COUNTERS + "</report>");
     }
 
-    private int publish() throws Exception {
-        Path root = Path.of(System.getProperty("regelsuche.repositoryRoot"));
-        // Only the external renderer boundary is replaced here. Output/count
-        // validation runs unchanged; JacocoAggregateReportTest tests rendering.
-        String program = """
-            import runpy, sys
-            from pathlib import Path
-            from unittest.mock import patch
-            module = runpy.run_path(sys.argv[1])
-            with patch('subprocess.run'):
-                module['generate_coverage'](Path('public'))
-            """;
-        Process process = new ProcessBuilder(List.of("python3", "-B", "-c", program,
-            root.resolve("scripts/generate-ci-pages.py").toString()))
-            .directory(temporary.toFile()).redirectErrorStream(true)
-            .redirectOutput(temporary.resolve("publisher.log").toFile()).start();
-        try {
-            assertTrue(process.waitFor(30, TimeUnit.SECONDS), "publisher timed out");
-            return process.exitValue();
-        } finally {
-            if (process.isAlive()) process.destroyForcibly();
-        }
+    private String publish() throws IOException {
+        return CoveragePages.writeBadge(temporary, temporary.resolve("public/coverage"), CoveragePages.Gate.read(temporary));
     }
 
     private static String group() {
@@ -175,8 +155,4 @@ class CoveragePagesContractTest {
         JSON.writeValue(temporary.resolve("build/reports/quality/coverage-report.json").toFile(), gate);
     }
 
-    private String readLog() {
-        try { return Files.readString(temporary.resolve("publisher.log")); }
-        catch (Exception exception) { return exception.toString(); }
-    }
 }
