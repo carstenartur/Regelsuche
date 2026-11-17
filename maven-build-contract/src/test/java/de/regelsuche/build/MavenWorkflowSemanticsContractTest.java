@@ -292,7 +292,7 @@ class MavenWorkflowSemanticsContractTest {
             "undeclared-host-runtime"));
         for (String extra : List.of(
                 command,
-                "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check",
+                "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\" --check",
                 "python3 -B scripts/undeclared-release.py",
                 "/usr/bin/python3 -B scripts/undeclared-release.py",
                 "env python3 -B scripts/undeclared-release.py",
