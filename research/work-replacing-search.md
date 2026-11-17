@@ -8,6 +8,12 @@ This is a new opt-in search slice, not a reinterpretation of the frozen negative
 
 The caller must declare state locality for providers, mathematical admission, valuation and any objective. Previous-rule or depth-dependent eligibility, changing external inventories and non-monotone resource policies do not satisfy this contract. The declaration is not inferred from a learned-rule score and does not grant proof authority. `PATH_SENSITIVE` remains the default. Complete-reference mode rejects the opt-in contract rather than silently pruning its relation. A pruned run does not claim complete bounded closure.
 
+The state-local index charges each comparison before performing it. Replacement
+requires enough work to compare the full label set and invalidate every dominated
+label. If the allowance runs out, the previously admitted labels remain current.
+A verified edge whose index admission cannot be paid records `WORK_LIMIT` and
+keeps its verification receipt.
+
 `TypedSourceOnlySearch.searchUntil(problem, objective, maximumOutputScore, contract)` updates an incumbent while the same frontier runs and stops at the explicit quality threshold. No desired expression is supplied. Initial satisfaction needs no candidate generation, equal scores retain the first incumbent, and rejected proposals never supply an incumbent. `QUALITY_REACHED` is distinct from `TARGET_REACHED`: source-only `reached()` remains false. This is sufficient quality, not a claim of global optimality.
 
 Online objective inspections and final path materialization are charged to search work. The wrapper independently replays the complete selected witness and adds that charge afterward. Callers must require `withinBudget()` as well as the requested output quality; a final replay overrun remains visible and is not a successful budget-respecting result. The old `search(problem, objective)` retains its post-search selection and accounting contract.
@@ -25,6 +31,18 @@ The initial focused local run used unchanged sources with Java 21 for the compil
 | Actual `x + 0` rewrite with a synthetic costed late provider: charged work including selected replay | 190 | 23 |
 
 The graph fixture retains the same reached expression set and pays all new index charges. The second fixture uses real typed matching and replay, but its late provider has an explicitly synthetic cost receipt. Neither table is a wall-time, memory, independently held-out or end-to-end learning result.
+
+The budget regression uses a single verifiable graph edge with an allowance of
+15 units, all spent by the end of verification. Previously, the search spent 17
+units and reported an enqueue. With bounded admission it spends 15 and retains
+the verified attempt as `WORK_LIMIT`. The funded case still reaches the same
+target at primitive depth one. An index test also checks that a short path and a
+primitive-frugal path both survive an unaffordable replacement and are both
+retired when the replacement has enough work.
+
+```bash
+./mvnw -pl regelsuche-search -am -Dtest=MoveSearchDominanceTest,MoveSearchVisitsTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
 
 `CheckedSchemaWorkReplacementTest` separately exercises the actual learner, exact schema formation, serialized model restoration and the same primitive/schema inventory on compound substitutions. It records BASE quality-controlled work, learned quality-controlled work, continued learned-search work, and training/restore charges. Its fixed schema-first scheduling is not an oracle selecting a desired target and is not a newly learned utility policy. The integration test is included in normal Java 25 CI; no local Java 25 result is claimed by the initial focused run.
 

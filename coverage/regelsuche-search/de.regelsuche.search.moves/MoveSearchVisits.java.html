@@ -37,44 +37,67 @@ final class MoveSearchVisits&lt;S extends SearchExecution.Position&lt;?&gt;&gt; 
 <span class="fc" id="L37">        this.charge = Objects.requireNonNull(charge);</span>
 <span class="fc" id="L38">    }</span>
 
-    MoveSearch.Decision rejection(S state, long theoryWork) {
-<span class="fc" id="L41">        var proposed = new Label&lt;&gt;(state, theoryWork);</span>
-<span class="fc bfc" id="L42" title="All 4 branches covered.">        if (!stateLocal) return live.contains(proposed) ? MoveSearch.Decision.DUPLICATE : null;</span>
-<span class="fc" id="L43">        charge.accept(1);</span>
-<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (var admitted : positions.getOrDefault(Position.of(state), List.of())) {</span>
-<span class="fc" id="L45">            charge.accept(1);</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (admitted.noMoreExpensiveThan(proposed)) {</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">                return admitted.equals(proposed) ? MoveSearch.Decision.DUPLICATE : MoveSearch.Decision.DOMINATED;</span>
+<span class="fc" id="L40">    boolean stateLocal() { return stateLocal; }</span>
+
+    MoveSearch.Decision rejection(S state, long theoryWork, long remaining) {
+<span class="fc" id="L43">        var proposed = new Label&lt;&gt;(state, theoryWork);</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">        if (!stateLocal) return live.contains(proposed) ? MoveSearch.Decision.DUPLICATE : null;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (remaining-- &lt;= 0) return MoveSearch.Decision.WORK_LIMIT;</span>
+<span class="fc" id="L46">        charge.accept(1);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (var admitted : positions.getOrDefault(Position.of(state), List.of())) {</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (remaining-- &lt;= 0) return MoveSearch.Decision.WORK_LIMIT;</span>
+<span class="fc" id="L49">            charge.accept(1);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (admitted.noMoreExpensiveThan(proposed)) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                return admitted.equals(proposed) ? MoveSearch.Decision.DUPLICATE : MoveSearch.Decision.DOMINATED;</span>
             }
-<span class="fc" id="L49">        }</span>
-<span class="fc" id="L50">        return null;</span>
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        return null;</span>
     }
 
-    void add(S state, long theoryWork) {
-<span class="fc" id="L54">        var admitted = new Label&lt;&gt;(state, theoryWork);</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (stateLocal) {</span>
-<span class="fc" id="L56">            charge.accept(1);</span>
-<span class="fc" id="L57">            var alternatives = positions.computeIfAbsent(Position.of(state), ignored -&gt; new ArrayList&lt;&gt;());</span>
-<span class="fc" id="L58">            var iterator = alternatives.iterator();</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
-<span class="fc" id="L60">                charge.accept(1);</span>
-<span class="fc" id="L61">                var previous = iterator.next();</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (admitted.noMoreExpensiveThan(previous)) {</span>
-<span class="fc" id="L63">                    iterator.remove();</span>
-<span class="fc" id="L64">                    live.remove(previous);</span>
-<span class="fc" id="L65">                    charge.accept(1);</span>
-                }
-<span class="fc" id="L67">            }</span>
-<span class="fc" id="L68">            alternatives.add(admitted);</span>
+    boolean add(S state, long theoryWork, long remaining) {
+<span class="fc" id="L58">        var admitted = new Label&lt;&gt;(state, theoryWork);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (stateLocal) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (remaining-- &lt;= 0) return false;</span>
+<span class="fc" id="L61">            charge.accept(1);</span>
+<span class="fc" id="L62">            Position position = Position.of(state);</span>
+<span class="fc" id="L63">            var alternatives = positions.get(position);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (alternatives == null) {</span>
+<span class="fc" id="L65">                alternatives = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L66">                positions.put(position, alternatives);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            } else if (!removeDominated(admitted, alternatives, remaining)) {</span>
+<span class="fc" id="L68">                return false;</span>
+            }
+<span class="fc" id="L70">            alternatives.add(admitted);</span>
         }
-<span class="fc" id="L70">        live.add(admitted);</span>
-<span class="fc" id="L71">    }</span>
+<span class="fc" id="L72">        live.add(admitted);</span>
+<span class="fc" id="L73">        return true;</span>
+    }
+
+    private boolean removeDominated(Label&lt;S&gt; admitted, List&lt;Label&lt;S&gt;&gt; alternatives, long remaining) {
+        // Establish the complete replacement and afford all removals before
+        // invalidating old frontier tickets or publishing the new label.
+<span class="fc" id="L79">        List&lt;Integer&gt; dominated = List.of();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (int i = 0; i &lt; alternatives.size(); i++) {</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (remaining-- &lt;= 0) return false;</span>
+<span class="fc" id="L82">            charge.accept(1);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (admitted.noMoreExpensiveThan(alternatives.get(i))) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                if (dominated.isEmpty()) dominated = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L85">                dominated.add(i);</span>
+            }
+        }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (remaining &lt; dominated.size()) return false;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (int i = dominated.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L90">            charge.accept(1);</span>
+<span class="fc" id="L91">            live.remove(alternatives.remove(dominated.get(i).intValue()));</span>
+        }
+<span class="fc" id="L93">        return true;</span>
+    }
 
     /** Invalidated tickets must not open or resume a picker, or consume another state slot. */
     boolean current(S state, long theoryWork) {
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!stateLocal) return true;</span>
-<span class="fc" id="L76">        charge.accept(1);</span>
-<span class="fc" id="L77">        return live.contains(new Label&lt;&gt;(state, theoryWork));</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!stateLocal) return true;</span>
+<span class="fc" id="L99">        charge.accept(1);</span>
+<span class="fc" id="L100">        return live.contains(new Label&lt;&gt;(state, theoryWork));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

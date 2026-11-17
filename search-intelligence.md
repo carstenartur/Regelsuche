@@ -37,6 +37,11 @@ states, prunes already-known-better paths and may retain a non-improving path
 when it introduces a new rule combination. Decisions are exposed at
 `/api/memory/pruning`.
 
+BestFirst searches with a `SYNTAX_EXACT` target still record observations in the
+table. They reconstruct a concrete path in the current run, since a stored
+canonical value can summarize another syntax or a different continuation. The
+in-run visited checks and search budgets control expansion for those searches.
+
 ## Structural diversity
 
 `DIVERSITY_DISCOVERY` is a deterministic target-blind diagnostic profile. At

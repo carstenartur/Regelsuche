@@ -136,381 +136,387 @@ import static de.regelsuche.search.moves.MoveSearch.*;
 <span class="fc" id="L136">            root = problem.state(root.expression(), 0, 0, &quot;&quot;, root.assumptions(), rootValue.capabilities().keySet(), 0);</span>
 <span class="fc" id="L137">            recordAssessment(assessments,root,rootValue);</span>
 <span class="fc" id="L138">            ledger.observe(root, MoveWitnessPath.root());</span>
-<span class="fc" id="L139">            frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.root(), rootValue), 0, serial[0]++));</span>
-<span class="fc" id="L140">            visited.add(root, 0);</span>
-<span class="fc" id="L141">            problem.checkpoint();</span>
-<span class="fc" id="L142">        }</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (!visited.add(root, 0, budget.totalWork() - ledger.total())) {</span>
+<span class="fc" id="L140">                stop(Outcome.WORK_EXHAUSTED);</span>
+<span class="fc" id="L141">                return;</span>
+            }
+<span class="fc" id="L143">            frontier.add(new Ticket(new Node(root, 0, MoveWitnessPath.root(), rootValue), 0, serial[0]++));</span>
+<span class="fc" id="L144">            problem.checkpoint();</span>
+<span class="fc" id="L145">        }</span>
 
         SearchExecution.Result&lt;S,M,V,A&gt; run() {
             try {
-<span class="fc" id="L146">                initialize();</span>
-<span class="fc bfc" id="L147" title="All 4 branches covered.">                while (!stopped &amp;&amp; !frontier.isEmpty()) {</span>
-<span class="fc" id="L148">                    advance();problem.checkpoint();</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                    if(!problem.ownershipComplete())stop(Outcome.INCONCLUSIVE);</span>
+<span class="fc" id="L149">                initialize();</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">                while (!stopped &amp;&amp; !frontier.isEmpty()) {</span>
+<span class="fc" id="L151">                    advance();problem.checkpoint();</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                    if(!problem.ownershipComplete())stop(Outcome.INCONCLUSIVE);</span>
                 }
-<span class="fc" id="L151">            } catch(SearchExecution.ResourceLimit exhausted) {</span>
-<span class="fc" id="L152">                var unreturned=exhausted.takeWork();</span>
-<span class="fc" id="L153">                ledger.search=Math.addExact(ledger.search,unreturned.mechanical());</span>
-<span class="fc" id="L154">                ledger.primitive=Math.addExact(ledger.primitive,unreturned.mathematics().canonicalWorkUnits());</span>
-<span class="fc" id="L155">                ledger.verification=Math.addExact(ledger.verification,unreturned.verification());</span>
-<span class="fc" id="L156">                stop(Outcome.INCONCLUSIVE);</span>
+<span class="fc" id="L154">            } catch(SearchExecution.ResourceLimit exhausted) {</span>
+<span class="fc" id="L155">                var unreturned=exhausted.takeWork();</span>
+<span class="fc" id="L156">                ledger.search=Math.addExact(ledger.search,unreturned.mechanical());</span>
+<span class="fc" id="L157">                ledger.primitive=Math.addExact(ledger.primitive,unreturned.mathematics().canonicalWorkUnits());</span>
+<span class="fc" id="L158">                ledger.verification=Math.addExact(ledger.verification,unreturned.verification());</span>
+<span class="fc" id="L159">                stop(Outcome.INCONCLUSIVE);</span>
             }
             finally {
-<span class="fc" id="L159">                closeIncremental(opened, ledger);</span>
-<span class="fc bfc" id="L160" title="All 6 branches covered.">                if(active!=null &amp;&amp; active.picker!=null &amp;&amp; !active.picker.incremental())ledger.collect(active);</span>
+<span class="fc" id="L162">                closeIncremental(opened, ledger);</span>
+<span class="fc bfc" id="L163" title="All 6 branches covered.">                if(active!=null &amp;&amp; active.picker!=null &amp;&amp; !active.picker.incremental())ledger.collect(active);</span>
             }
-<span class="fc" id="L162">            return finish();</span>
+<span class="fc" id="L165">            return finish();</span>
         }
 
         /** Preserve the ordering of quality, work, dominance and state-limit checks. */
         private void advance() {
-<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (ledger.qualityReached()) {</span>
-<span class="fc bfc" id="L168" title="All 2 branches covered.">                stop(ledger.total() &lt;= budget.totalWork() ? Outcome.QUALITY_REACHED : Outcome.WORK_EXHAUSTED);</span>
-<span class="fc" id="L169">                return;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (ledger.qualityReached()) {</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                stop(ledger.total() &lt;= budget.totalWork() ? Outcome.QUALITY_REACHED : Outcome.WORK_EXHAUSTED);</span>
+<span class="fc" id="L172">                return;</span>
             }
-<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (ledger.total() &gt;= budget.totalWork()) {</span>
-<span class="fc" id="L172">                stop(Outcome.WORK_EXHAUSTED);</span>
-<span class="fc" id="L173">                return;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (ledger.total() &gt;= budget.totalWork()) {</span>
+<span class="fc" id="L175">                stop(Outcome.WORK_EXHAUSTED);</span>
+<span class="fc" id="L176">                return;</span>
             }
-<span class="fc" id="L175">            var node = frontier.remove().node();active=node;</span>
-<span class="fc" id="L176">            ledger.search++;</span>
-<span class="fc" id="L177">            boolean current = visited.current(node.state, node.theoryWork);</span>
-<span class="fc bfc" id="L178" title="All 4 branches covered.">            if (contract != SearchContinuationContract.PATH_SENSITIVE &amp;&amp; ledger.total() &gt; budget.totalWork()) {</span>
-<span class="fc" id="L179">                stop(Outcome.WORK_EXHAUSTED);</span>
-<span class="fc" id="L180">                return;</span>
+<span class="fc" id="L178">            var node = frontier.remove().node();active=node;</span>
+<span class="fc" id="L179">            ledger.search++;</span>
+<span class="fc bfc" id="L180" title="All 4 branches covered.">            if (contract != SearchContinuationContract.PATH_SENSITIVE &amp;&amp; ledger.total() &gt;= budget.totalWork()) {</span>
+<span class="fc" id="L181">                stop(Outcome.WORK_EXHAUSTED);</span>
+<span class="fc" id="L182">                return;</span>
             }
-<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (!current) return;</span>
-<span class="fc bfc" id="L183" title="All 4 branches covered.">            if (node.picker == null &amp;&amp; !open(node)) return;</span>
-<span class="fc" id="L184">            recordExpansion(node, expand(problem, node, ledger, events, visited, frontier, serial, assessments));</span>
-<span class="fc" id="L185">        }</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (!visited.current(node.state, node.theoryWork)) return;</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">            if (node.picker == null &amp;&amp; !open(node)) return;</span>
+<span class="fc" id="L186">            recordExpansion(node, expand(problem, node, ledger, events, visited, frontier, serial, assessments));</span>
+<span class="fc" id="L187">        }</span>
 
         /** False also covers a depth-bound leaf; only terminal outcomes stop the whole run. */
         private boolean open(Node node) {
-<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (ledger.explored &gt;= budget.maxStates()) {</span>
-<span class="fc" id="L190">                stop(Outcome.STATE_LIMIT);</span>
-<span class="fc" id="L191">                return false;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (ledger.explored &gt;= budget.maxStates()) {</span>
+<span class="fc" id="L192">                stop(Outcome.STATE_LIMIT);</span>
+<span class="fc" id="L193">                return false;</span>
             }
-<span class="fc" id="L193">            ledger.explored++;</span>
-<span class="fc" id="L194">            boolean firstOpening=reached.add(node.state);</span>
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            de.regelsuche.retention.RetainedOperation.work(firstOpening?3:1);</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (node.state.expression().equals(problem.goal())) {</span>
-<span class="fc" id="L197">                stop(Outcome.TARGET_REACHED);</span>
-<span class="fc" id="L198">                witness = node.path.steps();</span>
-<span class="fc" id="L199">                hit = node.state.searchDepth();</span>
-<span class="fc" id="L200">                primitiveHit = node.state.primitiveDepth();</span>
-<span class="fc" id="L201">                return false;</span>
+<span class="fc" id="L195">            ledger.explored++;</span>
+<span class="fc" id="L196">            boolean firstOpening=reached.add(node.state);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            de.regelsuche.retention.RetainedOperation.work(firstOpening?3:1);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (node.state.expression().equals(problem.goal())) {</span>
+<span class="fc" id="L199">                stop(Outcome.TARGET_REACHED);</span>
+<span class="fc" id="L200">                witness = node.path.steps();</span>
+<span class="fc" id="L201">                hit = node.state.searchDepth();</span>
+<span class="fc" id="L202">                primitiveHit = node.state.primitiveDepth();</span>
+<span class="fc" id="L203">                return false;</span>
             }
-<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (node.state.searchDepth() == budget.maxSearchDepth()) return false;</span>
-<span class="fc" id="L204">            ledger.expanded++;</span>
-<span class="fc" id="L205">            node.picker = picker(problem, node.state);</span>
-<span class="fc" id="L206">            retainIncremental(node, opened);</span>
-<span class="fc" id="L207">            node.picker.initialize();</span>
-<span class="fc" id="L208">            return true;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            if (node.state.searchDepth() == budget.maxSearchDepth()) return false;</span>
+<span class="fc" id="L206">            ledger.expanded++;</span>
+<span class="fc" id="L207">            node.picker = picker(problem, node.state);</span>
+<span class="fc" id="L208">            retainIncremental(node, opened);</span>
+<span class="fc" id="L209">            node.picker.initialize();</span>
+<span class="fc" id="L210">            return true;</span>
         }
 
         private void recordExpansion(Node node, Expansion expansion) {
-<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (expansion == Expansion.WORK_LIMIT) {</span>
-<span class="fc" id="L213">                stop(Outcome.WORK_EXHAUSTED);</span>
-<span class="fc" id="L214">                return;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (expansion == Expansion.WORK_LIMIT) {</span>
+<span class="fc" id="L215">                stop(Outcome.WORK_EXHAUSTED);</span>
+<span class="fc" id="L216">                return;</span>
             }
-<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (expansion == Expansion.REJECTED_PROOF) complete = false;</span>
-<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (expansion == Expansion.EXHAUSTED) {</span>
-<span class="fc" id="L218">                complete &amp;= node.picker.complete();</span>
-<span class="fc bfc" id="L219" title="All 4 branches covered.">                if (node.enqueued == 0 &amp;&amp; node.picker.complete()) {</span>
-<span class="fc" id="L220">                    ledger.deadEnds++;</span>
-<span class="fc" id="L221">                    deadEnds.add(node.state);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (expansion == Expansion.REJECTED_PROOF) complete = false;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (expansion == Expansion.EXHAUSTED) {</span>
+<span class="fc" id="L220">                complete &amp;= node.picker.complete();</span>
+<span class="fc bfc" id="L221" title="All 4 branches covered.">                if (node.enqueued == 0 &amp;&amp; node.picker.complete()) {</span>
+<span class="fc" id="L222">                    ledger.deadEnds++;</span>
+<span class="fc" id="L223">                    deadEnds.add(node.state);</span>
                 }
             }
-<span class="fc" id="L224">        }</span>
+<span class="fc" id="L226">        }</span>
 
         private void stop(Outcome terminalOutcome) {
-<span class="fc" id="L227">            outcome = terminalOutcome;</span>
-<span class="fc" id="L228">            complete = false;</span>
-<span class="fc" id="L229">            stopped = true;</span>
-<span class="fc" id="L230">        }</span>
+<span class="fc" id="L229">            outcome = terminalOutcome;</span>
+<span class="fc" id="L230">            complete = false;</span>
+<span class="fc" id="L231">            stopped = true;</span>
+<span class="fc" id="L232">        }</span>
 
         private SearchExecution.Result&lt;S,M,V,A&gt; finish() {
-<span class="fc" id="L233">            problem.beginResultAssembly();</span>
+<span class="fc" id="L235">            problem.beginResultAssembly();</span>
             try {
-<span class="fc" id="L235">                finishObjective();</span>
-<span class="fc" id="L236">                assembleResult();</span>
-<span class="fc" id="L237">            } finally { problem.endResultAssembly(); }</span>
+<span class="fc" id="L237">                finishObjective();</span>
+<span class="fc" id="L238">                assembleResult();</span>
+<span class="fc" id="L239">            } finally { problem.endResultAssembly(); }</span>
             // One bounded correction, after copy, observation and frame-close costs.
             // Neither this correction nor the assembly phase may resume the search.
-<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (rejectFinalLimits()) {</span>
-<span class="fc" id="L241">                problem.beginResultAssembly();</span>
-<span class="fc" id="L242">                try { replaceResult(); }</span>
-<span class="fc" id="L243">                finally { problem.endResultAssembly(); }</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (rejectFinalLimits()) {</span>
+<span class="fc" id="L243">                problem.beginResultAssembly();</span>
+<span class="fc" id="L244">                try { replaceResult(); }</span>
+<span class="fc" id="L245">                finally { problem.endResultAssembly(); }</span>
             }
-<span class="fc" id="L245">            return result;</span>
+<span class="fc" id="L247">            return result;</span>
         }
 
         private void finishObjective() {
-<span class="fc" id="L249">            var objective = ledger.objective;</span>
-<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (objective != null) {</span>
-<span class="fc" id="L251">                ledger.search = Math.addExact(ledger.search, objective.finish(problem.accountsWitnessMaterialization()));</span>
-<span class="fc bfc" id="L252" title="All 2 branches covered.">                if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();</span>
+<span class="fc" id="L251">            var objective = ledger.objective;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (objective != null) {</span>
+<span class="fc" id="L253">                ledger.search = Math.addExact(ledger.search, objective.finish(problem.accountsWitnessMaterialization()));</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                if (outcome == Outcome.QUALITY_REACHED) witness = objective.witness();</span>
             }
-<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (finalWorkOverrun())</span>
-<span class="fc" id="L255">                rejectResult(Outcome.WORK_EXHAUSTED);</span>
-<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (!problem.ownershipComplete()) rejectResult(Outcome.INCONCLUSIVE);</span>
-<span class="fc" id="L257">        }</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (finalWorkOverrun())</span>
+<span class="fc" id="L257">                rejectResult(Outcome.WORK_EXHAUSTED);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (!problem.ownershipComplete()) rejectResult(Outcome.INCONCLUSIVE);</span>
+<span class="fc" id="L259">        }</span>
 
         private void assembleResult() {
-<span class="fc" id="L260">            var receipts = new ArrayList&lt;Object&gt;();</span>
-<span class="fc" id="L261">            Object[] pending = new Object[1];</span>
-<span class="fc" id="L262">            var retained = RetainedOperation.retainCompleted(2, this, receipts, pending);</span>
-<span class="fc" id="L263">            Throwable primary = null;</span>
+<span class="fc" id="L262">            var receipts = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L263">            Object[] pending = new Object[1];</span>
+<span class="fc" id="L264">            var retained = RetainedOperation.retainCompleted(2, this, receipts, pending);</span>
+<span class="fc" id="L265">            Throwable primary = null;</span>
             try {
-<span class="fc bfc" id="L265" title="All 2 branches covered.">                for (var node : opened) {</span>
-<span class="fc" id="L266">                    receipts.add(node.picker.executionReceipt());</span>
-<span class="fc" id="L267">                    SearchExecution.completed(1);</span>
-<span class="fc" id="L268">                }</span>
-<span class="fc bfc" id="L269" title="All 4 branches covered.">                boolean accountingComplete = problem.ownershipComplete() &amp;&amp; opened.stream().allMatch(node -&gt; node.picker.accountingComplete())</span>
-<span class="pc bpc" id="L270" title="1 of 6 branches missed.">                    &amp;&amp; ledger.batchReceipts.stream().allMatch(receipt-&gt;receipt.accountingComplete() &amp;&amp; receipt.status()!=IncrementalProviderContract.Status.FAILED);</span>
-<span class="fc bfc" id="L271" title="All 4 branches covered.">                if (!accountingComplete &amp;&amp; outcome != Outcome.WORK_EXHAUSTED) rejectResult(Outcome.INCONCLUSIVE);</span>
-<span class="fc bfc" id="L272" title="All 4 branches covered.">                if (outcome == Outcome.BOUNDED_EXHAUSTED &amp;&amp; !complete) outcome = Outcome.INCONCLUSIVE;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                for (var node : opened) {</span>
+<span class="fc" id="L268">                    receipts.add(node.picker.executionReceipt());</span>
+<span class="fc" id="L269">                    SearchExecution.completed(1);</span>
+<span class="fc" id="L270">                }</span>
+<span class="fc bfc" id="L271" title="All 4 branches covered.">                boolean accountingComplete = problem.ownershipComplete() &amp;&amp; opened.stream().allMatch(node -&gt; node.picker.accountingComplete())</span>
+<span class="pc bpc" id="L272" title="1 of 6 branches missed.">                    &amp;&amp; ledger.batchReceipts.stream().allMatch(receipt-&gt;receipt.accountingComplete() &amp;&amp; receipt.status()!=IncrementalProviderContract.Status.FAILED);</span>
+<span class="fc bfc" id="L273" title="All 4 branches covered.">                if (!accountingComplete &amp;&amp; outcome != Outcome.WORK_EXHAUSTED) rejectResult(Outcome.INCONCLUSIVE);</span>
+<span class="fc bfc" id="L274" title="All 4 branches covered.">                if (outcome == Outcome.BOUNDED_EXHAUSTED &amp;&amp; !complete) outcome = Outcome.INCONCLUSIVE;</span>
                 // Capture chronology before Map.copyOf/Set.copyOf discard iteration order.
-<span class="fc" id="L274">                assessmentOrder = List.copyOf(assessments.keySet());</span>
-<span class="fc" id="L275">                SearchExecution.completed(assessmentOrder.size() + 1L);</span>
-<span class="fc" id="L276">                reachedOrder = List.copyOf(reached);</span>
-<span class="fc" id="L277">                SearchExecution.completed(reachedOrder.size() + 1L);</span>
-<span class="fc" id="L278">                var metrics = metrics();</span>
-<span class="fc" id="L279">                pending[0] = metrics;</span>
-<span class="fc" id="L280">                SearchExecution.completed(ledger.matches.size() + 2L);</span>
-<span class="fc" id="L281">                result = new SearchExecution.Result&lt;&gt;(outcome, witness, events, reached, deadEnds, metrics, complete, assessments,</span>
+<span class="fc" id="L276">                assessmentOrder = List.copyOf(assessments.keySet());</span>
+<span class="fc" id="L277">                SearchExecution.completed(assessmentOrder.size() + 1L);</span>
+<span class="fc" id="L278">                reachedOrder = List.copyOf(reached);</span>
+<span class="fc" id="L279">                SearchExecution.completed(reachedOrder.size() + 1L);</span>
+<span class="fc" id="L280">                var metrics = metrics();</span>
+<span class="fc" id="L281">                pending[0] = metrics;</span>
+<span class="fc" id="L282">                SearchExecution.completed(ledger.matches.size() + 2L);</span>
+<span class="fc" id="L283">                result = new SearchExecution.Result&lt;&gt;(outcome, witness, events, reached, deadEnds, metrics, complete, assessments,</span>
                     receipts, ledger.batchReceipts, assessmentOrder, reachedOrder);
-<span class="nc" id="L283">            } catch (RuntimeException | Error failure) {</span>
-<span class="nc" id="L284">                primary = failure;</span>
-<span class="nc" id="L285">                SearchExecution.observeFailure(failure);</span>
-<span class="nc" id="L286">                throw failure;</span>
-<span class="fc" id="L287">            } finally { SearchExecution.close(retained, primary); }</span>
-<span class="fc" id="L288">        }</span>
+<span class="nc" id="L285">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L286">                primary = failure;</span>
+<span class="nc" id="L287">                SearchExecution.observeFailure(failure);</span>
+<span class="nc" id="L288">                throw failure;</span>
+<span class="fc" id="L289">            } finally { SearchExecution.close(retained, primary); }</span>
+<span class="fc" id="L290">        }</span>
 
         private Metrics metrics() {
-<span class="fc" id="L291">            return new Metrics(ledger.generated, ledger.consumed, ledger.discarded,</span>
+<span class="fc" id="L293">            return new Metrics(ledger.generated, ledger.consumed, ledger.discarded,</span>
                 ledger.generated - ledger.consumed, ledger.duplicates, ledger.deadEnds, ledger.explored, ledger.expanded,
                 ledger.primitive, ledger.search, ledger.verification, hit, primitiveHit, ledger.matches);
         }
 
         private void rejectResult(Outcome failure) {
-<span class="fc" id="L297">            stop(failure);</span>
-<span class="fc" id="L298">            witness = List.of();</span>
-<span class="fc" id="L299">            hit = -1;</span>
-<span class="fc" id="L300">            primitiveHit = -1;</span>
-<span class="fc" id="L301">        }</span>
+<span class="fc" id="L299">            stop(failure);</span>
+<span class="fc" id="L300">            witness = List.of();</span>
+<span class="fc" id="L301">            hit = -1;</span>
+<span class="fc" id="L302">            primitiveHit = -1;</span>
+<span class="fc" id="L303">        }</span>
 
         private boolean finalWorkOverrun() {
-<span class="fc bfc" id="L304" title="All 4 branches covered.">            return cleanupOverrun(problem, ledger)</span>
-<span class="fc bfc" id="L305" title="All 4 branches covered.">                || ((ledger.objective != null || problem.additionalWork() &gt; 0) &amp;&amp; ledger.total() &gt; budget.totalWork());</span>
+<span class="fc bfc" id="L306" title="All 4 branches covered.">            return cleanupOverrun(problem, ledger)</span>
+<span class="fc bfc" id="L307" title="All 4 branches covered.">                || ((ledger.objective != null || problem.additionalWork() &gt; 0) &amp;&amp; ledger.total() &gt; budget.totalWork());</span>
         }
 
         private boolean rejectFinalLimits() {
-<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (!problem.ownershipComplete()) rejectResult(Outcome.INCONCLUSIVE);</span>
-<span class="fc bfc" id="L310" title="All 2 branches covered.">            else if (finalWorkOverrun()) rejectResult(Outcome.WORK_EXHAUSTED);</span>
-<span class="pc bpc" id="L311" title="1 of 4 branches missed.">            return result.outcome() != outcome || result.completeBoundedRelation() != complete</span>
-<span class="pc bpc" id="L312" title="2 of 4 branches missed.">                || result.metrics().firstHitDepth() != hit || result.metrics().firstHitPrimitiveDepth() != primitiveHit</span>
-<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                || result.witness().size() != witness.size();</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (!problem.ownershipComplete()) rejectResult(Outcome.INCONCLUSIVE);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            else if (finalWorkOverrun()) rejectResult(Outcome.WORK_EXHAUSTED);</span>
+<span class="pc bpc" id="L313" title="1 of 4 branches missed.">            return result.outcome() != outcome || result.completeBoundedRelation() != complete</span>
+<span class="pc bpc" id="L314" title="2 of 4 branches missed.">                || result.metrics().firstHitDepth() != hit || result.metrics().firstHitPrimitiveDepth() != primitiveHit</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                || result.witness().size() != witness.size();</span>
         }
 
         private void replaceResult() {
-<span class="fc" id="L317">            var metrics = metrics();</span>
-<span class="fc" id="L318">            var retained = RetainedOperation.retainCompleted(ledger.matches.size() + 2L, this, metrics);</span>
-<span class="fc" id="L319">            Throwable primary = null;</span>
+<span class="fc" id="L319">            var metrics = metrics();</span>
+<span class="fc" id="L320">            var retained = RetainedOperation.retainCompleted(ledger.matches.size() + 2L, this, metrics);</span>
+<span class="fc" id="L321">            Throwable primary = null;</span>
             try {
                 // The attempted result stays owned by this field until the replacement is complete.
-<span class="fc" id="L322">                result = new SearchExecution.Result&lt;&gt;(outcome, witness, result.events(), result.reachedStates(), result.deadEndStates(),</span>
-<span class="fc" id="L323">                    metrics, complete, result.stateAssessments(), result.pickerReceipts(), result.batchCursorReceipts(),</span>
-<span class="fc" id="L324">                    result.assessmentOrder(), result.reachedOrder());</span>
-<span class="nc" id="L325">            } catch (RuntimeException | Error failure) {</span>
-<span class="nc" id="L326">                primary = failure;</span>
-<span class="nc" id="L327">                SearchExecution.observeFailure(failure);</span>
-<span class="nc" id="L328">                throw failure;</span>
-<span class="fc" id="L329">            } finally { SearchExecution.close(retained, primary); }</span>
-<span class="fc" id="L330">        }</span>
+<span class="fc" id="L324">                result = new SearchExecution.Result&lt;&gt;(outcome, witness, result.events(), result.reachedStates(), result.deadEndStates(),</span>
+<span class="fc" id="L325">                    metrics, complete, result.stateAssessments(), result.pickerReceipts(), result.batchCursorReceipts(),</span>
+<span class="fc" id="L326">                    result.assessmentOrder(), result.reachedOrder());</span>
+<span class="nc" id="L327">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L328">                primary = failure;</span>
+<span class="nc" id="L329">                SearchExecution.observeFailure(failure);</span>
+<span class="nc" id="L330">                throw failure;</span>
+<span class="fc" id="L331">            } finally { SearchExecution.close(retained, primary); }</span>
+<span class="fc" id="L332">        }</span>
 
     }
 
-<span class="fc" id="L334">    private SearchExecution.Picker&lt;M&gt; picker(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem,S state) { return problem.picker(state); }</span>
-<span class="fc bfc" id="L335" title="All 2 branches covered.">    private void retainIncremental(Node node,List&lt;Node&gt; opened) { if (node.picker.incremental()) opened.add(node); }</span>
+<span class="fc" id="L336">    private SearchExecution.Picker&lt;M&gt; picker(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem,S state) { return problem.picker(state); }</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">    private void retainIncremental(Node node,List&lt;Node&gt; opened) { if (node.picker.incremental()) opened.add(node); }</span>
     private void closeIncremental(List&lt;Node&gt; opened,Ledger ledger) {
-<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (var node:opened) { node.picker.close(); ledger.collect(node); }</span>
-<span class="fc" id="L338">    }</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (var node:opened) { node.picker.close(); ledger.collect(node); }</span>
+<span class="fc" id="L340">    }</span>
     private boolean cleanupOverrun(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem,Ledger ledger) {
-<span class="fc bfc" id="L340" title="All 4 branches covered.">        return (problem.scheduling()==Scheduling.INCREMENTAL_NATIVE_ORDER || problem.scheduling()==Scheduling.STAGED_INCREMENTAL)</span>
-<span class="fc bfc" id="L341" title="All 2 branches covered.">            &amp;&amp; ledger.total()&gt;problem.budget().totalWork();</span>
+<span class="fc bfc" id="L342" title="All 4 branches covered.">        return (problem.scheduling()==Scheduling.INCREMENTAL_NATIVE_ORDER || problem.scheduling()==Scheduling.STAGED_INCREMENTAL)</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            &amp;&amp; ledger.total()&gt;problem.budget().totalWork();</span>
     }
-<span class="fc" id="L343">    private enum Expansion { MORE, EXHAUSTED, REJECTED_PROOF, WORK_LIMIT }</span>
+<span class="fc" id="L345">    private enum Expansion { MORE, EXHAUSTED, REJECTED_PROOF, WORK_LIMIT }</span>
     private Expansion expand(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, Node node, Ledger ledger, List&lt;SearchExecution.Event&lt;S,M,V&gt;&gt; events,
             MoveSearchVisits&lt;S&gt; visited, PriorityQueue&lt;Ticket&gt; frontier, long[] serial, Map&lt;S, A&gt; assessments) {
-<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (problem.scheduling() == Scheduling.STAGED_INCREMENTAL) ledger.collect(node);</span>
-<span class="fc bfc" id="L347" title="All 2 branches covered.">        var next = node.picker.incremental()</span>
-<span class="fc" id="L348">            ? node.picker.next(Math.max(0, problem.budget().totalWork() - ledger.total())) : node.picker.next();</span>
-<span class="fc" id="L349">        ledger.collect(node); node.pulls++;</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (problem.scheduling() == Scheduling.STAGED_INCREMENTAL) ledger.collect(node);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        var next = node.picker.incremental()</span>
+<span class="fc" id="L350">            ? node.picker.next(Math.max(0, problem.budget().totalWork() - ledger.total())) : node.picker.next();</span>
+<span class="fc" id="L351">        ledger.collect(node); node.pulls++;</span>
         // Atomic providers report actual overrun; such runs cannot claim a budget-respecting success.
-<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (ledger.total() &gt; problem.budget().totalWork()) return Expansion.WORK_LIMIT;</span>
-<span class="fc bfc" id="L352" title="All 4 branches covered.">        if (node.picker.incremental() &amp;&amp; node.picker.workExhausted()) return Expansion.WORK_LIMIT;</span>
-<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (next.isEmpty()) return Expansion.EXHAUSTED;</span>
-<span class="fc" id="L354">        var move = next.orElseThrow(); ledger.consumed++; ledger.search++;</span>
-<span class="fc" id="L355">        var admission = admit(problem, node, move, visited, ledger);</span>
-<span class="fc" id="L356">        Object[] pending = new Object[4];</span>
-<span class="fc" id="L357">        var retained = RetainedOperation.retainCompleted(1, node, move, admission, pending);</span>
-<span class="fc" id="L358">        Throwable primary = null;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (ledger.total() &gt; problem.budget().totalWork()) return Expansion.WORK_LIMIT;</span>
+<span class="fc bfc" id="L354" title="All 4 branches covered.">        if (node.picker.incremental() &amp;&amp; node.picker.workExhausted()) return Expansion.WORK_LIMIT;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (next.isEmpty()) return Expansion.EXHAUSTED;</span>
+<span class="fc" id="L356">        var move = next.orElseThrow(); ledger.consumed++; ledger.search++;</span>
+<span class="fc" id="L357">        var admission = admit(problem, node, move, visited, ledger);</span>
+<span class="fc" id="L358">        Object[] pending = new Object[4];</span>
+<span class="fc" id="L359">        var retained = RetainedOperation.retainCompleted(1, node, move, admission, pending);</span>
+<span class="fc" id="L360">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L360">            return expandAdmission(problem, node, move, admission, pending, ledger, events, visited, frontier, serial, assessments);</span>
-<span class="nc" id="L361">        } catch (RuntimeException | Error failure) {</span>
-<span class="nc" id="L362">            primary = failure;</span>
-<span class="nc" id="L363">            SearchExecution.observeFailure(failure);</span>
-<span class="nc" id="L364">            throw failure;</span>
-<span class="fc" id="L365">        } finally { SearchExecution.close(retained, primary); }</span>
+<span class="fc" id="L362">            return expandAdmission(problem, node, move, admission, pending, ledger, events, visited, frontier, serial, assessments);</span>
+<span class="nc" id="L363">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L364">            primary = failure;</span>
+<span class="nc" id="L365">            SearchExecution.observeFailure(failure);</span>
+<span class="nc" id="L366">            throw failure;</span>
+<span class="fc" id="L367">        } finally { SearchExecution.close(retained, primary); }</span>
     }
 
     private Expansion expandAdmission(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, Node node, M move, Admission admission,
             Object[] pending, Ledger ledger, List&lt;SearchExecution.Event&lt;S,M,V&gt;&gt; events, MoveSearchVisits&lt;S&gt; visited,
             PriorityQueue&lt;Ticket&gt; frontier, long[] serial, Map&lt;S,A&gt; assessments) {
-<span class="fc" id="L371">        var decision = admission.decision();</span>
-<span class="fc" id="L372">        var verification = admission.verification();</span>
-<span class="fc" id="L373">        var child = admission.child();</span>
-<span class="fc" id="L374">        var delta = new HashSet&lt;&gt;(child.capabilities());</span>
-<span class="fc" id="L375">        pending[0] = delta;</span>
-<span class="fc" id="L376">        SearchExecution.completed(child.capabilities().size() + 1L);</span>
-<span class="fc" id="L377">        delta.removeAll(node.state.capabilities());</span>
-<span class="fc" id="L378">        SearchExecution.completed(node.state.capabilities().size());</span>
-<span class="fc" id="L379">        move = move.withCapabilityDelta(delta);</span>
-<span class="fc" id="L380">        pending[1] = move;</span>
-<span class="fc" id="L381">        SearchExecution.completed(1);</span>
-<span class="fc bfc" id="L382" title="All 4 branches covered.">        boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;</span>
-<span class="fc" id="L383">        boolean objectiveWorkLimited = false;</span>
-<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (decision == Decision.ENQUEUED) {</span>
-<span class="fc" id="L385">            visited.add(child, admission.theoryWork()); node.enqueued++; recordAssessment(assessments,child,admission.value());</span>
-<span class="fc" id="L386">            var path = node.path.append(new SearchExecution.Step&lt;&gt;(node.state, child, move, verification));</span>
-<span class="fc" id="L387">            pending[2] = path;</span>
-<span class="fc" id="L388">            var successor = new Node(child, admission.theoryWork(), path, admission.value());</span>
-<span class="fc" id="L389">            pending[3] = successor;</span>
-<span class="fc" id="L390">            frontier.add(new Ticket(successor,</span>
-<span class="fc bfc" id="L391" title="All 2 branches covered.">                child.expression().equals(problem.goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));</span>
+<span class="fc" id="L373">        var decision = admission.decision();</span>
+<span class="fc" id="L374">        var verification = admission.verification();</span>
+<span class="fc" id="L375">        var child = admission.child();</span>
+<span class="fc" id="L376">        var delta = new HashSet&lt;&gt;(child.capabilities());</span>
+<span class="fc" id="L377">        pending[0] = delta;</span>
+<span class="fc" id="L378">        SearchExecution.completed(child.capabilities().size() + 1L);</span>
+<span class="fc" id="L379">        delta.removeAll(node.state.capabilities());</span>
+<span class="fc" id="L380">        SearchExecution.completed(node.state.capabilities().size());</span>
+<span class="fc" id="L381">        move = move.withCapabilityDelta(delta);</span>
+<span class="fc" id="L382">        pending[1] = move;</span>
+<span class="fc" id="L383">        SearchExecution.completed(1);</span>
+<span class="fc bfc" id="L384" title="All 4 branches covered.">        boolean proofRejected = decision == Decision.PROOF_REJECTED || decision == Decision.ASSUMPTION_REJECTED;</span>
+<span class="fc" id="L385">        boolean objectiveWorkLimited = false;</span>
+<span class="fc bfc" id="L386" title="All 4 branches covered.">        if (decision == Decision.ENQUEUED &amp;&amp; !visited.add(child, admission.theoryWork(), problem.budget().totalWork() - ledger.total())) {</span>
+<span class="fc" id="L387">            decision = Decision.WORK_LIMIT;</span>
+        }
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        if (decision == Decision.ENQUEUED) {</span>
+<span class="fc" id="L390">            node.enqueued++; recordAssessment(assessments,child,admission.value());</span>
+<span class="fc" id="L391">            var path = node.path.append(new SearchExecution.Step&lt;&gt;(node.state, child, move, verification));</span>
+<span class="fc" id="L392">            pending[2] = path;</span>
+<span class="fc" id="L393">            var successor = new Node(child, admission.theoryWork(), path, admission.value());</span>
+<span class="fc" id="L394">            pending[3] = successor;</span>
+<span class="fc" id="L395">            frontier.add(new Ticket(successor,</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">                child.expression().equals(problem.goal()) ? -Double.MAX_VALUE : priority(problem, child, admission.value()), serial[0]++));</span>
             // State-local admission can itself spend the last available unit.
             // The accepted edge remains recorded even when its objective cannot run.
-<span class="fc bfc" id="L394" title="All 4 branches covered.">            if (ledger.objective != null &amp;&amp; ledger.total() &gt;= problem.budget().totalWork()) objectiveWorkLimited = true;</span>
-<span class="fc" id="L395">            else ledger.observe(child, path);</span>
+<span class="fc bfc" id="L399" title="All 4 branches covered.">            if (ledger.objective != null &amp;&amp; ledger.total() &gt;= problem.budget().totalWork()) objectiveWorkLimited = true;</span>
+<span class="fc" id="L400">            else ledger.observe(child, path);</span>
         }
-<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (decision != Decision.ENQUEUED) ledger.discarded++;</span>
-<span class="fc" id="L398">        events.add(new SearchExecution.Event&lt;&gt;(node.state, child, move, decision, verification));</span>
-<span class="fc bfc" id="L399" title="All 4 branches covered.">        if (decision == Decision.WORK_LIMIT || objectiveWorkLimited) return Expansion.WORK_LIMIT;</span>
-<span class="fc bfc" id="L400" title="All 2 branches covered.">        if (ledger.qualityReached()) return Expansion.MORE;</span>
-<span class="fc" id="L401">        int stage = node.picker.nextStage();</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (decision != Decision.ENQUEUED) ledger.discarded++;</span>
+<span class="fc" id="L403">        events.add(new SearchExecution.Event&lt;&gt;(node.state, child, move, decision, verification));</span>
+<span class="fc bfc" id="L404" title="All 4 branches covered.">        if (decision == Decision.WORK_LIMIT || objectiveWorkLimited) return Expansion.WORK_LIMIT;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (ledger.qualityReached()) return Expansion.MORE;</span>
+<span class="pc bpc" id="L406" title="1 of 4 branches missed.">        if (visited.stateLocal() &amp;&amp; ledger.total() &gt;= problem.budget().totalWork()) return Expansion.WORK_LIMIT;</span>
+<span class="fc" id="L407">        int stage = node.picker.nextStage();</span>
         // Parent widening stays on the frontier, so promising children can finish before later stages open.
-<span class="fc bfc" id="L403" title="All 2 branches covered.">        double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()</span>
-<span class="fc" id="L404">            : priority(problem, node.state, node.value) + 1 + stage + node.pulls / 2.0;</span>
-<span class="fc" id="L405">        frontier.add(new Ticket(node, continuation, serial[0]++)); ledger.search++;</span>
-<span class="fc bfc" id="L406" title="All 2 branches covered.">        return proofRejected ? Expansion.REJECTED_PROOF : Expansion.MORE;</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        double continuation = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? node.state.searchDepth()</span>
+<span class="fc" id="L410">            : priority(problem, node.state, node.value) + 1 + stage + node.pulls / 2.0;</span>
+<span class="fc" id="L411">        frontier.add(new Ticket(node, continuation, serial[0]++)); ledger.search++;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        return proofRejected ? Expansion.REJECTED_PROOF : Expansion.MORE;</span>
     }
 
     private void recordAssessment(Map&lt;S,A&gt; assessments,S state,A value){
-<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        boolean firstAdmission=assessments.put(state,value)==null;</span>
-<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        de.regelsuche.retention.RetainedOperation.work(firstAdmission?3:1);</span>
-<span class="fc" id="L412">    }</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        boolean firstAdmission=assessments.put(state,value)==null;</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        de.regelsuche.retention.RetainedOperation.work(firstAdmission?3:1);</span>
+<span class="fc" id="L418">    }</span>
     private final class Admission implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v) {
-<span class="fc" id="L415">            v.reference(MoveSearchKernel.this);v.reference(child);v.reference(decision);v.reference(verification);v.reference(value);</span>
-<span class="fc" id="L416">        }</span>
+<span class="fc" id="L421">            v.reference(MoveSearchKernel.this);v.reference(child);v.reference(decision);v.reference(verification);v.reference(value);</span>
+<span class="fc" id="L422">        }</span>
         private final S child; private final long theoryWork; private final Decision decision; private final V verification; private final A value;
-<span class="fc" id="L418">        Admission(S child,long theoryWork,Decision decision,V verification,A value){this.child=child;this.theoryWork=theoryWork;this.decision=decision;this.verification=verification;this.value=value;}</span>
-<span class="fc" id="L419">        S child(){return child;} long theoryWork(){return theoryWork;} Decision decision(){return decision;} V verification(){return verification;} A value(){return value;}</span>
+<span class="fc" id="L424">        Admission(S child,long theoryWork,Decision decision,V verification,A value){this.child=child;this.theoryWork=theoryWork;this.decision=decision;this.verification=verification;this.value=value;}</span>
+<span class="fc" id="L425">        S child(){return child;} long theoryWork(){return theoryWork;} Decision decision(){return decision;} V verification(){return verification;} A value(){return value;}</span>
     }
     private Admission admit(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, Node node, M move, MoveSearchVisits&lt;S&gt; visited, Ledger ledger) {
-<span class="fc" id="L422">        Object[] pending = new Object[5];</span>
-<span class="fc" id="L423">        var retained = RetainedOperation.retainCompleted(1, problem, node, move, pending);</span>
-<span class="fc" id="L424">        Throwable primary = null;</span>
-<span class="fc" id="L425">        try { return evaluateAdmission(problem, node, move, visited, ledger, pending); }</span>
-<span class="fc" id="L426">        catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L427">            primary = failure;</span>
-<span class="fc" id="L428">            SearchExecution.observeFailure(failure);</span>
-<span class="fc" id="L429">            throw failure;</span>
-<span class="fc" id="L430">        } finally { SearchExecution.close(retained, primary); }</span>
+<span class="fc" id="L428">        Object[] pending = new Object[5];</span>
+<span class="fc" id="L429">        var retained = RetainedOperation.retainCompleted(1, problem, node, move, pending);</span>
+<span class="fc" id="L430">        Throwable primary = null;</span>
+<span class="fc" id="L431">        try { return evaluateAdmission(problem, node, move, visited, ledger, pending); }</span>
+<span class="fc" id="L432">        catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L433">            primary = failure;</span>
+<span class="fc" id="L434">            SearchExecution.observeFailure(failure);</span>
+<span class="fc" id="L435">            throw failure;</span>
+<span class="fc" id="L436">        } finally { SearchExecution.close(retained, primary); }</span>
     }
 
     private Admission admission(Object[] pending,S child,long theory,Decision decision,V verification,A value) {
-<span class="fc" id="L434">        var result = new Admission(child, theory, decision, verification, value);</span>
-<span class="fc" id="L435">        pending[4] = result;</span>
-<span class="fc" id="L436">        SearchExecution.completed(1);</span>
-<span class="fc" id="L437">        return result;</span>
+<span class="fc" id="L440">        var result = new Admission(child, theory, decision, verification, value);</span>
+<span class="fc" id="L441">        pending[4] = result;</span>
+<span class="fc" id="L442">        SearchExecution.completed(1);</span>
+<span class="fc" id="L443">        return result;</span>
     }
 
     private Admission evaluateAdmission(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, Node node, M move,
             MoveSearchVisits&lt;S&gt; visited, Ledger ledger, Object[] pending) {
-<span class="fc" id="L442">        var step = move;</span>
-<span class="fc" id="L443">        long depth = (long) node.state.primitiveDepth() + step.primitiveStepCount();</span>
-<span class="fc" id="L444">        long theory = Math.addExact(node.theoryWork, step.executionWork().exactTheoryWorkUnits());</span>
-<span class="fc" id="L445">        var child = problem.state(step.targetExpression(), node.state.searchDepth() + 1,</span>
-<span class="fc" id="L446">            (int) Math.min(Integer.MAX_VALUE, depth), move.ruleId(), node.state.assumptions(), Set.of(), 0);</span>
-<span class="fc" id="L447">        pending[0] = child;</span>
-<span class="fc" id="L448">        SearchExecution.completed(1);</span>
-<span class="fc" id="L449">        var value = inspect(problem, child, ledger);</span>
-<span class="fc" id="L450">        pending[1] = value;</span>
-<span class="fc" id="L451">        long debt = Math.max(0L, (long) node.state.complexityDebt() + value.complexity() - node.value.complexity());</span>
-<span class="fc" id="L452">        child = problem.state(child.expression(), child.searchDepth(), child.primitiveDepth(), child.previousRule(), child.assumptions(),</span>
-<span class="fc" id="L453">            value.capabilities().keySet(), (int) Math.min(Integer.MAX_VALUE, debt));</span>
-<span class="fc" id="L454">        pending[2] = child;</span>
-<span class="fc" id="L455">        SearchExecution.completed(1);</span>
-<span class="fc" id="L456">        Decision decision = rejectBounds(problem, node, move, depth, theory, debt, ledger);</span>
-<span class="fc bfc" id="L457" title="All 2 branches covered.">        if (decision != null) return admission(pending, child, theory, decision, null, value);</span>
+<span class="fc" id="L448">        var step = move;</span>
+<span class="fc" id="L449">        long depth = (long) node.state.primitiveDepth() + step.primitiveStepCount();</span>
+<span class="fc" id="L450">        long theory = Math.addExact(node.theoryWork, step.executionWork().exactTheoryWorkUnits());</span>
+<span class="fc" id="L451">        var child = problem.state(step.targetExpression(), node.state.searchDepth() + 1,</span>
+<span class="fc" id="L452">            (int) Math.min(Integer.MAX_VALUE, depth), move.ruleId(), node.state.assumptions(), Set.of(), 0);</span>
+<span class="fc" id="L453">        pending[0] = child;</span>
+<span class="fc" id="L454">        SearchExecution.completed(1);</span>
+<span class="fc" id="L455">        var value = inspect(problem, child, ledger);</span>
+<span class="fc" id="L456">        pending[1] = value;</span>
+<span class="fc" id="L457">        long debt = Math.max(0L, (long) node.state.complexityDebt() + value.complexity() - node.value.complexity());</span>
+<span class="fc" id="L458">        child = problem.state(child.expression(), child.searchDepth(), child.primitiveDepth(), child.previousRule(), child.assumptions(),</span>
+<span class="fc" id="L459">            value.capabilities().keySet(), (int) Math.min(Integer.MAX_VALUE, debt));</span>
+<span class="fc" id="L460">        pending[2] = child;</span>
+<span class="fc" id="L461">        SearchExecution.completed(1);</span>
+<span class="fc" id="L462">        Decision decision = rejectBounds(problem, node, move, depth, theory, debt, ledger);</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (decision != null) return admission(pending, child, theory, decision, null, value);</span>
 
-<span class="fc" id="L459">        decision = visited.rejection(child, theory);</span>
-<span class="fc bfc" id="L460" title="All 2 branches covered.">        if (decision == Decision.DUPLICATE) ledger.duplicates++;</span>
-<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (ledger.total() &gt; problem.budget().totalWork()) decision = Decision.WORK_LIMIT;</span>
-<span class="fc bfc" id="L462" title="All 2 branches covered.">        if (decision != null) return admission(pending, child, theory, decision, null, value);</span>
-<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (ledger.total() &gt;= problem.budget().totalWork()) {</span>
-<span class="fc" id="L464">            return admission(pending, child, theory, Decision.WORK_LIMIT, null, value);</span>
+<span class="fc" id="L465">        decision = visited.rejection(child, theory, problem.budget().totalWork() - ledger.total());</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (decision == Decision.DUPLICATE) ledger.duplicates++;</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">        if (ledger.total() &gt; problem.budget().totalWork()) decision = Decision.WORK_LIMIT;</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        if (decision != null) return admission(pending, child, theory, decision, null, value);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (ledger.total() &gt;= problem.budget().totalWork()) {</span>
+<span class="fc" id="L470">            return admission(pending, child, theory, Decision.WORK_LIMIT, null, value);</span>
         }
-<span class="fc" id="L466">        var verification = problem.verify(node.state, move, problem.budget().totalWork() - ledger.total());</span>
-<span class="fc" id="L467">        ledger.verification = Math.addExact(ledger.verification, verification.work());</span>
-<span class="fc" id="L468">        pending[3] = verification;</span>
-<span class="fc" id="L469">        SearchExecution.completed(1);</span>
+<span class="fc" id="L472">        var verification = problem.verify(node.state, move, problem.budget().totalWork() - ledger.total());</span>
+<span class="fc" id="L473">        ledger.verification = Math.addExact(ledger.verification, verification.work());</span>
+<span class="fc" id="L474">        pending[3] = verification;</span>
+<span class="fc" id="L475">        SearchExecution.completed(1);</span>
         // An admitted child needs a separate objective evaluation. Do not start that
         // callback after verification has already spent its entire allowance.
-<span class="fc bfc" id="L472" title="All 2 branches covered.">        decision = ledger.total() &gt; problem.budget().totalWork()</span>
-<span class="fc bfc" id="L473" title="All 6 branches covered.">                || (verification.accepted() &amp;&amp; ledger.objective != null &amp;&amp; ledger.total() == problem.budget().totalWork())</span>
-<span class="fc" id="L474">            ? Decision.WORK_LIMIT</span>
-<span class="fc bfc" id="L475" title="All 2 branches covered.">            : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;</span>
-<span class="fc" id="L476">        return admission(pending, child, theory, decision, verification, value);</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        decision = ledger.total() &gt; problem.budget().totalWork()</span>
+<span class="fc bfc" id="L479" title="All 6 branches covered.">                || (verification.accepted() &amp;&amp; ledger.objective != null &amp;&amp; ledger.total() == problem.budget().totalWork())</span>
+<span class="fc" id="L480">            ? Decision.WORK_LIMIT</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            : verification.accepted() ? Decision.ENQUEUED : Decision.PROOF_REJECTED;</span>
+<span class="fc" id="L482">        return admission(pending, child, theory, decision, verification, value);</span>
     }
 
     /** A rejected bound must not trigger a paid visited lookup or a proof attempt. */
     private Decision rejectBounds(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, Node node, M move,
             long depth, long theory, long debt, Ledger ledger) {
-<span class="fc bfc" id="L482" title="All 2 branches covered.">        if (ledger.total() &gt; problem.budget().totalWork()) return Decision.WORK_LIMIT;</span>
-<span class="pc bpc" id="L483" title="1 of 2 branches missed.">        if (debt &gt; problem.budget().maxComplexityDebt()) return Decision.COMPLEXITY_BOUND;</span>
-<span class="pc bpc" id="L484" title="1 of 4 branches missed.">        if (depth &gt; problem.budget().maxPrimitiveSteps() || theory &gt; problem.budget().maxTheoryWork()) return Decision.PATH_BOUND;</span>
-<span class="fc bfc" id="L485" title="All 2 branches covered.">        if (!problem.carries(move.assumptions(), node.state)) return Decision.ASSUMPTION_REJECTED;</span>
-<span class="fc" id="L486">        return null;</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        if (ledger.total() &gt; problem.budget().totalWork()) return Decision.WORK_LIMIT;</span>
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">        if (debt &gt; problem.budget().maxComplexityDebt()) return Decision.COMPLEXITY_BOUND;</span>
+<span class="pc bpc" id="L490" title="1 of 4 branches missed.">        if (depth &gt; problem.budget().maxPrimitiveSteps() || theory &gt; problem.budget().maxTheoryWork()) return Decision.PATH_BOUND;</span>
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        if (!problem.carries(move.assumptions(), node.state)) return Decision.ASSUMPTION_REJECTED;</span>
+<span class="fc" id="L492">        return null;</span>
     }
 
     private A inspect(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, S state, Ledger ledger) {
-<span class="fc" id="L490">        Object[] pending = new Object[1];</span>
-<span class="fc" id="L491">        var retained = RetainedOperation.retainCompleted(1, problem, state, pending);</span>
-<span class="fc" id="L492">        Throwable primary = null;</span>
+<span class="fc" id="L496">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L497">        var retained = RetainedOperation.retainCompleted(1, problem, state, pending);</span>
+<span class="fc" id="L498">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L494">            var value = problem.inspect(state);</span>
-<span class="fc" id="L495">            pending[0] = value;</span>
+<span class="fc" id="L500">            var value = problem.inspect(state);</span>
+<span class="fc" id="L501">            pending[0] = value;</span>
             // Completed callback work is settled exactly once, even if source validation aborts.
-<span class="fc" id="L497">            ledger.search = Math.addExact(ledger.search, value.searchWork());</span>
-<span class="fc" id="L498">            ledger.primitive = Math.addExact(ledger.primitive, value.primitiveWork());</span>
-<span class="fc" id="L499">            SearchExecution.completed(1);</span>
-<span class="pc bpc" id="L500" title="2 of 4 branches missed.">            if (value.capabilities().values().stream().anyMatch(capability -&gt; !capability.sourceExpression().equals(state.expression())))</span>
-<span class="nc" id="L501">                throw new IllegalArgumentException(&quot;capability evidence differs from source state&quot;);</span>
-<span class="fc" id="L502">            return value;</span>
-<span class="fc" id="L503">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L504">            primary = failure;</span>
-<span class="fc" id="L505">            SearchExecution.observeFailure(failure);</span>
-<span class="fc" id="L506">            throw failure;</span>
-<span class="fc" id="L507">        } finally { SearchExecution.close(retained, primary); }</span>
+<span class="fc" id="L503">            ledger.search = Math.addExact(ledger.search, value.searchWork());</span>
+<span class="fc" id="L504">            ledger.primitive = Math.addExact(ledger.primitive, value.primitiveWork());</span>
+<span class="fc" id="L505">            SearchExecution.completed(1);</span>
+<span class="pc bpc" id="L506" title="2 of 4 branches missed.">            if (value.capabilities().values().stream().anyMatch(capability -&gt; !capability.sourceExpression().equals(state.expression())))</span>
+<span class="nc" id="L507">                throw new IllegalArgumentException(&quot;capability evidence differs from source state&quot;);</span>
+<span class="fc" id="L508">            return value;</span>
+<span class="fc" id="L509">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L510">            primary = failure;</span>
+<span class="fc" id="L511">            SearchExecution.observeFailure(failure);</span>
+<span class="fc" id="L512">            throw failure;</span>
+<span class="fc" id="L513">        } finally { SearchExecution.close(retained, primary); }</span>
     }
 
     private double priority(SearchExecution.Environment&lt;E,S,M,A,V&gt; problem, S state, A value) {
-<span class="fc bfc" id="L511" title="All 2 branches covered.">        double score = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? state.searchDepth() : problem.score(state) - value.value();</span>
-<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (!Double.isFinite(score)) throw new IllegalArgumentException(&quot;nonfinite state priority&quot;);</span>
-<span class="fc" id="L513">        return score;</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        double score = problem.mode() == Mode.COMPLETE_BOUNDED_REFERENCE ? state.searchDepth() : problem.score(state) - value.value();</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">        if (!Double.isFinite(score)) throw new IllegalArgumentException(&quot;nonfinite state priority&quot;);</span>
+<span class="fc" id="L519">        return score;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

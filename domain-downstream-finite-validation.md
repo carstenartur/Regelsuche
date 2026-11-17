@@ -144,9 +144,20 @@ promotion and Public Evidence statuses stay `NOT_EVALUATED`.
 
 Agreement on the retained finite data does not prove a unique infinite
 continuation, minimal recurrence order, universal theorem, external novelty or
-release qualification. Generic proof/novelty/promotion/release consumers and
-comparative multi-domain qualification remain open under
-#224. No campaign, protected corpus or study is executed by this API.
+release qualification. Generic proof, novelty, promotion and release consumers
+and comparative multi-domain qualification remain open under #1020. No campaign,
+protected corpus or study is executed by this API.
+
+## Workbench
+
+Open **Eigene Discovery-Domänen** from the Workbench, then select or import a
+saved sequence export. **Endliche Daten prüfen** runs the independent check
+for that selection. The action uses the retained workspace and evidence hashes.
+The status distinguishes finite agreement, refutation, a missing selected
+candidate and incomplete or failed checks. **Prüfbeleg herunterladen** downloads
+the exact retained receipt from its hash-addressed URL. The separate replay
+action reproduces the source evidence and has its own status. Switching exports
+clears the previous status and receipt link.
 
 ## Ordinary controls
 

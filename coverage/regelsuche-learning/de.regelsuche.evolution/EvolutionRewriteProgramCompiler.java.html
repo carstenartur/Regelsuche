@@ -327,7 +327,7 @@ public final class EvolutionRewriteProgramCompiler {
 <span class="nc" id="L327">                candidate.toTransformation().estimatedCostDelta()</span>
 <span class="nc bnc" id="L328" title="All 2 branches missed.">                    &lt;= requirement.threshold();</span>
 <span class="fc" id="L329">            case MAX_PRIMITIVE_STEPS -&gt; candidate -&gt;</span>
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                candidate.steps().size() &lt;= requirement.threshold();</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                candidate.executionWork().primitiveRewrites() &lt;= requirement.threshold();</span>
         };
     }
 

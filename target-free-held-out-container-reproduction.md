@@ -15,12 +15,17 @@ target-free-held-out-candidate-freeze.json
 target-free-held-out-post-freeze-qualification.json
 ```
 
-The Java verifier rejects a missing or additional file, symlink, malformed or
-non-canonical artifact, row-identity drift, an invalid plan/freeze/
-qualification binding, premature qualification disclosure, or any byte
-difference between the three executions. Its JUnit characterization also
-proves that byte drift, an invalid image identity and an additional artifact
-fail closed.
+The Java verifier rebuilds the plan from the pinned preregistration. It checks
+the freeze against the plan's input hashes, row identities, configured work and
+derived matched-work groups. It also checks the qualification's resource
+identity and links each qualification row and candidate back to the frozen work
+ledger, candidate set and lineage. Three identical copies of a canonically
+rehashed mismatch fail these checks.
+
+Missing or additional files, symlinks, malformed or non-canonical artifacts,
+premature qualification disclosure, invalid image identity and byte drift also
+cause rejection. Proof and capability assessment execute in the matrix runner.
+The reproduction verifier checks their evidence bindings.
 
 ## Reproduction command
 

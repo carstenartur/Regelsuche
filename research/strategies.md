@@ -17,6 +17,16 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Quellenbindung der zurückgehaltenen Darstellungsmatrix
+
+- **Hypothese.** Eine geprüfte Bindung an den Versuchsplan und die eingefrorenen Kandidaten verhindert, dass drei bytegleiche Kopien eine fachlich falsch zugeordnete Auswertung bestätigen.
+- **Umsetzungsstand.** Der Matrixläufer prüft die Bindung vor der Qualifikation. Der Reproduktionsprüfer gleicht den Plan mit der Präregistrierung und jede Auswertung mit dem eingefrorenen Lauf ab.
+- **Befund.** Im bestehenden Panel mit 144 Zeilen weist der Prüfer neu gehashte Kopien mit veränderter Formation, einem fremden Arbeitsnachweis oder einem abweichenden Kandidatenausdruck ab. [Daten, Prüfgrenzen und Reproduktion](../target-free-held-out-container-reproduction.md)
+- **Folgerung.** Den Prüfpfad bei weiteren Vergleichsläufen wiederverwenden. Für die historische Kalibrierung fehlen weiterhin eingefrorene Nachweise für Archiv- und Rangstufen.
+
+- [`TargetFreeHeldOutMatrixRunner.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeHeldOutMatrixRunner.java#L44) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeHeldOutMatrixRunner.java | public final class TargetFreeHeldOutMatrixRunner { -->
+- [`TargetFreeHeldOutContainerReproductionVerifierTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeHeldOutContainerReproductionVerifierTest.java#L20) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeHeldOutContainerReproductionVerifierTest.java | class TargetFreeHeldOutContainerReproductionVerifierTest { -->
+
 ## Gelernte Brücke zur Faktorisierung
 
 - **Hypothese.** Eine aus zwei Koeffizientenreihen gelernte Brücke spart Sucharbeit in zurückgehaltenen Aufgabenfamilien.
@@ -194,3 +204,13 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`ProjectiveHandoff.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoff.java#L29) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoff.java | public final class ProjectiveHandoff { -->
 - [`ProjectiveHandoffSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/iteration/ProjectiveHandoffSdk.java#L11) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/iteration/ProjectiveHandoffSdk.java | public final class ProjectiveHandoffSdk { -->
 - [`ProjectiveHandoffTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoffTest.java#L19) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/ProjectiveHandoffTest.java | class ProjectiveHandoffTest { -->
+
+## Zustandslokale Wiederverwendung von Suchfortsetzungen
+
+- **Hypothese.** Gleiche Ausdrücke, Annahmen und Fähigkeiten können bei zustandslokalen Regeln dieselbe Fortsetzung verwenden. Bei unterschiedlichen Pfadbudgets bleiben nichtdominierte Pfade erhalten.
+- **Umsetzungsstand.** Die optionale FAST-Suche prüft vor jedem Indexvergleich das verbleibende Arbeitsbudget und kann dominierte Einträge gemeinsam ersetzen.
+- **Befund.** Die Graphkontrolle behält denselben erreichbaren Ausdrucksbestand mit 43 statt 84 Expansionen. Bei 15 Einheiten für die Ein-Schritt-Kontrolle ist die Verifikation abgeschlossen. Der Index meldet Budgetende. Die frühere Variante gab noch zwei Einheiten für Aufnahme und weitere Einplanung aus. Mit ausreichendem Budget bleibt das Ziel in einem Primitivschritt erreichbar. [Kontrollen und Reproduktion](work-replacing-search.md#development-diagnostics)
+- **Folgerung.** Zustandslokale Wiederverwendung bleibt an den Fortsetzungsvertrag gebunden. Weitere Aussagen zum Nutzen erfordern einen Vergleich auf realen Aufgaben mit vielen wiederholten Zuständen.
+
+- [`MoveSearchVisits.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/moves/MoveSearchVisits.java#L13) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/moves/MoveSearchVisits.java | final class MoveSearchVisits<S extends SearchExecution.Position<?>> implements de.regelsuche.retention.RetainedGraph.View { -->
+- [`MoveSearchDominanceTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/moves/MoveSearchDominanceTest.java#L13) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/moves/MoveSearchDominanceTest.java | class MoveSearchDominanceTest { -->

@@ -330,247 +330,260 @@ public final class TargetFreeHeldOutMatrixRunner {
 <span class="fc" id="L330">        return QualificationArtifact.create(content);</span>
     }
 
-    private static void requireFreezeAuthority(
+    static void requireFreezeAuthority(
         PlanArtifact plan,
         FreezeArtifact freeze
     ) {
-<span class="fc" id="L337">        FreezeContent content = freeze.content();</span>
-<span class="fc" id="L338">        List&lt;String&gt; expected = plan.content().rows().stream()</span>
-<span class="fc" id="L339">            .map(PlanRow::configurationId).toList();</span>
-<span class="fc" id="L340">        List&lt;String&gt; actual = content.rows().stream()</span>
-<span class="fc" id="L341">            .map(FreezeRow::configurationId).toList();</span>
-<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (!content.repositoryRevision().equals(</span>
-<span class="fc" id="L343">                plan.content().repositoryRevision())</span>
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                || !content.planHash().equals(plan.contentHash())</span>
-<span class="pc bpc" id="L345" title="1 of 2 branches missed.">                || !content.preregistrationHash().equals(</span>
-<span class="fc" id="L346">                    plan.content().preregistrationHash())</span>
-<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                || !content.formationHash().equals(</span>
-<span class="fc" id="L348">                    plan.content().formationHash())</span>
-<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                || !content.qualificationHash().equals(</span>
-<span class="fc" id="L350">                    plan.content().qualificationHash())</span>
-<span class="pc bpc" id="L351" title="1 of 2 branches missed.">                || !QUALIFICATION_NOT_DISCLOSED.equals(</span>
-<span class="fc" id="L352">                    content.qualificationDisclosure())</span>
-<span class="pc bpc" id="L353" title="1 of 2 branches missed.">                || !expected.equals(actual)</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                || content.rows().size() != 144) {</span>
-<span class="nc" id="L355">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L337">        PlanContent planContent = plan.content();</span>
+<span class="fc" id="L338">        FreezeContent content = freeze.content();</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (!content.repositoryRevision().equals(planContent.repositoryRevision())</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                || !content.planHash().equals(plan.contentHash())</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                || !content.preregistrationHash().equals(planContent.preregistrationHash())</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                || !content.formationHash().equals(planContent.formationHash())</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                || !content.qualificationHash().equals(planContent.qualificationHash())</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                || content.qualificationByteLength() != planContent.qualificationByteLength()</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">                || !QUALIFICATION_NOT_DISCLOSED.equals(</span>
+<span class="fc" id="L346">                    content.qualificationDisclosure())</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                || content.rows().size() != planContent.rows().size()) {</span>
+<span class="fc" id="L348">            throw new IllegalArgumentException(</span>
                 &quot;candidate freeze is not the complete frozen authority&quot;);
         }
-<span class="fc" id="L358">    }</span>
+<span class="fc" id="L351">        Map&lt;String, CaseSpec&gt; cases = indexCases(planContent.cases());</span>
+<span class="fc" id="L352">        Map&lt;String, PolicySpec&gt; policies = indexPolicies(planContent.policies());</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        for (int index = 0; index &lt; planContent.rows().size(); index++) {</span>
+<span class="fc" id="L354">            PlanRow expected = planContent.rows().get(index);</span>
+<span class="fc" id="L355">            FreezeRow actual = content.rows().get(index);</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            if (actual.sequence() != expected.sequence()</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                    || !actual.configurationId().equals(expected.configurationId())</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                    || !actual.caseId().equals(expected.caseId())</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                    || !actual.policyId().equals(expected.policyId())</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                    || actual.checkpoint() != expected.checkpoint()</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                    || !actual.configuredBudget().equals(cases.get(expected.caseId()).budget())</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                    || actual.deterministicSeed() != policies.get(expected.policyId()).deterministicSeed()) {</span>
+<span class="nc" id="L363">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L364">                    &quot;candidate freeze row differs from plan: &quot; + expected.configurationId());</span>
+            }
+        }
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (!content.matchedWorkGroups().equals(</span>
+<span class="fc" id="L368">                TargetFreeHeldOutQualifier.matchedWorkGroups(planContent, content.rows()))) {</span>
+<span class="nc" id="L369">            throw new IllegalArgumentException(&quot;matched-work groups differ from frozen ledgers&quot;);</span>
+        }
+<span class="fc" id="L371">    }</span>
 
     static void requireBoundaryAuthority(
         FreezeRow frozen,
         RepresentationDiscoveryInformationBoundary boundary
     ) {
-<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        if (!boundary.contentHash().equals(</span>
-<span class="fc" id="L365">                frozen.informationBoundaryHash())</span>
-<span class="fc" id="L366">                || !boundary.candidateFormationSelectionCommitment()</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">                    .equals(frozen.formationSelectionCommitment())</span>
-<span class="fc" id="L368">                || !boundary.candidateFormationRuleInventoryHash()</span>
-<span class="pc bpc" id="L369" title="1 of 2 branches missed.">                    .equals(frozen.formationRuleInventoryHash())</span>
-<span class="fc" id="L370">                || !boundary.postFreezeCatalogCommitment()</span>
-<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                    .equals(frozen.postFreezeCatalogCommitment())) {</span>
-<span class="nc" id="L372">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (!boundary.contentHash().equals(</span>
+<span class="fc" id="L378">                frozen.informationBoundaryHash())</span>
+<span class="fc" id="L379">                || !boundary.candidateFormationSelectionCommitment()</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">                    .equals(frozen.formationSelectionCommitment())</span>
+<span class="fc" id="L381">                || !boundary.candidateFormationRuleInventoryHash()</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">                    .equals(frozen.formationRuleInventoryHash())</span>
+<span class="fc" id="L383">                || !boundary.postFreezeCatalogCommitment()</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                    .equals(frozen.postFreezeCatalogCommitment())) {</span>
+<span class="nc" id="L385">            throw new IllegalArgumentException(</span>
                 &quot;information boundary changed before qualification&quot;);
         }
-<span class="fc" id="L375">    }</span>
+<span class="fc" id="L388">    }</span>
 
     private static void validatePlanResources(
         Preregistration preregistration,
         Formation formation
     ) {
-<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        if (!&quot;regelsuche.target-free-held-out-preregistration/v1&quot;.equals(</span>
-<span class="fc" id="L382">                preregistration.schema())</span>
-<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                || !PLAN_STATUS.equals(preregistration.evidenceStatus())</span>
-<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                || !&quot;regelsuche.target-free-held-out-formation/v1&quot;.equals(</span>
-<span class="fc" id="L385">                    formation.schema())</span>
-<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                || !PLAN_STATUS.equals(formation.evidenceStatus())) {</span>
-<span class="nc" id="L387">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (!&quot;regelsuche.target-free-held-out-preregistration/v1&quot;.equals(</span>
+<span class="fc" id="L395">                preregistration.schema())</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">                || !PLAN_STATUS.equals(preregistration.evidenceStatus())</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">                || !&quot;regelsuche.target-free-held-out-formation/v1&quot;.equals(</span>
+<span class="fc" id="L398">                    formation.schema())</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                || !PLAN_STATUS.equals(formation.evidenceStatus())) {</span>
+<span class="nc" id="L400">            throw new IllegalArgumentException(</span>
                 &quot;unsupported held-out plan resources&quot;);
         }
-<span class="fc" id="L390">        if (formation.cases().size()</span>
-<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                != preregistration.configuredCaseCount()</span>
-<span class="fc" id="L392">                || formation.policies().size()</span>
-<span class="pc bpc" id="L393" title="1 of 2 branches missed.">                    != preregistration.configuredPolicyCount()</span>
-<span class="fc" id="L394">                || formation.workMatching().checkpoints().size()</span>
-<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                    != preregistration.configuredCheckpointCount()</span>
-<span class="fc" id="L396">                || formation.cases().size()</span>
-<span class="fc" id="L397">                    * formation.policies().size()</span>
-<span class="fc" id="L398">                    * formation.workMatching().checkpoints().size()</span>
-<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                    != preregistration.configuredEntryCount()) {</span>
-<span class="nc" id="L400">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L403">        if (formation.cases().size()</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                != preregistration.configuredCaseCount()</span>
+<span class="fc" id="L405">                || formation.policies().size()</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                    != preregistration.configuredPolicyCount()</span>
+<span class="fc" id="L407">                || formation.workMatching().checkpoints().size()</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                    != preregistration.configuredCheckpointCount()</span>
+<span class="fc" id="L409">                || formation.cases().size()</span>
+<span class="fc" id="L410">                    * formation.policies().size()</span>
+<span class="fc" id="L411">                    * formation.workMatching().checkpoints().size()</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                    != preregistration.configuredEntryCount()) {</span>
+<span class="nc" id="L413">            throw new IllegalArgumentException(</span>
                 &quot;held-out matrix counts do not balance&quot;);
         }
-<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (!List.of(8, 16, 32, 64, 128, 256).equals(</span>
-<span class="fc" id="L404">                formation.workMatching().checkpoints())</span>
-<span class="pc bpc" id="L405" title="1 of 2 branches missed.">                || !&quot;ADMITTED_PRIMITIVE_STEPS&quot;.equals(</span>
-<span class="fc" id="L406">                    formation.workMatching().authority())</span>
-<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                || !&quot;ALL_POLICIES_REACHED_EXACT_CHECKPOINT&quot;.equals(</span>
-<span class="fc" id="L408">                    formation.workMatching().comparisonEligibility())</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (!List.of(8, 16, 32, 64, 128, 256).equals(</span>
+<span class="fc" id="L417">                formation.workMatching().checkpoints())</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">                || !&quot;ADMITTED_PRIMITIVE_STEPS&quot;.equals(</span>
+<span class="fc" id="L419">                    formation.workMatching().authority())</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                || !&quot;ALL_POLICIES_REACHED_EXACT_CHECKPOINT&quot;.equals(</span>
+<span class="fc" id="L421">                    formation.workMatching().comparisonEligibility())</span>
                 || !&quot;STOP_BEFORE_ADMITTING_A_STEP_BEYOND_THE_CHECKPOINT&quot;
-<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                    .equals(formation.workMatching().stopSemantics())) {</span>
-<span class="nc" id="L411">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                    .equals(formation.workMatching().stopSemantics())) {</span>
+<span class="nc" id="L424">            throw new IllegalArgumentException(</span>
                 &quot;held-out work-matching contract changed&quot;);
         }
-<span class="fc" id="L414">        Set&lt;String&gt; availablePacks = new HashSet&lt;&gt;(</span>
-<span class="fc" id="L415">            CoreRuleCatalog.packIds());</span>
-<span class="fc" id="L416">        new KnowledgePackRegistry().allPacks().forEach(pack -&gt;</span>
-<span class="fc" id="L417">            availablePacks.add(pack.packId()));</span>
-<span class="fc bfc" id="L418" title="All 2 branches covered.">        for (CaseSpec benchmarkCase : formation.cases()) {</span>
-<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (benchmarkCase.ruleProfile() != RuleProfile.MINIMAL_KERNEL</span>
-<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                    || benchmarkCase.distractorRulePackIds().isEmpty()</span>
-<span class="pc bpc" id="L421" title="1 of 2 branches missed.">                    || !benchmarkCase.enabledRulePackIds().containsAll(</span>
-<span class="fc" id="L422">                        benchmarkCase.distractorRulePackIds())) {</span>
-<span class="nc" id="L423">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L427">        Set&lt;String&gt; availablePacks = new HashSet&lt;&gt;(</span>
+<span class="fc" id="L428">            CoreRuleCatalog.packIds());</span>
+<span class="fc" id="L429">        new KnowledgePackRegistry().allPacks().forEach(pack -&gt;</span>
+<span class="fc" id="L430">            availablePacks.add(pack.packId()));</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">        for (CaseSpec benchmarkCase : formation.cases()) {</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            if (benchmarkCase.ruleProfile() != RuleProfile.MINIMAL_KERNEL</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                    || benchmarkCase.distractorRulePackIds().isEmpty()</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">                    || !benchmarkCase.enabledRulePackIds().containsAll(</span>
+<span class="fc" id="L435">                        benchmarkCase.distractorRulePackIds())) {</span>
+<span class="nc" id="L436">                throw new IllegalArgumentException(</span>
                     &quot;case differs from frozen inventory contract: &quot;
-<span class="nc" id="L425">                        + benchmarkCase.id());</span>
+<span class="nc" id="L438">                        + benchmarkCase.id());</span>
             }
-<span class="fc bfc" id="L427" title="All 2 branches covered.">            for (String pack : benchmarkCase.enabledRulePackIds()) {</span>
-<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                if (!availablePacks.contains(pack)) {</span>
-<span class="nc" id="L429">                    throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">            for (String pack : benchmarkCase.enabledRulePackIds()) {</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">                if (!availablePacks.contains(pack)) {</span>
+<span class="nc" id="L442">                    throw new IllegalArgumentException(</span>
                         &quot;unknown pack &quot; + pack + &quot; for &quot;
-<span class="nc" id="L431">                            + benchmarkCase.id());</span>
+<span class="nc" id="L444">                            + benchmarkCase.id());</span>
                 }
-<span class="fc" id="L433">            }</span>
-<span class="fc" id="L434">        }</span>
-<span class="fc" id="L435">        formation.policies().forEach(</span>
+<span class="fc" id="L446">            }</span>
+<span class="fc" id="L447">        }</span>
+<span class="fc" id="L448">        formation.policies().forEach(</span>
             TargetFreeHeldOutMatrixRunner::validatePolicyAdapter);
-<span class="fc" id="L437">    }</span>
+<span class="fc" id="L450">    }</span>
 
     private static void validatePolicyAdapter(PolicySpec policy) {
         try {
-<span class="fc" id="L441">            Class&lt;?&gt; adapter = Class.forName(</span>
-<span class="fc" id="L442">                policy.adapter(),</span>
+<span class="fc" id="L454">            Class&lt;?&gt; adapter = Class.forName(</span>
+<span class="fc" id="L455">                policy.adapter(),</span>
                 false,
-<span class="fc" id="L444">                TargetFreeHeldOutMatrixRunner.class.getClassLoader());</span>
-<span class="fc bfc" id="L445" title="All 2 branches covered.">            if (&quot;TARGET_FREE_REPRESENTATION_SEARCH&quot;.equals(</span>
-<span class="fc" id="L446">                    policy.adapterInterface())) {</span>
-<span class="pc bpc" id="L447" title="1 of 2 branches missed.">                if (adapter != TargetFreeRepresentationSearch.class) {</span>
-<span class="nc" id="L448">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L457">                TargetFreeHeldOutMatrixRunner.class.getClassLoader());</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            if (&quot;TARGET_FREE_REPRESENTATION_SEARCH&quot;.equals(</span>
+<span class="fc" id="L459">                    policy.adapterInterface())) {</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">                if (adapter != TargetFreeRepresentationSearch.class) {</span>
+<span class="nc" id="L461">                    throw new IllegalArgumentException(</span>
                         &quot;native enumeration adapter changed&quot;);
                 }
-<span class="pc bpc" id="L451" title="1 of 2 branches missed.">            } else if (&quot;SEARCH_STRATEGY&quot;.equals(</span>
-<span class="fc" id="L452">                    policy.adapterInterface())) {</span>
-<span class="pc bpc" id="L453" title="1 of 2 branches missed.">                if (!SearchStrategy.class.isAssignableFrom(adapter)) {</span>
-<span class="nc" id="L454">                    throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            } else if (&quot;SEARCH_STRATEGY&quot;.equals(</span>
+<span class="fc" id="L465">                    policy.adapterInterface())) {</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                if (!SearchStrategy.class.isAssignableFrom(adapter)) {</span>
+<span class="nc" id="L467">                    throw new IllegalArgumentException(</span>
                         &quot;search adapter contract changed&quot;);
                 }
             } else {
-<span class="nc" id="L458">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L471">                throw new IllegalArgumentException(</span>
                     &quot;unknown adapter interface&quot;);
             }
-<span class="fc bfc" id="L461" title="All 2 branches covered.">            if (&quot;NO_ARGUMENT&quot;.equals(policy.adapterConstructor())) {</span>
-<span class="fc" id="L462">                adapter.getConstructor();</span>
-<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            } else if (&quot;LONG_SEED&quot;.equals(</span>
-<span class="fc" id="L464">                    policy.adapterConstructor())) {</span>
-<span class="fc" id="L465">                adapter.getConstructor(long.class);</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">            if (&quot;NO_ARGUMENT&quot;.equals(policy.adapterConstructor())) {</span>
+<span class="fc" id="L475">                adapter.getConstructor();</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">            } else if (&quot;LONG_SEED&quot;.equals(</span>
+<span class="fc" id="L477">                    policy.adapterConstructor())) {</span>
+<span class="fc" id="L478">                adapter.getConstructor(long.class);</span>
             } else {
-<span class="nc" id="L467">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L480">                throw new IllegalArgumentException(</span>
                     &quot;unknown adapter constructor&quot;);
             }
-<span class="nc" id="L470">        } catch (ReflectiveOperationException exception) {</span>
-<span class="nc" id="L471">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L483">        } catch (ReflectiveOperationException exception) {</span>
+<span class="nc" id="L484">            throw new IllegalArgumentException(</span>
                 &quot;configured policy adapter is unavailable: &quot;
-<span class="nc" id="L473">                    + policy.adapter(), exception);</span>
-<span class="fc" id="L474">        }</span>
-<span class="fc" id="L475">    }</span>
+<span class="nc" id="L486">                    + policy.adapter(), exception);</span>
+<span class="fc" id="L487">        }</span>
+<span class="fc" id="L488">    }</span>
 
     private static void validateQualification(
         PlanArtifact plan,
         QualificationSpec qualification
     ) {
-<span class="pc bpc" id="L481" title="1 of 2 branches missed.">        if (!&quot;regelsuche.target-free-held-out-qualification/v1&quot;.equals(</span>
-<span class="fc" id="L482">                qualification.schema())</span>
-<span class="pc bpc" id="L483" title="1 of 2 branches missed.">                || !&quot;SEALED_POST_FREEZE&quot;.equals(</span>
-<span class="fc" id="L484">                    qualification.evidenceStatus())) {</span>
-<span class="nc" id="L485">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (!&quot;regelsuche.target-free-held-out-qualification/v1&quot;.equals(</span>
+<span class="fc" id="L495">                qualification.schema())</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                || !&quot;SEALED_POST_FREEZE&quot;.equals(</span>
+<span class="fc" id="L497">                    qualification.evidenceStatus())) {</span>
+<span class="nc" id="L498">            throw new IllegalArgumentException(</span>
                 &quot;unsupported sealed qualification&quot;);
         }
-<span class="fc" id="L488">        List&lt;String&gt; expected = plan.content().cases().stream()</span>
-<span class="fc" id="L489">            .map(CaseSpec::id).toList();</span>
-<span class="fc" id="L490">        List&lt;String&gt; actual = qualification.caseQualifications().stream()</span>
-<span class="fc" id="L491">            .map(CaseQualification::id).toList();</span>
-<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
-<span class="nc" id="L493">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L501">        List&lt;String&gt; expected = plan.content().cases().stream()</span>
+<span class="fc" id="L502">            .map(CaseSpec::id).toList();</span>
+<span class="fc" id="L503">        List&lt;String&gt; actual = qualification.caseQualifications().stream()</span>
+<span class="fc" id="L504">            .map(CaseQualification::id).toList();</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
+<span class="nc" id="L506">            throw new IllegalArgumentException(</span>
                 &quot;qualification cases differ from plan&quot;);
         }
-<span class="fc" id="L496">        qualification.caseQualifications().forEach(value -&gt; {</span>
-<span class="pc bpc" id="L497" title="1 of 2 branches missed.">            if (!Set.of(POSITIVE_OUTCOME, NEGATIVE_OUTCOME).contains(</span>
-<span class="fc" id="L498">                    value.expectedOutcome())</span>
-<span class="pc bpc" id="L499" title="1 of 2 branches missed.">                    || value.referenceExpressions().isEmpty()) {</span>
-<span class="nc" id="L500">                throw new IllegalArgumentException(</span>
-<span class="nc" id="L501">                    &quot;incomplete qualification for &quot; + value.id());</span>
+<span class="fc" id="L509">        qualification.caseQualifications().forEach(value -&gt; {</span>
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">            if (!Set.of(POSITIVE_OUTCOME, NEGATIVE_OUTCOME).contains(</span>
+<span class="fc" id="L511">                    value.expectedOutcome())</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">                    || value.referenceExpressions().isEmpty()) {</span>
+<span class="nc" id="L513">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L514">                    &quot;incomplete qualification for &quot; + value.id());</span>
             }
-<span class="fc" id="L503">            value.requiredCapabilities().forEach(</span>
+<span class="fc" id="L516">            value.requiredCapabilities().forEach(</span>
                 TargetFreeHeldOutQualifier::capabilityRuleId);
-<span class="fc" id="L505">        });</span>
-<span class="fc" id="L506">    }</span>
+<span class="fc" id="L518">        });</span>
+<span class="fc" id="L519">    }</span>
 
     static KnowledgePackSelection visibleSelection(
         CaseSpec benchmarkCase
     ) {
-<span class="fc" id="L511">        KnowledgePackSelection selection = KnowledgePackSelection.profile(</span>
-<span class="fc" id="L512">            benchmarkCase.ruleProfile());</span>
-<span class="fc bfc" id="L513" title="All 2 branches covered.">        for (String pack : benchmarkCase.enabledRulePackIds()) {</span>
-<span class="fc" id="L514">            selection = selection.enablePack(pack);</span>
-<span class="fc" id="L515">        }</span>
-<span class="fc" id="L516">        return selection;</span>
+<span class="fc" id="L524">        KnowledgePackSelection selection = KnowledgePackSelection.profile(</span>
+<span class="fc" id="L525">            benchmarkCase.ruleProfile());</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        for (String pack : benchmarkCase.enabledRulePackIds()) {</span>
+<span class="fc" id="L527">            selection = selection.enablePack(pack);</span>
+<span class="fc" id="L528">        }</span>
+<span class="fc" id="L529">        return selection;</span>
     }
 
     static List&lt;RepresentationCandidateProposal&gt; uniqueProposals(
         String source,
         List&lt;CandidateEvidence&gt; candidates
     ) {
-<span class="fc" id="L523">        TreeMap&lt;String, RepresentationCandidateProposal&gt; byKey =</span>
+<span class="fc" id="L536">        TreeMap&lt;String, RepresentationCandidateProposal&gt; byKey =</span>
             new TreeMap&lt;&gt;();
-<span class="fc bfc" id="L525" title="All 2 branches covered.">        for (CandidateEvidence candidate : candidates) {</span>
-<span class="fc" id="L526">            RepresentationCandidateProposal proposal =</span>
-<span class="fc" id="L527">                RepresentationCandidateProposal.whole(</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        for (CandidateEvidence candidate : candidates) {</span>
+<span class="fc" id="L539">            RepresentationCandidateProposal proposal =</span>
+<span class="fc" id="L540">                RepresentationCandidateProposal.whole(</span>
                     source,
-<span class="fc" id="L529">                    candidate.expression(),</span>
-<span class="fc" id="L530">                    candidate.assumptions(),</span>
+<span class="fc" id="L542">                    candidate.expression(),</span>
+<span class="fc" id="L543">                    candidate.assumptions(),</span>
                     CandidateProofStatus.OBSERVED);
-<span class="fc" id="L532">            byKey.putIfAbsent(candidate.proposalKey(), proposal);</span>
-<span class="fc" id="L533">        }</span>
-<span class="fc" id="L534">        return List.copyOf(byKey.values());</span>
+<span class="fc" id="L545">            byKey.putIfAbsent(candidate.proposalKey(), proposal);</span>
+<span class="fc" id="L546">        }</span>
+<span class="fc" id="L547">        return List.copyOf(byKey.values());</span>
     }
 
     static List&lt;CandidateEvidence&gt; canonicalCandidateLineages(
         List&lt;CandidateEvidence&gt; candidates
     ) {
-<span class="fc" id="L540">        Map&lt;String, CandidateEvidence&gt; byHash = new TreeMap&lt;&gt;();</span>
-<span class="fc bfc" id="L541" title="All 2 branches covered.">        for (CandidateEvidence candidate : candidates) {</span>
-<span class="fc" id="L542">            byHash.putIfAbsent(candidate.candidateHash(), candidate);</span>
-<span class="fc" id="L543">        }</span>
-<span class="fc" id="L544">        return byHash.values().stream().sorted(CANDIDATE_ORDER).toList();</span>
+<span class="fc" id="L553">        Map&lt;String, CandidateEvidence&gt; byHash = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L554" title="All 2 branches covered.">        for (CandidateEvidence candidate : candidates) {</span>
+<span class="fc" id="L555">            byHash.putIfAbsent(candidate.candidateHash(), candidate);</span>
+<span class="fc" id="L556">        }</span>
+<span class="fc" id="L557">        return byHash.values().stream().sorted(CANDIDATE_ORDER).toList();</span>
     }
 
     private static Map&lt;String, CaseSpec&gt; indexCases(
         List&lt;CaseSpec&gt; cases
     ) {
-<span class="fc" id="L550">        return cases.stream().collect(Collectors.toUnmodifiableMap(</span>
-<span class="fc" id="L551">            CaseSpec::id, value -&gt; value));</span>
+<span class="fc" id="L563">        return cases.stream().collect(Collectors.toUnmodifiableMap(</span>
+<span class="fc" id="L564">            CaseSpec::id, value -&gt; value));</span>
     }
 
     private static Map&lt;String, PolicySpec&gt; indexPolicies(
         List&lt;PolicySpec&gt; policies
     ) {
-<span class="fc" id="L557">        return policies.stream().collect(Collectors.toUnmodifiableMap(</span>
-<span class="fc" id="L558">            PolicySpec::id, value -&gt; value));</span>
+<span class="fc" id="L570">        return policies.stream().collect(Collectors.toUnmodifiableMap(</span>
+<span class="fc" id="L571">            PolicySpec::id, value -&gt; value));</span>
     }
 
     static List&lt;String&gt; union(
         List&lt;String&gt; left,
         List&lt;String&gt; right
     ) {
-<span class="fc" id="L565">        TreeSet&lt;String&gt; values = new TreeSet&lt;&gt;(left);</span>
-<span class="fc" id="L566">        values.addAll(right);</span>
-<span class="fc" id="L567">        return List.copyOf(values);</span>
+<span class="fc" id="L578">        TreeSet&lt;String&gt; values = new TreeSet&lt;&gt;(left);</span>
+<span class="fc" id="L579">        values.addAll(right);</span>
+<span class="fc" id="L580">        return List.copyOf(values);</span>
     }
 
     static String enumStateKey(EnumState state) {
-<span class="fc" id="L571">        return CANONICALIZER.stableHash(state.expression())</span>
-<span class="fc" id="L572">            + &quot;|&quot; + String.join(&quot;\u0000&quot;, state.assumptions())</span>
-<span class="fc" id="L573">            + &quot;|&quot; + state.temporaryComplexityIncrease();</span>
+<span class="fc" id="L584">        return CANONICALIZER.stableHash(state.expression())</span>
+<span class="fc" id="L585">            + &quot;|&quot; + String.join(&quot;\u0000&quot;, state.assumptions())</span>
+<span class="fc" id="L586">            + &quot;|&quot; + state.temporaryComplexityIncrease();</span>
     }
 
     private static String configurationId(
@@ -579,19 +592,19 @@ public final class TargetFreeHeldOutMatrixRunner {
         String policyId,
         int checkpoint
     ) {
-<span class="fc" id="L582">        StringBuilder descriptor = new StringBuilder();</span>
-<span class="fc" id="L583">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L595">        StringBuilder descriptor = new StringBuilder();</span>
+<span class="fc" id="L596">        KnownStructureCatalog.appendCanonicalField(</span>
             descriptor, PLAN_SCHEMA + &quot;/configuration&quot;);
-<span class="fc" id="L585">        KnownStructureCatalog.appendCanonicalField(</span>
-<span class="fc" id="L586">            descriptor, requireSha256(</span>
+<span class="fc" id="L598">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L599">            descriptor, requireSha256(</span>
                 preregistrationHash, &quot;preregistrationHash&quot;));
-<span class="fc" id="L588">        KnownStructureCatalog.appendCanonicalField(</span>
-<span class="fc" id="L589">            descriptor, requireText(caseId, &quot;caseId&quot;));</span>
-<span class="fc" id="L590">        KnownStructureCatalog.appendCanonicalField(</span>
-<span class="fc" id="L591">            descriptor, requireText(policyId, &quot;policyId&quot;));</span>
-<span class="fc" id="L592">        KnownStructureCatalog.appendCanonicalField(</span>
-<span class="fc" id="L593">            descriptor, Integer.toString(checkpoint));</span>
-<span class="fc" id="L594">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
+<span class="fc" id="L601">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L602">            descriptor, requireText(caseId, &quot;caseId&quot;));</span>
+<span class="fc" id="L603">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L604">            descriptor, requireText(policyId, &quot;policyId&quot;));</span>
+<span class="fc" id="L605">        KnownStructureCatalog.appendCanonicalField(</span>
+<span class="fc" id="L606">            descriptor, Integer.toString(checkpoint));</span>
+<span class="fc" id="L607">        return KnownStructureCatalog.sha256(descriptor.toString());</span>
     }
 
     private static void requireBinding(
@@ -600,21 +613,21 @@ public final class TargetFreeHeldOutMatrixRunner {
         String expectedHash,
         String label
     ) {
-<span class="pc bpc" id="L603" title="1 of 2 branches missed.">        if (bytes.length != expectedLength</span>
-<span class="fc" id="L604">                || !TargetFreeRepresentationEvaluationPlan.sha256(bytes)</span>
-<span class="pc bpc" id="L605" title="1 of 2 branches missed.">                    .equals(requireSha256(expectedHash, label + &quot;Hash&quot;))) {</span>
-<span class="nc" id="L606">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">        if (bytes.length != expectedLength</span>
+<span class="fc" id="L617">                || !TargetFreeRepresentationEvaluationPlan.sha256(bytes)</span>
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">                    .equals(requireSha256(expectedHash, label + &quot;Hash&quot;))) {</span>
+<span class="nc" id="L619">            throw new IllegalArgumentException(</span>
                 label + &quot; differs from its byte commitment&quot;);
         }
-<span class="fc" id="L609">    }</span>
+<span class="fc" id="L622">    }</span>
 
     private static String requireRevision(String value) {
-<span class="fc" id="L612">        String revision = requireText(value, &quot;repositoryRevision&quot;);</span>
-<span class="pc bpc" id="L613" title="1 of 2 branches missed.">        if (!revision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
-<span class="nc" id="L614">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L625">        String revision = requireText(value, &quot;repositoryRevision&quot;);</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">        if (!revision.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="nc" id="L627">            throw new IllegalArgumentException(</span>
                 &quot;repositoryRevision must be a lowercase Git SHA&quot;);
         }
-<span class="fc" id="L617">        return revision;</span>
+<span class="fc" id="L630">        return revision;</span>
     }
 
     private static &lt;T&gt; T decode(
@@ -623,41 +636,41 @@ public final class TargetFreeHeldOutMatrixRunner {
         String label
     ) {
         try {
-<span class="fc" id="L626">            return JSON.readValue(bytes, type);</span>
-<span class="nc" id="L627">        } catch (IOException exception) {</span>
-<span class="nc" id="L628">            throw new IllegalArgumentException(&quot;invalid &quot; + label, exception);</span>
+<span class="fc" id="L639">            return JSON.readValue(bytes, type);</span>
+<span class="nc" id="L640">        } catch (IOException exception) {</span>
+<span class="nc" id="L641">            throw new IllegalArgumentException(&quot;invalid &quot; + label, exception);</span>
         }
     }
 
     static String canonical(Object value) {
         try {
-<span class="fc" id="L634">            return JSON.writeValueAsString(</span>
-<span class="fc" id="L635">                Objects.requireNonNull(value, &quot;value&quot;));</span>
-<span class="nc" id="L636">        } catch (JsonProcessingException exception) {</span>
-<span class="nc" id="L637">            throw new IllegalStateException(</span>
+<span class="fc" id="L647">            return JSON.writeValueAsString(</span>
+<span class="fc" id="L648">                Objects.requireNonNull(value, &quot;value&quot;));</span>
+<span class="nc" id="L649">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L650">            throw new IllegalStateException(</span>
                 &quot;cannot render held-out evidence&quot;, exception);
         }
     }
 
     private static void writeCanonical(Path target, String value)
             throws IOException {
-<span class="fc" id="L644">        AtomicJsonFile.writeUtf8(target, value);</span>
-<span class="pc bpc" id="L645" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
-<span class="pc bpc" id="L646" title="1 of 2 branches missed.">                || !value.equals(Files.readString(</span>
+<span class="fc" id="L657">        AtomicJsonFile.writeUtf8(target, value);</span>
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">        if (!Files.isRegularFile(target)</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">                || !value.equals(Files.readString(</span>
                     target, StandardCharsets.UTF_8))) {
-<span class="nc" id="L648">            throw new IllegalStateException(</span>
+<span class="nc" id="L661">            throw new IllegalStateException(</span>
                 &quot;canonical evidence changed while writing &quot; + target);
         }
-<span class="fc" id="L651">    }</span>
+<span class="fc" id="L664">    }</span>
 
     static void reject(
         Set&lt;String&gt; reasons,
         boolean condition,
         String reason
     ) {
-<span class="fc bfc" id="L658" title="All 2 branches covered.">        if (condition) {</span>
-<span class="fc" id="L659">            reasons.add(reason);</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">        if (condition) {</span>
+<span class="fc" id="L672">            reasons.add(reason);</span>
         }
-<span class="fc" id="L661">    }</span>
+<span class="fc" id="L674">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

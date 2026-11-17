@@ -30,7 +30,7 @@ import java.util.Set;
  */
 public final class EGraphPatternMatcher {
 
-<span class="fc" id="L33">    private record MatchCacheKey(String patternId, String patternFingerprint, EClassId root) {</span>
+<span class="fc" id="L33">    private record MatchCacheKey(String patternId, PatternExpr pattern, EClassId root) {</span>
     }
 
 <span class="fc" id="L36">    public record MatcherStats(</span>
@@ -75,7 +75,7 @@ public final class EGraphPatternMatcher {
 
     /** Every {@link Match} of {@code pattern} anywhere in the graph. */
     public List&lt;Match&gt; matchAll(PatternExpr pattern) {
-<span class="nc" id="L78">        return matchAll(pattern.toString(), pattern, null);</span>
+<span class="nc" id="L78">        return matchAll(null, pattern, null);</span>
     }
 
     /** Every {@link Match} of {@code pattern} on the given candidate roots. */
@@ -192,7 +192,7 @@ public final class EGraphPatternMatcher {
     }
 
     private List&lt;Map&lt;String, EClassId&gt;&gt; matchInClassMemoized(String patternId, PatternExpr pattern, EClassId rootId) {
-<span class="fc" id="L195">        MatchCacheKey key = new MatchCacheKey(patternId, pattern.toString(), eGraph.find(rootId));</span>
+<span class="fc" id="L195">        MatchCacheKey key = new MatchCacheKey(patternId, pattern, eGraph.find(rootId));</span>
 <span class="fc" id="L196">        List&lt;Map&lt;String, EClassId&gt;&gt; hit = matchCache.get(key);</span>
 <span class="fc bfc" id="L197" title="All 2 branches covered.">        if (hit != null) {</span>
 <span class="fc" id="L198">            matcherCacheHits++;</span>
