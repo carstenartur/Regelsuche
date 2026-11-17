@@ -114,7 +114,7 @@ class MavenWorkflowSemanticsContractTest {
     private static final Pattern DIRECT_HOST_INTERPRETER = Pattern.compile(
         "(?<![A-Za-z0-9_.-])"
             + "(?:python(?:3(?:\\.\\d+)?)?|node|npm|npx|perl|ruby"
-            + "|pwsh|powershell)(?=\\s+)"
+            + "|pwsh|powershell)(?=\\s+|$)"
     );
 
     // These five folded YAML commands are retained only until their Maven
@@ -376,6 +376,14 @@ class MavenWorkflowSemanticsContractTest {
             + "          -B scripts/new-release.py\n";
         assertEquals(List.of("python3", "-B scripts/new-release.py"),
             workflowRunCommands(noFold.lines().toList()));
+        // A standalone interpreter is a host runtime too; a blank line
+        // in a folded scalar does not make it an approved command.
+        assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml", noFold),
+            "undeclared-host-runtime"));
+        String separated = prefix + ">-\n          python3\n\n"
+            + "          -B scripts/new-release.py\n";
+        assertTrue(hasCategory(scanPlatformHostRuntimes(
+            "release.yml", separated), "undeclared-host-runtime"));
     }
 
     @Test
