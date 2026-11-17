@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,8 +61,51 @@ class MavenReleaseMetadataAlignmentTest {
             Files.writeString(file, Files.readString(file).replace(
                 "1.2.3-SNAPSHOT", "1.2.3"));
         }
+        addReleaseDates(root, "2026-11-18");
         assertDoesNotThrow(() -> verify(root, "1.2.3"));
         assertThrows(IllegalArgumentException.class, () -> verify(root, "1.2.4"));
+    }
+
+    @Test
+    void rejectsConflictingMissingOrMalformedReleaseDates(@TempDir Path temp)
+            throws Exception {
+        Path root = fixture(temp);
+        for (String relative : List.of(
+                "release.properties", "CITATION.cff", "CITATION.md",
+                ".zenodo.json", "codemeta.json", OPENAPI, "pom.xml",
+                "child/pom.xml")) {
+            Path file = root.resolve(relative);
+            Files.writeString(file, Files.readString(file).replace(
+                "1.2.3-SNAPSHOT", "1.2.3"));
+        }
+        addReleaseDates(root, "2026-11-18");
+        assertDoesNotThrow(() -> verify(root, "1.2.3"));
+
+        Path zenodo = root.resolve(".zenodo.json");
+        Files.writeString(zenodo, Files.readString(zenodo)
+            .replace("2026-11-18", "2026-11-19"));
+        assertThrows(IllegalArgumentException.class, () -> verify(root, "1.2.3"));
+        Files.writeString(zenodo, Files.readString(zenodo)
+            .replace("2026-11-19", "2026-11-18"));
+
+        Path cff = root.resolve("CITATION.cff");
+        String originalCff = Files.readString(cff);
+        Files.writeString(cff, originalCff.replace(
+            "date-released: \"2026-11-18\"\n", ""));
+        assertThrows(IllegalArgumentException.class, () -> verify(root, "1.2.3"));
+        Files.writeString(cff, originalCff + "date-released: \"2026-11-18\"\n");
+        assertThrows(IllegalArgumentException.class, () -> verify(root, "1.2.3"));
+        Files.writeString(cff, originalCff);
+
+        Path codemeta = root.resolve("codemeta.json");
+        Files.writeString(codemeta, Files.readString(codemeta)
+            .replace("2026-11-18", "2026-02-30"));
+        assertThrows(IllegalArgumentException.class, () -> verify(root, "1.2.3"));
+
+        Path snapshot = fixture(temp.resolve("snapshot"));
+        addReleaseDates(snapshot, "2026-11-18");
+        assertThrows(IllegalArgumentException.class,
+            () -> verify(snapshot, "1.2.3-SNAPSHOT"));
     }
 
     @Test
@@ -156,6 +201,7 @@ class MavenReleaseMetadataAlignmentTest {
         }
         require(expected.equals(jsonVersion(root.resolve(OPENAPI), "info", "version")),
             "OpenAPI info.version differs");
+        verifyPublicationDates(root, expected);
 
         Set<Path> visited = new HashSet<>();
         visitPom(root.toAbsolutePath().normalize(),
@@ -164,6 +210,72 @@ class MavenReleaseMetadataAlignmentTest {
         require(!visited.isEmpty(), "no Maven POMs visited");
         System.out.println("releaseMetadata=VERIFIED version=" + expected
             + " mavenPoms=" + visited.size() + " openapi=true");
+    }
+
+    private static void verifyPublicationDates(Path root, String version) throws IOException {
+        String cff = read(root, "CITATION.cff");
+        String citation = read(root, "CITATION.md");
+        String cffDate = singleDateLine(cff,
+            Pattern.compile("(?m)^date-released[ \\t]*:[ \\t]*([^\\r\\n]*)$"),
+            false, "CITATION.cff date-released");
+        String citationDate = singleDateLine(citation,
+            Pattern.compile("(?m)^[ \\t]*date[ \\t]*=[ \\t]*([^\\r\\n]*)$"),
+            true, "CITATION.md BibTeX date");
+        String zenodoDate = optionalJsonString(root.resolve(".zenodo.json"),
+            "publication_date");
+        String codemetaDate = optionalJsonString(root.resolve("codemeta.json"),
+            "datePublished");
+        if (version.endsWith("-SNAPSHOT")) {
+            require(cffDate == null && citationDate == null
+                    && zenodoDate == null && codemetaDate == null,
+                "snapshot metadata must not retain publication dates");
+            return;
+        }
+        require(cffDate != null && citationDate != null
+                && zenodoDate != null && codemetaDate != null,
+            "published metadata must declare all four release dates");
+        require(cffDate.equals(citationDate) && cffDate.equals(zenodoDate)
+                && cffDate.equals(codemetaDate),
+            "release dates differ across CFF, BibTeX, Zenodo and CodeMeta");
+        require(cffDate.matches("\\d{4}-\\d{2}-\\d{2}"),
+            "publication date must be an ISO local date");
+        try {
+            require(cffDate.equals(LocalDate.parse(cffDate).toString()),
+                "publication date must be canonical ISO local date");
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException("invalid calendar date: " + cffDate, exception);
+        }
+    }
+
+    private static String singleDateLine(String text, Pattern pattern,
+            boolean bibtex, String field) {
+        Matcher matcher = pattern.matcher(text);
+        if (!matcher.find()) return null;
+        String value = matcher.group(1).trim();
+        require(!matcher.find(), "duplicate " + field);
+        if (bibtex) {
+            Matcher wrapped = Pattern.compile("\\{([^{}]*)\\},").matcher(value);
+            require(wrapped.matches(), "malformed " + field);
+            return wrapped.group(1);
+        }
+        if ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.substring(1, value.length() - 1);
+        }
+        return value;
+    }
+
+    private static String optionalJsonString(Path path, String key) throws IOException {
+        checkNoSymbolicPath(path);
+        try (JsonParser parser = JSON_FACTORY.createParser(path.toFile())) {
+            JsonNode root = JSON.readTree(parser);
+            require(root != null && root.isObject(), "not a JSON object: " + path);
+            require(parser.nextToken() == null, "trailing JSON content: " + path);
+            JsonNode value = root.get(key);
+            if (value == null) return null;
+            require(value.isTextual(), "non-string publication date: " + path);
+            return value.textValue();
+        }
     }
 
     private static String jsonVersion(Path path, String... keys) throws IOException {
@@ -269,6 +381,22 @@ class MavenReleaseMetadataAlignmentTest {
 
     private static void require(boolean condition, String message) {
         if (!condition) throw new IllegalArgumentException(message);
+    }
+
+    private static void addReleaseDates(Path root, String date) throws IOException {
+        Path cff = root.resolve("CITATION.cff");
+        Files.writeString(cff, Files.readString(cff) + "date-released: \"" + date + "\"\n");
+        Path citation = root.resolve("CITATION.md");
+        Files.writeString(citation, Files.readString(citation)
+            + "  date         = {" + date + "},\n");
+        for (String file : List.of(".zenodo.json", "codemeta.json")) {
+            Path path = root.resolve(file);
+            String field = ".zenodo.json".equals(file) ? "publication_date" : "datePublished";
+            com.fasterxml.jackson.databind.node.ObjectNode node =
+                (com.fasterxml.jackson.databind.node.ObjectNode) JSON.readTree(path.toFile());
+            node.put(field, date);
+            Files.writeString(path, JSON.writeValueAsString(node));
+        }
     }
 
     private static Path fixture(Path root) throws IOException {
