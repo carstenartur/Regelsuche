@@ -348,16 +348,25 @@ jobs:
           VERSION: ${{ steps.release-state.outputs.release_version }}
         run: |
           set -euo pipefail
-          NOTES="docs/releases/${VERSION}.md"
-          if [[ ! -s "$NOTES" ]]; then
-            echo "::error::Missing curated release notes: ${NOTES}"
-            exit 1
+          if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/MavenCuratedReleaseNotesTest.java ]]; then
+            # Current releases use the same Maven/JUnit authority as the build contract.
+            mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+              -Dtest=MavenCuratedReleaseNotesTest \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dregelsuche.expectedCuratedReleaseNotesVersion="$VERSION" test
+          else
+            # Compatibility only: a historical tag predating the Java verifier.
+            NOTES="docs/releases/${VERSION}.md"
+            if [[ ! -s "$NOTES" ]]; then
+              echo "::error::Missing curated release notes: ${NOTES}"
+              exit 1
+            fi
+            if [[ "$(head -n 1 "$NOTES" | tr -d '\r')" != "# Regelsuche ${VERSION}" ]]; then
+              echo "::error::Curated release notes must start with '# Regelsuche ${VERSION}'"
+              exit 1
+            fi
+            git diff --check -- "$NOTES"
           fi
-          if [[ "$(head -n 1 "$NOTES" | tr -d '\r')" != "# Regelsuche ${VERSION}" ]]; then
-            echo "::error::Curated release notes must start with '# Regelsuche ${VERSION}'"
-            exit 1
-          fi
-          git diff --check -- "$NOTES"
 
       - name: Check Maven Central credentials
         if: >-
