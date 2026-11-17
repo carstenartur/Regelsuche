@@ -346,6 +346,7 @@ jobs:
         if: steps.release-state.outputs.publication_required == 'true'
         env:
           VERSION: ${{ steps.release-state.outputs.release_version }}
+          EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}
         run: |
           set -euo pipefail
           if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/MavenCuratedReleaseNotesTest.java ]]; then
@@ -355,7 +356,11 @@ jobs:
               -Dsurefire.failIfNoSpecifiedTests=false \
               -Dregelsuche.expectedCuratedReleaseNotesVersion="$VERSION" test
           else
-            # Compatibility only: a historical tag predating the Java verifier.
+            # Historic-tag recovery only. Missing Java authority on a fresh release is fatal.
+            if [[ "$EXISTING_TAG" != 'true' ]]; then
+              echo "::error::Missing Maven curated release-notes verifier in a new release" >&2
+              exit 1
+            fi
             NOTES="docs/releases/${VERSION}.md"
             if [[ ! -s "$NOTES" ]]; then
               echo "::error::Missing curated release notes: ${NOTES}"
