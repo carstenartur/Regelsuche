@@ -130,7 +130,7 @@ def one_artifact(
 
 
 def artifact_files(repository: Path, version: str) -> dict[str, Path]:
-    base = repository / "de" / "regelsuche"
+    base = repository / "io/github/carstenartur"
     artifacts: dict[str, Path] = {}
     for module in SDK_MODULES:
         directory = base / module / version
