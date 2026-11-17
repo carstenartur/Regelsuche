@@ -4,6 +4,16 @@ Diese Liste enthält offene Arbeit, die eine Person, einen unabhängigen Dritten
 
 Ist ein Beitrag verfügbar, im zugehörigen Eintrag den freigegebenen Beleg oder die öffentliche Referenz ergänzen und den nächsten ausführbaren Schritt verknüpfen. Keine Kontaktdaten, Schlüssel, unveröffentlichten Kandidaten, Gutachten oder versiegelten Testdaten in öffentliche Issues oder dieses Dokument kopieren.
 
+## Freigabe von Software-Releases und Maven Central
+
+**Herkunft:** [#749](https://github.com/carstenartur/Regelsuche/issues/749) (Maven-/Build-Vertrag), [#1020](https://github.com/carstenartur/Regelsuche/issues/1020) (Release-/Public-Evidence-Komposition); technischer SDK-Publishing-Pfad: [PR #1290](https://github.com/carstenartur/Regelsuche/pull/1290).
+
+- [ ] Die berechtigten Projektverantwortlichen entscheiden ausdrücklich, **ob und welche konkrete Version/Revision** mit welchen öffentlichen Artefakten, Abhängigkeiten, Metadaten und Quellen veröffentlicht werden darf. Auch Maven-Central-Uploads, ein Git-Tag und ein GitHub Release sind eigenständige Veröffentlichungsaktionen.
+- [ ] Vor einer tatsächlichen Veröffentlichung die Berechtigung für Namespace, Signaturschlüssel, Quellen- und Lizenzweitergabe sowie die vorgesehenen externen Empfänger und Sichtbarkeit klären und dokumentieren; keine Schlüssel oder nicht freigegebenen Artefakte in diesem Repository hinterlegen.
+- [ ] Erst nach dieser Entscheidung den konkreten Freigabeauftrag getrennt vom technischen CI-/Build-Nachweis erteilen. Ein grüner Maven-/Gradle-Job, eine bestandene Dry-Run-Verifikation oder ein vorhandener Veröffentlichungsworkflow sind **keine** Freigabe und dürfen nicht als automatische Veröffentlichungserlaubnis interpretiert werden.
+
+**Technik bleibt in den Issues:** reproduzierbarer Maven-only-Build, Signatur-/Artefaktprüfung, negative Tests, Quellen- und Metadatenbindung sowie lokal zurückgehaltene Bundles sind ohne Veröffentlichung umsetzbar. Diese TODO-Liste autorisiert weder eine Ausführung des Release-Workflows noch eine Veröffentlichung.
+
 ## SDK-Erprobung
 
 **Herkunft:** [#904](https://github.com/carstenartur/Regelsuche/issues/904) · [Versuchsablauf und Aufgaben](java-sdk-human-dx.md).
