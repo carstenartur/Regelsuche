@@ -58,7 +58,7 @@ class MavenOptimizationSdkDistributionTest {
             else assertEquals(expectedTests, tests, "Both clean builds must execute the same SDK test count");
             run(root, evidence.resolve(attempt + "-dependencies.log"), maven, "--batch-mode", "--no-transfer-progress",
                 "-pl", "regelsuche-optimization-sdk", "dependency:copy-dependencies", "-DincludeScope=runtime",
-                "-DexcludeGroupIds=de.regelsuche", "-DoutputDirectory=" + dependencies);
+                "-DexcludeGroupIds=io.github.carstenartur", "-DoutputDirectory=" + dependencies);
             String result = run(root, evidence.resolve(attempt + "-consumer.json"), python, "-B",
                 root.resolve("scripts/package-optimization-sdk.py").toString(),
                 "--external-dependencies", dependencies.toString(), "--output", output.toString(), "--java-home", javaHome);

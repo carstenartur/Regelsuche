@@ -1,20 +1,20 @@
 plugins { id 'java-platform'; id 'maven-publish' }
 def releaseProperties = new Properties()
 rootProject.file('release.properties').withInputStream { releaseProperties.load(it) }
-group = 'de.regelsuche'
+group = 'io.github.carstenartur'
 version = releaseProperties.getProperty('version')
 dependencies { constraints {
-    api "de.regelsuche:regelsuche-core:${project.version}"
-    api "de.regelsuche:regelsuche-egraph:${project.version}"
-    api "de.regelsuche:regelsuche-search:${project.version}"
-    api "de.regelsuche:regelsuche-math-algorithms:${project.version}"
-    api "de.regelsuche:regelsuche-optimization-sdk:${project.version}"
-    api "de.regelsuche:regelsuche-validation:${project.version}"
-    api "de.regelsuche:regelsuche-discovery:${project.version}"
-    api "de.regelsuche:regelsuche-discovery-sdk:${project.version}"
-    api "de.regelsuche:regelsuche-plugin-api:${project.version}"
-    api "de.regelsuche:regelsuche-extension-api:${project.version}"
-    api "de.regelsuche:regelsuche-extension-runtime:${project.version}"
+    api "io.github.carstenartur:regelsuche-core:${project.version}"
+    api "io.github.carstenartur:regelsuche-egraph:${project.version}"
+    api "io.github.carstenartur:regelsuche-search:${project.version}"
+    api "io.github.carstenartur:regelsuche-math-algorithms:${project.version}"
+    api "io.github.carstenartur:regelsuche-optimization-sdk:${project.version}"
+    api "io.github.carstenartur:regelsuche-validation:${project.version}"
+    api "io.github.carstenartur:regelsuche-discovery:${project.version}"
+    api "io.github.carstenartur:regelsuche-discovery-sdk:${project.version}"
+    api "io.github.carstenartur:regelsuche-plugin-api:${project.version}"
+    api "io.github.carstenartur:regelsuche-extension-api:${project.version}"
+    api "io.github.carstenartur:regelsuche-extension-runtime:${project.version}"
  } }
 publishing {
     publications { mavenJava(MavenPublication) { from components.javaPlatform } }

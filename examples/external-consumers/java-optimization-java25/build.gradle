@@ -2,21 +2,21 @@ plugins { id 'application' }
 repositories {
     exclusiveContent {
         forRepository { maven { url = uri(providers.gradleProperty('regelsucheRepository').getOrElse('repository')) } }
-        filter { includeGroup 'de.regelsuche' }
+        filter { includeGroup 'io.github.carstenartur' }
     }
     mavenCentral()
 }
 def sdkVersion = providers.gradleProperty('regelsucheVersion').getOrElse('0.5.0-SNAPSHOT')
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }
 dependencies {
-    implementation platform("de.regelsuche:regelsuche-bom:${sdkVersion}")
-    implementation "de.regelsuche:regelsuche-optimization-sdk:${sdkVersion}"
+    implementation platform("io.github.carstenartur:regelsuche-bom:${sdkVersion}")
+    implementation "io.github.carstenartur:regelsuche-optimization-sdk:${sdkVersion}"
 }
 application { mainClass = 'example.JavaOptimization' }
 tasks.register('verifyRegelsucheRuntimeModules') {
     doLast {
         def modules = configurations.runtimeClasspath.incoming.resolutionResult.allComponents
-            .collect { it.id }.findAll { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier && it.group == 'de.regelsuche' }
+            .collect { it.id }.findAll { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier && it.group == 'io.github.carstenartur' }
             .collect { it.module }.findAll { it != 'regelsuche-bom' }.toSet()
         def expected = ['regelsuche-core','regelsuche-egraph','regelsuche-search','regelsuche-validation',
                         'regelsuche-math-algorithms','regelsuche-optimization-sdk'] as Set

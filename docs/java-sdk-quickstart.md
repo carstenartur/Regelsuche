@@ -4,6 +4,19 @@ Voraussetzungen: JDK 25 und Maven 3.9.9 oder neuer aus der 3.x-Linie. Die frühe
 15-Minuten-Angabe ist ein Lernziel; eine gemessene Human-DX-Erprobung steht aus.
 Download- und Installationszeiten werden separat erfasst.
 
+## Maven Central ab 0.5.3
+
+```xml
+<dependency>
+  <groupId>io.github.carstenartur</groupId>
+  <artifactId>regelsuche-optimization-sdk</artifactId>
+  <version>0.5.3</version>
+</dependency>
+```
+
+Die Regelsuche-BOM hat dieselbe Group-ID und Version. Die folgenden Schritte
+beschreiben das archivierte SDK 0.5.2.
+
 ## 1. Bevorzugter Weg: das veröffentlichte SDK-Repository
 
 [Release v0.5.2](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2)
@@ -63,6 +76,7 @@ Im kopierten Beispielverzeichnis:
 
 ```bash
 mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.version=0.5.2 -Dregelsuche.groupId=de.regelsuche \
   -Dregelsuche.repository=file:///absoluter/pfad/regelsuche-sdk-0.5.2/repository \
   clean package
 java -cp "target/classes:target/dependency/*" example.HelloRule
@@ -107,6 +121,7 @@ des veröffentlichten 0.5.2-ZIPs. Im kopierten Verzeichnis:
 
 ```bash
 mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.version=0.5.2 -Dregelsuche.groupId=de.regelsuche \
   -Dregelsuche.repository=file:///absoluter/pfad/regelsuche-sdk-0.5.2/repository \
   clean package
 java -cp "target/classes:target/dependency/*" example.GeometricSequenceExample

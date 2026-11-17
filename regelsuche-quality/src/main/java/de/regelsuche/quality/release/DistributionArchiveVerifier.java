@@ -158,16 +158,16 @@ public final class DistributionArchiveVerifier {
     private static String productIdentity(Path artifact, String version) throws IOException {
         try (ZipFile jar = new ZipFile(artifact.toFile())) {
             List<String> identities = jar.stream().map(entry -> entry.getName())
-                .filter(name -> name.startsWith("META-INF/maven/de.regelsuche/")
+                .filter(name -> name.startsWith("META-INF/maven/io.github.carstenartur/")
                     && name.endsWith("/pom.properties")).toList();
             check(identities.size() == 1, "Missing or ambiguous product metadata: " + artifact);
             Properties properties = new Properties();
             properties.load(new ByteArrayInputStream(readEntry(jar, identities.getFirst())));
             String id = properties.getProperty("artifactId", "");
-            check("de.regelsuche".equals(properties.getProperty("groupId"))
+            check("io.github.carstenartur".equals(properties.getProperty("groupId"))
                     && version.equals(properties.getProperty("version"))
                     && id.startsWith("regelsuche-")
-                    && identities.getFirst().equals("META-INF/maven/de.regelsuche/" + id + "/pom.properties"),
+                    && identities.getFirst().equals("META-INF/maven/io.github.carstenartur/" + id + "/pom.properties"),
                 "Product metadata/version mismatch: " + artifact);
             return id;
         }

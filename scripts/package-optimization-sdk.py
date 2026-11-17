@@ -100,14 +100,14 @@ def package(root, external, output, java_home, skip_consumer=False):
                   'javaRelease': 25, 'publiclyPublished': False,
                   'inputs': {p.name: sha256(p.read_bytes()) for p in jars}}
     entries['META-INF/regelsuche/optimization-provenance.json'] = (json.dumps(provenance, indent=2, sort_keys=True) + '\n').encode()
-    coordinate = output / 'repository/de/regelsuche/regelsuche-optimization-sdk' / version
+    coordinate = output / 'repository/io/github/carstenartur/regelsuche-optimization-sdk' / version
     basename = f'regelsuche-optimization-sdk-{version}'
     binary = coordinate / f'{basename}-all.jar'
     write_zip(binary, entries)
     pom = coordinate / f'{basename}.pom'
     pom.write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>
-<groupId>de.regelsuche</groupId><artifactId>regelsuche-optimization-sdk</artifactId><version>{version}</version>
+<groupId>io.github.carstenartur</groupId><artifactId>regelsuche-optimization-sdk</artifactId><version>{version}</version>
 <name>Qualified standalone Regelsuche optimization SDK</name><description>Local revision {revision}; classifier all contains the runtime closure.</description>
 </project>
 ''')

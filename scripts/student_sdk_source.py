@@ -63,17 +63,20 @@ def current_sdk_consumer_files(project: Path) -> dict[str, bytes]:
     files['SOURCE.json'] = (project / 'SOURCE.json').read_bytes()
     original = files['build.gradle']
     adapted = adapt_discovery_runtime_inventory(original)
+    adapted = adapted.replace(b"'de.regelsuche'", b"'io.github.carstenartur'")
+    adapted = adapted.replace(b'de.regelsuche:regelsuche-', b'io.github.carstenartur:regelsuche-')
     files['build.gradle'] = adapted
     files['upstream-build.gradle'] = original
     receipt = {
         'schema': 'regelsuche.external-consumer-sdk-adaptation/v1',
-        'adaptationId': 'discovery-extension-api-runtime-contract/v1',
+        'adaptationId': 'discovery-extension-api-runtime-contract/v2',
         'upstreamRepository': manifest['repository'],
         'upstreamCommit': manifest['commit'],
         'upstreamBuildGitBlob': manifest['files']['build.gradle'],
         'upstreamBuildSha256': hashlib.sha256(original).hexdigest(),
         'adaptedBuildSha256': hashlib.sha256(adapted).hexdigest(),
         'addedRuntimeModules': ['regelsuche-extension-api'],
+        'sdkGroupId': 'io.github.carstenartur',
         'sourceManifestMeaning': 'SOURCE.json identifies the upstream baseline, not the adapted build.gradle; original build retained as upstream-build.gradle',
         'unchangedFiles': sorted(name for name in manifest['files'] if name != 'build.gradle'),
     }

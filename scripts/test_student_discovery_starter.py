@@ -226,7 +226,7 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
                 tree = ET.parse(root / module / 'pom.xml')
                 dependencies = [dependency.find('m:artifactId', namespace).text
                                 for dependency in tree.findall('./m:dependencies/m:dependency', namespace)
-                                if dependency.find('m:groupId', namespace).text == 'de.regelsuche']
+                                if dependency.find('m:groupId', namespace).text == 'io.github.carstenartur']
             for dependency in dependencies:
                 result.update(closure(dependency, build))
             return result
@@ -262,9 +262,12 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
         original = before['build.gradle']
         expected = original.replace(b"    'regelsuche-discovery-sdk'\n] as Set",
                                     b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api'\n] as Set")
+        expected = expected.replace(b"'de.regelsuche'", b"'io.github.carstenartur'")
+        expected = expected.replace(b'de.regelsuche:regelsuche-', b'io.github.carstenartur:regelsuche-')
         self.assertEqual(expected, files['build.gradle'])
         self.assertEqual(original, files['upstream-build.gradle'])
         receipt = json.loads(files['SDK-ADAPTATION.json'])
+        self.assertEqual('io.github.carstenartur', receipt['sdkGroupId'])
         self.assertEqual(hashlib.sha256(original).hexdigest(), receipt['upstreamBuildSha256'])
         self.assertEqual(hashlib.sha256(expected).hexdigest(), receipt['adaptedBuildSha256'])
         self.assertEqual(json.loads(before['SOURCE.json'])['files']['build.gradle'], receipt['upstreamBuildGitBlob'])

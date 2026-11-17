@@ -395,6 +395,7 @@ def qualify(root, evidence, maven):
                     arguments = [maven, '--batch-mode', '--no-transfer-progress', '--settings', str(settings),
                                  '--global-settings', str(settings), f'-Dmaven.repo.local={cache}',
                                  f'-Dregelsuche.repository={repository.as_uri()}', '-Dregelsuche.version=' + VERSION,
+                                 '-Dregelsuche.groupId=de.regelsuche',
                                  '-DskipTests=false', '-Dmaven.test.skip=false']
                     execute(arguments + ['clean', 'package'], consumer, output / 'maven-package.log', result['commands'])
                     result['surefire'] = read_surefire(consumer / 'target/surefire-reports', contract['tests'])

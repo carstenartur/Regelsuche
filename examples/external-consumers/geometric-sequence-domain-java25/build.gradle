@@ -15,7 +15,7 @@ repositories {
             }
         }
         filter {
-            includeGroup 'de.regelsuche'
+            includeGroup 'io.github.carstenartur'
         }
     }
     mavenCentral()
@@ -41,7 +41,7 @@ java {
 }
 
 dependencies {
-    implementation "de.regelsuche:regelsuche-discovery-sdk:${regelsucheVersion}"
+    implementation "io.github.carstenartur:regelsuche-discovery-sdk:${regelsucheVersion}"
 
     testImplementation platform('org.junit:junit-bom:6.1.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -64,7 +64,7 @@ def verifyRegelsucheRuntimeModules = tasks.register(
             .collect { component -> component.id }
             .findAll { id ->
                 id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier
-                    && id.group == 'de.regelsuche'
+                    && id.group == 'io.github.carstenartur'
             }
             .collect { id -> id.module }
             .toSet()
