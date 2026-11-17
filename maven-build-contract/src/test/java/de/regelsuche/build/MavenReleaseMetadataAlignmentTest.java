@@ -87,6 +87,14 @@ class MavenReleaseMetadataAlignmentTest {
             "old-tag compatibility fallback must remain restricted to missing verifier");
         require(step.indexOf("mvn --batch-mode") < step.indexOf("else\n"),
             "Maven must be the preferred verification path");
+        String jdkHeading = "      - name: Set up JDK 25\n";
+        int jdkStart = workflow.indexOf(jdkHeading);
+        require(jdkStart >= 0, "JDK provisioning step missing");
+        int jdkEnd = workflow.indexOf("\n      - name: ", jdkStart + jdkHeading.length());
+        require(jdkEnd > jdkStart
+                && workflow.substring(jdkStart, jdkEnd)
+                    .contains("steps.release-state.outputs.tag_exists == 'true'"),
+            "existing tags must provision JDK 25 before Maven verification");
     }
 
     @Test
