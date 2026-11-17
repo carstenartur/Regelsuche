@@ -29,10 +29,11 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final String FULL_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
   private static final String COVERAGE_PROFILE = "verify-cross-authority-coverage";
+  private static final String PUBLISH_COVERAGE = "regelsuche.coverage.publish";
   private static final String COVERAGE_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -pl regelsuche-quality"
-          + " -P" + COVERAGE_PROFILE + " -DskipTests verify";
-  private static final String COVERAGE_STEP = "Verify complete cross-authority coverage";
+          + " -P" + COVERAGE_PROFILE + " -D" + PUBLISH_COVERAGE + "=true -DskipTests verify";
+  private static final String COVERAGE_STEP = "Verify complete cross-authority coverage and render standard JaCoCo pages";
   private static final String ISOLATED_COVERAGE_REPORT = "regelsuche.coverage.isolatedReport";
   private static final String COVERAGE_MAIN =
       "de.regelsuche.quality.coverage.CoverageRegressionMain";
@@ -203,6 +204,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(convergence.contains("if-no-files-found: error"),
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
+    assertFalse(convergence.contains("scripts/generate-ci-pages.py"));
     assertEquals(1, occurrences(convergence, "mvn "),
         "convergence must run only the focused Maven coverage verification");
 
@@ -246,13 +248,17 @@ class MavenParallelVerificationWorkflowContractTest {
     Element properties = directChild(configuration, "systemPropertyVariables");
     assertEquals("${maven.multiModuleProjectDirectory}", directChildText(properties, "regelsuche.repositoryRoot"));
     assertEquals("${" + ISOLATED_COVERAGE_REPORT + "}", directChildText(properties, ISOLATED_COVERAGE_REPORT));
+    assertEquals("${" + PUBLISH_COVERAGE + "}", directChildText(properties, PUBLISH_COVERAGE));
 
     String replay = compact(Files.readString(root.resolve(
         "regelsuche-quality/src/test/java/de/regelsuche/quality/coverage/IsolatedCoverageInputTest.java")));
-    assertTrue(replay.contains("assertEquals(0, CoverageRegressionMain.run(new String[]{\"--root\", root,"
-        + " \"--isolated-report\", System.getProperty(\"" + ISOLATED_COVERAGE_REPORT
-        + "\")}, System.out, System.err));"),
+    assertTrue(replay.contains("String isolatedReport = System.getProperty(\"" + ISOLATED_COVERAGE_REPORT + "\");"));
+    int decision = replay.indexOf("assertEquals(0, CoverageRegressionMain.run(new String[]{\"--root\", folder,"
+        + " \"--isolated-report\", isolatedReport}, System.out, System.err));");
+    assertTrue(decision >= 0,
         "the Maven replay must pass the isolated report to the shared Java verifier and reject a nonzero exit");
+    assertTrue(replay.indexOf("if (Boolean.getBoolean(\"" + PUBLISH_COVERAGE + "\"))", decision) > decision);
+    assertTrue(replay.indexOf("CoveragePages.publish(root, root.resolve(\"public/coverage\"), inputs)", decision) > decision);
   }
 
   @Test

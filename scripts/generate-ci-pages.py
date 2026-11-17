@@ -27,69 +27,14 @@ def module_name(path: Path) -> str:
     return path.parts[0] if path.parts and path.parts[0] != "build" else "root"
 
 
-def counters(root: ET.Element) -> dict[str, tuple[int, int]]:
-    values = dict.fromkeys(("INSTRUCTION", "BRANCH", "LINE", "COMPLEXITY", "METHOD", "CLASS"), (0, 0))
-    seen: set[str] = set()
-    for item in root.findall("counter"):
-        kind = item.attrib["type"]
-        value = (int(item.attrib["missed"]), int(item.attrib["covered"]))
-        if kind not in values or kind in seen or min(value) < 0:
-            raise ValueError(f"Invalid or duplicate JaCoCo counter: {kind}")
-        seen.add(kind)
-        values[kind] = value
-    return values
-
-
-def generate_coverage(public: Path, sympy_inputs: Path | None = None) -> float:
-    """Render with JaCoCo itself, then bind the published counters to the gate."""
-    policy = json.loads(Path("config/quality/coverage-policy.json").read_text(encoding="utf-8"))
-    gate = json.loads(Path("build/reports/quality/coverage-report.json").read_text(encoding="utf-8"))
-    modules = sorted(policy["modules"])
-    if (not modules or policy["schema"] != "regelsuche.quality.coverage-policy/v1"
-            or gate["schema"] != "regelsuche.quality.coverage-report/v1"
-            or gate["status"] != "PASSED"
-            or any(gate[key] for key in ("missingModules", "undeclaredModules", "violations"))
-            or sorted(row["module"] for row in gate["modules"]) != modules):
-        raise ValueError("Coverage policy, successful gate and JaCoCo report modules must agree")
-    coverage_dir = public / "coverage"
+def generate_coverage(public: Path, sympy_inputs: Path | None = None) -> None:
+    # Compatibility wrapper for the local Gradle report task.
     command = ["java", "-cp", "build/reports/quality/coverage-report-runtime/*",
-               "de.regelsuche.quality.coverage.JacocoAggregateReport", str(coverage_dir.resolve())]
-    for module in modules:
-        inputs = (sympy_inputs if module == "regelsuche-math-sympy" and sympy_inputs is not None
-                  else Path(module) / "build/reports/jacoco/test/inputs")
-        command.extend((module, str(inputs.resolve())))
+               "de.regelsuche.quality.coverage.CoveragePages", str(Path.cwd()),
+               str((public / "coverage").resolve())]
+    if sympy_inputs is not None:
+        command.append(str(sympy_inputs.resolve()))
     subprocess.run(command, check=True)
-    aggregate = ET.parse(coverage_dir / "jacoco.xml").getroot()
-    groups = aggregate.findall("group")
-    if (sorted(group.attrib["name"] for group in groups) != modules
-            or not (coverage_dir / "index.html").is_file()):
-        raise ValueError("JaCoCo must render every policy module exactly once")
-    rendered = {group.attrib["name"]: counters(group) for group in groups}
-    totals = dict.fromkeys(rendered[modules[0]], (0, 0))
-    for row in gate["modules"]:
-        module = row["module"]
-        canonical = counters(ET.parse(
-            Path(module) / "build/reports/jacoco/test/jacocoTestReport.xml").getroot())
-        if rendered[module] != canonical:
-            raise ValueError(f"Rendered JaCoCo counters differ from measured report: {module}")
-        for kind in ("line", "branch"):
-            if canonical[kind.upper()] != (row[kind]["missed"], row[kind]["covered"]):
-                raise ValueError(f"Coverage gate and published {kind} counts differ: {module}")
-        for kind, (missed, covered) in canonical.items():
-            totals[kind] = (totals[kind][0] + missed, totals[kind][1] + covered)
-    if counters(aggregate) != totals:
-        raise ValueError("JaCoCo aggregate does not equal the complete module totals")
-    for kind in ("line", "branch"):
-        measured = gate["aggregate"][kind]
-        if totals[kind.upper()] != (measured["missed"], measured["covered"]):
-            raise ValueError(f"Coverage gate and published aggregate {kind} counts differ")
-    missed, covered = totals["LINE"]
-    percent = 100.0 * covered / (missed + covered) if missed + covered else 100.0
-    write_json(coverage_dir / "badge.json", {
-        "schemaVersion": 1, "label": "coverage (lines)",
-        "message": f"{percent:.2f}%", "color": "brightgreen",
-    })
-    return percent
 
 
 def generate_tests(public: Path) -> tuple[int, int, int]:
@@ -188,7 +133,7 @@ def main() -> None:
     args = parser.parse_args()
     public = Path("public")
     if not args.tests_only:
-        print(f"Coverage: {generate_coverage(public, args.sympy_inputs):.2f}% lines")
+        generate_coverage(public, args.sympy_inputs)
     if not args.coverage_only:
         total, failed, skipped = generate_tests(public)
         print(f"Tests: {total} ({failed} failed, {skipped} skipped)")

@@ -109,8 +109,8 @@ rootProject.tasks.named('check') {
     dependsOn tasks.named('verifySupplyChainVulnerabilities')
 }
 
-// Stage the standard JaCoCo renderer and its small module-assembly adapter in
-// the normal build. Convergence neither reruns tests nor resolves dependencies.
+// Stage the standard JaCoCo renderer and its module-assembly adapter for the
+// local reporting command. Split CI runs the same publisher through Maven.
 def coverageReportRuntime = tasks.register('coverageReportRuntime', Sync) {
     group = 'reporting'
     description = 'Retains the JaCoCo report runtime with the verification evidence.'
@@ -143,7 +143,6 @@ rootProject.subprojects.findAll { it.name in coverageModules }.each { module ->
 }
 
 rootProject.tasks.named('generateCiPages').configure {
-    dependsOn coverageReportRuntime
     inputs.file rootProject.file('config/quality/coverage-policy.json')
     outputs.upToDateWhen { false }
     def deferredSympy = providers.gradleProperty('separateSympyRuntimeAuthority').orNull == 'true' &&
@@ -151,6 +150,7 @@ rootProject.tasks.named('generateCiPages').configure {
     if (deferredSympy) {
         args '--tests-only'
     } else {
+        dependsOn coverageReportRuntime
         dependsOn ':verifyCoverageRegression'
         dependsOn coverageModules.collect { ":${it}:jacocoTestReport" }
     }

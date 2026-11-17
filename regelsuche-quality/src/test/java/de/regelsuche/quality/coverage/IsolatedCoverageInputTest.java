@@ -24,11 +24,17 @@ class IsolatedCoverageInputTest {
     /** Maven entry point for the CI join and replay of its retained coverage inputs. */
     @Test
     @EnabledIfSystemProperty(named = "regelsuche.coverage.isolatedReport", matches = ".*")
-    void verifyRetainedSplitCoverage() {
-        String root = System.getProperty("regelsuche.coverage.evidenceRoot",
+    void verifyRetainedSplitCoverage() throws IOException {
+        String folder = System.getProperty("regelsuche.coverage.evidenceRoot",
             System.getProperty("regelsuche.repositoryRoot"));
-        assertEquals(0, CoverageRegressionMain.run(new String[]{"--root", root, "--isolated-report",
-            System.getProperty("regelsuche.coverage.isolatedReport")}, System.out, System.err));
+        String isolatedReport = System.getProperty("regelsuche.coverage.isolatedReport");
+        assertEquals(0, CoverageRegressionMain.run(new String[]{"--root", folder, "--isolated-report",
+            isolatedReport}, System.out, System.err));
+        if (Boolean.getBoolean("regelsuche.coverage.publish")) {
+            Path root = Path.of(folder);
+            Path inputs = root.resolve(isolatedReport).resolveSibling("inputs");
+            CoveragePages.publish(root, root.resolve("public/coverage"), inputs);
+        }
     }
 
     @Test void installsExactIsolatedBytesAndEvaluatesTheExistingCoveragePolicy() throws Exception {

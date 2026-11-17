@@ -34,12 +34,16 @@ public final class JacocoAggregateReport {
         Map<String, Path> inputs = new LinkedHashMap<>();
         for (int index = 1; index < args.length; index += 2) {
             String name = args[index];
-            if (!name.matches("[A-Za-z0-9][A-Za-z0-9_.-]*")
+            if (!validModuleName(name)
                     || inputs.putIfAbsent(name, Path.of(args[index + 1])) != null) {
                 throw new IllegalArgumentException("Invalid or duplicate module: " + name);
             }
         }
         write(Path.of(args[0]), inputs);
+    }
+
+    static boolean validModuleName(String name) {
+        return name.matches("[A-Za-z0-9][A-Za-z0-9_.-]*");
     }
 
     static void write(Path output, Map<String, Path> inputs) throws IOException {
