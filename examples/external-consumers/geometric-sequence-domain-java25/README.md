@@ -33,6 +33,7 @@ Mit JDK 25, Maven 3.9.9 oder neuer aus der 3.x-Linie und dem entpackten
 
 ```bash
 mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.version=0.5.2 -Dregelsuche.groupId=de.regelsuche \
   -Dregelsuche.repository=file:///pfad/regelsuche-sdk-0.5.2/repository \
   clean package
 java -cp "target/classes:target/dependency/*" example.GeometricSequenceExample

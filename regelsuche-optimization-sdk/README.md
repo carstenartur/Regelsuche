@@ -158,7 +158,7 @@ The migrated affine calculation retains its original EPL-2.0 notice.
 ## Reproducible local distribution
 
 The BOM aligns the Maven and Gradle version of
-`de.regelsuche:regelsuche-optimization-sdk`. The pinned standalone distribution
+`io.github.carstenartur:regelsuche-optimization-sdk` starting with 0.5.3. The pinned standalone distribution
 uses the checkout's base version in `<version>-issue1657-<commit12>` and the
 classifier `all`. It includes the dependency closure, licenses, sources,
 Javadoc, an example consumer and SHA-256 provenance.
@@ -170,7 +170,7 @@ SDK_SOURCE_EPOCH=$(git show -s --format=%ct HEAD)
 mvn -B -Psdk-release -pl regelsuche-optimization-sdk -am clean install \
   -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH"
 mvn -B -pl regelsuche-optimization-sdk dependency:copy-dependencies \
-  -DincludeScope=runtime -DexcludeGroupIds=de.regelsuche \
+  -DincludeScope=runtime -DexcludeGroupIds=io.github.carstenartur \
   -DoutputDirectory=/absolute/external-runtime
 python3 scripts/package-optimization-sdk.py \
   --external-dependencies /absolute/external-runtime \
