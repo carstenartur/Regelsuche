@@ -82,8 +82,11 @@ class MavenCuratedReleaseNotesTest {
                 && step.contains("-Dtest=MavenCuratedReleaseNotesTest")
                 && step.contains("-D" + VERSION_PROPERTY + "=\"$VERSION\""),
             "active release must check its exact curated version through Maven/JUnit");
-        assertTrue(step.contains("else\n") && step.contains("NOTES=\"docs/releases/${VERSION}.md\""),
-            "compatibility fallback must remain available for historic tags");
+        assertTrue(step.contains("EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}")
+                && step.contains("if [[ \"$EXISTING_TAG\" != 'true' ]]; then")
+                && step.contains("else\n")
+                && step.contains("NOTES=\"docs/releases/${VERSION}.md\""),
+            "missing Java authority must fail for new releases; only existing tags may fall back");
         assertTrue(step.indexOf("mvn --batch-mode") < step.indexOf("else\n"),
             "Maven verification must be the primary authority");
     }
