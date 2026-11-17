@@ -117,6 +117,34 @@ class MavenWorkflowSemanticsContractTest {
             + "|pwsh|powershell)(?=\\s+)"
     );
 
+    // These five folded YAML commands are retained only until their Maven
+    // replacements are authoritative. Match the entire folded scalar, not
+    // just its first physical line: extra arguments must not evade the guard.
+    private static final Set<String> LEGACY_FOLDED_PYTHON_COMMANDS = Set.of(
+        "python3 -B scripts/collect-quality-acceptance-evidence.py"
+            + " --root \"$PWD\" --require-complete",
+        "python3 -B scripts/run-jmh-precision-study-v1.py"
+            + " --replicate \"$REGELSUCHE_STUDY_REPLICATE\""
+            + " --job-start-epoch \"$REGELSUCHE_STUDY_JOB_START\""
+            + " --output \"build/reports/jmh-precision-study-v1/"
+            + "replicate-$REGELSUCHE_STUDY_REPLICATE\"",
+        "python3 -B scripts/report-jmh-precision-study-v1.py"
+            + " --replicate retained/jmh-precision-study-v1-replicate-1"
+            + " --replicate retained/jmh-precision-study-v1-replicate-2"
+            + " --replicate retained/jmh-precision-study-v1-replicate-3"
+            + " --output build/reports/jmh-precision-study-v1/analysis",
+        "python3 -B scripts/run-jmh-precision-study-v2.py"
+            + " --replicate \"$REGELSUCHE_STUDY_REPLICATE\""
+            + " --job-start-epoch \"$REGELSUCHE_STUDY_JOB_START\""
+            + " --output \"build/reports/jmh-precision-study-v2/"
+            + "replicate-$REGELSUCHE_STUDY_REPLICATE\"",
+        "python3 -B scripts/report-jmh-precision-study-v2.py"
+            + " --replicate retained/jmh-precision-study-v2-replicate-1"
+            + " --replicate retained/jmh-precision-study-v2-replicate-2"
+            + " --replicate retained/jmh-precision-study-v2-replicate-3"
+            + " --output build/reports/jmh-precision-study-v2/analysis"
+    );
+
     // No new Python/Node/Perl/PowerShell host drivers may enter the release
     // workflow while migration to Maven/Java is still incomplete. These
     // exact existing commands are transitional, not approved build authority.
@@ -326,6 +354,50 @@ class MavenWorkflowSemanticsContractTest {
             assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml", unauthorized),
                 "undeclared-host-runtime"), header);
         }
+    }
+
+    @Test
+    void foldedYamlRunScalarsCannotHideSplitHostRuntimeCommands() {
+        String prefix = "jobs:\n  release:\n    steps:\n      - run: ";
+        for (String header : List.of(">", ">-", ">+2", ">-2 # comment")) {
+            String unauthorized = prefix + header
+                + "\n          python3\n          -B scripts/new-release.py\n";
+            assertEquals(
+                List.of("python3 -B scripts/new-release.py"),
+                workflowRunCommands(unauthorized.lines().toList()),
+                header
+            );
+            assertTrue(hasCategory(scanPlatformHostRuntimes(
+                "release.yml", unauthorized), "undeclared-host-runtime"),
+                header
+            );
+        }
+        String noFold = prefix + "|\n          python3\n"
+            + "          -B scripts/new-release.py\n";
+        assertEquals(List.of("python3", "-B scripts/new-release.py"),
+            workflowRunCommands(noFold.lines().toList()));
+    }
+
+    @Test
+    void foldedVerificationCommandsRequireExactLegacyArguments() {
+        MergeGovernance governance = validGovernance();
+        String prefix = validWorkflow()
+            + "\n      - run: >-\n          python3\n"
+            + "          -B scripts/collect-quality-acceptance-evidence.py\n";
+        assertViolation(
+            prefix + "          --unapproved-option\n",
+            governance,
+            "undeclared-host-runtime"
+        );
+        String allowed = validWorkflow()
+            + "\n      - run: >-\n"
+            + "          python3 -B scripts/collect-quality-acceptance-evidence.py\n"
+            + "          --root \"$PWD\" --require-complete\n";
+        assertNoViolation(allowed, governance, "undeclared-host-runtime");
+        String splitExecutable = validWorkflow()
+            + "\n      - run: >-\n          python3\n"
+            + "          scripts/new-check.py\n";
+        assertViolation(splitExecutable, governance, "undeclared-host-runtime");
     }
 
     @Test
@@ -733,6 +805,17 @@ class MavenWorkflowSemanticsContractTest {
         }
 
         List<String> commandLines = workflowRunCommands(lines);
+        // Folded YAML joins physical lines with spaces before the shell runs.
+        // The physical-line inventory above cannot see a split interpreter.
+        for (String command : commandLines) {
+            if (DIRECT_HOST_INTERPRETER.matcher(command).find()
+                    && !LEGACY_PYTHON_RUN_LINES.contains(command)
+                    && !LEGACY_FOLDED_PYTHON_COMMANDS.contains(command)) {
+                violations.add(new Violation(
+                    workflow, 1, "undeclared-host-runtime", command
+                ));
+            }
+        }
         long invocationCount = commandLines.stream()
             .mapToLong(command -> GRADLE_INVOCATION.matcher(command)
                 .results()
@@ -830,20 +913,38 @@ class MavenWorkflowSemanticsContractTest {
     private static List<String> workflowRunCommands(List<String> lines) {
         List<String> commands = new ArrayList<>();
         Integer blockIndent = null;
+        StringBuilder foldedCommand = null;
 
         for (String line : lines) {
             if (blockIndent != null) {
                 String stripped = line.strip();
                 if (stripped.isEmpty()) {
+                    // A blank line in a folded scalar preserves a newline.
+                    // Do not join unrelated shell commands across it.
+                    if (foldedCommand != null && foldedCommand.length() > 0) {
+                        commands.add(foldedCommand.toString());
+                        foldedCommand.setLength(0);
+                    }
                     continue;
                 }
                 int indentation = leadingWhitespace(line);
                 if (indentation > blockIndent) {
                     if (!stripped.startsWith("#")) {
-                        commands.add(stripped);
+                        if (foldedCommand == null) {
+                            commands.add(stripped);
+                        } else {
+                            if (foldedCommand.length() > 0) {
+                                foldedCommand.append(' ');
+                            }
+                            foldedCommand.append(stripped);
+                        }
                     }
                     continue;
                 }
+                if (foldedCommand != null && foldedCommand.length() > 0) {
+                    commands.add(foldedCommand.toString());
+                }
+                foldedCommand = null;
                 blockIndent = null;
             }
 
@@ -854,9 +955,14 @@ class MavenWorkflowSemanticsContractTest {
             String command = directive.group(2).strip();
             if (command.matches("[|>](?:[1-9][+-]?|[+-][1-9]?)?(?:\\s+#.*)?")) {
                 blockIndent = directive.group(1).length();
+                foldedCommand = command.startsWith(">")
+                    ? new StringBuilder() : null;
             } else if (!command.isEmpty() && !command.startsWith("#")) {
                 commands.add(command);
             }
+        }
+        if (foldedCommand != null && foldedCommand.length() > 0) {
+            commands.add(foldedCommand.toString());
         }
         return List.copyOf(commands);
     }
