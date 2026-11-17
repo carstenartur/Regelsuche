@@ -10,6 +10,7 @@ With JDK 25 and Maven 3.9.9 or newer from the 3.x line, run in this directory:
 
 ```bash
 mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.version=0.5.2 -Dregelsuche.groupId=de.regelsuche \
   -Dregelsuche.repository=file:///absolute/path/regelsuche-sdk-0.5.2/repository \
   clean package
 java -cp "target/classes:target/dependency/*" example.HelloRule

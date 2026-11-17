@@ -19,7 +19,7 @@ def verifySdkApiCompatibility = tasks.register('verifySdkApiCompatibility', Exec
     doFirst {
         def external = project(':regelsuche-discovery-sdk').configurations.runtimeClasspath
             .resolvedConfiguration.resolvedArtifacts
-            .findAll { it.moduleVersion.id.group != 'de.regelsuche' && !(it.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) }
+            .findAll { it.moduleVersion.id.group != 'io.github.carstenartur' && !(it.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) }
             .collect { it.file.absolutePath }.join(File.pathSeparator)
         def jars = sdkApiModules.collect { project(":${it}").tasks.named('jar').get().archiveFile.get().asFile.absolutePath }
         commandLine(['python3', 'scripts/verify-sdk-api-compatibility.py', '--root', rootDir.absolutePath,

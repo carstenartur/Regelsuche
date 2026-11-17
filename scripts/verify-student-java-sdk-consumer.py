@@ -130,7 +130,7 @@ def one_artifact(
 
 
 def artifact_files(repository: Path, version: str) -> dict[str, Path]:
-    base = repository / "de" / "regelsuche"
+    base = repository / "io/github/carstenartur"
     artifacts: dict[str, Path] = {}
     for module in SDK_MODULES:
         directory = base / module / version
@@ -218,7 +218,7 @@ def verify_generated_project_shape(starter: Path) -> dict:
         "providerId": GENERATED_PROVIDER,
         "javaFeature": 25,
         "gradleWrapperVersion": GENERATED_GRADLE_WRAPPER,
-        "sdkArtifact": "de.regelsuche:regelsuche-discovery-sdk",
+        "sdkArtifact": "io.github.carstenartur:regelsuche-discovery-sdk",
     }
     observed = {key: manifest.get(key) for key in expected}
     if observed != expected:

@@ -46,27 +46,27 @@ class MavenDependencyManagementContractTest {
 
   private static final Set<String> MANAGED_REACTOR_DEPENDENCIES =
       Set.of(
-          "de.regelsuche:regelsuche-core",
-          "de.regelsuche:regelsuche-egraph",
-          "de.regelsuche:regelsuche-search",
-          "de.regelsuche:regelsuche-validation",
-          "de.regelsuche:regelsuche-math-algorithms",
-          "de.regelsuche:regelsuche-math-jas",
-          "de.regelsuche:regelsuche-math-sympy",
-          "de.regelsuche:regelsuche-persistence",
-          "de.regelsuche:regelsuche-persistence-hibernate",
-          "de.regelsuche:regelsuche-solver-ir",
-          "de.regelsuche:regelsuche-solver-portfolio",
-          "de.regelsuche:regelsuche-learning",
-          "de.regelsuche:regelsuche-discovery",
-          "de.regelsuche:regelsuche-experiments",
-          "de.regelsuche:regelsuche-cli",
-          "de.regelsuche:regelsuche-quality",
-          "de.regelsuche:regelsuche-autopilot",
-          "de.regelsuche:regelsuche-release",
-          "de.regelsuche:regelsuche-benchmarks",
-          "de.regelsuche:regelsuche-app",
-          "de.regelsuche:regelsuche-integration-tests");
+          "io.github.carstenartur:regelsuche-core",
+          "io.github.carstenartur:regelsuche-egraph",
+          "io.github.carstenartur:regelsuche-search",
+          "io.github.carstenartur:regelsuche-validation",
+          "io.github.carstenartur:regelsuche-math-algorithms",
+          "io.github.carstenartur:regelsuche-math-jas",
+          "io.github.carstenartur:regelsuche-math-sympy",
+          "io.github.carstenartur:regelsuche-persistence",
+          "io.github.carstenartur:regelsuche-persistence-hibernate",
+          "io.github.carstenartur:regelsuche-solver-ir",
+          "io.github.carstenartur:regelsuche-solver-portfolio",
+          "io.github.carstenartur:regelsuche-learning",
+          "io.github.carstenartur:regelsuche-discovery",
+          "io.github.carstenartur:regelsuche-experiments",
+          "io.github.carstenartur:regelsuche-cli",
+          "io.github.carstenartur:regelsuche-quality",
+          "io.github.carstenartur:regelsuche-autopilot",
+          "io.github.carstenartur:regelsuche-release",
+          "io.github.carstenartur:regelsuche-benchmarks",
+          "io.github.carstenartur:regelsuche-app",
+          "io.github.carstenartur:regelsuche-integration-tests");
 
   private static final Set<String> MANAGED_PLUGINS =
       Set.of(
@@ -120,7 +120,7 @@ class MavenDependencyManagementContractTest {
         "org.testcontainers:testcontainers-bom",
         "${testcontainers.version}");
 
-    Element testJar = managedDependencies.get("de.regelsuche:regelsuche-app:test-jar");
+    Element testJar = managedDependencies.get("io.github.carstenartur:regelsuche-app:test-jar");
     assertNotNull(testJar, "app test sources must be centrally versioned");
     assertEquals("${project.version}", directChildText(testJar, "version"));
     assertEquals("test-jar", directChildText(testJar, "type"));

@@ -1,8 +1,7 @@
 name: Release
 
-# The checkout owns verification, metadata alignment and Maven packaging. This
-# workflow only provisions the pinned environment and performs the GitHub-side
-# tag, release, maintenance-branch and follow-up-PR mutations.
+# Maven owns build, signing and Central publication. The workflow provisions
+# the environment and manages GitHub tags, releases and development branches.
 
 on:
   workflow_dispatch:
@@ -31,10 +30,16 @@ on:
         required: false
         type: boolean
         default: false
+      publish_maven_central:
+        description: 'Publish the Java SDK libraries to Maven Central'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - 'release/dry-run-v*-next-v*-SNAPSHOT'
       - 'release/run-v*-next-v*-SNAPSHOT'
+      - 'release/central-v*-next-v*-SNAPSHOT'
     paths:
       - '.github/release-request'
     tags:
@@ -78,8 +83,10 @@ jobs:
           INPUT_NEXT_INCREMENT: ${{ inputs.next_version_increment }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
+          INPUT_MAVEN_CENTRAL: ${{ inputs.publish_maven_central }}
         run: |
           set -euo pipefail
+          PUBLISH_CENTRAL=false
 
           trim() {
             local value="$1"
@@ -143,6 +150,9 @@ jobs:
             else
               DRY_RUN=false
             fi
+            if [[ "$mode" == 'central' ]]; then
+              PUBLISH_CENTRAL=true
+            fi
 
             git fetch --no-tags origin \
               '+refs/heads/main:refs/remotes/origin/main' \
@@ -205,6 +215,8 @@ jobs:
             resolve_branch_request 'dry-run'
           elif [[ "$GITHUB_REF_NAME" == release/run-v*-next-v*-SNAPSHOT ]]; then
             resolve_branch_request 'run'
+          elif [[ "$GITHUB_REF_NAME" == release/central-v*-next-v*-SNAPSHOT ]]; then
+            resolve_branch_request 'central'
           elif [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]; then
             if [[ "$GITHUB_REF_NAME" != 'main' ]]; then
               echo "::error::Manual releases must be dispatched from main"
@@ -222,6 +234,7 @@ jobs:
             INCREMENT="${INPUT_NEXT_INCREMENT:-patch}"
             DRY_RUN="${INPUT_DRY_RUN:-false}"
             SKIP_TESTS="${INPUT_SKIP_TESTS:-false}"
+            PUBLISH_CENTRAL="${INPUT_MAVEN_CENTRAL:-false}"
             RELEASE_TRIGGER='workflow-dispatch'
           else
             echo "::error::Unsupported release trigger: ${GITHUB_EVENT_NAME} ${GITHUB_REF}"
@@ -297,17 +310,23 @@ jobs:
             echo "maintenance_branch=maintenance/${SERIES}.x"
             echo "dry_run=$DRY_RUN"
             echo "skip_tests=$SKIP_TESTS"
+            echo "publish_central=$PUBLISH_CENTRAL"
             echo "source_commit=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 25
-        if: steps.release-state.outputs.publication_required == 'true'
+        if: >-
+          steps.release-state.outputs.publication_required == 'true'
+          || steps.release-state.outputs.publish_central == 'true'
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '25'
           verify-signature: true
           cache: maven
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
 
       - name: Validate development metadata and Maven versions
         if: >-
@@ -338,6 +357,25 @@ jobs:
             exit 1
           fi
           git diff --check -- "$NOTES"
+
+      - name: Check Maven Central credentials
+        if: >-
+          steps.release-state.outputs.publish_central == 'true'
+          && steps.release-state.outputs.dry_run != 'true'
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.MAVEN_GPG_KEY }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in CENTRAL_USERNAME CENTRAL_PASSWORD MAVEN_GPG_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing repository secret $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
 
       - name: Set up Gradle compatibility gate
         if: >-
@@ -500,7 +538,7 @@ jobs:
             mvn --batch-mode --no-transfer-progress \
               -Dmaven.repo.local="$SDK_REPOSITORY" \
               -pl regelsuche-optimization-sdk dependency:copy-dependencies \
-              -DincludeScope=runtime -DexcludeGroupIds=de.regelsuche \
+              -DincludeScope=runtime -DexcludeGroupIds=io.github.carstenartur \
               -DoutputDirectory="$SDK_DEPENDENCIES"
             python3 -B scripts/package-optimization-sdk.py \
               --external-dependencies "$SDK_DEPENDENCIES" \
@@ -623,6 +661,24 @@ jobs:
           set -euo pipefail
           git tag -a "$TAG" -m "Release $VERSION"
           git push origin "$TAG"
+
+      - name: Publish Java SDK libraries to Maven Central
+        if: >-
+          steps.release-state.outputs.publish_central == 'true'
+          && steps.release-state.outputs.dry_run != 'true'
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.MAVEN_GPG_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          SOURCE_EPOCH=$(git show -s --format=%ct HEAD)
+          mvn --batch-mode --no-transfer-progress -Psdk-release,maven-central \
+            -pl :regelsuche-discovery-sdk,:regelsuche-optimization-sdk,:regelsuche-plugin-api,:regelsuche-extension-api,:regelsuche-extension-runtime,:regelsuche-bom -am \
+            -Dproject.build.outputTimestamp="$SOURCE_EPOCH" \
+            -Dgpg.signer=bc -Dcentral.skipUpload=false \
+            -Dcentral.autoPublish=true -Dcentral.waitUntil=published clean deploy
 
       - name: Update maintenance branch
         if: steps.release-state.outputs.dry_run != 'true'

@@ -411,8 +411,8 @@ class DistributionArchiveVerifierTest {
         if (application) manifest.getMainAttributes().putValue("Main-Class", "de.regelsuche.App");
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path), manifest)) {
             if (id != null) {
-                jar.putNextEntry(new JarEntry("META-INF/maven/de.regelsuche/" + id + "/pom.properties"));
-                jar.write(("groupId=de.regelsuche\nartifactId=" + id + "\nversion=" + version + "\n")
+                jar.putNextEntry(new JarEntry("META-INF/maven/io.github.carstenartur/" + id + "/pom.properties"));
+                jar.write(("groupId=io.github.carstenartur\nartifactId=" + id + "\nversion=" + version + "\n")
                     .getBytes(StandardCharsets.UTF_8));
                 jar.closeEntry();
             }

@@ -4,13 +4,32 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>de.regelsuche</groupId>
+  <groupId>io.github.carstenartur</groupId>
   <artifactId>regelsuche-parent</artifactId>
   <version>0.5.3-SNAPSHOT</version>
   <packaging>pom</packaging>
 
-  <name>Regelsuche Maven Reactor</name>
-  <description>Authoritative Java 25 LTS, Maven and JUnit reactor introduced by issue 632.</description>
+  <name>Regelsuche</name>
+  <description>Java libraries for mathematical rule discovery, verified search and computation optimization.</description>
+  <url>https://github.com/carstenartur/Regelsuche</url>
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/license/mit</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>carstenartur</id>
+      <name>Carsten Hammer</name>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/carstenartur/Regelsuche.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/carstenartur/Regelsuche.git</developerConnection>
+    <url>https://github.com/carstenartur/Regelsuche</url>
+  </scm>
 
   <modules>
     <module>regelsuche-core</module>
@@ -126,35 +145,35 @@
       <dependency><groupId>org.graalvm.python</groupId><artifactId>python-embedding</artifactId><version>${graalpy.version}</version></dependency>
       <dependency><groupId>org.jacoco</groupId><artifactId>org.jacoco.report</artifactId><version>${jacoco.report.version}</version></dependency>
 
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-core</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-egraph</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-search</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-validation</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-algorithms</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-optimization-sdk</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-jas</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-math-sympy</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-persistence-hibernate</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-ir</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-solver-portfolio</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-learning</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-discovery-sdk</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-plugin-api</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-extension-api</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-extension-runtime</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-experiments</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-cli</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-quality</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-quality-aggregate</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-autopilot</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-release</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-benchmarks</artifactId><version>${project.version}</version></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-app</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-core</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-egraph</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-search</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-validation</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-math-algorithms</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-optimization-sdk</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-math-jas</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-math-sympy</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-persistence</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-persistence-hibernate</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-solver-ir</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-solver-portfolio</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-learning</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-discovery</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-discovery-sdk</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-plugin-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-extension-api</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-extension-runtime</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-experiments</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-cli</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-quality</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-quality-aggregate</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-autopilot</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-release</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-benchmarks</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-app</artifactId><version>${project.version}</version></dependency>
       <!-- Test sources are managed independently of the production JAR. -->
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-app</artifactId><version>${project.version}</version><type>test-jar</type></dependency>
-      <dependency><groupId>de.regelsuche</groupId><artifactId>regelsuche-integration-tests</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-app</artifactId><version>${project.version}</version><type>test-jar</type></dependency>
+      <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-integration-tests</artifactId><version>${project.version}</version></dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -226,6 +245,57 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>maven-central</id>
+      <properties>
+        <central.skipUpload>true</central.skipUpload>
+        <central.autoPublish>false</central.autoPublish>
+        <central.waitUntil>validated</central.waitUntil>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>require-central-release-version</id>
+                <phase>validate</phase>
+                <goals><goal>enforce</goal></goals>
+                <configuration><rules><requireReleaseVersion/></rules></configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <configuration><bestPractices>true</bestPractices></configuration>
+            <executions>
+              <execution>
+                <id>sign-central-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.12.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <deploymentName>Regelsuche ${project.version}</deploymentName>
+              <skipUpload>${central.skipUpload}</skipUpload>
+              <autoPublish>${central.autoPublish}</autoPublish>
+              <waitUntil>${central.waitUntil}</waitUntil>
+              <excludeArtifacts><excludeArtifact>regelsuche-app</excludeArtifact></excludeArtifacts>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>product-reactor</id>
       <activation><activeByDefault>true</activeByDefault></activation>

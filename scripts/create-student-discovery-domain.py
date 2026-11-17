@@ -198,7 +198,7 @@ def generate(
         "providerId": provider_id,
         "javaFeature": 25,
         "gradleWrapperVersion": GRADLE_WRAPPER_VERSION,
-        "sdkArtifact": "de.regelsuche:regelsuche-discovery-sdk",
+        "sdkArtifact": "io.github.carstenartur:regelsuche-discovery-sdk",
     }
     (output / "regelsuche-starter.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -50,7 +50,7 @@ class MavenReleaseWorkflowContractTest(unittest.TestCase):
                 dependencies = model.findall('m:dependencies/m:dependency', namespace)
                 dependencies += model.findall('m:parent', namespace)
                 for dependency in dependencies:
-                    if dependency.findtext('m:groupId', namespaces=namespace) == 'de.regelsuche':
+                    if dependency.findtext('m:groupId', namespaces=namespace) == 'io.github.carstenartur':
                         owner = dependency.findtext('m:artifactId', namespaces=namespace)
                         if owner in models:
                             pending.append(owner)
@@ -87,7 +87,7 @@ class SdkPackageTest(unittest.TestCase):
         shutil.rmtree(destination)
         shutil.copytree(pinned, destination)
         for module in ('regelsuche-discovery-sdk', 'regelsuche-bom'):
-            directory = self.repo / 'de/regelsuche' / module / self.version
+            directory = self.repo / 'io/github/carstenartur' / module / self.version
             directory.mkdir(parents=True)
             (directory / f'{module}-{self.version}.pom').write_text(
                 '<project xmlns="http://maven.apache.org/POM/4.0.0">'
@@ -126,7 +126,7 @@ class SdkPackageTest(unittest.TestCase):
         # Deliberately name the required consumer independently of package.EXAMPLES.
         base = 'examples/external-consumers/extension-runtime-java25/'
         files = {
-            'build.gradle': 'implementation "de.regelsuche:regelsuche-extension-runtime:0.5.0-SNAPSHOT"',
+            'build.gradle': 'implementation "io.github.carstenartur:regelsuche-extension-runtime:0.5.0-SNAPSHOT"',
             'settings.gradle': "rootProject.name = 'extension-runtime-consumer'",
             'README.md': '# Generic extensions 0.5.0-SNAPSHOT',
             'src/main/java/example/GreetingPlugin.java': 'class GreetingPlugin {}',

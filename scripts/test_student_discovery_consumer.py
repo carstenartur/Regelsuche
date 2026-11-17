@@ -71,6 +71,26 @@ class StudentDiscoveryConsumerTest(unittest.TestCase):
         self.assertEqual("published artifacts", (self.repository / "keep.txt").read_text())
         self.assertEqual("maintained consumer", (self.source / "keep.txt").read_text())
 
+    def test_artifact_inventory_resolves_the_public_sdk_namespace(self):
+        version = "0.5.3"
+        base = self.repository / "io/github/carstenartur"
+        for module in verifier.SDK_MODULES:
+            directory = base / module / version
+            self.write(directory / f"{module}-{version}.jar", "binary")
+            self.write(directory / f"{module}-{version}.pom", "model")
+            if module in verifier.SOURCE_DOC_MODULES:
+                self.write(directory / f"{module}-{version}-sources.jar", "sources")
+                self.write(directory / f"{module}-{version}-javadoc.jar", "documentation")
+        artifacts = verifier.artifact_files(self.repository, version)
+        self.assertEqual(
+            base / "regelsuche-core" / version / f"regelsuche-core-{version}.jar",
+            artifacts["regelsuche-core:jar"],
+        )
+        self.assertEqual(
+            2 * len(verifier.SDK_MODULES) + 2 * len(verifier.SOURCE_DOC_MODULES),
+            len(artifacts),
+        )
+
     def test_cli_rejects_caller_output_before_cleanup(self):
         self.write(self.output / "stale.txt", "not yet removable")
         for extra in (["--output", str(self.outside)], [f"--output={self.outside}"]):

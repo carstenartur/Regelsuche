@@ -30,7 +30,7 @@ def package(root, repository, version, output):
     requires_parent = False
     namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
     for module in policy['modules'] + ['regelsuche-bom']:
-        directory = repository / 'de/regelsuche' / module / version
+        directory = repository / 'io/github/carstenartur' / module / version
         pom = single(directory, f'{module}-*.pom')
         model = ET.fromstring(pom.read_bytes())
         requires_parent |= model.find('m:parent', namespace) is not None
@@ -54,7 +54,7 @@ def package(root, repository, version, output):
             # Publish canonical coordinate filenames, including Maven snapshots.
             classifier = '-sources' if artifact.name.endswith('-sources.jar') else '-javadoc' if artifact.name.endswith('-javadoc.jar') else ''
             extension = artifact.suffix
-            destination = f'repository/de/regelsuche/{module}/{version}/{module}-{version}{classifier}{extension}'
+            destination = f'repository/io/github/carstenartur/{module}/{version}/{module}-{version}{classifier}{extension}'
             members[destination] = data
             members[destination + '.sha256'] = (hashlib.sha256(data).hexdigest() + '\n').encode()
             ledger[destination] = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
@@ -70,12 +70,12 @@ def package(root, repository, version, output):
                             raise ValueError('invalid Javadoc path')
                         members[f'javadoc/{module}/{name}'] = docs.read(name)
     # Maven-published POMs inherit the reactor parent. Gradle publications are parentless.
-    parent_dir = repository / 'de/regelsuche/regelsuche-parent' / version
+    parent_dir = repository / 'io/github/carstenartur/regelsuche-parent' / version
     if parent_dir.exists():
         parent = single(parent_dir, 'regelsuche-parent-*.pom')
         if ET.fromstring(parent.read_bytes()).findtext('m:version', namespaces=namespace) != version:
             raise ValueError('parent POM version differs from SDK version')
-        members[f'repository/de/regelsuche/regelsuche-parent/{version}/regelsuche-parent-{version}.pom'] = parent.read_bytes()
+        members[f'repository/io/github/carstenartur/regelsuche-parent/{version}/regelsuche-parent-{version}.pom'] = parent.read_bytes()
     elif requires_parent:
         raise ValueError('published SDK POM requires missing regelsuche-parent')
     mapping = {**policy, 'productVersion': version, 'artifacts': ledger,

@@ -35,7 +35,7 @@ repository:
 ```bash
 mvn --batch-mode --no-transfer-progress \
   -Dregelsuche.repository=file:///absolute/path/regelsuche-sdk-0.5.2/repository \
-  -Dregelsuche.version=0.5.2 clean package
+  -Dregelsuche.version=0.5.2 -Dregelsuche.groupId=de.regelsuche clean package
 java -cp "target/classes:target/dependency/*" example.Main
 ```
 
