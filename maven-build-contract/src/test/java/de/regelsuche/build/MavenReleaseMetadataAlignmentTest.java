@@ -48,6 +48,48 @@ class MavenReleaseMetadataAlignmentTest {
     }
 
     @Test
+    void exactPublishedVersionUsesTheSameMavenMetadataContract(@TempDir Path temp)
+            throws Exception {
+        Path root = fixture(temp);
+        for (String relative : List.of(
+                "release.properties", "CITATION.cff", "CITATION.md",
+                ".zenodo.json", "codemeta.json", OPENAPI, "pom.xml",
+                "child/pom.xml")) {
+            Path file = root.resolve(relative);
+            Files.writeString(file, Files.readString(file).replace(
+                "1.2.3-SNAPSHOT", "1.2.3"));
+        }
+        assertDoesNotThrow(() -> verify(root, "1.2.3"));
+        assertThrows(IllegalArgumentException.class, () -> verify(root, "1.2.4"));
+    }
+
+    @Test
+    void currentReleaseWorkflowUsesMavenAndRetainsAnOldTagFallback() throws Exception {
+        String workflow = Files.readString(MavenPomTestSupport.repositoryRoot()
+            .resolve(".github/workflows/release.yml"));
+        String heading = "      - name: Validate release metadata and Maven versions\n";
+        int start = workflow.indexOf(heading);
+        require(start >= 0, "release verification step missing");
+        int end = workflow.indexOf("\n      - name: ", start + heading.length());
+        require(end > start, "release verification step boundary missing");
+        String step = workflow.substring(start, end);
+        require(step.contains("if [[ -f maven-build-contract/src/test/java/"
+                + "de/regelsuche/build/MavenReleaseMetadataAlignmentTest.java ]]; then"),
+            "current-source Maven verifier not selected");
+        require(step.contains("-Dtest=MavenReleaseMetadataAlignmentTest")
+                && step.contains("-Dregelsuche.expectedDevelopmentVersion=")
+                && step.contains("mvn --batch-mode --no-transfer-progress"),
+            "release verifier must run the existing Maven/JUnit authority");
+        require(step.contains("else\n"
+                + "            python3 .github/scripts/update-release-metadata.py "
+                + "\"$VERSION\" --check\n"
+                + "          fi"),
+            "old-tag compatibility fallback must remain restricted to missing verifier");
+        require(step.indexOf("mvn --batch-mode") < step.indexOf("else\n"),
+            "Maven must be the preferred verification path");
+    }
+
+    @Test
     void rejectsPartialMetadataAndUnlistedProfileModules(@TempDir Path temp) throws Exception {
         Path root = fixture(temp);
         assertDoesNotThrow(() -> verify(root, "1.2.3-SNAPSHOT"));
