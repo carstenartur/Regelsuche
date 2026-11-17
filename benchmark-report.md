@@ -10,28 +10,28 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | x + 0 | ✅ | ✓ | ✓ | 158 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x + 0 | ✅ | ✓ | ✓ | 130 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 | beam | x + 0 | ✅ | ✓ | ✓ | 11 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 | a-star | x + 0 | ✅ | ✓ | ✓ | 5 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | x + 0 | ✅ | ✓ | ✓ | 9 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x + 0 | ✅ | ✓ | ✓ | 18 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | x + 0 | ✅ | ✓ | ✓ | 16 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | x * 1 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | x + 0 | ✅ | ✓ | ✓ | 10 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x + 0 | ✅ | ✓ | ✓ | 11 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | x + 0 | ✅ | ✓ | ✓ | 10 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x * 1 | ✅ | ✓ | ✓ | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 | beam | x * 1 | ✅ | ✓ | ✓ | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | x * 1 | ✅ | ✓ | ✓ | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | x * 1 | ✅ | ✓ | ✓ | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x * 1 | ✅ | ✓ | ✓ | 7 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | x * 1 | ✅ | ✓ | ✓ | 4 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | x * 1 | ✅ | ✓ | ✓ | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | x * 1 | ✅ | ✓ | ✓ | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x * 1 | ✅ | ✓ | ✓ | 6 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | x * 1 | ✅ | ✓ | ✓ | 5 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 | best-first | x * 0 | ✅ | ✓ | ✓ | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | x * 0 | ✅ | ✓ | ✓ | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | x * 0 | ✅ | ✓ | ✓ | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | x * 0 | ✅ | ✓ | ✓ | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x * 0 | ✅ | ✓ | ✓ | 10 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | x * 0 | ✅ | ✓ | ✓ | 3 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | a + a | ❌ | ✗ | — | 23 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
+| beam | x * 0 | ✅ | ✓ | ✓ | 6 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | x * 0 | ✅ | ✓ | ✓ | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | x * 0 | ✅ | ✓ | ✓ | 2 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x * 0 | ✅ | ✓ | ✓ | 11 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | x * 0 | ✅ | ✓ | ✓ | 4 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | a + a | ❌ | ✗ | — | 12 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | beam | a + a | ❌ | ✗ | — | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
-| a-star | a + a | ❌ | ✗ | — | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
-| random-mc | a + a | ❌ | ✗ | — | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
+| a-star | a + a | ❌ | ✗ | — | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
+| random-mc | a + a | ❌ | ✗ | — | 3 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | mcts | a + a | ❌ | ✗ | — | 5 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | hybrid | a + a | ❌ | ✗ | — | 6 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 
@@ -39,36 +39,36 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | (x + 1)*(x + 1) | ✅ | ✓ | — | 137 | 22 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | (x + 1)*(x + 1) | ✅ | ✓ | — | 47 | 21 | 46 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + 1)*(x + 1) | ✅ | ✓ | — | 52 | 21 | 76 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + 1)*(x + 1) | ✅ | ✓ | — | 31 | 25 | 64 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + 1)*(x + 1) | ✅ | ✓ | — | 1457 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + 1)*(x + 1) | ✅ | ✓ | — | 27 | 43 | 128 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | x*x + x*x | ✅ | ✓ | — | 4 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | x*x + x*x | ✅ | ✓ | — | 2 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | x*x + x*x | ✅ | ✓ | — | 3 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + 1)*(x + 1) | ✅ | ✓ | — | 174 | 22 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | (x + 1)*(x + 1) | ✅ | ✓ | — | 98 | 21 | 46 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + 1)*(x + 1) | ✅ | ✓ | — | 72 | 21 | 76 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + 1)*(x + 1) | ✅ | ✓ | — | 51 | 25 | 64 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + 1)*(x + 1) | ✅ | ✓ | — | 1537 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + 1)*(x + 1) | ✅ | ✓ | — | 44 | 43 | 128 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | x*x + x*x | ✅ | ✓ | — | 7 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | x*x + x*x | ✅ | ✓ | — | 3 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | x*x + x*x | ✅ | ✓ | — | 4 | 9 | 21 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 | random-mc | x*x + x*x | ✅ | ✓ | — | 3 | 9 | 25 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | x*x + x*x | ✅ | ✓ | — | 64 | 170 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | x*x + x*x | ✅ | ✓ | — | 5 | 18 | 42 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | (x + 2)*(x + 3) | ✅ | ✓ | — | 33 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | (x + 2)*(x + 3) | ✅ | ✓ | — | 9 | 17 | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + 2)*(x + 3) | ✅ | ✓ | — | 28 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + 2)*(x + 3) | ✅ | ✓ | — | 16 | 37 | 93 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + 2)*(x + 3) | ✅ | ✓ | — | 915 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + 2)*(x + 3) | ✅ | ✓ | — | 21 | 59 | 153 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| best-first | (x + a)^2 | ✅ | ✓ | — | 20 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | x*x + x*x | ✅ | ✓ | — | 77 | 170 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | x*x + x*x | ✅ | ✓ | — | 13 | 18 | 42 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + 2)*(x + 3) | ✅ | ✓ | — | 68 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | (x + 2)*(x + 3) | ✅ | ✓ | — | 20 | 17 | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + 2)*(x + 3) | ✅ | ✓ | — | 42 | 42 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + 2)*(x + 3) | ✅ | ✓ | — | 23 | 37 | 93 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + 2)*(x + 3) | ✅ | ✓ | — | 1174 | 1500 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + 2)*(x + 3) | ✅ | ✓ | — | 55 | 59 | 153 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + a)^2 | ✅ | ✓ | — | 29 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 | beam | (x + a)^2 | ✅ | ✓ | — | 7 | 15 | 35 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + a)^2 | ✅ | ✓ | — | 44 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + a)^2 | ✅ | ✓ | — | 26 | 25 | 95 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + a)^2 | ✅ | ✓ | — | 712 | 1214 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + a)^2 | ✅ | ✓ | — | 24 | 41 | 141 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + a)^2 | ✅ | ✓ | — | 23 | 26 | 106 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + a)^2 | ✅ | ✓ | — | 13 | 25 | 95 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + a)^2 | ✅ | ✓ | — | 556 | 1045 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + a)^2 | ✅ | ✓ | — | 33 | 41 | 141 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 
 ## rational-simplification
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | (x*y)/(x*z) | ❌ | ✗ | — | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
+| best-first | (x*y)/(x*z) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | beam | (x*y)/(x*z) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | a-star | (x*y)/(x*z) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | random-mc | (x*y)/(x*z) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
@@ -76,7 +76,7 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 | hybrid | (x*y)/(x*z) | ❌ | ✗ | — | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | best-first | (a/b)*(c/d) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | beam | (a/b)*(c/d) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
-| a-star | (a/b)*(c/d) | ❌ | ✗ | — | 3 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
+| a-star | (a/b)*(c/d) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | random-mc | (a/b)*(c/d) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | mcts | (a/b)*(c/d) | ❌ | ✗ | — | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
 | hybrid | (a/b)*(c/d) | ❌ | ✗ | — | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | OBSERVED | ✓ |
@@ -91,30 +91,30 @@ Automatisch generiert von `./gradlew benchmarkReport`. Jede Zeile zeigt neben de
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| best-first | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 640 | 663 | 2232 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| beam | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 13 | 20 | 55 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| a-star | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 439 | 664 | 2241 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| random-mc | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 313 | 619 | 2059 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| mcts | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 1392 | 3000 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
-| hybrid | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 387 | 683 | 2287 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| best-first | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 801 | 663 | 2232 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| beam | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 31 | 20 | 55 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| a-star | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 894 | 664 | 2241 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| random-mc | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 394 | 619 | 2059 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| mcts | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 1919 | 3000 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
+| hybrid | (x + a)*(x + b)*(x + c) | ✅ | ✓ | — | 430 | 683 | 2287 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | VALIDATED_BY_EXAMPLES | ✓ |
 
 ## equations
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| math-domain | x + 3 = 7 | ✅ | ✓ | — | 10 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | SYMBOLICALLY_VERIFIED | ✓ |
+| math-domain | x + 3 = 7 | ✅ | ✓ | — | 7 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | SYMBOLICALLY_VERIFIED | ✓ |
 
 ## inequalities
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| math-domain | (0 - 2) * x < 4 | ✅ | ✓ | — | 4 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | SYMBOLICALLY_VERIFIED | ✓ |
+| math-domain | (0 - 2) * x < 4 | ✅ | ✓ | — | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | SYMBOLICALLY_VERIFIED | ✓ |
 
 ## calculus
 
 | Strategie | Ausdruck | Status | Gefunden | Erw. getroffen | Zeit (ms) | Besucht | Geprunt | e-Klassen | e-Knoten | Klassen-Scans | Knoten-Scans | Kandidaten-Skips | Matches | Cache-Hits | Cache-Misses | Sat-Iterationen | Regeln gefeuert | Sat-Sparung | Lernregel | Proof | Export |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| math-domain | diff(x ^ 3, x) | ✅ | ✓ | — | 9 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | SYMBOLICALLY_VERIFIED | ✓ |
+| math-domain | diff(x ^ 3, x) | ✅ | ✓ | — | 5 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | nicht gemessen | – | SYMBOLICALLY_VERIFIED | ✓ |
 
 ## linear-algebra
 
