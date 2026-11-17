@@ -308,6 +308,27 @@ class MavenWorkflowSemanticsContractTest {
     }
 
     @Test
+    void releaseRuntimeGuardParsesYamlBlockHeadersWithCommentsAndIndentIndicators() {
+        String grandfathered =
+            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release";
+        for (String header : List.of(
+                "|", "|-", "|2", "|2-", "|-2", ">+2",
+                "| # retained", "|- # retained", "|2 # retained",
+                "|2- # retained", "|-2 # retained", ">+2 # retained")) {
+            String release = "jobs:\n  release:\n    steps:\n      - run: "
+                + header + "\n          " + grandfathered + "\n";
+            assertEquals(List.of(grandfathered),
+                workflowRunCommands(release.lines().toList()), header);
+            assertFalse(hasCategory(scanPlatformHostRuntimes("release.yml", release),
+                "undeclared-host-runtime"), header);
+            String unauthorized = release.replace(grandfathered,
+                "python3 scripts/undeclared-release.py");
+            assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml", unauthorized),
+                "undeclared-host-runtime"), header);
+        }
+    }
+
+    @Test
     void workflowTextGuardRejectsEveryForbiddenSemantic() {
         Map<String, String> samples = new LinkedHashMap<>();
         samples.put(
@@ -831,7 +852,7 @@ class MavenWorkflowSemanticsContractTest {
                 continue;
             }
             String command = directive.group(2).strip();
-            if (command.matches("[|>][+-]?")) {
+            if (command.matches("[|>](?:[1-9][+-]?|[+-][1-9]?)?(?:\\s+#.*)?")) {
                 blockIndent = directive.group(1).length();
             } else if (!command.isEmpty() && !command.startsWith("#")) {
                 commands.add(command);
