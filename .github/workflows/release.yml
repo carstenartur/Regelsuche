@@ -511,6 +511,7 @@ jobs:
           || steps.release-state.outputs.tag_exists == 'true'
         env:
           VERSION: ${{ steps.release-state.outputs.release_version }}
+          EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}
         run: |
           set -euo pipefail
           # Newer source trees own this read-only check through Maven/JUnit.
@@ -522,6 +523,13 @@ jobs:
               -Dsurefire.failIfNoSpecifiedTests=false \
               -Dregelsuche.expectedDevelopmentVersion="$VERSION" test
           else
+            # The Python compatibility check is allowed only when replaying an
+            # already-existing tag that predates the Java verifier. A fresh
+            # release must fail closed if Maven/JUnit authority is absent.
+            if [[ "$EXISTING_TAG" != 'true' ]]; then
+              echo "::error::Missing Maven release metadata verifier in a new release" >&2
+              exit 1
+            fi
             python3 .github/scripts/update-release-metadata.py "$VERSION" --check
           fi
           test -z "$(git status --porcelain --untracked-files=all)"
