@@ -314,6 +314,20 @@ jobs:
             echo "source_commit=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Set up JDK 25
+        if: >-
+          steps.release-state.outputs.publication_required == 'true'
+          || steps.release-state.outputs.publish_central == 'true'
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+
       - name: Validate development metadata and Maven versions
         if: >-
           steps.release-state.outputs.publication_required == 'true'
@@ -322,8 +336,10 @@ jobs:
           DEVELOPMENT_VERSION: ${{ steps.release-state.outputs.release_version }}-SNAPSHOT
         run: |
           set -euo pipefail
-          python3 .github/scripts/update-release-metadata.py \
-            "$DEVELOPMENT_VERSION" --check
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+            -Dtest=MavenReleaseMetadataAlignmentTest \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            -Dregelsuche.expectedDevelopmentVersion="$DEVELOPMENT_VERSION" test
 
       - name: Validate curated release notes
         if: steps.release-state.outputs.publication_required == 'true'
@@ -360,20 +376,6 @@ jobs:
             fi
           done
           exit "$missing"
-
-      - name: Set up JDK 25
-        if: >-
-          steps.release-state.outputs.publication_required == 'true'
-          || steps.release-state.outputs.publish_central == 'true'
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        with:
-          distribution: temurin
-          java-version: '25'
-          verify-signature: true
-          cache: maven
-          server-id: central
-          server-username: CENTRAL_USERNAME
-          server-password: CENTRAL_PASSWORD
 
       - name: Set up Gradle compatibility gate
         if: >-
@@ -822,7 +824,10 @@ jobs:
             echo "Main already contains ${NEXT_VERSION}"
           elif [[ "$CURRENT" == "${RELEASE_VERSION}-SNAPSHOT" ]]; then
             python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
-            python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION" --check
+            mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+              -Dtest=MavenReleaseMetadataAlignmentTest \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              -Dregelsuche.expectedDevelopmentVersion="$NEXT_VERSION" test
             git diff --check
             echo "required=true" >> "$GITHUB_OUTPUT"
           else

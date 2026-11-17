@@ -322,12 +322,57 @@ class ReleaseMetadataTest(unittest.TestCase):
         step = workflow_step(self.release_workflow(), 'Prepare next development metadata')
         _, marker, body = step.partition('        run: |\n')
         self.assertTrue(marker, 'the regression must run the actual preparation shell')
-        return subprocess.run(
-            ['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', textwrap.dedent(body)],
-            cwd=directory, capture_output=True, text=True, encoding='utf-8', timeout=20,
-            env={**os.environ, 'RELEASE_VERSION': '9.8.7', 'NEXT_VERSION': '9.9.0-SNAPSHOT',
-                 'GITHUB_OUTPUT': str(output), 'PYTHONDONTWRITEBYTECODE': '1'},
-        )
+        # This fixture intentionally uses minimal POMs, not a runnable Maven reactor.
+        # Exercise the *real* workflow shell and assert its exact Maven invocation.
+        # The fixture-only Maven stand-in delegates its read-only assertion to the
+        # existing metadata oracle. The real Java/JUnit authority is independently
+        # exercised by Maven in CI against the complete checked-in reactor.
+        with tempfile.TemporaryDirectory(prefix='regelsuche-follow-up-maven-') as temporary:
+            fake_mvn = Path(temporary) / 'mvn'
+            fake_mvn.write_text(textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import os
+                from pathlib import Path
+                import subprocess
+                import sys
+
+                expected = [
+                    '--batch-mode', '--no-transfer-progress',
+                    '-pl', 'maven-build-contract', '-am',
+                    '-Dtest=MavenReleaseMetadataAlignmentTest',
+                    '-Dsurefire.failIfNoSpecifiedTests=false',
+                    '-Dregelsuche.expectedDevelopmentVersion=' + os.environ['NEXT_VERSION'],
+                    'test',
+                ]
+                if sys.argv[1:] != expected:
+                    print('unexpected Maven follow-up arguments: ' + repr(sys.argv[1:]),
+                          file=sys.stderr)
+                    sys.exit(2)
+                # Repeated validation must never be silently accepted.
+                Path(os.environ['REGELSUCHER_MAVEN_MARKER']).touch(exist_ok=False)
+                sys.exit(subprocess.run([
+                    sys.executable, '-B', '.github/scripts/update-release-metadata.py',
+                    os.environ['NEXT_VERSION'], '--check',
+                ], check=False).returncode)
+            """), encoding='utf-8')
+            fake_mvn.chmod(0o755)
+            marker_file = Path(temporary) / 'maven-invoked'
+            result = subprocess.run(
+                ['bash', '--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+                 textwrap.dedent(body)],
+                cwd=directory, capture_output=True, text=True, encoding='utf-8',
+                timeout=20,
+                env={**os.environ, 'RELEASE_VERSION': '9.8.7',
+                     'NEXT_VERSION': '9.9.0-SNAPSHOT',
+                     'GITHUB_OUTPUT': str(output), 'PYTHONDONTWRITEBYTECODE': '1',
+                     'PATH': temporary + os.pathsep + os.environ.get('PATH', ''),
+                     'REGELSUCHER_MAVEN_MARKER': str(marker_file)},
+            )
+            if result.returncode == 0 and output.exists():
+                changed = output.read_text(encoding='utf-8') == 'required=true\n'
+                self.assertEqual(changed, marker_file.exists(),
+                    'Maven preflight must run exactly once when metadata changes')
+            return result
 
     def assert_source_preserved(self) -> None:
         self.assertEqual(self.source_head, self.git(self.root, 'rev-parse', 'HEAD'))

@@ -121,13 +121,11 @@ class MavenWorkflowSemanticsContractTest {
     // workflow while migration to Maven/Java is still incomplete. These
     // exact existing commands are transitional, not approved build authority.
     private static final Set<String> LEGACY_RELEASE_HOST_COMMANDS = Set.of(
-        "python3 .github/scripts/update-release-metadata.py \\",
         "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release",
         "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check",
         "python3 -B scripts/package-student-sdk.py \\",
         "python3 -B scripts/package-optimization-sdk.py \\",
-        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\"",
-        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\" --check"
+        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\""
     );
 
     @Test
@@ -283,7 +281,7 @@ class MavenWorkflowSemanticsContractTest {
     @Test
     void releaseWorkflowHostRuntimeInventoryRejectsNewAndDuplicateDrivers() {
         String command =
-            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check";
+            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release";
         String release = "jobs:\n  release:\n    steps:\n      - run: |\n          "
             + command + "\n";
 
@@ -294,6 +292,7 @@ class MavenWorkflowSemanticsContractTest {
             "undeclared-host-runtime"));
         for (String extra : List.of(
                 command,
+                "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\" --check",
                 "python3 -B scripts/undeclared-release.py",
                 "/usr/bin/python3 -B scripts/undeclared-release.py",
                 "env python3 -B scripts/undeclared-release.py",
