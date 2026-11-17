@@ -154,7 +154,7 @@ class MavenBuildContractTest {
                 () -> "module has no parent: " + module
             );
             assertEquals(
-                "de.regelsuche",
+                "io.github.carstenartur",
                 directChildText(declaredParent, "groupId")
             );
             assertEquals(

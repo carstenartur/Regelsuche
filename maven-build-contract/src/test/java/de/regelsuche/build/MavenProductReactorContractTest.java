@@ -101,7 +101,7 @@ class MavenProductReactorContractTest {
       Document child = parse(modulePom);
       Element childParent = directChild(child.getDocumentElement(), "parent");
       assertNotNull(childParent, () -> "module has no parent: " + module);
-      assertEquals("de.regelsuche", directChildText(childParent, "groupId"));
+      assertEquals("io.github.carstenartur", directChildText(childParent, "groupId"));
       assertEquals("regelsuche-parent", directChildText(childParent, "artifactId"));
       assertEquals(
           reactorVersion,
