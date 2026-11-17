@@ -324,8 +324,30 @@ Der veröffentlichte GitHub Release enthält exakt fünf Dateien:
 Die kuratierten Release Notes sind keine sechste Binärdatei. Sie liegen im
 getaggten Quellbaum, sind als GitHub-Release-Body veröffentlicht und werden
 über `release_notes_file` sowie `release_notes_sha256` im Manifest gebunden.
-Eine GitHub-Produktveröffentlichung ist nicht automatisch eine separate
-Veröffentlichung des Discovery SDK auf Maven Central oder GitHub Packages.
+## Maven Central
+
+Aktiviere im bestehenden Release-Workflow `publish_maven_central` oder nutze
+einen Release-Request-Zweig `release/central-vX.Y.Z-next-vX.Y.Z-SNAPSHOT`
+mit `mode=central`. Der Workflow verwendet die Repository-Secrets
+`CENTRAL_USERNAME`, `CENTRAL_PASSWORD`, `MAVEN_GPG_KEY` und bei einem
+passwortgeschützten Schlüssel `MAVEN_GPG_PASSPHRASE`. Der öffentliche
+Signaturschlüssel muss für Central überprüfbar sein.
+
+Lokal erzeugt folgender Maven-Aufruf aus dem vorbereiteten Release-Stand ein
+signiertes Central-Bundle. Dafür ist ein konfigurierter GnuPG-Schlüssel nötig.
+
+```bash
+mvn -B -ntp -Psdk-release,maven-central \
+  -pl :regelsuche-discovery-sdk,:regelsuche-optimization-sdk,:regelsuche-plugin-api,:regelsuche-extension-api,:regelsuche-extension-runtime,:regelsuche-bom -am \
+  clean deploy
+```
+
+Das Bundle in `target/central-publishing/central-bundle.zip` enthält die
+öffentlichen SDK-Module samt Abhängigkeiten, Parent und BOM. Die Veröffentlichung
+der Spring-Boot-JAR ist im Profil ausgeschlossen. Für den Upload ergänze
+`-Dcentral.skipUpload=false -Dcentral.autoPublish=true -Dcentral.waitUntil=published`
+und konfiguriere in den Maven-Settings den Central-Portal-Token unter dem
+Servernamen `central`.
 
 ## Zenodo
 

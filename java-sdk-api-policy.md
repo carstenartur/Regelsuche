@@ -3,7 +3,7 @@
 Die maschinenlesbare Liste steht in `config/sdk/public-api.json`, im
 Release-ZIP mit konkreter Produktversion und SHA-256-Ledger zusätzlich in
 `sdk-compatibility.json`. Alle Module benutzen dieselbe Produktversion; die
-BOM `de.regelsuche:regelsuche-bom` richtet sie aus.
+BOM `io.github.carstenartur:regelsuche-bom` richtet sie ab 0.5.3 aus.
 
 | Achse | Aktueller Vertrag |
 |---|---|
