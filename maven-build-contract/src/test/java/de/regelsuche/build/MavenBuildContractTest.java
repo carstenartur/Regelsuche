@@ -219,26 +219,26 @@ class MavenBuildContractTest {
 
         for (String suite : SOURCE_ARCHIVE_CONTAINER_SUITES) {
             Files.writeString(reports.resolve("TEST-de.regelsuche.dockere2e." + suite + ".xml"),
-                "<testsuite tests=\\"1\\" failures=\\"0\\" errors=\\"0\\" skipped=\\"0\\"/>");
+                "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
         }
         assertEquals(SOURCE_ARCHIVE_CONTAINER_SUITES.size(),
             requiredSourceArchiveContainerTests(temporary).size());
 
         Path postgres = reports.resolve("TEST-de.regelsuche.dockere2e.PostgresDiscoveryPersistenceTest.xml");
         Files.writeString(postgres,
-            "<testsuite tests=\\"1\\" failures=\\"0\\" errors=\\"0\\" skipped=\\"1\\"/>");
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"1\"/>");
         assertThrows(AssertionError.class,
             () -> requiredSourceArchiveContainerTests(temporary));
 
         Files.writeString(postgres,
-            "<testsuite tests=\\"1\\" failures=\\"1\\" errors=\\"0\\" skipped=\\"0\\"/>");
+            "<testsuite tests=\"1\" failures=\"1\" errors=\"0\" skipped=\"0\"/>");
         assertThrows(AssertionError.class,
             () -> requiredSourceArchiveContainerTests(temporary));
 
         Files.writeString(postgres,
-            "<!DOCTYPE testsuite [<!ENTITY xxe SYSTEM \\"file:///etc/passwd\\">]>"
-                + "<testsuite tests=\\"1\\" failures=\\"0\\" errors=\\"0\\""
-                + " skipped=\\"0\\">&xxe;</testsuite>");
+            "<!DOCTYPE testsuite [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"
+                + "<testsuite tests=\"1\" failures=\"0\" errors=\"0\""
+                + " skipped=\"0\">&xxe;</testsuite>");
         assertThrows(org.xml.sax.SAXException.class,
             () -> requiredSourceArchiveContainerTests(temporary));
     }
