@@ -58,6 +58,13 @@ class MavenBuildContractTest {
         "regelsuche-validation",
         "regelsuche-math-algorithms"
     );
+    // Failsafe requires actual container-backed execution, not just a reachable daemon.
+    // These are pinned Postgres/Neo4j JUnit/Testcontainers suites in the full profile.
+    private static final List<String> SOURCE_ARCHIVE_CONTAINER_SUITES = List.of(
+        "DockerAvailabilityIT",
+        "PostgresDiscoveryPersistenceTest",
+        "Neo4jExpressionGraphStoreTest"
+    );
     private static final Set<String> FORBIDDEN_BUILD_PLUGINS = Set.of(
         "org.codehaus.mojo:exec-maven-plugin",
         "com.github.eirslett:frontend-maven-plugin"
@@ -187,6 +194,83 @@ class MavenBuildContractTest {
         Files.writeString(reports.resolve("TEST-synthetic.xml"),
             "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
         assertThrows(AssertionError.class, () -> executedFirstSliceSurefireTests(temporary));
+    }
+
+    @Test
+    void gitFreeFullProfileReplayRequiresExecutedContainerSuites() throws Exception {
+        if (Boolean.getBoolean("regelsuche.sourceArchiveContainerMode")) {
+            Path root = repositoryRoot();
+            assertNoGitMetadata(root);
+            Map<String, Long> suites = requiredSourceArchiveContainerTests(root);
+            for (var suite : suites.entrySet()) {
+                System.out.println("sourceArchive=VERIFIED containerSuite=" + suite.getKey()
+                    + " executedTests=" + suite.getValue());
+            }
+        }
+    }
+
+    @Test
+    void containerReplayRejectsPartialSkippedFailedAndUnsafeEvidence(
+            @TempDir Path temporary) throws Exception {
+        Path reports = temporary.resolve("regelsuche-integration-tests/target/failsafe-reports");
+        Files.createDirectories(reports);
+        assertThrows(AssertionError.class,
+            () -> requiredSourceArchiveContainerTests(temporary));
+
+        for (String suite : SOURCE_ARCHIVE_CONTAINER_SUITES) {
+            Files.writeString(reports.resolve("TEST-de.regelsuche.dockere2e." + suite + ".xml"),
+                "<testsuite tests=\\"1\\" failures=\\"0\\" errors=\\"0\\" skipped=\\"0\\"/>");
+        }
+        assertEquals(SOURCE_ARCHIVE_CONTAINER_SUITES.size(),
+            requiredSourceArchiveContainerTests(temporary).size());
+
+        Path postgres = reports.resolve("TEST-de.regelsuche.dockere2e.PostgresDiscoveryPersistenceTest.xml");
+        Files.writeString(postgres,
+            "<testsuite tests=\\"1\\" failures=\\"0\\" errors=\\"0\\" skipped=\\"1\\"/>");
+        assertThrows(AssertionError.class,
+            () -> requiredSourceArchiveContainerTests(temporary));
+
+        Files.writeString(postgres,
+            "<testsuite tests=\\"1\\" failures=\\"1\\" errors=\\"0\\" skipped=\\"0\\"/>");
+        assertThrows(AssertionError.class,
+            () -> requiredSourceArchiveContainerTests(temporary));
+
+        Files.writeString(postgres,
+            "<!DOCTYPE testsuite [<!ENTITY xxe SYSTEM \\"file:///etc/passwd\\">]>"
+                + "<testsuite tests=\\"1\\" failures=\\"0\\" errors=\\"0\\""
+                + " skipped=\\"0\\">&xxe;</testsuite>");
+        assertThrows(org.xml.sax.SAXException.class,
+            () -> requiredSourceArchiveContainerTests(temporary));
+    }
+
+    private static Map<String, Long> requiredSourceArchiveContainerTests(Path root)
+            throws Exception {
+        Path reports = root.resolve("regelsuche-integration-tests/target/failsafe-reports");
+        assertTrue(Files.isDirectory(reports),
+            () -> "missing Git-free Maven Failsafe reports: " + reports);
+        Map<String, Long> executed = new LinkedHashMap<>();
+        for (String suite : SOURCE_ARCHIVE_CONTAINER_SUITES) {
+            Path report = reports.resolve("TEST-de.regelsuche.dockere2e." + suite + ".xml");
+            assertTrue(Files.isRegularFile(report),
+                () -> "missing container-backed Failsafe suite: " + report);
+            Element xml = parse(report).getDocumentElement();
+            assertEquals("testsuite", xml.getLocalName(),
+                () -> "invalid Failsafe suite in " + report);
+            int tests = Integer.parseInt(xml.getAttribute("tests"));
+            int failures = Integer.parseInt(xml.getAttribute("failures"));
+            int errors = Integer.parseInt(xml.getAttribute("errors"));
+            int skipped = Integer.parseInt(xml.getAttribute("skipped"));
+            assertTrue(tests > 0 && failures >= 0 && errors >= 0 && skipped >= 0
+                && failures + errors + skipped <= tests,
+                () -> "invalid Failsafe counters in " + report);
+            assertEquals(0, failures, () -> "failed container-backed test in " + report);
+            assertEquals(0, errors, () -> "errored container-backed test in " + report);
+            long run = tests - skipped;
+            assertTrue(run > 0,
+                () -> "no executed container-backed tests (skipped/empty): " + report);
+            executed.put(suite, run);
+        }
+        return executed;
     }
 
     private static Map<String, Long> executedFirstSliceSurefireTests(Path root) throws Exception {
