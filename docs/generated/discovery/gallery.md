@@ -42,4 +42,3 @@ Public entries are admitted only after `PublicBenchmarkEvidenceGate` accepts the
 |---|---|---|---:|---:|---:|---:|---:|
 | Complete-square factorization | yes | unavailable | 9 | 22 | 2 | 1 | 1 |
 | Sophie-Germain hidden structure | yes | unavailable | 49 | 94 | 2 | 1 | 1 |
-

@@ -154,7 +154,7 @@ public final class DocsDiscoveryGalleryGenerator {
                 """
                 .replace("${completeSquare}", renderScenarioSection(completeSquare, "Bridge used"))
                 .replace("${sophieGermain}", renderScenarioSection(sophieGermain, "Hidden bridge used"))
-                .replace("${rows}", renderComparisonRows(artifacts));
+                .replace("${rows}", renderComparisonRows(artifacts).stripTrailing());
     }
 
     private String renderScenarioSection(PublicScenarioArtifact artifact, String bridgeLabel) {

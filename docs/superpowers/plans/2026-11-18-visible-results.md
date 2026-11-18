@@ -1,6 +1,6 @@
 # Visible Results Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Show current Regelsuche capabilities through usable result views and verified browser captures.
 
@@ -59,4 +59,5 @@
 - [x] Make learning entry reach useful existing comparison content; label recorded runs clearly. Prevent a macro run with no reuse from displaying an unconditional success presentation.
 - [x] Add semantic assertions and opt-in capture integration for current comparison and native replay. Record input, route/scenario, source revision and PNG SHA-256 with captures.
 - [x] Execute the targeted real browser flows; visually inspect desktop and narrow screenshots and correct actual layout defects.
-- [ ] Run focused app/generator checks and required feasible repository gates. Review complete diff, publish one focused PR and follow CI, addressing failures in scope.
+- [x] Run focused app/generator checks, review the complete diff and publish one focused PR.
+- [ ] Follow the complete repository CI, addressing failures in scope.
