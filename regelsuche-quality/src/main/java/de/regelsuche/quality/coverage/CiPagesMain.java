@@ -62,6 +62,9 @@ public final class CiPagesMain {
 
     static TestCounts publishTests(Path root, Path output) throws Exception {
         Files.createDirectories(output);
+        // Never leave a success badge from an earlier run after a failed replay.
+        Files.deleteIfExists(output.resolve("badge.json"));
+        Files.deleteIfExists(output.resolve("index.html"));
         List<TestSuite> suites = new ArrayList<>();
         int tests = 0, failures = 0, errors = 0, skipped = 0;
         for (Path report : paths(root, CiPagesMain::isTestXml)) {
