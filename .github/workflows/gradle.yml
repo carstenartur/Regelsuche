@@ -195,6 +195,10 @@ jobs:
         run: bash gradle/run-released-sdk-maven-consumers.sh
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
+      - name: Replay retained Maven Surefire and Failsafe pages without Gradle inputs
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
+          -Dregelsuche.tests.mavenPages=true verify
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -208,6 +212,7 @@ jobs:
             **/target/surefire-reports/**
             **/target/failsafe-reports/**
             **/target/discovery-artifacts/**
+            public/tests/**
           include-hidden-files: true
           if-no-files-found: warn
 
