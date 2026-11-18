@@ -31,11 +31,13 @@ public final class CiPagesMain {
     public static void main(String[] args) throws Exception {
         boolean testsOnly = false;
         boolean coverageOnly = false;
+        boolean mavenTests = false;
         Path sympy = null;
         for (int index = 0; index < args.length; index++) {
             switch (args[index]) {
                 case "--tests-only" -> testsOnly = true;
                 case "--coverage-only" -> coverageOnly = true;
+                case "--maven-tests" -> mavenTests = true;
                 case "--sympy-inputs" -> {
                     if (++index >= args.length || sympy != null) {
                         throw new IllegalArgumentException("Expected one --sympy-inputs path");
@@ -45,7 +47,8 @@ public final class CiPagesMain {
                 default -> throw new IllegalArgumentException("Unknown CI pages argument: " + args[index]);
             }
         }
-        if (testsOnly && coverageOnly || testsOnly && sympy != null) {
+        if (testsOnly && coverageOnly || testsOnly && sympy != null
+                || mavenTests && !testsOnly) {
             throw new IllegalArgumentException("Conflicting CI pages rendering options");
         }
         Path root = Path.of("").toAbsolutePath().normalize();
@@ -54,20 +57,31 @@ public final class CiPagesMain {
             CoveragePages.publish(root, publicDir.resolve("coverage"), sympy);
         }
         if (!coverageOnly) {
-            TestCounts counts = publishTests(root, publicDir.resolve("tests"));
+            Path output = publicDir.resolve(mavenTests ? "maven-tests" : "tests");
+            TestCounts counts = publishTests(root, output,
+                mavenTests ? TestInput.MAVEN : TestInput.GRADLE);
             System.out.println("Tests: " + counts.tests() + " (" + counts.failed()
                 + " failed, " + counts.skipped() + " skipped)");
         }
     }
 
     static TestCounts publishTests(Path root, Path output) throws Exception {
+        return publishTests(root, output, TestInput.GRADLE);
+    }
+
+    static TestCounts publishTests(Path root, Path output, TestInput input) throws Exception {
         Files.createDirectories(output);
         // Never leave a success badge from an earlier run after a failed replay.
         Files.deleteIfExists(output.resolve("badge.json"));
         Files.deleteIfExists(output.resolve("index.html"));
         List<TestSuite> suites = new ArrayList<>();
         int tests = 0, failures = 0, errors = 0, skipped = 0;
-        for (Path report : paths(root, CiPagesMain::isTestXml)) {
+        List<Path> reports = paths(root, (base, path) -> input == TestInput.MAVEN
+            ? isMavenTestXml(base, path) : isTestXml(base, path));
+        if (input == TestInput.MAVEN && reports.isEmpty()) {
+            throw new IOException("No Maven Surefire/Failsafe reports; refusing a zero-test badge");
+        }
+        for (Path report : reports) {
             // A malformed/hostile report must not be converted into a green badge.
             Element suite = readSuite(report);
             int suiteTests = count(suite, "tests");
@@ -86,10 +100,16 @@ public final class CiPagesMain {
                 String file = report.getFileName().toString();
                 name = file.substring(0, file.length() - ".xml".length());
             }
-            suites.add(new TestSuite(module(root, report), task(root, report, "test-results"),
+            String reportTask = input == TestInput.MAVEN
+                ? report.getParent().getFileName().toString().replace("-reports", "")
+                : task(root, report, "test-results");
+            suites.add(new TestSuite(module(root, report), reportTask,
                 name, suiteTests, suiteFailures + suiteErrors, suiteSkipped));
         }
-        int failed = failures + errors;
+        if (input == TestInput.MAVEN && tests == 0) {
+            throw new IOException("Maven Surefire/Failsafe reports contain no executed test cases");
+        }
+        int failed = Math.addExact(failures, errors);
         int passed = tests - failed - skipped;
         ObjectNode badge = JSON.createObjectNode();
         badge.put("schemaVersion", 1);
@@ -98,7 +118,8 @@ public final class CiPagesMain {
         badge.put("color", failed == 0 ? "brightgreen" : "red");
 
         Map<String, String> links = new TreeMap<>();
-        for (Path reportDir : paths(root, CiPagesMain::isTestHtmlReport)) {
+        for (Path reportDir : input == TestInput.GRADLE
+                ? paths(root, CiPagesMain::isTestHtmlReport) : List.<Path>of()) {
             String module = module(root, reportDir);
             String task = task(root, reportDir, "tests");
             String name = module + "-" + task;
@@ -199,6 +220,16 @@ public final class CiPagesMain {
         return false;
     }
 
+    private static boolean isMavenTestXml(Path root, Path path) {
+        if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)
+                || !path.getFileName().toString().matches("TEST-.*\\.xml")) return false;
+        Path relative = root.relativize(path);
+        int size = relative.getNameCount();
+        return size >= 3 && "target".equals(relative.getName(size - 3).toString())
+            && ("surefire-reports".equals(relative.getName(size - 2).toString())
+                || "failsafe-reports".equals(relative.getName(size - 2).toString()));
+    }
+
     private static boolean isTestHtmlReport(Path root, Path path) {
         if (!Files.isDirectory(path) || Files.isSymbolicLink(path)
                 || !Files.isRegularFile(path.resolve("index.html"))) return false;
@@ -241,6 +272,7 @@ public final class CiPagesMain {
             .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#x27;");
     }
 
+    enum TestInput { GRADLE, MAVEN }
     record TestCounts(int tests, int failed, int skipped) { }
     private record TestSuite(String module, String task, String name, int tests,
             int failed, int skipped) { }

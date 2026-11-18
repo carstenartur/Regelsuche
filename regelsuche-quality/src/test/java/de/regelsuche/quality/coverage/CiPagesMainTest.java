@@ -65,6 +65,46 @@ class CiPagesMainTest {
         assertFalse(Files.exists(root.resolve("public/tests/badge.json")));
     }
 
+
+    @Test
+    void mavenReportsAreSelectedWithoutDoubleCountingGradleResults() throws Exception {
+        write("app/target/surefire-reports/TEST-A.xml",
+            "<testsuite name=\"A\" tests=\"2\" failures=\"0\" errors=\"0\" skipped=\"1\"/>");
+        write("app/target/failsafe-reports/TEST-B.xml",
+            "<testsuite name=\"B\" tests=\"1\" failures=\"1\" errors=\"0\" skipped=\"0\"/>");
+        write("app/build/test-results/test/TEST-A.xml",
+            "<testsuite name=\"A\" tests=\"99\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        CiPagesMain.TestCounts counts = CiPagesMain.publishTests(root,
+            root.resolve("public/tests"), CiPagesMain.TestInput.MAVEN);
+        assertEquals(3, counts.tests());
+        assertEquals(1, counts.failed());
+        assertEquals(1, counts.skipped());
+        String html = Files.readString(root.resolve("public/tests/index.html"));
+        assertTrue(html.contains("<td>surefire</td>"));
+        assertTrue(html.contains("<td>failsafe</td>"));
+        assertFalse(html.contains("<td>test</td>"));
+        assertEquals("1/3 failed",
+            JSON.readTree(root.resolve("public/tests/badge.json").toFile()).path("message").asText());
+    }
+
+    @Test
+    void missingOrInvalidMavenReportsCannotPublishGreenEvidence() throws Exception {
+        Path output = root.resolve("public/tests");
+        assertThrows(IOException.class,
+            () -> CiPagesMain.publishTests(root, output, CiPagesMain.TestInput.MAVEN));
+        assertFalse(Files.exists(output.resolve("badge.json")));
+        write("app/target/surefire-reports/TEST-A.xml",
+            "<testsuite tests=\"1\" failures=\"2\" errors=\"0\" skipped=\"0\"/>");
+        assertThrows(IOException.class,
+            () -> CiPagesMain.publishTests(root, output, CiPagesMain.TestInput.MAVEN));
+        assertFalse(Files.exists(output.resolve("badge.json")));
+        write("app/target/surefire-reports/TEST-A.xml",
+            "<testsuite tests=\"0\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        assertThrows(IOException.class,
+            () -> CiPagesMain.publishTests(root, output, CiPagesMain.TestInput.MAVEN));
+        assertFalse(Files.exists(output.resolve("badge.json")));
+    }
+
     private Path write(String path, String value) throws IOException {
         Path file = root.resolve(path);
         Files.createDirectories(file.getParent());

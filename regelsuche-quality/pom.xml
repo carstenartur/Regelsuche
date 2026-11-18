@@ -158,5 +158,34 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <!-- Explicit replay after a successful Maven reactor; never rerun tests or infer gate success. -->
+      <id>render-maven-test-pages</id>
+      <activation><property><name>regelsuche.tests.mavenPages</name></property></activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-failsafe-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>render-retained-maven-test-pages</id>
+                <goals><goal>integration-test</goal><goal>verify</goal></goals>
+                <configuration>
+                  <test>de.regelsuche.quality.coverage.CiPagesMavenEvidenceIT</test>
+                  <skipTests>false</skipTests>
+                  <failIfNoTests>true</failIfNoTests>
+                  <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+                  <systemPropertyVariables>
+                    <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+                    <regelsuche.tests.mavenPages>true</regelsuche.tests.mavenPages>
+                  </systemPropertyVariables>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 </project>
