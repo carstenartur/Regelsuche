@@ -159,6 +159,80 @@ class MavenBuildContractTest {
     }
 
     @Test
+    void sourceArchiveReplayRunsCoreUnitTests() throws Exception {
+        if (Boolean.getBoolean("regelsuche.sourceArchiveMode")) {
+            long executed = executedCoreSurefireTests(
+                repositoryRoot().resolve(
+                    "regelsuche-core/target/surefire-reports"));
+            System.out.println(
+                "sourceArchive=VERIFIED coreExecutedTests=" + executed);
+        }
+    }
+
+    @Test
+    void coreReportGuardRejectsMissingEmptySkippedAndFailedRuns(
+            @TempDir Path temporary) throws Exception {
+        assertThrows(AssertionError.class, () ->
+            executedCoreSurefireTests(temporary.resolve("missing")));
+        Path reports = Files.createDirectory(temporary.resolve("reports"));
+        assertThrows(AssertionError.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Path report = reports.resolve("TEST-synthetic.xml");
+        Files.writeString(report,
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"1\"/>");
+        assertThrows(AssertionError.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Files.writeString(report,
+            "<testsuite tests=\"1\" failures=\"1\" errors=\"0\" skipped=\"0\"/>");
+        assertThrows(AssertionError.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Files.writeString(report,
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"1\" skipped=\"0\"/>");
+        assertThrows(AssertionError.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Files.writeString(report,
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        assertEquals(1L, executedCoreSurefireTests(reports));
+    }
+
+    private static long executedCoreSurefireTests(Path reports) throws Exception {
+        assertTrue(Files.isDirectory(reports),
+            () -> "missing core Surefire reports in source archive: " + reports);
+        List<Path> suites;
+        try (var entries = Files.list(reports)) {
+            suites = entries.filter(path -> {
+                String name = path.getFileName().toString();
+                return Files.isRegularFile(path)
+                    && name.startsWith("TEST-") && name.endsWith(".xml");
+            }).sorted().toList();
+        }
+        assertFalse(suites.isEmpty(),
+            () -> "empty core Surefire report inventory: " + reports);
+        long executed = 0;
+        for (Path suite : suites) {
+            Element xml = parse(suite).getDocumentElement();
+            assertEquals("testsuite", xml.getLocalName(),
+                () -> "invalid Surefire suite in " + suite);
+            int tests = Integer.parseInt(xml.getAttribute("tests"));
+            int failures = Integer.parseInt(xml.getAttribute("failures"));
+            int errors = Integer.parseInt(xml.getAttribute("errors"));
+            int skipped = Integer.parseInt(xml.getAttribute("skipped"));
+            assertTrue(tests >= 0 && skipped >= 0 && skipped <= tests,
+                () -> "invalid core Surefire test counts in " + suite);
+            assertEquals(0, failures, () -> "core tests failed in " + suite);
+            assertEquals(0, errors, () -> "core tests errored in " + suite);
+            executed += tests - skipped;
+        }
+        assertTrue(executed > 0,
+            () -> "no executed core tests in source archive: " + reports);
+        return executed;
+    }
+
+    @Test
     void reactorContainsTheDeclaredJavaModuleSlice() throws Exception {
         Path root = repositoryRoot();
         Document parent = parse(root.resolve("pom.xml"));
