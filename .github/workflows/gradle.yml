@@ -212,6 +212,8 @@ jobs:
             mvn --batch-mode --no-transfer-progress \
               -pl maven-build-contract -am test
           )
+          # The replay must actually execute tests, not merely pass an empty reactor.
+          test -s "$source_root/maven-build-contract/target/surefire-reports/TEST-de.regelsuche.build.MavenBuildContractTest.xml"
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
