@@ -227,12 +227,12 @@ def verifyCapabilityStatus = tasks.register('verifyCapabilityStatus', Exec) {
     }
 }
 
-def generateCiPages = tasks.register('generateCiPages', Exec) {
+def generateCiPages = tasks.register('generateCiPages', JavaExec) {
     group = 'reporting'
-    description = 'Renders coverage and JUnit report pages from local Gradle outputs.'
+    description = 'Renders coverage and JUnit pages using the shared Java quality module.'
     workingDir rootDir
-    commandLine pythonExecutable, 'scripts/generate-ci-pages.py'
-    inputs.file('scripts/generate-ci-pages.py')
+    dependsOn ':regelsuche-quality:classes'
+    mainClass = 'de.regelsuche.quality.coverage.CiPagesMain'
     outputs.dir('public')
 }
 
