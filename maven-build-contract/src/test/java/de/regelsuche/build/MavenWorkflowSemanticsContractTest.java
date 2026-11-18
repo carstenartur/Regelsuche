@@ -104,7 +104,6 @@ class MavenWorkflowSemanticsContractTest {
     // Transitional host drivers are frozen, not blessed as Maven authority.
     // Each retained line may occur at most once and can disappear during migration.
     private static final Set<String> LEGACY_PYTHON_RUN_LINES = Set.of(
-        "python3 -B scripts/generate-ci-pages.py --coverage-only",
         "python3 -B scripts/collect-quality-acceptance-evidence.py",
         "python3 -B scripts/run-jmh-precision-study-v1.py",
         "python3 -B scripts/report-jmh-precision-study-v1.py",
@@ -275,7 +274,7 @@ class MavenWorkflowSemanticsContractTest {
         String workflow = validWorkflow();
         String allowed = "python3 -B scripts/generate-ci-pages.py --coverage-only";
 
-        assertNoViolation(
+        assertViolation(
             workflow + "\n          " + allowed + "\n",
             governance,
             "undeclared-host-runtime"

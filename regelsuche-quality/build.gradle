@@ -142,7 +142,9 @@ rootProject.subprojects.findAll { it.name in coverageModules }.each { module ->
     }
 }
 
-rootProject.tasks.named('generateCiPages').configure {
+rootProject.tasks.named('generateCiPages', JavaExec).configure {
+    classpath = sourceSets.main.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor(java.toolchain)
     inputs.file rootProject.file('config/quality/coverage-policy.json')
     outputs.upToDateWhen { false }
     def deferredSympy = providers.gradleProperty('separateSympyRuntimeAuthority').orNull == 'true' &&
