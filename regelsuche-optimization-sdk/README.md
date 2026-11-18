@@ -30,6 +30,18 @@ limits and cancellation token. See [the mathematical contract and
 reproduction](../docs/research/congruence-coverage.md), including the
 trillion-slot scheduling example and the limits of finite certificates.
 
+The `0.5.4-SNAPSHOT` source also exposes
+`de.regelsuche.sdk.optimization.modular.PolynomialCongruenceSdk.solve` and
+`verify`. Pass a core `PolynomialCongruence.Request` with signed
+`BigInteger` coefficients in ascending exponent order, a positive `int`
+modulus and a signed `BigInteger` target residue. A `COMPLETE` result contains
+the sorted preimage, which can be empty. An `UNAVAILABLE` result carries a
+reason and no solution. The core compares the exact source and replays the
+finite scan during verification. `maximumStates` bounds the coefficient and
+root counts individually. The facade also forwards `maximumWork`,
+`timeoutMillis` and `CancellationToken`. See [the mathematical contract and
+reproduction](../docs/research/polynomial-congruences.md).
+
 The Java 25 headless facade `de.regelsuche.sdk.optimization.ComputationOptimizer`
 uses the existing `JointPlanSearch`, `JointComputationPlan` and
 `PreparedJointComputation`. It does not contain an Eclipse adapter or a second
