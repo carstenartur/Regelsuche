@@ -168,17 +168,34 @@ class MavenBuildContractTest {
     @Test
     void sourceArchiveReplayRunsFirstMavenSliceUnitTests() throws Exception {
         if (Boolean.getBoolean("regelsuche.sourceArchiveMode")) {
-            for (String module : SOURCE_ARCHIVE_MODULES) {
-                long executed = executedModuleSurefireTests(
-                    repositoryRoot().resolve(module).resolve("target/surefire-reports"), module);
-                System.out.println("sourceArchive=VERIFIED module=" + module
-                    + " executedTests=" + executed);
-                if ("regelsuche-core".equals(module)) {
+            Map<String, Long> executedByModule = executedFirstSliceSurefireTests(repositoryRoot());
+            for (var entry : executedByModule.entrySet()) {
+                System.out.println("sourceArchive=VERIFIED module=" + entry.getKey()
+                    + " executedTests=" + entry.getValue());
+                if ("regelsuche-core".equals(entry.getKey())) {
                     // Retain the established marker for existing CI consumers.
-                    System.out.println("sourceArchive=VERIFIED coreExecutedTests=" + executed);
+                    System.out.println("sourceArchive=VERIFIED coreExecutedTests=" + entry.getValue());
                 }
             }
         }
+    }
+
+    @Test
+    void archiveReplayRejectsPartialFirstSliceEvidence(@TempDir Path temporary) throws Exception {
+        Path reports = temporary.resolve("regelsuche-core/target/surefire-reports");
+        Files.createDirectories(reports);
+        Files.writeString(reports.resolve("TEST-synthetic.xml"),
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        assertThrows(AssertionError.class, () -> executedFirstSliceSurefireTests(temporary));
+    }
+
+    private static Map<String, Long> executedFirstSliceSurefireTests(Path root) throws Exception {
+        Map<String, Long> executedByModule = new LinkedHashMap<>();
+        for (String module : SOURCE_ARCHIVE_MODULES) {
+            executedByModule.put(module, executedModuleSurefireTests(
+                root.resolve(module).resolve("target/surefire-reports"), module));
+        }
+        return executedByModule;
     }
 
     @Test
@@ -269,8 +286,8 @@ class MavenBuildContractTest {
             int skipped = Integer.parseInt(xml.getAttribute("skipped"));
             assertTrue(tests >= 0 && skipped >= 0 && skipped <= tests,
                 () -> "invalid " + module + " Surefire test counts in " + suite);
-            assertEquals(0, failures, () -> "" + module + " tests failed in " + suite);
-            assertEquals(0, errors, () -> "" + module + " tests errored in " + suite);
+            assertEquals(0, failures, () -> module + " tests failed in " + suite);
+            assertEquals(0, errors, () -> module + " tests errored in " + suite);
             executed += tests - skipped;
         }
         assertTrue(executed > 0,
