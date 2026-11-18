@@ -61,11 +61,13 @@ No GitHub API, Git checkout metadata or host-side interpreter is used by these
 commands.
 
 The Maven product CI also replays `-pl maven-build-contract -am test` in a
-temporary directory unpacked from `git archive HEAD`, verifying that no
-`.git` directory is present before running Maven. This independently exercises
-the build-contract tests against tracked source files instead of relying on
-checkout metadata or generated checkout outputs. Git is used by the CI adapter
-to *create* the input archive, not by the Maven replay.
+temporary directory unpacked from `git archive HEAD`. The Maven/JUnit
+`regelsuche.sourceArchiveMode=true` guard checks that `.git` metadata is absent;
+`failIfNoTests=true` prevents an empty test run from passing. All build-contract
+tests run against tracked source files instead of relying on checkout metadata
+or generated checkout outputs. Git is used by the CI adapter to *create* the
+input archive, not by the Maven replay. The assertions remain in Java/JUnit,
+not in GitHub Actions shell commands.
 
 This is a **limited source-archive test**, not a demonstration of the complete
 `mvn -Pfull verify` lifecycle from an archive. It does not yet qualify

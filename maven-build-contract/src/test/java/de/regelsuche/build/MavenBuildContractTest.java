@@ -130,6 +130,35 @@ class MavenBuildContractTest {
         );
 
     @Test
+    void explicitSourceArchiveReplayHasNoGitMetadata() {
+        if (Boolean.getBoolean("regelsuche.sourceArchiveMode")) {
+            assertNoGitMetadata(repositoryRoot());
+            System.out.println("sourceArchive=VERIFIED gitMetadata=absent");
+        }
+    }
+
+    @Test
+    void archiveGuardRejectsGitDirectoryAndGitFile(
+            @TempDir Path temporary) throws Exception {
+        Path gitDirectory = Files.createDirectory(temporary.resolve(".git"));
+        assertThrows(AssertionError.class, () -> assertNoGitMetadata(temporary));
+        Files.delete(gitDirectory);
+
+        Files.writeString(temporary.resolve(".git"), "gitdir: elsewhere");
+        assertThrows(AssertionError.class, () -> assertNoGitMetadata(temporary));
+        Files.delete(temporary.resolve(".git"));
+
+        assertNoGitMetadata(temporary);
+    }
+
+    private static void assertNoGitMetadata(Path root) {
+        assertFalse(
+            Files.exists(root.resolve(".git")),
+            () -> "source archive unexpectedly contains .git metadata: " + root
+        );
+    }
+
+    @Test
     void reactorContainsTheDeclaredJavaModuleSlice() throws Exception {
         Path root = repositoryRoot();
         Document parent = parse(root.resolve("pom.xml"));
