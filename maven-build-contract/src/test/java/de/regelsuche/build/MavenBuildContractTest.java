@@ -199,6 +199,36 @@ class MavenBuildContractTest {
         assertEquals(1L, executedCoreSurefireTests(reports));
     }
 
+    @Test
+    void coreReportGuardRejectsInvalidCountersAndUnsafeXml(
+            @TempDir Path temporary) throws Exception {
+        Path reports = Files.createDirectory(temporary.resolve("reports"));
+        Path first = reports.resolve("TEST-first.xml");
+
+        Files.writeString(first,
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"2\"/>");
+        assertThrows(AssertionError.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Files.writeString(first,
+            "<testsuite tests=\"invalid\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        assertThrows(NumberFormatException.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Files.writeString(first,
+            "<!DOCTYPE testsuite [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>"
+                + "<testsuite tests=\"1\" failures=\"0\" errors=\"0\""
+                + " skipped=\"0\">&xxe;</testsuite>");
+        assertThrows(org.xml.sax.SAXException.class, () ->
+            executedCoreSurefireTests(reports));
+
+        Files.writeString(first,
+            "<testsuite tests=\"2\" failures=\"0\" errors=\"0\" skipped=\"1\"/>");
+        Files.writeString(reports.resolve("TEST-second.xml"),
+            "<testsuite tests=\"1\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        assertEquals(2L, executedCoreSurefireTests(reports));
+    }
+
     private static long executedCoreSurefireTests(Path reports) throws Exception {
         assertTrue(Files.isDirectory(reports),
             () -> "missing core Surefire reports in source archive: " + reports);
