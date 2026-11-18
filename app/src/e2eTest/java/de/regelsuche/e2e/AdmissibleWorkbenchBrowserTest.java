@@ -9,6 +9,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.Request;
 import com.microsoft.playwright.TimeoutError;
 import java.io.IOException;
@@ -91,13 +92,41 @@ class AdmissibleWorkbenchBrowserTest {
         };
         target.onRequestFailed(detectNetworkChange);
         try {
-            target.navigate(origin + "admissible-workbench.html");
-            if (scriptInterrupted.getAndSet(false)) target.reload();
+            String url = origin + "admissible-workbench.html";
+            boolean navigationRetried = false;
+            try {
+                target.navigate(url);
+            } catch (PlaywrightException failure) {
+                // Chromium may interrupt the top-level navigation while its
+                // network interface changes. Retry only this specific transport
+                // error, once; never retry server, page, or assertion failures.
+                if (!isInterruptedNavigation(failure)) throw failure;
+                navigationRetried = true;
+                record(lifecycle, "one retry after net::ERR_NETWORK_CHANGED during navigation");
+                scriptInterrupted.set(false);
+                target.navigate(url);
+            }
+            if (scriptInterrupted.getAndSet(false)) {
+                assertFalse(navigationRetried,
+                    () -> "Workbench navigation and script load both interrupted. " + diagnostics(target));
+                target.reload();
+            }
             assertFalse(scriptInterrupted.get(), () -> "Workbench script load interrupted twice. " + diagnostics(target));
         } finally {
             target.offRequestFailed(detectNetworkChange);
         }
     }
+
+    private static boolean isInterruptedNavigation(PlaywrightException failure) {
+        return failure.getMessage() != null && failure.getMessage().contains("net::ERR_NETWORK_CHANGED");
+    }
+
+    @Test void navigationRetryAcceptsOnlyTheKnownTransientTransportError() {
+        assertTrue(isInterruptedNavigation(new PlaywrightException("Page.navigate: net::ERR_NETWORK_CHANGED")));
+        assertFalse(isInterruptedNavigation(new PlaywrightException("Page.navigate: net::ERR_CONNECTION_REFUSED")));
+        assertFalse(isInterruptedNavigation(new PlaywrightException("Page.navigate: Timeout 30000ms exceeded")));
+    }
+
     private static void record(List<String> events, String event) {
         if (events.size() == 100) events.removeFirst();
         events.add(java.time.Instant.now() + " " + event);
