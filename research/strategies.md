@@ -29,6 +29,18 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - [`CongruenceCoverageSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdk.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdk.java | public final class CongruenceCoverageSdk { -->
 - [`CongruenceCoverageSdkTest.java`](../../regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdkTest.java#L13) <!-- strategy-code: regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/modular/CongruenceCoverageSdkTest.java | class CongruenceCoverageSdkTest { -->
 
+## Restklassen zu ganzzahligen Polynomen
+
+- **Hypothese.** Eine begrenzte Enumeration mit modularer Horner-Auswertung kann für kleine positive Moduln alle passenden Parameterreste bestimmen, auch bei mehrfachen Nullstellen und zusammengesetzten Moduln.
+- **Umsetzungsstand.** Der mathematische Kern löst und prüft quellengebundene Kongruenzen beliebigen Grades innerhalb der Ressourcenlimits. Das Optimierungs-SDK reicht Anfrage, Budget und Abbruchsignal weiter.
+- **Befund.** Für 250 reproduzierbar erzeugte Anfragen stimmt die Wurzelmenge mit einer unabhängigen Vollenumeration über exakte Potenzsummen überein. Kontrollen decken mehrfache Wurzeln, zusammengesetzte Moduln, leere Mengen und manipulierte Lösungen ab. [Vertrag, Vergleich und Reproduktion](polynomial-congruences.md)
+- **Folgerung.** Für vollständige Restmengen bei kleinen Moduln einsetzen. Die Arbeit wächst mit Modulus und Koeffizientenzahl. Ausgeschöpfte Budgets liefern keine Teilmenge als Ergebnis.
+
+- [`PolynomialCongruence.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/PolynomialCongruence.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/PolynomialCongruence.java | public final class PolynomialCongruence { -->
+- [`PolynomialCongruenceTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/PolynomialCongruenceTest.java#L20) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/PolynomialCongruenceTest.java | class PolynomialCongruenceTest { -->
+- [`PolynomialCongruenceSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/PolynomialCongruenceSdk.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/PolynomialCongruenceSdk.java | public final class PolynomialCongruenceSdk { -->
+- [`PolynomialCongruenceSdkTest.java`](../../regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/modular/PolynomialCongruenceSdkTest.java#L16) <!-- strategy-code: regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/modular/PolynomialCongruenceSdkTest.java | class PolynomialCongruenceSdkTest { -->
+
 ## Quellenbindung der zurückgehaltenen Darstellungsmatrix
 
 - **Hypothese.** Eine geprüfte Bindung an den Versuchsplan und die eingefrorenen Kandidaten verhindert, dass drei bytegleiche Kopien eine fachlich falsch zugeordnete Auswertung bestätigen.

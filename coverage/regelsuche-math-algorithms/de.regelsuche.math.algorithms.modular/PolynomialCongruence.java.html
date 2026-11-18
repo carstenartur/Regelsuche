@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialCongruence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">PolynomialCongruence.java</span></div><h1>PolynomialCongruence.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Exact finite preimages of integer polynomials in a bounded residue scan. */
+public final class PolynomialCongruence {
+    private PolynomialCongruence() {}
+
+    /** The original signed coefficients, lowest exponent first, and target residue. */
+    public record Request(List&lt;BigInteger&gt; coefficientsAscending, int modulus, BigInteger residue) {
+<span class="fc" id="L18">        public Request {</span>
+<span class="fc" id="L19">            Objects.requireNonNull(residue);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">            if (modulus &lt;= 0) throw new IllegalArgumentException(&quot;INVALID_CONGRUENCE_MODULUS&quot;);</span>
+<span class="fc" id="L21">            coefficientsAscending = List.copyOf(coefficientsAscending);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            if (coefficientsAscending.isEmpty()) throw new IllegalArgumentException(&quot;EMPTY_POLYNOMIAL_COEFFICIENTS&quot;);</span>
+<span class="fc" id="L23">        }</span>
+    }
+
+    /** Finite evidence bound to the exact request. Use {@link #verify} to check supplied evidence. */
+    public record Solution(Request source, List&lt;Integer&gt; residues) {
+<span class="fc" id="L28">        public Solution {</span>
+<span class="fc" id="L29">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L30">            residues = List.copyOf(residues);</span>
+<span class="fc" id="L31">        }</span>
+    }
+
+<span class="fc" id="L34">    public enum Status { COMPLETE, UNAVAILABLE }</span>
+
+    /** A completed scan carries the entire sorted set, including a possible empty set. */
+    public record Result(Status status, Optional&lt;Solution&gt; solution, String reason, long work) {
+<span class="fc" id="L38">        public Result {</span>
+<span class="fc" id="L39">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L40">            Objects.requireNonNull(solution);</span>
+<span class="fc" id="L41">            Objects.requireNonNull(reason);</span>
+<span class="pc bpc" id="L42" title="2 of 6 branches missed.">            if (work &lt; 0 || (status == Status.COMPLETE) != solution.isPresent()) {</span>
+<span class="nc" id="L43">                throw new IllegalArgumentException(&quot;INVALID_POLYNOMIAL_CONGRUENCE_RESULT&quot;);</span>
+            }
+<span class="fc" id="L45">        }</span>
+    }
+
+    /** A failed or interrupted verification has {@code valid=false}. */
+<span class="fc" id="L49">    public record Verification(boolean valid, String reason, long work) {}</span>
+
+    /**
+     * Checks every residue from zero to {@code modulus - 1}. {@code maximumTerms} bounds the
+     * coefficient count and result count individually. A resource or cancellation stop returns
+     * {@code UNAVAILABLE} with no solution.
+     */
+    public static Result solve(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L57">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L58">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L60">            var roots = scan(request, work);</span>
+<span class="fc" id="L61">            work.charge(roots.size());</span>
+<span class="fc" id="L62">            var solution = new Solution(request, roots);</span>
+<span class="fc" id="L63">            work.charge(0);</span>
+<span class="fc" id="L64">            return new Result(Status.COMPLETE, Optional.of(solution), &quot;COMPLETE&quot;, work.used);</span>
+<span class="fc" id="L65">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L66">            return new Result(Status.UNAVAILABLE, Optional.empty(), unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    /** Checks exact source equality and canonical residues, then replays the complete scan. */
+    public static Verification verify(Request request, Solution solution, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L73">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(solution);</span>
+<span class="fc" id="L75">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L77">            work.terms(request.coefficientsAscending().size());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (!matchesSource(request, solution.source(), work)) {</span>
+<span class="fc" id="L79">                return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+            }
+<span class="fc" id="L81">            var claimed = solution.residues();</span>
+<span class="fc" id="L82">            work.terms(claimed.size());</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (!canonical(claimed, request.modulus(), work)) {</span>
+<span class="fc" id="L84">                return new Verification(false, &quot;NONCANONICAL_RESIDUES&quot;, work.used);</span>
+            }
+<span class="fc" id="L86">            var roots = scan(request, work);</span>
+<span class="fc" id="L87">            work.charge(1L + Math.min(roots.size(), claimed.size()));</span>
+<span class="fc" id="L88">            boolean valid = roots.equals(claimed);</span>
+<span class="fc" id="L89">            work.charge(0);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            return new Verification(valid, valid ? &quot;VERIFIED&quot; : &quot;RESIDUES_MISMATCH&quot;, work.used);</span>
+<span class="fc" id="L91">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L92">            return new Verification(false, unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    private static boolean matchesSource(Request request, Request source, Work work) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (request == source) return true;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (request.modulus() != source.modulus()) return false;</span>
+<span class="fc" id="L99">        var coefficients = request.coefficientsAscending();</span>
+<span class="fc" id="L100">        var sourceCoefficients = source.coefficientsAscending();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (coefficients.size() != sourceCoefficients.size()) return false;</span>
+<span class="fc" id="L102">        work.charge(work.inputWords(request.residue()));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!request.residue().equals(source.residue())) return false;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int i = 0; i &lt; coefficients.size(); i++) {</span>
+<span class="fc" id="L105">            var coefficient = coefficients.get(i);</span>
+<span class="fc" id="L106">            work.charge(work.inputWords(coefficient));</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (!coefficient.equals(sourceCoefficients.get(i))) return false;</span>
+        }
+<span class="fc" id="L109">        return true;</span>
+    }
+
+    private static boolean canonical(List&lt;Integer&gt; residues, int modulus, Work work) {
+<span class="fc" id="L113">        int previous = -1;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int residue : residues) {</span>
+<span class="fc" id="L115">            work.charge(1);</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">            if (residue &lt;= previous || residue &gt;= modulus) return false;</span>
+<span class="fc" id="L117">            previous = residue;</span>
+<span class="fc" id="L118">        }</span>
+<span class="fc" id="L119">        return true;</span>
+    }
+
+    private static List&lt;Integer&gt; scan(Request request, Work work) {
+<span class="fc" id="L123">        var coefficients = request.coefficientsAscending();</span>
+<span class="fc" id="L124">        work.terms(coefficients.size());</span>
+<span class="fc" id="L125">        var modulus = BigInteger.valueOf(request.modulus());</span>
+<span class="fc" id="L126">        int target = normalize(request.residue(), modulus, work);</span>
+<span class="fc" id="L127">        work.charge(coefficients.size());</span>
+<span class="fc" id="L128">        var normalized = new int[coefficients.size()];</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int i = 0; i &lt; normalized.length; i++) {</span>
+<span class="fc" id="L130">            normalized[i] = normalize(coefficients.get(i), modulus, work);</span>
+        }
+<span class="fc" id="L132">        var roots = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int x = 0; x &lt; request.modulus(); x++) {</span>
+<span class="fc" id="L134">            work.charge(1L + normalized.length);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (evaluateNormalized(normalized, request.modulus(), x) == target) {</span>
+<span class="fc" id="L136">                work.terms(roots.size() + 1);</span>
+<span class="fc" id="L137">                roots.add(x);</span>
+            }
+        }
+<span class="fc" id="L140">        return roots;</span>
+    }
+
+    private static int normalize(BigInteger value, BigInteger modulus, Work work) {
+<span class="fc" id="L144">        work.charge(1L + work.inputWords(value));</span>
+<span class="fc" id="L145">        return value.mod(modulus).intValueExact();</span>
+    }
+
+    // Each input residue is in [0, modulus), so every unreduced step is at most
+    // modulus * (modulus - 1), which fits in a signed long for a positive int modulus.
+    static int evaluateNormalized(int[] coefficients, int modulus, int x) {
+<span class="fc" id="L151">        long value = 0;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (int i = coefficients.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L153">            value = (value * x + coefficients[i]) % modulus;</span>
+        }
+<span class="fc" id="L155">        return (int) value;</span>
+    }
+
+    private static final class Work {
+        private final IterationLimits limits;
+        private final BooleanSupplier cancellation;
+<span class="fc" id="L161">        private final long start = System.nanoTime();</span>
+        private final long timeout;
+        private long used;
+
+<span class="fc" id="L165">        private Work(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L166">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L167">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L168">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L169">        }</span>
+
+        private void charge(long amount) {
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (System.nanoTime() - start &gt;= timeout) throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (amount &gt; limits.maximumWork() - used) throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L175">            used += amount;</span>
+<span class="fc" id="L176">        }</span>
+
+        private void terms(int count) {
+<span class="fc" id="L179">            charge(1);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (count &gt; limits.maximumTerms()) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L181">        }</span>
+
+        private long inputWords(BigInteger value) {
+<span class="fc" id="L184">            int bits = value.abs().bitLength();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (bits &gt; IterationLimits.MAX_RUNTIME_BITS) throw new Unavailable(&quot;RUNTIME_BIT_LIMIT&quot;);</span>
+<span class="fc" id="L186">            return 1L + bits / 64L;</span>
+        }
+    }
+
+    private static final class Unavailable extends RuntimeException {
+<span class="fc" id="L191">        private Unavailable(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
