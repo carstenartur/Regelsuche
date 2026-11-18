@@ -57,7 +57,8 @@ public final class CiPagesMain {
             CoveragePages.publish(root, publicDir.resolve("coverage"), sympy);
         }
         if (!coverageOnly) {
-            TestCounts counts = publishTests(root, publicDir.resolve("tests"),
+            Path output = publicDir.resolve(mavenTests ? "maven-tests" : "tests");
+            TestCounts counts = publishTests(root, output,
                 mavenTests ? TestInput.MAVEN : TestInput.GRADLE);
             System.out.println("Tests: " + counts.tests() + " (" + counts.failed()
                 + " failed, " + counts.skipped() + " skipped)");
