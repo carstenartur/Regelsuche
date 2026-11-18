@@ -105,7 +105,10 @@ public final class CiPagesMain {
             suites.add(new TestSuite(module(root, report), reportTask,
                 name, suiteTests, suiteFailures + suiteErrors, suiteSkipped));
         }
-        int failed = failures + errors;
+        if (input == TestInput.MAVEN && tests == 0) {
+            throw new IOException("Maven Surefire/Failsafe reports contain no executed test cases");
+        }
+        int failed = Math.addExact(failures, errors);
         int passed = tests - failed - skipped;
         ObjectNode badge = JSON.createObjectNode();
         badge.put("schemaVersion", 1);
