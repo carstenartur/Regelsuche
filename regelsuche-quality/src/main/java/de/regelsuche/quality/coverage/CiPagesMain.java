@@ -96,8 +96,6 @@ public final class CiPagesMain {
         badge.put("label", "tests");
         badge.put("message", failed == 0 ? passed + " passed" : failed + "/" + tests + " failed");
         badge.put("color", failed == 0 ? "brightgreen" : "red");
-        Files.writeString(output.resolve("badge.json"),
-            JSON.writeValueAsString(badge) + "\n", StandardCharsets.UTF_8);
 
         Map<String, String> links = new TreeMap<>();
         for (Path reportDir : paths(root, CiPagesMain::isTestHtmlReport)) {
@@ -133,6 +131,10 @@ public final class CiPagesMain {
             + "<th>Report</th></tr></thead><tbody>" + table + "</tbody></table>"
             + "</body></html>\n";
         Files.writeString(output.resolve("index.html"), html, StandardCharsets.UTF_8);
+        // The badge is the final success marker after every input and retained
+        // HTML report has been checked/copied.
+        Files.writeString(output.resolve("badge.json"),
+            JSON.writeValueAsString(badge) + "\n", StandardCharsets.UTF_8);
         return new TestCounts(tests, failed, skipped);
     }
 
