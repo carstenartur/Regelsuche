@@ -29,16 +29,31 @@ Der Release-Ablauf besitzt fünf zusammengehörige, maschinell geprüfte Quellen
   Maven-Paketierung und GitHub-spezifische Mutationen.
 
 Die Versionsangaben in `CITATION.cff`, `CITATION.md`, `.zenodo.json`,
-`codemeta.json` und OpenAPI müssen ebenfalls übereinstimmen. Der Befehl
+`codemeta.json` und OpenAPI müssen ebenfalls übereinstimmen. Die **lesende**
+Kontrolle im aktuellen Checkout läuft über den Maven/JUnit-Build-Vertrag:
 
 ```bash
-python3 .github/scripts/update-release-metadata.py 0.4.0-SNAPSHOT --check
+mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+  -Dtest=MavenReleaseMetadataAlignmentTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-prüft diese Invariante einschließlich sämtlicher POMs und der öffentlichen
-OpenAPI-Metadaten, ohne Dateien zu ändern. Die gleiche Hilfsroutine stellt beim
-Release und beim Wechsel auf die nächste Entwicklungsversion alle Quellen
-gemeinsam um.
+Diese Prüfung liest die Version aus `release.properties`, gleicht sämtliche
+Reaktor- und Profil-POMs sowie die öffentlichen Metadaten ab und kontrolliert
+die Publikationsdaten: Bei Release-Versionen müssen alle vier Datumsangaben
+übereinstimmen und einen gültigen Kalendertag bezeichnen; bei SNAPSHOT dürfen
+sie nicht gesetzt sein. Sie verändert keine Dateien und benötigt keinen
+Host-Python-Interpreter. Bei einer konkreten Release-Prüfung bindet der
+Workflow zusätzlich die erwartete Version über
+`-Dregelsuche.expectedDevelopmentVersion=<Release-Version>`.
+
+Die **schreibende** Umstellung beim Release und beim Wechsel auf die nächste
+Entwicklungsversion verwendet während der Übergangsphase weiterhin
+`.github/scripts/update-release-metadata.py`. Dessen frühere
+`--check`-Variante ist nicht mehr der dokumentierte Standard für neue
+Checkouts. Diese Teilmigration bedeutet **noch keine Maven-only-Gesamtabnahme**:
+Gradle- und andere Host-basierte Prüf- und Erzeugungspfade sind im laufenden
+Build-Vertrag weiterhin vorhanden (siehe [#749](https://github.com/carstenartur/Regelsuche/issues/749)).
 
 Bei `version=0.4.0-SNAPSHOT` ist die zu veröffentlichende Version `0.4.0` und
 der Tag `v0.4.0`. Die Angabe der nächsten Version verändert nicht die zu
@@ -48,8 +63,10 @@ Entwicklungslinie. Für den hier beschriebenen nächsten Funktionszweig lautet s
 
 ## Build-Vertrag
 
-Die vollständige Produktqualifikation erfolgt autoritativ durch den
-Maven-Vollprofil-Reaktor:
+Die Maven-Produktqualifikation mit dem Vollprofil erfolgt über den
+folgenden Reaktor. Sie ist erforderlich, ersetzt während der laufenden
+Migration nach [#749](https://github.com/carstenartur/Regelsuche/issues/749)
+aber noch nicht alle zusätzlichen Gradle-/Host-Prüfungen der aktiven CI:
 
 ```bash
 mvn --batch-mode --no-transfer-progress -Pfull verify
