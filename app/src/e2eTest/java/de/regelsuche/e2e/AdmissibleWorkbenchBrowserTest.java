@@ -112,6 +112,12 @@ class AdmissibleWorkbenchBrowserTest {
                 target.reload();
             }
             assertFalse(scriptInterrupted.get(), () -> "Workbench script load interrupted twice. " + diagnostics(target));
+        } catch (PlaywrightException failure) {
+            // Keep the original failure and provide the real transport message
+            // in CI logs; the Gradle test summary otherwise omits this detail.
+            System.err.println("Workbench navigation failed: " + failure.getMessage()
+                + "; " + diagnostics(target));
+            throw failure;
         } finally {
             target.offRequestFailed(detectNetworkChange);
         }
