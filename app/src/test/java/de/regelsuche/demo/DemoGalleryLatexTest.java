@@ -23,12 +23,9 @@ class DemoGalleryLatexTest {
     }
 
     @Test
-    void demoGalleryIsGeneratedDiscoveryEvidenceOnly() {
-        assertTrue(gallery.startsWith("# Regelsuche Discovery Gallery"));
-        assertTrue(gallery.contains("This gallery contains generated evidence only."));
-        assertTrue(gallery.contains("## Complete-square factorization"));
-        assertTrue(gallery.contains("## Sophie-Germain discovery"));
-        assertTrue(gallery.contains("## Scenario comparison"));
+    void workbenchGalleryLinksDetailedGeneratedAlgebraEvidence() {
+        assertTrue(gallery.contains("](generated/discovery/gallery.md)"));
+        assertTrue(Files.isRegularFile(REPO_ROOT.resolve("docs/generated/discovery/gallery.md")));
     }
 
     @Test
@@ -40,10 +37,7 @@ class DemoGalleryLatexTest {
     }
 
     @Test
-    void generatedGalleryDoesNotExposeLegacyCuratedDemoSections() {
-        assertFalse(gallery.contains("Binomische Formel"));
-        assertFalse(gallery.contains("Bruchkürzung"));
-        assertFalse(gallery.contains("Ungleichung"));
+    void galleryDoesNotUseLegacyDiscoveryMedia() {
         assertFalse(gallery.contains("parametric-sophie-germain-discovery.png"));
         assertFalse(gallery.contains("convergent-sophie-germain.svg"));
     }

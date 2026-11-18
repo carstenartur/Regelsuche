@@ -258,6 +258,20 @@
             const context = section(replay, 'Ausgewählter Replay-Schritt · ' + step.position + ' von ' + selected.replaySteps.length);
             context.id = 'nativeReplaySelection'; context.dataset.generationSequence = String(generation.sequence);
             text('p', 'Ausgewählter Endkandidat: ' + state.expression, context);
+            const expressions = text('div', undefined, context);
+            expressions.className = 'native-replay-expressions';
+            for (const [kind, label, expression] of [
+                ['before', 'Vor diesem Schritt', generation.sourceExpression],
+                ['after', 'Nach diesem Schritt', generation.transformedExpression]
+            ]) {
+                const card = text('figure', undefined, expressions);
+                text('figcaption', label, card);
+                text('code', expression, card).dataset.replayExpression = kind;
+            }
+            const change = text('p', 'Ersetzter Teilausdruck: ', context);
+            text('code', generation.sourceOccurrenceExpression + ' → ' + generation.transformedOccurrenceExpression, change);
+            const rule = text('p', 'Angewandte Regel: ', context);
+            text('code', generation.ruleId, rule);
             const position = text('p', 'Tatsächliche Quellposition: ', context);
             text('code', generation.occurrencePath.length ? generation.occurrencePath.join('.') : 'root', position).dataset.replayOccurrence = '';
             const navigation = text('div', undefined, context); navigation.className = 'native-replay-controls';
@@ -269,7 +283,9 @@
             const graphButton = text('button', 'Gespeicherte Graphkante öffnen', navigation);
             graphButton.type = 'button'; graphButton.id = 'nativeReplayGraph';
             graphButton.addEventListener('click', () => chooseReplay(step, 'SEARCH_GRAPH'));
-            generationDetails(context, generation);
+            const metadata = text('details', undefined, context);
+            text('summary', 'Ausführungsdaten und Zuordnung anzeigen', metadata);
+            generationDetails(metadata, generation);
         }
         const allSteps = text('details', undefined, replay);
         text('summary', 'Vollständige gespeicherte Schrittabfolge', allSteps);

@@ -92,15 +92,15 @@ public final class DemoCatalog {
         ));
         map.put("macro-learning", new Demo(
             "macro-learning",
-            "System lernt eine Makroregel",
+            "Makro-Lernen untersuchen",
             "Vier aufeinanderfolgende Suchläufe über (x+1)^2, (x+2)^2, (x+3)^2 und (x+7)^2: "
-                + "nach drei Beispielen aktiviert MacroRuleLearningService die binomische "
-                + "Formel als Makroregel im Inventar, der vierte Lauf nutzt sie und ist messbar "
-                + "kürzer.",
+                + "Das System verarbeitet die gefundenen Pfade im Makro-Lernen und zeigt, "
+                + "ob der letzte Lauf eine gelernte Regel verwendet. Die unterschiedlichen "
+                + "Eingaben erlauben keinen direkten Laufzeitvergleich.",
             "(x+7)^2",
             InputType.TERM,
             SearchProfile.DISCOVERY_PLUS,
-            "(a+b)^2 wird als gelernte Regel angewandt",
+            "Suchläufe, aktive Makros und tatsächliche Wiederverwendung untersuchen",
             "49 + 14 * x + x ^ 2"
         ));
         // ---------------- math-domain demos (PR #13/follow-up) ----------------

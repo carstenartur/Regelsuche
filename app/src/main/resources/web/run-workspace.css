@@ -27,6 +27,12 @@ body.retained-run #demoHero, body.retained-run .tab-panel:not(#tab-runs):not(#ta
 #tab-runs .native-replay-controls button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 #tab-runs [data-replay-generation][aria-current="step"] { border: 3px solid #466ca2; font-weight: 700; }
 #tab-runs #nativeReplaySelection { padding: .75rem; border-left: 5px solid #466ca2; background: #f5f8fc; }
+#tab-runs .native-replay-expressions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .75rem; margin: 1rem 0; }
+#tab-runs .native-replay-expressions figure { margin: 0; padding: 1rem; min-width: 0; border: 1px solid #c5cedb; border-radius: 6px; background: #fff; }
+#tab-runs .native-replay-expressions figcaption { margin-bottom: .75rem; color: #475569; font-weight: 600; }
+#tab-runs .native-replay-expressions code { display: block; font-size: 1.1rem; line-height: 1.5; }
+#tab-runs #nativeReplaySelection > details { margin-top: 1rem; }
+#tab-runs #nativeReplaySelection > details > summary { cursor: pointer; padding: .5rem 0; }
 #tab-runs #duplicateRetainedRun { margin: 1rem 0; padding: 1rem; border: 1px solid #c5cedb; overflow-wrap: anywhere; }
 #tab-runs #duplicateRunSeed, #tab-runs #importCandidateDossier { max-width: 100%; box-sizing: border-box; }
 #tab-runs input:focus-visible, #candidateGraphEvidence:focus { outline: 3px solid #955a00; outline-offset: 3px; }

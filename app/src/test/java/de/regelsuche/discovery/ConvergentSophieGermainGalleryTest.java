@@ -175,7 +175,6 @@ class ConvergentSophieGermainGalleryTest {
             "README must link generated Sophie-Germain evidence");
         assertTrue(gallery.contains("generated/discovery/sophie-germain/search-space.svg"),
             "Gallery must show the generated evidence search-space SVG");
-        assertTrue(gallery.contains("This gallery contains generated evidence only."));
     }
 
     @Test

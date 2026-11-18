@@ -236,9 +236,11 @@
                 return;
             }
             const data = JSON.parse(raw);
-            status.className = 'status ok';
-            status.textContent = 'Demo "' + data.title + '" abgeschlossen in '
-                + (data.metrics && data.metrics.elapsedMillis) + ' ms.';
+            status.className = data.id === 'macro-learning' && data.usedLearnedRule !== true
+                ? 'status info' : 'status ok';
+            const elapsedMillis = data.metrics && data.metrics.elapsedMillis;
+            status.textContent = 'Demo "' + data.title + '" abgeschlossen'
+                + (Number.isFinite(elapsedMillis) ? ' in ' + elapsedMillis + ' ms.' : '.');
             renderDemoSummary(data);
             window.__regelsucheDemoReady = true;
             // Refresh the existing panels so users see graph/replay immediately.
@@ -256,22 +258,25 @@
     }
 
     function renderMacroLearningSummary(data) {
-        const sp = data.speedup || {};
+        const reused = data.usedLearnedRule === true;
         const stepsHtml = (data.steps || []).map((s) =>
-            '<tr><td>' + s.expression + '</td><td>' + s.stepCount + '</td>'
+            '<tr><td>' + escapeHtml(s.expression) + '</td><td>' + s.stepCount + '</td>'
             + '<td>' + s.elapsedMillis + ' ms</td>'
             + '<td>' + (s.confidenceScore || 0).toFixed(2) + '</td>'
             + '<td>' + s.learnedRulesActive + '</td></tr>').join('');
         $('demoSummary').innerHTML =
-            '<div class="status ok demo-banner"><strong>System lernt eine Makroregel.</strong>'
-            + ' Gelernte Regel wurde im letzten Lauf'
-            + (data.usedLearnedRule ? ' angewendet.' : ' nicht angewendet.') + '</div>'
+            '<div class="status ' + (reused ? 'ok' : 'info') + ' demo-banner"><strong>'
+            + (reused ? 'Gelernte Makroregel angewendet.' : 'Makro-Lernen ausgeführt.') + '</strong> '
+            + (reused ? 'Der letzte Suchlauf verwendet gelerntes Wissen.'
+                : 'Im letzten Suchlauf wurde keine gelernte Regel verwendet.') + '</div>'
             + '<table class="demo-table"><thead><tr>'
             + '<th>Ausdruck</th><th>Schritte</th><th>Laufzeit</th><th>Konfidenz</th>'
             + '<th>aktive Makros</th></tr></thead><tbody>' + stepsHtml + '</tbody></table>'
-            + '<p class="hint">Vorher (' + (sp.firstRunSteps || 0) + ' Schritte / '
-            + (sp.firstRunMillis || 0) + ' ms) → nachher ('
-            + (sp.lastRunSteps || 0) + ' Schritte / ' + (sp.lastRunMillis || 0) + ' ms).</p>';
+            + '<p class="hint">Die Suchläufe verwenden unterschiedliche Eingaben. '
+            + 'Ihre Laufzeiten beschreiben die einzelnen Läufe. Für einen Nutzenvergleich '
+            + 'wird dieselbe Aufgabe mit und ohne gelernte Regel untersucht.</p>'
+            + '<p><a href="/static/public-discovery-comparison.html" hreflang="en">'
+            + 'Aufgezeichneten Vergleich derselben Aufgaben öffnen (Englisch)</a></p>';
     }
 
     function renderDemoSummary(data) {

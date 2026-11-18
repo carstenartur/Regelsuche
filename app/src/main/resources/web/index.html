@@ -51,7 +51,7 @@
                 <strong>Ausdruck erkunden</strong><span>Einen Term eingeben und die gefundenen Schritte nachvollziehen.</span>
             </a>
             <a id="workflowLearn" class="workflow-card" href="#tab=compare" data-open-tab="compare">
-                <strong>Regeln lernen und vergleichen</strong><span>Suchwege, gelernte Strategien und ihren gemessenen Nutzen prüfen.</span>
+                <strong>Regeln lernen und vergleichen</strong><span>Dieselbe Aufgabe mit und ohne gelernte Regel untersuchen oder eigene Suchwege vergleichen.</span>
             </a>
             <a id="workflowOptimize" class="workflow-card" href="/static/pair-reductions.html">
                 <strong>Berechnung optimieren</strong><span>Für Summenschleifen einen günstigeren, exakt geprüften Rechenplan finden.</span>
@@ -120,7 +120,7 @@
                 </button>
                 <button class="demo-button" data-demo="macro-learning">
                     <span class="demo-icon">⚡</span>
-                    <span class="demo-title">System lernt eine Makroregel</span>
+                    <span class="demo-title">Makro-Lernen untersuchen</span>
                     <span class="demo-expr">(x+1)² → (x+7)²</span>
                 </button>
                 <button class="demo-button" data-demo="math-equation">
@@ -446,6 +446,12 @@
         <div class="card">
             <h2>Regeln lernen und vergleichen</h2>
             <p>Beginne mit einer geführten Studie oder vergleiche die Pfade deiner aktuellen Suche. Lern- und Prüfaufwand gehören zur Bewertung des Nutzens.</p>
+            <section class="recorded-comparison-entry" aria-labelledby="recordedComparisonTitle">
+                <h3 id="recordedComparisonTitle">Was spart eine gelernte Regel?</h3>
+                <p>Öffne eine konkrete Aufgabe und vergleiche Ziel, untersuchte Zustände und Pfadlänge beider Suchläufe. Die gespeicherten Versuche zeigen erfolgreiche Wiederverwendung und einen erfolglosen Transfer.</p>
+                <a id="openRecordedLearningComparison" class="export-button" href="/static/public-discovery-comparison.html" hreflang="en">Aufgezeichneten Lernvergleich öffnen (Englisch)</a>
+                <p class="hint">Die Ansicht öffnet vorhandene Versuchsdaten. Sie startet keinen neuen Suchlauf.</p>
+            </section>
             <div class="actions">
                 <a class="export-button" href="/static/strategy-demo.html">Geführte Lernstudie</a>
                 <a class="export-button" href="/static/representations.html">Darstellungen vergleichen</a>

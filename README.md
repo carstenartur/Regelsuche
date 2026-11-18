@@ -16,6 +16,8 @@ Verfahren und eigenständig nutzbare Java-SDKs verbinden diese Suche mit
 strukturellen Aufgaben, kumulativem Lernen und geprüften Rechenoptimierungen.
 
 [Demo starten](#schnellstart) ·
+[Paarsummen optimieren](#einen-ein-pass-algorithmus-aus-einer-paarsumme-herleiten) ·
+[Ergebnisse ansehen](docs/demo-gallery.md) ·
 [Ersten Rechenweg untersuchen](#erster-ablauf-einen-rechenweg-verstehen) ·
 [Forschungsverfahren und Ergebnisse](#lernen-muss-sich-auf-unbekannten-fällen-auszahlen) ·
 [Rechenpläne herleiten](#geprüfte-rechenpläne-herleiten) ·
@@ -70,6 +72,25 @@ und [Testing](docs/testing.md) unterscheiden diese Prüfumfänge.
 Der vollständige Einstieg einschließlich Sicherheitshinweisen und
 Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
 
+## Einen Ein-Pass-Algorithmus aus einer Paarsumme herleiten
+
+Öffne auf der Startseite **Berechnung optimieren**. In **Summenschleifen
+beschleunigen** ist das Beispiel **Quadrierte Abstände** mit dem Summanden
+`(x_i-x_j)^2` vorausgefüllt. Wähle **Algorithmus herleiten**. Aus der
+Summe der Werte und der Summe ihrer Quadrate entsteht ein Plan, der jede
+Zeile einmal liest. Die Workbench erklärt unter **Herleitung und Prüfung**,
+wie sie die Gleichheit der beiden Rechenwege symbolisch prüft.
+
+Für die eingegebenen Werte `2`, `-1` und `5` ergibt die exakte Auswertung
+**54**. Die separate Hochrechnung für **100.000 Zeilen** vergleicht
+**4.999.950.000 Paare** in der direkten Schleife mit einem Durchlauf.
+
+![Geprüfter Paarsummenplan mit Formel, Hochrechnung und dem exakten Beispielergebnis 54](docs/assets/screenshots/pair-reduction-result.png)
+
+[Weitere Bildschirmaufnahmen und Nachweise](docs/demo-gallery.md) ·
+[Bedienablauf](docs/user-workflows.md#summenschleifen-optimieren) ·
+[SDK und Nachweis](regelsuche-optimization-sdk/FINITE_SERIES.md#one-pass-pair-reductions)
+
 ## Erster Ablauf: einen Rechenweg verstehen
 
 Ein Einstieg für Lernen und Lehren ist die binomische Formel:
@@ -113,22 +134,6 @@ Die Punkte an den AST-Knoten stehen für konkrete Regelanwendungen. Der gewählt
 Zug entfernt die Addition von null; eine andere Regel am Potenzknoten erzeugt
 einen anderen vollständigen Ausdruck. Position, Bindungen und Ergebnis bleiben
 nachvollziehbar.*
-
-## Workbench statt Konsolenausgabe
-
-Browser-E2E-Tests prüfen die sichtbaren Abläufe und erzeugen dieselben
-Dokumentationsaufnahmen. Der folgende kompakte Ausschnitt zeigt einen Lauf, in
-dem ein mehrstufiger Pfad als Makro gelernt und erneut verwendet wird.
-
-![Testgenerierte Workbench-Zusammenfassung eines gelernten und wiederverwendeten Makros](docs/assets/screenshots/macro-learning-summary.png)
-
-Weitere Aufnahmen in voller Größe: [rationale Umformung mit Ergebnis und Suchdaten](docs/assets/screenshots/rational-summary.png)
-und [Vorschau einer Matrixdarstellung](docs/assets/screenshots/math-matrix-preview.png).
-
-Weitere sichtbare Abläufe: [Pfade, Graph und Replay](docs/web-ui-user-guide.md),
-[AST-Regelradar](docs/ast-rule-radar.md),
-[Proof Workbench](docs/proof-workbench.md) und
-[User Workflows](docs/user-workflows.md).
 
 ## Lernen muss sich auf unbekannten Fällen auszahlen
 
@@ -224,6 +229,9 @@ Prüfung stehen im [Autonomous Discovery Walkthrough](docs/autonomous-discovery-
 Das ist projektinterne, symbolisch geprüfte Wiederverwendung — **keine
 Behauptung externer mathematischer Neuheit**.
 
+In der Workbench gelangst du über **Regeln lernen und vergleichen** zum
+[aufgezeichneten Vergleich](docs/demo-gallery.md#eine-gelernte-regel-im-vergleich).
+
 Frühere, separat eingefrorene Lernversuche behalten ihre eigenen Ergebnisse.
 Die verlinkten Berichte enthalten Versuchsaufbau, Herkunft, Vergleichszeilen
 und Reproduktionswege:
@@ -276,19 +284,8 @@ kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
 
 [Suchgraph zur Detailinspektion in voller Größe](docs/generated/discovery/sophie-germain/search-space.svg) ·
 [Evidence dieses Laufs](docs/generated/discovery/sophie-germain/evidence.json) ·
-[visuelle Discovery Gallery](docs/demo-gallery.md) ·
+[Galerie mit Ergebnissen](docs/demo-gallery.md) ·
 [domänenbewusste Polynomfaktorisierung](docs/domain-aware-polynomial-factorization.md)
-
-## Einen Ein-Pass-Algorithmus aus einer Paarsumme herleiten
-
-Öffne in der Workbench **Paarberechnungen beschleunigen** und gib den Summanden
-für ein Paar von Zeilen ein. Aus `(x_i-x_j)^2` leitet Regelsuche die beiden
-Zwischensummen für `x` und `x*x` her. Für 100.000 Zeilen stellt die Demo
-4.999.950.000 Paarberechnungen einem Durchlauf mit 100.000 Zeilen gegenüber.
-Du kannst die Herleitung, die symbolische Prüfung und die benötigten
-Zwischensummen ansehen. Die gewichtete Variante und Paarprodukte mit
-Diagonalkorrektur lassen sich mit demselben Verfahren herleiten.
-[SDK und Nachweis](regelsuche-optimization-sdk/FINITE_SERIES.md#one-pass-pair-reductions)
 
 ## Geprüfte Rechenpläne herleiten
 
@@ -551,9 +548,9 @@ Evidence-Identität. Neue allgemeine Discovery-Profile verwenden für den
 unterstützten Quartikbereich den semantischen Syntheseoperator; der frühere
 benannte Bridge bleibt nur zur Reproduktion und Ablation erhalten.
 
-Die [Discovery Gallery](docs/demo-gallery.md) zeigt ausschließlich aus Tests
-beziehungsweise Evidence-Generatoren abgeleitete Darstellungen. Manuell
-nachgezeichnete Erfolgsbilder sind kein Ersatz für gebundene Artefakte.
+Die [Galerie](docs/demo-gallery.md) zeigt Aufnahmen aus der laufenden Workbench
+und verlinkt die [generierten Algebra-Suchläufe](docs/generated/discovery/gallery.md)
+mit Suchgraphen und kanonischen Nachweisen.
 
 <!-- capability-status:start -->
 ## Verifizierter Capability- und Claim-Status

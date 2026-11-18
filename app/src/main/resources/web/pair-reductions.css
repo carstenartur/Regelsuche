@@ -1,7 +1,11 @@
 .pair-reduction-page .brand a { color: inherit; }
+.pair-reduction-page .brand a:focus-visible { outline-color: #93c5fd; }
 .pair-reduction-page [hidden] { display: none; }
 .pair-reduction-page header { padding-bottom: .7rem; }
+.pair-reduction-page .brand { max-width: 1052px; margin-inline: auto; }
 .pair-reduction-page .brand h1 { margin-top: .6rem; }
+.pair-reduction-page .brand p { margin-block: .45rem; }
+.pair-reduction-page .field { min-width: 0; }
 .pair-reduction-page textarea,
 .pair-reduction-page input[type="number"] {
     width: 100%;
@@ -11,7 +15,88 @@
     padding: .5rem .6rem;
     font: inherit;
 }
+.pair-reduction-page textarea { resize: vertical; }
 .pair-reduction-page .grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
-.pair-reduction-page #pairResult,
-.pair-reduction-page #pairIndexedResult { overflow-wrap: anywhere; }
-.pair-reduction-page main section h3 { font-size: 1rem; margin: 1.1rem 0 .3rem; }
+.pair-reduction-page #pairSubmit { margin-top: .65rem; min-height: 2.75rem; }
+.pair-status { margin: 0; }
+.pair-status:not(:empty) { margin: .75rem 0; overflow-wrap: anywhere; }
+
+.pair-result {
+    border-top: 3px solid #2563eb;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}
+.pair-result h2 { margin-bottom: .4rem; }
+.pair-result h3 { font-size: 1rem; line-height: 1.35; margin: 0 0 .6rem; }
+.pair-result h2:focus-visible,
+.pair-derivation summary:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.pair-source {
+    margin: 0 0 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .35rem .75rem;
+    color: #475569;
+    font-size: .9rem;
+}
+.pair-source code { background: #f1f5f9; color: #1e293b; border-radius: 4px; padding: .2rem .5rem; }
+.pair-result .hint { color: #475569; }
+.pair-metrics,
+.pair-evidence {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .8rem;
+}
+.pair-metrics { margin: 0; }
+.pair-metrics > div,
+.pair-panel {
+    padding: .9rem 1rem;
+    border: 1px solid #dbe3ed;
+    border-radius: 6px;
+}
+.pair-metrics > div { background: #f8fafc; }
+.pair-metrics > div:nth-child(2) { background: #eff6ff; border-color: #bfdbfe; }
+.pair-metrics dt { font-size: .9rem; font-weight: 600; color: #334155; }
+.pair-metrics dd { margin: .2rem 0 0; color: #334155; }
+.pair-metrics strong,
+.pair-sample-value {
+    display: block;
+    color: #172554;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    font-size: clamp(1.75rem, 4.4vw, 2.75rem);
+}
+.pair-evidence { margin-top: 1.2rem; }
+.pair-formula {
+    display: block;
+    padding: .65rem .75rem;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #1e293b;
+    font-size: .95rem;
+}
+.pair-panel ul,
+.pair-derivation ul { padding-left: 1.35rem; margin: .65rem 0 0; }
+.pair-sample-panel { background: #f0fdf4; border-color: #bbdfc6; }
+.pair-sample { margin: 0; display: grid; gap: .4rem; }
+.pair-sample .hint { margin: 0; }
+.pair-sample-value { color: #14532d; }
+.pair-sample-value:empty { display: none; }
+
+.pair-derivation { margin-top: 1rem; border-top: 1px solid #dbe3ed; }
+.pair-derivation summary { cursor: pointer; padding: .75rem .15rem; font-weight: 600; color: #1e40af; }
+.pair-derivation-body { padding: .55rem .15rem 0; }
+.pair-derivation-body p { margin: .65rem 0; }
+.pair-derivation-body h3:not(:first-child) { margin-top: 1rem; }
+
+@media (max-width: 700px) {
+    .pair-reduction-page header { padding-inline: .75rem; }
+    .pair-reduction-page .card { padding: 1rem; }
+}
+@media (max-width: 540px) {
+    .pair-metrics,
+    .pair-evidence { grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+    .pair-metrics > div,
+    .pair-panel { padding: .7rem .75rem; }
+    .pair-reduction-page #pairSubmit { width: 100%; }
+}

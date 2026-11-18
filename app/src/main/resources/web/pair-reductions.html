@@ -12,10 +12,11 @@
 <header><div class="brand">
     <a href="/">← Regelsuche Workbench</a>
     <h1>Summenschleifen beschleunigen</h1>
-    <p>Regelsuche leitet Algorithmen für Paare, geordnete Ketten und gleitende Paarfenster her.</p>
+    <p>Regelsuche leitet symbolisch geprüfte Algorithmen für Paarsummen, geordnete Tupel und gleitende Paarfenster her.</p>
 </div></header>
 <main>
-    <form id="pairForm" class="card">
+    <form id="pairForm" class="card" aria-labelledby="pairFormTitle">
+        <h2 id="pairFormTitle">Aufgabe eingeben</h2>
         <div class="grid">
             <label class="field"><span>Beispiel</span>
                 <select id="pairExample">
@@ -63,42 +64,95 @@
         <button id="pairSubmit" type="submit" class="primary">Algorithmus herleiten</button>
     </form>
 
-    <p id="pairStatus" role="status" aria-live="polite"></p>
-    <section id="pairResult" class="card" hidden aria-labelledby="pairResultTitle">
-        <h2 id="pairResultTitle">Geprüfter Algorithmus</h2>
-        <p>Die direkte Schleife berechnet <strong id="pairOriginal"></strong> Paare. Der hergeleitete Algorithmus liest <strong id="pairLinear"></strong> Zeilen in einem Durchlauf.</p>
-        <ol>
-            <li><h3>Summand ausmultiplizieren</h3>
-                <code id="pairExpanded"></code>
-            </li>
-            <li><h3>Zwischensummen bestimmen</h3>
-                <p>Jedes Produkt aus einem Faktor der Zeile i und einem Faktor der Zeile j lässt sich über alle i und j als Produkt zweier Summen berechnen. Der Plan zieht die Paare i = j ab und zählt jedes übrige Paar einmal.</p>
+    <p id="pairStatus" class="status pair-status" role="status" aria-live="polite"></p>
+    <section id="pairResult" class="card pair-result" hidden aria-labelledby="pairResultTitle">
+        <h2 id="pairResultTitle" tabindex="-1">Geprüfter Algorithmus</h2>
+        <p class="pair-source"><span>Summand je Paar</span> <code id="pairSource"></code></p>
+
+        <h3>Hochrechnung</h3>
+        <dl class="pair-metrics">
+            <div>
+                <dt>Direkte Schleife</dt>
+                <dd><strong id="pairOriginal"></strong> <span>Paare</span></dd>
+            </div>
+            <div>
+                <dt>Hergeleiteter Plan</dt>
+                <dd><strong id="pairLinear"></strong> <span>Zeilen in einem Durchlauf</span></dd>
+            </div>
+        </dl>
+        <p class="hint">Für <code>n</code> Zeilen zählt die direkte Schleife <code>n · (n − 1) / 2</code> Paare. Der Plan sammelt seine Zwischensummen beim Lesen der Zeilen.</p>
+
+        <div class="pair-evidence">
+            <section class="pair-panel" aria-labelledby="pairFormulaTitle">
+                <h3 id="pairFormulaTitle">Ergebnisformel</h3>
+                <code id="pairFormula" class="pair-formula"></code>
                 <ul id="pairAccumulators"></ul>
-            </li>
-            <li><h3>Ergebnis aus den Summen berechnen</h3>
-                <p><code>n</code> ist die Zahl der gelesenen Zeilen.</p>
-                <code id="pairFormula"></code>
-            </li>
-            <li><h3>Gleichheit prüfen</h3>
-                <p>Die Prüfung setzt eine und zwei symbolische Zeilen ein. Der Beitrag einer einzelnen Zeile ist null. Der Beitrag zweier verschiedener Zeilen stimmt als Polynom mit dem eingegebenen Summanden überein. Der Plan besteht nur aus Einzel- und Paarbeiträgen. Damit gilt die Gleichheit für jede Zeilenanzahl.</p>
-            </li>
-        </ol>
-        <p id="pairSample" hidden></p>
-        <p id="pairWork" class="hint"></p>
+            </section>
+            <section class="pair-panel pair-sample-panel" aria-labelledby="pairSampleTitle">
+                <h3 id="pairSampleTitle">Exakte Beispielauswertung</h3>
+                <p id="pairSample" class="pair-sample" hidden>
+                    <strong id="pairSampleValue" class="pair-sample-value"></strong>
+                    <span id="pairSampleContext"></span>
+                </p>
+                <p id="pairSampleMissing" class="hint" hidden>Keine Beispieldaten eingegeben.</p>
+            </section>
+        </div>
+
+        <details class="pair-derivation">
+            <summary>Herleitung und Prüfung</summary>
+            <div class="pair-derivation-body">
+                <h3>Summand ausmultiplizieren</h3>
+                <code id="pairExpanded" class="pair-formula"></code>
+                <p>Ein Faktor aus Zeile <code>i</code> und ein Faktor aus Zeile <code>j</code> ergeben über alle <code>i</code> und <code>j</code> ein Produkt zweier Summen. Der Plan zieht die Beiträge mit <code>i = j</code> ab und zählt jedes übrige Paar einmal.</p>
+                <h3>Gleichheit prüfen</h3>
+                <p>Die Prüfung setzt eine und zwei symbolische Zeilen ein. Für eine Zeile ergibt sich null. Für zwei verschiedene Zeilen stimmen die Polynomkoeffizienten mit dem eingegebenen Summanden überein. Weil der Plan nur Einzel- und Paarbeiträge enthält, gilt die Gleichheit für jede Zeilenanzahl.</p>
+                <p id="pairWork" class="hint"></p>
+            </div>
+        </details>
     </section>
-    <section id="pairIndexedResult" class="card" hidden aria-labelledby="pairIndexedTitle">
-        <h2 id="pairIndexedTitle">Geprüfter Algorithmus</h2>
-        <p>Die direkte Aufzählung prüft <strong id="pairIndexedCandidates"></strong> Kandidatentupel.</p>
-        <ol>
-            <li><h3>Summand in Faktoren je Zeile zerlegen</h3><ul id="pairFactors"></ul></li>
-            <li><h3>Passende frühere Beiträge abfragen</h3><ul id="pairLookups"></ul></li>
-            <li><h3>Reihenfolge und Gleichheit prüfen</h3>
+    <section id="pairIndexedResult" class="card pair-result" hidden aria-labelledby="pairIndexedTitle">
+        <h2 id="pairIndexedTitle" tabindex="-1">Geprüfter Algorithmus</h2>
+        <p class="pair-source"><span>Summand je Tupel</span> <code id="pairIndexedSource"></code></p>
+
+        <h3>Hochrechnung</h3>
+        <dl class="pair-metrics">
+            <div>
+                <dt>Direkte Aufzählung</dt>
+                <dd><strong id="pairIndexedCandidates"></strong> <span id="pairIndexedCandidateLabel"></span></dd>
+            </div>
+            <div>
+                <dt>Eingabegröße im Vergleich</dt>
+                <dd><strong id="pairIndexedRows"></strong> <span>Zeilen</span></dd>
+            </div>
+        </dl>
+
+        <div class="pair-evidence">
+            <section class="pair-panel" aria-labelledby="pairLookupTitle">
+                <h3 id="pairLookupTitle">Frühere Beiträge abfragen</h3>
+                <ul id="pairLookups"></ul>
+            </section>
+            <section class="pair-panel pair-sample-panel" aria-labelledby="pairIndexedSampleTitle">
+                <h3 id="pairIndexedSampleTitle">Exakte Beispielauswertung</h3>
+                <p id="pairIndexedSample" class="pair-sample" hidden>
+                    <strong id="pairIndexedSampleValue" class="pair-sample-value"></strong>
+                    <span id="pairIndexedSampleContext"></span>
+                    <span id="pairIndexedSampleMetrics" class="hint"></span>
+                </p>
+                <p id="pairIndexedSampleMissing" class="hint" hidden>Keine Beispieldaten eingegeben.</p>
+            </section>
+        </div>
+
+        <details class="pair-derivation">
+            <summary>Herleitung und Prüfung</summary>
+            <div class="pair-derivation-body">
+                <h3>Summand in Faktoren je Zeile zerlegen</h3>
+                <ul id="pairFactors"></ul>
+                <h3>Reihenfolge und Gleichheit prüfen</h3>
                 <p id="pairSchedule"></p>
                 <p>Die Prüfung rekonstruiert den ursprünglichen Summanden aus den Faktoren und gleicht die Abfragegrenzen mit der Eingabe ab.</p>
-            </li>
-        </ol>
-        <p id="pairIndexedSample" hidden></p>
-        <p id="pairIndexedWork" class="hint"></p>
+                <p id="pairIndexedWork" class="hint"></p>
+            </div>
+        </details>
     </section>
 </main>
 </body>

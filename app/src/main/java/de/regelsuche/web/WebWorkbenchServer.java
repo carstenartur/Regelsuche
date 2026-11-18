@@ -2499,7 +2499,7 @@ public class WebWorkbenchServer {
         de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();
         w.beginObject();
         w.property("id", "macro-learning");
-        w.property("title", "System lernt eine Makroregel");
+        w.property("title", de.regelsuche.demo.DemoCatalog.byId("macro-learning").title());
         w.property("usedLearnedRule", usedLearnedRule);
         w.property("finalConfidenceScore", lastConfidence);
         w.array("confidenceTrace", arr -> confidenceTrace.forEach(v -> arr.value(v.toString())));
