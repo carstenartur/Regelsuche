@@ -90,6 +90,129 @@ class MavenGradleHostRuntimeInventoryContractTest {
       ))
   );
 
+  // Checkout-owned verification wrappers are transitional authority, not additional
+  // Maven-approved producers. Freeze exact invocation lines from main@99de5c049fae.
+  // Removing a legacy driver is allowed; adding, editing or duplicating one is not.
+  private static final Map<String, List<String>> RETAINED_SCRIPT_WRAPPER_LINES = Map.ofEntries(
+      Map.entry("scripts/freeze-flagship-rewrite-program.sh", List.of(
+          "python3 - \"${repository_root}\" \"${validation_private}\" \"${final_test_private}\" <<'PY'",
+          "validation_private=$(python3 -c \\",
+          "final_test_private=$(python3 -c \\",
+          "exec ./gradlew \\"
+      )),
+      Map.entry("scripts/run-capability-status-verification.sh", List.of(
+          "PYTHON=\"$VENV/bin/python\"",
+          "PIP=\"$VENV/bin/pip\"",
+          "if [[ ! -x \"$PYTHON\" ]]; then",
+          "python3 -m venv \"$VENV\"",
+          "if ! \"$PYTHON\" -c 'import importlib.metadata as m; raise SystemExit(0 if m.version(\"jsonschema\") == \"4.25.1\" else 1)' 2>/dev/null; then",
+          "\"$PIP\" install --disable-pip-version-check --quiet jsonschema==4.25.1",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/generate-capability-status.py \\",
+          "\"$PYTHON\" scripts/verify-capability-status.py \\"
+      )),
+      Map.entry("scripts/run-comparative-benchmarks-verification.sh", List.of(
+          "exec ./gradlew --no-daemon verifyComparativeBenchmarks \"$@\""
+      )),
+      Map.entry("scripts/run-domain-generic-qualification-verification.sh", List.of(
+          "PYTHON=\"$VENV/bin/python\"",
+          "PIP=\"$VENV/bin/pip\"",
+          "if [[ ! -x \"$PYTHON\" ]]; then",
+          "python3 -m venv \"$VENV\"",
+          "if ! \"$PYTHON\" -c 'import importlib.metadata as m; raise SystemExit(0 if m.version(\"jsonschema\") == \"4.25.1\" else 1)' 2>/dev/null; then",
+          "\"$PIP\" install --disable-pip-version-check --quiet jsonschema==4.25.1",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/verify-domain-generic-qualification.py \\",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/verify-domain-generic-qualification.py \\"
+      )),
+      Map.entry("scripts/run-generic-discovery-domains-verification.sh", List.of(
+          "PYTHON=\"$VENV/bin/python\"",
+          "PIP=\"$VENV/bin/pip\"",
+          "if [[ ! -x \"$PYTHON\" ]]; then",
+          "python3 -m venv \"$VENV\"",
+          "if ! \"$PYTHON\" -c 'import importlib.metadata as m; raise SystemExit(0 if m.version(\"jsonschema\") == \"4.25.1\" else 1)' 2>/dev/null; then",
+          "\"$PIP\" install --disable-pip-version-check --quiet jsonschema==4.25.1",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/verify-generic-discovery-domains.py \\",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/verify-generic-discovery-domains.py \\"
+      )),
+      Map.entry("scripts/run-jmh-benchmark-verification.sh", List.of(
+          "exec ./gradlew --no-daemon verifyJmhBenchmark \"$@\""
+      )),
+      Map.entry("scripts/run-release-readiness-verification.sh", List.of(
+          "./gradlew \\"
+      )),
+      Map.entry("scripts/run-solver-ir-verification.sh", List.of(
+          "PYTHON=\"$VENV/bin/python\"",
+          "PIP=\"$VENV/bin/pip\"",
+          "if [[ ! -x \"$PYTHON\" ]]; then",
+          "python3 -m venv \"$VENV\"",
+          "if ! \"$PYTHON\" -c 'import importlib.metadata as m; raise SystemExit(0 if m.version(\"jsonschema\") == \"4.25.1\" else 1)' 2>/dev/null; then",
+          "\"$PIP\" install --disable-pip-version-check --quiet jsonschema==4.25.1",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/verify-solver-ir-evidence.py \\"
+      )),
+      Map.entry("scripts/run-solver-portfolio-verification.sh", List.of(
+          "PYTHON=\"$VENV/bin/python\"",
+          "PIP=\"$VENV/bin/pip\"",
+          "if [[ ! -x \"$PYTHON\" ]]; then",
+          "python3 -m venv \"$VENV\"",
+          "if ! \"$PYTHON\" -c 'import importlib.metadata as m; raise SystemExit(0 if m.version(\"jsonschema\") == \"4.25.1\" else 1)' 2>/dev/null; then",
+          "\"$PIP\" install --disable-pip-version-check --quiet jsonschema==4.25.1",
+          "./gradlew \\",
+          "./gradlew \\",
+          "\"$PYTHON\" scripts/verify-solver-portfolio-evidence.py \\"
+      )),
+      Map.entry("scripts/verify-python-client.sh", List.of(
+          "task_reports=\"$task_root/build/reports/python-client\"",
+          "task_work_root=\"$task_root/build/tmp/python-client-validation\"",
+          "python3 -m venv \"$task_work/build-venv\"",
+          "\"$task_work/build-venv/bin/python\" -m pip wheel \"$task_root/python\" --no-deps --wheel-dir \"$task_work/wheels\" > \"$task_reports/build.log\" 2>&1",
+          "python3 -m venv \"$task_work/venv\"",
+          "\"$task_work/venv/bin/python\" -m pip install --no-index \"${task_wheels[0]}\" > \"$task_reports/install.log\" 2>&1",
+          "\"$task_work/venv/bin/python\" -m unittest discover -s \"$task_root/python/tests\" -v > \"$task_reports/unit.log\" 2>&1",
+          "\"$task_work/venv/bin/python\" -m regelsuche verify \"$task_root/docs/examples/linear-solution.json\" > \"$task_reports/offline.json\"",
+          "task_distribution=\"$(python3 - \"$task_root\" \"$task_work\" <<'PY'",
+          "REGELSUCHE_TEST_LAUNCHER=\"$task_distribution/bin/regelsuche\" \"$task_work/venv/bin/python\" \"$task_root/python/tests/live_client.py\" > \"$task_reports/live.json\"",
+          "\"$task_work/venv/bin/python\" -m regelsuche verify \"$task_reports/java-example.json\" > \"$task_reports/java-example-verification.json\"",
+          "printf '%s\\n' 'Python wheel, offline proof, live Java server and external Java example verified.'"
+      ))
+  );
+
+  @Test
+  void repositoryVerificationWrappersCannotGainUndeclaredHostRuntimeCommands() throws IOException {
+    Path root = MavenPomTestSupport.repositoryRoot().resolve("scripts");
+    try (Stream<Path> files = Files.walk(root)) {
+      for (Path file : files.filter(Files::isRegularFile)
+          .filter(p -> p.getFileName().toString().endsWith(".sh")).toList()) {
+        String relative = root.relativize(file).toString().replace('\\', '/');
+        rejectNewRuntimeLines("scripts/" + relative,
+            Files.readString(file, StandardCharsets.UTF_8), RETAINED_SCRIPT_WRAPPER_LINES);
+      }
+    }
+  }
+
+  @Test
+  void rootScriptInventoryRejectsNewDuplicatedAndChangedHostDrivers() {
+    String script = "scripts/run-jmh-benchmark-verification.sh";
+    String retained = "exec ./gradlew --no-daemon verifyJmhBenchmark \"$@\"";
+    rejectNewRuntimeLines(script, retained, RETAINED_SCRIPT_WRAPPER_LINES);
+    assertThrows(AssertionError.class,
+        () -> rejectNewRuntimeLines(script, retained + "\n" + retained,
+            RETAINED_SCRIPT_WRAPPER_LINES));
+    assertThrows(AssertionError.class,
+        () -> rejectNewRuntimeLines(script, "exec ./gradlew --no-daemon newGate",
+            RETAINED_SCRIPT_WRAPPER_LINES));
+    for (String newHost : List.of("python3 -m pip install package",
+        "node verification.js", "npm run test", "exec ./gradlew check")) {
+      assertThrows(AssertionError.class,
+          () -> rejectNewRuntimeLines("scripts/new-verification.sh", newHost,
+              RETAINED_SCRIPT_WRAPPER_LINES));
+    }
+  }
+
   @Test
   void existingShellAdaptersCannotGainUndeclaredHostRuntimeCommands() throws IOException {
     Path root = MavenPomTestSupport.repositoryRoot().resolve("gradle");
@@ -132,8 +255,13 @@ class MavenGradleHostRuntimeInventoryContractTest {
   }
 
   private static void rejectNewRuntimeLines(String script, String contents) {
+    rejectNewRuntimeLines(script, contents, RETAINED_LEGACY_LINES);
+  }
+
+  private static void rejectNewRuntimeLines(String script, String contents,
+      Map<String, List<String>> retainedLegacyLines) {
     List<String> remaining = new ArrayList<>(
-        RETAINED_LEGACY_LINES.getOrDefault(script, List.of()));
+        retainedLegacyLines.getOrDefault(script, List.of()));
     for (String original : contents.split("\\R")) {
       String line = original.strip();
       if (line.isEmpty() || line.startsWith("#") || !HOST_RUNTIME.matcher(line).find()) {
