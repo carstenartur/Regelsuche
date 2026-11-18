@@ -188,8 +188,12 @@ docker run --rm -p 127.0.0.1:8081:8080 regelsuche
 Installiere auf Linux einmalig die von Playwright benötigten Hostbibliotheken:
 
 ```bash
-./gradlew :app:installPlaywrightHostDependencies
+mvn --batch-mode --no-transfer-progress -f playwright-bootstrap/pom.xml \
+  org.codehaus.mojo:exec-maven-plugin:3.5.0:java
 ```
+
+Das installiert nur Chromium-Hostbibliotheken über den eigenständigen,
+versionierten Maven-Bootstrap; es führt keine Browser-Tests aus.
 
 ### Docker-/Datenbanktests werden übersprungen oder schlagen fehl
 

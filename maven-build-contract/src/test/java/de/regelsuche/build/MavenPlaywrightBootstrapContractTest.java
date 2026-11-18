@@ -16,7 +16,7 @@ class MavenPlaywrightBootstrapContractTest {
       "com.microsoft.playwright:playwright:" + PLAYWRIGHT_VERSION;
 
   @Test
-  void ciBootstrapUsesThePinnedCliWithoutCompilingTheMainReactor()
+  void ciBootstrapUsesPinnedMavenCliWithoutCompilingTheMainReactor()
       throws IOException {
     Path root = repositoryRoot();
     String appBuild = Files.readString(root.resolve("app/build.gradle"));
@@ -24,6 +24,8 @@ class MavenPlaywrightBootstrapContractTest {
         root.resolve("playwright-bootstrap/build.gradle"));
     String settings = Files.readString(
         root.resolve("playwright-bootstrap/settings.gradle"));
+    String mavenBootstrap = Files.readString(
+        root.resolve("playwright-bootstrap/pom.xml"));
     String workflow = Files.readString(
         root.resolve(".github/workflows/gradle.yml"));
 
@@ -49,11 +51,24 @@ class MavenPlaywrightBootstrapContractTest {
         settings.contains("regelsuche-playwright-bootstrap"),
         "the bootstrap must remain an independent Gradle build");
 
-    assertTrue(
-        workflow.contains(
-            "./gradlew --no-daemon -p playwright-bootstrap "
-                + "installPlaywrightHostDependencies --console=plain"),
-        "CI must invoke the isolated Playwright bootstrap");
+    assertTrue(mavenBootstrap.contains(
+        "<playwright.version>" + PLAYWRIGHT_VERSION + "</playwright.version>"),
+        "the isolated Maven bootstrap must use the application Playwright version");
+    assertTrue(mavenBootstrap.contains(
+        "<mainClass>com.microsoft.playwright.CLI</mainClass>"));
+    assertTrue(mavenBootstrap.contains("<argument>install-deps</argument>"));
+    assertTrue(mavenBootstrap.contains("<argument>chromium</argument>"));
+    assertFalse(mavenBootstrap.contains("<modules>"),
+        "the Maven bootstrap must not configure or compile the main reactor");
+    assertEquals(2, occurrences(workflow, "-f playwright-bootstrap/pom.xml"),
+        "both checkout and Maven authorities must use the independent Maven bootstrap");
+    assertEquals(2, occurrences(workflow,
+        "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"),
+        "both checkout and Maven authorities must run the pinned Maven CLI");
+    assertFalse(workflow.contains(
+        "./gradlew --no-daemon -p playwright-bootstrap "
+            + "installPlaywrightHostDependencies --console=plain"),
+        "no CI authority may invoke the Gradle Playwright bootstrap");
     assertFalse(
         workflow.contains(
             "./gradlew --no-daemon :app:installPlaywrightHostDependencies "

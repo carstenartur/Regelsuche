@@ -143,11 +143,14 @@ Evidence-Artefakte gelangen in die Konvergenz.
 ### Playwright auf Linux
 
 ```bash
-./gradlew :app:installPlaywrightHostDependencies
+mvn --batch-mode --no-transfer-progress -f playwright-bootstrap/pom.xml \
+  org.codehaus.mojo:exec-maven-plugin:3.5.0:java
 ```
 
-Dieser Task installiert Hostbibliotheken. Er definiert keine alternative
-Testsemantik.
+Der eigenständige, auf Playwright 1.65.0 festgelegte Maven-Bootstrap installiert
+Chromium-Hostbibliotheken, ohne den Hauptreaktor zu kompilieren. Das ist nur
+eine Vorbereitung; die fachlichen Tests und Qualitätsentscheidungen bleiben
+separat. Bis zur vollständigen Migration ist die CI weiterhin gemischt.
 
 ### GraalPy-Isolation nativer Module auf Linux
 
