@@ -213,10 +213,12 @@ jobs:
           git archive --format=tar HEAD | tar -xf - -C "$source_root"
           (
             cd "$source_root"
-            # Maven/JUnit owns the Git-free assertions. An empty test run fails.
+            # Run actual core unit tests as well as the Maven/JUnit archive
+            # contract. The contract rejects absent/empty/failed Surefire XML;
+            # this fresh archive contains no stale target outputs.
             mvn --batch-mode --no-transfer-progress \
               -Dregelsuche.sourceArchiveMode=true -DfailIfNoTests=true \
-              -pl maven-build-contract -am test
+              -pl regelsuche-core,maven-build-contract -am test
           )
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
