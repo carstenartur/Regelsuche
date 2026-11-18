@@ -59,8 +59,9 @@ Laufzeit brauchen eine eigene Bilanz.
 
 ## Einen ausgeführten Kandidatenschritt im Replay prüfen
 
-Der native Suchlauf startet bei `(x + 0) * (x + 0)` und speichert konkrete
-Umformungen an den beiden gleich geschriebenen Teilausdrücken. Öffnest du im
+Der native Suchlauf startet bei `(x + 0) * (x + 0)`. Die Aufnahme zeigt den
+ersten Schritt zu `(x + 0)^2` am Wurzelknoten; ausgewählter Endkandidat ist
+`x^2`. Öffnest du im
 Kandidatendossier einen Schritt aus der **Replay-Ansicht der gespeicherten Schritte**,
 siehst du den vollständigen Ausdruck **Vor diesem Schritt** und **Nach diesem
 Schritt**. Darunter stehen der ersetzte Teilausdruck, die angewandte Regel und die

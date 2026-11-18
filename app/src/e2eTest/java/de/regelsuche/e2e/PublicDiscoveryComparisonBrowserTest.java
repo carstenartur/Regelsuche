@@ -28,15 +28,17 @@ class PublicDiscoveryComparisonBrowserTest {
             assertThat(example.getByText("(20 + 2) * (i * j + k) + 20 * (i * j + k)",
                 new Locator.GetByTextOptions().setExact(true))).isVisible();
             assertThat(page.locator("#qualification")).containsText("12/12 negative controls passed");
+            String inputDescription = "(20 + 2) * (i * j + k) + 20 * (i * j + k); "
+                + "both arms reach the target, 26/3 states and 3/1 steps";
             DocumentationScreenshots.capture(page, page.locator("#qualification"),
                 "learned-rule-comparison.png", "Recorded composite-factor qualification, affine-factor-20",
-                "(20 + 2) * (i * j + k) + 20 * (i * j + k); both arms reach the target, 26/3 states and 3/1 steps");
+                inputDescription);
             page.setViewportSize(390, 844);
             assertThat(example).containsText("26 → 3 explored states");
             assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth"));
             DocumentationScreenshots.capture(page, example, "learned-rule-comparison-mobile.png",
                 "Recorded composite-factor qualification, affine-factor-20 on a narrow screen",
-                "Same retained paired task, not a new search or runtime measurement");
+                inputDescription);
         }
     }
 

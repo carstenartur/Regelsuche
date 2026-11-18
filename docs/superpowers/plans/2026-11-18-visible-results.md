@@ -1,6 +1,6 @@
 # Visible Results Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Show current Regelsuche capabilities through usable result views and verified browser captures.
 
@@ -33,10 +33,10 @@
 
 **Interfaces:** Existing `/api/pair-reductions` JSON contract unchanged. Retain existing input/result element IDs. New browser flow is also the source of `pair-reduction-result.png` and `pair-reduction-mobile.png`; root coordinates shared screenshot recording.
 
-- [ ] Add behavioral browser checks for verified default result (4,999,950,000 pairs, 100,000 rows, sample 54), meaningful focused result, input invalidation and unsupported input; run the failing checks.
-- [ ] Improve result hierarchy, explain the pair/row comparison, make derivation inspectable, and retain exact sample provenance. Support existing weighted/ordered/window presets.
-- [ ] Verify desktop and 390px keyboard/results behavior against the real server.
-- [ ] Report changed files and test evidence; root handles shared commits.
+- [x] Add behavioral browser checks for verified default result (4,999,950,000 pairs, 100,000 rows, sample 54), meaningful focused result, input invalidation and unsupported input; run the failing checks.
+- [x] Improve result hierarchy, explain the pair/row comparison, make derivation inspectable, and retain exact sample provenance. Support existing weighted/ordered/window presets.
+- [x] Verify desktop and 390px keyboard/results behavior against the real server.
+- [x] Report changed files and test evidence; root handles shared commits.
 
 ## Task 2: Gallery generation and public documentation
 
@@ -44,11 +44,11 @@
 
 **Interfaces:** Captures will be `docs/assets/screenshots/pair-reduction-result.png`, `pair-reduction-mobile.png`, `learned-rule-comparison.png`, `candidate-replay.png`. Root supplies actual capture metadata. Do not manufacture images or dates.
 
-- [ ] Add a generator regression exercising preservation of curated content; observe failure before correcting generation.
-- [ ] Limit generation to owned evidence content (a marked block or a separate generated page), preserve the public evidence contract and update current references to shared-core-v3.
-- [ ] Rewrite the gallery around input/result/proof/work with new capture links, a concise research-results section and links to detailed algebra evidence.
-- [ ] Update README and user instructions to match actual UI labels and screenshot claims; retain useful evidence links and badges.
-- [ ] Run generator/evidence/link checks; report source changes and needed capture integration.
+- [x] Add a generator regression exercising preservation of curated content; observe failure before correcting generation.
+- [x] Limit generation to owned evidence content (a marked block or a separate generated page), preserve the public evidence contract and update current references to shared-core-v3.
+- [x] Rewrite the gallery around input/result/proof/work with new capture links, a concise research-results section and links to detailed algebra evidence.
+- [x] Update README and user instructions to match actual UI labels and screenshot claims; retain useful evidence links and badges.
+- [x] Run generator/evidence/link checks; report source changes and needed capture integration.
 
 ## Task 3: Entry flow, honest macro display and verified capture integration
 
@@ -56,7 +56,7 @@
 
 **Interfaces:** Existing public comparison serves retained evidence and existing native replay serves executed search states. Keep stable link IDs and current routes.
 
-- [ ] Make learning entry reach useful existing comparison content; label recorded runs clearly. Prevent a macro run with no reuse from displaying an unconditional success presentation.
-- [ ] Add semantic assertions and opt-in capture integration for current comparison and native replay. Record input, route/scenario, source revision and PNG SHA-256 with captures.
-- [ ] Execute the targeted real browser flows; visually inspect desktop and narrow screenshots and correct actual layout defects.
+- [x] Make learning entry reach useful existing comparison content; label recorded runs clearly. Prevent a macro run with no reuse from displaying an unconditional success presentation.
+- [x] Add semantic assertions and opt-in capture integration for current comparison and native replay. Record input, route/scenario, source revision and PNG SHA-256 with captures.
+- [x] Execute the targeted real browser flows; visually inspect desktop and narrow screenshots and correct actual layout defects.
 - [ ] Run focused app/generator checks and required feasible repository gates. Review complete diff, publish one focused PR and follow CI, addressing failures in scope.
