@@ -199,6 +199,19 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
           -Dregelsuche.tests.mavenPages=true verify
+      - name: Reproduce Maven build contract from a Git-free source archive
+        run: |
+          set -euo pipefail
+          source_root="$(mktemp -d "${RUNNER_TEMP}/regelsuche-maven-source.XXXXXXXX")"
+          trap 'rm -rf "$source_root"' EXIT
+          git archive --format=tar HEAD | tar -xf - -C "$source_root"
+          test -f "$source_root/pom.xml"
+          test ! -e "$source_root/.git"
+          (
+            cd "$source_root"
+            mvn --batch-mode --no-transfer-progress \
+              -pl maven-build-contract -am test
+          )
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
