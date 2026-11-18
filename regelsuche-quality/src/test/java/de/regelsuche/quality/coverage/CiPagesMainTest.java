@@ -98,6 +98,11 @@ class CiPagesMainTest {
         assertThrows(IOException.class,
             () -> CiPagesMain.publishTests(root, output, CiPagesMain.TestInput.MAVEN));
         assertFalse(Files.exists(output.resolve("badge.json")));
+        write("app/target/surefire-reports/TEST-A.xml",
+            "<testsuite tests=\"0\" failures=\"0\" errors=\"0\" skipped=\"0\"/>");
+        assertThrows(IOException.class,
+            () -> CiPagesMain.publishTests(root, output, CiPagesMain.TestInput.MAVEN));
+        assertFalse(Files.exists(output.resolve("badge.json")));
     }
 
     private Path write(String path, String value) throws IOException {
