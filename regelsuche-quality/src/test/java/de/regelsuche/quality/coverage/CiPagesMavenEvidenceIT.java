@@ -15,7 +15,7 @@ class CiPagesMavenEvidenceIT {
     void renderRetainedMavenReports() throws Exception {
         Path root = Path.of(System.getProperty("regelsuche.repositoryRoot"))
             .toAbsolutePath().normalize();
-        CiPagesMain.publishTests(root, root.resolve("public/tests"),
+        CiPagesMain.publishTests(root, root.resolve("public/maven-tests"),
             CiPagesMain.TestInput.MAVEN);
     }
 }
