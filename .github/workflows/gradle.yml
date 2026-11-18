@@ -290,7 +290,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
       - name: Retain the exact proof-authority source
         run: git archive --format=zip --output=/tmp/checked-proof-source.zip HEAD
       - name: Install the pinned Lean and mathlib reference projects

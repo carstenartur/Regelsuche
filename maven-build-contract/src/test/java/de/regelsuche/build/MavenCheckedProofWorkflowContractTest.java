@@ -34,8 +34,11 @@ class MavenCheckedProofWorkflowContractTest {
         for (JsonNode step : proof.path("steps")) {
             assertFalse(step.has("continue-on-error"));
             if (step.has("run")) commands.add(step.path("run").asText());
-            if (step.path("uses").asText().startsWith("actions/setup-java@"))
+            if (step.path("uses").asText().startsWith("actions/setup-java@")) {
                 assertTrue(step.path("with").path("verify-signature").asBoolean());
+                assertEquals("maven", step.path("with").path("cache").asText(),
+                    "checked proof authority must reuse the Maven dependency cache");
+            }
             if (step.path("uses").asText().startsWith("actions/upload-artifact@")) {
                 assertTrue(step.path("if").asText().contains("always()"));
                 assertTrue(step.path("with").path("path").asText().contains("app/target/checked-proof/"));
