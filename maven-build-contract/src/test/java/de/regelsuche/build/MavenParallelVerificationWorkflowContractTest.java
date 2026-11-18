@@ -73,9 +73,15 @@ class MavenParallelVerificationWorkflowContractTest {
 
     assertTrue(gradle.contains("actions/checkout@"),
         "the Gradle authority must start from its own checkout");
+    assertTrue(gradle.contains("-f playwright-bootstrap/pom.xml"),
+        "the checkout authority must install browser prerequisites via Maven");
     assertTrue(gradle.contains(
-        "./gradlew --no-daemon -p playwright-bootstrap "
-            + "installPlaywrightHostDependencies --console=plain"));
+        "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"),
+        "the independent pinned Playwright CLI must remain the bootstrap");
+    assertTrue(gradle.contains("cache: maven"),
+        "the checkout authority must cache its Maven bootstrap dependencies");
+    assertFalse(gradle.contains("installPlaywrightHostDependencies"),
+        "the checkout authority must no longer run the Gradle browser bootstrap");
     assertTrue(gradle.contains(
         "./gradlew --no-daemon --no-configuration-cache "
             + "-PseparateJmhAuthority=true "
