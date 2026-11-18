@@ -60,17 +60,19 @@ mvn --batch-mode --no-transfer-progress \
 No GitHub API, Git checkout metadata or host-side interpreter is used by these
 commands.
 
-The Maven product CI also replays `-pl regelsuche-core,maven-build-contract
--am test` in a temporary directory unpacked from `git archive HEAD`. The
-Maven/JUnit `regelsuche.sourceArchiveMode=true` guard checks that `.git`
-metadata is absent. In addition to the build-contract tests, it now runs the
-**actual core module's complete Maven/JUnit unit-test suite** from this fresh
-archive. A Java contract checks the core Surefire XML and rejects a missing
-report directory, an empty report inventory, exclusively skipped tests,
-failures or errors. Synthetic negative tests cover those cases.
+The Maven product CI also replays the **five first-slice Maven modules**
+(`regelsuche-core`, `regelsuche-egraph`, `regelsuche-search`,
+`regelsuche-validation`, `regelsuche-math-algorithms`) plus
+`maven-build-contract` with `-am test` in a temporary directory unpacked
+from `git archive HEAD`. The Maven/JUnit
+`regelsuche.sourceArchiveMode=true` guard checks that `.git` metadata is
+absent. Every one of the five modules must produce nonempty Surefire XML with
+at least one actually executed test and zero failures or errors. The Java
+contract rejects missing, empty, exclusively skipped, invalid or unsafe XML
+reports, including an omitted module that was not built in the archive.
 `failIfNoTests=true` separately prevents an empty Maven test phase from
 passing. The clean archive prevents stale `target` outputs from masquerading
-as a new test execution. Git is used by the CI adapter to *create* the input
+as new test execution. Git is used by the CI adapter to *create* the input
 archive, not by the Maven replay. The assertions remain in Java/JUnit,
 not in GitHub Actions shell commands.
 
