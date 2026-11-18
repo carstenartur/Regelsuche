@@ -51,6 +51,13 @@ class MavenBuildContractTest {
         "regelsuche-quality",
         "maven-build-contract"
     );
+    private static final List<String> SOURCE_ARCHIVE_MODULES = List.of(
+        "regelsuche-core",
+        "regelsuche-egraph",
+        "regelsuche-search",
+        "regelsuche-validation",
+        "regelsuche-math-algorithms"
+    );
     private static final Set<String> FORBIDDEN_BUILD_PLUGINS = Set.of(
         "org.codehaus.mojo:exec-maven-plugin",
         "com.github.eirslett:frontend-maven-plugin"
@@ -159,13 +166,18 @@ class MavenBuildContractTest {
     }
 
     @Test
-    void sourceArchiveReplayRunsCoreUnitTests() throws Exception {
+    void sourceArchiveReplayRunsFirstMavenSliceUnitTests() throws Exception {
         if (Boolean.getBoolean("regelsuche.sourceArchiveMode")) {
-            long executed = executedCoreSurefireTests(
-                repositoryRoot().resolve(
-                    "regelsuche-core/target/surefire-reports"));
-            System.out.println(
-                "sourceArchive=VERIFIED coreExecutedTests=" + executed);
+            for (String module : SOURCE_ARCHIVE_MODULES) {
+                long executed = executedModuleSurefireTests(
+                    repositoryRoot().resolve(module).resolve("target/surefire-reports"), module);
+                System.out.println("sourceArchive=VERIFIED module=" + module
+                    + " executedTests=" + executed);
+                if ("regelsuche-core".equals(module)) {
+                    // Retain the established marker for existing CI consumers.
+                    System.out.println("sourceArchive=VERIFIED coreExecutedTests=" + executed);
+                }
+            }
         }
     }
 
@@ -230,8 +242,12 @@ class MavenBuildContractTest {
     }
 
     private static long executedCoreSurefireTests(Path reports) throws Exception {
+        return executedModuleSurefireTests(reports, "regelsuche-core");
+    }
+
+    private static long executedModuleSurefireTests(Path reports, String module) throws Exception {
         assertTrue(Files.isDirectory(reports),
-            () -> "missing core Surefire reports in source archive: " + reports);
+            () -> "missing " + module + " Surefire reports in source archive: " + reports);
         List<Path> suites;
         try (var entries = Files.list(reports)) {
             suites = entries.filter(path -> {
@@ -241,7 +257,7 @@ class MavenBuildContractTest {
             }).sorted().toList();
         }
         assertFalse(suites.isEmpty(),
-            () -> "empty core Surefire report inventory: " + reports);
+            () -> "empty " + module + " Surefire report inventory: " + reports);
         long executed = 0;
         for (Path suite : suites) {
             Element xml = parse(suite).getDocumentElement();
@@ -252,13 +268,13 @@ class MavenBuildContractTest {
             int errors = Integer.parseInt(xml.getAttribute("errors"));
             int skipped = Integer.parseInt(xml.getAttribute("skipped"));
             assertTrue(tests >= 0 && skipped >= 0 && skipped <= tests,
-                () -> "invalid core Surefire test counts in " + suite);
-            assertEquals(0, failures, () -> "core tests failed in " + suite);
-            assertEquals(0, errors, () -> "core tests errored in " + suite);
+                () -> "invalid " + module + " Surefire test counts in " + suite);
+            assertEquals(0, failures, () -> "" + module + " tests failed in " + suite);
+            assertEquals(0, errors, () -> "" + module + " tests errored in " + suite);
             executed += tests - skipped;
         }
         assertTrue(executed > 0,
-            () -> "no executed core tests in source archive: " + reports);
+            () -> "no executed " + module + " tests in source archive: " + reports);
         return executed;
     }
 
