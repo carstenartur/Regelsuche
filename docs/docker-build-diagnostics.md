@@ -14,7 +14,14 @@ verwendeten Docker-Java-Client. Es wird kein Docker-CLI-Prozess benötigt.
 
 Die Ausgabe erfolgt im Test-Standardfehlerkanal mit den Markern
 `REGELSUCHE_DOCKER_BUILD_FAILURE`, `REGELSUCHE_DOCKER_EVENT` und
-`REGELSUCHE_DOCKER_EVENTS`. Sie bleibt damit in den bestehenden JUnit-XML-Dateien
+`REGELSUCHE_DOCKER_EVENTS`. Der Failure-Marker enthält zusätzlich eine
+auf **sechs Ursachenklassen** begrenzte `causeTypes`-Kette und einen
+`failureHint` aus einer festen technischen Kategorie (etwa
+`CACHE_OR_IMAGE_REFERENCE`, `BUILD_INPUT_REFERENCE`, `DISK_SPACE`,
+`REGISTRY_RATE_LIMIT`, `TIMEOUT` oder `UNCLASSIFIED`). Die Kategorie ist
+eine **Heuristik**, kein Nachweis der eigentlichen Ursache. Insbesondere
+werden keine frei formulierten Exception-Meldungen ausgegeben: Sie könnten
+private Registry-Adressen, Build-Argumente oder Zugangsdaten enthalten. Sie bleibt damit in den bestehenden JUnit-XML-Dateien
 und CI-Testlogs erhalten; es gibt weder einen zusätzlichen Workflow noch einen
 separaten Veröffentlichungsweg.
 
@@ -54,6 +61,8 @@ Die Ausgabe ist technische Diagnose, keine kanonische mathematische Evidence.
 
 Die Testklasse prüft Memoisierung, ursprüngliche Exception, fehlende Zusatz-Retries,
 begrenzte unveränderliche Ereigniszeilen, API-Fehler, Streamabschluss und Interrupts.
+Sie prüft außerdem die begrenzte Ursachenklassenkette, erlaubte Signal-Kategorien
+und das Nichtausgeben privater Exception-Payloads.
 Ein echter negativer Docker-Build aus `FROM scratch` mit einer absichtlich
 fehlenden COPY-Quelle prüft zusätzlich den vollständigen Fehler- und Abfragepfad.
 Er benötigt keine herunterzuladende Fixture-Basis. Docker bleibt eine Pflicht der
