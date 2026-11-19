@@ -203,7 +203,7 @@ public final class DomainExportWorkspace {
 <span class="fc" id="L203">            JsonNode value = JSON.readTree(bytes);</span>
 <span class="pc bpc" id="L204" title="2 of 4 branches missed.">            if (value == null || !value.isObject()) throw new IllegalArgumentException(&quot;expected a JSON object&quot;);</span>
 <span class="fc" id="L205">            return value;</span>
-<span class="nc" id="L206">        } catch (IOException exception) { throw new IllegalArgumentException(&quot;invalid domain export JSON&quot;, exception); }</span>
+<span class="fc" id="L206">        } catch (IOException exception) { throw new IllegalArgumentException(&quot;invalid domain export JSON&quot;, exception); }</span>
     }
     static String write(JsonNode value) {
 <span class="fc" id="L209">        try { return JSON.writeValueAsString(value); }</span>

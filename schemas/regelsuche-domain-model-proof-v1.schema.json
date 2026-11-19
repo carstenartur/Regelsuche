@@ -1,0 +1,1099 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:regelsuche:domain-model-proof:v1",
+  "title": "Source-bound checked recurrence of an explicit affine sequence model",
+  "$comment": "Structural validation is necessary but does not verify hash equality, canonical rational reduction, work conservation or the model theorem. DomainModelProof.requireRetained reproduces the complete bounded execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "consumerContract",
+    "status",
+    "detail",
+    "failureClass",
+    "sourceOutcome",
+    "source",
+    "model",
+    "proof",
+    "finiteCheck",
+    "replay",
+    "budget",
+    "work",
+    "originalSequenceProofStatus",
+    "formalProofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "claimBoundary",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-model-proof/v1"
+    },
+    "consumerContract": {
+      "const": "regelsuche.builtin-sequence-affine-model-proof/v1"
+    },
+    "status": {
+      "enum": [
+        "PROVED_MODEL",
+        "INCONCLUSIVE",
+        "UNSUPPORTED",
+        "NOT_EVALUATED_NO_SELECTED_CANDIDATE",
+        "FINITE_CHECK_NOT_CONFIRMED",
+        "REPLAY_MISMATCH",
+        "TECHNICAL_FAILURE"
+      ]
+    },
+    "detail": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failureClass": {
+      "type": "string"
+    },
+    "sourceOutcome": {
+      "$ref": "urn:regelsuche:domain-downstream-validation:v1#/properties/sourceOutcome"
+    },
+    "source": {
+      "$ref": "urn:regelsuche:domain-downstream-validation:v1#/properties/source"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/model"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "proof": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/proof"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "finiteCheck": {
+      "anyOf": [
+        {
+          "$ref": "urn:regelsuche:domain-finite-data-check:v1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "replay": {
+      "$ref": "urn:regelsuche:domain-downstream-validation:v1#/properties/replay"
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxReplayAttempts",
+        "maxPayloadCharacters",
+        "finiteCheck",
+        "maxPreparationWorkUnits",
+        "maxBindingWorkUnits",
+        "maxQueryWorkUnits"
+      ],
+      "properties": {
+        "maxReplayAttempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxPayloadCharacters": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 512
+        },
+        "finiteCheck": {
+          "$ref": "urn:regelsuche:domain-downstream-validation:v1#/properties/checkBudget"
+        },
+        "maxPreparationWorkUnits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        },
+        "maxBindingWorkUnits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        },
+        "maxQueryWorkUnits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        }
+      }
+    },
+    "work": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preparation",
+        "binding",
+        "queries",
+        "modelProjectionWork",
+        "encodingAndHashWork",
+        "totalWork"
+      ],
+      "properties": {
+        "preparation": {
+          "$ref": "#/$defs/phase"
+        },
+        "binding": {
+          "$ref": "#/$defs/phase"
+        },
+        "queries": {
+          "$ref": "#/$defs/phase"
+        },
+        "modelProjectionWork": {
+          "const": "UNAVAILABLE"
+        },
+        "encodingAndHashWork": {
+          "const": "UNAVAILABLE"
+        },
+        "totalWork": {
+          "const": "UNAVAILABLE"
+        }
+      }
+    },
+    "originalSequenceProofStatus": {
+      "const": "NOT_ESTABLISHED"
+    },
+    "formalProofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "claimBoundary": {
+      "const": "The checked theorem concerns the explicit affine candidate model only. Exact model terms beyond retained data are conditional predictions. Finite observations establish neither a unique infinite continuation nor that the original source follows this model. No formal proof, external novelty, promotion, Public Evidence, release qualification or comparative total-work claim is authorized."
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PROVED_MODEL"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "sourceOutcome": {
+            "const": "CONFIRMED"
+          },
+          "source": {
+            "properties": {
+              "selectedCandidateHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "certificateObjectHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "renderedCertificateHash": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "IDENTICAL_CANONICAL_EVIDENCE"
+              }
+            }
+          },
+          "finiteCheck": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "CONFIRMED_FINITE_DATA"
+              },
+              "complete": {
+                "const": true
+              }
+            }
+          },
+          "model": {
+            "type": "object"
+          },
+          "proof": {
+            "type": "object"
+          },
+          "work": {
+            "properties": {
+              "preparation": {
+                "properties": {
+                  "status": {
+                    "const": "COMPLETE"
+                  }
+                }
+              },
+              "binding": {
+                "properties": {
+                  "status": {
+                    "const": "COMPLETE"
+                  }
+                }
+              },
+              "queries": {
+                "properties": {
+                  "status": {
+                    "const": "COMPLETE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "proof": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "model": {
+            "type": "object"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "sourceOutcome": {
+            "const": "CONFIRMED"
+          },
+          "source": {
+            "properties": {
+              "selectedCandidateHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "certificateObjectHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "renderedCertificateHash": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "IDENTICAL_CANONICAL_EVIDENCE"
+              }
+            }
+          },
+          "finiteCheck": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "CONFIRMED_FINITE_DATA"
+              },
+              "complete": {
+                "const": true
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "work": {
+            "properties": {
+              "preparation": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_RUN"
+                  }
+                }
+              },
+              "binding": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_RUN"
+                  }
+                }
+              },
+              "queries": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_RUN"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "UNSUPPORTED",
+              "NOT_EVALUATED_NO_SELECTED_CANDIDATE",
+              "FINITE_CHECK_NOT_CONFIRMED",
+              "REPLAY_MISMATCH"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "NOT_EVALUATED_NO_SELECTED_CANDIDATE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "finiteCheck": {
+            "type": "null"
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "IDENTICAL_CANONICAL_EVIDENCE"
+              }
+            }
+          },
+          "source": {
+            "properties": {
+              "selectedCandidateHash": {
+                "type": "null"
+              },
+              "certificateObjectHash": {
+                "type": "null"
+              },
+              "renderedCertificateHash": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "FINITE_CHECK_NOT_CONFIRMED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "finiteCheck": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "not": {
+                  "const": "CONFIRMED_FINITE_DATA"
+                }
+              }
+            }
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "IDENTICAL_CANONICAL_EVIDENCE"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "REPLAY_MISMATCH"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "finiteCheck": {
+            "type": "null"
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "MISMATCH"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "domainId": {
+                "const": "integer-sequence-finite-difference"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "model": {
+            "properties": {
+              "adapterContract": {
+                "const": "regelsuche.finite-difference-affine-model/v1"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "model": {
+            "properties": {
+              "adapterContract": {
+                "const": "regelsuche.linear-recurrence-companion-model/v1"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "work": {
+            "properties": {
+              "binding": {
+                "properties": {
+                  "status": {
+                    "not": {
+                      "const": "NOT_RUN"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "work": {
+            "properties": {
+              "preparation": {
+                "properties": {
+                  "status": {
+                    "const": "COMPLETE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "work": {
+            "properties": {
+              "queries": {
+                "properties": {
+                  "status": {
+                    "not": {
+                      "const": "NOT_RUN"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "work": {
+            "properties": {
+              "binding": {
+                "properties": {
+                  "status": {
+                    "const": "COMPLETE"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rational": {
+      "type": "string",
+      "pattern": "^(?:0|-?[1-9][0-9]*)(?:/[1-9][0-9]*)?$"
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "configured",
+        "executed",
+        "skipped",
+        "remaining"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_RUN",
+            "COMPLETE",
+            "BUDGET_INCONCLUSIVE",
+            "ARITHMETIC_LIMIT",
+            "TECHNICAL_FAILURE"
+          ]
+        },
+        "configured": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        },
+        "executed": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 200000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skipped": {
+          "anyOf": [
+            {
+              "const": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remaining": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 200000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "TECHNICAL_FAILURE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "executed": {
+                "type": "null"
+              },
+              "skipped": {
+                "type": "null"
+              },
+              "remaining": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "executed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200000
+              },
+              "skipped": {
+                "const": 0
+              },
+              "remaining": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200000
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "NOT_RUN"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "executed": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "BUDGET_INCONCLUSIVE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "remaining": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "adapterContract",
+        "sourceOrder",
+        "dimension",
+        "coordinates",
+        "linear",
+        "offset",
+        "initialState",
+        "observation",
+        "initialIndex",
+        "assumptions",
+        "contentHash"
+      ],
+      "properties": {
+        "schema": {
+          "const": "regelsuche.sequence-affine-model/v1"
+        },
+        "adapterContract": {
+          "enum": [
+            "regelsuche.finite-difference-affine-model/v1",
+            "regelsuche.linear-recurrence-companion-model/v1"
+          ]
+        },
+        "sourceOrder": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "dimension": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "x0",
+              "x1",
+              "x2"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "linear": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/rational"
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "offset": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rational"
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "initialState": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rational"
+          },
+          "minItems": 1,
+          "maxItems": 3
+        },
+        "observation": {
+          "const": "x0"
+        },
+        "initialIndex": {
+          "const": 0
+        },
+        "assumptions": {
+          "const": [
+            "The selected candidate defines every subsequent model step. Finite observations do not establish that an unspecified infinite source sequence follows this model."
+          ]
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sourceOrder": {
+                "const": 1
+              },
+              "coordinates": {
+                "const": [
+                  "x0"
+                ]
+              },
+              "linear": {
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                  "minItems": 1,
+                  "maxItems": 1
+                }
+              },
+              "offset": {
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "initialState": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 2
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sourceOrder": {
+                "const": 2
+              },
+              "coordinates": {
+                "const": [
+                  "x0",
+                  "x1"
+                ]
+              },
+              "linear": {
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              },
+              "offset": {
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "initialState": {
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dimension": {
+                "const": 3
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sourceOrder": {
+                "const": 3
+              },
+              "coordinates": {
+                "const": [
+                  "x0",
+                  "x1",
+                  "x2"
+                ]
+              },
+              "linear": {
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              },
+              "offset": {
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "initialState": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          }
+        }
+      ]
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkerContract",
+        "modelHash",
+        "scope",
+        "recurrenceOrder",
+        "coefficientsOldestFirst",
+        "queries",
+        "contentHash"
+      ],
+      "properties": {
+        "checkerContract": {
+          "const": "regelsuche.recurrence-observation-krylov-model-proof/v1"
+        },
+        "modelHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scope": {
+          "const": "EXPLICIT_AFFINE_MODEL"
+        },
+        "recurrenceOrder": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "coefficientsOldestFirst": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rational"
+          },
+          "minItems": 1,
+          "maxItems": 4
+        },
+        "queries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/query"
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "recurrenceOrder": {
+                "const": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coefficientsOldestFirst": {
+                "minItems": 1,
+                "maxItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "recurrenceOrder": {
+                "const": 2
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coefficientsOldestFirst": {
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "recurrenceOrder": {
+                "const": 3
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coefficientsOldestFirst": {
+                "minItems": 3,
+                "maxItems": 3
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "recurrenceOrder": {
+                "const": 4
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "coefficientsOldestFirst": {
+                "minItems": 4,
+                "maxItems": 4
+              }
+            }
+          }
+        }
+      ]
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "value",
+        "role",
+        "matchesRetained"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "value": {
+          "$ref": "#/$defs/rational"
+        },
+        "role": {
+          "enum": [
+            "RETAINED_MODEL_TERM",
+            "MODEL_PREDICTION"
+          ]
+        },
+        "matchesRetained": {
+          "anyOf": [
+            {
+              "const": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "RETAINED_MODEL_TERM"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "matchesRetained": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "matchesRetained": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

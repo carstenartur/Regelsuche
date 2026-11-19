@@ -486,8 +486,8 @@ import java.util.Optional;
 <span class="fc" id="L486">        LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc bfc" id="L487" title="All 2 branches covered.">        for (String part : payload.split(&quot;;&quot;)) {</span>
 <span class="fc" id="L488">            int separator = part.indexOf('=');</span>
-<span class="pc bpc" id="L489" title="2 of 4 branches missed.">            if (separator &lt; 1 || separator == part.length() - 1) {</span>
-<span class="nc" id="L490">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L489" title="1 of 4 branches missed.">            if (separator &lt; 1 || separator == part.length() - 1) {</span>
+<span class="fc" id="L490">                throw new IllegalArgumentException(</span>
                     &quot;sequence payload entries must use key=value&quot;);
             }
 <span class="fc" id="L493">            String key = part.substring(0, separator).trim();</span>

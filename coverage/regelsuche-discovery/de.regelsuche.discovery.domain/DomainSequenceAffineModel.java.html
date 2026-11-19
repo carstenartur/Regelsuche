@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainSequenceAffineModel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainSequenceAffineModel.java</span></div><h1>DomainSequenceAffineModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain.FiniteDifferenceCandidate;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain.LinearRecurrenceCandidate;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
+import de.regelsuche.math.algorithms.linalg.RecurrenceInvariantSynthesis.Transition;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Fixed, bounded projections of the two retained sequence models into the existing affine checker. */
+final class DomainSequenceAffineModel {
+    static final String SCHEMA = &quot;regelsuche.sequence-affine-model/v1&quot;;
+    static final String DIFFERENCES = &quot;regelsuche.finite-difference-affine-model/v1&quot;;
+    static final String RECURRENCE = &quot;regelsuche.linear-recurrence-companion-model/v1&quot;;
+    private static final String ASSUMPTION = &quot;The selected candidate defines every subsequent model step. &quot;
+        + &quot;Finite observations do not establish that an unspecified infinite source sequence follows this model.&quot;;
+
+    private final Transition transition;
+    private final List&lt;Rational&gt; initial;
+    private final List&lt;Long&gt; retained;
+    private final ObjectNode json;
+
+    private DomainSequenceAffineModel(String contract, int order, List&lt;List&lt;Rational&gt;&gt; matrix,
+<span class="fc" id="L30">            List&lt;Rational&gt; offset, List&lt;Rational&gt; initial, List&lt;Long&gt; observed, List&lt;Long&gt; holdout) {</span>
+<span class="fc" id="L31">        this.transition = new Transition(new ExactMatrix(matrix), new ExactVector(offset));</span>
+<span class="fc" id="L32">        this.initial = List.copyOf(initial);</span>
+<span class="fc" id="L33">        var terms = new ArrayList&lt;&gt;(observed);</span>
+<span class="fc" id="L34">        terms.addAll(holdout);</span>
+<span class="fc" id="L35">        this.retained = List.copyOf(terms);</span>
+<span class="fc" id="L36">        this.json = DomainExportWorkspace.JSON.createObjectNode().put(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L37">            .put(&quot;adapterContract&quot;, contract).put(&quot;sourceOrder&quot;, order).put(&quot;dimension&quot;, initial.size());</span>
+<span class="fc" id="L38">        ArrayNode coordinates = json.putArray(&quot;coordinates&quot;);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (int index = 0; index &lt; initial.size(); index++) coordinates.add(&quot;x&quot; + index);</span>
+<span class="fc" id="L40">        ArrayNode rows = json.putArray(&quot;linear&quot;);</span>
+<span class="fc" id="L41">        matrix.forEach(row -&gt; rationals(rows.addArray(), row));</span>
+<span class="fc" id="L42">        rationals(json.putArray(&quot;offset&quot;), offset);</span>
+<span class="fc" id="L43">        rationals(json.putArray(&quot;initialState&quot;), initial);</span>
+<span class="fc" id="L44">        json.put(&quot;observation&quot;, &quot;x0&quot;).put(&quot;initialIndex&quot;, 0);</span>
+<span class="fc" id="L45">        json.putArray(&quot;assumptions&quot;).add(ASSUMPTION);</span>
+<span class="fc" id="L46">        json.put(&quot;contentHash&quot;, DomainCanonical.sha256(DomainExportWorkspace.write(json)));</span>
+<span class="fc" id="L47">    }</span>
+
+    /** Rejects dimensions and rational widths before conversion or mathematical backend invocation. */
+    static void requireSupported(Object candidate) {
+        int order;
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (candidate instanceof FiniteDifferenceCandidate value) {</span>
+<span class="fc" id="L53">            order = value.order();</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        } else if (candidate instanceof LinearRecurrenceCandidate value) {</span>
+<span class="fc" id="L55">            order = value.model().order();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (order &gt; 3) throw new UnsupportedModel(&quot;MODEL_DIMENSION_EXCEEDS_THREE&quot;);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            for (var coefficient : value.model().coefficients()) {</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">                if (coefficient.numerator().bitLength() &gt; 128 || coefficient.denominator().bitLength() &gt; 128) {</span>
+<span class="nc" id="L59">                    throw new UnsupportedModel(&quot;MODEL_COEFFICIENT_EXCEEDS_128_BITS&quot;);</span>
+                }
+<span class="fc" id="L61">            }</span>
+<span class="nc" id="L62">        } else throw new UnsupportedModel(&quot;NO_AFFINE_PROJECTION_FOR_SELECTED_TYPE&quot;);</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (order &lt; 1 || order &gt; 3) throw new UnsupportedModel(&quot;MODEL_DIMENSION_EXCEEDS_THREE&quot;);</span>
+<span class="fc" id="L64">    }</span>
+
+    /** Caller must first obtain the candidate from exact replay and independently check its finite witness. */
+    static DomainSequenceAffineModel from(Object candidate) {
+<span class="fc" id="L68">        requireSupported(candidate);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (candidate instanceof FiniteDifferenceCandidate value) {</span>
+<span class="fc" id="L70">            int dimension = value.order();</span>
+<span class="fc" id="L71">            var matrix = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc" id="L72">            var offset = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L74">                var entries = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                for (int column = 0; column &lt; dimension; column++) {</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">                    entries.add(column == row || column == row + 1 ? Rational.ONE : Rational.ZERO);</span>
+                }
+<span class="fc" id="L78">                matrix.add(List.copyOf(entries));</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                offset.add(row == dimension - 1 ? Rational.of(value.initialDifferences().get(dimension)) : Rational.ZERO);</span>
+            }
+<span class="fc" id="L81">            return new DomainSequenceAffineModel(DIFFERENCES, dimension, matrix, offset,</span>
+<span class="fc" id="L82">                value.initialDifferences().subList(0, dimension).stream().map(Rational::of).toList(),</span>
+<span class="fc" id="L83">                value.observed(), value.holdout());</span>
+        }
+<span class="fc" id="L85">        var value = (LinearRecurrenceCandidate) candidate;</span>
+<span class="fc" id="L86">        int dimension = value.model().order();</span>
+<span class="fc" id="L87">        var matrix = new ArrayList&lt;List&lt;Rational&gt;&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
+<span class="fc" id="L89">            var entries = new ArrayList&lt;Rational&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (int column = 0; column &lt; dimension; column++) {</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                if (row == dimension - 1) {</span>
+<span class="fc" id="L92">                    var coefficient = value.model().coefficients().get(dimension - 1 - column);</span>
+<span class="fc" id="L93">                    entries.add(new Rational(coefficient.numerator(), coefficient.denominator()));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                } else entries.add(column == row + 1 ? Rational.ONE : Rational.ZERO);</span>
+            }
+<span class="fc" id="L96">            matrix.add(List.copyOf(entries));</span>
+        }
+<span class="fc" id="L98">        return new DomainSequenceAffineModel(RECURRENCE, dimension, matrix,</span>
+<span class="fc" id="L99">            java.util.Collections.nCopies(dimension, Rational.ZERO),</span>
+<span class="fc" id="L100">            value.observed().subList(0, dimension).stream().map(Rational::of).toList(),</span>
+<span class="fc" id="L101">            value.observed(), value.holdout());</span>
+    }
+
+<span class="fc" id="L104">    Transition transition() { return transition; }</span>
+<span class="fc" id="L105">    Polynomial observation() { return Polynomial.variable(&quot;x0&quot;); }</span>
+<span class="fc" id="L106">    List&lt;Rational&gt; initialState() { return initial; }</span>
+<span class="fc" id="L107">    List&lt;Long&gt; retained() { return retained; }</span>
+<span class="fc" id="L108">    ObjectNode json() { return json.deepCopy(); }</span>
+<span class="fc" id="L109">    String contentHash() { return json.path(&quot;contentHash&quot;).asText(); }</span>
+
+    List&lt;BigInteger&gt; indices() {
+<span class="fc" id="L112">        var indices = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (int index = 0; index &lt; retained.size(); index++) indices.add(BigInteger.valueOf(index));</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (retained.size() &lt;= 100) indices.add(BigInteger.valueOf(100));</span>
+<span class="fc" id="L115">        return List.copyOf(indices);</span>
+    }
+
+<span class="fc" id="L118">    static void rationals(ArrayNode target, List&lt;Rational&gt; values) { values.forEach(value -&gt; target.add(value.toString())); }</span>
+
+    static final class UnsupportedModel extends RuntimeException {
+<span class="fc" id="L121">        UnsupportedModel(String message) { super(message); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

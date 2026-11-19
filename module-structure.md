@@ -26,7 +26,7 @@ Diese Seite erklärt die beabsichtigte Verantwortung und darf keine abweichende 
 | `:regelsuche-solver-ir` | solver-neutrale Obligationen, Übersetzungen, Ergebnisse und Executions | Core, Search, Validation, Math Algorithms |
 | `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
 | `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten, schematische Beweispläne und Rewrite-Program-Lernen | Core, Search, Validation, Math Algorithms, Solver IR |
-| `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation |
+| `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation, Math Algorithms |
 | `:regelsuche-optimization-sdk` | externe Fassade für typisierte numerische Rechenpläne und unabhängige Java-Semantikprüfung | Search, Math Algorithms |
 | `:regelsuche-discovery-sdk` | kleine externe Java-25-Fassade, Domain-Builder und ServiceLoader-SPI | Discovery |
 | `:regelsuche-experiments` | Experiment-, Corpus-, Budget- und Evidence-DAG-Verträge | Search, Validation, Discovery, Math Algorithms |

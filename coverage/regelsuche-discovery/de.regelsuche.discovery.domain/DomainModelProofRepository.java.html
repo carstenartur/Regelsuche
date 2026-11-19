@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainModelProofRepository.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainModelProofRepository.java</span></div><h1>DomainModelProofRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Source-bound model receipts stored separately from immutable discovery exports. */
+public final class DomainModelProofRepository {
+    public static final int MAX_RECEIPT_BYTES = 1_048_576;
+    public static final int MAX_RECEIPTS_PER_EXPORT = 16;
+    private final Path sourceDirectory;
+    private final Path directory;
+
+<span class="fc" id="L18">    public DomainModelProofRepository(Path sourceDirectory) {</span>
+<span class="fc" id="L19">        Path source = Objects.requireNonNull(sourceDirectory, &quot;sourceDirectory&quot;).toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        if (source.getFileName() == null) throw new IllegalArgumentException(&quot;a named source repository is required&quot;);</span>
+<span class="fc" id="L21">        this.sourceDirectory = source;</span>
+<span class="fc" id="L22">        directory = source.resolveSibling(source.getFileName() + &quot;-model-proofs&quot;);</span>
+<span class="fc" id="L23">    }</span>
+
+    /** Only the proof consumer can issue Receipt; writing it does not run a second search. */
+    public void retain(DomainExportWorkspace workspace, DomainModelProof.Receipt receipt) {
+<span class="fc" id="L27">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
+<span class="fc" id="L28">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L29">        byte[] bytes = receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_RECEIPT_BYTES) throw new IllegalArgumentException(&quot;model proof receipt exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L31">        var value = DomainExportWorkspace.read(bytes);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (!DomainDownstreamValidation.sourceBinding(workspace).equals(value.path(&quot;source&quot;))) {</span>
+<span class="fc" id="L33">            throw new IllegalArgumentException(&quot;model proof receipt belongs to another source&quot;);</span>
+        }
+<span class="fc" id="L35">        Path target = target(workspace.runId(), receipt.contentHash());</span>
+<span class="fc" id="L36">        synchronized (DomainModelProofRepository.class) {</span>
+            try {
+<span class="fc" id="L38">                var retained = new DomainExportWorkspaceRepository(sourceDirectory).find(workspace.runId()).orElseThrow(() -&gt;</span>
+<span class="fc" id="L39">                    new IllegalStateException(&quot;model proof source export is not retained&quot;));</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                if (!workspace.toCanonicalJson().equals(retained.toCanonicalJson())) {</span>
+<span class="nc" id="L41">                    throw new IllegalArgumentException(&quot;model proof source workspace differs from retained bytes&quot;);</span>
+                }
+<span class="fc" id="L43">                createDirectories(target.getParent());</span>
+<span class="fc" id="L44">                Path locks = directory.resolve(&quot;.locks&quot;);</span>
+<span class="fc" id="L45">                createDirectories(locks);</span>
+<span class="fc" id="L46">                Path lockPath = locks.resolve(workspace.runId().substring(7) + &quot;.lock&quot;);</span>
+<span class="fc" id="L47">                rejectLinks(lockPath);</span>
+                // The JVM monitor prevents overlapping FileLocks in this process; the file lock covers other writers.
+<span class="fc" id="L49">                try (var channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE,</span>
+<span class="fc" id="L50">                        LinkOption.NOFOLLOW_LINKS); var lock = channel.lock()) {</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">                    if (!lock.isValid() || channel.size() != 0) throw new IllegalStateException(&quot;invalid model proof writer lock&quot;);</span>
+<span class="fc" id="L52">                    retainBytes(target, bytes);</span>
+                }
+<span class="fc" id="L54">            } catch (IOException | IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
+<span class="fc" id="L55">                throw new IllegalStateException(&quot;unable to retain model proof receipt&quot;, exception);</span>
+<span class="fc" id="L56">            }</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">    }</span>
+
+    /** Successful historical proofs are reproduced before returning their exact original bytes. */
+    public Optional&lt;byte[]&gt; find(String runId, String receiptHash) {
+        // Reject caller-controlled path material before entering the retained-artifact error boundary.
+<span class="fc" id="L63">        Path target = target(runId, receiptHash);</span>
+        try {
+<span class="fc" id="L65">            checkDirectories(target.getParent());</span>
+<span class="fc" id="L66">            var workspace = new DomainExportWorkspaceRepository(sourceDirectory).find(runId);</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">            if (workspace.isEmpty() || !Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
+<span class="fc" id="L68">            byte[] bytes = readBytes(target);</span>
+<span class="fc" id="L69">            DomainModelProof.requireRetained(workspace.orElseThrow(), receiptHash, bytes);</span>
+<span class="fc" id="L70">            return Optional.of(bytes);</span>
+<span class="fc" id="L71">        } catch (IOException | IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
+<span class="fc" id="L72">            throw new IllegalStateException(&quot;invalid retained model proof receipt&quot;, exception);</span>
+        }
+    }
+
+    private Path target(String runId, String receiptHash) {
+<span class="fc" id="L77">        DomainCanonical.requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L78">        DomainCanonical.requireSha256(receiptHash, &quot;receiptHash&quot;);</span>
+<span class="fc" id="L79">        Path parent = directory.resolve(runId.substring(7));</span>
+<span class="fc" id="L80">        return parent.resolve(receiptHash.substring(7) + &quot;.json&quot;);</span>
+    }
+
+    private static void retainBytes(Path target, byte[] bytes) throws IOException {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L85">            requireSame(readBytes(target), bytes);</span>
+<span class="fc" id="L86">            return;</span>
+        }
+<span class="fc" id="L88">        requireCapacity(target.getParent());</span>
+<span class="fc" id="L89">        Path pending = Files.createTempFile(target.getParent(), &quot;.pending-&quot;, &quot;.tmp&quot;);</span>
+        try {
+<span class="fc" id="L91">            Files.write(pending, bytes, StandardOpenOption.TRUNCATE_EXISTING);</span>
+<span class="fc" id="L92">            try { Files.createLink(target, pending); }</span>
+<span class="pc" id="L93">            catch (FileAlreadyExistsException exception) { requireSame(readBytes(target), bytes); }</span>
+<span class="fc" id="L94">        } finally { Files.deleteIfExists(pending); }</span>
+<span class="fc" id="L95">    }</span>
+
+    private static void requireSame(byte[] retained, byte[] supplied) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (!Arrays.equals(retained, supplied)) throw new IllegalStateException(&quot;immutable model proof receipt conflict&quot;);</span>
+<span class="fc" id="L99">    }</span>
+
+    private static void createDirectories(Path path) throws IOException {
+<span class="fc" id="L102">        checkDirectories(path);</span>
+<span class="fc" id="L103">        Files.createDirectories(path);</span>
+<span class="fc" id="L104">        checkDirectories(path);</span>
+<span class="fc" id="L105">    }</span>
+
+    private static void checkDirectories(Path path) {
+<span class="fc" id="L108">        Path current = path.getRoot();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (Path part : path) {</span>
+<span class="fc" id="L110">            current = current.resolve(part);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">                    || (Files.exists(current, LinkOption.NOFOLLOW_LINKS) &amp;&amp; !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS))) {</span>
+<span class="fc" id="L113">                throw new IllegalArgumentException(&quot;invalid model proof repository directory&quot;);</span>
+            }
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">    }</span>
+
+    private static byte[] readBytes(Path target) throws IOException {
+<span class="fc" id="L119">        rejectLinks(target);</span>
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.size(target) &gt; MAX_RECEIPT_BYTES) {</span>
+<span class="fc" id="L121">            throw new IllegalArgumentException(&quot;invalid retained model proof file&quot;);</span>
+        }
+<span class="fc" id="L123">        try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L124">            byte[] bytes = input.readNBytes(MAX_RECEIPT_BYTES + 1);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            if (bytes.length &gt; MAX_RECEIPT_BYTES) throw new IllegalArgumentException(&quot;model proof file exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L126">            return bytes;</span>
+        }
+    }
+
+    private static void requireCapacity(Path parent) throws IOException {
+<span class="fc" id="L131">        try (var stream = Files.list(parent)) {</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            var entries = stream.filter(path -&gt; !path.getFileName().toString().startsWith(&quot;.pending-&quot;))</span>
+<span class="fc" id="L133">                .limit(MAX_RECEIPTS_PER_EXPORT + 1L).toList();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (Path path : entries) {</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                if (!path.getFileName().toString().matches(&quot;[0-9a-f]{64}\\.json&quot;)</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">                        || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(path)) {</span>
+<span class="nc" id="L137">                    throw new IllegalStateException(&quot;invalid model proof repository entry&quot;);</span>
+                }
+<span class="fc" id="L139">            }</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (entries.size() &gt;= MAX_RECEIPTS_PER_EXPORT) {</span>
+<span class="fc" id="L141">                throw new IllegalStateException(&quot;model proof receipt limit reached for this export&quot;);</span>
+            }
+        }
+<span class="fc" id="L144">    }</span>
+
+    private static void rejectLinks(Path path) {
+<span class="fc" id="L147">        Path current = path.getRoot();</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (Path part : path) {</span>
+<span class="fc" id="L149">            current = current.resolve(part);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)) throw new IllegalArgumentException(&quot;symbolic model proof repository path&quot;);</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
