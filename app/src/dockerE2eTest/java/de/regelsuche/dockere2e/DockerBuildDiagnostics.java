@@ -8,8 +8,12 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
+import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -75,7 +79,9 @@ final class DockerBuildDiagnostics {
             failed.getEpochSecond()) + 1);
         output.accept("REGELSUCHE_DOCKER_BUILD_FAILURE image=" + token(image)
             + " dockerfile=" + token(dockerfile) + " since=" + since
-            + " until=" + until + " failureType=" + token(failure.getClass().getName()));
+            + " until=" + until + " failureType=" + token(failure.getClass().getName())
+            + " causeTypes=" + causeTypes(failure)
+            + " failureHint=" + failureHint(failure));
 
         EventBuffer events = new EventBuffer();
         String query;
@@ -102,6 +108,74 @@ final class DockerBuildDiagnostics {
         output.accept("REGELSUCHE_DOCKER_EVENTS query=" + query
             + " retained=" + lines.size() + " truncated=" + events.truncated()
             + " history=BOUNDED_CLIENT_CLOCK_WINDOW");
+    }
+
+    /**
+     * Retain only exception class names. Docker errors may contain private
+     * registry URLs, image labels, tokens and build arguments in their messages.
+     * A bounded causal chain is safer than logging arbitrary exception text.
+     */
+    static String causeTypes(Throwable failure) {
+        StringBuilder types = new StringBuilder();
+        for (Throwable cause : causes(failure)) {
+            if (!types.isEmpty()) {
+                types.append('>');
+            }
+            types.append(token(cause.getClass().getSimpleName()));
+        }
+        return types.isEmpty() ? "NONE" : types.toString();
+    }
+
+    /**
+     * A heuristic diagnostic signal, not a root-cause conclusion. Never echo
+     * messages from the Docker daemon or a nested exception into CI logs.
+     */
+    static String failureHint(Throwable failure) {
+        for (Throwable cause : causes(failure)) {
+            String message = cause.getMessage();
+            if (message == null) {
+                continue;
+            }
+            String lower = message.substring(0, Math.min(message.length(), 4096))
+                .toLowerCase(Locale.ROOT);
+            if (lower.contains("no space left on device")) {
+                return "DISK_SPACE";
+            }
+            if (lower.contains("too many requests") || lower.contains("toomanyrequests")
+                    || lower.contains("rate limit")) {
+                return "REGISTRY_RATE_LIMIT";
+            }
+            if (lower.contains("failed to compute cache key")
+                    || lower.contains("failed to calculate checksum")
+                    || lower.contains("no such image")) {
+                return "CACHE_OR_IMAGE_REFERENCE";
+            }
+            if (lower.contains("copy failed") || lower.contains("no such file")) {
+                return "BUILD_INPUT_REFERENCE";
+            }
+            if (lower.contains("timed out") || lower.contains("timeout")) {
+                return "TIMEOUT";
+            }
+            if (lower.contains("connection refused") || lower.contains("connection reset")
+                    || lower.contains("tls handshake")) {
+                return "TRANSPORT";
+            }
+            if (lower.contains("unauthorized") || lower.contains("permission denied")) {
+                return "ACCESS_DENIED";
+            }
+        }
+        return "UNCLASSIFIED";
+    }
+
+    private static List<Throwable> causes(Throwable failure) {
+        List<Throwable> chain = new java.util.ArrayList<>();
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable current = failure;
+        while (current != null && chain.size() < 6 && seen.add(current)) {
+            chain.add(current);
+            current = current.getCause();
+        }
+        return chain;
     }
 
     private static String token(Object value) {
