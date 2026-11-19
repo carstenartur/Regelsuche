@@ -63,6 +63,46 @@ class ProofDockerfileBuildContextTest {
             () -> verifyBuilder(valid.replace("tar -xf", "echo")));
     }
 
+    @Test
+    void standardImageUsesMavenButKeepsTheSeparateGradleWalkthrough() throws IOException {
+        String dockerfile = Files.readString(REPOSITORY_ROOT.resolve("Dockerfile"));
+        verifyStandardImage(dockerfile);
+    }
+
+    @Test
+    void standardImageRejectsLegacyProductionAndWrongStage() throws IOException {
+        String valid = Files.readString(REPOSITORY_ROOT.resolve("Dockerfile"));
+        assertThrows(AssertionError.class,
+            () -> verifyStandardImage(valid.replace(
+                "COPY --from=build /workspace/app-distribution/ ./",
+                "COPY --from=walkthrough-build /workspace/app/build/install/app/ ./")));
+        assertThrows(AssertionError.class,
+            () -> verifyStandardImage(valid.replace(
+                "ENTRYPOINT [\\\"./bin/regelsuche\\\"]", "ENTRYPOINT [\\\"./bin/app\\\"]")));
+        assertThrows(AssertionError.class,
+            () -> verifyStandardImage(valid.replace(
+                "FROM maven:3.10.0-eclipse-temurin-25-noble AS build",
+                "FROM eclipse-temurin:25.0.5_8-jdk-noble AS build")));
+    }
+
+    private static void verifyStandardImage(String dockerfile) {
+        String legacy = "FROM eclipse-temurin:25.0.5_8-jdk-noble AS walkthrough-build";
+        String walkthrough = "FROM walkthrough-build AS walkthrough";
+        String maven = "FROM maven:3.10.0-eclipse-temurin-25-noble AS build";
+        assertTrue(dockerfile.contains(legacy), "Retain the legacy walkthrough target");
+        assertTrue(dockerfile.contains(walkthrough), "Walkthrough must use its own Gradle builder");
+        assertTrue(dockerfile.indexOf(walkthrough) < dockerfile.indexOf(maven),
+            "The default image must not depend on the Gradle walkthrough stage");
+        assertTrue(dockerfile.contains("mvn --batch-mode --no-transfer-progress -Pfull -pl app -am"),
+            "The standard application distribution must be built by Maven");
+        assertTrue(dockerfile.contains("tar -xf app/target/regelsuche-*.tar"),
+            "Unpack the Maven distribution rather than Gradle installDist");
+        assertTrue(dockerfile.contains("COPY --from=build /workspace/app-distribution/ ./"),
+            "Runtime must consume only the Maven-built distribution");
+        assertTrue(dockerfile.contains("ENTRYPOINT [\\\"./bin/regelsuche\\\"]"),
+            "Use the Maven distribution launcher");
+    }
+
     private static void verifyBuilder(String dockerfile) {
         assertTrue(dockerfile.contains("FROM maven:3.10.0-eclipse-temurin-25-noble AS build"),
             "The image must pin the declared JDK 25 Maven builder");

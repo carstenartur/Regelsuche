@@ -36,8 +36,8 @@ class AutopilotArchitectureBoundariesTest {
 
     @Test
     void allDockerBuildsIncludeTheAutopilotCompositionModule() throws IOException {
-        // The standard image still uses Gradle. The proof image now builds
-        // the dependency-closed application distribution with Maven.
+        // The optional walkthrough stage retains Gradle module files; both default
+        // runtime images use the dependency-closed Maven distribution.
         for (String dockerfileName : List.of("Dockerfile")) {
             String dockerfile = Files.readString(REPO_ROOT.resolve(dockerfileName));
             assertTrue(

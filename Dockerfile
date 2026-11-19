@@ -1,5 +1,5 @@
-# ---------- Stage 1: Build with Gradle ----------
-FROM eclipse-temurin:25.0.5_8-jdk-noble AS build
+# ---------- Legacy Gradle builder: walkthrough target only ----------
+FROM eclipse-temurin:25.0.5_8-jdk-noble AS walkthrough-build
 WORKDIR /workspace
 
 # Copy Gradle wrapper and build scripts first to leverage Docker layer caching
@@ -81,12 +81,27 @@ RUN ./gradlew --no-daemon :app:installDist -x test
 # Build explicitly with `docker build --target walkthrough ...`. This stage is
 # deliberately not last: an ordinary `docker build .` must produce the normal
 # Web Workbench runtime image documented by the README and Dockerfile comments.
-FROM build AS walkthrough
+FROM walkthrough-build AS walkthrough
 ARG REGELSUCHE_REPOSITORY_REVISION
 ENV REGELSUCHE_REPOSITORY_REVISION=${REGELSUCHE_REPOSITORY_REVISION}
 RUN mkdir -p /out
 VOLUME ["/out"]
 ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscoveryWalkthrough", "-PwalkthroughOutput=/out"]
+
+
+# ---------- Standard Web Workbench: Maven production distribution ----------
+# Keep the legacy Gradle walkthrough target above independently reproducible.
+# The default runtime below depends only on this Maven build stage.
+FROM maven:3.10.0-eclipse-temurin-25-noble AS build
+WORKDIR /workspace
+COPY . .
+RUN mvn --batch-mode --no-transfer-progress -Pfull -pl app -am \\
+        -Dmaven.test.skip=true package \\
+    && mkdir -p /workspace/app-distribution \\
+    && tar -xf app/target/regelsuche-*.tar \\
+        -C /workspace/app-distribution --strip-components=1 \\
+    && test -x /workspace/app-distribution/bin/regelsuche \\
+    && test -s /workspace/app-distribution/regelsuche.jar
 
 
 # ---------- Default Web Workbench runtime ----------
@@ -98,7 +113,7 @@ WORKDIR /opt/regelsuche
 
 # Non-root user for the runtime.
 RUN useradd --create-home --uid 10001 regelsuche
-COPY --from=build /workspace/app/build/install/app/ ./
+COPY --from=build /workspace/app-distribution/ ./
 RUN chown -R regelsuche:regelsuche /opt/regelsuche
 USER regelsuche
 
@@ -116,5 +131,5 @@ VOLUME ["/opt/regelsuche/data"]
 # `serve --host 0.0.0.0` binds the embedded web workbench on all interfaces so
 # the container is reachable from the host. Override by passing different
 # arguments to `docker run` if you need basic-auth, TLS or a different port.
-ENTRYPOINT ["./bin/app"]
+ENTRYPOINT ["./bin/regelsuche"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8080"]

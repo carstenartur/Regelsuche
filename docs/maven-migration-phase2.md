@@ -54,7 +54,20 @@ is derived from the immutable tracked-file snapshot and excludes mutable
 `build`/`target` outputs. The public source and license files required
 by the distribution descriptor remain available to Maven.
 
-This is **one image-production path**, not a claim that the standard image,
-all evidence producers, browser and SymPy profiles or CI have migrated away
-from Gradle/host scripts. Neither this image build nor green image tests
-establish a fix for the previously intermittent Docker daemon failure.
+The default `Dockerfile` Web Workbench runtime now uses the same checked Maven
+producer, tar layout and `bin/regelsuche` launcher as `Dockerfile.proof`.
+The `--target walkthrough` stage retains its separate legacy Gradle builder,
+including its original research command. It is *not* redirected to a different
+application workflow or silently removed. The standard image's runtime stage
+depends only on the Maven distribution; the separate Gradle walkthrough stage
+is not a prerequisite for it. The image policy explicitly retains the two
+builder identities and the Temurin runtime image in their actual FROM order.
+
+These are **two application image-production paths**, not a claim that the
+walkthrough, all evidence producers, browser/SymPy profiles, other Dockerfiles,
+CI or the release authority have migrated away from Gradle/host scripts.
+Image construction still skips tests; actual Testcontainers Web Workbench and
+proof-image checks must pass on the PR head and after integration. A green image
+build cannot explain or repair the earlier sporadic Docker daemon failure.
+No frozen reproduction Dockerfile, scientific receipt, quality threshold or
+historical test corpus is changed.
