@@ -71,6 +71,23 @@ class RetainedOperationTest {
         assertEquals(0, RetainedGraph.measure(sink.scope).retained().characters());
     }
 
+    @Test void explicitArrayVarargsRetainsTheLiveMutableBuffer() {
+        // NativeMoveProof hands a String[] through Object... to observe two
+        // slots populated after the frame opens, without copying or wrapping it.
+        var values = new String[2];
+        try (var scope = RetainedOperation.open(new FailingCharge(Integer.MAX_VALUE))) {
+            try (var frame = RetainedOperation.retain((Object[]) values)) {
+                assertEquals(0, RetainedGraph.measure(scope).retained().characters());
+                values[0] = "source";
+                values[1] = "target";
+                assertEquals(12, RetainedGraph.measure(scope).retained().characters(),
+                    "the retained frame must observe both late-filled values");
+            }
+            assertEquals(0, RetainedGraph.measure(scope).retained().characters(),
+                "closing the frame must release the mutable buffer");
+        }
+    }
+
     private static final class FailingCharge implements RetainedOperation.Sink {
         final int throwAt;
         int calls;
