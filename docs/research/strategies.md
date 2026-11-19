@@ -197,6 +197,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`RecurrenceObservationKrylov.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java#L32) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationKrylov.java | public final class RecurrenceObservationKrylov { -->
 - [`RecurrenceObservationComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java#L33) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/RecurrenceObservationComparisonTest.java | class RecurrenceObservationComparisonTest { -->
 
+## Geprüfte Modelle aus gespeicherten Folgenkandidaten
+
+- **Hypothese.** Ein gespeicherter Folgenkandidat lässt sich unter seiner ursprünglichen Quellenbindung in ein explizites Modell überführen, dessen Rekurrenz und einzelne Werte unabhängig geprüft werden können.
+- **Umsetzungsstand.** Die beiden vorhandenen Folgendomänen sind über identisches Quellen-Replay, eine getrennte endliche Datenprüfung und eine begrenzte affine Abbildung mit dem bestehenden Krylov-Prüfer verbunden. Die Workbench speichert den Beleg getrennt vom unveränderten Export und reproduziert ihn vor dem erneuten Download.
+- **Befund.** Die Kontrollen prüfen konstante, lineare, quadratische und kubische Differenzmodelle sowie rationale und unsymmetrische Rekurrenzen. Für das aus `1,4,9,16` mit Holdout `25,36` gebundene Modell ergibt sich an Index 100 exakt `10201`. Der Beweis gilt für das explizite Modell; eine eindeutige unendliche Fortsetzung der ursprünglichen endlichen Daten ist damit nicht bewiesen. [Ablauf und Grenzen](../domain-model-proof.md)
+- **Folgerung.** Der Modellbeleg ermöglicht nachvollziehbare Folgeabfragen. Neuheit, Promotion, Release-Freigabe und gemeinsame vergleichende Arbeitsbewertung bleiben eigenständige Anforderungen von #1020.
+
+- [`DomainModelProof.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainModelProof.java#L20) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainModelProof.java | public final class DomainModelProof { -->
+- [`DomainModelProofTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainModelProofTest.java#L17) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainModelProofTest.java | class DomainModelProofTest { -->
+
 ## Automatisch hergeleitete Zustände für wechselnde Übergänge
 
 - **Hypothese.** Der unter allen erlaubten Übergängen abgeschlossene Beobachtungsraum liefert in zwei Aufgabenfamilien mindestens 20 Prozent weniger Gesamtarbeit als direkte Auswertung.

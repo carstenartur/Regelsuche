@@ -161,7 +161,7 @@ ein vollständiges positives Qualification-Receipt belegt.
 Dieses Dokument beschreibt den heutigen Einstieg. Die unveränderlichen
 [0.5.2-Quellen](https://github.com/carstenartur/Regelsuche/tree/v0.5.2) und ihre
 [Release-Hinweise](releases/0.5.2.md) beschreiben die ausgelieferten Funktionen.
-`main` ist derzeit `0.5.3-SNAPSHOT`: spätere API-Ergänzungen und neue Beispiele
+`main` ist derzeit `0.5.4-SNAPSHOT`: spätere API-Ergänzungen und neue Beispiele
 sind nicht automatisch mit 0.5.2 kompatibel. Der exakte `NumberExpr`-AST ist
 allerdings bereits in den tatsächlichen 0.5.2-Core-Binärdateien enthalten und
 wird hier nicht als unveröffentlicht dargestellt. Für eine Integration immer Version, API-Revision und tatsächliche
@@ -183,12 +183,14 @@ Primachsenraum-Repository.
 Für den aktuellen SDK-Quellstand verwenden die externe Verifikation und neue
 SDK-ZIPs eine ausdrücklich **abgeleitete Build-Konfiguration** dieses Consumers.
 Nach vollständiger Prüfung des gepinnten Snapshots wird ausschließlich die exakte
-Runtime-Modulliste in `build.gradle` um `regelsuche-extension-api` ergänzt: Das
-Discovery SDK benötigt diese öffentliche API für seinen typisierten Erweiterungspunkt.
+Runtime-Modulliste in `build.gradle` um `regelsuche-extension-api` und
+`regelsuche-math-algorithms` ergänzt: Das Discovery SDK benötigt die öffentliche
+Extension-API für seinen typisierten Erweiterungspunkt; der Discovery-Verbraucher
+für gespeicherte Sequenzmodelle verwendet den vorhandenen mathematischen Prüfer.
 Die Gleichheitsprüfung bleibt strikt; App, Extension-Runtime oder weitere Module
 werden nicht freigegeben. Java-Code, Ressourcen, Tests und das historische README
 bleiben unverändert. Dessen ältere Aussage zur sechsmoduligen Closure beschreibt
-den damaligen Upstream-Stand, nicht die aktuelle siebenmodulige SDK-Closure.
+den damaligen Upstream-Stand, nicht die aktuelle achtmodulige SDK-Closure.
 
 `upstream-build.gradle` bewahrt die Originalbytes. `SDK-ADAPTATION.json` dokumentiert
 Adaptations-ID, Upstream-Commit und Git-Blob sowie SHA-256 der ursprünglichen und

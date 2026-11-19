@@ -504,6 +504,181 @@
         }
       }
     },
+    "/api/discovery-domains/exports/{runDigest}/model-proof": {
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "proveDomainExportModel",
+        "summary": "Gespeicherten Folgenkandidaten als explizites Modell prüfen und exakte Modellwerte berechnen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expectedWorkspaceHash",
+                  "expectedEvidenceHash"
+                ],
+                "properties": {
+                  "expectedWorkspaceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "expectedEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quellengebundener Modellbeleg oder ausdrückliches unvollständiges, nicht unterstütztes bzw. fehlgeschlagenes Ergebnis; Status im Body prüfen",
+            "headers": {
+              "Location": {
+                "description": "Pfad zum gespeicherten Receipt",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erwarteter Workspace- oder Evidence-Hash gehört nicht zur unveränderten Quelle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "description": "Modellbeleg konnte nicht unveränderlich gespeichert werden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "description": "Verwendet die unveränderte Quelle, identisches Replay, unabhängige endliche Validierung und den vorhandenen rationalen Rekurrenzprüfer. Der Beleg beweist nur das explizite Modell; keine eindeutige Fortsetzung der ursprünglichen Daten, formale Proof-Freigabe oder Promotion. Der JSON-Body ist auf 4096 Bytes begrenzt."
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}/model-proof/{receiptDigest}": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "loadDomainModelProofReceipt",
+        "summary": "Gebundenen Modellbeleg reproduzieren und dessen Originalbytes laden",
+        "description": "Prüft Quelle und Hash und reproduziert den gesamten Beleg unter seinen hart begrenzten Originalbudgets. Nur byteidentische Ergebnisse werden zurückgegeben. Die Arbeit dieser erneuten Prüfung verändert die historischen Arbeitszähler nicht.",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "receiptDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exakte Originalbytes des reproduzierten Modellbelegs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder zugehöriger Modellbeleg fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "description": "Gespeicherter Modellbeleg ist ungültig oder nicht vollständig reproduzierbar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/discovery-domains/exports/{runDigest}/files/{fileName}": {
       "get": {
         "tags": [
