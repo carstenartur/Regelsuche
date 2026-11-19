@@ -7,12 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.github.dockerjava.api.model.Event;
+import com.github.dockerjava.api.model.EventActor;
 import com.github.dockerjava.api.model.EventType;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -126,6 +128,48 @@ class DockerBuildDiagnosticsTest {
             assertTrue(events.truncated());
             assertTrue(events.lines().getFirst().endsWith("id=3"));
             assertTrue(events.lines().getLast().endsWith("id=258"));
+        }
+    }
+
+    @Test
+    void exposesOnlyBoundedNumericExitCodesOnContainerDeaths() throws IOException {
+        try (var events = new DockerBuildDiagnostics.EventBuffer()) {
+            Event die = new Event().withType(EventType.CONTAINER).withAction("die")
+                .withEventActor(new EventActor().withId("safe-id").withAttributes(
+                    Map.of("exitCode", "137", "image", "private-registry/DO_NOT_LOG",
+                        "name", "DO_NOT_LOG", "token", "DO_NOT_LOG")));
+            events.onNext(die);
+            String retained = events.lines().getFirst();
+            assertTrue(retained.contains("id=safe-id exitCode=137"), retained);
+            assertFalse(retained.contains("DO_NOT_LOG"), retained);
+
+            // Events for the same object that are not deaths cannot expose
+            // actor metadata, even when an exitCode attribute is present.
+            die.withAction("start");
+            events.onNext(die);
+            assertFalse(events.lines().get(1).contains("exitCode="));
+
+            die.withAction("die").withType(EventType.IMAGE);
+            events.onNext(die);
+            assertFalse(events.lines().get(2).contains("exitCode="));
+
+            die.withType(EventType.CONTAINER).withEventActor(new EventActor()
+                .withId("safe-id").withAttributes(Map.of(
+                    "exitCode", "137;token=DO_NOT_LOG")));
+            events.onNext(die);
+            assertFalse(events.lines().get(3).contains("exitCode="));
+            assertFalse(events.lines().get(3).contains("DO_NOT_LOG"));
+
+            die.withEventActor(new EventActor().withId("safe-id")
+                .withAttributes(Map.of("exitCode", "999")));
+            events.onNext(die);
+            assertFalse(events.lines().get(4).contains("exitCode="));
+
+            die.withEventActor(new EventActor().withId("safe-id")
+                .withAttributes(Map.of("exitCode", "0")));
+            events.onNext(die);
+            assertTrue(events.lines().get(5).endsWith("exitCode=0"));
+            assertEquals(6, events.lines().size());
         }
     }
 
