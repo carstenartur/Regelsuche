@@ -34,6 +34,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          problem-matcher: true
           verify-signature: true
           cache: maven
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
@@ -99,7 +100,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0 }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Install isolated benchmark prerequisites
@@ -139,7 +140,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0 }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Install isolated SymPy runtime prerequisites
@@ -180,6 +181,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          problem-matcher: true
           verify-signature: true
           cache: maven
       - name: Install independent Maven checkout prerequisites
@@ -250,7 +252,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Run the checkout-owned polynomial pilot and independent verification
@@ -278,7 +280,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Run typed comparison and independent verification
@@ -314,6 +316,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          problem-matcher: true
           verify-signature: true
           cache: maven
       - name: Retain the exact proof-authority source
@@ -374,7 +377,7 @@ jobs:
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - name: Download project-parallel Gradle coverage evidence
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
@@ -480,7 +483,7 @@ jobs:
         with: { fetch-depth: 0, ref: '${{ github.sha }}' }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         timeout-minutes: 5
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         timeout-minutes: 5
         with: { cache-cleanup: on-success }
@@ -565,7 +568,7 @@ jobs:
         with: { fetch-depth: 0, ref: '${{ github.sha }}' }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         timeout-minutes: 5
-        with: { distribution: temurin, java-version: '25', verify-signature: true }
+        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         timeout-minutes: 5
         with: { cache-cleanup: on-success }
