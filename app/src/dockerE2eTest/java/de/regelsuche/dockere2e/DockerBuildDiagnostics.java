@@ -3,6 +3,7 @@ package de.regelsuche.dockere2e;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.EventsCmd;
 import com.github.dockerjava.api.model.Event;
+import com.github.dockerjava.api.model.EventType;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Clock;
@@ -221,7 +222,28 @@ final class DockerBuildDiagnostics {
             lines.addLast("REGELSUCHE_DOCKER_EVENT time=" + token(event.getTime())
                 + " timeNano=" + token(event.getTimeNano())
                 + " type=" + token(event.getType())
-                + " action=" + token(action) + " id=" + token(id));
+                + " action=" + token(action) + " id=" + token(id)
+                + safeExitCode(event, action));
+        }
+
+        /**
+         * Docker's container "die" event can include a numeric exitCode.
+         * Retain only that bounded integer: other actor attributes (image,
+         * name, labels and environments) can contain private data. An exit
+         * code of 137 alone does not establish an OOM kill.
+         */
+        private static String safeExitCode(Event event, String action) {
+            if (event.getType() != EventType.CONTAINER || !"die".equals(action)
+                    || event.getActor() == null
+                    || event.getActor().getAttributes() == null) {
+                return "";
+            }
+            String raw = event.getActor().getAttributes().get("exitCode");
+            if (raw == null || !raw.matches("[0-9]{1,3}")) {
+                return "";
+            }
+            int code = Integer.parseInt(raw);
+            return code <= 255 ? " exitCode=" + code : "";
         }
 
         @Override
