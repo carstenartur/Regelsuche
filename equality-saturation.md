@@ -189,7 +189,7 @@ Focused regression coverage lives in `EqualitySaturationMatchLimitTest`,
 and `EqualitySaturationStrategyTest`. Run the affected Maven reactor with:
 
 ```sh
-./mvnw -pl regelsuche-egraph,regelsuche-search -am test
+mvn -pl regelsuche-egraph,regelsuche-search -am test
 ```
 
 Historical benchmarks remain unchanged. Matcher/index microbenchmarks

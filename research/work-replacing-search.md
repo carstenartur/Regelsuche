@@ -41,7 +41,7 @@ primitive-frugal path both survive an unaffordable replacement and are both
 retired when the replacement has enough work.
 
 ```bash
-./mvnw -pl regelsuche-search -am -Dtest=MoveSearchDominanceTest,MoveSearchVisitsTest -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl regelsuche-search -am -Dtest=MoveSearchDominanceTest,MoveSearchVisitsTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 `CheckedSchemaWorkReplacementTest` separately exercises the actual learner, exact schema formation, serialized model restoration and the same primitive/schema inventory on compound substitutions. It records BASE quality-controlled work, learned quality-controlled work, continued learned-search work, and training/restore charges. Its fixed schema-first scheduling is not an oracle selecting a desired target and is not a newly learned utility policy. The integration test is included in normal Java 25 CI; no local Java 25 result is claimed by the initial focused run.
