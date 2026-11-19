@@ -32,8 +32,12 @@ Eine spät eintreffende Antwort wird auch nach Ablauf der Wartezeit geschlossen.
 Die Ausgabe unterscheidet `WINDOW_COMPLETE`, `TIMEOUT`, `INTERRUPTED`,
 API-Fehler und technische Nichtverfügbarkeit. Bei einem Interrupt bleibt das
 Interruptflag erhalten. Zeilen und Felder sind begrenzt; zusätzliche
-Ereignisausgaben enthalten nur Zeit, Typ, Aktion und Objekt-ID, keine
-Containerumgebungen, beliebigen Attribute oder Quellimagenamen.
+Ereignisausgaben enthalten Zeit, Typ, Aktion und Objekt-ID. Nur bei
+Containerereignissen mit Aktion `die` wird ein streng numerischer
+`exitCode` im Bereich 0–255 aus den Docker-Actor-Attributen ergänzt.
+Beliebige andere Attribute, Containerumgebungen, Namen, Labels und
+Quellimagenamen bleiben ausgeschlossen. Ein Exitcode 137 ist insbesondere
+**kein eigenständiger Nachweis für einen OOM-Kill**.
 
 Die ursprüngliche Build-Exception bleibt maßgeblich. Die Diagnose fügt keinen
 Buildversuch hinzu, schaltet keine Bereinigung ab und ändert weder Dockerfiles,
@@ -62,7 +66,9 @@ Die Ausgabe ist technische Diagnose, keine kanonische mathematische Evidence.
 Die Testklasse prüft Memoisierung, ursprüngliche Exception, fehlende Zusatz-Retries,
 begrenzte unveränderliche Ereigniszeilen, API-Fehler, Streamabschluss und Interrupts.
 Sie prüft außerdem die begrenzte Ursachenklassenkette, erlaubte Signal-Kategorien
-und das Nichtausgeben privater Exception-Payloads.
+das Nichtausgeben privater Exception-Payloads sowie ausschließlich gültige
+Exitcodes bei `die`-Ereignissen mit fehlenden, manipulierten oder
+irrelevanten Actor-Attributen.
 Ein echter negativer Docker-Build aus `FROM scratch` mit einer absichtlich
 fehlenden COPY-Quelle prüft zusätzlich den vollständigen Fehler- und Abfragepfad.
 Er benötigt keine herunterzuladende Fixture-Basis. Docker bleibt eine Pflicht der
