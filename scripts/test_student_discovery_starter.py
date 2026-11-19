@@ -250,6 +250,11 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
             build = (output / 'build.gradle').read_text()
             block = re.search(r'def expectedRegelsucheRuntimeModules = \[(.*?)\] as Set', build, re.S)
             self.assertEqual(expected, set(re.findall(r"'(regelsuche-[^']+)'", block[1])))
+        import student_sdk_source
+        source = examples / 'number-theory-plan-java25'
+        adapted = student_sdk_source.current_sdk_consumer_files(source)['build.gradle'].decode()
+        block = re.search(r'def expectedRegelsucheRuntimeModules = \[(.*?)\] as Set', adapted, re.S)
+        self.assertEqual(expected, set(re.findall(r"'(regelsuche-[^']+)'", block[1])))
 
     def test_pinned_consumer_adaptation_is_exact_reproducible_and_preserves_upstream(self):
         import hashlib
@@ -261,13 +266,17 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
         self.assertEqual(files, student_sdk_source.current_sdk_consumer_files(source))
         original = before['build.gradle']
         expected = original.replace(b"    'regelsuche-discovery-sdk'\n] as Set",
-                                    b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api'\n] as Set")
+                                    b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api',\n"
+                                    b"    'regelsuche-math-algorithms'\n] as Set")
         expected = expected.replace(b"'de.regelsuche'", b"'io.github.carstenartur'")
         expected = expected.replace(b'de.regelsuche:regelsuche-', b'io.github.carstenartur:regelsuche-')
         self.assertEqual(expected, files['build.gradle'])
         self.assertEqual(original, files['upstream-build.gradle'])
         receipt = json.loads(files['SDK-ADAPTATION.json'])
         self.assertEqual('io.github.carstenartur', receipt['sdkGroupId'])
+        self.assertEqual('discovery-model-proof-runtime-contract/v3', receipt['adaptationId'])
+        self.assertEqual(['regelsuche-extension-api', 'regelsuche-math-algorithms'],
+                         receipt['addedRuntimeModules'])
         self.assertEqual(hashlib.sha256(original).hexdigest(), receipt['upstreamBuildSha256'])
         self.assertEqual(hashlib.sha256(expected).hexdigest(), receipt['adaptedBuildSha256'])
         self.assertEqual(json.loads(before['SOURCE.json'])['files']['build.gradle'], receipt['upstreamBuildGitBlob'])

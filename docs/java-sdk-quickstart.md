@@ -183,12 +183,14 @@ Primachsenraum-Repository.
 Für den aktuellen SDK-Quellstand verwenden die externe Verifikation und neue
 SDK-ZIPs eine ausdrücklich **abgeleitete Build-Konfiguration** dieses Consumers.
 Nach vollständiger Prüfung des gepinnten Snapshots wird ausschließlich die exakte
-Runtime-Modulliste in `build.gradle` um `regelsuche-extension-api` ergänzt: Das
-Discovery SDK benötigt diese öffentliche API für seinen typisierten Erweiterungspunkt.
+Runtime-Modulliste in `build.gradle` um `regelsuche-extension-api` und
+`regelsuche-math-algorithms` ergänzt: Das Discovery SDK benötigt die öffentliche
+Extension-API für seinen typisierten Erweiterungspunkt; der Discovery-Verbraucher
+für gespeicherte Sequenzmodelle verwendet den vorhandenen mathematischen Prüfer.
 Die Gleichheitsprüfung bleibt strikt; App, Extension-Runtime oder weitere Module
 werden nicht freigegeben. Java-Code, Ressourcen, Tests und das historische README
 bleiben unverändert. Dessen ältere Aussage zur sechsmoduligen Closure beschreibt
-den damaligen Upstream-Stand, nicht die aktuelle siebenmodulige SDK-Closure.
+den damaligen Upstream-Stand, nicht die aktuelle achtmodulige SDK-Closure.
 
 `upstream-build.gradle` bewahrt die Originalbytes. `SDK-ADAPTATION.json` dokumentiert
 Adaptations-ID, Upstream-Commit und Git-Blob sowie SHA-256 der ursprünglichen und

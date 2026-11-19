@@ -46,13 +46,14 @@ _UPSTREAM_DISCOVERY_RUNTIME = b"""def expectedRegelsucheRuntimeModules = [
 
 
 def adapt_discovery_runtime_inventory(build: bytes) -> bytes:
-    """Apply only the declared six-to-seven-module contract change; reject drift."""
+    """Apply only the declared six-to-eight-module contract change; reject drift."""
     if (build.count(_UPSTREAM_DISCOVERY_RUNTIME) != 1
             or build.count(b'def expectedRegelsucheRuntimeModules') != 1):
         raise ValueError('upstream Discovery runtime inventory differs from exact pinned contract')
     replacement = _UPSTREAM_DISCOVERY_RUNTIME.replace(
         b"    'regelsuche-discovery-sdk'\n] as Set",
-        b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api'\n] as Set")
+        b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api',\n"
+        b"    'regelsuche-math-algorithms'\n] as Set")
     return build.replace(_UPSTREAM_DISCOVERY_RUNTIME, replacement, 1)
 
 
@@ -69,13 +70,13 @@ def current_sdk_consumer_files(project: Path) -> dict[str, bytes]:
     files['upstream-build.gradle'] = original
     receipt = {
         'schema': 'regelsuche.external-consumer-sdk-adaptation/v1',
-        'adaptationId': 'discovery-extension-api-runtime-contract/v2',
+        'adaptationId': 'discovery-model-proof-runtime-contract/v3',
         'upstreamRepository': manifest['repository'],
         'upstreamCommit': manifest['commit'],
         'upstreamBuildGitBlob': manifest['files']['build.gradle'],
         'upstreamBuildSha256': hashlib.sha256(original).hexdigest(),
         'adaptedBuildSha256': hashlib.sha256(adapted).hexdigest(),
-        'addedRuntimeModules': ['regelsuche-extension-api'],
+        'addedRuntimeModules': ['regelsuche-extension-api', 'regelsuche-math-algorithms'],
         'sdkGroupId': 'io.github.carstenartur',
         'sourceManifestMeaning': 'SOURCE.json identifies the upstream baseline, not the adapted build.gradle; original build retained as upstream-build.gradle',
         'unchangedFiles': sorted(name for name in manifest['files'] if name != 'build.gradle'),

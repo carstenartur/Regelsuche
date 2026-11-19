@@ -11,7 +11,7 @@ into this layer.
 
 The helper is deliberately plain Java in `regelsuche-core`, which both consumers
 already depend on. It imports neither Polyglot nor Python nor an application
-module. Consequently the six-module SDK dependency closure and existing Maven /
+module. Consequently the SDK dependency closure and existing Maven /
 Gradle reactor remain unchanged. Loading the Java SDK does not initialize Python.
 GraalPy and its packages remain optional adapter dependencies. A separate public
 runtime artifact can be extracted later without making it a prerequisite of this
