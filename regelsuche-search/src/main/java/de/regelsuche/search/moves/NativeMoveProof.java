@@ -22,7 +22,9 @@ public sealed interface NativeMoveProof permits NativeMoveProof.Primitive,Native
         @Override public String rule(){return step.rule();}
         @Override public Transformation exportLegacy(){
             var codec=new CompiledAstReplayCodec();var text=new String[2];
-            try(var held=de.regelsuche.retention.RetainedOperation.retain(text)) {
+            // This is intentionally a varargs array, not a new single-object wrapper:
+            // the retained frame observes the same mutable two-slot buffer.
+            try(var held=de.regelsuche.retention.RetainedOperation.retain((Object[]) text)) {
             text[0]=codec.encodeExpression(source());text[1]=codec.encodeExpression(target());
             String source=text[0],target=text[1];
             return de.regelsuche.retention.RetainedOperation.produced(new Transformation(step.rule(),target,step.kind(),step.mayIncreaseComplexity(),step.estimatedCostDelta(),
