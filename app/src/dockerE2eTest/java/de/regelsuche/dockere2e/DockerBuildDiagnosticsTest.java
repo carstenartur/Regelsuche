@@ -72,6 +72,42 @@ class DockerBuildDiagnosticsTest {
     }
 
     @Test
+    void reportsOnlySafeCauseTypesAndAHeuristicSignal() {
+        var cause = new IllegalArgumentException(
+            "private-registry.example/secret?token=DO_NOT_LOG: failed to compute cache key");
+        var failure = new IllegalStateException("another-private-value", cause);
+        assertEquals("IllegalStateException>IllegalArgumentException",
+            DockerBuildDiagnostics.causeTypes(failure));
+        assertEquals("CACHE_OR_IMAGE_REFERENCE",
+            DockerBuildDiagnostics.failureHint(failure));
+        assertEquals("UNCLASSIFIED", DockerBuildDiagnostics.failureHint(
+            new IllegalStateException("token=DO_NOT_LOG")));
+        assertEquals("DISK_SPACE", DockerBuildDiagnostics.failureHint(
+            new IllegalStateException("no space left on device")));
+        assertEquals("REGISTRY_RATE_LIMIT", DockerBuildDiagnostics.failureHint(
+            new IllegalStateException("toomanyrequests")));
+        assertEquals("TIMEOUT", DockerBuildDiagnostics.failureHint(
+            new IllegalStateException("TLS read timed out")));
+        assertEquals("ACCESS_DENIED", DockerBuildDiagnostics.failureHint(
+            new IllegalStateException("unauthorized")));
+    }
+
+    @Test
+    void diagnosticCauseTraversalIsBoundedAndDoesNotRetainPrivatePayloads() {
+        var root = new IllegalStateException("private=DO_NOT_LOG");
+        Throwable outer = root;
+        for (int index = 0; index < 10; index++) {
+            outer = new IllegalArgumentException("secret=" + index, outer);
+        }
+        String types = DockerBuildDiagnostics.causeTypes(outer);
+        assertEquals(6, types.split(">").length);
+        assertFalse(types.contains("DO_NOT_LOG"));
+        assertFalse(types.contains("secret"));
+        assertEquals("UNCLASSIFIED", DockerBuildDiagnostics.failureHint(outer));
+        assertEquals("NONE", DockerBuildDiagnostics.causeTypes(null));
+    }
+
+    @Test
     void eventRowsAreBoundedSnapshotsWithoutUnrelatedPayload() throws IOException {
         try (var events = new DockerBuildDiagnostics.EventBuffer()) {
             Event mutable = new Event().withId("before").withAction("delete\nforged")
