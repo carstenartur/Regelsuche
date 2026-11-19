@@ -77,9 +77,12 @@ gallery with the existing source-only Sophie-Germain solver instead.
   details and direct step selection. Check against the real server on desktop
   and at 390px, with a different demo path already present.
 - [x] Identify the red CI's one-pixel matrix-capture shift caused by the longer
-  entry text. Update only that baseline from the actual pinned CI artifact
-  and its content hash; preserve the comparison thresholds. Replay all four
-  pinned captures and check the baseline policy.
+  entry text. The next full run confirms that fix and identifies the three
+  downstream crops affected by the historical action wrapping the footer
+  into a second row (45.59375px to 99.1875px). Inspect their unchanged
+  mathematical content, update the affected references from the actual
+  pinned CI artifacts and retain the existing comparison thresholds.
+  Replay all four final pinned captures and check the baseline policy.
 - [x] Rewrite the README and gallery around the historical result. Review all
   ten open issues against their remaining acceptance criteria; this bounded
   demo does not close the larger research and product requirements.
