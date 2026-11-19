@@ -92,6 +92,20 @@
     const validateButton = element('validateDomainExport');
     const validationStatus = element('retainedDomainValidationStatus');
     const receiptLink = element('downloadDomainValidationReceipt');
+    const proofPanel = element('retainedDomainModelProof');
+    const proofButton = element('proveDomainExportModel');
+    const proofStatus = element('retainedDomainModelProofStatus');
+    const proofResult = element('domainModelProofResult');
+    const proofReceiptLink = element('downloadDomainModelProofReceipt');
+    const proofMessages = {
+        PROVED_MODEL: 'Modellgesetz bewiesen: Die Rekurrenz gilt für das unten definierte affine Modell.',
+        INCONCLUSIVE: 'Die begrenzte Modellprüfung liefert kein abschließendes Ergebnis.',
+        UNSUPPORTED: 'Dieses Modell wird von der begrenzten Modellprüfung nicht unterstützt.',
+        NOT_EVALUATED_NO_SELECTED_CANDIDATE: 'Die Quelle enthält keinen ausgewählten Kandidaten für eine Modellprüfung.',
+        FINITE_CHECK_NOT_CONFIRMED: 'Die unabhängige Prüfung der endlichen Daten hat den Kandidaten nicht bestätigt. Es wurde kein Modellgesetz bewiesen.',
+        REPLAY_MISMATCH: 'Die erneute Ausführung reproduziert die gebundene Quelle nicht vollständig. Es wurde kein Modellgesetz bewiesen.',
+        TECHNICAL_FAILURE: 'Ein technischer Fehler hat die Modellprüfung abgebrochen.'
+    };
     const validationMessages = {
         CONFIRMED_FINITE_DATA: 'Der Kandidat stimmt mit den gespeicherten endlichen Daten überein.',
         REFUTED_FINITE_DATA: 'Ein gespeichertes Folgenglied widerlegt den Kandidaten.',
@@ -132,12 +146,14 @@
         result.append(node('summary', title), node('pre', JSON.stringify(value, null, 2)));
         return result;
     }
-    async function readResponse(response) {
-        const text = await response.text();
+    function parseResponse(response, text) {
         let value;
         try { value = JSON.parse(text); } catch { throw new Error(`Ungültige Serverantwort (${response.status}).`); }
         if (!response.ok) throw new Error(value.message || value.code || `HTTP ${response.status}`);
         return value;
+    }
+    async function readResponse(response) {
+        return parseResponse(response, await response.text());
     }
     function checkView(view, response, requestedId) {
         if (view.schema !== schema || !hashPattern.test(view.runId) || !hashPattern.test(view.contentHash)
@@ -161,6 +177,14 @@
         validationStatus.textContent = message;
         delete validationStatus.dataset.status;
     }
+    function clearProof(message) {
+        proofReceiptLink.hidden = true;
+        proofReceiptLink.removeAttribute('href');
+        proofResult.hidden = true;
+        proofResult.replaceChildren();
+        proofStatus.textContent = message;
+        delete proofStatus.dataset.status;
+    }
     function beginSelection() {
         const ticket = ++selectionEpoch;
         selected = null; detail.hidden = true; detail.replaceChildren(); delete detail.dataset.runId;
@@ -170,6 +194,9 @@
         validationPanel.hidden = true;
         validateButton.disabled = true;
         clearValidation('');
+        proofPanel.hidden = true;
+        proofButton.disabled = true;
+        clearProof('');
         markSelection();
         return ticket;
     }
@@ -231,6 +258,9 @@
             : 'Die Quelle überschreitet das begrenzte Replay-Budget. Die gespeicherten Daten bleiben lesbar.';
         validationPanel.hidden = false;
         validateButton.disabled = false;
+        proofPanel.hidden = false;
+        proofButton.disabled = false;
+        proofStatus.textContent = 'Noch kein Modellgesetz für diese Auswahl geprüft.';
         history.replaceState(null, '', `#export=${view.runId.slice(7)}`);
         status.textContent = 'Originalexport geladen. Die gespeicherte Quellenidentität bleibt unverändert.';
         markSelection();
@@ -354,6 +384,194 @@
             if (ticket === selectionEpoch) validationStatus.textContent = `Prüfung fehlgeschlagen: ${error.message}`;
         } finally {
             if (ticket === selectionEpoch) validateButton.disabled = false;
+        }
+    });
+    function matchesProofSource(source, view) {
+        return source?.runId === view.runId && source.workspaceHash === view.contentHash
+            && source.evidenceHash === view.evidence.contentHash && source.domainId === view.domainId
+            && source.domainRevision === view.domainRevision && source.manifestHash === view.manifest.contentHash
+            && source.manifestByteHash === view.verification.manifestByteHash
+            && source.descriptorHash === view.manifest.domainDescriptorHash && source.seedHash === view.inputHash
+            && source.handoffHash === view.manifest.lifecycleHandoffHash && source.verificationHash === view.verification.contentHash
+            && source.selectedCandidateHash === (view.evidence.selectedCandidateHash || null)
+            && source.certificateObjectHash === (view.evidence.certificate?.certificateObjectHash ?? null)
+            && source.renderedCertificateHash === (view.evidence.certificate?.contentHash ?? null)
+            && JSON.stringify(source.artifactBytes) === JSON.stringify(view.manifest.artifacts);
+    }
+    function checkModelProof(receipt, response, view, actionPath) {
+        if (receipt.schema !== 'regelsuche.domain-model-proof/v1'
+            || receipt.consumerContract !== 'regelsuche.builtin-sequence-affine-model-proof/v1'
+            || !hashPattern.test(receipt.contentHash) || !Object.hasOwn(proofMessages, receipt.status)
+            || !matchesProofSource(receipt.source, view) || receipt.sourceOutcome !== view.evidence.outcome
+            || response.headers.get('X-Regelsuche-Run-Id') !== view.runId
+            || receipt.originalSequenceProofStatus !== 'NOT_ESTABLISHED'
+            || ['formalProofStatus', 'externalNoveltyStatus', 'promotionStatus', 'publicEvidenceStatus']
+                .some(field => receipt[field] !== 'NOT_EVALUATED')) {
+            throw new Error('Der Modellbeleg gehört nicht zur ausgewählten Quelle oder überschreitet seinen Gültigkeitsbereich.');
+        }
+        const digest = receipt.contentHash.slice(7), receiptPath = `${actionPath}/${digest}`;
+        if (response.headers.get('ETag') !== `"${digest}"` || response.headers.get('Location') !== receiptPath) {
+            throw new Error('Der Download gehört nicht zur Identität des Modellbelegs.');
+        }
+        const model = receipt.model, proof = receipt.proof;
+        const rational = value => typeof value === 'string' && /^-?(0|[1-9][0-9]*)(\/[1-9][0-9]*)?$/.test(value);
+        if (model) {
+            const size = model.dimension, vector = values => Array.isArray(values) && values.length === size && values.every(rational);
+            if (model.schema !== 'regelsuche.sequence-affine-model/v1' || !hashPattern.test(model.contentHash)
+                || !Number.isInteger(size) || size < 1 || size > 3 || model.initialIndex !== 0 || model.observation !== 'x0'
+                || !Array.isArray(model.coordinates) || model.coordinates.length !== size
+                || model.coordinates.some((name, index) => name !== `x${index}`)
+                || !Array.isArray(model.linear) || model.linear.length !== size || !model.linear.every(vector)
+                || !vector(model.offset) || !vector(model.initialState)
+                || !Array.isArray(model.assumptions) || !model.assumptions.length || !model.assumptions.every(value => typeof value === 'string')) {
+                throw new Error('Der Modellbeleg enthält kein unterstütztes affines Modell.');
+            }
+        }
+        if (receipt.status === 'PROVED_MODEL') {
+            if (!model || !proof || proof.checkerContract !== 'regelsuche.recurrence-observation-krylov-model-proof/v1'
+                || proof.scope !== 'EXPLICIT_AFFINE_MODEL' || proof.modelHash !== model.contentHash
+                || !hashPattern.test(proof.contentHash) || !Number.isInteger(proof.recurrenceOrder)
+                || proof.recurrenceOrder < 1 || proof.recurrenceOrder > model.dimension + 1
+                || !Array.isArray(proof.coefficientsOldestFirst) || proof.coefficientsOldestFirst.length !== proof.recurrenceOrder
+                || !proof.coefficientsOldestFirst.every(rational) || !Array.isArray(proof.queries) || !proof.queries.length
+                || proof.queries.some(query => !Number.isSafeInteger(query.index) || query.index < 0 || !rational(query.value)
+                    || !(query.role === 'RETAINED_MODEL_TERM' && query.matchesRetained === true
+                        || query.role === 'MODEL_PREDICTION' && query.matchesRetained === null))
+                || receipt.finiteCheck?.status !== 'CONFIRMED_FINITE_DATA' || receipt.finiteCheck.complete !== true
+                || receipt.replay?.status !== 'IDENTICAL_CANONICAL_EVIDENCE' || receipt.replay.actualEvidenceHash !== view.evidence.contentHash
+                || ['preparation', 'binding', 'queries'].some(phase => receipt.work?.[phase]?.status !== 'COMPLETE')) {
+                throw new Error('Der Modellbeleg enthält keinen vollständig geprüften Modellnachweis.');
+            }
+        } else if (proof) throw new Error('Ein unbestätigtes Ergebnis enthält einen widersprüchlichen Modellnachweis.');
+        return receiptPath;
+    }
+    // Format exact backend coefficients without converting them to floating-point numbers.
+    function linearExpression(coefficients, variables, offset = '0') {
+        const terms = coefficients.map((value, index) => ({value, variable: variables[index]}));
+        terms.push({value: offset, variable: ''});
+        let result = '';
+        for (const {value, variable} of terms) {
+            if (value === '0') continue;
+            const negative = value.startsWith('-'), magnitude = negative ? value.slice(1) : value;
+            const term = variable ? (magnitude === '1' ? variable : `${magnitude} × ${variable}`) : magnitude;
+            result += result ? `${negative ? ' − ' : ' + '}${term}` : `${negative ? '−' : ''}${term}`;
+        }
+        return result || '0';
+    }
+    function workCounts(line, executedLabel = 'ausgeführt') {
+        const count = value => Number.isSafeInteger(value) && value >= 0 ? String(value) : 'nicht verfügbar';
+        return `Budget ${count(line?.configured)} · ${executedLabel} ${count(line?.executed)} · übersprungen ${count(line?.skipped)} · verbleibend ${count(line?.remaining)}`;
+    }
+    function renderProofWork(receipt) {
+        const work = node('details'); work.id = 'domainModelProofWork';
+        work.append(node('summary', 'Zusätzliche Arbeit je Prüfphase'));
+        const replay = node('div'); replay.dataset.proofPhase = 'replay';
+        replay.append(node('h4', 'Replay der Quelle'), node('p', `Quellaufrufe: ${workCounts(receipt.replay?.admission)}`));
+        if (Array.isArray(receipt.replay?.resources)) {
+            const resources = node('ul');
+            for (const line of receipt.replay.resources) resources.append(node('li', `${line.resource}: ${workCounts(line)}`));
+            replay.append(resources);
+        }
+        work.append(replay);
+        const finite = node('div'); finite.dataset.proofPhase = 'finite-check';
+        finite.append(node('h4', 'Unabhängige Prüfung der endlichen Daten'));
+        if (receipt.finiteCheck) {
+            for (const [key, label] of [['inputItems', 'Eingabeelemente'], ['termChecks', 'Termprüfungen'], ['scalarOperations', 'Freigegebene skalare Operationen']]) {
+                finite.append(node('p', `${label}: ${workCounts(receipt.finiteCheck.work?.[key])}`));
+            }
+        } else finite.append(node('p', 'In diesem Modelllauf nicht ausgeführt.'));
+        work.append(finite);
+        const phaseNames = [['preparation', 'Modellgesetz vorbereiten und prüfen'], ['binding', 'Anfangszustand binden'], ['queries', 'Exakte Modellwerte abfragen']];
+        const phaseStatuses = {COMPLETE: 'Abgeschlossen', NOT_RUN: 'Nicht ausgeführt',
+            BUDGET_INCONCLUSIVE: 'Budget ausgeschöpft; kein abschließendes Ergebnis',
+            ARITHMETIC_LIMIT: 'Grenze der exakten Arithmetik erreicht', TECHNICAL_FAILURE: 'Technischer Fehler'};
+        for (const [key, label] of phaseNames) {
+            const phase = node('div'); phase.dataset.proofPhase = key;
+            const line = receipt.work?.[key];
+            phase.append(node('h4', label), node('p', `${phaseStatuses[line?.status] || line?.status || 'Status nicht verfügbar'}. ${workCounts(line, 'verbraucht')}`));
+            work.append(phase);
+        }
+        work.append(node('p', 'Jede Phase und jede Ressource behält ihre eigene Einheit. Die gespeicherten Zähler der Quelle bleiben unverändert.'),
+            node('p', 'Die drei Modellphasen zählen logische Budgeteinheiten des Prüfers. Bei einer Budgetverweigerung kann auch der ausgeschöpfte Rest eines Arbeitspakets als verbraucht gebucht sein.'),
+            node('p', 'Keine Gesamtarbeit ausgewiesen: Interne Arithmetik, Modellprojektion sowie Kodierung und Hashberechnung sind nicht vollständig erfasst.'));
+        return work;
+    }
+    function renderModelProof(receipt) {
+        const finite = node('p', receipt.finiteCheck
+            ? `Unabhängige Prüfung: ${validationMessages[receipt.finiteCheck.status] || 'Kein bestätigtes Ergebnis für die endlichen Daten.'}`
+            : 'Für diesen Modelllauf wurden die endlichen Daten nicht unabhängig geprüft.');
+        finite.id = 'domainModelProofFiniteCheck'; proofResult.append(finite);
+        if (receipt.status === 'UNSUPPORTED' && receipt.detail === 'MODEL_DIMENSION_EXCEEDS_THREE') {
+            proofResult.append(node('p', 'Das ausgewählte Modell benötigt mehr als drei Zustandskoordinaten. Diese Modellprüfung unterstützt ein bis drei Koordinaten.'));
+        }
+        if (receipt.model) {
+            const model = receipt.model;
+            const modelView = node('section'); modelView.id = 'domainModelProofModel';
+            modelView.append(node('h3', 'Ausgewähltes affines Modell'),
+                node('p', `${model.dimension} Zustandskoordinaten · Startindex 0 · Alle Werte sind exakt rational.`));
+            const equations = model.linear.map((row, index) => `${model.coordinates[index]}(n + 1) = ${linearExpression(row, model.coordinates.map(name => `${name}(n)`), model.offset[index])}`);
+            equations.push('', ...model.initialState.map((value, index) => `${model.coordinates[index]}(0) = ${value}`), '', 'a(n) = x0(n)');
+            const rendered = node('pre', equations.join('\n')); rendered.className = 'output'; modelView.append(rendered);
+            modelView.append(node('p', 'Modellannahme: Diese Anfangswerte und Übergänge definieren die Folge für alle n ≥ 0.'));
+            proofResult.append(modelView);
+        }
+        if (receipt.status === 'PROVED_MODEL') {
+            const proof = receipt.proof, recurrence = node('section'); recurrence.id = 'domainModelProofRecurrence';
+            recurrence.append(node('h3', 'Bewiesenes Gesetz dieses Modells'));
+            const terms = proof.coefficientsOldestFirst.map((value, index) => index === 0 ? 'a(n)' : `a(n + ${index})`);
+            const equation = node('pre', `a(n + ${proof.recurrenceOrder}) = ${linearExpression(proof.coefficientsOldestFirst, terms)}\nfür alle n ≥ 0 unter der Modellannahme`);
+            equation.className = 'output'; recurrence.append(equation); proofResult.append(recurrence);
+            proofResult.append(node('h3', 'Exakte Modellwerte'),
+                node('p', 'Modellvorhersagen außerhalb der gespeicherten Daten sind bedingte Rechenergebnisse dieses Modells.'));
+            const values = node('pre'); values.className = 'output';
+            for (const query of proof.queries) {
+                const row = node('span'); row.dataset.modelIndex = String(query.index);
+                const value = node('span', query.value); value.dataset.modelValue = '';
+                row.append(document.createTextNode(`a(${query.index}) = `), value,
+                    document.createTextNode(query.role === 'MODEL_PREDICTION' ? ' · Modellvorhersage\n' : ' · gespeichertes Glied bestätigt\n'));
+                values.append(row);
+            }
+            proofResult.append(values);
+        }
+        proofResult.append(renderProofWork(receipt));
+        const identity = disclosure('Quellenbindung und Belegidentität', receipt); identity.id = 'domainModelProofIdentity';
+        proofResult.append(identity, node('p', 'Externe Neuheit, Promotion und Public Evidence wurden nicht bewertet. Die Status der ursprünglichen Evidence bleiben unverändert.'));
+        proofResult.hidden = false;
+    }
+    proofButton.addEventListener('click', async () => {
+        const view = selected, ticket = selectionEpoch;
+        if (!view) return;
+        const actionPath = `${base}/${view.runId.slice(7)}/model-proof`;
+        proofButton.disabled = true;
+        clearProof('Quelle, endliche Daten und Modellgesetz werden geprüft …');
+        try {
+            const response = await fetch(actionPath, {method: 'POST', redirect: 'error', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({expectedWorkspaceHash: view.contentHash, expectedEvidenceHash: view.evidence.contentHash})});
+            const receiptText = await response.text();
+            if (ticket !== selectionEpoch) return;
+            const receipt = parseResponse(response, receiptText);
+            const receiptPath = checkModelProof(receipt, response, view, actionPath);
+            proofStatus.textContent = 'Der gespeicherte Modellbeleg wird erneut an seiner Quelle geprüft …';
+            const retainedResponse = await fetch(receiptPath, {redirect: 'error', cache: 'no-store'});
+            const retainedText = await retainedResponse.text();
+            if (ticket !== selectionEpoch) return;
+            if (!retainedResponse.ok) throw new Error(`Der gespeicherte Modellbeleg konnte nicht überprüft werden (HTTP ${retainedResponse.status}).`);
+            // GET reproduces the retained proof on the server. Compare original response text,
+            // never a JSON serialization that could round large numeric source values.
+            if (retainedResponse.headers.get('X-Regelsuche-Run-Id') !== view.runId
+                || retainedResponse.headers.get('ETag') !== response.headers.get('ETag')
+                || retainedText !== receiptText) {
+                throw new Error('Der gespeicherte Modellbeleg stimmt nicht mit der Antwort für die ausgewählte Quelle überein.');
+            }
+            renderModelProof(receipt);
+            proofStatus.textContent = proofMessages[receipt.status];
+            proofStatus.dataset.status = receipt.status;
+            proofReceiptLink.href = receiptPath;
+            proofReceiptLink.hidden = false;
+        } catch (error) {
+            if (ticket === selectionEpoch) clearProof(`Modellprüfung fehlgeschlagen: ${error.message}`);
+        } finally {
+            if (ticket === selectionEpoch) proofButton.disabled = false;
         }
     });
     element('refreshDomainExports').addEventListener('click', refreshList);

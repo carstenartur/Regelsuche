@@ -18,7 +18,7 @@ final class DomainExportWorkspaceActions {
         if (suffix.endsWith("/")) suffix = suffix.substring(0, suffix.length() - 1);
         try {
             boolean post = exchange.getRequestMethod().equals("POST");
-            var boundRequest = post && (suffix.endsWith("/replay") || suffix.endsWith("/validate"))
+            var boundRequest = post && (suffix.endsWith("/replay") || suffix.endsWith("/validate") || suffix.endsWith("/model-proof"))
                 ? readBoundRequest(exchange, maxBytes) : Map.<String, Object>of();
             var repository = new DomainExportWorkspaceRepository(directory);
             if (suffix.isEmpty()) {
@@ -27,21 +27,30 @@ final class DomainExportWorkspaceActions {
             }
             String[] path = suffix.substring(1).split("/", -1);
             if (!path[0].matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid export digest");
+            if (path.length == 3 && path[1].equals("model-proof")) {
+                var receipt = new DomainModelProofRepository(directory).find("sha256:" + path[0], "sha256:" + path[2]);
+                if (receipt.isEmpty()) {
+                    error(exchange, 404, "DOMAIN_MODEL_PROOF_NOT_FOUND", "retained export or model proof receipt not found");
+                    return;
+                }
+                sendReceipt(exchange, "sha256:" + path[0], path[2], receipt.orElseThrow(), "domain-model-proof");
+                return;
+            }
             if (path.length == 3 && path[1].equals("validate")) {
                 var receipt = repository.findValidation("sha256:" + path[0], "sha256:" + path[2]);
                 if (receipt.isEmpty()) {
                     error(exchange, 404, "DOMAIN_VALIDATION_NOT_FOUND", "retained export or validation receipt not found");
                     return;
                 }
-                sendValidation(exchange, "sha256:" + path[0], path[2], receipt.orElseThrow());
+                sendReceipt(exchange, "sha256:" + path[0], path[2], receipt.orElseThrow(), "domain-validation");
                 return;
             }
-            var found = repository.find("sha256:" + path[0]);
+            var found = findSource(repository, "sha256:" + path[0], path.length == 2 && path[1].equals("model-proof"));
             if (found.isEmpty()) { error(exchange, 404, "DOMAIN_EXPORT_NOT_FOUND", "retained export not found"); return; }
             var workspace = found.get();
             if (path.length == 1) sendWorkspace(exchange, 200, workspace);
-            else if (path.length == 2 && (path[1].equals("replay") || path[1].equals("validate"))) {
-                handleBoundAction(exchange, repository, workspace, boundRequest, path[1]);
+            else if (path.length == 2 && Set.of("replay", "validate", "model-proof").contains(path[1])) {
+                handleBoundAction(exchange, repository, directory, workspace, boundRequest, path[1]);
             } else if (path.length == 3 && path[1].equals("files")) {
                 sendOriginalFile(exchange, workspace, path[2]);
             } else error(exchange, 404, "DOMAIN_EXPORT_ROUTE_NOT_FOUND", "unsupported export action");
@@ -56,19 +65,36 @@ final class DomainExportWorkspaceActions {
         }
     }
 
+    private static Optional<DomainExportWorkspace> findSource(DomainExportWorkspaceRepository repository,
+            String runId, boolean modelProof) throws IOException {
+        try { return repository.find(runId); }
+        catch (IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {
+            if (modelProof) throw new IllegalStateException("invalid retained model proof source", exception);
+            throw exception;
+        }
+    }
+
     private static void handleBoundAction(HttpExchange exchange, DomainExportWorkspaceRepository repository,
-            DomainExportWorkspace workspace,
+            Path directory, DomainExportWorkspace workspace,
             Map<String, Object> boundRequest, String action) throws IOException {
         if (!workspace.contentHash().equals(boundRequest.get("expectedWorkspaceHash"))
                 || !workspace.evidence().contentHash().equals(boundRequest.get("expectedEvidenceHash"))) {
             error(exchange, 409, "SOURCE_BINDING_MISMATCH", "request belongs to another source view"); return;
+        }
+        if (action.equals("model-proof")) {
+            var receipt = DomainModelProof.prove(workspace);
+            new DomainModelProofRepository(directory).retain(workspace, receipt);
+            String digest = receipt.contentHash().substring(7);
+            exchange.getResponseHeaders().set("Location", BASE + "/" + workspace.runId().substring(7) + "/model-proof/" + digest);
+            sendReceipt(exchange, workspace.runId(), digest, receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8), "domain-model-proof");
+            return;
         }
         if (action.equals("validate")) {
             var receipt = DomainDownstreamValidation.validate(workspace);
             repository.retainValidation(workspace, receipt);
             String digest = receipt.contentHash().substring(7);
             exchange.getResponseHeaders().set("Location", BASE + "/" + workspace.runId().substring(7) + "/validate/" + digest);
-            sendValidation(exchange, workspace.runId(), digest, receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
+            sendReceipt(exchange, workspace.runId(), digest, receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8), "domain-validation");
             return;
         }
         try {
@@ -83,11 +109,11 @@ final class DomainExportWorkspaceActions {
         } catch (IllegalStateException exception) { error(exchange, 409, "REPLAY_NOT_REPRODUCED", exception.getMessage()); }
     }
 
-    private static void sendValidation(HttpExchange exchange, String runId,
-            String digest, byte[] bytes) throws IOException {
+    private static void sendReceipt(HttpExchange exchange, String runId,
+            String digest, byte[] bytes, String filePrefix) throws IOException {
         exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", runId);
         exchange.getResponseHeaders().set("ETag", "\"" + digest + "\"");
-        exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"domain-validation-" + digest + ".json\"");
+        exchange.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + filePrefix + "-" + digest + ".json\"");
         send(exchange, 200, bytes);
     }
 

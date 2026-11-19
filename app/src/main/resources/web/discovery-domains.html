@@ -41,6 +41,15 @@
     <p id="retainedDomainValidationStatus" role="status" aria-live="polite"></p>
     <a id="downloadDomainValidationReceipt" hidden download>Prüfbeleg herunterladen</a>
   </section>
+  <section class="card" id="retainedDomainModelProof" aria-labelledby="domainModelProofTitle" hidden>
+    <h2 id="domainModelProofTitle">Ein Gesetz für das ausgewählte Modell</h2>
+    <p id="domainModelProofScope">Ein Modellgesetz gilt unter der Annahme, dass alle weiteren Folgenglieder durch die angezeigten Anfangswerte und Übergänge definiert sind. Die Prüfung liefert keinen Beweis für den unendlichen Verlauf der ursprünglichen Folge: Endliche Daten bestimmen diese Fortsetzung nicht eindeutig.</p>
+    <p>Die Prüfung wiederholt den Quelllauf, prüft die endlichen Daten unabhängig und untersucht anschließend ein rationales affines Modell mit höchstens drei Zustandskoordinaten. Diese Schritte verursachen zusätzliche Arbeit.</p>
+    <button id="proveDomainExportModel" type="button" disabled>Modellgesetz prüfen</button>
+    <p id="retainedDomainModelProofStatus" role="status" aria-live="polite"></p>
+    <div id="domainModelProofResult" hidden></div>
+    <a id="downloadDomainModelProofReceipt" hidden download>Modellbeleg herunterladen</a>
+  </section>
   <form id="domainForm" class="card">
     <h2>Neue Suche mit einer installierten Domäne</h2>
     <label class="field">Domäne<select id="domainChoice" required></select></label>

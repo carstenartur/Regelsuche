@@ -1,8 +1,9 @@
 # Gespeicherte Sequenz-Exporte in der Workbench
 
 Die vorhandene Seite **Eigene Discovery-Domänen** kann einen verifizierten
-Vier-Dateien-Export der eingebauten Domäne
-`integer-sequence-finite-difference@v1` importieren, unveränderlich laden und
+Vier-Dateien-Export der eingebauten Domänen
+`integer-sequence-finite-difference@v1` und
+`integer-sequence-linear-recurrence@v1` importieren, unveränderlich laden und
 begrenzt reproduzieren. Das ist ein produktiver Consumer von
 `VerifiedDomainExport` für einen konkreten Objekttyp. Es schließt den weiteren
 Lifecycle-Umfang von #224 nicht.
@@ -21,7 +22,13 @@ Lifecycle-Umfang von #224 nicht.
 4. Optional **Vollständige Evidence reproduzieren** ausführen. Replay verwendet
    genau den ursprünglichen Seed und das ursprüngliche Budget. Es erzeugt
    zusätzliche Arbeit; historische Zähler werden nicht geändert.
-5. Originaldateien über ihre Dateilinks herunterladen. Ein Link der Form
+5. Optional **Endliche Daten prüfen** für den separaten
+   [endlichen Validierungsbeleg](domain-downstream-finite-validation.md) oder
+   **Modellgesetz prüfen** für einen
+   [Beleg zum ausdrücklich angenommenen affinen Modell](domain-model-proof.md)
+   ausführen. Beide Aktionen binden die ausgewählte unveränderte Quelle und
+   weisen ihre zusätzliche Arbeit getrennt aus.
+6. Originaldateien über ihre Dateilinks herunterladen. Ein Link der Form
    `#export=<64-stelliger Manifest-Digest>` lädt später dieselbe Quelle.
 
 Ein kleiner öffentlicher Beispiel-Export lässt sich mit dem vorhandenen
@@ -103,6 +110,10 @@ die neuen Routen unter `/api/discovery-domains/exports`:
 | `GET /{runDigest}` | Die erneut verifizierte, gespeicherte Quellenansicht |
 | `GET /{runDigest}/files/{fileName}` | Eine der vier byteidentischen Originaldateien |
 | `POST /{runDigest}/replay` | Genau `expectedWorkspaceHash` und `expectedEvidenceHash`; nur passend zur ausgewählten Quelle |
+| `POST /{runDigest}/validate` | Unabhängige endliche Prüfung mit denselben zwei Quellenbindungen; eigener Validierungsbeleg |
+| `GET /{runDigest}/validate/{receiptDigest}` | Gespeicherter endlicher Validierungsbeleg mit geprüfter Quellenbindung |
+| `POST /{runDigest}/model-proof` | Bedingtes affines Modellgesetz nach Replay und endlicher Prüfung; eigener Modellbeleg |
+| `GET /{runDigest}/model-proof/{receiptDigest}` | Gespeicherter Modellbeleg nach vollständiger erneuter Reproduktion |
 
 `runDigest` ist der kleingeschriebene 64-stellige SHA-256-Digest des ursprünglichen
 Manifests. Die Ansicht liefert `X-Regelsuche-Run-Id` und einen ETag aus ihrem
@@ -144,6 +155,13 @@ Domain-Vertrag. Beides behält die ursprünglichen Statuswerte
 `publicEvidenceStatus` als `NOT_EVALUATED` bei. Es folgt weder ein formaler Beweis
 noch externe mathematische Neuheit, ein Default-/Utility-Claim oder eine neue
 [domain-generic Qualification](domain-generic-qualification.md).
+
+Die nachgelagerten [endlichen Prüfungen](domain-downstream-finite-validation.md)
+und [Modellbeweise](domain-model-proof.md) verändern diese ursprünglichen
+Statuswerte nicht. Ein Modellbeleg kann ein Gesetz des ausdrücklich definierten
+affinen Modells bestätigen; dass eine anderweitig definierte unendliche Quelle
+diesem Modell folgt, bleibt unbewiesen. Die Quellenansicht, der endliche Beleg
+und der Modellbeleg haben getrennte Identitäten und Aussagegrenzen.
 
 Die fokussierten Kontrollen verwenden kleine öffentliche Folgen, echte
 HTTP-Imports und den vorhandenen Browser. Sie ersetzen keine Mehrdomänen-Studie

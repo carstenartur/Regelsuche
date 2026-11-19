@@ -22,6 +22,8 @@ class OpenApiBadRequestMediaContractTest {
         "GET /api/discovery-domains/exports/{runDigest}/files/{fileName}",
         "POST /api/discovery-domains/exports/{runDigest}/validate",
         "GET /api/discovery-domains/exports/{runDigest}/validate/{receiptDigest}",
+        "POST /api/discovery-domains/exports/{runDigest}/model-proof",
+        "GET /api/discovery-domains/exports/{runDigest}/model-proof/{receiptDigest}",
         "GET /api/discovery-runs",
         "POST /api/discovery-runs",
         "GET /api/discovery-runs/{runDigest}",

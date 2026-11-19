@@ -144,9 +144,13 @@ promotion and Public Evidence statuses stay `NOT_EVALUATED`.
 
 Agreement on the retained finite data does not prove a unique infinite
 continuation, minimal recurrence order, universal theorem, external novelty or
-release qualification. Generic proof, novelty, promotion and release consumers
-and comparative multi-domain qualification remain open under #1020. No campaign,
-protected corpus or study is executed by this API.
+release qualification. A separate [source-bound model-proof consumer](domain-model-proof.md)
+can prove a recurrence of an explicit affine candidate model after repeating
+source replay and finite checking. That conditional model theorem does not
+change this receipt or establish an unspecified infinite source continuation.
+The expression production lifecycle, external novelty, promotion, release
+composition and comparative multi-domain qualification remain open under #1020.
+No campaign, protected corpus or study is executed by this API.
 
 ## Workbench
 
@@ -158,6 +162,11 @@ candidate and incomplete or failed checks. **Prüfbeleg herunterladen** download
 the exact retained receipt from its hash-addressed URL. The separate replay
 action reproduces the source evidence and has its own status. Switching exports
 clears the previous status and receipt link.
+
+**Modellgesetz prüfen** runs the separate model consumer for the selected source.
+Its own model, proof status, work and **Modellbeleg herunterladen** link are
+described in [the model-proof workflow](domain-model-proof.md). A successful
+finite receipt alone does not authorize that result.
 
 ## Ordinary controls
 
@@ -178,12 +187,14 @@ clears the previous status and receipt link.
   include the one additional JSON POST. The complete existing request-limit
   matrix retains its 1024-byte control limit and checks fixed and chunked
   oversized requests before lookup, including an unknown validation run.
-- Offline Draft 2020-12 checks use the existing pinned networknt 2.0.7 authority
+- Offline Draft 2020-12 checks use the existing pinned networknt 3.0.9 authority
   in the release module, without new dependencies or qualification execution.
   Real receipts for both domains, refuted sources and partial checks validate;
   false completeness, missing bindings and contradictory proof roles fail.
 - Full original-byte comparison for confirmed, refuted and oversized-budget
   finite sources against captures compiled before production changes.
 
-All are ordinary focused Java 25 Maven controls. They do not initialize a
-GraalPy/SymPy runtime or run Gradle, a browser, release studies or GitHub writes.
+The Java controls run as focused Java 25 Gradle tests, including
+`DomainDownstreamValidationTest` and `DomainDownstreamValidationSchemaTest`.
+They do not initialize a GraalPy/SymPy runtime or run release studies. Browser
+workflow checks remain a separate test task.
