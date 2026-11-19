@@ -77,6 +77,16 @@ class RetainedOperationTest {
         var values = new String[2];
         try (var scope = RetainedOperation.open(new FailingCharge(Integer.MAX_VALUE))) {
             try (var frame = RetainedOperation.retain((Object[]) values)) {
+                var references = new java.util.ArrayList<Object>();
+                frame.retainedReferences(new RetainedGraph.Visitor() {
+                    @Override public void reference(Object value) { references.add(value); }
+                    @Override public void requireExact(Object value, Class<?> auditedType) {
+                        throw new AssertionError("frame does not request exact-type traversal");
+                    }
+                });
+                assertEquals(3, references.size());
+                assertSame(values, references.get(2),
+                    "Object... must retain the original array without an extra wrapper");
                 assertEquals(0, RetainedGraph.measure(scope).retained().characters());
                 values[0] = "source";
                 values[1] = "target";
