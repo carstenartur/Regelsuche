@@ -219,6 +219,21 @@ jobs:
             mvn --batch-mode --no-transfer-progress \
               -Dregelsuche.sourceArchiveMode=true -DfailIfNoTests=true \
               -pl regelsuche-core,regelsuche-egraph,regelsuche-search,regelsuche-validation,regelsuche-math-algorithms,maven-build-contract -am test
+            # The archive has no .git: carry the exact checked-out source
+            # commit as explicit provenance for the three preparation tests.
+            # Never run git from inside the extracted tree or invent a SHA.
+            export REGELSUCHE_PREPARATION_REVISION="${REGELSUCHE_AUTHORITY_GITHUB_SHA:?}"
+            # Exercise real PostgreSQL and Neo4j through the existing pinned
+            # JUnit/Testcontainers full-profile Failsafe module. A success
+            # without Git metadata must not be a skip-only result.
+            mvn --batch-mode --no-transfer-progress \
+              -Pfull -pl regelsuche-integration-tests -am verify
+            # This separate Maven/JUnit pass runs after Failsafe has produced
+            # its reports. The contract fails on missing, skipped, failed or
+            # malformed evidence for the required real container suites.
+            mvn --batch-mode --no-transfer-progress \
+              -pl maven-build-contract -Dregelsuche.sourceArchiveContainerMode=true \
+              -DfailIfNoTests=true test
           )
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
