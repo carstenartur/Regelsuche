@@ -12,6 +12,11 @@
   <artifactId>regelsuche-core</artifactId>
   <name>Regelsuche Core</name>
   <dependencies>
+    <!-- Keep the annotation types in Core's published compile API as well. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>

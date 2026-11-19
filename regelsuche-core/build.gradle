@@ -14,6 +14,9 @@ java {
 }
 
 dependencies {
+    // Core's public model types carry Jackson annotations: expose their types
+    // to downstream Java-library compilation, not only Core's own compile task.
+    api 'com.fasterxml.jackson.core:jackson-annotations:2.23'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.23.0'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.23.0'
     testImplementation libs.junit.jupiter
