@@ -65,10 +65,9 @@ public enum SearchProfile {
         }
     },
     /**
-     * Search-intelligence profile: activates the mathematical transposition
-     * table, keeps non-improving paths that bring new rule combinations and
-     * applies stricter cycle detection. Used to demonstrate learning
-     * macro-rules across multiple runs.
+     * Search-intelligence profile: records mathematical value observations
+     * across runs. BestFirst retains its run-local application histories and
+     * assumptions when deciding whether to explore a continuation.
      */
     DISCOVERY_PLUS(new SearchHeuristic(6, 2000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {
         @Override
