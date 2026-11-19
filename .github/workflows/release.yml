@@ -323,6 +323,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+          problem-matcher: true
           verify-signature: true
           cache: maven
           server-id: central
