@@ -95,12 +95,12 @@ ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscov
 FROM maven:3.10.0-eclipse-temurin-25-noble AS build
 WORKDIR /workspace
 COPY . .
-RUN mvn --batch-mode --no-transfer-progress -Pfull -pl app -am \\
-        -Dmaven.test.skip=true package \\
-    && mkdir -p /workspace/app-distribution \\
-    && tar -xf app/target/regelsuche-*.tar \\
-        -C /workspace/app-distribution --strip-components=1 \\
-    && test -x /workspace/app-distribution/bin/regelsuche \\
+RUN mvn --batch-mode --no-transfer-progress -Pfull -pl app -am \
+        -Dmaven.test.skip=true package \
+    && mkdir -p /workspace/app-distribution \
+    && tar -xf app/target/regelsuche-*.tar \
+        -C /workspace/app-distribution --strip-components=1 \
+    && test -x /workspace/app-distribution/bin/regelsuche \
     && test -s /workspace/app-distribution/regelsuche.jar
 
 
