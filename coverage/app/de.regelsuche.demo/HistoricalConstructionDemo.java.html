@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HistoricalConstructionDemo.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.demo</a> &gt; <span class="el_source">HistoricalConstructionDemo.java</span></div><h1>HistoricalConstructionDemo.java</h1><pre class="source lang-java linenums">package de.regelsuche.demo;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.discovery.DiscoveredTransformation;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.evolution.CheckedSchemaTaskSolver;
+import de.regelsuche.evolution.CumulativeTaskKnowledge;
+import de.regelsuche.evolution.StructuralTaskObjective;
+import de.regelsuche.evolution.TaskConstructionProfile;
+import de.regelsuche.evolution.TraceStrategyTransferExample;
+import de.regelsuche.graph.ExpressionGraphStore;
+import de.regelsuche.graph.GraphEdge;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/** Connects the source-only historical factorization task to the ordinary Workbench replay. */
+public final class HistoricalConstructionDemo {
+    static final String ID = &quot;historical-sophie-germain&quot;;
+<span class="fc" id="L31">    static final TaskConstructionProfile PROFILE = TaskConstructionProfile.STRUCTURAL_EXPANSION_V1;</span>
+<span class="fc" id="L32">    private static final StructuralTaskObjective GOAL = StructuralTaskObjective.FACTORIZATION;</span>
+<span class="fc" id="L33">    private static final MoveSearch.Budget BUDGET = new MoveSearch.Budget(32, 8, 10_000_000, 512, 10_000_000);</span>
+
+    private HistoricalConstructionDemo() {}
+
+    public record Summary(StructuralTaskObjective goal, TaskConstructionProfile profile, long totalWork,
+            MoveSearch.Budget budget, List&lt;Step&gt; steps) {
+<span class="fc" id="L39">        public Summary {</span>
+<span class="fc" id="L40">            steps = List.copyOf(steps);</span>
+<span class="fc" id="L41">        }</span>
+    }
+
+<span class="fc" id="L44">    public record Step(int stepIndex, String sourceExpression, String targetExpression, String ruleId,</span>
+            SearchMove.SourceKind sourceKind, String provenanceHash, MoveVerifier.Verification verification) {}
+
+    static DemoService.DemoRunResult run(DemoCatalog.Demo demo, ExpressionGraphStore graphStore,
+            ExpressionScorer scorer, ExpressionCanonicalizer canonicalizer) {
+<span class="fc" id="L49">        long started = System.nanoTime();</span>
+<span class="fc" id="L50">        var source = new ExpressionParser().parseExactTerm(demo.expression()).expression();</span>
+<span class="fc" id="L51">        String sourceExpression = ExpressionFormatter.format(source);</span>
+<span class="fc" id="L52">        var task = new CheckedSchemaTaskSolver.Task(source, List.of(), GOAL.goal(), BUDGET);</span>
+<span class="fc" id="L53">        var knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory(), PROFILE);</span>
+<span class="fc" id="L54">        var run = knowledge.solve(task, CumulativeTaskKnowledge.Strategy.BASELINE);</span>
+
+<span class="fc" id="L56">        var sourceScore = scorer.score(sourceExpression);</span>
+<span class="fc" id="L57">        var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L58">        var pathSteps = new ArrayList&lt;TransformationStep&gt;();</span>
+<span class="fc" id="L59">        DiscoveredTransformation path = null;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (run.solved()) {</span>
+<span class="fc" id="L61">            var evidence = run.solution().orElseThrow().evidence();</span>
+<span class="fc" id="L62">            var witness = evidence.witness();</span>
+<span class="fc" id="L63">            var cursor = source;</span>
+<span class="fc" id="L64">            var score = sourceScore;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            for (var edge : witness) {</span>
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">                if (!cursor.equals(edge.source().expression()) || !edge.verification().accepted()) {</span>
+<span class="nc" id="L67">                    throw new IllegalStateException(&quot;Historical construction witness is not continuous and verified&quot;);</span>
+                }
+<span class="fc" id="L69">                String before = ExpressionFormatter.format(cursor);</span>
+<span class="fc" id="L70">                cursor = edge.target().expression();</span>
+<span class="fc" id="L71">                String after = ExpressionFormatter.format(cursor);</span>
+<span class="fc" id="L72">                var afterScore = scorer.score(after);</span>
+<span class="fc" id="L73">                var move = edge.move();</span>
+<span class="fc" id="L74">                int index = steps.size();</span>
+<span class="fc" id="L75">                steps.add(new Step(index, before, after, move.ruleId(), move.sourceKind(),</span>
+<span class="fc" id="L76">                    move.provenance().contentHash(), edge.verification()));</span>
+                // The Workbench displays formatted math. The typed execution's provenance is bound
+                // to serialized ASTs and is carried by the summary, not by a legacy replay edge.
+<span class="fc" id="L79">                pathSteps.add(new TransformationStep(index, before, after, move.ruleId(),</span>
+<span class="fc" id="L80">                    move.transformation().kind(), score.weightedTotal(), afterScore.weightedTotal(),</span>
+<span class="fc" id="L81">                    move.transformation().equivalencePreservingByConstruction(), edge.verification().reason(),</span>
+<span class="fc" id="L82">                    move.assumptions()));</span>
+<span class="fc" id="L83">                score = afterScore;</span>
+<span class="fc" id="L84">            }</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">            if (steps.isEmpty() || !cursor.equals(evidence.incumbent().expression())) {</span>
+<span class="nc" id="L86">                throw new IllegalStateException(&quot;Historical construction witness lacks its verified endpoint&quot;);</span>
+            }
+<span class="fc" id="L88">            String improved = ExpressionFormatter.format(cursor);</span>
+<span class="fc" id="L89">            String lineage = steps.stream().map(Step::provenanceHash).collect(Collectors.joining(&quot;\n&quot;));</span>
+<span class="fc" id="L90">            String pathId = &quot;demo-&quot; + ID + &quot;-&quot; + UUID.nameUUIDFromBytes(lineage.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L91">            path = new DiscoveredTransformation(pathId, sourceExpression, improved, pathSteps,</span>
+<span class="fc" id="L92">                sourceScore, score, sourceScore.improvementTo(score), CandidateProofStatus.SYMBOLICALLY_VERIFIED,</span>
+<span class="fc" id="L93">                Instant.now(), canonicalizer.stableHash(improved));</span>
+<span class="fc" id="L94">            retainPath(graphStore, path, witness, canonicalizer);</span>
+<span class="fc" id="L95">        } else {</span>
+<span class="nc" id="L96">            graphStore.saveNode(sourceExpression, sourceScore.weightedTotal());</span>
+        }
+
+<span class="fc" id="L99">        var summary = new Summary(GOAL, PROFILE, run.totalWork(), BUDGET, steps);</span>
+<span class="fc" id="L100">        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;</span>
+<span class="fc" id="L101">        return new DemoService.DemoRunResult(demo, sourceExpression, null, steps.size() + 1, steps.size(),</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">            path == null ? 0 : 1, path, path, path, path != null,</span>
+<span class="fc" id="L103">            steps.stream().map(Step::ruleId).distinct().toList(), List.of(), elapsedMillis,</span>
+            null, false, &quot;&quot;, &quot;&quot;, null, summary);
+    }
+
+    private static void retainPath(ExpressionGraphStore graphStore, DiscoveredTransformation path,
+            List&lt;TypedMoveSearch.WitnessStep&gt; witness, ExpressionCanonicalizer canonicalizer) {
+<span class="fc" id="L109">        synchronized (graphStore) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (graphStore.discoveredTransformations().stream().anyMatch(found -&gt; found.id().equals(path.id()))) {</span>
+<span class="nc" id="L111">                return;</span>
+            }
+<span class="fc" id="L113">            graphStore.saveNode(path.originalExpression(), path.originalScore().weightedTotal());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (var step : path.steps()) {</span>
+<span class="fc" id="L115">                var edge = witness.get(step.index());</span>
+<span class="fc" id="L116">                var move = edge.move().transformation();</span>
+<span class="fc" id="L117">                graphStore.saveNode(step.afterExpression(), step.scoreAfter());</span>
+<span class="fc" id="L118">                graphStore.saveEdge(new GraphEdge(step.beforeExpression(), step.afterExpression(), step.ruleId(),</span>
+<span class="fc" id="L119">                    edge.target().searchDepth(), step.scoreBefore() - step.scoreAfter(), path.id(),</span>
+<span class="fc" id="L120">                    canonicalizer.stableHash(step.afterExpression()), step.scoreBefore(), step.scoreAfter(),</span>
+<span class="fc" id="L121">                    step.ruleKind(), move.mayIncreaseComplexity(), move.estimatedCostDelta(),</span>
+<span class="fc" id="L122">                    step.equivalencePreserving(), path.validationStatus()));</span>
+<span class="fc" id="L123">            }</span>
+<span class="fc" id="L124">            graphStore.saveDiscoveredTransformation(path);</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

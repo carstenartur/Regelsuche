@@ -311,9 +311,35 @@ Screenshots und Videos sind ein bewusster Ausgabemodus derselben Browser-Tests:
 ./gradlew :app:e2eTest -Pregelsuche.recordDocs=true
 ```
 
+Die Desktop- und Mobilaufnahmen der [Galerie](demo-gallery.md) lassen sich
+gezielt mit den folgenden Tests erneuern. Der getestete Quellstand muss als Commit
+vorliegen. Die Tests prüfen sichtbare Ergebnisse in der laufenden Workbench,
+bevor sie die PNG-Dateien unter `docs/assets/screenshots/` schreiben.
+
+```bash
+./gradlew --no-configuration-cache :app:e2eTest -Pregelsuche.recordDocs=true \
+  --tests de.regelsuche.e2e.HistoricalConstructionBrowserTest \
+  --tests de.regelsuche.e2e.PairReductionBrowserFlowTest \
+  --tests de.regelsuche.e2e.PublicDiscoveryComparisonBrowserTest
+```
+
+Zu jeder Galerie-PNG gehört eine gleichnamige JSON-Datei mit Aufnahmezeit in
+UTC, Git-Revision, Szenario, Eingabe, Route, Viewport und SHA-256 der PNG-Datei.
+Prüfe nach der Aufnahme die Desktop- und schmale Ansicht sowie die Zuordnung
+der Metadaten zu den Bildern.
+
+`NativeReplaySelectionBrowserTest` prüft zusätzlich das Auswählen gebundener
+Schritte und Kanten im nativen Dossier. Der optionale Aufnahmemodus zeichnet
+diese Bedienkontrollen separat auf.
+
 Ein normaler `ciCheck` aktualisiert keine Dokumentationsmedien. Änderungen an
 sichtbaren Flows müssen UI, Browser-E2E, Handbuch und gegebenenfalls Screenshots
 gemeinsam aktualisieren.
+
+Die Algebra-Nachweise der Galerie haben einen eigenen Generierungsschritt.
+`./gradlew :app:generateDiscoveryGallery` schreibt die Detailseite und ihre
+Artefakte unter `docs/generated/discovery/`. Der Regressionstest prüft, dass
+der Lauf die redaktionelle [Workbench-Galerie](demo-gallery.md) erhält.
 
 ## GitHub-Grenze
 

@@ -41,13 +41,18 @@ public final class DemoCatalog {
 <span class="fc" id="L41">            this(id, title, description, expression, inputType, profile,</span>
                 expectedHighlight, expectedResultExpression, &quot;algebra&quot;);
 <span class="fc" id="L43">        }</span>
+
+        public String profileName() {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            return HistoricalConstructionDemo.ID.equals(id)</span>
+<span class="fc" id="L47">                ? HistoricalConstructionDemo.PROFILE.name() : profile.name();</span>
+        }
     }
 
-<span class="fc" id="L46">    private static final Map&lt;String, Demo&gt; DEMOS = buildDemos();</span>
+<span class="fc" id="L51">    private static final Map&lt;String, Demo&gt; DEMOS = buildDemos();</span>
 
     private static Map&lt;String, Demo&gt; buildDemos() {
-<span class="fc" id="L49">        Map&lt;String, Demo&gt; map = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L50">        map.put(&quot;binomial&quot;, new Demo(</span>
+<span class="fc" id="L54">        Map&lt;String, Demo&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L55">        map.put(&quot;binomial&quot;, new Demo(</span>
             &quot;binomial&quot;,
             &quot;Binomische Formel&quot;,
             &quot;Aus (x+3)^2 emergiert die binomische Formel als Makroregel aus rein atomaren &quot;
@@ -58,7 +63,7 @@ public final class DemoCatalog {
             &quot;(a+b)^2 = a^2 + 2*a*b + b^2&quot;,
             &quot;x ^ 2 + 6 * x + 9&quot;
         ));
-<span class="fc" id="L61">        map.put(&quot;rational&quot;, new Demo(</span>
+<span class="fc" id="L66">        map.put(&quot;rational&quot;, new Demo(</span>
             &quot;rational&quot;,
             &quot;Bruchkürzung&quot;,
             &quot;Bei (x*y)/(x*z) wird der gemeinsame Faktor x aus Zähler und Nenner erkannt; &quot;
@@ -69,7 +74,7 @@ public final class DemoCatalog {
             &quot;(x*y)/(x*z) = y/z, sofern x ≠ 0&quot;,
             &quot;y / z&quot;
         ));
-<span class="fc" id="L72">        map.put(&quot;trigonometry&quot;, new Demo(</span>
+<span class="fc" id="L77">        map.put(&quot;trigonometry&quot;, new Demo(</span>
             &quot;trigonometry&quot;,
             &quot;Trigonometrische Identität&quot;,
             &quot;sin(x)^2 + cos(x)^2 wird über die Pythagoräische Identität auf 1 reduziert.&quot;,
@@ -79,7 +84,7 @@ public final class DemoCatalog {
             &quot;sin(x)^2 + cos(x)^2 = 1&quot;,
             &quot;1&quot;
         ));
-<span class="fc" id="L82">        map.put(&quot;polynomial-expansion&quot;, new Demo(</span>
+<span class="fc" id="L87">        map.put(&quot;polynomial-expansion&quot;, new Demo(</span>
             &quot;polynomial-expansion&quot;,
             &quot;Polynom-Expansion&quot;,
             &quot;(x+1)*(x+2) wird durch Distributivität und Zusammenfassen gleicher Terme zu &quot;
@@ -90,18 +95,29 @@ public final class DemoCatalog {
             &quot;(x+1)*(x+2) = x^2 + 3*x + 2&quot;,
             &quot;x ^ 2 + 3 * x + 2&quot;
         ));
-<span class="fc" id="L93">        map.put(&quot;macro-learning&quot;, new Demo(</span>
+<span class="fc" id="L98">        map.put(&quot;macro-learning&quot;, new Demo(</span>
             &quot;macro-learning&quot;,
-            &quot;System lernt eine Makroregel&quot;,
+            &quot;Makro-Lernen untersuchen&quot;,
             &quot;Vier aufeinanderfolgende Suchläufe über (x+1)^2, (x+2)^2, (x+3)^2 und (x+7)^2: &quot;
-                + &quot;nach drei Beispielen aktiviert MacroRuleLearningService die binomische &quot;
-                + &quot;Formel als Makroregel im Inventar, der vierte Lauf nutzt sie und ist messbar &quot;
-                + &quot;kürzer.&quot;,
+                + &quot;Das System verarbeitet die gefundenen Pfade im Makro-Lernen und zeigt, &quot;
+                + &quot;ob der letzte Lauf eine gelernte Regel verwendet. Die unterschiedlichen &quot;
+                + &quot;Eingaben erlauben keinen direkten Laufzeitvergleich.&quot;,
             &quot;(x+7)^2&quot;,
             InputType.TERM,
             SearchProfile.DISCOVERY_PLUS,
-            &quot;(a+b)^2 wird als gelernte Regel angewandt&quot;,
+            &quot;Suchläufe, aktive Makros und tatsächliche Wiederverwendung untersuchen&quot;,
             &quot;49 + 14 * x + x ^ 2&quot;
+        ));
+<span class="fc" id="L111">        map.put(HistoricalConstructionDemo.ID, new Demo(</span>
+            HistoricalConstructionDemo.ID,
+            &quot;Sophie-Germain-Faktorisierung&quot;,
+            &quot;Zerlege das Polynom in zwei nichtkonstante Faktoren. Die Workbench zeigt die Zwischenschritte &quot;
+                + &quot;zur Differenz zweier Quadrate und die exakte Prüfung jedes Schritts.&quot;,
+            &quot;x^4+4*y^4&quot;,
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            &quot;Nichttriviale Faktorisierung&quot;,
+            null
         ));
         // ---------------- math-domain demos (PR #13/follow-up) ----------------
         // These four entries flow through `UnifiedMathDomainWorkbench` instead
@@ -110,7 +126,7 @@ public final class DemoCatalog {
         // appear as first-class citizens in the same workbench UI, replay,
         // proof bridge and macro-rule learning pipeline as the algebraic
         // demos — no special UI path.
-<span class="fc" id="L113">        map.put(&quot;math-equation&quot;, new Demo(</span>
+<span class="fc" id="L129">        map.put(&quot;math-equation&quot;, new Demo(</span>
             &quot;math-equation&quot;,
             &quot;Lineare Gleichung&quot;,
             &quot;x + 3 = 7 wird durch Isolieren der Variablen schrittweise zu x = 4 umgeformt. &quot;
@@ -123,7 +139,7 @@ public final class DemoCatalog {
             &quot;x = 4&quot;,
             &quot;equations&quot;
         ));
-<span class="fc" id="L126">        map.put(&quot;math-inequality&quot;, new Demo(</span>
+<span class="fc" id="L142">        map.put(&quot;math-inequality&quot;, new Demo(</span>
             &quot;math-inequality&quot;,
             &quot;Ungleichung mit Vorzeichen-Flip&quot;,
             &quot;-2*x &lt; 4 wird zu x &gt; -2 umgeformt. Replay markiert die Division durch einen &quot;
@@ -135,7 +151,7 @@ public final class DemoCatalog {
             &quot;x &gt; -2&quot;,
             &quot;inequalities&quot;
         ));
-<span class="fc" id="L138">        map.put(&quot;math-derivative&quot;, new Demo(</span>
+<span class="fc" id="L154">        map.put(&quot;math-derivative&quot;, new Demo(</span>
             &quot;math-derivative&quot;,
             &quot;Ableitung – Potenzregel&quot;,
             &quot;d/dx x^3 wird durch die Anwendung der Potenzregel als gewöhnliche RewriteRule &quot;
@@ -147,7 +163,7 @@ public final class DemoCatalog {
             &quot;3 * x ^ 2&quot;,
             &quot;calculus&quot;
         ));
-<span class="fc" id="L150">        map.put(&quot;math-matrix&quot;, new Demo(</span>
+<span class="fc" id="L166">        map.put(&quot;math-matrix&quot;, new Demo(</span>
             &quot;math-matrix&quot;,
             &quot;Matrix-Distributivität&quot;,
             &quot;A*(B+C) wird durch Distributivität zu A*B + A*C umgeformt. Die LaTeX-Ausgabe &quot;
@@ -164,7 +180,7 @@ public final class DemoCatalog {
         // pipeline but are tagged with domain=&quot;didactic&quot; so the UI can
         // route them to the Didaktik panel (replay with SymbolDiff,
         // hint mode, step check).
-<span class="fc" id="L167">        map.put(&quot;didaktik-multipath&quot;, new Demo(</span>
+<span class="fc" id="L183">        map.put(&quot;didaktik-multipath&quot;, new Demo(</span>
             &quot;didaktik-multipath&quot;,
             &quot;Mehrere Lösungswege&quot;,
             &quot;(x+1)*(x+2) lässt sich auf mehreren Wegen vereinfachen: erst ausmultiplizieren &quot;
@@ -177,7 +193,7 @@ public final class DemoCatalog {
             &quot;2 + 3 * x + x ^ 2&quot;,
             &quot;didactic&quot;
         ));
-<span class="fc" id="L180">        map.put(&quot;didaktik-typischer-fehler&quot;, new Demo(</span>
+<span class="fc" id="L196">        map.put(&quot;didaktik-typischer-fehler&quot;, new Demo(</span>
             &quot;didaktik-typischer-fehler&quot;,
             &quot;Typischer Fehler&quot;,
             &quot;Aus (a+b)/b kürzen Lernende oft fälschlich das b zu a. Der Didaktik-Modus &quot;
@@ -189,7 +205,7 @@ public final class DemoCatalog {
             &quot;1 + a / b&quot;,
             &quot;didactic&quot;
         ));
-<span class="fc" id="L192">        map.put(&quot;didaktik-hinweis&quot;, new Demo(</span>
+<span class="fc" id="L208">        map.put(&quot;didaktik-hinweis&quot;, new Demo(</span>
             &quot;didaktik-hinweis&quot;,
             &quot;Hinweis-Modus&quot;,
             &quot;a*(b+c) soll ausmultipliziert werden. Der Hinweis-Modus liefert gestufte Hilfen: &quot;
@@ -201,7 +217,7 @@ public final class DemoCatalog {
             &quot;a * b + a * c&quot;,
             &quot;didactic&quot;
         ));
-<span class="fc" id="L204">        map.put(&quot;didaktik-schrittpruefung&quot;, new Demo(</span>
+<span class="fc" id="L220">        map.put(&quot;didaktik-schrittpruefung&quot;, new Demo(</span>
             &quot;didaktik-schrittpruefung&quot;,
             &quot;Schrittprüfung&quot;,
             &quot;Die Lernenden geben einen Zwischenschritt ein. Der StudentStepValidator prüft &quot;
@@ -213,32 +229,32 @@ public final class DemoCatalog {
             &quot;2 * x + 6&quot;,
             &quot;didactic&quot;
         ));
-<span class="fc" id="L216">        return java.util.Collections.unmodifiableMap(map);</span>
+<span class="fc" id="L232">        return java.util.Collections.unmodifiableMap(map);</span>
     }
 
     private DemoCatalog() {
     }
 
     public static Map&lt;String, Demo&gt; all() {
-<span class="fc" id="L223">        return DEMOS;</span>
+<span class="fc" id="L239">        return DEMOS;</span>
     }
 
     public static Demo byId(String id) {
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (id == null) {</span>
-<span class="nc" id="L228">            return null;</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L244">            return null;</span>
         }
-<span class="fc" id="L230">        String key = id.toLowerCase(java.util.Locale.ROOT);</span>
-<span class="fc" id="L231">        Demo found = DEMOS.get(key);</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (found != null) {</span>
-<span class="fc" id="L233">            return found;</span>
+<span class="fc" id="L246">        String key = id.toLowerCase(java.util.Locale.ROOT);</span>
+<span class="fc" id="L247">        Demo found = DEMOS.get(key);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (found != null) {</span>
+<span class="fc" id="L249">            return found;</span>
         }
         // Backwards-compatible alias: the demo formerly known as &quot;equation&quot;
         // has been honestly renamed to &quot;polynomial-expansion&quot; because the
         // current atomic rule set does not solve linear equations.
-<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (&quot;equation&quot;.equals(key)) {</span>
-<span class="fc" id="L239">            return DEMOS.get(&quot;polynomial-expansion&quot;);</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (&quot;equation&quot;.equals(key)) {</span>
+<span class="fc" id="L255">            return DEMOS.get(&quot;polynomial-expansion&quot;);</span>
         }
-<span class="nc" id="L241">        return null;</span>
+<span class="nc" id="L257">        return null;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -21,9 +21,37 @@ Beide Zugänge sind auch über den Tab **Hilfe** erreichbar und laden keine Asse
 
 ## Einstieg über die Demo-Karten
 
-Der Startbereich bietet vorbereitete Aufgaben für binomische Formeln, Bruchkürzung, Trigonometrie, Polynom-Expansion, Makroregel-Lernen, Gleichungen, Ungleichungen, Ableitungen und Matrizen.
+Über **Berechnung optimieren** öffnest du das vorausgefüllte Beispiel für
+quadrierte Abstände. **Regeln lernen und vergleichen** führt zum Tab **Vergleich**
+mit einem Link zu den aufgezeichneten Lernvergleichen. Die Demo-Karten bieten
+außerdem vorbereitete Aufgaben für binomische Formeln, Bruchkürzung,
+Trigonometrie, Polynom-Expansion, Gleichungen, Ungleichungen, Ableitungen und
+Matrizen.
 
-Ein Klick startet nicht nur eine isolierte Berechnung. Die Workbench führt den vollständigen Ablauf aus, zeigt eine Zusammenfassung und macht anschließend die passenden Bereiche für Suchgraph, AST-Regelradar, Pfade, Replay, Identitäten, Qualität und Export zugänglich.
+Unter den Demo-Karten startet **Sophie-Germain faktorisieren** eine Suche
+für `x^4 + 4*y^4`. Die Zusammenfassung zeigt das Faktorisierungsziel, das
+gefundene Produkt, die geprüften Schritte und den logischen Aufwand. **Exakt
+geprüft** öffnet die Prüfdaten einer Umformung. **Im Replay öffnen** zeigt
+genau diesen Schritt. Unter **Rechenauftrag und Aussagekraft** stehen das
+Suchprofil, die Grenzen des Laufs und die Bedeutung der Arbeitszahl.
+[Bedienablauf](user-workflows.md#eine-historische-faktorisierung-nachverfolgen)
+
+Eine Suchdemo zeigt eine Zusammenfassung und öffnet die passenden Bereiche für
+Suchgraph, AST-Regelradar, Pfade, Replay, Identitäten, Qualität und Export. Die
+Makro-Demo meldet, ob im letzten Suchlauf eine gelernte Regel zur Anwendung kam.
+Die Suchläufe verwenden unterschiedliche Eingaben. Für einen Nutzenvergleich
+auf derselben Aufgabe öffne den aufgezeichneten Lernvergleich.
+[Beispiele mit Bildschirmaufnahmen](demo-gallery.md)
+
+### Summenschleifen beschleunigen
+
+**Algorithmus herleiten** prüft den eingegebenen **Summanden** und zeigt den
+Rechenplan mit seinen Zwischensummen und der Formel. Unter **Herleitung und
+Prüfung** findest du die einzelnen Prüfschritte. **Zeilenanzahl für den
+Vergleich** bestimmt die **Hochrechnung**. Unter **Exakte Beispielauswertung**
+siehst du das Ergebnis für die eingegebenen Zeilen. Bei leerem Wertefeld zeigt
+die Workbench **Keine Beispieldaten eingegeben.** Sobald du eine Eingabe oder
+Berechnungsart änderst, verschwindet das bisherige Ergebnis. [Bedienablauf und Varianten](user-workflows.md#summenschleifen-optimieren)
 
 ## Oberfläche
 
@@ -94,9 +122,20 @@ Der Tab **Benchmark** stellt reproduzierbare Szenarien mit Ampelstatus und Quali
 
 Im **Replay** wird ein ausgewählter Rechenweg abgespielt oder schrittweise durchlaufen. Geänderte mathematische Teile werden hervorgehoben. Kritische Operationen, Annahmen und mögliche Änderungen eines Vergleichszeichens müssen direkt am betroffenen Schritt verständlich sein.
 
+Im Kandidatendossier eines gespeicherten nativen Laufs kannst du die **Replay-Ansicht
+der gespeicherten Schritte** öffnen. Jeder Schritt zeigt den vollständigen Ausdruck
+vor und nach der Umformung, die tatsächliche Quellposition und die konkrete
+Ersetzung. **Ausführungsdaten und Zuordnung anzeigen** öffnet die gespeicherten
+Details zum Schritt. Über **Gespeicherte Graphkante öffnen** prüfst du den
+zugehörigen Übergang im Suchgraphen. [Nativer Trace und Vorkommensbindung](native-target-free-workspace.md#quellenbindung-und-anzeige)
+
 ### Vergleich
 
 Der Tab **Vergleich** stellt zwei Ergebnisse oder Rechenwege nebeneinander. Er unterstützt die Auswahl nach Ergebnisform, Pfadlänge, Komplexität, didaktischer Eignung oder Beweisfreundlichkeit.
+
+Die aufgezeichneten Lernvergleiche laden gespeicherte Aufgaben, Ziele, Prüfergebnisse
+und Suchzahlen. Die englische Ansicht lässt positive Fälle und Negativkontrollen
+einzeln öffnen. [Bedienablauf und Beispiel](user-workflows.md#aufgezeichnete-lernvergleiche-öffnen)
 
 ### Inventar
 

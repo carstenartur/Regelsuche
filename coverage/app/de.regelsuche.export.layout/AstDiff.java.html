@@ -56,8 +56,8 @@ public final class AstDiff {
 <span class="fc bfc" id="L56" title="All 2 branches covered.">            &amp;&amp; binary.operator().precedence() &gt;= parentPrecedence) {</span>
 <span class="fc" id="L57">            List&lt;MathLayoutNode&gt; out = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L58">            int leftParent = binary.operator().precedence();</span>
-<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            int rightParent = binary.operator() == BinaryOperator.SUB</span>
-<span class="nc" id="L60">                ? binary.operator().precedence() + 1</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            int rightParent = binary.operator() == BinaryOperator.SUB</span>
+<span class="fc" id="L60">                ? binary.operator().precedence() + 1</span>
 <span class="fc" id="L61">                : binary.operator().precedence();</span>
 <span class="fc" id="L62">            out.addAll(nodesFor(binary.left(), oppositeRoot, renderer, leftParent, cssClass));</span>
 <span class="fc" id="L63">            out.add(MathLayoutNode.fragment(operatorLatex(binary.operator()), cssClass));</span>
@@ -88,9 +88,9 @@ public final class AstDiff {
     }
 
     private static String operatorLatex(BinaryOperator operator) {
-<span class="pc bpc" id="L91" title="3 of 5 branches missed.">        return switch (operator) {</span>
+<span class="pc bpc" id="L91" title="2 of 5 branches missed.">        return switch (operator) {</span>
 <span class="fc" id="L92">            case ADD -&gt; &quot; + &quot;;</span>
-<span class="nc" id="L93">            case SUB -&gt; &quot; - &quot;;</span>
+<span class="fc" id="L93">            case SUB -&gt; &quot; - &quot;;</span>
 <span class="fc" id="L94">            case MUL -&gt; &quot; \\cdot &quot;;</span>
 <span class="nc" id="L95">            case DIV -&gt; &quot; / &quot;;</span>
 <span class="nc" id="L96">            case POW -&gt; &quot;^&quot;;</span>
