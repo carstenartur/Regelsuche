@@ -1,61 +1,67 @@
 package de.regelsuche.solver.portfolio;
 
-import de.regelsuche.solver.ir.SolverIr.Expression;
+import static de.regelsuche.solver.portfolio.Z3ProofSyntax.*;
+import static de.regelsuche.solver.portfolio.Z3ProofValues.*;
+
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.Relation;
 import de.regelsuche.solver.ir.SolverIr.Sort;
-import de.regelsuche.solver.ir.SolverIr.Symbol;
 import de.regelsuche.solver.ir.SolverIr.Theory;
-import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-/** Checks a bounded fragment of Z3's native object without invoking any solver. */
+/** Checks bounded native equality/ring proofs without invoking an external solver. */
 public final class Z3EqualityProofReplay {
     static final int MAX_BYTES = 131_072;
-    private Z3EqualityProofReplay() {}
+    private Z3EqualityProofReplay() { }
 
     /** Require a complete contradiction using every supplied premise and the exact negated goal. */
     public static boolean verifies(Obligation obligation, String object) {
         if (obligation == null || object == null || object.length() > MAX_BYTES
+                || object.getBytes(StandardCharsets.UTF_8).length > MAX_BYTES
                 || !obligation.theories().equals(List.of(Theory.REAL_ARITHMETIC))
-                || obligation.assumptions().size() > 128
+                || obligation.assumptions().size() > 128 || obligation.declarations().size() > 128
                 || obligation.declarations().stream().anyMatch(d -> d.sort() != Sort.REAL)) return false;
         try {
-            var checker = new Checker();
+            var checker = new Checker(obligation);
             for (var premise : obligation.assumptions()) {
-                checker.addAssertion(equality(premise.relation(), premise.left(), premise.right()));
+                checker.addAssertion(checker.equality(premise.relation(), premise.left(), premise.right()));
             }
             var goal = obligation.goal();
-            checker.addAssertion(equality(goal.relation(), goal.left(), goal.right()).negate());
-            return checker.check(new Parser(object).read());
-        } catch (Invalid unsupported) {
+            checker.addAssertion(checker.values.negate(checker.equality(goal.relation(), goal.left(), goal.right())));
+            return checker.check(Z3ProofSyntax.parse(object));
+        } catch (Invalid | IllegalArgumentException | ArithmeticException unsupported) {
             return false;
         }
     }
 
-    private record Formula(String left, String right, boolean negative) {
-        Formula negate() { return new Formula(left, right, !negative); }
-        Formula reverse() { return new Formula(right, left, negative); }
-    }
-
-    private static Formula equality(Relation relation, Expression left, Expression right) {
-        if (relation != Relation.EQUALS || !(left instanceof Symbol a) || !(right instanceof Symbol b)) throw new Invalid();
-        return new Formula(a.name(), b.name(), false);
-    }
-
-    /** A null conclusion represents false. Dependencies are the actual asserted leaves of this derivation. */
-    private record Step(Formula conclusion, BitSet dependencies) {}
+    /** Dependencies are the actual asserted leaves used by this checked derivation. */
+    private record Step(Formula conclusion, BitSet dependencies) { }
 
     private static final class Checker {
         private final Map<Formula, Integer> assertions = new HashMap<>();
-        private final Map<String, Formula> formulas = new HashMap<>();
         private final Map<String, Step> steps = new HashMap<>();
+        private final Z3ProofValues values;
+        private final Z3PolynomialProofRewrites rewrites;
+
+        Checker(Obligation obligation) {
+            values = new Z3ProofValues(obligation.declarations().stream().map(d -> d.name()).collect(Collectors.toSet()));
+            rewrites = new Z3PolynomialProofRewrites(obligation);
+        }
+
+        Equality equality(Relation relation, de.regelsuche.solver.ir.SolverIr.Expression left,
+                          de.regelsuche.solver.ir.SolverIr.Expression right) {
+            if (relation != Relation.EQUALS) throw new Invalid();
+            return values.equality(values.expression(left), values.expression(right));
+        }
 
         void addAssertion(Formula assertion) {
-            // Indistinguishable duplicate premise IDs cannot be recovered from native asserted leaves.
+            // Native asserted leaves cannot recover distinct IDs for indistinguishable premises.
             if (assertions.putIfAbsent(assertion, assertions.size()) != null) throw new Invalid();
         }
 
@@ -68,49 +74,49 @@ public final class Z3EqualityProofReplay {
             Node body = proof.get(1);
             while (body.head("let")) {
                 var let = body.items(3);
-                var binding = let.get(1).items(1).getFirst().items(2);
-                bind(binding.get(0).atom(), binding.get(1));
+                bindParallel(let.get(1));
                 body = let.get(2);
             }
             Step result = step(body);
-            return result.conclusion() == null && result.dependencies().cardinality() == assertions.size();
+            return result.conclusion() == Truth.FALSE && result.dependencies().cardinality() == assertions.size();
         }
 
-        private void bind(String name, Node value) {
-            if (name.matches("\\$x[0-9]+") && !formulas.containsKey(name)) {
-                formulas.put(name, formula(value));
-            } else if (name.matches("@x[0-9]+") && !steps.containsKey(name)) {
-                steps.put(name, step(value));
-            } else {
-                throw new Invalid();
+        private void bindParallel(Node node) {
+            if (node.children() == null || node.children().isEmpty()) throw new Invalid();
+            var names = new HashSet<String>();
+            var pendingValues = new HashMap<String, Value>();
+            var pendingSteps = new HashMap<String, Step>();
+            for (Node binding : node.children()) {
+                var pair = binding.items(2);
+                String name = pair.get(0).atom();
+                if (!names.add(name) || values.bound(name) || steps.containsKey(name)) throw new Invalid();
+                if (name.matches("\\?x[0-9]+")) {
+                    pendingValues.put(name, asReal(values.value(pair.get(1))));
+                } else if (name.matches("\\$x[0-9]+")) {
+                    pendingValues.put(name, values.formula(pair.get(1)));
+                } else if (name.matches("@x[0-9]+")) {
+                    pendingSteps.put(name, step(pair.get(1)));
+                } else throw new Invalid();
             }
-        }
-
-        private Formula formula(Node node) {
-            if (node.head("=")) {
-                var args = node.items(3);
-                return new Formula(args.get(1).atom(), args.get(2).atom(), false);
-            }
-            if (node.head("not")) {
-                Formula value = formula(node.items(2).get(1));
-                if (value.negative()) throw new Invalid();
-                return value.negate();
-            }
-            Formula bound = formulas.get(node.atom());
-            if (bound == null) throw new Invalid();
-            return bound;
+            // SMT lets are parallel: no RHS can observe a newly introduced sibling.
+            values.bindAll(pendingValues);
+            steps.putAll(pendingSteps);
         }
 
         private Step step(Node node) {
-            if (node.atom != null) {
-                Step bound = steps.get(node.atom);
+            if (node.token() != null) {
+                Step bound = steps.get(node.atom());
                 if (bound == null) throw new Invalid();
                 return bound;
             }
             return switch (node.first()) {
-                case "asserted" -> asserted(formula(node.items(2).get(1)));
+                case "asserted" -> asserted(values.formula(node.items(2).get(1)));
+                case "refl" -> reflexivity(node.items(2));
                 case "symm" -> symmetry(node.items(3));
                 case "trans", "trans*" -> transitivity(node);
+                case "monotonicity" -> congruence(node);
+                case "rewrite" -> rewrite(node.items(2));
+                case "mp" -> modusPonens(node.items(4));
                 case "unit-resolution" -> resolve(node.items(4));
                 default -> throw new Invalid();
             };
@@ -124,98 +130,100 @@ public final class Z3EqualityProofReplay {
             return new Step(value, used);
         }
 
+        private Step reflexivity(List<Node> nodes) {
+            Equality equality = asEquality(values.formula(nodes.get(1)));
+            if (!equality.left().equals(equality.right())) throw new Invalid();
+            return new Step(equality, new BitSet());
+        }
+
         private Step symmetry(List<Node> nodes) {
             Step source = step(nodes.get(1));
-            Formula expected = positive(source).reverse();
-            if (!expected.equals(formula(nodes.get(2)))) throw new Invalid();
+            Equality expected = asEquality(source.conclusion()).reverse();
+            if (!expected.equals(values.formula(nodes.get(2)))) throw new Invalid();
             return new Step(expected, source.dependencies());
         }
 
         private Step transitivity(Node node) {
-            var chain = node.children;
-            if (chain.size() < 4 || (node.head("trans") && chain.size() != 4)) throw new Invalid();
+            var chain = node.children();
+            if (chain.size() < 4 || node.head("trans") && chain.size() != 4) throw new Invalid();
             Step start = step(chain.get(1));
-            Formula first = positive(start);
+            Equality first = asEquality(start.conclusion());
             var used = (BitSet) start.dependencies().clone();
-            String end = first.right();
+            Value end = first.right();
             for (int i = 2; i < chain.size() - 1; i++) {
                 Step next = step(chain.get(i));
-                Formula link = positive(next);
+                Equality link = asEquality(next.conclusion());
                 if (!end.equals(link.left())) throw new Invalid();
                 end = link.right();
                 used.or(next.dependencies());
             }
-            var expected = new Formula(first.left(), end, false);
-            if (!expected.equals(formula(chain.getLast()))) throw new Invalid();
+            Equality expected = values.equality(first.left(), end);
+            if (!expected.equals(values.formula(chain.getLast()))) throw new Invalid();
             return new Step(expected, used);
+        }
+
+        private Step congruence(Node node) {
+            var parts = node.children();
+            if (parts.size() < 2) throw new Invalid();
+            Equality result = asEquality(values.formula(parts.getLast()));
+            if (!sameOperator(result.left(), result.right())) throw new Invalid();
+            var left = arguments(result.left());
+            var right = arguments(result.right());
+            if (left.size() != right.size()) throw new Invalid();
+            var covered = new BitSet();
+            var used = new BitSet();
+            for (int i = 1; i < parts.size() - 1; i++) {
+                Step premise = step(parts.get(i));
+                Equality equality = asEquality(premise.conclusion());
+                boolean relevant = false;
+                boolean newChange = false;
+                for (int j = 0; j < left.size(); j++) {
+                    if (equality.left().equals(left.get(j)) && equality.right().equals(right.get(j))) {
+                        newChange |= !covered.get(j) && !left.get(j).equals(right.get(j));
+                        covered.set(j);
+                        relevant = true;
+                    }
+                }
+                if (!relevant || !premise.dependencies().isEmpty() && !newChange) throw new Invalid();
+                used.or(premise.dependencies());
+            }
+            for (int i = 0; i < left.size(); i++) {
+                if (!left.get(i).equals(right.get(i)) && !covered.get(i)) throw new Invalid();
+            }
+            return new Step(result, used);
+        }
+
+        private Step rewrite(List<Node> nodes) {
+            Equality result = asEquality(values.formula(nodes.get(1)));
+            if (!rewrites.verifies(result)) throw new Invalid();
+            return new Step(result, new BitSet());
+        }
+
+        private Step modusPonens(List<Node> nodes) {
+            Step premise = step(nodes.get(1)), bridge = step(nodes.get(2));
+            Equality implication = asEquality(bridge.conclusion());
+            Formula result = values.formula(nodes.get(3));
+            if (!implication.left().equals(premise.conclusion()) || !implication.right().equals(result)) throw new Invalid();
+            return new Step(result, union(premise, bridge));
         }
 
         private Step resolve(List<Node> nodes) {
             Step a = step(nodes.get(1)), b = step(nodes.get(2));
-            if (!nodes.get(3).is("false") || a.conclusion() == null
-                    || !a.conclusion().negate().equals(b.conclusion())) throw new Invalid();
-            var used = (BitSet) a.dependencies().clone();
-            used.or(b.dependencies());
-            return new Step(null, used);
+            boolean opposite = a.conclusion() instanceof Negation n && n.operand().equals(b.conclusion())
+                || b.conclusion() instanceof Negation m && m.operand().equals(a.conclusion());
+            if (!nodes.get(3).is("false") || !opposite) throw new Invalid();
+            return new Step(Truth.FALSE, union(a, b));
         }
 
-        private static Formula positive(Step step) {
-            if (step.conclusion() == null || step.conclusion().negative()) throw new Invalid();
-            return step.conclusion();
-        }
-    }
-
-    /** Bounded wire syntax only. Formulas and proof steps have separate namespaces above. */
-    private record Node(String atom, List<Node> children) {
-        @Override public String atom() {
-            if (atom == null) throw new Invalid();
-            return atom;
-        }
-        boolean is(String value) { return value.equals(atom); }
-        boolean head(String value) { return children != null && !children.isEmpty() && children.getFirst().is(value); }
-        String first() { if (children == null || children.isEmpty()) throw new Invalid(); return children.getFirst().atom(); }
-        List<Node> items(int arity) { if (children == null || children.size() != arity) throw new Invalid(); return children; }
-    }
-
-    private static final class Parser {
-        private final String text;
-        private int offset, nodes;
-
-        Parser(String text) { this.text = text; }
-
-        Node read() {
-            Node root = read(0);
-            space();
-            if (offset != text.length()) throw new Invalid();
-            return root;
+        private static BitSet union(Step first, Step second) {
+            var result = (BitSet) first.dependencies().clone();
+            result.or(second.dependencies());
+            return result;
         }
 
-        private Node read(int depth) {
-            space();
-            if (++nodes > 8192 || depth > 128 || offset == text.length()) throw new Invalid();
-            if (text.charAt(offset) != '(') {
-                int begin = offset;
-                while (offset < text.length() && !delimiter(text.charAt(offset))) offset++;
-                if (begin == offset || offset - begin > 256) throw new Invalid();
-                return new Node(text.substring(begin, offset), null);
-            }
-            offset++;
-            var children = new ArrayList<Node>();
-            space();
-            while (offset < text.length() && text.charAt(offset) != ')') {
-                children.add(read(depth + 1));
-                space();
-            }
-            if (offset == text.length()) throw new Invalid();
-            offset++;
-            return new Node(null, children);
+        private static Equality asEquality(Formula formula) {
+            if (!(formula instanceof Equality equality)) throw new Invalid();
+            return equality;
         }
-
-        private static boolean delimiter(char c) { return c == '(' || c == ')' || Character.isWhitespace(c); }
-        private void space() { while (offset < text.length() && Character.isWhitespace(text.charAt(offset))) offset++; }
-    }
-
-    private static final class Invalid extends RuntimeException {
-        private static final long serialVersionUID = 1L;
     }
 }

@@ -93,22 +93,104 @@ A reported `unsat` alone is insufficient: a second invocation must retrieve a
 nonempty proof object. `executeWithEvidence` retains the complete SMT inputs,
 stdout/stderr, invocation status and proof object as well as the canonical
 native evidence chain. The stored proof text has exactly the certificate hash
-reported by the backend. The optional `RetainedAttempt.replaysEqualityProof(expected)` reads the
-retained object, checks its hash and the expected native obligation, and calls
-a solver-independent Java checker. The supported fragment is equality between
-declared real symbols. The checker validates each native asserted leaf, equality
-symmetry, transitivity and final unit resolution. Acceptance requires a
-derivation of false from the exact negated goal and every distinct premise.
-Duplicate or unused premises and unsupported native rules yield no replay.
-The raw checker `Z3EqualityProofReplay.verifies(expected, object)` performs
-the same proof check using only the typed statement and object text. Neither
-entry point invokes Z3 or infers consistency of the premises. Existing
-arithmetic proof retention and portfolio result statuses remain separate.
+reported by the backend.
 
-The checked-proof suite generates fresh objects with the installed Z3 binary
-for an equality chain and its symmetry control. It also exercises changed
-goals, changed asserted leaves, missing premises, truncated objects and a
-proof file exchanged between two genuine executions.
+### Optional independent polynomial proof replay
+
+`RetainedAttempt.replaysEqualityProof(expected)` additionally binds the expected
+obligation, the original confirmed execution and the retained proof hash before
+calling the Java checker. `Z3EqualityProofReplay.verifies(expected, object)`
+checks the same mathematical derivation using only the typed statement and
+object text. Neither entry point invokes an external solver. They return a
+Boolean result separately from the existing solver status and capabilities:
+`SMT_UNSAT_PROOF_OBJECT` still describes the external proof object, not an
+independently replayed proof. An unsupported or exhausted replay returns
+`false`; it does not refute the theorem or revoke the external execution.
+
+Real terms reuse `SolverIr.Expression`: declared real symbols, exact decimal
+literals, addition, subtraction, multiplication and positive integer powers
+with exponents 1–20. Exponent zero is rejected: native Z3 `^` does not establish
+the convention `0^0 = 1`, so replay cannot import that normalization from the
+polynomial backend.
+The native syntax can contain n-ary arithmetic arguments, unary minus and
+`to_real` on integer literals. A quotient of literal constants is accepted
+only when exact decimal division terminates: `(/ 1.0 2.0)` denotes exactly
+`0.5`, while `(/ 1.0 3.0)`, division by zero and symbolic denominators remain
+unsupported. No rounded coefficient enters replay. Native argument positions
+remain available to the congruence checker even when an n-ary term is folded
+into the existing binary IR.
+
+The supported proof rules are `asserted`, `refl`, `symm`, ordered `trans`/`trans*`,
+`monotonicity`, `rewrite`, `mp` and two-complement `unit-resolution`.
+Congruence checks the operator, argument count and an exact equality proof for
+each changed argument. A proof carrying premise dependencies must cover at
+least one changed argument position that has not already been covered; an
+unchanged or already covered position alone cannot justify those dependencies.
+Dependency-free reflexivity, including exact numeral coercions, is permitted.
+This is a local relevance check, not a proof that the overall premise set is
+minimal. Boolean equality, negation and constants support the
+equivalences used by native normalization proofs; `mp` checks both sides of
+the claimed equivalence. Every polynomial `rewrite` is checked without
+premises by `PolynomialNormalFormSolverBackend`. The native rule name grants
+no authority. A failed polynomial identity check is never interpreted as a
+disequality valid for every assignment: `x = 0` is neither constantly true
+nor constantly false.
+
+Assertions must match the original premises or exact negated goal after exact
+numeral/coercion normalization. An algebraically equivalent replacement is not
+an authorized asserted leaf. Acceptance requires a derivation of `false` using
+the exact negated goal and every distinct supplied premise. Duplicate and
+unused premises are rejected. Term (`?x`), formula (`$x`) and proof (`@x`)
+bindings have separate checked kinds. Multi-binding `let` expressions are
+parallel; duplicate, shadowed and forward bindings are rejected.
+
+The admission limits are conservative resource limits, not a measured speed
+advantage or a complete cost model:
+
+| Admission check | Limit |
+| --- | --- |
+| Proof object | 131,072 UTF-8 bytes; also at most 131,072 Java characters |
+| Wire syntax | 8,192 nodes, depth 128, atom length 256 |
+| Typed request | 128 real declarations and 128 equality premises |
+| Native arithmetic arguments and scalar literal text | 128 arguments; 256 characters per literal |
+| Expanded term/formula size | 4,096 per value; cumulative admission charge 65,536 |
+| Polynomial expansion estimate | 256 monomials, total degree 32, literal power exponent 1–20 |
+| Coefficient admission estimates | At most 4,096 bits each for coefficient numerators and a common denominator |
+| Uncached polynomial leaf checks | 128 calls; cumulative size-times-monomial estimate 262,144 |
+
+Coefficient growth is bounded before normalization, including constant
+coefficients embedded in nonconstant terms. The estimates can reject an
+expression whose fully reduced coefficients would be smaller; they do not
+promise a minimal or exact operation count. Limits are checked before the
+corresponding polynomial leaf is dispatched.
+Inequality theory lemmas (`th-lemma`), quantifiers, general clause resolution,
+scoped hypothesis/lemma discharge and analytic calls are outside this replay
+grammar. General binders, sets, summability and limit semantics, broader replay
+grammars, learned tactics and imported-lemma dependency evidence in #1066
+remain separate work. Issue #1066 remains open.
+
+### Native evidence and reproduction
+
+The [four retained Z3 4.8.12 fixtures](../regelsuche-solver-portfolio/src/test/resources/z3-proof-replay/README.md)
+cover distributivity, addition of zero, exact decimal coefficient collection
+and a rejected conditional object. The conditional request `x = y ⊢ x*z = y*z`
+returns `unsat` externally, but the captured default object omits the `x = y`
+asserted leaf and uses a condition-dependent `rewrite`. Independent replay
+rejects it both with the original premise and with the premise removed.
+This is a coverage boundary of the retained object and checker, not a claim
+that the conditional mathematical statement is false.
+
+The checked-proof suite also obtains fresh objects through
+`executeWithEvidence` for distributivity, decimal collection, cubic expansion,
+the earlier symbol-equality chain and its symmetry control. Exact statement
+binding is tested with changed coefficients, reversed goals and added
+premises; retained-file controls exchange genuine proofs and truncate an
+object. The focused replay tests check explicit congruence derivations and
+forged rewrites independently of a Z3 installation. Native proof choices may
+differ between Z3 versions; a different rule grammar is not automatically
+accepted. See the commands below to run the real-tool lane without treating
+skipped tests as evidence. These controls establish bounded replay behavior,
+not general SMT proof completeness or a solver performance comparison.
 
 ## Process success is not mathematical evidence
 
@@ -133,6 +215,19 @@ factories support application-owned directories.
 
 Generic contract tests do not need a prover installation. Real tool tests are
 separate and must actually execute, not merely be skipped:
+
+```sh
+z3 --version
+mvn -B -pl regelsuche-solver-portfolio -am \
+  -Dtest=Z3EqualityProofReplayTest,Z3SmtSolverBackendTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+This targeted replay run requires Z3 on `PATH`; check that the native-object
+tests execute without skips. The independent Java fixture checks also run
+when Z3 is absent, but alone do not establish the fresh-execution result.
+
+For the separate Lean and application-bridge real-tool controls:
 
 ```sh
 export REGELSUCHE_REAL_LEAN=true

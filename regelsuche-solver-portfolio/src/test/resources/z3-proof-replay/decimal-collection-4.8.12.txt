@@ -1,0 +1,8 @@
+((set-logic ALL)
+(proof
+(let ((?x31 (* (/ 3.0 4.0) x)))
+(let (($x32 (= (+ (* (/ 1.0 2.0) x) (* (/ 1.0 4.0) x)) ?x31)))
+(let (($x33 (not $x32)))
+(let ((@x43 (trans (monotonicity (rewrite $x32) (= $x32 (= ?x31 ?x31))) (rewrite (= (= ?x31 ?x31) true)) (= $x32 true))))
+(let ((@x50 (trans (monotonicity @x43 (= $x33 (not true))) (rewrite (= (not true) false)) (= $x33 false))))
+(mp (asserted $x33) @x50 false))))))))

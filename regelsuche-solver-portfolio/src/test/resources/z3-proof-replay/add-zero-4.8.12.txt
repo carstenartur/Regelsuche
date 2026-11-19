@@ -1,0 +1,9 @@
+((set-logic ALL)
+(proof
+(let ((?x26 (to_real 0)))
+(let ((?x27 (+ x ?x26)))
+(let (($x28 (= ?x27 x)))
+(let ((@x39 (trans (monotonicity (rewrite (= ?x26 0.0)) (= ?x27 (+ x 0.0))) (rewrite (= (+ x 0.0) x)) $x28)))
+(let ((@x46 (trans (monotonicity @x39 (= $x28 (= x x))) (rewrite (= (= x x) true)) (= $x28 true))))
+(let ((@x53 (trans (monotonicity @x46 (= (not $x28) (not true))) (rewrite (= (not true) false)) (= (not $x28) false))))
+(mp (asserted (not $x28)) @x53 false)))))))))
