@@ -1,0 +1,12 @@
+((set-logic ALL)
+(proof
+(let ((@x46 (monotonicity (rewrite (= (* x z) (* y z))) (= (= (* x z) (* y z)) (= (* y z) (* y z))))))
+(let ((@x50 (trans @x46 (rewrite (= (= (* y z) (* y z)) true)) (= (= (* x z) (* y z)) true))))
+(let ((@x53 (monotonicity @x50 (= (not (= (* x z) (* y z))) (not true)))))
+(let ((@x57 (trans @x53 (rewrite (= (not true) false)) (= (not (= (* x z) (* y z))) false))))
+(let ((?x30 (* y z)))
+(let ((?x29 (* x z)))
+(let (($x31 (= ?x29 ?x30)))
+(let (($x32 (not $x31)))
+(let ((@x33 (asserted $x32)))
+(mp @x33 @x57 false))))))))))))

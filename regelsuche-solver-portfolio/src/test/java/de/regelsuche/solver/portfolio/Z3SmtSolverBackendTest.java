@@ -24,6 +24,9 @@ import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
 import de.regelsuche.solver.ir.SolverObligationVerifier;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -459,8 +462,8 @@ class Z3SmtSolverBackendTest {
         assertFalse(Z3EqualityProofReplay.verifies(equalityObligation(List.of(xy), xz), proof));
         assertFalse(Z3EqualityProofReplay.verifies(equalityObligation(List.of(xy, yz),
             new Goal(Relation.EQUALS, z, x)), proof));
-        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.replace("trans*", "unverified-rule")));
-        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.replace("(asserted (= y z))", "(asserted (= x z))")));
+        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.replaceFirst("\\(asserted\\s", "(unverified-rule ")));
+        assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.replaceAll("\\by\\b", "undeclared_y")));
         assertFalse(Z3EqualityProofReplay.verifies(obligation, proof.substring(0, proof.length() - 1)));
         var symmetry = equalityObligation(List.of(xy), new Goal(Relation.EQUALS, y, x));
         var other = detection.backend().executeWithEvidence(symmetry, root);
@@ -469,6 +472,124 @@ class Z3SmtSolverBackendTest {
         java.nio.file.Files.copy(other.directory().resolve("invocation-2/proof.txt"),
             attempt.directory().resolve("invocation-2/proof.txt"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         assertFalse(attempt.replaysEqualityProof(obligation));
+    }
+
+    @Test
+    void independentlyReplaysFreshRealZ3Distributivity(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        assertFreshPolynomialReplay("distributivity", "x * (y + z)", "x * y + x * z", root);
+    }
+
+    @Test
+    void independentlyReplaysFreshRealZ3ExactDecimalCollection(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        assertFreshPolynomialReplay("decimal-collection", "0.5 * x + 0.25 * x", "0.75 * x", root);
+    }
+
+    @Test
+    void independentlyReplaysFreshRealZ3CubicExpansion(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        assertFreshPolynomialReplay("cubic-expansion", "(x + y) * (x + y) * (x + y)",
+            "x * x * x + 3 * x * x * y + 3 * x * y * y + y * y * y", root);
+    }
+
+    @Test
+    void realZ3CountermodelBlocksZeroExponentProofReplay(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        var detection = Z3SmtSolverBackend.detectSystemZ3();
+        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE, detection.detail());
+        // A declared REAL base keeps the actual native power semantics visible.
+        // Z3 can assign its underspecified zero-to-zero case a value other than one.
+        var obligation = polynomialObligation("zero-exponent-countermodel", "x ^ 0", "1", List.of());
+        var attempt = detection.backend().executeWithEvidence(obligation, root);
+
+        assertEquals(TranslationStatus.LOSSLESS, attempt.execution().translation().status());
+        assertEquals("sat", Files.readString(attempt.directory().resolve("invocation-1/stdout.txt")).strip());
+        assertEquals(ResultStatus.REFUTED, attempt.execution().result().status());
+        // Z3 4.8.12 retains a bare definition list, while the optional parsed
+        // counterexample map accepts only a payload wrapped in "(model ...)".
+        String modelOutput = Files.readString(attempt.directory().resolve("invocation-2/stdout.txt"));
+        assertEquals("sat", modelOutput.lines().findFirst().orElse(""));
+        assertTrue(modelOutput.contains("(define-fun"));
+        assertTrue(attempt.execution().result().certificateHash().isEmpty());
+        assertFalse(attempt.replaysEqualityProof(obligation));
+    }
+
+    @Test
+    void retainedPolynomialReplayRejectsChangedStatementAndProofFile(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        var detection = Z3SmtSolverBackend.detectSystemZ3();
+        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE, detection.detail());
+        var obligation = polynomialObligation("polynomial-binding", "x * (y + z)", "x * y + x * z", List.of());
+        var attempt = detection.backend().executeWithEvidence(obligation, root);
+        assertEquals(ResultStatus.CONFIRMED, attempt.execution().result().status());
+        assertTrue(attempt.replaysEqualityProof(obligation));
+        Path proofFile = attempt.directory().resolve("invocation-2/proof.txt");
+        String proof = Files.readString(proofFile);
+
+        // These remain exact statement bindings even when a changed statement is also true.
+        for (var changed : List.of(
+                polynomialObligation("polynomial-binding", "x * y + x * z", "x * (y + z)", List.of()),
+                polynomialObligation("polynomial-binding", "x * (y + z)", "x * y + 2 * x * z", List.of()),
+                polynomialObligation("polynomial-binding", "x * (y + z)", "x * y + x * z", List.of("x = y")))) {
+            assertFalse(attempt.replaysEqualityProof(changed));
+            assertFalse(Z3EqualityProofReplay.verifies(changed, proof));
+        }
+
+        var otherObligation = polynomialObligation("different-polynomial", "0.5 * x + 0.25 * x", "0.75 * x", List.of());
+        var other = detection.backend().executeWithEvidence(otherObligation, root);
+        assertEquals(ResultStatus.CONFIRMED, other.execution().result().status());
+        assertTrue(other.replaysEqualityProof(otherObligation));
+        Files.copy(other.directory().resolve("invocation-2/proof.txt"), proofFile,
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        assertFalse(attempt.replaysEqualityProof(obligation));
+
+        Files.writeString(proofFile, proof.substring(0, proof.lastIndexOf(')')));
+        assertFalse(attempt.replaysEqualityProof(obligation));
+        Files.writeString(proofFile, proof);
+        assertTrue(attempt.replaysEqualityProof(obligation));
+    }
+
+    @Test
+    void realZ3ConditionalExecutionCannotAuthorizeChangedPremises(@org.junit.jupiter.api.io.TempDir Path root) throws Exception {
+        var detection = Z3SmtSolverBackend.detectSystemZ3();
+        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE, detection.detail());
+        var obligation = polynomialObligation("conditional-product", "x * z", "y * z", List.of("x = y"));
+        var attempt = detection.backend().executeWithEvidence(obligation, root);
+        assertEquals(ResultStatus.CONFIRMED, attempt.execution().result().status());
+        assertFalse(attempt.execution().result().certificateHash().isEmpty());
+        assertFalse(attempt.replaysEqualityProof(
+            polynomialObligation("conditional-product", "x * z", "y * z", List.of())));
+        assertFalse(attempt.replaysEqualityProof(
+            polynomialObligation("conditional-product", "x * z", "y * z", List.of("x = z"))));
+        // Native proof choices vary by Z3 release. The captured omission below is the
+        // version-independent rejection control; a future complete native proof may replay.
+    }
+
+    @Test
+    void rejectsCapturedConditionalRewriteWithoutItsPremise() throws Exception {
+        String raw;
+        try (var input = Z3SmtSolverBackendTest.class.getResourceAsStream(
+                "/z3-proof-replay/premise-eliminated-4.8.12.txt")) {
+            raw = new String(java.util.Objects.requireNonNull(input).readAllBytes(), StandardCharsets.UTF_8);
+        }
+        assertFalse(Z3EqualityProofReplay.verifies(
+            polynomialObligation("conditional-product", "x * z", "y * z", List.of("x = y")), raw));
+        assertFalse(Z3EqualityProofReplay.verifies(
+            polynomialObligation("conditional-product", "x * z", "y * z", List.of()), raw));
+    }
+
+    private static void assertFreshPolynomialReplay(String id, String source, String target, Path root) throws Exception {
+        var detection = Z3SmtSolverBackend.detectSystemZ3();
+        assumeTrue(detection.availability() == BackendAvailability.AVAILABLE, detection.detail());
+        var obligation = polynomialObligation(id, source, target, List.of());
+        var attempt = detection.backend().executeWithEvidence(obligation, root);
+        assertEquals(ResultStatus.CONFIRMED, attempt.execution().result().status());
+        assertEquals(TranslationStatus.LOSSLESS, attempt.execution().translation().status());
+        String proof = Files.readString(attempt.directory().resolve("invocation-2/proof.txt"));
+        assertEquals(SolverIr.sha256(proof), attempt.execution().result().certificateHash());
+        assertTrue(attempt.replaysEqualityProof(obligation), "independent replay of " + id);
+        assertTrue(Z3EqualityProofReplay.verifies(obligation, proof));
+    }
+
+    private static Obligation polynomialObligation(String id, String source, String target, List<String> assumptions) {
+        return new SolverObligationFactory().equality(id, source, target, assumptions,
+            RequestedEvidence.FORMAL_PROOF, provenance(id));
     }
 
     @Test

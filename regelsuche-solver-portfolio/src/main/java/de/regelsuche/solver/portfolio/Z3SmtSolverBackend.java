@@ -149,7 +149,7 @@ public final class Z3SmtSolverBackend implements SolverBackend {
 
     /** Full raw evidence for one invocation of this existing backend. */
     public record RetainedAttempt(SolverExecution execution, java.nio.file.Path directory) {
-        /** Optional independent replay of the retained native real-symbol equality fragment. */
+        /** Optional independent replay of the retained bounded real equality/polynomial fragment. */
         public boolean replaysEqualityProof(Obligation expected) throws IOException {
             if (expected == null || !execution.obligationHash().equals(expected.contentHash())
                     || execution.result().status() != ResultStatus.CONFIRMED) return false;
