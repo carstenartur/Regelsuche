@@ -83,6 +83,9 @@ gallery with the existing source-only Sophie-Germain solver instead.
 - [x] Rewrite the README and gallery around the historical result. Review all
   ten open issues against their remaining acceptance criteria; this bounded
   demo does not close the larger research and product requirements.
-- [ ] Record the two historical documentation captures from committed source,
+- [x] Record the two historical documentation captures from committed source,
   verify their metadata and run the documentation checks.
-- [ ] Integrate current main, publish the updated PR and follow its complete CI.
+- [x] Integrate current main (`44646893`). The final recording run repeats the
+  API and browser checks on that integrated source; 40 focused documentation,
+  generation, asset and demo integration checks also pass.
+- [ ] Publish the updated PR and follow its complete CI.
