@@ -161,7 +161,7 @@ ein vollständiges positives Qualification-Receipt belegt.
 Dieses Dokument beschreibt den heutigen Einstieg. Die unveränderlichen
 [0.5.2-Quellen](https://github.com/carstenartur/Regelsuche/tree/v0.5.2) und ihre
 [Release-Hinweise](releases/0.5.2.md) beschreiben die ausgelieferten Funktionen.
-`main` ist derzeit `0.5.3-SNAPSHOT`: spätere API-Ergänzungen und neue Beispiele
+`main` ist derzeit `0.5.4-SNAPSHOT`: spätere API-Ergänzungen und neue Beispiele
 sind nicht automatisch mit 0.5.2 kompatibel. Der exakte `NumberExpr`-AST ist
 allerdings bereits in den tatsächlichen 0.5.2-Core-Binärdateien enthalten und
 wird hier nicht als unveröffentlicht dargestellt. Für eine Integration immer Version, API-Revision und tatsächliche

@@ -167,9 +167,10 @@ class MoreWarmupPolicyTest(unittest.TestCase):
         self.assertIn("'verifyJmhBenchmark'", block)
 
     def test_docker_build_stages_include_configuration_time_policies(self):
-        # The real Docker tests build these stages; this fast contract catches
-        # missing COPY inputs before starting any Gradle or Docker process.
-        for name in ("Dockerfile", "Dockerfile.proof"):
+        # The legacy standard image still configures Gradle in its builder.
+        # The proof image is Maven-built and is verified separately below.
+        # This fast contract catches missing policy COPY inputs before Docker.
+        for name in ("Dockerfile",):
             dockerfile = (ROOT / name).read_text(encoding="utf-8")
             build = dockerfile.split("RUN ./gradlew --no-daemon :app:installDist", 1)[0]
             copied = set()
@@ -193,6 +194,21 @@ class MoreWarmupPolicyTest(unittest.TestCase):
                 with self.subTest(dockerfile=name, policy=policy.name):
                     self.assertIn(policy.relative_to(ROOT), copied,
                                   "Docker build omits required JMH policy before Gradle configuration")
+
+    def test_maven_proof_image_retains_the_tracked_policy_context(self):
+        # The proof image no longer configures the Gradle JMH plugin. Its
+        # Maven builder receives the complete isolated tracked source tree.
+        proof = (ROOT / "Dockerfile.proof").read_text(encoding="utf-8")
+        self.assertIn("FROM maven:3.10.0-eclipse-temurin-25-noble AS build", proof)
+        self.assertIn("COPY . .", proof)
+        self.assertIn("-Pfull -pl app -am", proof)
+        self.assertNotIn("./gradlew", proof)
+        ignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+        # Neither the policy directory nor the source tree can be ignored.
+        self.assertNotIn("\\nconfig/quality", ignore)
+        self.assertNotIn("\\nconfig\\n", ignore)
+        for policy in (THRESHOLD, DECISION, BASELINE):
+            self.assertTrue(policy.is_file(), policy)
 
     def test_gradle_uses_one_execution_source_and_current_verifiers(self):
         app = (ROOT / "app/build.gradle").read_text()
