@@ -36,7 +36,9 @@ class AutopilotArchitectureBoundariesTest {
 
     @Test
     void allDockerBuildsIncludeTheAutopilotCompositionModule() throws IOException {
-        for (String dockerfileName : List.of("Dockerfile", "Dockerfile.proof")) {
+        // The standard image still uses Gradle. The proof image now builds
+        // the dependency-closed application distribution with Maven.
+        for (String dockerfileName : List.of("Dockerfile")) {
             String dockerfile = Files.readString(REPO_ROOT.resolve(dockerfileName));
             assertTrue(
                 dockerfile.contains(
@@ -46,6 +48,14 @@ class AutopilotArchitectureBoundariesTest {
                 dockerfile.contains("COPY regelsuche-autopilot ./regelsuche-autopilot"),
                 () -> dockerfileName + " must copy the Autopilot sources");
         }
+        String proof = Files.readString(REPO_ROOT.resolve("Dockerfile.proof"));
+        assertTrue(proof.contains("COPY . ."),
+            "Maven proof-image context must include tracked module sources");
+        assertTrue(proof.contains("-Pfull -pl app -am"),
+            "Proof image must resolve its production application module graph");
+        assertTrue(Files.readString(REPO_ROOT.resolve("pom.xml"))
+            .contains("<module>regelsuche-autopilot</module>"),
+            "The full Maven reactor must continue to declare Autopilot");
     }
 
     private static List<String> projectDependencyTokens(String buildFileContent) {

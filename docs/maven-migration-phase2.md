@@ -39,3 +39,22 @@ The Java generators and the current Python evidence verifiers in learning/discov
 ## Claim boundary
 
 This phase expands the executable Maven/JUnit reactor. It does not yet make Maven authoritative for the whole repository, and it does not claim that all evidence gates or integration tests have migrated.
+
+## Proof Docker image: Maven application distribution
+
+The `Dockerfile.proof` build stage now uses the exact-versioned JDK 25 /
+Maven 3.10.0 builder and assembles the production application with
+`mvn -Pfull -pl app -am -Dmaven.test.skip=true package`. The Maven assembly
+archive is unpacked into the unchanged JRE 25 runtime, where the Maven
+`bin/regelsuche` launcher starts the same `de.regelsuche.App` entry point.
+The test skip applies only to image construction; the actual Z3/cvc5 and
+Sophie-Germain proof workflow are exercised separately by
+`ProofDockerImageIntegrationTest` under Testcontainers. The Docker context
+is derived from the immutable tracked-file snapshot and excludes mutable
+`build`/`target` outputs. The public source and license files required
+by the distribution descriptor remain available to Maven.
+
+This is **one image-production path**, not a claim that the standard image,
+all evidence producers, browser and SymPy profiles or CI have migrated away
+from Gradle/host scripts. Neither this image build nor green image tests
+establish a fix for the previously intermittent Docker daemon failure.
