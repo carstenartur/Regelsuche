@@ -207,7 +207,7 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
           -Dregelsuche.tests.mavenPages=true verify
-      - name: Reproduce Maven build contract from a Git-free source archive
+      - name: Reproduce full Maven lifecycle from a Git-free source archive
         run: |
           set -euo pipefail
           source_root="$(mktemp -d "${RUNNER_TEMP}/regelsuche-maven-source.XXXXXXXX")"
@@ -215,27 +215,17 @@ jobs:
           git archive --format=tar HEAD | tar -xf - -C "$source_root"
           (
             cd "$source_root"
-            # Replay the whole initial Maven/JUnit core slice from the fresh
-            # Git-free archive. The Java contract requires actual executed
-            # Surefire tests in every declared module, not just the core.
-            mvn --batch-mode --no-transfer-progress \
-              -Dregelsuche.sourceArchiveMode=true -DfailIfNoTests=true \
-              -pl regelsuche-core,regelsuche-egraph,regelsuche-search,regelsuche-validation,regelsuche-math-algorithms,maven-build-contract -am test
-            # The archive has no .git: carry the exact checked-out source
-            # commit as explicit provenance for the three preparation tests.
-            # Never run git from inside the extracted tree or invent a SHA.
+            # This is intentionally the unfiltered full Maven reactor, not
+            # a selected -pl subset. The archive has no .git metadata.
+            # Supply exact checkout provenance explicitly before any module
+            # that may need the preparation revision performs its tests.
             export REGELSUCHE_PREPARATION_REVISION="${REGELSUCHE_AUTHORITY_GITHUB_SHA:?}"
-            # Exercise real PostgreSQL and Neo4j through the existing pinned
-            # JUnit/Testcontainers full-profile Failsafe module. A success
-            # without Git metadata must not be a skip-only result.
-            mvn --batch-mode --no-transfer-progress \
-              -Pfull -pl regelsuche-integration-tests -am verify
-            # This separate Maven/JUnit pass runs after Failsafe has produced
-            # its reports. The contract fails on missing, skipped, failed or
-            # malformed evidence for the required real container suites.
-            mvn --batch-mode --no-transfer-progress \
-              -pl maven-build-contract -Dregelsuche.sourceArchiveContainerMode=true \
-              -DfailIfNoTests=true test
+            mvn --batch-mode --no-transfer-progress -Pfull verify
+            # Run read-only, fail-closed report checks only AFTER the full
+            # reactor has produced its actual Surefire/Failsafe evidence.
+            # They require executed unit tests in the declared core slice,
+            # real PostgreSQL and Neo4j container suites, and no .git.
+            mvn --batch-mode --no-transfer-progress               -pl maven-build-contract               -Dregelsuche.sourceArchiveMode=true               -Dregelsuche.sourceArchiveContainerMode=true               -DfailIfNoTests=true test
           )
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
