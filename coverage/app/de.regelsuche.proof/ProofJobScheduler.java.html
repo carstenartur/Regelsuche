@@ -189,7 +189,7 @@ public final class ProofJobScheduler implements AutoCloseable {
     // ── internal poll loop ─────────────────────────────────────────────────
 
     private synchronized void dispatch() {
-<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        if (closing || activeAttempt != null) return;</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">        if (closing || activeAttempt != null) return;</span>
 <span class="fc" id="L193">        var next = jobRepository.findNextQueued();</span>
 <span class="fc bfc" id="L194" title="All 2 branches covered.">        if (next.isEmpty()) return;</span>
 <span class="fc" id="L195">        ProofJob job = next.get();</span>
