@@ -221,6 +221,22 @@ class LandingPageBrowserFlowTest {
     }
 
     @Test
+    void learningEntryOpensAnInspectableRecordedComparison() {
+        page.setViewportSize(390, 844);
+        page.locator("#workflowLearn").click();
+        page.locator("#openRecordedLearningComparison").press("Enter");
+        page.waitForSelector("#qualification");
+        assertTrue(page.locator("#qualification").textContent().contains("423 → 32"));
+        page.locator("#qualification .case-group > summary").first().click();
+        var example = page.locator("#qualificationPositives details").first();
+        example.locator("summary").click();
+        assertTrue(example.textContent().contains("26 → 3"));
+        assertTrue(example.textContent().contains("REACHED"));
+        page.goBack();
+        assertTrue(page.locator("#tab-compare").isVisible());
+    }
+
+    @Test
     void primaryTasksAndKeyboardNavigationKeepToolsReachable() {
         assertTrue(page.locator("#workflowExplore").isVisible());
         assertTrue(page.locator("#workflowLearn").isVisible());

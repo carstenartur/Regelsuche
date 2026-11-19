@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class GalleryConsistencyTest {
     private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();
@@ -26,12 +27,30 @@ class GalleryConsistencyTest {
     private final DiscoveryEvidenceSchemaV1 schema = new DiscoveryEvidenceSchemaV1();
 
     @Test
+    void regeneratingDiscoveryEvidencePreservesCuratedGallery(@TempDir Path repoRoot) throws IOException {
+        Path gallery = Files.createDirectories(repoRoot.resolve("docs")).resolve("demo-gallery.md");
+        String curated = """
+            # Redaktionelle Galerie
+
+            ![Aufnahme aus der Workbench](assets/screenshots/result.png)
+            """;
+        Files.writeString(gallery, curated, StandardCharsets.UTF_8);
+
+        new DocsDiscoveryGalleryGenerator().generate(repoRoot);
+
+        assertEquals(curated, Files.readString(gallery, StandardCharsets.UTF_8));
+        assertTrue(Files.isRegularFile(repoRoot.resolve("docs/generated/discovery/index.json")));
+        assertTrue(Files.isRegularFile(repoRoot.resolve("docs/generated/discovery/gallery.md")));
+    }
+
+    @Test
     void galleryReferencesOnlySuccessfulGeneratedEvidence() throws IOException {
         Path gallery = REPO_ROOT.resolve("docs/demo-gallery.md");
         Path generatedRoot = REPO_ROOT.resolve("docs/generated/discovery");
         String markdown = Files.readString(gallery, StandardCharsets.UTF_8);
         Set<Path> evidenceFiles = new HashSet<>();
         Set<Path> svgFiles = new HashSet<>();
+        String generatedGallery = Files.readString(generatedRoot.resolve("gallery.md"), StandardCharsets.UTF_8);
 
         Matcher matcher = GENERATED_LINK.matcher(markdown);
         while (matcher.find()) {
@@ -56,6 +75,10 @@ class GalleryConsistencyTest {
             schema.assertValidDocument(evidence, evidenceFile.getParent());
             Path svg = evidenceFile.getParent().resolve("search-space.svg");
             assertTrue(svgFiles.contains(svg), "Gallery must link SVG next to " + evidenceFile);
+            assertTrue(generatedGallery.contains("[`" + evidence.path("canonicalEvidenceId").asText() + "`]("
+                    + generatedRoot.relativize(evidenceFile).toString().replace('\\', '/') + ")"), evidenceFile.toString());
+            assertTrue(generatedGallery.contains("[SVG](" + generatedRoot.relativize(svg).toString().replace('\\', '/')
+                    + ")"), svg.toString());
             String svgContent = Files.readString(svg, StandardCharsets.UTF_8);
             assertTrue(svgContent.contains("data-scenario-id=\"" + evidence.path("scenarioId").asText() + "\""), svg.toString());
             assertTrue(svgContent.contains("data-generated-by=\"SearchSpaceGallerySvgWriter\""), svg.toString());

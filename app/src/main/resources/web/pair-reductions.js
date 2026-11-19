@@ -35,6 +35,7 @@ function clearResult() {
     result.hidden = true;
     indexedResult.hidden = true;
     status.textContent = '';
+    status.classList.remove('error');
 }
 
 function syncMode() {
@@ -49,6 +50,8 @@ function syncMode() {
 }
 
 form.addEventListener('input', clearResult);
+form.addEventListener('change', clearResult);
+form.addEventListener('invalid', clearResult, true);
 element('pairMode').addEventListener('change', syncMode);
 syncMode();
 element('pairExample').addEventListener('change', event => {
@@ -60,40 +63,41 @@ element('pairExample').addEventListener('change', event => {
     if (preset.predicates) element('pairPredicates').value = preset.predicates;
     if (preset.width) element('pairWidth').value = preset.width;
     syncMode();
-    clearResult();
 });
 
 function formatted(value) {
     return BigInt(value).toLocaleString('de-DE');
 }
 
-function showResult(data) {
+function sampleDescription(input) {
+    const label = formatted(input.rows.length) + ' Beispielzeilen für ' + input.columns.join(', ');
+    const preview = input.rows.slice(0, 4).map(row =>
+        row.length === 1 ? row[0] : '(' + row.join(', ') + ')').join(', ');
+    if (preview.length > 140) return label;
+    return label + ' · ' + preview + (input.rows.length > 4 ? ', …' : '');
+}
+
+function workDescription(data) {
+    return formatted(data.synthesisWork) + ' logische Arbeitseinheiten für die Herleitung, '
+        + formatted(data.verificationWork) + ' für die symbolische Prüfung.';
+}
+
+function showResult(data, input) {
+    element('pairSource').textContent = input.summand;
     element('pairOriginal').textContent = formatted(data.originalPairs);
     element('pairLinear').textContent = formatted(data.rowCount);
     element('pairExpanded').textContent = data.expandedSummand;
     element('pairFormula').textContent = data.formula;
-    const sums = data.accumulators.map(({ name, rowProduct }) => {
-        const item = document.createElement('li');
-        item.textContent = name + ' = Summe von ' + rowProduct + ' über alle Zeilen';
-        return item;
-    });
-    if (sums.length === 0) {
-        const item = document.createElement('li');
-        item.textContent = 'Der Plan braucht keine Zwischensummen.';
-        sums.push(item);
-    }
-    element('pairAccumulators').replaceChildren(...sums);
+    items('pairAccumulators', data.accumulators.map(({ name, rowProduct }) =>
+        name + ' = Summe von ' + rowProduct + ' über alle Zeilen'));
+    element('pairAccumulators').hidden = data.accumulators.length === 0;
     const sample = element('pairSample');
     sample.hidden = data.sampleResult === undefined && data.sampleUnavailable === undefined;
-    if (data.sampleUnavailable) {
-        sample.textContent = 'Die Beispielwerte konnten innerhalb der Auswertungsgrenzen nicht berechnet werden.';
-    } else {
-        sample.textContent = sample.hidden ? '' :
-            'Exaktes Ergebnis für ' + formatted(data.sampleRows) + ' Beispielzeilen: ' + formatted(data.sampleResult);
-    }
-    element('pairWork').textContent =
-        'Gezählte Arbeitseinheiten: ' + formatted(data.synthesisWork) + ' für die Herleitung, '
-        + formatted(data.verificationWork) + ' für die Prüfung.';
+    element('pairSampleMissing').hidden = !sample.hidden;
+    element('pairSampleValue').textContent = data.sampleResult === undefined ? '' : formatted(data.sampleResult);
+    element('pairSampleContext').textContent = sample.hidden ? '' : data.sampleUnavailable
+        ? 'Die Beispielwerte überschreiten die Auswertungsgrenzen.' : sampleDescription(input);
+    element('pairWork').textContent = workDescription(data);
     result.hidden = false;
 }
 
@@ -129,8 +133,12 @@ function describeLookup(lookup) {
         + (lookup.complement ? ' außerhalb ' : ' in ') + bounds;
 }
 
-function showIndexedResult(data) {
+function showIndexedResult(data, input) {
+    element('pairIndexedSource').textContent = input.summand;
     element('pairIndexedCandidates').textContent = formatted(data.originalCandidates);
+    element('pairIndexedCandidateLabel').textContent = data.eviction
+        ? 'Paarkandidaten über alle vollständigen Fenster' : 'Kandidatentupel vor dem Filtern';
+    element('pairIndexedRows').textContent = formatted(data.rowCount);
     items('pairFactors', data.terms.length === 0 ? ['Der Summand ist null.'] : data.terms.map(term =>
         term.coefficient + ' · ' + term.factors.map((factor, slot) => '(' + factor + ') für Zeile ' + slot).join(' · ')));
     const lookups = data.lookups.map((lookup, slot) => 'Von Zeile ' + slot + ' zu Zeile ' + (slot + 1)
@@ -142,15 +150,20 @@ function showIndexedResult(data) {
         : 'Jede Präfixsumme enthält nur frühere Zeilen. Die aktuelle Zeile wird nach allen Abfragen eingetragen.';
     const sample = element('pairIndexedSample');
     sample.hidden = data.sampleSums === undefined && data.sampleUnavailable === undefined;
+    element('pairIndexedSampleMissing').hidden = !sample.hidden;
+    element('pairIndexedSampleValue').textContent = data.sampleSums?.map(formatted).join(', ') ?? '';
+    const context = element('pairIndexedSampleContext');
+    const metrics = element('pairIndexedSampleMetrics');
+    metrics.textContent = '';
     if (data.sampleUnavailable) {
-        sample.textContent = 'Die Beispielwerte überschreiten die Auswertungsgrenzen.';
+        context.textContent = 'Die Beispielwerte überschreiten die Auswertungsgrenzen.';
     } else if (data.sampleSums) {
-        sample.textContent = data.sampleSums.length === 0 ? 'Die Beispieldaten enthalten kein vollständiges Fenster.'
-            : 'Exakte Beispielergebnisse ' + data.sampleSums.map(formatted).join(', ')
-                + '. Gelesene Zeilen ' + formatted(data.sampleRows) + '. Indexzellen ' + formatted(data.indexAccesses) + '.';
+        context.textContent = data.sampleSums.length === 0 ? 'Die Beispieldaten enthalten kein vollständiges Fenster.'
+            : (data.eviction ? 'Ergebnisse je Fenster · ' : '') + sampleDescription(input);
+        metrics.textContent = 'Gelesene Zeilen ' + formatted(data.sampleRows)
+            + ' · Zugriffe auf Indexzellen ' + formatted(data.indexAccesses);
     }
-    element('pairIndexedWork').textContent = formatted(data.synthesisWork) + ' Arbeitseinheiten für die Herleitung und '
-        + formatted(data.verificationWork) + ' für die Prüfung.';
+    element('pairIndexedWork').textContent = workDescription(data);
     indexedResult.hidden = false;
 }
 
@@ -171,6 +184,7 @@ form.addEventListener('submit', async event => {
     // Keep the displayed form and response bound to the same input.
     const controls = Array.from(form.elements).filter(control => !control.disabled);
     controls.forEach(control => { control.disabled = true; });
+    let focusTarget = submit;
     try {
         const mode = element('pairMode').value;
         if (mode !== 'symmetric') input.restrictions = restrictions(element('pairPredicates').value);
@@ -185,18 +199,25 @@ form.addEventListener('submit', async event => {
         }
         const data = await response.json();
         if (data.status === 'VERIFIED') {
-            if (mode === 'symmetric') showResult(data);
-            else showIndexedResult(data);
-            status.textContent = 'Der Algorithmus ist symbolisch geprüft.';
+            if (mode === 'symmetric') {
+                showResult(data, input);
+                focusTarget = element('pairResultTitle');
+            } else {
+                showIndexedResult(data, input);
+                focusTarget = element('pairIndexedTitle');
+            }
+            status.textContent = '';
         } else {
+            status.classList.add('error');
             status.textContent = data.reason === 'UNBOUND_SYMBOL' && mode !== 'symmetric'
                 ? 'Ein Symbol lässt sich keiner Spalte zuordnen. Verwende die Endungen _0, _1 und so weiter.'
                 : reasons[data.reason] ?? ('Kein Plan innerhalb der unterstützten Grenzen (' + data.reason + ').');
         }
     } catch (error) {
+        status.classList.add('error');
         status.textContent = 'Die Berechnung konnte nicht geprüft werden. ' + error.message;
     } finally {
         controls.forEach(control => { control.disabled = false; });
-        submit.focus();
+        focusTarget.focus();
     }
 });

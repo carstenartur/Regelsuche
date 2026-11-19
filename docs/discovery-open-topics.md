@@ -8,7 +8,7 @@ This document records which parts of the discovery roadmap are considered implem
 - Candidate lifecycle and support examples are tracked in the candidate store.
 - Candidate reports carry structured ablation evidence when real with/without metrics exist.
 - Public candidate evidence requires structured ablation metrics, not just a status string.
-- The generated `docs/demo-gallery.md` source is protected by `PublicBenchmarkEvidenceGate`.
+- `PublicBenchmarkEvidenceGate` controls the scenarios published in the [generated algebra gallery](generated/discovery/gallery.md).
 - Gallery generation writes `docs/generated/discovery/public-scenario-gate.json` and `docs/generated/discovery/public-scenario-rejections.md`.
 - Generated campaigns may produce support examples, but synthetic generator metadata must not be accepted as public evidence until backed by real search provenance.
 

@@ -236,9 +236,11 @@
                 return;
             }
             const data = JSON.parse(raw);
-            status.className = 'status ok';
-            status.textContent = 'Demo "' + data.title + '" abgeschlossen in '
-                + (data.metrics && data.metrics.elapsedMillis) + ' ms.';
+            status.className = data.id === 'macro-learning' && data.usedLearnedRule !== true
+                ? 'status info' : 'status ok';
+            const elapsedMillis = data.metrics && data.metrics.elapsedMillis;
+            status.textContent = 'Demo "' + data.title + '" abgeschlossen'
+                + (Number.isFinite(elapsedMillis) ? ' in ' + elapsedMillis + ' ms.' : '.');
             renderDemoSummary(data);
             window.__regelsucheDemoReady = true;
             // Refresh the existing panels so users see graph/replay immediately.
@@ -256,27 +258,34 @@
     }
 
     function renderMacroLearningSummary(data) {
-        const sp = data.speedup || {};
+        const reused = data.usedLearnedRule === true;
         const stepsHtml = (data.steps || []).map((s) =>
-            '<tr><td>' + s.expression + '</td><td>' + s.stepCount + '</td>'
+            '<tr><td>' + escapeHtml(s.expression) + '</td><td>' + s.stepCount + '</td>'
             + '<td>' + s.elapsedMillis + ' ms</td>'
             + '<td>' + (s.confidenceScore || 0).toFixed(2) + '</td>'
             + '<td>' + s.learnedRulesActive + '</td></tr>').join('');
         $('demoSummary').innerHTML =
-            '<div class="status ok demo-banner"><strong>System lernt eine Makroregel.</strong>'
-            + ' Gelernte Regel wurde im letzten Lauf'
-            + (data.usedLearnedRule ? ' angewendet.' : ' nicht angewendet.') + '</div>'
+            '<div class="status ' + (reused ? 'ok' : 'info') + ' demo-banner"><strong>'
+            + (reused ? 'Gelernte Makroregel angewendet.' : 'Makro-Lernen ausgeführt.') + '</strong> '
+            + (reused ? 'Der letzte Suchlauf verwendet gelerntes Wissen.'
+                : 'Im letzten Suchlauf wurde keine gelernte Regel verwendet.') + '</div>'
             + '<table class="demo-table"><thead><tr>'
             + '<th>Ausdruck</th><th>Schritte</th><th>Laufzeit</th><th>Konfidenz</th>'
             + '<th>aktive Makros</th></tr></thead><tbody>' + stepsHtml + '</tbody></table>'
-            + '<p class="hint">Vorher (' + (sp.firstRunSteps || 0) + ' Schritte / '
-            + (sp.firstRunMillis || 0) + ' ms) → nachher ('
-            + (sp.lastRunSteps || 0) + ' Schritte / ' + (sp.lastRunMillis || 0) + ' ms).</p>';
+            + '<p class="hint">Die Suchläufe verwenden unterschiedliche Eingaben. '
+            + 'Ihre Laufzeiten beschreiben die einzelnen Läufe. Für einen Nutzenvergleich '
+            + 'wird dieselbe Aufgabe mit und ohne gelernte Regel untersucht.</p>'
+            + '<p><a href="/static/public-discovery-comparison.html" hreflang="en">'
+            + 'Aufgezeichneten Vergleich derselben Aufgaben öffnen (Englisch)</a></p>';
     }
 
     function renderDemoSummary(data) {
         if (data && data.id === 'macro-learning') {
             renderMacroLearningSummary(data);
+            return;
+        }
+        if (data && data.constructionSummary) {
+            renderHistoricalConstructionSummary(data);
             return;
         }
         const m = data.metrics || {};
@@ -439,6 +448,100 @@
             + '<div class="demo-actions">' + linkList + '</div>';
         wireProofBridgeButton(data);
         window.renderMath($('demoSummary'));
+    }
+
+    function constructionStepTitle(ruleId) {
+        const operation = String(ruleId || '').split(':').pop();
+        return ({
+            EXPOSE_SQUARE: 'Als Quadrat schreiben',
+            RATIONAL_EXPOSE_SQUARE: 'Als Quadrat schreiben',
+            COMPLETE_SQUARE: 'Quadrat ergänzen',
+            RECOGNIZE_SQUARE: 'Rest als Quadrat erkennen',
+            RECOGNIZE_METERED_SQUARE: 'Rest als Quadrat erkennen',
+            RECOGNIZE_RATIONAL_SQUARE: 'Rest als Quadrat erkennen',
+            FACTOR_DIFFERENCE: 'Differenz der Quadrate faktorisieren'
+        })[operation] || 'Geprüfte Umformung';
+    }
+
+    function renderHistoricalConstructionSummary(data) {
+        const selected = data.selectedPath || {};
+        const construction = data.constructionSummary;
+        const steps = construction.steps || [];
+        const details = selected.stepDetails || [];
+        const checked = steps.filter((step) => step.verification && step.verification.accepted === true).length;
+        const reached = data.targetReached === true && steps.length > 0 && checked === steps.length;
+        const number = (value) => Number.isFinite(value) ? value.toLocaleString('de-DE') : '–';
+        window.__lastSelectedPathId = selected.id || null;
+        const formula = (latex, expression, label, cssClass) => '<div class="historical-formula ' + cssClass
+            + '" role="region" tabindex="0" aria-label="' + escapeHtml(label) + '">'
+            + mathSpan(latex, expression) + '</div>';
+        const witness = steps.map((step, index) => {
+            const verification = step.verification || {};
+            const title = constructionStepTitle(step.ruleId);
+            const keyStep = String(step.ruleId).endsWith(':COMPLETE_SQUARE');
+            return '<li data-construction-step="' + index + '" data-source-expression="'
+                + escapeHtml(step.sourceExpression) + '" class="historical-step' + (keyStep ? ' historical-key-step' : '') + '">'
+                + '<div class="historical-step-heading"><span class="historical-step-number" aria-hidden="true">' + (index + 1) + '</span>'
+                + '<h4>' + escapeHtml(title) + '</h4>' + (keyStep ? '<span class="historical-key-label">Schlüsselidee</span>' : '') + '</div>'
+                + formula((details[index] || {}).afterLatex, step.targetExpression,
+                    'Ergebnis von Schritt ' + (index + 1), 'historical-step-formula')
+                + (keyStep ? '<p class="historical-step-note">Der Ausdruck wird zunächst größer. Damit wird die Faktorisierung zugänglich.</p>' : '')
+                + '<div class="historical-step-actions"><details><summary>'
+                + (verification.accepted === true ? 'Exakt geprüft' : 'Prüfung nicht bestätigt') + '</summary>'
+                + '<div class="historical-verification"><dl><dt>Regel</dt><dd><code>' + escapeHtml(step.ruleId) + '</code></dd>'
+                + '<dt>Prüfergebnis</dt><dd><code>' + escapeHtml(verification.reason || '') + '</code></dd>'
+                + '<dt>Prüfarbeit</dt><dd>' + number(verification.work) + ' logische Einheiten</dd>'
+                + '<dt>Quellgebundener Beleg</dt><dd><code>' + escapeHtml(step.provenanceHash || '') + '</code></dd></dl>'
+                + '<ul>' + (verification.receipts || []).map((receipt) => '<li><code>' + escapeHtml(receipt) + '</code></li>').join('')
+                + '</ul></div></details>'
+                + '<button type="button" data-construction-replay="' + index + '" aria-label="Schritt ' + (index + 1)
+                + ' im Replay öffnen">Im Replay öffnen →</button></div></li>';
+        }).join('');
+        $('demoSummary').innerHTML = '<section id="historicalConstruction" class="historical-construction" aria-labelledby="historicalTitle" tabindex="-1">'
+            + '<p class="historical-eyebrow">Historische Aufgabe · Sophie-Germain</p>'
+            + '<h3 id="historicalTitle">' + (reached ? 'Faktorisierung gefunden' : 'Suchlauf ohne bestätigte Faktorisierung') + '</h3>'
+            + '<p class="historical-intro">Der Solver erhält den Ausdruck und das Ziel „faktorisieren“ – ohne vorgegebene Zielformel.</p>'
+            + '<div class="historical-task"><div><span class="historical-label">Eingabe</span>'
+            + formula(selected.originalExpressionLatex, selected.originalExpression || data.expression, 'Eingabe', '')
+            + '</div><div data-construction-result><span class="historical-label">Gefundenes Produkt</span>'
+            + formula(selected.improvedExpressionLatex, selected.improvedExpression, 'Gefundenes Produkt', '') + '</div></div>'
+            + '<div class="historical-metrics"><span><strong>' + checked + ' geprüfte Schritte</strong></span>'
+            + '<span><strong data-construction-work>' + number(construction.totalWork) + '</strong> logische Arbeitseinheiten</span></div>'
+            + '<h4 class="historical-path-title">Der gefundene Rechenweg</h4><ol class="historical-witness">' + witness + '</ol>'
+            + '<p class="historical-evidence-note">Die Schritte wurden mit ihrer jeweiligen Quelle erneut ausgeführt und als Polynomidentitäten exakt geprüft.</p>'
+            + '<details class="historical-contract"><summary>Rechenauftrag und Aussagekraft</summary>'
+            + '<p>Dies ist eine bekannte historische Identität. Die allgemeinen Konstruktionsverfahren und ihre Priorisierung sind implementiert; '
+            + 'der Suchlauf wählt daraus den gezeigten Weg. Die Schritte zeigen die geprüften Zwischenformen, nicht jeden internen Rechenschritt der Verfahren.</p>'
+            + '<p>Die logischen Arbeitseinheiten zählen Such- und Prüfarbeit. Sie sind keine Laufzeitmessung. Ein Beweis in Lean wurde nicht ausgeführt.</p>'
+            + '<dl><dt>Ziel</dt><dd><code>' + escapeHtml(construction.goal) + '</code></dd><dt>Profil</dt><dd><code>'
+            + escapeHtml(construction.profile) + '</code></dd><dt>Budget</dt><dd><code>'
+            + escapeHtml(JSON.stringify(construction.budget)) + '</code></dd></dl></details></section>';
+        window.renderMath($('demoSummary'));
+        $('historicalConstruction').querySelectorAll('[data-construction-replay]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                button.disabled = true;
+                try {
+                    await populateReplayPaths();
+                    const select = $('replayPathSelect');
+                    select.value = selected.id;
+                    select.dataset.loaded = '1';
+                    if (select.value !== selected.id) throw new Error('Der berechnete Pfad ist nicht mehr verfügbar.');
+                    window.RegelsucheWorkbench.activateTab('replay');
+                    await loadReplay(Number(button.dataset.constructionReplay));
+                    const canvas = $('replayCanvas');
+                    canvas.tabIndex = -1;
+                    canvas.focus({preventScroll: true});
+                    canvas.scrollIntoView({block: 'start'});
+                } catch (error) {
+                    $('demoStatus').className = 'status error';
+                    $('demoStatus').textContent = 'Replay konnte nicht geladen werden: ' + error.message;
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+        $('historicalConstruction').focus({preventScroll: true});
+        $('historicalConstruction').scrollIntoView({block: 'start'});
     }
 
     /**
@@ -1644,7 +1747,7 @@
             select.innerHTML = '<option>Fehler: ' + ex + '</option>';
         }
     }
-    async function loadReplay() {
+    async function loadReplay(requestedIndex = 0) {
         window.__regelsucheReplayReady = false;
         const select = $('replayPathSelect');
         const pathId = select && select.value;
@@ -1658,7 +1761,8 @@
             replayState.alignedDerivationLatex = data.alignedDerivationLatex || '';
             replayState.alignedDerivationLatexWithDiff = data.alignedDerivationLatexWithDiff || '';
             replayState.derivationLayout = data.derivationLayout || null;
-            replayState.index = 0;
+            replayState.index = Number.isInteger(requestedIndex)
+                ? Math.max(0, Math.min(requestedIndex, replayState.steps.length - 1)) : 0;
             renderReplayStep();
         } catch (ex) {
             $('replayCanvas').innerHTML = '<div class="hint">Fehler: ' + ex + '</div>';
@@ -1751,7 +1855,7 @@
         const counterexampleSteps = replayState.steps.filter((s) =>
             String(s.ruleExplanation || '').toLowerCase().includes('counterexample')).length;
         return '<div class="replay-dashboard-metrics">'
-            + '<span><strong>searchSpaceSize</strong>: ' + replayState.steps.length + '</span>'
+            + '<span><strong>Schritte im Pfad</strong>: ' + replayState.steps.length + '</span>'
             + '<span><strong>macroMoveUsage</strong>: ' + macroSteps + '</span>'
             + '<span><strong>counterexampleStats</strong>: ' + counterexampleSteps + '</span>'
             + '</div>';

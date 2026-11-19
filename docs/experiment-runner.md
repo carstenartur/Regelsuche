@@ -80,7 +80,10 @@ Siehe auch:
 
 ## Generated artifact ownership (Discovery Gallery)
 
-`generateDiscoveryGallery` muss reproduzierbar sein und der CI/CD-Check ist absichtlich strikt.
+`generateDiscoveryGallery` erzeugt die [Algebra-Galerie](generated/discovery/gallery.md)
+und die zugehörigen Nachweise unter `docs/generated/discovery/`. Die
+[Workbench-Galerie](demo-gallery.md) wird redaktionell gepflegt. Die zugehörigen
+Bildschirmaufnahmen entstehen im [Aufnahmemodus der Browsertests](testing.md#dokumentationsaufnahmen).
 
 Regel für dieses Repository:
 
@@ -92,7 +95,7 @@ Pflichtschritte vor Merge:
 
 ```bash
 ./gradlew build
-env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
+./gradlew :app:generateDiscoveryGallery
 git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
 ```
 

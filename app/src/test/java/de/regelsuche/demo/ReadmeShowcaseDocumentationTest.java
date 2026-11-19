@@ -44,7 +44,7 @@ class ReadmeShowcaseDocumentationTest {
         );
         assertContains(
             readme,
-            "docs/assets/screenshots/macro-learning-summary.png"
+            "docs/assets/screenshots/pair-reduction-result.png"
         );
         assertContains(readme, "rule difference_of_squares:");
         assertContains(readme, "firstApplicable(");
@@ -72,10 +72,7 @@ class ReadmeShowcaseDocumentationTest {
             "docs/assets/ast-rule-radar.svg",
             "docs/generated/discovery/sophie-germain/search-space.svg",
             "docs/generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg",
-            "docs/generated/autonomous-discovery-walkthrough-exact-v2/representative-search.svg",
-            "docs/assets/screenshots/macro-learning-summary.png",
-            "docs/assets/screenshots/rational-summary.png",
-            "docs/assets/screenshots/math-matrix-preview.png",
+            "docs/assets/screenshots/pair-reduction-result.png",
             "docs/java-discovery-sdk.md",
             "examples/external-consumers/geometric-sequence-domain-java25/README.md"
         )) {

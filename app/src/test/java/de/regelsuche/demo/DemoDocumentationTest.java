@@ -34,6 +34,7 @@ class DemoDocumentationTest {
 
     private static final Path REPO_ROOT = locateRepoRoot();
     private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^]]*]\\(([^)]+)\\)");
+    private static final Pattern HTML_IMAGE = Pattern.compile("<img\\s+src=\"([^\"]+)\"");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("(?<!!)\\[[^]]*]\\(([^)]+)\\)");
     private static final Pattern MARKDOWN_HEADING = Pattern.compile("^#{1,6}\\s+(.+)$", Pattern.MULTILINE);
 
@@ -156,23 +157,23 @@ class DemoDocumentationTest {
         String gallery = Files.readString(galleryPath, StandardCharsets.UTF_8);
 
         assertTrue(readme.contains("## Discovery evidence"), "README.md must expose the generated discovery evidence section");
-        assertTrue(readme.contains("docs/demo-gallery.md"), "README.md must link to the generated Discovery Gallery");
+        assertTrue(readme.contains("docs/demo-gallery.md"), "README.md must link to the Workbench gallery");
         assertTrue(readme.contains("docs/generated/discovery/complete-square/evidence.json"),
             "README.md must link complete-square generated evidence");
         assertTrue(readme.contains("docs/generated/discovery/sophie-germain/evidence.json"),
             "README.md must link Sophie-Germain generated evidence");
-        assertTrue(gallery.contains("# Regelsuche Discovery Gallery"),
-            "docs/demo-gallery.md must be the generated discovery gallery");
         assertTrue(gallery.contains("generated/discovery/sophie-germain/search-space.svg"),
             "Gallery must show the generated Sophie-Germain search-space SVG");
-        assertTrue(gallery.contains("This gallery contains generated evidence only."),
-            "Gallery must state that it contains generated evidence only");
     }
 
     @Test
     void localDocsLinksAndImagesResolve() throws IOException {
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("README.md"));
         assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/demo-gallery.md"));
+        assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/generated/discovery/gallery.md"));
+        assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/user-workflows.md"));
+        assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/web-ui-user-guide.md"));
+        assertMarkdownReferencesResolve(REPO_ROOT.resolve("docs/testing.md"));
     }
 
     private static String readReadme() throws IOException {
@@ -222,7 +223,9 @@ class DemoDocumentationTest {
 
     private static void assertMarkdownReferencesResolve(Path markdownFile) throws IOException {
         String markdown = Files.readString(markdownFile, StandardCharsets.UTF_8);
-        for (String image : localReferences(markdown, MARKDOWN_IMAGE)) {
+        List<String> images = localReferences(markdown, MARKDOWN_IMAGE);
+        images.addAll(localReferences(markdown, HTML_IMAGE));
+        for (String image : images) {
             Path imagePath = resolveReference(markdownFile, image);
             assertTrue(Files.exists(imagePath), "Referenced image must exist: " + image + " in " + markdownFile);
             assertTrue(Files.isRegularFile(imagePath), "Referenced image must be a file: " + image + " in " + markdownFile);

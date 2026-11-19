@@ -23,12 +23,10 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
         "\"headSha\"",
         "\"commitSha\""
     };
-    private static final Path GALLERY_PATH = Path.of(
-        "docs/demo-gallery.md"
-    );
     private static final Path GENERATED_PATH = Path.of(
         "docs/generated/discovery"
     );
+    private static final Path GALLERY_PATH = GENERATED_PATH.resolve("gallery.md");
 
     @Test
     void regeneratingDiscoveryGalleryIsDeterministicAndMatchesCheckout(
@@ -96,7 +94,6 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
     private static void seedSyntheticRoot(Path root, String evidence)
             throws IOException {
         Files.createDirectories(root.resolve(GENERATED_PATH));
-        Files.createDirectories(root.resolve(GALLERY_PATH).getParent());
         Files.writeString(
             root.resolve(GALLERY_PATH),
             "gallery\n",
@@ -139,7 +136,6 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
     private static Map<String, Path> artifactFiles(Path root)
             throws IOException {
         Map<String, Path> files = new TreeMap<>();
-        addRegularFile(files, root, GALLERY_PATH);
 
         requireNoSymbolicComponents(root, GENERATED_PATH);
         Path generated = root.resolve(GENERATED_PATH);
@@ -171,24 +167,14 @@ class GeneratedDiscoveryEvidenceReproducibilityTest {
             }
         }
         assertTrue(
+            files.containsKey(GALLERY_PATH.toString().replace('\\', '/')),
+            "generated gallery page is missing: " + GALLERY_PATH
+        );
+        assertTrue(
             files.size() > 1,
-            "generated gallery must contain files below " + GENERATED_PATH
+            "generated gallery must contain evidence below " + GENERATED_PATH
         );
         return Map.copyOf(files);
-    }
-
-    private static void addRegularFile(
-        Map<String, Path> files,
-        Path root,
-        Path relative
-    ) {
-        requireNoSymbolicComponents(root, relative);
-        Path path = root.resolve(relative);
-        assertTrue(
-            Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS),
-            "generated file is missing or non-regular: " + relative
-        );
-        files.put(relative.toString().replace('\\', '/'), path);
     }
 
     private static void requireNoSymbolicComponents(

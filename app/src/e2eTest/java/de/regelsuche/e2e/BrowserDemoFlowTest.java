@@ -192,16 +192,30 @@ class BrowserDemoFlowTest {
     }
 
     @Test
-    @DisplayName("Macro-Learning: System lernt eine Makroregel")
-    void macroLearningBrowserFlow() {
-        clickDemoButton("macro-learning");
+    @DisplayName("Macro-Learning: tatsächliche Wiederverwendung untersuchen")
+    void macroLearningBrowserFlow() throws IOException {
+        Response response = page.waitForResponse(
+            candidate -> candidate.url().endsWith("/api/demo/macro-learning")
+                && candidate.request().method().equals("POST") && candidate.status() == 200,
+            () -> clickDemoButton("macro-learning"));
+        var reported = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.text());
         // Macro-learning uses its own summary renderer; wait for the
         // characteristic block to appear instead of selectedPath structure.
         waitForDemoFinished("macro-learning");
-        waitForMathRendered("#demoSummary");
         page.waitForSelector("#demoSummary >> text=/Makro|Iteration|reusable/i",
             new Page.WaitForSelectorOptions().setTimeout(10_000));
         assertTrue(page.locator("#demoSummary").innerText().length() > 50);
+        var banner = page.locator("#demoSummary .demo-banner");
+        org.junit.jupiter.api.Assertions.assertEquals(reported.path("usedLearnedRule").asBoolean(),
+            banner.evaluate("node => node.classList.contains('ok')"),
+            "Only actual reuse may receive the success presentation");
+        org.junit.jupiter.api.Assertions.assertEquals(reported.path("usedLearnedRule").asBoolean(),
+            page.locator("#demoStatus").evaluate("node => node.classList.contains('ok')"),
+            "The completion status must not imply a reuse success that the result does not report");
+        assertTrue(page.locator("#demoSummary").textContent().contains("unterschiedliche Eingaben"),
+            "Different inputs must not be presented as a paired speedup measurement");
+        org.junit.jupiter.api.Assertions.assertFalse(page.locator("#demoStatus").textContent().contains("undefined"),
+            "The macro response has per-run timing, not a total metrics.elapsedMillis value");
         screenshotDemoSummaryCard("macro-learning-summary.png",
             "#demoSummary table", false);
     }

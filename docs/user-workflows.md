@@ -2,6 +2,45 @@
 
 Diese Seite beschreibt die wichtigsten Bedienabläufe der Regelsuche-Web-Workbench. Die Schritte verwenden ausschließlich sichtbare Tabs, Felder und Aktionen. Die zugrunde liegenden REST-Verträge werden nicht dupliziert; Methoden, Pfade, Schemata und Statuscodes stehen in Swagger/OpenAPI.
 
+## Eine historische Faktorisierung nachverfolgen
+
+1. Unter den Demo-Karten **Sophie-Germain faktorisieren** wählen. Der Lauf
+   erhält `x^4 + 4*y^4` und das Ziel **Faktorisierung**.
+2. In der Zusammenfassung die Produktform, die Zwischenformen, den Prüfstatus
+   und die gezählte logische Arbeit prüfen.
+3. Bei **Quadrat ergänzen** über **Exakt geprüft** die Prüfdaten dieses Schritts
+   öffnen. **Im Replay öffnen** springt zu genau diesem Schritt. Unter **Graph**
+   den aufgezeichneten Pfad ansehen.
+
+Die Demo führt die allgemeine Konstruktion beim Start aus. Die Prüfung
+vergleicht die Polynome an jedem ausgeführten Schritt und überprüft, dass das
+Produkt die Eingabe darstellt. [Aufnahmen und Herleitung](demo-gallery.md#sophie-germain-in-der-workbench-faktorisieren)
+
+## Summenschleifen optimieren
+
+1. Auf der Startseite **Berechnung optimieren** öffnen. In **Summenschleifen
+   beschleunigen** ist unter **Beispiel** bereits **Quadrierte Abstände**
+   ausgewählt.
+2. Unter **Eingabespalten** steht `x`, unter **Summand** `(x_i-x_j)^2`.
+   **Zeilenanzahl für den Vergleich** legt die Größe der Hochrechnung fest.
+   Für eine exakte Auswertung unter **Beispielwerte zur exakten Auswertung
+   (optional)** pro Zeile die tatsächlichen Werte eingeben. Mehrere
+   Spaltenwerte innerhalb einer Zeile durch Leerzeichen trennen.
+3. **Algorithmus herleiten** wählen. Für `2`, `-1` und `5` erscheint unter
+   **Exakte Beispielauswertung** der Wert **54**. Bei leerem Wertefeld erscheint
+   der Hinweis **Keine Beispieldaten eingegeben.** Mit der Vergleichsgröße
+   `100000` zeigt die **Hochrechnung** 4.999.950.000 Paare für die direkte
+   Schleife und 100.000 gelesene Zeilen im hergeleiteten Plan.
+4. **Herleitung und Prüfung** öffnen. So siehst du, welche Zwischensummen der
+   Plan verwendet und wie die Gleichheit geprüft wird. Nach einer Eingabeänderung
+   erneut **Algorithmus herleiten** wählen. Bei einer abgelehnten Eingabe zeigt
+   der Status, was zu korrigieren ist.
+
+Unter **Berechnung** stehen auch **Geordnete Tupel** und **Gleitende Paarfenster**
+zur Wahl. Die Beispiele für Dreierketten und begrenzte Abstände zeigen passende
+Summanden und Bedingungen. Für gleitende Paarfenster steht außerdem
+**Fensterbreite** zur Verfügung. [Galerie mit Bildschirmaufnahmen](demo-gallery.md#ein-durchlauf-für-eine-paarsumme)
+
 ---
 
 ## 1. Lernen und Lehren — „Zeige mir einen nachvollziehbaren Schulweg“
@@ -38,6 +77,17 @@ Diese Seite beschreibt die wichtigsten Bedienabläufe der Regelsuche-Web-Workben
 **Sichtbares Ergebnis:** Eine nachvollziehbare Kette von konkreten lokalen Zügen über Suchpfade, Kandidaten und Identitäten bis zum kontrollierten Regelbestand.
 
 **Technische Zuordnung:** Swagger-Bereiche *Search*, *Search Graph*, *Rule Radar*, *Candidates*, *Identities*, *Memory* und *Inventory*.
+
+### Aufgezeichnete Lernvergleiche öffnen
+
+Wähle auf der Startseite **Regeln lernen und vergleichen** und im Tab
+**Vergleich** die Aktion **Aufgezeichneten Lernvergleich öffnen (Englisch)**.
+Öffne im Abschnitt **Composite-factor qualification** die Liste **12 positive
+holdouts and paired search results**. Beim Fall `qualified-affine-factor-20`
+siehst du Eingabe, Zieldarstellung, das Ergebnis der Prüfung und die
+gespeicherten 26 beziehungsweise 3 untersuchten Zustände. Die Ansicht lädt
+die gespeicherten Ergebnisse. Der Tab **Vergleich** bietet auch den Vergleich
+eigener Pfade nach einer Suche. [Beispiel in der Galerie](demo-gallery.md#eine-gelernte-regel-im-vergleich)
 
 ---
 

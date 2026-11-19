@@ -73,6 +73,9 @@ public final class DemoService {
     }
 
     public DemoRunResult run(DemoCatalog.Demo demo) {
+        if (demo != null && HistoricalConstructionDemo.ID.equals(demo.id())) {
+            return HistoricalConstructionDemo.run(demo, graphStore, scorer, canonicalizer);
+        }
         // Math-domain demos (equations, inequalities, derivatives, matrices) go
         // through `UnifiedMathDomainWorkbench`: the workbench writes the demo
         // into the same graph store / DiscoveredTransformation pipeline that
@@ -316,7 +319,8 @@ public final class DemoService {
             exec.comparatorFlipped(),
             exec.inputLatex(),
             exec.resultLatex(),
-            exec.proofOutcome()
+            exec.proofOutcome(),
+            null
         );
     }
 
@@ -342,7 +346,8 @@ public final class DemoService {
         boolean comparatorFlipped,
         String inputLatex,
         String resultLatex,
-        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome proofOutcome
+        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome proofOutcome,
+        HistoricalConstructionDemo.Summary constructionSummary
     ) {
         public DemoRunResult {
             appliedRuleIds = appliedRuleIds == null ? List.of() : List.copyOf(appliedRuleIds);
@@ -375,7 +380,7 @@ public final class DemoService {
                 appliedRuleIds, assumptions, elapsedMillis,
                 de.regelsuche.api.searchgraph.SearchExpression.classify(
                     demo == null ? "" : demo.expression()),
-                false, "", "", null);
+                false, "", "", null, null);
         }
     }
 }

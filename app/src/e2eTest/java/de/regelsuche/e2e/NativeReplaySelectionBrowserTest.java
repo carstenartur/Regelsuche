@@ -109,10 +109,16 @@ class NativeReplaySelectionBrowserTest {
         Path evidence = Path.of("build/reports/native-replay-selection"); Files.createDirectories(evidence);
         page.locator("#nativeReplaySelection").evaluate("node => node.scrollIntoView({block: 'start'})");
         page.screenshot(new Page.ScreenshotOptions().setPath(evidence.resolve("earlier-step-desktop.png")));
+        DocumentationScreenshots.capture(page, page.locator("#nativeReplaySelection"),
+            "candidate-replay.png", "Native retained search: select an earlier primitive step",
+            run.workspace().input().displayText() + "; generation " + first);
         page.setViewportSize(390, 844);
         page.locator("#nativeReplaySelection").evaluate("node => node.scrollIntoView({block: 'start'})");
         assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
         page.screenshot(new Page.ScreenshotOptions().setPath(evidence.resolve("earlier-step-390.png")));
+        DocumentationScreenshots.capture(page, page.locator("#nativeReplaySelection"),
+            "candidate-replay-mobile.png", "Native retained search replay on a narrow screen",
+            run.workspace().input().displayText() + "; generation " + first);
         var other = run.artifact().content().states().stream().filter(s -> !s.generationSequences().isEmpty()
             && !s.stateId().equals(candidate.stateId())).findFirst().orElseThrow();
         page.locator("button[data-candidate-id='" + other.stateId() + "']").click();
@@ -206,7 +212,8 @@ class NativeReplaySelectionBrowserTest {
     }
 
     private RunResult retain(String expression) throws Exception {
-        var result = TargetFreeRepresentationDiscoveryRun.writeTargetFree(temporary.resolve("runs"), expression, BUDGET, REVISION);
+        var result = TargetFreeRepresentationDiscoveryRun.writeTargetFree(temporary.resolve("runs"), expression, BUDGET,
+            DocumentationScreenshots.sourceRevisionOr(REVISION));
         try (var paths = Files.walk(temporary)) {
             for (var path : paths.filter(Files::isRegularFile).toList()) originals.putIfAbsent(path, Files.readAllBytes(path));
         }
@@ -228,6 +235,12 @@ class NativeReplaySelectionBrowserTest {
         var selected = page.locator("#nativeReplaySelection");
         assertEquals(String.valueOf(generation), selected.getAttribute("data-generation-sequence"));
         var observed = selectedRun.artifact().content().generations().get(generation);
+        var before = selected.locator("[data-replay-expression='before']");
+        var after = selected.locator("[data-replay-expression='after']");
+        assertTrue(before.isVisible(), "the selected step must show its original complete expression");
+        assertTrue(after.isVisible(), "the selected step must show its resulting complete expression");
+        assertEquals(observed.sourceExpression(), before.textContent());
+        assertEquals(observed.transformedExpression(), after.textContent());
         assertTrue(selected.textContent().contains(observed.executionHash()));
         assertTrue(selected.textContent().contains(observed.sourceOccurrenceExpression()));
         assertEquals(observed.occurrencePath().isEmpty() ? "root" : observed.occurrencePath().stream().map(String::valueOf)
