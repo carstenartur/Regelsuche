@@ -138,6 +138,28 @@ negativer Ausgang wird durch die Parallelisierung entfernt. Zwischen den
 Produzenten werden keine Build-Ausgaben wiederverwendet; nur abgeschlossene
 Evidence-Artefakte gelangen in die Konvergenz.
 
+### Git-freier Maven-Vollprofil-Nachbau
+
+Der CI-Job **Complete Maven product and Docker authority** extrahiert den
+aktuellen Checkout außerdem mit `git archive` in ein frisches Verzeichnis
+**ohne `.git`**. Dort wird der ungefilterte Maven-Reaktor mit
+`mvn -Pfull verify` geprüft; nicht nur eine ausgewählte `-pl`-Teilmenge.
+Die tatsächliche Checkout-Revision wird für die vorhandenen
+Vorbereitungstests ausdrücklich mit `REGELSUCHE_PREPARATION_REVISION`
+übergeben, statt sie im Archiv zu erfinden.
+
+Erst **nach** der Maven-Ausführung prüft ein getrennter JUnit-Lauf die
+Surefire-Berichte der fünf deklarierten Kernmodule und die ausgeführten
+PostgreSQL-/Neo4j-/Docker-Tests aus Failsafe. Fehlende, ausschließlich
+übersprungene oder fehlgeschlagene Nachweise gelten nicht als Erfolg.
+Die Repository-Vertragsprüfung lehnt eine Rückkehr zum selektiven
+Quellarchiv-Replay und das Abschalten der Prüftests ab.
+
+Dieser Nachbau ist ein **zusätzlicher Reproduktionsnachweis**: Die
+verbleibenden Gradle-, Python-/Shell- und Host-Autoritäten sind noch nicht
+entfernt. Solange diese bestehen, ist `mvn -Pfull verify` noch **nicht**
+die alleinige autoritative CI-/Release-Lifecycle-Entscheidung.
+
 ## Externe Voraussetzungen
 
 ### Playwright auf Linux
