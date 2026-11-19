@@ -118,9 +118,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     private void processNextState(SearchProblem problem, SearchFrame frame) {
         SearchState current = frame.frontier().remove();
         frame.telemetry().stateDequeued(current, frame.frontier().size(), frame.visited().size());
-        if (!markVisited(current, frame) || pruneByTransposition(problem, current, frame)) {
+        if (!markVisited(current, frame)) {
             return;
         }
+        recordTranspositionObservation(problem, current, frame);
         frame.explored().add(current);
         frame.progress().record(current, frame.target().distance(current.expression()));
         if (frame.target().reached(current.expression())) {
@@ -144,25 +145,18 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return false;
     }
 
-    private boolean pruneByTransposition(SearchProblem problem, SearchState current, SearchFrame frame) {
+    private void recordTranspositionObservation(SearchProblem problem, SearchState current, SearchFrame frame) {
         if (current.depth() == 0 || problem.memory() == null) {
-            return false;
+            return;
         }
-        // The durable entry summarizes mathematical values across searches. An
-        // exact goal still needs this run's concrete state and continuations.
-        boolean pruneFromHistory = problem.target() == null || problem.target().relation() != TargetRelation.SYNTAX_EXACT;
-        if (TranspositionGate.evaluate(
-                problem.memory(),
-                current,
-                current.canonicalHash() + "#" + current.depth(),
-                List.of(frame.identity().legacyHash(current.expression())),
-                pruneFromHistory)
-                != TranspositionGate.Verdict.PRUNE) {
-            return false;
-        }
-        frame.progress().transpositionPrunes++;
-        frame.telemetry().statePrunedTransposition(current, frame.frontier().size(), frame.visited().size());
-        return true;
+        // Durable values omit application history and the run's inventory and
+        // budgets. Only the local visited key can suppress this run's revisits.
+        TranspositionGate.evaluate(
+            problem.memory(),
+            current,
+            current.canonicalHash() + "#" + current.depth(),
+            List.of(frame.identity().legacyHash(current.expression())),
+            false);
     }
 
     private boolean pruneByDepth(SearchProblem problem, SearchState current, SearchFrame frame) {

@@ -13,9 +13,10 @@ import java.util.List;
  * a re-visited state without changing its return type.</p>
  *
  * <p>When a {@link de.regelsuche.search.strategy.SearchProblem} carries
- * {@code null} as its memory, strategies fall back to their classic
- * canonical-hash-only deduplication and emit no decisions — that keeps the
- * existing rule-mining and benchmark tests stable. Memory is wired in by
+ * {@code null} as its memory, strategies use their run-local visited checks
+ * without durable observations or memory decisions. BestFirst records durable
+ * observations without using them to suppress current-run continuations;
+ * other strategies may consult the table for pruning. Memory is wired in by
  * {@link de.regelsuche.search.SearchProfile#DISCOVERY_PLUS} and tests that
  * explicitly opt in.</p>
  */

@@ -96,6 +96,11 @@ class BestFirstSearchTelemetryTest {
             assertEquals(2, assumptions.size());
             assertTrue(assumptions.containsAll(List.of(List.of("x != 0", "x < 0"), List.of("x != 0", "x > 0"))));
         }
+        SearchMemory memory = new SearchMemory();
+        assertEquals(states, new BestFirstSearchStrategy().search(problem.withMemory(memory)));
+        assertEquals(states, new BestFirstSearchStrategy().search(problem.withMemory(memory)));
+        assertEquals(4, memory.table().size(), "Both expressions retain separate observations under each assumption set");
+        assertTrue(memory.table().entries().stream().allMatch(entry -> entry.visitCount() == 2));
     }
 
     @Test
@@ -162,7 +167,7 @@ class BestFirstSearchTelemetryTest {
     }
 
     @Test
-    void transpositionPrunedStatesAreNotReportedAsExploredResults() {
+    void durableObservationsPreserveExplorationAndMigrateLegacyEntriesWithoutPhantomPruning() {
         RecordingObserver observer = new RecordingObserver();
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
         ExpressionScorer scorer = new ExpressionScorer();
@@ -176,16 +181,20 @@ class BestFirstSearchTelemetryTest {
             new SearchHeuristic(1, 8, 1, 2, 4, 8)
         ).withMemory(memory).withObserver(observer);
 
-        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
 
-        assertEquals(List.of("x"), states.stream().map(SearchState::expression).toList());
-        assertFalse(memory.decisions().isEmpty());
-        assertTrue(observer.events().stream().anyMatch(
+        assertEquals(List.of("x", "a"), result.states().stream().map(SearchState::expression).toList());
+        assertEquals(0, result.metrics().transpositionPrunes());
+        assertTrue(memory.decisions().isEmpty());
+        assertFalse(observer.events().stream().anyMatch(
             event -> event.type() == SearchEventType.STATE_PRUNED_TRANSPOSITION));
         try (BestFirstSearchStrategy.ValueIdentitySession identity =
                 new BestFirstSearchStrategy.ValueIdentitySession(canonicalizer)) {
-            assertTrue(memory.table().lookup(identity.valueHash("a")).isPresent(),
-                "legacy entry must be lazily recorded under the ValueKey-derived identity");
+            var migrated = memory.table().lookup(identity.valueHash("a")).orElseThrow();
+            assertEquals(2, migrated.visitCount());
+            assertEquals(Instant.EPOCH, migrated.firstSeen());
+            assertEquals(Set.of("known_rule"), migrated.reachedByRuleIds());
+            assertEquals(1, memory.table().lookup(canonicalizer.stableHash("a")).orElseThrow().visitCount());
         }
     }
 

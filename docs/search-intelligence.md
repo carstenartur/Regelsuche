@@ -23,7 +23,7 @@ candidates.
 | `TEACHING` | Beam | `TEACHING_FRIENDLY` |
 | `PROOF_ORIENTED` | A* | `PROOF_FRIENDLY` |
 | `EXHAUSTIVE_SMALL` | MCTS | `SIMPLIFY` |
-| `DISCOVERY_PLUS` | BestFirst + transposition table | `SIMPLIFY` |
+| `DISCOVERY_PLUS` | BestFirst + durable value observations | `SIMPLIFY` |
 | `EQUALITY_SATURATION` | EGraph saturation | `SIMPLIFY` |
 
 The web UI exposes profile and goal separately. `POST /api/search` accepts both;
@@ -32,15 +32,54 @@ when `goal` is omitted, the profile default applies. Usage guidance is in
 
 ## Transposition table
 
-`DISCOVERY_PLUS` activates the `TranspositionTable`. It recognizes canonical
-states, prunes already-known-better paths and may retain a non-improving path
-when it introduces a new rule combination. Decisions are exposed at
-`/api/memory/pruning`.
+`DISCOVERY_PLUS` activates durable `TranspositionTable` observations for
+BestFirst. The table aggregates scores, depths, rule IDs and visits by canonical
+value and assumption fingerprint. Legacy identity entries are migrated lazily
+when the current value identity is observed.
 
-BestFirst searches with a `SYNTAX_EXACT` target still record observations in the
-table. They reconstruct a concrete path in the current run, since a stored
-canonical value can summarize another syntax or a different continuation. The
-in-run visited checks and search budgets control expansion for those searches.
+When memory is attached, all BestFirst modes record these observations without
+using them to suppress the current run's continuations. This includes untargeted searches, both target
+relations, and the inherited A* and policy-aware BestFirst implementations. The
+run-local typed visited key includes canonical value, applied rule applications
+and assumptions. Candidate filters and search budgets still limit exploration.
+The durable summary does not contain the application history, rule inventory,
+profile or remaining budget needed to certify that a continuation is reusable.
+Observations from another run therefore cannot justify such a cutoff.
+
+BestFirst records no transposition-pruning decisions or events, and its
+`transpositionPrunes` metric remains zero. Other strategies that directly use
+`TranspositionGate` retain their existing pruning behavior. Their decisions
+remain exposed at `/api/memory/pruning`; the durable schema and gate API are
+unchanged.
+
+### Continuation regression and limits
+
+Using only the built-in `ast_power_of_power` rule, `((x^2)^2)^2` has two
+immediate reductions: `(x ^ 2) ^ 4` and `(x ^ 4) ^ 2`. They share a canonical
+value, score, depth and rule ID but have different applied-rule application
+sets. The first has already consumed the application needed to reach `x ^ 8`;
+the second still permits that continuation.
+
+At `eb3faf92487ab839ac53c0e3df5b78ada0d7ea11`, untargeted BestFirst without
+memory explores four states and reaches `x ^ 8` through `(x ^ 4) ^ 2`. Fresh
+memory explores two states and loses that reduction; repeated or shallow-run
+memory can leave only the root. The production-rule
+[`BestFirstMemoryContinuationTest`](../regelsuche-search/src/test/java/de/regelsuche/search/strategy/BestFirstMemoryContinuationTest.java)
+compares the complete explored states and concrete reduction path with the
+same no-memory search for fresh, repeated and warmed memory, a continued value
+target, and A* with observations from BestFirst. All five comparisons pass
+after the cutoff is removed. The telemetry and goal-aware
+tests also retain assumption separation, legacy migration and repeated
+syntax-exact paths.
+
+The observed loss concerns a reduced syntax and better expression score: the
+value canonicalizer already recognizes their equivalence. The restricted
+production inventory isolates this failure; it is not a full-default-inventory
+performance comparison. Memory-enabled BestFirst may now explore more states
+and use more of its budgets. No general completeness or scaling result follows,
+and this change does not qualify the other strategies' durable pruning.
+Issue #696 remains open for the broader search-scaling and reusable-knowledge
+criteria.
 
 ## Structural diversity
 
