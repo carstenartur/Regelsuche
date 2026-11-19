@@ -2,6 +2,20 @@
 
 Diese Seite beschreibt die wichtigsten Bedienabläufe der Regelsuche-Web-Workbench. Die Schritte verwenden ausschließlich sichtbare Tabs, Felder und Aktionen. Die zugrunde liegenden REST-Verträge werden nicht dupliziert; Methoden, Pfade, Schemata und Statuscodes stehen in Swagger/OpenAPI.
 
+## Eine historische Faktorisierung nachverfolgen
+
+1. Unter den Demo-Karten **Sophie-Germain faktorisieren** wählen. Der Lauf
+   erhält `x^4 + 4*y^4` und das Ziel **Faktorisierung**.
+2. In der Zusammenfassung die Produktform, die Zwischenformen, den Prüfstatus
+   und die gezählte logische Arbeit prüfen.
+3. Bei **Quadrat ergänzen** über **Exakt geprüft** die Prüfdaten dieses Schritts
+   öffnen. **Im Replay öffnen** springt zu genau diesem Schritt. Unter **Graph**
+   den aufgezeichneten Pfad ansehen.
+
+Die Demo führt die allgemeine Konstruktion beim Start aus. Die Prüfung
+vergleicht die Polynome an jedem ausgeführten Schritt und überprüft, dass das
+Produkt die Eingabe darstellt. [Aufnahmen und Herleitung](demo-gallery.md#sophie-germain-in-der-workbench-faktorisieren)
+
 ## Summenschleifen optimieren
 
 1. Auf der Startseite **Berechnung optimieren** öffnen. In **Summenschleifen

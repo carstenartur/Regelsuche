@@ -4,6 +4,42 @@ Die Beispiele zeigen, was Regelsuche aus einer Eingabe herleitet, welche
 Prüfungen sie ausführt und wie sich der Aufwand vergleichen lässt. Die
 Bildschirmaufnahmen stammen aus der laufenden Anwendung. [Workbench starten](../README.md#schnellstart)
 
+## Sophie-Germain in der Workbench faktorisieren
+
+Wähle unter den Demo-Karten **Sophie-Germain faktorisieren**. Die Demo nutzt
+die bekannte historische Aufgabe `x^4 + 4*y^4`. Der mathematische Kern erhält
+als Ziel eine nichttriviale Faktorisierung. Die Produktform ist dabei offen.
+
+Der abgezogene Kreuzterm ist selbst ein Quadrat. Mit $u=x^2$ und $v=2y^2$
+wird aus $u^2+v^2$ die Form $(u+v)^2-2uv$. Hier ist $2uv=4x^2y^2=(2xy)^2$.
+Die Differenz zweier Quadrate lässt sich anschließend faktorisieren.
+
+$$
+x^4+4y^4 = (x^2+2y^2)^2-(2xy)^2 = (x^2+2y^2-2xy)(x^2+2y^2+2xy)
+$$
+
+Die Zusammenfassung zeigt das Ergebnis und alle fünf geprüften Schritte. Am Schritt
+**Quadrat ergänzen** öffnet **Im Replay öffnen** die exakte Vorher- und
+Nachherform dieses Schritts. **Exakt geprüft** klappt die zugehörigen
+Prüfdaten auf. **Graph** macht den aufgezeichneten Pfad sichtbar.
+
+Der Lauf verwendet die im Programm implementierten allgemeinen
+Konstruktionsverfahren. Er prüft jeden Schritt und das Ergebnis exakt als
+Polynomidentitäten. Das Replay zeigt die ausgeführten Konstruktionsoperationen
+und fasst deren interne Rechenschritte zusammen. Der angezeigte Prüfstatus
+steht für diese Polynomprüfung. Beim gezeigten Lauf fallen **43.722 logische
+Arbeitseinheiten** für Suche und Prüfung an. Unter **Rechenauftrag und
+Aussagekraft** stehen die Grenzen des Laufs, darunter 32 primitive Schritte,
+Suchtiefe 8, 512 Zustände und je 10.000.000 Einheiten für Theorie- und
+Gesamtarbeit. Formale Lean-Beweise haben einen eigenen Prüfablauf. [Proof-Jobs](proof-workbench.md)
+
+![Die Workbench zeigt die Eingabe x⁴ + 4y⁴, die gefundene Produktform und den exakt geprüften Rechenweg](assets/screenshots/historical-sophie-germain.png)
+
+[Ansicht bei 390 Pixel Breite](assets/screenshots/historical-sophie-germain-mobile.png) ·
+[Aufnahmedaten für Desktop](assets/screenshots/historical-sophie-germain.json) und
+[schmale Ansicht](assets/screenshots/historical-sophie-germain-mobile.json) ·
+[Rechenweg, Budget und Prüfmethode](research/structural-construction-learning.md#the-frozen-catalog-through-one-source-only-task-solver)
+
 ## Ein Durchlauf für eine Paarsumme
 
 1. Öffne **Berechnung optimieren** und wähle **Quadrierte Abstände**. Der
@@ -57,28 +93,6 @@ Laufzeit brauchen eine eigene Bilanz.
 [Aufgabe und Suchaufwand als SVG](generated/autonomous-discovery-walkthrough-shared-core-v3/representative-search.svg) ·
 [Vollständiger Walkthrough und Reproduktion](autonomous-discovery-walkthrough.md)
 
-## Einen ausgeführten Kandidatenschritt im Replay prüfen
-
-Der native Suchlauf startet bei `(x + 0) * (x + 0)`. Die Aufnahme zeigt den
-ersten Schritt zu `(x + 0)^2` am Wurzelknoten; ausgewählter Endkandidat ist
-`x^2`. Öffnest du im
-Kandidatendossier einen Schritt aus der **Replay-Ansicht der gespeicherten Schritte**,
-siehst du den vollständigen Ausdruck **Vor diesem Schritt** und **Nach diesem
-Schritt**. Darunter stehen der ersetzte Teilausdruck, die angewandte Regel und die
-tatsächliche Quellposition. **Ausführungsdaten und Zuordnung anzeigen** öffnet
-die gespeicherten Details. **Gespeicherte Graphkante öffnen** führt zur
-zugehörigen Kante. Der ausgewählte Endkandidat bleibt beim Wechsel erhalten.
-
-Der Browsertest führt die native Suche aus und zeichnet ihre gespeicherten
-Schritte in der Workbench auf.
-
-![Nativer Kandidat im Replay mit vollständigen Ausdrücken vor und nach dem Schritt, ersetztem Teilausdruck und Quellposition](assets/screenshots/candidate-replay.png)
-
-[Ansicht bei 390 Pixel Breite](assets/screenshots/candidate-replay-mobile.png) ·
-[Aufnahmedaten für Desktop](assets/screenshots/candidate-replay.json) und
-[schmale Ansicht](assets/screenshots/candidate-replay-mobile.json) ·
-[Aufnahme und Reproduktion](testing.md#dokumentationsaufnahmen)
-
 ## Forschungsbefunde zur logischen Arbeit
 
 | Entwicklungssatz | Direkter Vergleich | Mit wiederverwendetem Wissen |
@@ -99,9 +113,10 @@ beschreiben diese Entwicklungssätze. [Forschungsstand](discovery-status.md#neue
 
 ## Detailnachweise zur Algebra-Suche
 
-Die historischen Suchläufe zur quadratischen Ergänzung und zur
+Die archivierten Suchläufe zur quadratischen Ergänzung und zur
 Sophie-Germain-Faktorisierung zeigen Zwischenformen, Brückenregeln und die
-spätere Anwendung des jeweiligen Makros. Eingaben, Ziele, Graphgrößen und
+spätere Anwendung des jeweiligen Makros. Die Archivläufe verwenden einen
+eigenen Szenariovertrag. Eingaben, Ziele, Graphgrößen und
 kanonische Evidence-IDs stehen in der
 [generierten Algebra-Galerie](generated/discovery/gallery.md).
 

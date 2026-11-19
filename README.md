@@ -16,6 +16,7 @@ Verfahren und eigenständig nutzbare Java-SDKs verbinden diese Suche mit
 strukturellen Aufgaben, kumulativem Lernen und geprüften Rechenoptimierungen.
 
 [Demo starten](#schnellstart) ·
+[Sophie-Germain faktorisieren](#sophie-germain-in-der-workbench-faktorisieren) ·
 [Paarsummen optimieren](#einen-ein-pass-algorithmus-aus-einer-paarsumme-herleiten) ·
 [Ergebnisse ansehen](docs/demo-gallery.md) ·
 [Ersten Rechenweg untersuchen](#erster-ablauf-einen-rechenweg-verstehen) ·
@@ -71,6 +72,20 @@ und [Testing](docs/testing.md) unterscheiden diese Prüfumfänge.
 
 Der vollständige Einstieg einschließlich Sicherheitshinweisen und
 Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
+
+## Sophie-Germain in der Workbench faktorisieren
+
+Wähle unter den Demo-Karten **Sophie-Germain faktorisieren**. Die Workbench
+erhält `x^4 + 4*y^4` und das Ziel **Faktorisierung**. Aus der Summe zweier
+Quadrate konstruiert sie mit allgemeinen Regeln eine Differenz zweier Quadrate
+und findet das Produkt `(x^2 + 2*y^2 - 2*x*y)*(x^2 + 2*y^2 + 2*x*y)`.
+
+Die Zusammenfassung zeigt das Ergebnis, **fünf exakt geprüfte Schritte** und
+**43.722 logische Arbeitseinheiten**. Wähle am Schritt **Quadrat ergänzen** die Aktion
+**Im Replay öffnen**, um genau diese Umformung mit Ausgangs- und Ergebnisform
+zu sehen. [Herleitung und Bildschirmaufnahmen](docs/demo-gallery.md#sophie-germain-in-der-workbench-faktorisieren)
+
+![Sophie-Germain-Faktorisierung in der Workbench mit Ausgangsausdruck, Produktform und geprüften Schritten](docs/assets/screenshots/historical-sophie-germain.png)
 
 ## Einen Ein-Pass-Algorithmus aus einer Paarsumme herleiten
 
@@ -266,21 +281,12 @@ hier eine Auswahlbedingung; mathematische Verfahren sind schon vorgegeben.
 Der installierbare [Python-Client](docs/python-client.md) prüft die vollständigen
 rationalen Lösungsmengen unabhängig vom Java-Server.
 
-## Beispiel: eine versteckte Faktorisierung als Suchraum
+## Ein früherer Sophie-Germain-Suchlauf
 
-Ausgangspunkt und Ziel des generierten Sophie-Germain-Szenarios sind:
-
-```text
-x^4 + 4*y^4
-
-→ (x^2 - 2*x*y + 2*y^2) * (x^2 + 2*x*y + 2*y^2)
-```
-
-Interessant ist nicht, dass die bekannte Identität irgendwo hinterlegt werden
-könnte. Der Lauf behält vielmehr die tatsächlich untersuchten Zustände, die
-vorbereitende Bridge, die primitive Faktorisierung, das daraus gebildete Makro
-und dessen spätere Wiederverwendung. Der detaillierte Suchgraph wird aus der
-kanonischen Evidence erzeugt, nicht für das README nachgezeichnet.
+Der archivierte Algebra-Lauf zur selben Eingabe hält die untersuchten
+Zustände, die vorbereitende Brückenregel, das gebildete Makro und dessen
+Wiederverwendung fest. Sein Suchgraph wird aus der kanonischen Evidence
+erzeugt.
 
 [Suchgraph zur Detailinspektion in voller Größe](docs/generated/discovery/sophie-germain/search-space.svg) ·
 [Evidence dieses Laufs](docs/generated/discovery/sophie-germain/evidence.json) ·

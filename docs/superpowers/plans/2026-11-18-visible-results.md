@@ -61,3 +61,28 @@
 - [x] Execute the targeted real browser flows; visually inspect desktop and narrow screenshots and correct actual layout defects.
 - [x] Run focused app/generator checks, review the complete diff and publish one focused PR.
 - [ ] Follow the complete repository CI, addressing failures in scope.
+
+## Task 4: Historical computation and the failed visual check (2026-11-19)
+
+The user's review rejected the `(x + 0) * (x + 0)` replay as a capability
+showcase. Keep it as an occurrence-selection regression control, and lead the
+gallery with the existing source-only Sophie-Germain solver instead.
+
+- [x] Add a real HTTP regression and observe the missing endpoint fail. Run
+  the existing typed Java solver on `x^4 + 4*y^4`, empty assumptions and the
+  general `FACTORIZATION` goal; provide no target expression or witness.
+- [x] Retain the actual five verified witness edges in the standard graph and
+  replay, including source-bound receipts, budget and measured logical work.
+- [x] Add the Workbench result, all intermediate expressions, verification
+  details and direct step selection. Check against the real server on desktop
+  and at 390px, with a different demo path already present.
+- [x] Identify the red CI's one-pixel matrix-capture shift caused by the longer
+  entry text. Update only that baseline from the actual pinned CI artifact
+  and its content hash; preserve the comparison thresholds. Replay all four
+  pinned captures and check the baseline policy.
+- [x] Rewrite the README and gallery around the historical result. Review all
+  ten open issues against their remaining acceptance criteria; this bounded
+  demo does not close the larger research and product requirements.
+- [ ] Record the two historical documentation captures from committed source,
+  verify their metadata and run the documentation checks.
+- [ ] Integrate current main, publish the updated PR and follow its complete CI.

@@ -41,6 +41,11 @@ public final class DemoCatalog {
             this(id, title, description, expression, inputType, profile,
                 expectedHighlight, expectedResultExpression, "algebra");
         }
+
+        public String profileName() {
+            return HistoricalConstructionDemo.ID.equals(id)
+                ? HistoricalConstructionDemo.PROFILE.name() : profile.name();
+        }
     }
 
     private static final Map<String, Demo> DEMOS = buildDemos();
@@ -102,6 +107,17 @@ public final class DemoCatalog {
             SearchProfile.DISCOVERY_PLUS,
             "Suchläufe, aktive Makros und tatsächliche Wiederverwendung untersuchen",
             "49 + 14 * x + x ^ 2"
+        ));
+        map.put(HistoricalConstructionDemo.ID, new Demo(
+            HistoricalConstructionDemo.ID,
+            "Sophie-Germain-Faktorisierung",
+            "Zerlege das Polynom in zwei nichtkonstante Faktoren. Die Workbench zeigt die Zwischenschritte "
+                + "zur Differenz zweier Quadrate und die exakte Prüfung jedes Schritts.",
+            "x^4+4*y^4",
+            InputType.TERM,
+            SearchProfile.DISCOVERY,
+            "Nichttriviale Faktorisierung",
+            null
         ));
         // ---------------- math-domain demos (PR #13/follow-up) ----------------
         // These four entries flow through `UnifiedMathDomainWorkbench` instead

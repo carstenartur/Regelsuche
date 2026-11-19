@@ -12,6 +12,7 @@ import com.sun.net.httpserver.HttpsServer;
 import de.regelsuche.api.ExportQueryService;
 import de.regelsuche.api.RuleInventoryQueryService;
 import de.regelsuche.api.TransformationQueryService;
+import de.regelsuche.demo.HistoricalConstructionDemo;
 import de.regelsuche.discovery.DiscoveredTransformation;
 import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace;
 import de.regelsuche.equivalence.SymPyEquivalenceService;
@@ -100,6 +101,7 @@ public class WebWorkbenchServer {
     private final de.regelsuche.didactic.analytics.DidacticEventStore didacticEventStore;
     private final de.regelsuche.didactic.analytics.DidacticAnalyticsService didacticAnalytics;
     private final de.regelsuche.didactic.StudentStepValidator didacticStepValidator;
+    private volatile HistoricalDemoReplay historicalDemoReplay;
 
     private HttpServer server;
     private final de.regelsuche.didactic.export.EducationalExporter didacticExporter =
@@ -1166,6 +1168,10 @@ public class WebWorkbenchServer {
         JsonWriter writer = new JsonWriter();
         writer.beginObject();
         writer.property("pathId", dto.pathId());
+        var historical = historicalDemoReplay;
+        if (historical != null && historical.pathId().equals(path.id())) {
+            writeConstructionSummary(writer, historical.summary());
+        }
         writer.property("alignedDerivationLatex", dto.alignedDerivationLatex());
         writer.property("alignedDerivationLatexWithDiff", dto.alignedDerivationLatexWithDiff());
         MathLayoutJsonWriter.write(writer, "derivationLayout", dto.derivationLayout());
@@ -2629,7 +2635,7 @@ public class WebWorkbenchServer {
                     inner.property("description", demo.description());
                     inner.property("expression", demo.expression());
                     inner.property("inputType", demo.inputType().name());
-                    inner.property("profile", demo.profile().name());
+                    inner.property("profile", demo.profileName());
                     inner.property("expectedHighlight", demo.expectedHighlight());
                     inner.property("expectedResultExpression", demo.expectedResultExpression());
                     inner.property("domain", demo.domain());
@@ -2659,8 +2665,13 @@ public class WebWorkbenchServer {
                 searchMemory);
         demoService.useProofBridge(leanProofBridgeService);
         de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);
+        if (result.constructionSummary() != null && result.selectedPath() != null) {
+            historicalDemoReplay = new HistoricalDemoReplay(result.selectedPath().id(), result.constructionSummary());
+        }
         sendJson(exchange, 200, renderDemoBundle(result));
     }
+
+    private record HistoricalDemoReplay(String pathId, HistoricalConstructionDemo.Summary summary) {}
 
     private String renderDemoBundle(de.regelsuche.demo.DemoService.DemoRunResult result) {
         de.regelsuche.demo.DemoCatalog.Demo demo = result.demo();
@@ -2682,7 +2693,7 @@ public class WebWorkbenchServer {
             writer.property("expressionLatex", expressionLatex);
         }
         writer.property("inputType", demo.inputType().name());
-        writer.property("profile", demo.profile().name());
+        writer.property("profile", demo.profileName());
         writer.property("expectedHighlight", demo.expectedHighlight());
         writer.property("expectedResultExpression", demo.expectedResultExpression());
         writer.property("domain", demo.domain());
@@ -2693,6 +2704,9 @@ public class WebWorkbenchServer {
         }
         if (!result.resultLatex().isEmpty()) {
             writer.property("resultLatex", result.resultLatex());
+        }
+        if (result.constructionSummary() != null) {
+            writeConstructionSummary(writer, result.constructionSummary());
         }
         if (result.proofOutcome() != null) {
             writer.object("proofOutcome", po -> {
@@ -2770,6 +2784,33 @@ public class WebWorkbenchServer {
         });
         writer.endObject();
         return writer.toString();
+    }
+
+    private static void writeConstructionSummary(JsonWriter writer, HistoricalConstructionDemo.Summary summary) {
+        var budget = summary.budget();
+        writer.object("constructionSummary", object -> object
+            .property("goal", summary.goal().name())
+            .property("profile", summary.profile().name())
+            .property("totalWork", summary.totalWork())
+            .object("budget", value -> value
+                .property("maxPrimitiveSteps", budget.maxPrimitiveSteps())
+                .property("maxSearchDepth", budget.maxSearchDepth())
+                .property("maxTheoryWork", budget.maxTheoryWork())
+                .property("maxStates", budget.maxStates())
+                .property("totalWork", budget.totalWork())
+                .property("maxComplexityDebt", budget.maxComplexityDebt()))
+            .array("steps", values -> summary.steps().forEach(step -> values.objectValue(value -> value
+                .property("stepIndex", step.stepIndex())
+                .property("sourceExpression", step.sourceExpression())
+                .property("targetExpression", step.targetExpression())
+                .property("ruleId", step.ruleId())
+                .property("sourceKind", step.sourceKind().name())
+                .property("provenanceHash", step.provenanceHash())
+                .object("verification", verification -> verification
+                    .property("accepted", step.verification().accepted())
+                    .property("work", step.verification().work())
+                    .property("reason", step.verification().reason())
+                    .stringArray("receipts", step.verification().receipts()))))));
     }
 
     private static void writePath(JsonWriter writer, String key,

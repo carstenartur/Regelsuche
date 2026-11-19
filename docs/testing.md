@@ -318,15 +318,19 @@ bevor sie die PNG-Dateien unter `docs/assets/screenshots/` schreiben.
 
 ```bash
 ./gradlew --no-configuration-cache :app:e2eTest -Pregelsuche.recordDocs=true \
+  --tests de.regelsuche.e2e.HistoricalConstructionBrowserTest \
   --tests de.regelsuche.e2e.PairReductionBrowserFlowTest \
-  --tests de.regelsuche.e2e.PublicDiscoveryComparisonBrowserTest \
-  --tests de.regelsuche.e2e.NativeReplaySelectionBrowserTest
+  --tests de.regelsuche.e2e.PublicDiscoveryComparisonBrowserTest
 ```
 
 Zu jeder Galerie-PNG gehört eine gleichnamige JSON-Datei mit Aufnahmezeit in
 UTC, Git-Revision, Szenario, Eingabe, Route, Viewport und SHA-256 der PNG-Datei.
 Prüfe nach der Aufnahme die Desktop- und schmale Ansicht sowie die Zuordnung
 der Metadaten zu den Bildern.
+
+`NativeReplaySelectionBrowserTest` prüft zusätzlich das Auswählen gebundener
+Schritte und Kanten im nativen Dossier. Der optionale Aufnahmemodus zeichnet
+diese Bedienkontrollen separat auf.
 
 Ein normaler `ciCheck` aktualisiert keine Dokumentationsmedien. Änderungen an
 sichtbaren Flows müssen UI, Browser-E2E, Handbuch und gegebenenfalls Screenshots

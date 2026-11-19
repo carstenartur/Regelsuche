@@ -60,25 +60,47 @@ mvn --batch-mode --no-transfer-progress \
 No GitHub API, Git checkout metadata or host-side interpreter is used by these
 commands.
 
-The Maven product CI also replays `-pl regelsuche-core,maven-build-contract
--am test` in a temporary directory unpacked from `git archive HEAD`. The
-Maven/JUnit `regelsuche.sourceArchiveMode=true` guard checks that `.git`
-metadata is absent. In addition to the build-contract tests, it now runs the
-**actual core module's complete Maven/JUnit unit-test suite** from this fresh
-archive. A Java contract checks the core Surefire XML and rejects a missing
-report directory, an empty report inventory, exclusively skipped tests,
-failures or errors. Synthetic negative tests cover those cases.
+The Maven product CI also replays the **five first-slice Maven modules**
+(`regelsuche-core`, `regelsuche-egraph`, `regelsuche-search`,
+`regelsuche-validation`, `regelsuche-math-algorithms`) plus
+`maven-build-contract` with `-am test` in a temporary directory unpacked
+from `git archive HEAD`. The Maven/JUnit
+`regelsuche.sourceArchiveMode=true` guard checks that `.git` metadata is
+absent. Every one of the five modules must produce nonempty Surefire XML with
+at least one actually executed test and zero failures or errors. The Java
+contract rejects missing, empty, exclusively skipped, invalid or unsafe XML
+reports, including an omitted module that was not built in the archive.
 `failIfNoTests=true` separately prevents an empty Maven test phase from
 passing. The clean archive prevents stale `target` outputs from masquerading
-as a new test execution. Git is used by the CI adapter to *create* the input
+as new test execution. Git is used by the CI adapter to *create* the input
 archive, not by the Maven replay. The assertions remain in Java/JUnit,
 not in GitHub Actions shell commands.
 
-This is a **limited source-archive test**, not a demonstration of the complete
-`mvn -Pfull verify` lifecycle from an archive. It does not yet qualify
-Testcontainers, other authority-bearing modules, a Git-free host toolchain or
-the Maven-only acceptance criteria A–E in
-[issue #749](https://github.com/carstenartur/Regelsuche/issues/749).
+The same CI source archive is additionally subjected to the Maven `full`
+profile for `regelsuche-integration-tests` and its reactor dependencies:
+
+```text
+mvn --batch-mode --no-transfer-progress \
+  -Pfull -pl regelsuche-integration-tests -am verify
+mvn --batch-mode --no-transfer-progress \
+  -pl maven-build-contract -Dregelsuche.sourceArchiveContainerMode=true \
+  -DfailIfNoTests=true test
+```
+
+The second command checks the freshly produced Failsafe XML for an actually
+executed Docker availability test and actual pinned PostgreSQL and Neo4j
+container-backed suites. Missing reports, skipped-only tests, errors, invalid
+counts, and unsafe XML fail the JUnit contract. A reachable Docker daemon
+alone is insufficient: both database suites must execute. This qualification
+is separate from the initial five-module Surefire replay; it is **not** a
+release, a study, or evidence of mathematical validity.
+
+This remains a **limited source-archive replay**, not a demonstration of an
+entire independent `mvn -Pfull verify` product lifecycle with all evidence
+producers and browser, solver and SymPy boundaries. Gradle/host-authoritative
+steps still remain. The broader Maven-only criteria A–E in
+[issue #749](https://github.com/carstenartur/Regelsuche/issues/749)
+are therefore still open.
 
 ## JMH decision-path migration (issue #749)
 

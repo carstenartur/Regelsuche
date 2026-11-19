@@ -28,6 +28,14 @@ außerdem vorbereitete Aufgaben für binomische Formeln, Bruchkürzung,
 Trigonometrie, Polynom-Expansion, Gleichungen, Ungleichungen, Ableitungen und
 Matrizen.
 
+Unter den Demo-Karten startet **Sophie-Germain faktorisieren** eine Suche
+für `x^4 + 4*y^4`. Die Zusammenfassung zeigt das Faktorisierungsziel, das
+gefundene Produkt, die geprüften Schritte und den logischen Aufwand. **Exakt
+geprüft** öffnet die Prüfdaten einer Umformung. **Im Replay öffnen** zeigt
+genau diesen Schritt. Unter **Rechenauftrag und Aussagekraft** stehen das
+Suchprofil, die Grenzen des Laufs und die Bedeutung der Arbeitszahl.
+[Bedienablauf](user-workflows.md#eine-historische-faktorisierung-nachverfolgen)
+
 Eine Suchdemo zeigt eine Zusammenfassung und öffnet die passenden Bereiche für
 Suchgraph, AST-Regelradar, Pfade, Replay, Identitäten, Qualität und Export. Die
 Makro-Demo meldet, ob im letzten Suchlauf eine gelernte Regel zur Anwendung kam.
@@ -119,7 +127,7 @@ der gespeicherten Schritte** öffnen. Jeder Schritt zeigt den vollständigen Aus
 vor und nach der Umformung, die tatsächliche Quellposition und die konkrete
 Ersetzung. **Ausführungsdaten und Zuordnung anzeigen** öffnet die gespeicherten
 Details zum Schritt. Über **Gespeicherte Graphkante öffnen** prüfst du den
-zugehörigen Übergang im Suchgraphen. [Beispiel in der Galerie](demo-gallery.md#einen-ausgeführten-kandidatenschritt-im-replay-prüfen)
+zugehörigen Übergang im Suchgraphen. [Nativer Trace und Vorkommensbindung](native-target-free-workspace.md#quellenbindung-und-anzeige)
 
 ### Vergleich
 
