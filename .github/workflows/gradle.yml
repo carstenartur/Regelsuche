@@ -203,58 +203,11 @@ jobs:
         run: bash gradle/run-released-sdk-maven-consumers.sh
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
-      - name: Exercise default Maven Web Workbench image over HTTP
-        timeout-minutes: 35
-        run: |
-          set -euo pipefail
-          # This explicitly builds the final runtime target rather than the
-          # independent, Gradle-backed walkthrough target. Static Dockerfile
-          # contracts alone cannot catch missing runtime jars or web assets.
-          docker build --progress=plain --target runtime --tag regelsuche-web-workbench:ci .
-          container_id="$(docker run --detach --publish 127.0.0.1:18080:8080 regelsuche-web-workbench:ci)"
-          cleanup() {
-            docker logs "$container_id" || true
-            docker rm --force "$container_id" >/dev/null || true
-          }
-          trap cleanup EXIT
-          ready=0
-          for attempt in $(seq 1 90); do
-            if curl --fail --silent --show-error --max-time 3 \
-                -o "$RUNNER_TEMP/regelsuche-container-index.html" \
-                http://127.0.0.1:18080/; then
-              ready=1
-              break
-            fi
-            if ! docker inspect --format '{{.State.Running}}' "$container_id" | grep -qx true; then
-              break
-            fi
-            sleep 2
-          done
-          test "$ready" -eq 1
-          grep -q 'Regelsuche' "$RUNNER_TEMP/regelsuche-container-index.html"
-          curl --fail --silent --show-error --max-time 15 \
-            -o "$RUNNER_TEMP/regelsuche-container-style.css" http://127.0.0.1:18080/style.css
-          test -s "$RUNNER_TEMP/regelsuche-container-style.css"
-          curl --fail --silent --show-error --max-time 15 \
-            -o "$RUNNER_TEMP/regelsuche-container-app.js" http://127.0.0.1:18080/app.js
-          test -s "$RUNNER_TEMP/regelsuche-container-app.js"
-          curl --fail --silent --show-error --max-time 15 \
-            -o "$RUNNER_TEMP/regelsuche-container-paths.json" http://127.0.0.1:18080/api/paths
-          curl --fail --silent --show-error --max-time 15 \
-            -o "$RUNNER_TEMP/regelsuche-container-inventory.json" http://127.0.0.1:18080/api/inventory
-          python3 - "$RUNNER_TEMP/regelsuche-container-paths.json" \
-                    "$RUNNER_TEMP/regelsuche-container-inventory.json" <<'PY'
-          import json
-          import sys
-
-          with open(sys.argv[1], encoding="utf-8") as input_file:
-              paths = json.load(input_file)
-          with open(sys.argv[2], encoding="utf-8") as input_file:
-              inventory = json.load(input_file)
-          assert isinstance(paths["transformations"], list), paths
-          assert isinstance(inventory["rules"], list), inventory
-          print("Default Maven image: HTTP index, CSS, JS, paths and inventory verified")
-          PY
+      - name: Verify Maven Web Workbench Docker image through JUnit/Testcontainers
+        timeout-minutes: 40
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image
+          -pl regelsuche-integration-tests -am verify
       - name: Replay retained Maven Surefire and Failsafe pages without Gradle inputs
         run: >-
           mvn --batch-mode --no-transfer-progress -pl regelsuche-quality

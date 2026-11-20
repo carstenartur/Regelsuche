@@ -71,3 +71,33 @@ proof-image checks must pass on the PR head and after integration. A green image
 build cannot explain or repair the earlier sporadic Docker daemon failure.
 No frozen reproduction Dockerfile, scientific receipt, quality threshold or
 historical test corpus is changed.
+
+
+## Maven-owned standard Web Workbench image verification
+
+The hosted verification workflow now invokes the existing full Maven product
+authority unchanged, then runs a dedicated checkout-owned Maven/JUnit authority:
+
+```sh
+mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image \
+  -pl regelsuche-integration-tests -am verify
+```
+
+The opt-in Maven Failsafe profile compiles and executes the **existing**
+`WebWorkbenchDockerImageTest` with Testcontainers. It builds the final
+`Dockerfile` image from the immutable tracked-file snapshot, allocates a
+Testcontainers-managed random host port, waits for HTTP readiness and checks
+HTML, JavaScript, styles, bundled vendor assets, the OpenAPI reference,
+path-traversal rejection and both discovery API response structures.
+`DockerAvailabilityIT` requires an actual reachable daemon, so an absent
+Docker engine does not silently count as an image acceptance. This preserves
+the repository's workflow-semantics contract: no manual `docker build`,
+`docker run`, port binding or inline Python assertions in GitHub Actions.
+
+The image suite is **explicitly checkout-only** because its current
+reproducible build-context helper enumerates Git-tracked sources. The separate
+Git-free `mvn -Pfull verify` archive replay remains unchanged and continues
+to enforce the independent Postgres/Neo4j container suites. No result from the
+new image suite may be claimed before its exact-head hosted Failsafe report
+shows executed tests with zero failures, errors and skips. This does not yet
+close #749's Maven-only A–E acceptance or diagnose an intermittent daemon failure.
