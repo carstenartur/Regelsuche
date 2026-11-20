@@ -73,6 +73,26 @@ class ScopedLeanContractTest {
         }
     }
 
+    @Test void globalDomainFactsAreIndependentOfPremiseIdentifiers() {
+        var log = app("log", x);
+        var logIdentity = app("eq", log, log);
+        var positive = app("lt", zero, x);
+        var nested = app("log", log);
+        var declarations = List.of(new SymbolDeclaration("b0", Sort.REAL));
+        for (var order : List.of(List.of("a-log", "z-positive"), List.of("z-log", "a-positive"))) {
+            var guarded = theorem(declarations, List.of(Predicate.holds(order.get(0), logIdentity),
+                Predicate.holds(order.get(1), positive)), app("eq", x, x));
+            var material = new LeanSourceRenderer().render(guarded);
+            assertTrue(material.supported(), material.issues().toString());
+        }
+        // The guard for log(log x) itself has a domain and may sort before x > 0.
+        var chained = theorem(declarations, List.of(Predicate.holds("a", app("lt", zero, log)),
+            Predicate.holds("z", positive)), app("eq", nested, nested));
+        assertTrue(new LeanSourceRenderer().render(chained).supported());
+        assertFalse(new LeanSourceRenderer().render(theorem(declarations,
+            List.of(Predicate.holds("a", app("lt", zero, log))), app("eq", nested, nested))).supported());
+    }
+
     @Test void localDomainFactsApplyOnlyToTheCorrectVariableAndImplicationBranch() {
         var positive = app("lt", zero, n);
         var logIdentity = app("eq", app("log", n), app("log", n));

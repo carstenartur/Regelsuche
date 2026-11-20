@@ -54,11 +54,11 @@ final class ScopedLeanRenderer {
                 type.append(" (rs_").append(d.name()).append(" : ").append(sortName(d.sort())).append(")");
             }
             if (!type.isEmpty()) type.insert(0, "∀").append(", ");
+            collectGlobalGuards();
             for (var p : obligation.assumptions()) {
                 String premise = relation(p.relation(), p.left(), p.right(), null);
                 mapping.put("assumption." + p.id(), premise);
                 type.append(premise).append(" → ");
-                if (p.relation() == Relation.HOLDS) collectGuards(p.left(), 0);
             }
             var goal = obligation.goal();
             type.append(relation(goal.relation(), goal.left(), goal.right(), mapping));
@@ -212,6 +212,16 @@ final class ScopedLeanRenderer {
         boolean nonzero = LeanSourceRenderer.nonzero(b.right(), obligation)
             || guards.stream().anyMatch(g -> g.source.equals(right) && g.nonzero);
         return new Term(LeanSourceRenderer.binary(b, issues, left, right, positive, nonzero), REAL);
+    }
+
+    private void collectGlobalGuards() {
+        // Premise identifiers order the wire representation, not the domain conditions.
+        // Type-check guard operands now. Recheck all their partial-operation domains below
+        // when rendering every full premise with the complete set of global facts.
+        for (var p : obligation.assumptions()) {
+            if (p.relation() == Relation.HOLDS) collectGuards(p.left(), 0);
+        }
+        issues.clear();
     }
 
     private void collectGuards(Expression condition, int depth) {
