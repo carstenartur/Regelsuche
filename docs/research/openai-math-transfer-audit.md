@@ -32,6 +32,10 @@ Satz über gegenseitig unverzerrte Basen.
 | Bezug | Gemeinsamer Kern und SDK | Tatsächlicher Umfang |
 | --- | --- | --- |
 | Familie 266, exakte Substitutionen | `ModularKernel`, `ModularKernelVerifier`, `ModularKernelSdk`; optional `RecurrenceInvariantSynthesis.solveWithModularKernel` | Modulare Elimination, CRT und rationale Rekonstruktion schlagen Regeln vor. Ein unabhängiger exakter Prüfer unterscheidet Substitutionen für ausgewählte Originalzeilen von einer Basis des vollständigen Kerns. |
+| Familie 119, rationale Boxen | `BernsteinPositivity`, `PolynomialPositivitySdk` | Ein- und zweidimensionale Bernstein-Netze, exakte Halbierung und unabhängige vollständige Blattprüfung. [Vertrag und Kontrollen](polynomial-positivity.md). |
+| Familie 266, Gram-/Schur-Schritt | `GramPositivity`, `PolynomialPositivitySdk` | Exakte symmetrische Matrixprüfung einschließlich singulärer Nullpivots; ein Polynomurteil benötigt die vollständige Gram-Identität. Die Quellmatrizen des Manuskripts werden dadurch nicht automatisch zertifiziert. |
+| Familie 187 als Architekturhinweis | `FiniteProofDag`, `FiniteProofDagSdk`, `FiniteProofDagJson` | Kleiner endlicher Regelsatz mit geprüften Coverage-/Hunter-/Hall-Blättern, Maximum und positiver Existenzfolgerung. Kein Import des Snaky-Spielbeweises. [Vertrag](hunter-finite-proofs.md). |
+| Klassische Hunter-Schranke | `HunterCoverage`, `HunterCoverageSdk` | Exakte CRT-Paarschnitte und Spannbaumzertifikate für endliche Überdeckungen. Die mathematische Schranke stammt von Hunter (1976), nicht aus einem neuen OpenAI-Satz. |
 | Familie 116, rationaler Trefferpunkt | `NoncommutativeFormula`, `NoncommutativeIdentity`, `NoncommutativeIdentitySdk` | Experimenteller Vergleich beschränkter, divisionsfreier geordneter Formelbäume über rationalen Koeffizienten in Charakteristik null. [Vertrag und Grenzen](noncommutative-identity.md). |
 | Familie 021 als Anstoß zu endlichen Siebschranken | `CongruenceCoverage`, `CongruenceCoverageSdk` | Aktivierte Kongruenzen auf endlichen Progressionen, verallgemeinerter CRT, exakte Überdeckung und Bonferroni-Schranken. [Vertrag und Rechnung](congruence-coverage.md). |
 | Klassische Matching- und Hall-Zertifikate | `BipartiteMatching`, `BipartiteMatchingSdk` | Endliche bipartite Graphen mit Kapazität eins, maximales Matching, maximale Hall-Defizienz und prüfbare Knotenüberdeckung. [Vertrag](bipartite-matching.md). Das ist keine Implementierung des allgemeinen Graph-Matching-Algorithmus aus Familie 120. |
@@ -59,17 +63,20 @@ gleichen Pivotspalten. Der exakte Zertifikatsprüfer bleibt unverändert.
 | Möglichkeit | Abgrenzung zum vorhandenen Code |
 | --- | --- |
 | Weitere Varianten aus Familie 116 | Der Katalog enthält auch Trefferlisten für Formeln mit Inversen und Trefferpunkte in positiver Charakteristik. Der aktuelle Formeltyp hat keine Inversen und ist auf rationale Koeffizienten beschränkt. „Rational“ bezeichnet hier die Koeffizienten, nicht rationale Ausdrücke mit inversen Variablen. Die [Lean-Beschreibung](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/116.md) trennt die beiden formalisierten Formelklassen. |
-| Exakte Positivitäts- und Ungleichheitszertifikate aus Familie 266 | Abschnitt 5 prüft positive Matrizen durch rationale Schur-Komplemente und anschließend eine strikte Schranke aus konstantem Term und absoluter Koeffizientensumme. Ein eigener allgemeiner Java-Prüfer für diese Gram-/Schur-Zertifikate wurde in den untersuchten mathematischen Modulen nicht gefunden. Die lineare Kernsubstitution allein deckt diesen Schritt nicht ab. |
 | Deterministische Faktorisierung aus Familie 142 | Vorhanden ist [klassische Berlekamp-Faktorisierung](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/FiniteFieldFactorization.java) mit Enumeration von Körperresten und einer [begrenzten Policy](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/FiniteFieldFactorizationPolicy.java). Die Familie behauptet dagegen vollständige Faktorisierung in einer Bitkomplexität polynomial in Grad und `log(p)`; ihr [Manuskript](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/Deterministic-Polynomial-Factorization-over-Prime-Fields-October-4-2026/Deterministic-Polynomial-Factorization-over-Prime-Fields.pdf) ist damit nicht schon implementiert. |
 | Allgemeine Graphen und Zählverfahren | Bipartites Matching deckt weder allgemeine Graph-Matchings und vorgeschriebene Gradfaktoren aus Familie 120 noch approximatives Matchingzählen aus Familie 113 ab. Diese sind eigene Algorithmus- und Verifikationsaufgaben. |
 | Allgemeine bilineare Entdeckung | Die vorhandenen Montgomery-Vorschläge prüfen zwei konkrete, allgemein parametrisierte Schemata. Eine Suche nach beliebigen Bilinearformen oder minimalem Tensor-Rang folgt nicht aus einem linearen Kernlöser; die [akzeptierte Transferspezifikation](../superpowers/specs/2026-11-20-mathematical-transfer-design.md) lässt diese nichtlineare Aufgabe ausdrücklich offen. |
 
-Das sind konkrete Ansatzpunkte, keine Liste bereits zugesagter zusätzlicher
-Implementierungen. Für einen weiteren Transfer braucht es einen begrenzten
+Diese verbleibenden Ansatzpunkte gehören nicht zur oben aufgeführten
+Implementierung. Für einen weiteren Transfer braucht es einen begrenzten
 Eingabevertrag, einen unabhängigen Prüfer und einen belegten Nutzen gegenüber
 dem vorhandenen Verfahren. Asymptotische Ergebnisse über Matrixmultiplikation
 (107), Ganzzahlmultiplikation (109) oder exakte Fouriertransformation (130)
 begründen allein keinen praktischen Geschwindigkeitsgewinn im Java-Kern.
+
+Der [Verfügbarkeitsstand](../mathematical-capabilities.md) ordnet die implementierten
+Verfahren dem aktuellen Checkout, dem veröffentlichten SDK und den Demos zu.
+Die Ergänzungen sind durch die [Umsetzungsspezifikation](../superpowers/specs/2026-11-20-exact-certificates-and-demos.md) begrenzt.
 
 ## Verbraucher und Abschlusskriterien
 

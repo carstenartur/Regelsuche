@@ -6,13 +6,16 @@
     <title>Summenschleifen beschleunigen – Regelsuche</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="pair-reductions.css">
+    <link rel="stylesheet" href="certificate-demos.css">
     <script defer src="pair-reductions.js"></script>
+    <script type="module" src="certificate-demos.js"></script>
 </head>
 <body class="pair-reduction-page">
 <header><div class="brand">
     <a href="/">← Regelsuche Workbench</a>
     <h1>Summenschleifen beschleunigen</h1>
     <p>Regelsuche leitet symbolisch geprüfte Algorithmen für Paarsummen, geordnete Tupel und gleitende Paarfenster her.</p>
+    <p><a href="#pair-large-demo">Zum Lauf mit 100.000 Zeilen</a></p>
 </div></header>
 <main>
     <form id="pairForm" class="card" aria-labelledby="pairFormTitle">
@@ -153,6 +156,36 @@
                 <p id="pairIndexedWork" class="hint"></p>
             </div>
         </details>
+    </section>
+    <section id="pair-large-demo" class="card certificate-demo" data-certificate-demo="pair-reduction" aria-labelledby="pairLargeDemoTitle">
+        <h2 id="pairLargeDemoTitle">Quadrierte Abstände für 100.000 Zeilen</h2>
+        <p>Die feste Demo summiert <code>(xᵢ − xⱼ)²</code> für alle <code>i &lt; j</code> über aufeinanderfolgende ganze Zahlen von −50.000 bis 49.999.</p>
+        <button type="button" class="primary" id="pairLargeRun" data-demo-run aria-controls="pairLargeResult">100.000 Zeilen auswerten</button>
+        <p id="pairLargeStatus" class="status certificate-demo-status" role="status" data-demo-status></p>
+
+        <div id="pairLargeResult" class="certificate-demo-result" data-demo-output hidden>
+            <h3 id="pairLargeTitle" tabindex="-1" data-demo-title>Geprüften Plan ausgeführt</h3>
+            <dl class="certificate-metrics">
+                <div><dt>Gelesene Zeilen in einem Durchlauf</dt><dd id="pairLargeRows"></dd></div>
+                <div><dt>Rechnerische Paaranzahl der Vollschleife</dt><dd id="pairLargeBaseline"></dd></div>
+            </dl>
+            <p class="hint">Die Paaranzahl der Vollschleife folgt aus <code>n · (n − 1) / 2</code>. Der ausgeführte direkte Vergleich umfasst die ersten <span id="pairLargePrefixSize"></span> Werte.</p>
+            <div class="certificate-evidence">
+                <section class="certificate-panel certificate-exact" aria-labelledby="pairLargeValueTitle">
+                    <h4 id="pairLargeValueTitle">Exakte Paarsumme</h4>
+                    <p class="certificate-total" id="pairLargeValue"></p>
+                    <p class="certificate-equation">n Σ xᵢ² − (Σ xᵢ)²</p>
+                </section>
+                <section class="certificate-panel" aria-labelledby="pairLargeCheckTitle">
+                    <h4 id="pairLargeCheckTitle">Präfixkontrolle</h4>
+                    <dl class="certificate-facts">
+                        <div><dt>Direkt berechnete Paare</dt><dd id="pairLargePrefixPairs"></dd></div>
+                        <div><dt>Summe der direkten Schleife</dt><dd id="pairLargePrefixDirect"></dd></div>
+                        <div><dt>Summe des geprüften Plans</dt><dd id="pairLargePrefixReduced"></dd></div>
+                    </dl>
+                </section>
+            </div>
+        </div>
     </section>
 </main>
 </body>

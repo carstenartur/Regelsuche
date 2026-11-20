@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Exakte Rechennachweise – Regelsuche</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="certificate-demos.css">
+    <script type="module" src="certificate-demos.js"></script>
+</head>
+<body class="certificate-demo-page">
+<header>
+    <div class="brand">
+        <a href="/">← Regelsuche Workbench</a>
+        <h1>Exakte Rechennachweise</h1>
+        <p>Berechne ein größtes Matching oder prüfe, wann sich Montgomery-Reduktionen zusammenfassen lassen.</p>
+    </div>
+</header>
+<main>
+    <section id="hall-demo" class="card certificate-demo" data-certificate-demo="hall" aria-labelledby="hallTitle">
+        <h2 id="hallTitle">Hall-Defizit</h2>
+        <p>Vier Kandidaten stehen vier Blockierern gegenüber. Jeder Blockierer hat Kapazität eins. Wie viele Kandidaten bleiben ohne Zuordnung?</p>
+        <button type="button" class="primary" id="hallRun" data-demo-run aria-controls="hallResult">Hall-Defizit berechnen</button>
+        <p id="hallStatus" class="status certificate-demo-status" role="status" data-demo-status></p>
+
+        <div id="hallResult" class="certificate-demo-result" data-demo-output hidden>
+            <h3 id="hallResultTitle" tabindex="-1" data-demo-title>Größtes Matching exakt geprüft</h3>
+            <dl class="certificate-metrics">
+                <div><dt>Defizit der Gesamtzahlen</dt><dd id="hallCountDeficit"></dd></div>
+                <div><dt>Zuordnungen im größten Matching</dt><dd id="hallMatchingSize"></dd></div>
+                <div><dt>Hall-Defizit</dt><dd id="hallDeficit"></dd></div>
+            </dl>
+            <div class="certificate-evidence">
+                <div class="certificate-panel">
+                    <table class="certificate-graph">
+                        <caption>Eingabegraph</caption>
+                        <thead><tr><th scope="col">Kandidat</th><th scope="col">Mögliche Blockierer</th></tr></thead>
+                        <tbody id="hallGraph"></tbody>
+                    </table>
+                </div>
+                <section class="certificate-panel" aria-labelledby="hallWitnessTitle">
+                    <h4 id="hallWitnessTitle">Zuordnung und Zeuge</h4>
+                    <dl class="certificate-facts">
+                        <div><dt>Matching</dt><dd id="hallMatching"></dd></div>
+                        <div><dt>Zeugenmenge S</dt><dd id="hallWitness"></dd></div>
+                        <div><dt>Nachbarschaft N(S)</dt><dd id="hallNeighbors"></dd></div>
+                    </dl>
+                    <p>Das Defizit ist <span class="certificate-equation" id="hallWitnessDeficit"></span>.</p>
+                </section>
+            </div>
+            <p class="hint">Für diesen endlichen Graphen stimmen Matchinggröße und Größe der aus S und N(S) abgeleiteten Knotenüberdeckung überein. Anwendungen müssen die Kanten und die Kapazität eins aus dem jeweiligen Problem begründen.</p>
+        </div>
+    </section>
+
+    <section id="montgomery-demo" class="card certificate-demo" data-certificate-demo="montgomery" aria-labelledby="montgomeryTitle">
+        <h2 id="montgomeryTitle">Montgomery-Reduktionen verschieben</h2>
+        <p>Ein Skalarprodukt mit vorzeichenbehafteten Eingaben wird zuerst Produkt für Produkt reduziert. Der alternative Plan verschiebt die Reduktion ans Ende.</p>
+        <button type="button" class="primary" id="montgomeryRun" data-demo-run aria-controls="montgomeryResult">Montgomery-Plan prüfen</button>
+        <p id="montgomeryStatus" class="status certificate-demo-status" role="status" data-demo-status></p>
+
+        <div id="montgomeryResult" class="certificate-demo-result" data-demo-output hidden>
+            <h3 id="montgomeryResultTitle" tabindex="-1" data-demo-title>Rechenpläne exakt geprüft</h3>
+            <dl class="certificate-metrics">
+                <div>
+                    <dt>Reduktionen im direkten Plan</dt><dd id="montgomerySourceReductions"></dd>
+                    <dd class="certificate-equation">Σ M(aⱼ · bⱼ)</dd>
+                </div>
+                <div>
+                    <dt>Reduktionen im verschobenen Plan</dt><dd id="montgomeryTargetReductions"></dd>
+                    <dd class="certificate-equation">M(Σ aⱼ · bⱼ)</dd>
+                </div>
+            </dl>
+            <div class="certificate-evidence">
+                <section class="certificate-panel" aria-labelledby="montgomeryInputTitle">
+                    <h4 id="montgomeryInputTitle">Eingabe und Parameter</h4>
+                    <dl class="certificate-facts">
+                        <div><dt>Produkte</dt><dd id="montgomeryProducts"></dd></div>
+                        <div><dt>Modul q</dt><dd id="montgomeryModulus"></dd></div>
+                        <div><dt>Radix R</dt><dd id="montgomeryRadix"></dd></div>
+                        <div><dt>q⁻¹ modulo R</dt><dd id="montgomeryInverse"></dd></div>
+                        <div><dt>Eingaben aⱼ</dt><dd id="montgomeryLeftRange"></dd></div>
+                        <div><dt>Eingaben bⱼ</dt><dd id="montgomeryRightRange"></dd></div>
+                    </dl>
+                </section>
+                <section class="certificate-panel" aria-labelledby="montgomeryBoundsTitle">
+                    <h4 id="montgomeryBoundsTitle">Geprüfte Wortgrenzen</h4>
+                    <dl class="certificate-facts">
+                        <div><dt>Akkumulator vor Reduktion</dt><dd id="montgomeryAccumulator"></dd></div>
+                        <div><dt>Ausgabe des direkten Plans</dt><dd id="montgomerySourceOutput"></dd></div>
+                        <div><dt>Ausgabe des verschobenen Plans</dt><dd id="montgomeryTargetOutput"></dd></div>
+                    </dl>
+                </section>
+            </div>
+            <p class="hint"><code>M(t) = (t − u · q) / R</code> mit dem vorzeichenbehafteten Niederwort <code>u</code> von <code>t · q⁻¹</code>.</p>
+            <p class="hint"><strong>Beobachtung</strong> <span id="montgomeryObservation"></span> für alle Werte in den angegebenen Intervallen. Die Operationszahlen zählen Reduktionen in den Plänen. Die Laufzeit hängt von Implementierung und Hardware ab.</p>
+        </div>
+    </section>
+</main>
+</body>
+</html>

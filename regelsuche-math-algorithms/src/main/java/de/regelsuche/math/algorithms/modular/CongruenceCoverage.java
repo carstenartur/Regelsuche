@@ -264,13 +264,13 @@ public final class CongruenceCoverage {
         if (order < 0) throw new IllegalArgumentException("INVALID_COVERAGE_BOUNDS_ORDER");
     }
 
-    private static boolean sameSource(Request request, Request source, Work work) {
+    static boolean sameSource(Request request, Request source, Work work) {
         validateInput(source, work);
         work.charge(1L + request.rules().size());
         return request.equals(source);
     }
 
-    private static void validateInput(Request request, Work work) {
+    static void validateInput(Request request, Work work) {
         work.charge(1);
         var progression = request.progression();
         work.integer(progression.first());
@@ -297,7 +297,7 @@ public final class CongruenceCoverage {
         }
     }
 
-    private record Ray(BigInteger first, BigInteger period) {}
+    record Ray(BigInteger first, BigInteger period) {}
 
     private record IntersectedRule(int position, Ray intersection) {}
 
@@ -403,7 +403,7 @@ public final class CongruenceCoverage {
         work.terms(terms.size());
     }
 
-    private static Ray indexRay(Progression progression, Rule rule, Work work) {
+    static Ray indexRay(Progression progression, Rule rule, Work work) {
         var divisor = work.gcd(progression.step(), rule.modulus());
         var difference = work.subtract(rule.residue(), progression.first());
         if (work.mod(difference, divisor).signum() != 0) return null;
@@ -417,7 +417,7 @@ public final class CongruenceCoverage {
         return clipped(lift(residue, period, threshold, work), period, progression.count(), work);
     }
 
-    private static Ray intersect(Ray left, Ray right, BigInteger count, Work work) {
+    static Ray intersect(Ray left, Ray right, BigInteger count, Work work) {
         work.charge(1);
         if (left.period().equals(count)) return singletonIntersection(left, right, work);
         if (right.period().equals(count)) return singletonIntersection(right, left, work);
@@ -467,7 +467,7 @@ public final class CongruenceCoverage {
         return sum;
     }
 
-    private static BigInteger rayCount(BigInteger first, BigInteger period, BigInteger boundary, Work work) {
+    static BigInteger rayCount(BigInteger first, BigInteger period, BigInteger boundary, Work work) {
         return work.add(work.divide(work.subtract(work.subtract(boundary, ONE), first), period), ONE);
     }
 
@@ -493,25 +493,25 @@ public final class CongruenceCoverage {
         return false;
     }
 
-    private static final class Unavailable extends RuntimeException {
+    static final class Unavailable extends RuntimeException {
         private Unavailable(String reason) { super(reason, null, false, false); }
     }
 
     /** Word-based accounting for this integer algorithm; no polynomial semantics are involved. */
-    private static final class Work {
+    static final class Work {
         private final IterationLimits limits;
         private final BooleanSupplier cancellation;
         private final long start = System.nanoTime();
         private final long timeout;
-        private long used;
+        long used;
 
-        private Work(IterationLimits limits, BooleanSupplier cancellation) {
+        Work(IterationLimits limits, BooleanSupplier cancellation) {
             this.limits = Objects.requireNonNull(limits);
             this.cancellation = Objects.requireNonNull(cancellation);
             timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());
         }
 
-        private void charge(long amount) {
+        void charge(long amount) {
             if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Unavailable("CANCELLED");
             if (System.nanoTime() - start >= timeout) throw new Unavailable("TIME_LIMIT");
             if (amount < 0 || amount > limits.maximumWork() - used) throw new Unavailable("WORK_LIMIT");
@@ -521,23 +521,23 @@ public final class CongruenceCoverage {
         private static int bits(BigInteger value) { return value.abs().bitLength(); }
         private static long words(BigInteger value) { return 1L + bits(value) / 64L; }
 
-        private BigInteger integer(BigInteger value) {
+        BigInteger integer(BigInteger value) {
             charge(words(value));
             if (bits(value) > IterationLimits.MAX_RUNTIME_BITS) throw new Unavailable("RUNTIME_BIT_LIMIT");
             return value;
         }
 
-        private void terms(int count) {
+        void terms(int count) {
             charge(1);
             if (count > limits.maximumTerms()) throw new Unavailable("TERM_LIMIT");
         }
 
-        private BigInteger add(BigInteger left, BigInteger right) {
+        BigInteger add(BigInteger left, BigInteger right) {
             charge(1L + Math.max(words(left), words(right)));
             return integer(left.add(right));
         }
 
-        private BigInteger subtract(BigInteger left, BigInteger right) {
+        BigInteger subtract(BigInteger left, BigInteger right) {
             charge(1L + Math.max(words(left), words(right)));
             return integer(left.subtract(right));
         }

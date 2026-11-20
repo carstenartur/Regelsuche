@@ -1,17 +1,41 @@
 # Java computation optimization SDK
 
-For released binaries, start with the [0.5.2 SDK distribution guide](../docs/java-sdk-quickstart.md).
-The preferred Maven route uses `regelsuche-sdk-0.5.2.zip` and
-`de.regelsuche:regelsuche-optimization-sdk:0.5.2`. The separately published
-`regelsuche-optimization-sdk-0.5.2.zip` contains a self-contained `-all.jar`
-under the exact internal version `0.5.2-issue1657-ca38d64cca3e` and a matching
-qualification record for source `ca38d64cca3e415e7c7823e39cadbf762b908ef6`.
-Its retained `publiclyPublished=false` field predates the actual GitHub release;
-publication is established by the release entry, not by rewriting the record.
-Read its own consumer and qualification metadata when using that archive.
+Released binaries are available from Maven Central as
+`io.github.carstenartur:regelsuche-optimization-sdk:0.5.3`.
+Start with the [current SDK distribution guide](../docs/java-sdk-quickstart.md#maven-central-ab-053).
+The older 0.5.2 ZIPs and their qualification records remain documented in the
+[archive instructions](../docs/java-sdk-quickstart.md#1-archivierter-weg-das-sdk-repository-052).
 
-The following API documentation describes current `0.5.4-SNAPSHOT` source.
-It is not a retroactive compatibility or qualification claim for 0.5.2 JARs.
+The following API reference describes this `0.5.4-SNAPSHOT` source checkout.
+The [availability matrix](../docs/mathematical-capabilities.md) distinguishes
+source APIs, released 0.5.3 binaries, Workbench demonstrations and consumer
+integration. New source methods do not retroactively become part of a release.
+
+## Exact finite certificates in current source
+
+`positivity.PolynomialPositivitySdk` exposes rational polynomial `bounds` and
+`verifyBounds`, subdivision `prove` and `verify`, exact `checkMatrix`, and
+`verifyPolynomial` for a supplied Gram identity. A PSD matrix proves a
+polynomial inequality only after the exact reconstruction check. Negative
+Bernstein coefficients can be inconclusive; they do not establish a negative
+polynomial. See [bounds, proof scope and executable tests](../docs/research/polynomial-positivity.md).
+
+`modular.HunterCoverageSdk.bounds` and `verify` use exact singleton and tree-edge
+intersection counts. A positive certified lower bound establishes a free
+point in the specified finite progression. `proof.FiniteProofDagSdk.verify`
+combines checked count leaves of the same expected source and allows an
+existence conclusion only from a positive bound. `proof.FiniteProofDagJson`
+transports the closed, versioned node vocabulary; decoding is not verification.
+See [the finite proof contract and example](../docs/research/hunter-finite-proofs.md).
+
+The existing `linalg.ModularKernelSdk`, `noncommutative.NoncommutativeIdentitySdk`
+and `modular.MontgomeryScheduleSdk` are also source APIs introduced after 0.5.3.
+Their individual contracts cover [kernel reconstruction](../docs/research/modular-kernel-profile-recovery.md),
+[bounded noncommutative identity checks](../docs/research/noncommutative-identity.md)
+and [finite Montgomery schedules](../docs/research/montgomery-schedules.md).
+All these SDK adapters forward typed inputs, budgets and cancellation to the
+mathematical core. The [bilinear proposal adapter](../docs/research/bilinear-core-proposals.md)
+likewise retains Java type eligibility while the core owns algebraic candidate construction.
 
 Finite reductions have a separate scoped API alongside scalar computations. See
 [FINITE_SERIES.md](FINITE_SERIES.md) for constant and runtime-bound polynomial sums,

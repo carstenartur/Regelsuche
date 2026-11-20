@@ -17,6 +17,45 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Rationale Positivitätszertifikate für Polynome
+
+- **Hypothese.** Rationale Bernstein-Netze und exakte Gram-Identitäten können endliche, unabhängig prüfbare Nachweise für Polynomungleichungen liefern.
+- **Umsetzungsstand.** Der Kern begrenzt ein- und zweidimensionale Polynome auf rationalen Boxen, halbiert vorzeichenbehaftete Netze und prüft die gesamte Blattüberdeckung sowie alle Polynomidentitäten auf einem exakten Interpolationsgitter. Die separate Gram-Prüfung unterscheidet singuläre Semidefinitheit von positiver Definitheit und fordert die vollständige Polynomrekonstruktion. Das SDK delegiert sechs typisierte Operationen.
+- **Befund.** Für (x−1/2)²+1/8 bleibt das ungeteilte Netz mit Untergrenze −1/8 ohne Vorzeichenbeweis; zwei Hälften belegen je mindestens 1/8. Alle Koeffizienten von 64 Rechteckfällen stimmen mit unabhängigen Polarformen und die Klassifikationen aller 729 kleinen symmetrischen 3×3-Matrizen mit dem Hauptminorenkriterium überein. Manipulierte Quellen, Blattüberdeckungen, Gram-Identitäten und erschöpfte Budgets werden geprüft. [Vertrag und Reproduktion](polynomial-positivity.md)
+- **Folgerung.** Für nachrechenbare Schranken und vorgelegte Gram-Zerlegungen einsetzen. Die Tiefen- und Ressourcenlimits können den Nachweis offenlassen. Ein positiv definites Q allein belegt keine strikte Positivität von zᵀQz für einen möglicherweise verschwindenden Monomvektor.
+
+- [`BernsteinPositivity.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/BernsteinPositivity.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/BernsteinPositivity.java | public final class BernsteinPositivity { -->
+- [`GramPositivity.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/GramPositivity.java#L12) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/GramPositivity.java | public final class GramPositivity { -->
+- [`BernsteinPositivityTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/BernsteinPositivityTest.java#L11) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/BernsteinPositivityTest.java | class BernsteinPositivityTest { -->
+- [`GramPositivityTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/GramPositivityTest.java#L12) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/GramPositivityTest.java | class GramPositivityTest { -->
+
+## Hunter-Schranke und endliche Beweis-DAGs
+
+- **Hypothese.** Eine Auswahl exakt gezählter Paarschnitte kann die untere Schranke aus Einzelsummen verbessern, ohne höhere Schnittschichten aufzubauen.
+- **Umsetzungsstand.** Der mathematische Kern konstruiert einen Spannbaum maximalen Gewichts und prüft beliebige vorgelegte Bäume gegen die erwartete Progression samt Regelliste. Typisierte endliche Ableitungen verbinden geprüfte Zählgrenzen derselben Quelle und folgern Existenz aus strikter Positivität. Das SDK unterstützt quellengebundenen Replay und versionierten JSON-Transport.
+- **Befund.** Für die Vielfachen von 2, 3 und 5 im Fenster 0 bis 29 steigt die Untergrenze von null auf sieben bei exakt acht freien Zahlen. In 220 kleinen Anfragen stimmen Schnittgrößen und maximales Baumgewicht mit unabhängiger Enumeration überein. Ein schwächerer gültiger Baum, geänderte Quellen und unzulässige Schlussregeln bilden Gegenproben. [Beweis, Vertrag und ausführbares Beispiel](hunter-finite-proofs.md)
+- **Folgerung.** Die endliche Hunter-Schranke eignet sich bei bezahlbaren Paarschnitten. Der Consumer begründet Vollständigkeit und Bedeutung seiner Quelle. Hall-Aussagen quantifizieren über Matchings mit Kapazität eins.
+
+- [`HunterCoverage.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/HunterCoverage.java#L19) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/HunterCoverage.java | public final class HunterCoverage { -->
+- [`HunterCoverageTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/HunterCoverageTest.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/HunterCoverageTest.java | class HunterCoverageTest { -->
+- [`FiniteProofDag.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/proof/FiniteProofDag.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/proof/FiniteProofDag.java | public final class FiniteProofDag { -->
+- [`FiniteProofDagTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/proof/FiniteProofDagTest.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/proof/FiniteProofDagTest.java | class FiniteProofDagTest { -->
+- [`HunterCoverageSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/HunterCoverageSdk.java#L10) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/HunterCoverageSdk.java | public final class HunterCoverageSdk { -->
+- [`FiniteProofDagJson.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/proof/FiniteProofDagJson.java#L26) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/proof/FiniteProofDagJson.java | public final class FiniteProofDagJson { -->
+- [`FiniteProofDagSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/proof/FiniteProofDagSdk.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/proof/FiniteProofDagSdk.java | public final class FiniteProofDagSdk { -->
+- [`FiniteProofDagSdkTest.java`](../../regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/proof/FiniteProofDagSdkTest.java#L22) <!-- strategy-code: regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/proof/FiniteProofDagSdkTest.java | class FiniteProofDagSdkTest { -->
+
+## Gemeinsame bilineare Vorschläge im mathematischen Kern
+
+- **Hypothese.** Die klassische Drei-Produkt-Identität lässt sich über einen typisierten Ausdrucksadapter wiederverwenden, während Java-Typsemantik und unabhängige Annahmeprüfung beim Aufrufer bleiben.
+- **Umsetzungsstand.** `BilinearPairCandidates` besitzt Faktorvergleich, Orientierung und Kandidatenkonstruktion. Das SDK übersetzt zulässige BigInteger-Operationen und reicht das gemeinsame Arbeitsbudget weiter; `PolynomialProof` prüft die Vorschläge.
+- **Befund.** Die exakte Auswertung von 625 Vierertupeln, Modul- und Positionskontrollen, lineare irrelevante Scans sowie bestehende SDK-Akzeptanztests bestehen. Der neue Kerntest fehlte vor Einführung des Kerneinstiegs. [Vertrag und Reproduktion](bilinear-core-proposals.md)
+- **Folgerung.** Die allgemeine algebraische Vorschlagssuche im Kern wiederverwenden. Der Adapter muss stabile, geeignete Operationen liefern; ein Vorschlag ist noch kein Beweis und die Auslagerung belegt keinen neuen Laufzeitgewinn.
+
+- [`BilinearPairCandidates.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/BilinearPairCandidates.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/BilinearPairCandidates.java | public final class BilinearPairCandidates { -->
+- [`BilinearPairCandidatesTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/BilinearPairCandidatesTest.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/BilinearPairCandidatesTest.java | class BilinearPairCandidatesTest { -->
+- [`BilinearCandidates.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/BilinearCandidates.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/BilinearCandidates.java | final class BilinearCandidates { -->
+
 ## Laufgebundene Wiederverwendung verifizierter Polynomübergänge
 
 - **Hypothese.** Ein leerer Cache-Verlauf pro Lauf kann vor dem Freeze prüfen, ob jeder beobachtete Hit aus einer früheren, noch gehaltenen Einfügung desselben Laufs stammt.

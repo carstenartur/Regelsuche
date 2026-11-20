@@ -80,6 +80,57 @@ class WebWorkbenchServerTest {
     }
 
     @Test
+    void hallDemoVerifiesTheLocalDeficitAgainstItsDisplayedGraph() throws IOException {
+        var body = certificateDemo("hall");
+        assertEquals("VERIFIED", body.get("status"));
+        assertEquals(4, body.get("leftCount"));
+        assertEquals(4, body.get("rightCount"));
+        assertEquals(List.of(List.of(0, 0), List.of(1, 0), List.of(2, 0),
+            List.of(3, 1), List.of(3, 2), List.of(3, 3)), body.get("edges"));
+        assertEquals(List.of(List.of(0, 0), List.of(3, 1)), body.get("matching"));
+        assertEquals(List.of(0, 1, 2), body.get("witness"));
+        assertEquals(List.of(0), body.get("neighbors"));
+        assertEquals(0, body.get("countDeficit"));
+        assertEquals(2, body.get("hallDeficit"));
+    }
+
+    @Test
+    void montgomeryDemoVerifiesItsWordBoundedCanonicalResiduePlan() throws IOException {
+        var body = certificateDemo("montgomery");
+        assertEquals("VERIFIED", body.get("status"));
+        assertEquals(3329, body.get("modulus"));
+        assertEquals(16, body.get("radixBits"));
+        assertEquals(62209, body.get("inverse"));
+        assertEquals("CANONICAL_RESIDUE", body.get("observation"));
+        assertEquals(4, body.get("sourceReductions"));
+        assertEquals(1, body.get("targetReductions"));
+        assertEquals(List.of(-80_000, 80_000), body.get("targetAccumulatorRange"));
+        assertEquals(List.of(-100, 100), body.get("leftRange"));
+        assertEquals(List.of(-200, 200), body.get("rightRange"));
+    }
+
+    @Test
+    void pairDemoExecutesTheCheckedPlanAndMatchesAPrefixOracle() throws IOException {
+        var body = certificateDemo("pair-reduction");
+        assertEquals("VERIFIED", body.get("status"));
+        assertEquals(100_000, body.get("evaluatedRows"));
+        assertEquals("8333333332500000000", body.get("value"));
+        assertEquals("4999950000", body.get("baselinePairs"));
+        assertEquals(64, body.get("prefixRows"));
+        assertEquals(2016, body.get("prefixPairs"));
+        assertEquals("1397760", body.get("prefixReducedValue"));
+        assertEquals("1397760", body.get("prefixDirectValue"));
+    }
+
+    private Map<String, Object> certificateDemo(String demo) throws IOException {
+        var connection = open("/api/certificate-demos/" + demo);
+        assertEquals(200, connection.getResponseCode());
+        try (var response = connection.getInputStream()) {
+            return new JsonReader(new String(response.readAllBytes(), StandardCharsets.UTF_8)).readObject();
+        }
+    }
+
+    @Test
     void pairReductionRejectsAnAsymmetricKernelAndInvalidSampleRows() throws IOException {
         var asymmetric = postPairReduction("""
             {"columns":["x"],"summand":"x_i-x_j","rowCount":3}

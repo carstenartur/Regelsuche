@@ -25,7 +25,9 @@ strukturellen Aufgaben, kumulativem Lernen und geprüften Rechenoptimierungen.
 [Erweitern und integrieren](#in-wenigen-zeilen-erweitern)
 
 **English:** [Start here](docs/start-here.md) · [recorded browser demo](docs/demos/recorded-discovery.html)
-(no installation) · [released Java SDK 0.5.2](docs/java-sdk-quickstart.md).
+(no installation) · [released Java SDK 0.5.3](docs/java-sdk-quickstart.md).
+[Verfügbarkeit der mathematischen Funktionen](docs/mathematical-capabilities.md)
+trennt Quellcode, Release, Workbench und Consumer-Stand.
 
 ## Für wen und wofür?
 

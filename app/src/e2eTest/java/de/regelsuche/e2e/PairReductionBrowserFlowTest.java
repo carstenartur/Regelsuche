@@ -8,11 +8,14 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.AriaRole;
 import java.io.IOException;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class PairReductionBrowserFlowTest {
     private static final String SAMPLE_INPUT = "Symmetrische Paarsumme (x_i-x_j)^2, "
@@ -145,6 +148,34 @@ class PairReductionBrowserFlowTest {
             assertThat(page.locator("#pairSample")).isHidden();
             assertThat(page.locator("#pairResult")).containsText("Hochrechnung");
             assertThat(page.locator("#pairResult")).containsText("Keine Beispieldaten");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1200, 390})
+    void executesTheLargeDistanceDemoAndShowsItsDirectPrefixCheck(int width) throws IOException {
+        try (BrowserContext context = viewport(width)) {
+            Page page = open(context);
+            page.getByRole(AriaRole.LINK, new Page.GetByRoleOptions()
+                .setName("Zum Lauf mit 100.000 Zeilen")).click();
+            assertThat(page).hasURL(Pattern.compile("#pair-large-demo$"));
+            var large = page.locator("#pairLargeResult");
+            assertThat(large).isHidden();
+            page.locator("#pairLargeRun").press("Enter");
+            assertThat(page.locator("#pairLargeTitle")).isFocused();
+            assertThat(page.locator("#pairLargeRows")).hasText("100.000");
+            assertThat(page.locator("#pairLargeValue")).hasText("8.333.333.332.500.000.000");
+            assertThat(page.locator("#pairLargeBaseline")).hasText("4.999.950.000");
+            assertThat(large).containsText("Rechnerische Paaranzahl");
+            assertThat(large).containsText("2.016");
+            assertThat(large).containsText("1.397.760");
+            assertEquals(Boolean.TRUE, page.evaluate("""
+                () => document.documentElement.scrollWidth === document.documentElement.clientWidth
+                """));
+            String suffix = width == 390 ? "-mobile.png" : ".png";
+            DocumentationScreenshots.capture(page, page.locator("#pair-large-demo"), "pair-reduction-large" + suffix,
+                "Ausgeführter Ein-Pass-Plan über 100.000 Zeilen mit direkter Präfixkontrolle",
+                "Quadrierter Abstand mit x_i = i - 50000 für 0 ≤ i < 100000. Direkter Vergleich der ersten 64 Werte.");
         }
     }
 
