@@ -80,12 +80,7 @@ class DomainExportWorkspaceTest {
         assertThrows(IllegalStateException.class, workspace::replay);
     }
 
-    @Test void foreignDomainAndSemanticallyForgedSourceHashesFailClosed() throws Exception {
-        var domain = new ExpressionRewriteDiscoveryDomain("x");
-        var foreign = new DomainDiscoveryRunner().run("foreign-export", domain,
-            DiscoverySeed.create("source", domain.domainId(), "x + 0", "public-test"), budget()).evidence();
-        assertThrows(IllegalArgumentException.class, () -> DomainExportWorkspace.fromVerified(export(foreign)));
-
+    @Test void semanticallyForgedSourceHashesFailClosed() throws Exception {
         var source = sequence("observed=1,4,9,16;holdout=25,36");
         var manifest = new DomainDiscoveryExport().write(directory, source);
         byte[] altered = source.toCanonicalJson().replace("public-test", "forged-source-reference").getBytes(StandardCharsets.UTF_8);

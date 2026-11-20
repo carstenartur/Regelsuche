@@ -208,6 +208,8 @@
     function show(view) {
         selected = view;
         const source = view.evidence;
+        const sequence = view.domainRevision === 'v1' &&
+            ['integer-sequence-finite-difference', 'integer-sequence-linear-recurrence'].includes(view.domainId);
         detail.append(node('h2', `${source.campaignId} · ${source.outcome}`));
         detail.append(node('p', `${view.domainId} · ${view.domainRevision}`));
         const identity = node('dl');
@@ -215,7 +217,8 @@
             ['Ursprüngliche Exportidentität', view.runId], ['Startdaten', source.seed.payload],
             ['Quellenangabe', source.seed.sourceReference], ['Eingabe-Hash', view.inputHash]
         ]) identity.append(node('dt', label), node('dd', value));
-        detail.append(identity, node('h3', 'Beobachtete Folge und zurückgehaltene Prüfdaten'));
+        detail.append(identity, node('h3', sequence
+            ? 'Beobachtete Folge und zurückgehaltene Prüfdaten' : 'Formel und Umschreibungsnachweis'));
         detail.append(table(['Gespeichertes Feld', 'Wert'], source.domainEvidence.properties.map(item => [item.key, item.value])));
         detail.append(node('h3', 'Gespeicherte Arbeit je Dimension'));
         detail.append(table(['Ressource', 'Budget', 'Ausgeführt', 'Übersprungen', 'Verbleibend'],
@@ -256,10 +259,10 @@
         element('replayDomainExport').disabled = !view.replaySupported;
         replayStatus.textContent = view.replaySupported ? 'Noch kein Replay für diese Auswahl ausgeführt.'
             : 'Die Quelle überschreitet das begrenzte Replay-Budget. Die gespeicherten Daten bleiben lesbar.';
-        validationPanel.hidden = false;
-        validateButton.disabled = false;
-        proofPanel.hidden = false;
-        proofButton.disabled = false;
+        validationPanel.hidden = !sequence;
+        validateButton.disabled = !sequence;
+        proofPanel.hidden = !sequence;
+        proofButton.disabled = !sequence;
         proofStatus.textContent = 'Noch kein Modellgesetz für diese Auswahl geprüft.';
         history.replaceState(null, '', `#export=${view.runId.slice(7)}`);
         status.textContent = 'Originalexport geladen. Die gespeicherte Quellenidentität bleibt unverändert.';
