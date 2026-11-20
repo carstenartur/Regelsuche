@@ -59,6 +59,8 @@ class MavenProductReactorContractTest {
           "regelsuche-benchmarks",
           "app",
           "regelsuche-integration-tests",
+          "regelsuche-jmh",
+          "regelsuche-sympy-jmh",
           "regelsuche-quality-aggregate");
 
   @Test

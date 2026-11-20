@@ -66,3 +66,19 @@ by the current contract, historical replay, wrong-unit/duration rejection,
 precise regression failure and fail-closed INCONCLUSIVE. Synthetic controls do
 not demonstrate actual precision or performance. Current-head CI must execute
 and retain the complete benchmark inventory before this migration is accepted.
+
+## Maven measurement and raw replay
+
+The full Maven reactor compiles the application benchmark sources with the JMH 1.36 annotation processor. Failsafe starts separate, uninstrumented JDK 25 forks for the 29 latency measurements and six allocation measurements. The two latency decisions apply the frozen publication baseline and the v3 regression policy, respectively. A failed or inconclusive decision fails verify and retains the original inputs under `regelsuche-jmh/target/reports/jmh/`. To run this part of the reactor on a dedicated runner:
+
+```bash
+mvn -Pfull -pl regelsuche-jmh -am verify
+```
+
+Ordinary `mvn verify` also replays the two [original CI captures](../regelsuche-quality/src/test/resources/jmh-ci/README.md), including their respective six- and two-warmup policies and the recorded INCONCLUSIVE result. This replay runs without Git metadata, Docker, host Python or new timings. The independent isolated Gradle authority remains until the Maven producers have passed their hosted qualification.
+
+The full reactor also builds the two original factorization benchmark classes and stages their resolved JAR dependencies. The `regelsuche-sympy-jmh` Failsafe test runs JMH inside one Testcontainers worker. Its JDK and CPython base images are pinned by digest, its SymPy and mpmath wheels by SHA-256, and its native patchelf package by version. It keeps raw JMH JSON, stdout, stderr and the verified v2 report in `regelsuche-sympy-jmh/target/reports/jmh/`. This separate 42-row factorization matrix is diagnostic. A missing runtime or incomplete matrix fails verification.
+
+```bash
+mvn -Pfull -pl regelsuche-sympy-jmh -am verify
+```

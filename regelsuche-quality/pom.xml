@@ -38,6 +38,24 @@
           </systemPropertyVariables>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>replay-original-jmh-ci-decisions</id>
+            <goals><goal>integration-test</goal><goal>verify</goal></goals>
+            <configuration>
+              <test>de.regelsuche.quality.jmh.JmhRetainedCiReplayIT</test>
+              <failIfNoTests>true</failIfNoTests>
+              <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+              <systemPropertyVariables>
+                <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+              </systemPropertyVariables>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <profiles>

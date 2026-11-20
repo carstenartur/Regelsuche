@@ -62,6 +62,7 @@
     <maven.compiler.release>25</maven.compiler.release>
     <maven.minimum.version>3.9.9</maven.minimum.version>
     <maven.maximum.exclusive.version>4.0.0</maven.maximum.exclusive.version>
+    <jmh.version>1.36</jmh.version>
     <maven.test.fork.timeout.seconds>600</maven.test.fork.timeout.seconds>
     <releaseVersion>${project.version}</releaseVersion>
 
@@ -103,6 +104,8 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>${jmh.version}</version></dependency>
+      <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>${jmh.version}</version></dependency>
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
@@ -317,6 +320,8 @@
         <module>regelsuche-benchmarks</module>
         <module>app</module>
         <module>regelsuche-integration-tests</module>
+        <module>regelsuche-jmh</module>
+        <module>regelsuche-sympy-jmh</module>
         <module>regelsuche-quality-aggregate</module>
       </modules>
     </profile>
