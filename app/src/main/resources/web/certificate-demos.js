@@ -95,4 +95,5 @@ for (const section of document.querySelectorAll('[data-certificate-demo]')) {
             if (!output.hidden && document.activeElement === button) title.focus();
         }
     });
+    button.disabled = false;
 }

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class CertificateDemoBrowserFlowTest {
@@ -49,7 +50,9 @@ class CertificateDemoBrowserFlowTest {
             var montgomery = page.locator("#montgomeryResult");
             assertThat(hall).isHidden();
             assertThat(montgomery).isHidden();
-            page.locator("#hallRun").press("Enter");
+            var hallButton = page.locator("#hallRun");
+            assertThat(hallButton).isEnabled();
+            hallButton.press("Enter");
             assertThat(page.locator("#hallResultTitle")).isFocused();
             assertThat(page.locator("#hallCountDeficit")).hasText("0");
             assertThat(page.locator("#hallDeficit")).hasText("2");
@@ -67,7 +70,9 @@ class CertificateDemoBrowserFlowTest {
                 "Geprüftes Hall-Defizit mit Eingabegraph, Matching und Hall-Zeugen",
                 "Vier Kandidaten, vier Blockierer, sechs Kanten, Kapazität eins je Blockierer");
 
-            page.locator("#montgomeryRun").press("Enter");
+            var montgomeryButton = page.locator("#montgomeryRun");
+            assertThat(montgomeryButton).isEnabled();
+            montgomeryButton.press("Enter");
             assertThat(page.locator("#montgomeryResultTitle")).isFocused();
             assertThat(page.locator("#montgomerySourceReductions")).hasText("4");
             assertThat(page.locator("#montgomeryTargetReductions")).hasText("1");
@@ -81,6 +86,34 @@ class CertificateDemoBrowserFlowTest {
             DocumentationScreenshots.capture(page, page.locator("#montgomery-demo"), "montgomery-planning" + suffix,
                 "Geprüfter Montgomery-Plan mit Wortgrenzen und Beobachtung",
                 "Vier Produkte mit q = 3329 und R = 2^16. Intervalle [-100, 100] und [-200, 200].");
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "openCertificateDemos, hallRun, hallResultTitle",
+        "openCertificateDemos, montgomeryRun, montgomeryResultTitle",
+        "workflowOptimize, pairLargeRun, pairLargeTitle"
+    })
+    void runButtonsWaitForTheDemoModule(String entry, String runButton, String resultTitle) {
+        try (var context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1200, 900))) {
+            var page = context.newPage();
+            page.setDefaultTimeout(5_000);
+            var pending = new AtomicReference<Route>();
+            page.route("**/certificate-demos.js", pending::set);
+            page.navigate(app.baseUrl());
+            page.locator("#" + entry).click();
+
+            var button = page.locator("#" + runButton);
+            assertThat(button).isDisabled();
+            page.waitForCondition(() -> pending.get() != null);
+            var module = pending.get();
+            assertNotNull(module);
+            module.resume();
+
+            assertThat(button).isEnabled();
+            button.press("Enter");
+            assertThat(page.locator("#" + resultTitle)).isFocused();
         }
     }
 
@@ -116,6 +149,7 @@ class CertificateDemoBrowserFlowTest {
 
             var hall = page.locator("#hallRun");
             var montgomery = page.locator("#montgomeryRun");
+            assertThat(hall).isEnabled();
             hall.press("Enter");
             assertThat(hall).isDisabled();
             page.keyboard().press("Tab");

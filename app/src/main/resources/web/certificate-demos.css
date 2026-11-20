@@ -13,7 +13,7 @@
 .certificate-demo h2 { margin-bottom: .45rem; }
 .certificate-demo h2 + p { margin-top: 0; }
 .certificate-demo button { min-height: 2.75rem; }
-.certificate-demo button[aria-disabled="true"] { opacity: .65; cursor: wait; }
+.certificate-demo button:is(:disabled, [aria-disabled="true"]) { opacity: .65; cursor: wait; }
 .certificate-demo-status { margin: 0; }
 .certificate-demo-status:not(:empty) { margin-top: .65rem; }
 .certificate-demo-result { border-top: 1px solid #dbe3ed; margin-top: 1rem; }

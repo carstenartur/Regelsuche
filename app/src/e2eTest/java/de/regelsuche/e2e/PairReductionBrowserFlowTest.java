@@ -161,7 +161,9 @@ class PairReductionBrowserFlowTest {
             assertThat(page).hasURL(Pattern.compile("#pair-large-demo$"));
             var large = page.locator("#pairLargeResult");
             assertThat(large).isHidden();
-            page.locator("#pairLargeRun").press("Enter");
+            var run = page.locator("#pairLargeRun");
+            assertThat(run).isEnabled();
+            run.press("Enter");
             assertThat(page.locator("#pairLargeTitle")).isFocused();
             assertThat(page.locator("#pairLargeRows")).hasText("100.000");
             assertThat(page.locator("#pairLargeValue")).hasText("8.333.333.332.500.000.000");
