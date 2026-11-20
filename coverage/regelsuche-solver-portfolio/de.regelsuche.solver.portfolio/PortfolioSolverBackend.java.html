@@ -132,40 +132,43 @@ public final class PortfolioSolverBackend implements SolverBackend {
         }
 <span class="pc bpc" id="L133" title="1 of 2 branches missed.">        Map&lt;String, String&gt; terms = rejected</span>
 <span class="nc" id="L134">            ? Map.of(&quot;portfolio.report&quot;, report.contentHash())</span>
-<span class="fc" id="L135">            : Map.of(</span>
-<span class="fc" id="L136">                &quot;goal.left&quot;, obligation.goal().left().canonicalMaterial(),</span>
-<span class="fc" id="L137">                &quot;goal.right&quot;, obligation.goal().right().canonicalMaterial(),</span>
-<span class="fc" id="L138">                &quot;portfolio.report&quot;, report.contentHash());</span>
-<span class="fc" id="L139">        SolverTranslation translation = SolverTranslation.create(</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            : obligation.goal().relation() == Relation.HOLDS</span>
+<span class="nc" id="L136">                ? Map.of(&quot;goal.proposition&quot;, obligation.goal().left().canonicalMaterial(),</span>
+<span class="nc" id="L137">                    &quot;portfolio.report&quot;, report.contentHash())</span>
+<span class="fc" id="L138">                : Map.of(</span>
+<span class="fc" id="L139">                &quot;goal.left&quot;, obligation.goal().left().canonicalMaterial(),</span>
+<span class="fc" id="L140">                &quot;goal.right&quot;, obligation.goal().right().canonicalMaterial(),</span>
+<span class="fc" id="L141">                &quot;portfolio.report&quot;, report.contentHash());</span>
+<span class="fc" id="L142">        SolverTranslation translation = SolverTranslation.create(</span>
             obligation, descriptor, translationStatus, issues, terms);
-<span class="pc bpc" id="L141" title="5 of 6 branches missed.">        ResultStatus status = switch (report.outcome()) {</span>
-<span class="nc" id="L142">            case UNSUPPORTED -&gt; ResultStatus.UNSUPPORTED;</span>
-<span class="nc" id="L143">            case TIMEOUT -&gt; ResultStatus.TIMEOUT;</span>
-<span class="nc" id="L144">            case ERROR, CONFLICT -&gt; ResultStatus.ERROR;</span>
-<span class="nc" id="L145">            case CONFIRMED -&gt; ResultStatus.CONFIRMED;</span>
-<span class="nc" id="L146">            case REFUTED -&gt; ResultStatus.REFUTED;</span>
-<span class="fc" id="L147">            case INCONCLUSIVE, CANCELLED, BUDGET_EXHAUSTED -&gt; ResultStatus.UNKNOWN;</span>
+<span class="pc bpc" id="L144" title="5 of 6 branches missed.">        ResultStatus status = switch (report.outcome()) {</span>
+<span class="nc" id="L145">            case UNSUPPORTED -&gt; ResultStatus.UNSUPPORTED;</span>
+<span class="nc" id="L146">            case TIMEOUT -&gt; ResultStatus.TIMEOUT;</span>
+<span class="nc" id="L147">            case ERROR, CONFLICT -&gt; ResultStatus.ERROR;</span>
+<span class="nc" id="L148">            case CONFIRMED -&gt; ResultStatus.CONFIRMED;</span>
+<span class="nc" id="L149">            case REFUTED -&gt; ResultStatus.REFUTED;</span>
+<span class="fc" id="L150">            case INCONCLUSIVE, CANCELLED, BUDGET_EXHAUSTED -&gt; ResultStatus.UNKNOWN;</span>
         };
-<span class="fc" id="L149">        SolverResult result = SolverResult.create(</span>
+<span class="fc" id="L152">        SolverResult result = SolverResult.create(</span>
             obligation,
             descriptor,
             status,
             translationStatus,
-<span class="fc" id="L154">            List.of(&quot;CAPABILITY_AWARE_PORTFOLIO&quot;, report.outcome().name()),</span>
+<span class="fc" id="L157">            List.of(&quot;CAPABILITY_AWARE_PORTFOLIO&quot;, report.outcome().name()),</span>
             issues,
-<span class="fc" id="L156">            &quot;portfolioOutcome=&quot; + report.outcome().name()</span>
-<span class="fc" id="L157">                + &quot;; reportHash=&quot; + report.contentHash(),</span>
-<span class="fc" id="L158">            Map.of(),</span>
+<span class="fc" id="L159">            &quot;portfolioOutcome=&quot; + report.outcome().name()</span>
+<span class="fc" id="L160">                + &quot;; reportHash=&quot; + report.contentHash(),</span>
+<span class="fc" id="L161">            Map.of(),</span>
             &quot;&quot;);
-<span class="fc" id="L160">        return SolverExecution.create(obligation, translation, result);</span>
+<span class="fc" id="L163">        return SolverExecution.create(obligation, translation, result);</span>
     }
 
     private static SolverObjective objective(RequestedEvidence evidence) {
-<span class="pc bpc" id="L164" title="3 of 4 branches missed.">        return switch (evidence) {</span>
-<span class="nc" id="L165">            case DECISION -&gt; SolverObjective.VALIDATION;</span>
-<span class="nc" id="L166">            case COUNTEREXAMPLE -&gt; SolverObjective.COUNTEREXAMPLE_SEARCH;</span>
-<span class="nc" id="L167">            case SYMBOLIC_CERTIFICATE -&gt; SolverObjective.SYMBOLIC_CONFIRMATION;</span>
-<span class="fc" id="L168">            case FORMAL_PROOF -&gt; SolverObjective.FORMAL_PROOF;</span>
+<span class="pc bpc" id="L167" title="3 of 4 branches missed.">        return switch (evidence) {</span>
+<span class="nc" id="L168">            case DECISION -&gt; SolverObjective.VALIDATION;</span>
+<span class="nc" id="L169">            case COUNTEREXAMPLE -&gt; SolverObjective.COUNTEREXAMPLE_SEARCH;</span>
+<span class="nc" id="L170">            case SYMBOLIC_CERTIFICATE -&gt; SolverObjective.SYMBOLIC_CONFIRMATION;</span>
+<span class="fc" id="L171">            case FORMAL_PROOF -&gt; SolverObjective.FORMAL_PROOF;</span>
         };
     }
 }

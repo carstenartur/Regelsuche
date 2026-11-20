@@ -525,8 +525,8 @@ import java.util.Optional;
 <span class="fc" id="L525">                matrix[pivotRow][item] = matrix[pivotRow][item].divide(pivot);</span>
             }
 <span class="fc bfc" id="L527" title="All 2 branches covered.">            for (int row = 0; row &lt; rowCount; row++) {</span>
-<span class="pc bpc" id="L528" title="1 of 4 branches missed.">                if (row == pivotRow || matrix[row][column].isZero()) {</span>
-<span class="nc" id="L529">                    continue;</span>
+<span class="fc bfc" id="L528" title="All 4 branches covered.">                if (row == pivotRow || matrix[row][column].isZero()) {</span>
+<span class="fc" id="L529">                    continue;</span>
                 }
 <span class="fc" id="L531">                Rational factor = matrix[row][column];</span>
 <span class="fc bfc" id="L532" title="All 2 branches covered.">                for (int item = column; item &lt;= variableCount; item++) {</span>

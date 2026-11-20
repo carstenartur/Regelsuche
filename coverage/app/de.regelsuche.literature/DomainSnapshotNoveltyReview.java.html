@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainSnapshotNoveltyReview.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.literature</a> &gt; <span class="el_source">DomainSnapshotNoveltyReview.java</span></div><h1>DomainSnapshotNoveltyReview.java</h1><pre class="source lang-java linenums">package de.regelsuche.literature;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier;
+import de.regelsuche.discovery.domain.DomainExportWorkspace;
+import de.regelsuche.discovery.domain.DomainSnapshotAssessment;
+import de.regelsuche.literature.ExternalNoveltyReview.Decision;
+import de.regelsuche.literature.ExternalNoveltyReview.Reviewer;
+import de.regelsuche.literature.LiteratureReviewRepository.Subject;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Receiver-side composition of a verified scalar domain claim and independently signed, frozen literature review. */
+public final class DomainSnapshotNoveltyReview {
+    private static final String SCHEMA = &quot;regelsuche.domain-snapshot-external-review/v1&quot;;
+<span class="fc" id="L24">    private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L25">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
+    private DomainSnapshotNoveltyReview() { }
+
+    public record FrozenSubject(Subject subject, String equation, List&lt;String&gt; assumptions, String formationEvidenceRoot) {
+<span class="fc" id="L29">        public FrozenSubject { assumptions = List.copyOf(assumptions); }</span>
+    }
+
+<span class="fc" id="L32">    public record Receipt(String schema, Subject subject, String formationEvidenceRoot, String workspaceHash,</span>
+            String equation, List&lt;String&gt; assumptions, String freezeRoot, String catalogueRoot, String packetRoot,
+            String intakeRoot, String reviewerRosterRoot, Decision decision, String promotionStatus, String publicEvidenceStatus) { }
+
+    public static FrozenSubject subject(DomainExportWorkspace workspace) throws IOException {
+<span class="fc" id="L37">        var checked = DomainSnapshotAssessment.assess(workspace);</span>
+<span class="fc" id="L38">        var result = JSON.readTree(checked.toCanonicalJson());</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!&quot;PROVED_POLYNOMIAL_IDENTITY&quot;.equals(result.at(&quot;/proof/status&quot;).asText())) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;scalar review requires an independently checked polynomial identity&quot;);</span>
+        }
+<span class="fc" id="L42">        var proof = result.required(&quot;proof&quot;);</span>
+<span class="fc" id="L43">        var subject = new Subject(workspace.runId(),workspace.evidence().selectedCandidateHash(),workspace.evidence().contentHash());</span>
+<span class="fc" id="L44">        var assumptions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L45">        assumptions.add(proof.required(&quot;scope&quot;).textValue());</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        for (var assumption : proof.required(&quot;rewriteAssumptions&quot;)) assumptions.add(assumption.textValue());</span>
+<span class="fc" id="L47">        return new FrozenSubject(subject, proof.required(&quot;originalSource&quot;).textValue() + &quot; = &quot; + proof.required(&quot;requestedTarget&quot;).textValue(),</span>
+<span class="fc" id="L48">            assumptions, checked.contentHash());</span>
+    }
+
+    public static Receipt verify(DomainExportWorkspace workspace, String expectedFreeze, String expectedCatalogue,
+            List&lt;Reviewer&gt; eligible, byte[] encodedRun) throws IOException {
+<span class="fc" id="L53">        var source = subject(workspace);</span>
+<span class="fc" id="L54">        var roster = List.copyOf(eligible);</span>
+<span class="fc" id="L55">        var review = new ExternalNoveltyReview().replay(expectedFreeze,expectedCatalogue,roster,encodedRun);</span>
+<span class="fc" id="L56">        var plan = review.packet().plan();</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        if (!source.subject().equals(plan.subject()) || !source.equation().equals(plan.equation())</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">                || !source.formationEvidenceRoot().equals(plan.formationEvidenceRoot()) || !source.assumptions().equals(plan.assumptions())) {</span>
+<span class="fc" id="L59">            throw new IllegalArgumentException(&quot;frozen review subject, equation, assumptions or formation evidence differs from the checked source&quot;);</span>
+        }
+<span class="fc" id="L61">        var outcome = review.outcome();</span>
+<span class="fc" id="L62">        return new Receipt(SCHEMA,source.subject(),source.formationEvidenceRoot(),workspace.contentHash(),source.equation(),</span>
+<span class="fc" id="L63">            source.assumptions(),expectedFreeze,expectedCatalogue,outcome.packetRoot(),outcome.intakeRoot(),</span>
+<span class="fc" id="L64">            ExternalNoveltyReview.identity(&quot;domain-review-receiver-roster/v1&quot;,roster),outcome.decision(),&quot;NOT_EVALUATED&quot;,&quot;NOT_EVALUATED&quot;);</span>
+    }
+
+    /** All authorities are supplied locally by the receiver, independently of the submitted run. */
+    public static int command(String[] args, PrintStream out) {
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        boolean inspect = args.length == 2 &amp;&amp; args[0].equals(&quot;review-subject&quot;);</span>
+<span class="pc bpc" id="L70" title="2 of 6 branches missed.">        if (!inspect &amp;&amp; !(args.length == 6 &amp;&amp; args[0].equals(&quot;verify-review&quot;))) {</span>
+<span class="nc" id="L71">            out.println(&quot;Usage: domains review-subject EXPORT | verify-review EXPORT PINNED_FREEZE PINNED_CATALOGUE TRUSTED_ROSTER.json REVIEW.json&quot;);</span>
+<span class="nc" id="L72">            return 1;</span>
+        }
+        try {
+<span class="fc" id="L75">            var source = DomainExportWorkspace.fromVerified(new DomainDiscoveryExportVerifier().requireVerified(Path.of(args[1])));</span>
+            Object result;
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (inspect) result = subject(source);</span>
+            else {
+<span class="fc" id="L79">                List&lt;Reviewer&gt; roster = JSON.readValue(readBounded(Path.of(args[4]), 128 * 1024), new TypeReference&lt;List&lt;Reviewer&gt;&gt;() {});</span>
+<span class="fc" id="L80">                result = verify(source,args[2],args[3],roster,readBounded(Path.of(args[5]),1024 * 1024));</span>
+            }
+<span class="fc" id="L82">            out.println(JSON.writeValueAsString(result));</span>
+<span class="fc" id="L83">            return 0;</span>
+<span class="nc" id="L84">        } catch (IOException | RuntimeException failure) {</span>
+<span class="nc" id="L85">            out.println(&quot;Domain review failed: &quot; + failure.getMessage());</span>
+<span class="nc" id="L86">            return 1;</span>
+        }
+    }
+
+    private static byte[] readBounded(Path file, int maxBytes) throws IOException {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;expected a regular review input file&quot;);</span>
+<span class="fc" id="L92">        try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L93">            byte[] bytes = input.readNBytes(maxBytes + 1);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (bytes.length &gt; maxBytes) throw new IOException(&quot;review input exceeds its size limit&quot;);</span>
+<span class="fc" id="L95">            return bytes;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

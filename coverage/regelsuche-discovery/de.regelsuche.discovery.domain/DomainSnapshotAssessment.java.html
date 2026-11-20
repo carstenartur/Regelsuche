@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainSnapshotAssessment.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainSnapshotAssessment.java</span></div><h1>DomainSnapshotAssessment.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.domain.ExpressionRewriteDiscoveryDomain.ExpressionCandidate;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import java.util.LinkedHashMap;
+import java.util.Objects;
+
+/** Assesses an immutable workspace, independently of the discovery receipt's original authority. */
+public final class DomainSnapshotAssessment {
+    public static final String SCHEMA = &quot;regelsuche.domain-snapshot-assessment/v1&quot;;
+    private final String canonicalJson;
+    private final String contentHash;
+
+<span class="fc" id="L17">    private DomainSnapshotAssessment(ObjectNode value) {</span>
+<span class="fc" id="L18">        contentHash = DomainCanonical.sha256(DomainExportWorkspace.write(value));</span>
+<span class="fc" id="L19">        value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L20">        canonicalJson = DomainExportWorkspace.write(value);</span>
+<span class="fc" id="L21">    }</span>
+
+<span class="fc" id="L23">    public String toCanonicalJson() { return canonicalJson; }</span>
+<span class="nc" id="L24">    public String contentHash() { return contentHash; }</span>
+
+    public static DomainSnapshotAssessment assess(DomainExportWorkspace workspace) {
+<span class="fc" id="L27">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
+<span class="fc" id="L28">        var root = DomainExportWorkspace.JSON.createObjectNode().put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L29">        root.set(&quot;source&quot;, DomainDownstreamValidation.sourceBinding(workspace));</span>
+<span class="fc" id="L30">        var validation = gate(root, &quot;validation&quot;);</span>
+<span class="fc" id="L31">        var counterexamples = gate(root, &quot;counterexamples&quot;);</span>
+<span class="fc" id="L32">        var proof = gate(root, &quot;proof&quot;);</span>
+<span class="fc" id="L33">        var ablation = gate(root, &quot;ablation&quot;);</span>
+<span class="fc" id="L34">        boolean reproduced = false;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (!workspace.replaySupported()) {</span>
+<span class="fc" id="L36">            root.put(&quot;replayStatus&quot;, &quot;OUTSIDE_REPLAY_BUDGET&quot;);</span>
+        } else {
+            try {
+<span class="fc" id="L39">                var observed = workspace.replayObserved();</span>
+<span class="fc" id="L40">                var replay = observed.result();</span>
+<span class="fc" id="L41">                reproduced = true;</span>
+<span class="fc" id="L42">                root.put(&quot;replayStatus&quot;, &quot;IDENTICAL_CANONICAL_EVIDENCE&quot;);</span>
+<span class="fc" id="L43">                JsonNode source = DomainExportWorkspace.read(replay.evidence().toCanonicalJson());</span>
+<span class="fc" id="L44">                root.set(&quot;resources&quot;, source.required(&quot;resources&quot;));</span>
+<span class="fc" id="L45">                root.set(&quot;certificate&quot;, source.required(&quot;certificate&quot;));</span>
+<span class="fc" id="L46">                counterexamples.put(&quot;status&quot;, &quot;REPRODUCED_ATTEMPTS&quot;);</span>
+<span class="fc" id="L47">                counterexamples.set(&quot;attempts&quot;, source.required(&quot;candidateAttempts&quot;));</span>
+<span class="fc" id="L48">                observed.firstRefutation().ifPresent(attempt -&gt;</span>
+<span class="fc" id="L49">                    counterexamples.set(&quot;independentCheck&quot;, DomainRejectedCandidateCheck.check(attempt)));</span>
+<span class="fc" id="L50">                validation.put(&quot;status&quot;, replay.evidence().outcome().name()).put(&quot;method&quot;, &quot;EXACT_DISCOVERY_REPLAY&quot;);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                if (replay.selectedCandidate().isEmpty()) {</span>
+<span class="fc" id="L52">                    proof.put(&quot;status&quot;, &quot;NO_SELECTED_CANDIDATE&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                } else if (replay.selectedCandidate().orElseThrow() instanceof ExpressionCandidate expression) {</span>
+<span class="fc" id="L54">                    expressionProof(workspace, expression, proof, validation);</span>
+                } else {
+<span class="fc" id="L56">                    var model = DomainExportWorkspace.read(DomainModelProof.prove(workspace).toCanonicalJson());</span>
+<span class="fc" id="L57">                    proof.put(&quot;status&quot;, model.required(&quot;status&quot;).asText()).set(&quot;modelReceipt&quot;, model);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    if (model.path(&quot;finiteCheck&quot;).isObject()) {</span>
+<span class="fc" id="L59">                        validation.put(&quot;status&quot;, model.at(&quot;/finiteCheck/status&quot;).asText()).put(&quot;method&quot;, DomainFiniteDataCheck.SCHEMA);</span>
+                    }
+                }
+<span class="fc" id="L62">                var control = DomainExportWorkspace.read(workspace.depthZeroControl().toCanonicalJson());</span>
+<span class="fc" id="L63">                ablation.put(&quot;status&quot;, &quot;EXECUTED&quot;).put(&quot;control&quot;, &quot;MAX_DEPTH_ZERO&quot;);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                for (String field : new String[]{&quot;budget&quot;, &quot;resources&quot;, &quot;outcome&quot;, &quot;selectedCandidateHash&quot;, &quot;contentHash&quot;}) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    ablation.set(field.equals(&quot;contentHash&quot;) ? &quot;controlEvidenceHash&quot; : field, control.required(field));</span>
+                }
+<span class="fc" id="L67">            } catch (DomainExportWorkspace.ReplayMismatch mismatch) {</span>
+<span class="fc" id="L68">                root.put(&quot;replayStatus&quot;, &quot;REPLAY_MISMATCH&quot;).put(&quot;actualEvidenceHash&quot;, mismatch.actual().contentHash());</span>
+<span class="fc" id="L69">            }</span>
+        }
+<span class="fc" id="L71">        var handoff = DiscoveryLifecycleHandoff.from(workspace.evidence());</span>
+<span class="fc" id="L72">        gate(root, &quot;lifecycle&quot;).put(&quot;status&quot;, lifecycle(reproduced, validation, proof))</span>
+<span class="fc" id="L73">            .put(&quot;fromHandoffHash&quot;, handoff.contentHash()).put(&quot;sourceStage&quot;, handoff.stage().name())</span>
+<span class="fc" id="L74">            .put(&quot;sourceDisposition&quot;, handoff.disposition().name());</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        gate(root, &quot;release&quot;).put(&quot;status&quot;, reproduced ? &quot;REPRODUCIBLE_RESEARCH_RECORD&quot; : &quot;BLOCKED&quot;)</span>
+<span class="fc" id="L76">            .put(&quot;scope&quot;, &quot;Retained source, resource comparison and delimited checker findings&quot;);</span>
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        boolean selected = reproduced &amp;&amp; !workspace.evidence().selectedCandidateHash().isEmpty();</span>
+<span class="fc" id="L78">        var novelty = gate(root, &quot;externalNovelty&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        novelty.put(&quot;status&quot;, selected ? &quot;POST_FREEZE_REVIEW_REQUIRED&quot; : &quot;NO_VERIFIED_SUBJECT&quot;);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (selected) {</span>
+<span class="fc" id="L81">            novelty.putObject(&quot;subject&quot;).put(&quot;runId&quot;, workspace.runId())</span>
+<span class="fc" id="L82">                .put(&quot;candidateId&quot;, workspace.evidence().selectedCandidateHash()).put(&quot;artifactHash&quot;, workspace.evidence().contentHash());</span>
+        }
+<span class="fc" id="L84">        var promotion = gate(root, &quot;promotion&quot;).put(&quot;status&quot;, &quot;BLOCKED&quot;);</span>
+<span class="fc" id="L85">        var blockers = promotion.putArray(&quot;blockers&quot;);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (!selected) blockers.add(&quot;NO_VERIFIED_CANDIDATE&quot;);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!proof.path(&quot;status&quot;).asText().startsWith(&quot;PROVED_&quot;)) blockers.add(&quot;NO_CHECKED_DOMAIN_PROOF&quot;);</span>
+<span class="fc" id="L88">        blockers.add(&quot;MISSING_INDEPENDENT_PROMOTION_RECORD&quot;);</span>
+<span class="fc" id="L89">        gate(root, &quot;publicEvidence&quot;).put(&quot;status&quot;, &quot;BLOCKED&quot;).putArray(&quot;blockers&quot;)</span>
+<span class="fc" id="L90">            .add(&quot;MISSING_PUBLIC_PROMOTION_RECORD&quot;).add(&quot;MISSING_EXTERNAL_NOVELTY_DECISION&quot;);</span>
+<span class="fc" id="L91">        return new DomainSnapshotAssessment(root);</span>
+    }
+
+    private static String lifecycle(boolean reproduced, ObjectNode validation, ObjectNode proof) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!reproduced) return &quot;SOURCE_NOT_REPRODUCED&quot;;</span>
+<span class="fc bfc" id="L96" title="All 3 branches covered.">        return switch (proof.required(&quot;status&quot;).asText()) {</span>
+<span class="fc" id="L97">            case &quot;PROVED_POLYNOMIAL_IDENTITY&quot; -&gt; &quot;CHECKED_IDENTITY&quot;;</span>
+<span class="fc" id="L98">            case &quot;PROVED_MODEL&quot; -&gt; &quot;CHECKED_CONDITIONAL_MODEL&quot;;</span>
+<span class="pc bpc" id="L99" title="1 of 3 branches missed.">            default -&gt; switch (validation.required(&quot;status&quot;).asText()) {</span>
+<span class="fc" id="L100">                case &quot;REFUTED&quot;, &quot;REFUTED_FINITE_DATA&quot; -&gt; &quot;REPRODUCED_REFUTATION&quot;;</span>
+<span class="fc" id="L101">                case &quot;CONFIRMED&quot;, &quot;CONFIRMED_FINITE_DATA&quot; -&gt; &quot;VALIDATED_WITHIN_SOURCE_SCOPE&quot;;</span>
+<span class="nc" id="L102">                default -&gt; &quot;REPRODUCED_OBSERVATION&quot;;</span>
+            };
+        };
+    }
+
+    private static ObjectNode gate(ObjectNode root, String name) {
+<span class="fc" id="L108">        return root.putObject(name).put(&quot;contract&quot;, SCHEMA + &quot;#&quot; + name).put(&quot;status&quot;, &quot;NOT_EVALUATED&quot;);</span>
+    }
+
+    private static void expressionProof(DomainExportWorkspace workspace, ExpressionCandidate candidate,
+            ObjectNode proof, ObjectNode validation) {
+<span class="fc" id="L113">        String original = workspace.evidence().seed().payload();</span>
+<span class="fc" id="L114">        String requested = workspace.evidence().domainEvidence().properties().get(&quot;expectedTarget&quot;);</span>
+<span class="fc" id="L115">        proof.put(&quot;checker&quot;, ExactParsedUnivariatePolynomialView.VIEW_ID)</span>
+<span class="fc" id="L116">            .put(&quot;scope&quot;, &quot;Polynomial identity over Q with polynomial-ring powers and nonzero constant denominators&quot;)</span>
+<span class="fc" id="L117">            .put(&quot;originalSource&quot;, original).put(&quot;requestedTarget&quot;, requested)</span>
+<span class="fc" id="L118">            .put(&quot;selectedSource&quot;, candidate.sourceExpression()).put(&quot;selectedTarget&quot;, candidate.targetExpression());</span>
+<span class="fc" id="L119">        var assumptions = proof.putArray(&quot;rewriteAssumptions&quot;);</span>
+<span class="fc" id="L120">        candidate.assumptions().forEach(assumptions::add);</span>
+<span class="fc" id="L121">        var checks = proof.putArray(&quot;normalForms&quot;);</span>
+<span class="fc" id="L122">        var results = new LinkedHashMap&lt;String, ExactParsedUnivariatePolynomialView.Analysis&gt;();</span>
+<span class="fc" id="L123">        var parser = new ExpressionParser();</span>
+<span class="fc" id="L124">        var checker = new ExactParsedUnivariatePolynomialView();</span>
+        // The original seed is parsed afresh. Formatting performed by the discovery engine cannot authorize equality.
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (String text : new String[]{original, candidate.sourceExpression(), candidate.targetExpression(), requested}) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (results.containsKey(text)) continue;</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (text.length() &gt; 256) {</span>
+<span class="nc" id="L129">                proof.put(&quot;status&quot;, &quot;OUTSIDE_PROOF_BUDGET&quot;);</span>
+<span class="nc" id="L130">                return;</span>
+            }
+<span class="fc" id="L132">            var analysis = checker.analyze(parser.parseExactTerm(text));</span>
+<span class="fc" id="L133">            results.put(text, analysis);</span>
+<span class="fc" id="L134">            var item = checks.addObject().put(&quot;input&quot;, text).put(&quot;status&quot;, analysis.status().name())</span>
+<span class="fc" id="L135">                .put(&quot;detail&quot;, analysis.detailCode()).put(&quot;certificateHash&quot;, analysis.certificateHash());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (analysis.supported()) item.put(&quot;normalForm&quot;, analysis.polynomial().orElseThrow().canonicalMaterial());</span>
+        }
+<span class="fc bfc" id="L138" title="All 4 branches covered.">        if (results.values().stream().anyMatch(analysis -&gt; !analysis.supported())) {</span>
+<span class="fc" id="L139">            proof.put(&quot;status&quot;, &quot;OUTSIDE_CHECKED_POLYNOMIAL_FRAGMENT&quot;);</span>
+<span class="fc" id="L140">            return;</span>
+        }
+<span class="fc" id="L142">        var baseline = results.get(original).polynomial().orElseThrow();</span>
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if (results.values().stream().anyMatch(analysis -&gt; !baseline.equals(analysis.polynomial().orElseThrow()))) {</span>
+<span class="nc" id="L144">            proof.put(&quot;status&quot;, &quot;NORMAL_FORMS_DIFFER&quot;);</span>
+<span class="nc" id="L145">            validation.put(&quot;status&quot;, &quot;INDEPENDENT_CHECK_NOT_CONFIRMED&quot;).put(&quot;method&quot;, ExactParsedUnivariatePolynomialView.VIEW_ID);</span>
+<span class="nc" id="L146">            return;</span>
+        }
+<span class="fc" id="L148">        proof.put(&quot;status&quot;, &quot;PROVED_POLYNOMIAL_IDENTITY&quot;);</span>
+<span class="fc" id="L149">        validation.put(&quot;status&quot;, &quot;CONFIRMED_POLYNOMIAL_IDENTITY&quot;).put(&quot;method&quot;, ExactParsedUnivariatePolynomialView.VIEW_ID);</span>
+<span class="fc" id="L150">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

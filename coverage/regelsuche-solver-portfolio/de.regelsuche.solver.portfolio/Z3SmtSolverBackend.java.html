@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 /** External Z3 backend that confirms unsatisfiability only with a retrieved proof object. */
 public final class Z3SmtSolverBackend implements SolverBackend {
 <span class="fc" id="L33">    private static final List&lt;Relation&gt; GOAL_RELATIONS = Arrays.stream(Relation.values())</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        .filter(relation -&gt; relation != Relation.IS_INTEGER)</span>
+<span class="fc bfc" id="L34" title="All 4 branches covered.">        .filter(relation -&gt; relation != Relation.IS_INTEGER &amp;&amp; relation != Relation.HOLDS)</span>
 <span class="fc" id="L35">        .toList();</span>
 
     private final BackendDescriptor descriptor;

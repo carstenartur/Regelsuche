@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainRejectedCandidateCheck.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainRejectedCandidateCheck.java</span></div><h1>DomainRejectedCandidateCheck.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.RecurrenceObservationKrylov;
+import de.regelsuche.representation.RepresentationBridge.Budget;
+import java.math.BigInteger;
+import java.util.stream.IntStream;
+
+/** Recomputes an exact retained-term counterexample for the first replayed, rejected sequence model. */
+final class DomainRejectedCandidateCheck {
+    private static final int MAX_TERMS = 64;
+    private static final int PHASE_WORK = 4096;
+    private DomainRejectedCandidateCheck() { }
+
+    static ObjectNode check(DomainExportWorkspace.RejectedAttempt attempt) {
+<span class="fc" id="L17">        var result = DomainExportWorkspace.JSON.createObjectNode().put(&quot;contract&quot;, &quot;regelsuche.affine-model-counterexample/v1&quot;)</span>
+<span class="fc" id="L18">            .put(&quot;candidateHash&quot;, attempt.row().candidateHash()).put(&quot;attemptSequence&quot;, attempt.row().sequence())</span>
+<span class="fc" id="L19">            .put(&quot;termLimit&quot;, MAX_TERMS);</span>
+        try {
+<span class="fc" id="L21">            var model = DomainSequenceAffineModel.from(attempt.candidate());</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">            if (model.retained().size() &gt; MAX_TERMS) return result.put(&quot;status&quot;, &quot;TERM_LIMIT_EXCEEDED&quot;);</span>
+<span class="fc" id="L23">            result.put(&quot;modelHash&quot;, model.contentHash());</span>
+<span class="fc" id="L24">            var work = result.putArray(&quot;phases&quot;);</span>
+<span class="fc" id="L25">            var prepared = RecurrenceObservationKrylov.prepare(model.transition(), model.observation(), new Budget(PHASE_WORK));</span>
+<span class="fc" id="L26">            phase(work.addObject(), &quot;PREPARE&quot;, prepared);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (prepared.value().isEmpty()) return result.put(&quot;status&quot;, &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L28">            var bound = prepared.value().orElseThrow().bind(model.initialState(), new Budget(PHASE_WORK));</span>
+<span class="fc" id="L29">            phase(work.addObject(), &quot;BIND&quot;, bound);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (bound.value().isEmpty()) return result.put(&quot;status&quot;, &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L31">            var indices = IntStream.range(0, model.retained().size()).mapToObj(BigInteger::valueOf).toList();</span>
+<span class="fc" id="L32">            var values = bound.value().orElseThrow().valuesAt(indices, new Budget(PHASE_WORK));</span>
+<span class="fc" id="L33">            phase(work.addObject(), &quot;QUERY&quot;, values);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">            if (values.value().isEmpty()) return result.put(&quot;status&quot;, &quot;INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L35">            var terms = values.value().orElseThrow();</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            for (int index = 0; index &lt; terms.size(); index++) {</span>
+<span class="fc" id="L37">                Rational actual = Rational.of(model.retained().get(index));</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                if (!actual.equals(terms.get(index))) {</span>
+<span class="fc" id="L39">                    return result.put(&quot;status&quot;, &quot;REFUTED_FINITE_MODEL&quot;).put(&quot;index&quot;, index)</span>
+<span class="fc" id="L40">                        .put(&quot;retained&quot;, actual.toString()).put(&quot;predicted&quot;, terms.get(index).toString());</span>
+                }
+            }
+<span class="nc" id="L43">            return result.put(&quot;status&quot;, &quot;NO_MODEL_MISMATCH_IN_RETAINED_TERMS&quot;);</span>
+<span class="nc" id="L44">        } catch (DomainSequenceAffineModel.UnsupportedModel unavailable) {</span>
+<span class="nc" id="L45">            return result.put(&quot;status&quot;, &quot;UNSUPPORTED_MODEL&quot;).put(&quot;detail&quot;, unavailable.getMessage());</span>
+        }
+    }
+
+    private static void phase(ObjectNode line, String name, RecurrenceObservationKrylov.Result&lt;?&gt; result) {
+<span class="fc" id="L50">        line.put(&quot;phase&quot;, name).put(&quot;status&quot;, result.status().name()).put(&quot;configured&quot;, result.work().configuredWorkUnits())</span>
+<span class="fc" id="L51">            .put(&quot;executed&quot;, result.work().consumedWorkUnits()).put(&quot;remaining&quot;, result.work().remainingWorkUnits());</span>
+<span class="fc" id="L52">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

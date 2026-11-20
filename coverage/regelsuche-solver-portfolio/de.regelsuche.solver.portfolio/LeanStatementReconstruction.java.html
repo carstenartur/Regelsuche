@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LeanStatementReconstruction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">LeanStatementReconstruction.java</span></div><h1>LeanStatementReconstruction.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverIr.*;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.List;
+
+/**
+ * Second lowering of v2 IR used only by the pinned rebuild. Deliberately independent of the
+ * tactic/source renderer: close the conclusion backwards, give every variable a different
+ * name, and use explicit constructors. Lean checks definitional equality with the first term.
+ */
+final class LeanStatementReconstruction {
+    private LeanStatementReconstruction() { }
+
+    static String theorem(Obligation o) {
+<span class="fc" id="L17">        String type = relation(o.goal().relation(), o.goal().left(), o.goal().right());</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        for (var p : o.assumptions().reversed())</span>
+<span class="fc" id="L19">            type = &quot;(&quot; + relation(p.relation(), p.left(), p.right()) + &quot; → &quot; + type + &quot;)&quot;;</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        for (var d : o.declarations().reversed())</span>
+<span class="fc" id="L21">            type = &quot;(∀ (free_&quot; + d.name() + &quot; : &quot; + sort(d.sort()) + &quot;), &quot; + type + &quot;)&quot;;</span>
+<span class="fc" id="L22">        return &quot;\ntheorem regelsuche_reconstructed : &quot; + type + &quot; := @regelsuche_lemma\n&quot;;</span>
+    }
+
+    private static String sort(Sort s) {
+<span class="pc bpc" id="L26" title="5 of 7 branches missed.">        return switch (s) {</span>
+<span class="pc" id="L27">            case REAL -&gt; &quot;ℝ&quot;; case NATURAL -&gt; &quot;ℕ&quot;; case REAL_SET -&gt; &quot;Set ℝ&quot;;</span>
+<span class="nc" id="L28">            case PROPOSITION -&gt; &quot;Prop&quot;; case REAL_SEQUENCE -&gt; &quot;ℕ → ℝ&quot;; case REAL_FUNCTION -&gt; &quot;ℝ → ℝ&quot;;</span>
+<span class="nc" id="L29">            default -&gt; throw new IllegalArgumentException(&quot;unsupported reconstructed sort &quot; + s);</span>
+        };
+    }
+
+    private static String relation(Relation relation, Expression left, Expression right) {
+<span class="fc" id="L34">        String lhs = term(left, 0);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (relation == Relation.HOLDS) return lhs;</span>
+<span class="nc" id="L36">        String rhs = term(right, 0);</span>
+<span class="nc bnc" id="L37" title="All 7 branches missed.">        return switch (relation) {</span>
+<span class="nc" id="L38">            case EQUALS -&gt; apply(&quot;Eq&quot;, lhs, rhs); case NOT_EQUALS -&gt; apply(&quot;Ne&quot;, lhs, rhs);</span>
+<span class="nc" id="L39">            case LESS_OR_EQUAL -&gt; apply(&quot;LE.le&quot;, lhs, rhs); case LESS_THAN -&gt; apply(&quot;LT.lt&quot;, lhs, rhs);</span>
+<span class="nc" id="L40">            case GREATER_OR_EQUAL -&gt; apply(&quot;LE.le&quot;, rhs, lhs); case GREATER_THAN -&gt; apply(&quot;LT.lt&quot;, rhs, lhs);</span>
+<span class="nc" id="L41">            default -&gt; throw new IllegalArgumentException(&quot;unsupported reconstructed relation &quot; + relation);</span>
+        };
+    }
+
+    private static String term(Expression e, int level) {
+<span class="pc bpc" id="L46" title="1 of 6 branches missed.">        return switch (e) {</span>
+<span class="fc" id="L47">            case Literal l -&gt; real(l);</span>
+<span class="fc" id="L48">            case Symbol s -&gt; &quot;free_&quot; + s.name();</span>
+<span class="fc" id="L49">            case Bound b -&gt; &quot;local_&quot; + (level - b.index() - 1);</span>
+<span class="nc" id="L50">            case Binary b -&gt; arithmetic(b.operator(), term(b.left(), level), term(b.right(), level), b.right());</span>
+<span class="fc" id="L51">            case Binder b -&gt; {</span>
+<span class="fc" id="L52">                String variable = &quot;(local_&quot; + level + &quot; : &quot; + sort(b.domain()) + &quot;)&quot;;</span>
+<span class="fc" id="L53">                String body = term(b.body(), level + 1);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">                yield switch (b.kind()) {</span>
+<span class="nc" id="L55">                    case FORALL -&gt; &quot;(∀ &quot; + variable + &quot;, &quot; + body + &quot;)&quot;;</span>
+<span class="nc" id="L56">                    case EXISTS -&gt; &quot;(Exists (fun &quot; + variable + &quot; =&gt; &quot; + body + &quot;))&quot;;</span>
+<span class="fc" id="L57">                    case SET_OF -&gt; &quot;((fun &quot; + variable + &quot; =&gt; &quot; + body + &quot;) : Set ℝ)&quot;;</span>
+<span class="fc" id="L58">                    case SEQUENCE, FUNCTION -&gt; &quot;(fun &quot; + variable + &quot; =&gt; &quot; + body + &quot;)&quot;;</span>
+                };
+            }
+<span class="fc" id="L61">            case Call c -&gt; call(c, c.arguments().stream().map(a -&gt; term(a, level)).toList());</span>
+        };
+    }
+
+    private static String real(Literal l) {
+<span class="fc" id="L66">        BigDecimal d = new BigDecimal(l.value());</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (d.scale() &lt;= 0) return &quot;(&quot; + d.toBigIntegerExact() + &quot; : ℝ)&quot;;</span>
+<span class="nc" id="L68">        return &quot;((&quot; + d.unscaledValue() + &quot; : ℝ) / &quot; + BigInteger.TEN.pow(d.scale()) + &quot;)&quot;;</span>
+    }
+
+    private static String arithmetic(BinaryOperator op, String l, String r, Expression exponent) {
+<span class="nc bnc" id="L72" title="All 5 branches missed.">        return switch (op) {</span>
+<span class="nc" id="L73">            case ADD -&gt; apply(&quot;HAdd.hAdd&quot;, l, r); case MULTIPLY -&gt; apply(&quot;HMul.hMul&quot;, l, r);</span>
+<span class="nc" id="L74">            case SUBTRACT -&gt; apply(&quot;HSub.hSub&quot;, l, r); case DIVIDE -&gt; apply(&quot;HDiv.hDiv&quot;, l, r);</span>
+            case POWER -&gt; {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                if (exponent instanceof Literal literal) {</span>
+<span class="nc" id="L77">                    BigDecimal d = new BigDecimal(literal.value());</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">                    if (d.scale() &lt;= 0 &amp;&amp; d.signum() &gt;= 0) yield &quot;(&quot; + l + &quot; ^ (&quot; + d.toBigIntegerExact() + &quot; : ℕ))&quot;;</span>
+                }
+<span class="nc" id="L80">                yield apply(&quot;Real.rpow&quot;, l, r);</span>
+            }
+        };
+    }
+
+    private static String call(Call c, List&lt;String&gt; args) {
+<span class="fc" id="L86">        String a = args.getFirst();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (args.size() == 1) return unary(c, a);</span>
+<span class="fc" id="L88">        return multiple(c, args, a, args.get(1));</span>
+    }
+
+    private static String unary(Call c, String a) {
+<span class="pc bpc" id="L92" title="9 of 11 branches missed.">        return switch (c.function()) {</span>
+<span class="fc" id="L93">            case &quot;nat&quot; -&gt; &quot;(&quot; + ((Literal)c.arguments().getFirst()).value() + &quot; : ℕ)&quot;;</span>
+<span class="fc" id="L94">            case &quot;of_nat&quot; -&gt; &quot;(&quot; + a + &quot; : ℝ)&quot;;</span>
+<span class="nc" id="L95">            case &quot;succ&quot; -&gt; apply(&quot;Nat.succ&quot;, a); case &quot;not&quot; -&gt; apply(&quot;Not&quot;, a);</span>
+<span class="nc" id="L96">            case &quot;summable&quot; -&gt; apply(&quot;Summable&quot;, a); case &quot;tsum&quot; -&gt; apply(&quot;tsum&quot;, a);</span>
+<span class="nc" id="L97">            case &quot;exp&quot; -&gt; apply(&quot;Real.exp&quot;, a); case &quot;log&quot;, &quot;ln&quot; -&gt; apply(&quot;Real.log&quot;, a);</span>
+<span class="nc" id="L98">            case &quot;sqrt&quot; -&gt; apply(&quot;Real.sqrt&quot;, a); case &quot;abs&quot; -&gt; apply(&quot;abs&quot;, a);</span>
+<span class="nc" id="L99">            default -&gt; throw new IllegalArgumentException(&quot;unsupported reconstructed call &quot; + c.function());</span>
+        };
+    }
+
+    private static String multiple(Call c, List&lt;String&gt; args, String a, String b) {
+<span class="pc bpc" id="L104" title="10 of 17 branches missed.">        return switch (c.function()) {</span>
+<span class="pc" id="L105">            case &quot;eq&quot; -&gt; apply(&quot;Eq&quot;, a, b); case &quot;ne&quot; -&gt; apply(&quot;Ne&quot;, a, b);</span>
+<span class="pc" id="L106">            case &quot;lt&quot; -&gt; apply(&quot;LT.lt&quot;, a, b); case &quot;le&quot; -&gt; apply(&quot;LE.le&quot;, a, b);</span>
+<span class="pc" id="L107">            case &quot;and&quot; -&gt; apply(&quot;And&quot;, a, b); case &quot;or&quot; -&gt; apply(&quot;Or&quot;, a, b);</span>
+<span class="nc" id="L108">            case &quot;implies&quot; -&gt; &quot;(&quot; + a + &quot; → &quot; + b + &quot;)&quot;;</span>
+<span class="pc" id="L109">            case &quot;at&quot; -&gt; apply(a, b); case &quot;has_sum&quot; -&gt; apply(&quot;HasSum&quot;, a, b);</span>
+<span class="fc" id="L110">            case &quot;tends_to&quot; -&gt; apply(&quot;Filter.Tendsto&quot;, a, &quot;Filter.atTop&quot;, apply(&quot;nhds&quot;, b));</span>
+<span class="fc" id="L111">            case &quot;limit_at&quot; -&gt; apply(&quot;Filter.Tendsto&quot;, a, apply(&quot;nhds&quot;, b), apply(&quot;nhds&quot;, args.get(2)));</span>
+<span class="pc" id="L112">            case &quot;mem&quot; -&gt; apply(&quot;Set.Mem&quot;, b, a); case &quot;subset&quot; -&gt; apply(&quot;Set.Subset&quot;, a, b);</span>
+<span class="nc" id="L113">            case &quot;union&quot; -&gt; apply(&quot;Set.union&quot;, a, b); case &quot;inter&quot; -&gt; apply(&quot;Set.inter&quot;, a, b);</span>
+<span class="nc" id="L114">            case &quot;pow&quot; -&gt; arithmetic(BinaryOperator.POWER, a, b, c.arguments().get(1));</span>
+<span class="nc" id="L115">            default -&gt; throw new IllegalArgumentException(&quot;unsupported reconstructed call &quot; + c.function());</span>
+        };
+    }
+
+    private static String apply(String function, String... args) {
+<span class="fc" id="L120">        return &quot;(&quot; + function + &quot; &quot; + String.join(&quot; &quot;, args) + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

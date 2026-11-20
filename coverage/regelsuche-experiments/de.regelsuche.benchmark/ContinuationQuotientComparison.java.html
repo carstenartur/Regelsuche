@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ContinuationQuotientComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ContinuationQuotientComparison.java</span></div><h1>ContinuationQuotientComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.IdentityPolicy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.QuotientMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.TieOrder;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngines;
+import de.regelsuche.transform.AstRewriteTransformationEngines.Backend;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Public target-visible diagnostic; never a held-out discovery or runtime superiority claim. */
+public final class ContinuationQuotientComparison {
+    public static final String SCHEMA = &quot;regelsuche.continuation-quotient-comparison/v1&quot;;
+    private ContinuationQuotientComparison() {}
+
+<span class="fc" id="L35">    public record Row(String caseId, String family, String source, String target, String backend, String policy,</span>
+            int maxDepth, int maxStates, boolean targetReached, boolean replayVerified, int explored,
+            int distinctSyntax, long engineCalls, long generatedProposals, long generatedPrimitiveSteps,
+            int duplicatePrunes, QuotientMetrics arena, long replayCalls, long replayProposals) {}
+    public record Report(String corpusSha256, String inventoryRevision, List&lt;Row&gt; rows) {
+<span class="fc" id="L40">        public Report { rows = List.copyOf(rows); }</span>
+        public String json() {
+<span class="fc" id="L42">            var out = new JsonWriter().beginObject().property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L43">                .property(&quot;corpusSha256&quot;, corpusSha256).property(&quot;inventoryRevision&quot;, inventoryRevision)</span>
+<span class="fc" id="L44">                .property(&quot;tieOrder&quot;, TieOrder.SYNTAX_V1.name())</span>
+<span class="fc" id="L45">                .property(&quot;regime&quot;, &quot;PUBLIC_TARGET_VISIBLE_DIAGNOSTIC&quot;)</span>
+<span class="fc" id="L46">                .property(&quot;claim&quot;, &quot;FINITE_WORK_COUNTS_NOT_RUNTIME_OR_HEAP&quot;)</span>
+<span class="fc" id="L47">                .array(&quot;rows&quot;, values -&gt; rows.forEach(row -&gt; values.objectValue(o -&gt; writeRow(o, row))));</span>
+<span class="fc" id="L48">            return out.endObject().toString() + &quot;\n&quot;;</span>
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (args.length != 1) throw new IllegalArgumentException(&quot;output JSON path required&quot;);</span>
+<span class="nc" id="L54">        var output = Path.of(args[0]).toAbsolutePath();</span>
+<span class="nc" id="L55">        Files.createDirectories(output.getParent());</span>
+<span class="nc" id="L56">        Files.writeString(output, run().json());</span>
+<span class="nc" id="L57">    }</span>
+
+    public static Report run() {
+<span class="fc" id="L60">        var corpus = HistoricalRediscoveryCorpus.load();</span>
+<span class="fc" id="L61">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (var sample : corpus.cases()) {</span>
+<span class="fc" id="L63">            var heuristic = new SearchHeuristic(sample.searchMaxDepth(), sample.searchMaxVisitedStates(), 1,</span>
+<span class="fc" id="L64">                sample.maxExpandingSteps(), sample.maxCandidatesPerState(), sample.beamWidth());</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            var target = sample.targetRelation() == HistoricalRediscoveryCorpus.TargetRelation.SYNTAX_EXACT</span>
+<span class="fc" id="L66">                ? SearchProblem.SearchTarget.syntaxExact(format(sample.target()))</span>
+<span class="fc" id="L67">                : SearchProblem.SearchTarget.valueEquivalent(format(sample.target()));</span>
+<span class="fc" id="L68">            compare(rows, sample.id(), sample.family(), sample.source(), sample.target(), target,</span>
+<span class="fc" id="L69">                heuristic, AstRewriteTransformationEngine.defaultRules(), 128,</span>
+<span class="fc" id="L70">                Math.max(200, sample.maxCandidatesPerState() * 2));</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        control(rows, &quot;independent-three-factor&quot;, &quot;pair(a*x+a*y,b*x+b*y,c*x+c*y)&quot;,</span>
+            &quot;pair(a*(x+y),b*(x+y),c*(x+y))&quot;, 3,
+<span class="fc" id="L74">            Set.of(&quot;ast_factor_common_left&quot;, &quot;ast_factor_common_right&quot;));</span>
+<span class="fc" id="L75">        control(rows, &quot;nested-power-control&quot;, &quot;((x^2)^2)^2&quot;, &quot;x^8&quot;, 4, Set.of(&quot;ast_power_of_power&quot;));</span>
+<span class="fc" id="L76">        return new Report(corpus.contentSha256(), corpus.inventoryRevision(), rows);</span>
+    }
+
+    private static void control(List&lt;Row&gt; rows, String id, String source, String target, int depth, Set&lt;String&gt; inventory) {
+<span class="fc" id="L80">        var rules = AstRewriteTransformationEngine.defaultRules().stream().filter(r -&gt; inventory.contains(r.id())).toList();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (rules.size() != inventory.size()) throw new IllegalStateException(&quot;control inventory changed&quot;);</span>
+<span class="fc" id="L82">        compare(rows, id, &quot;DECLARED_PRODUCTION_CONTROL&quot;, source, target, SearchProblem.SearchTarget.syntaxExact(format(target)),</span>
+            new SearchHeuristic(depth, 10_000, 1, depth, 10_000, 10_000), rules, 128, 10_000);
+<span class="fc" id="L84">    }</span>
+
+    private static void compare(List&lt;Row&gt; rows, String id, String family, String source, String targetText,
+            SearchProblem.SearchTarget target, SearchHeuristic heuristic, List&lt;RewriteRule&gt; rules, int growth, int candidates) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (var backend : Backend.values()) {</span>
+<span class="fc" id="L89">            List&lt;List&lt;String&gt;&gt; legacyPaths = null;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (var policy : IdentityPolicy.values()) {</span>
+<span class="fc" id="L91">                var engine = new CountedEngine(AstRewriteTransformationEngines.create(backend, rules, growth, candidates));</span>
+<span class="fc" id="L92">                var problem = new SearchProblem(format(source), engine, new ExpressionScorer(), new ExpressionCanonicalizer(), heuristic)</span>
+<span class="fc" id="L93">                    .withTarget(target.continueAfterReached());</span>
+<span class="fc" id="L94">                var run = new BestFirstSearchStrategy(policy, TieOrder.SYNTAX_V1).searchWithExecutionDiagnostics(problem);</span>
+<span class="fc" id="L95">                var paths = run.search().states().stream().map(SearchState::path).toList();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (policy == IdentityPolicy.APPLICATION_HISTORY_V1) legacyPaths = paths;</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">                if (policy == IdentityPolicy.ARENA_APPLICATION_HISTORY_V1 &amp;&amp; !paths.equals(legacyPaths))</span>
+<span class="nc" id="L98">                    throw new IllegalStateException(&quot;arena-only path parity failed: &quot; + id + &quot; &quot; + backend);</span>
+<span class="fc" id="L99">                var replay = new Replay(rules, growth, candidates);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                for (var state : run.search().states()) replay.require(state);</span>
+<span class="fc" id="L101">                rows.add(new Row(id, family, source, targetText, backend.name(), policy.version(), heuristic.maxDepth(),</span>
+<span class="fc" id="L102">                    heuristic.maxVisitedExpressions(), run.search().reached(), true, run.search().states().size(),</span>
+<span class="fc" id="L103">                    (int) run.search().states().stream().map(SearchState::expression).distinct().count(),</span>
+<span class="fc" id="L104">                    engine.calls, engine.proposals, engine.primitiveSteps, run.search().metrics().duplicatePrunes(),</span>
+<span class="fc" id="L105">                    run.quotient(), replay.engine.calls, replay.engine.proposals));</span>
+            }
+        }
+<span class="fc" id="L108">    }</span>
+
+    private static String format(String expression) {
+<span class="fc" id="L111">        return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static final class CountedEngine implements TransformationEngine {
+        private final TransformationEngine delegate;
+        long calls, proposals, primitiveSteps;
+<span class="fc" id="L117">        CountedEngine(TransformationEngine delegate) { this.delegate = delegate; }</span>
+        @Override public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L119">            calls++;</span>
+<span class="fc" id="L120">            var result = delegate.transform(expression);</span>
+<span class="fc" id="L121">            proposals += result.size();</span>
+<span class="fc" id="L122">            primitiveSteps += result.stream().mapToLong(Transformation::primitiveStepCount).sum();</span>
+<span class="fc" id="L123">            return result;</span>
+        }
+    }
+
+    /** A separately constructed reference matcher checks every retained primitive edge. */
+    private static final class Replay {
+        private final CountedEngine engine;
+<span class="fc" id="L130">        private final Map&lt;String, List&lt;Transformation&gt;&gt; cache = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L131">        Replay(List&lt;RewriteRule&gt; rules, int growth, int candidates) {</span>
+<span class="fc" id="L132">            engine = new CountedEngine(AstRewriteTransformationEngines.reference(rules, growth, candidates));</span>
+<span class="fc" id="L133">        }</span>
+        void require(SearchState state) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (state.depth() == 0) return;</span>
+<span class="fc" id="L136">            var path = state.path();</span>
+<span class="fc" id="L137">            var moves = state.transformations();</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">            if (moves == null || moves.size() + 1 != path.size()) throw new IllegalStateException(&quot;incomplete lineage&quot;);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (int i = 0; i &lt; moves.size(); i++) {</span>
+<span class="fc" id="L140">                var move = moves.get(i);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                if (!move.transformedExpression().equals(path.get(i + 1))</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                        || !cache.computeIfAbsent(path.get(i), engine::transform).contains(move))</span>
+<span class="nc" id="L143">                    throw new IllegalStateException(&quot;primitive replay differs: &quot; + state.expression());</span>
+            }
+<span class="fc" id="L145">        }</span>
+    }
+
+    private static void writeRow(JsonWriter o, Row r) {
+<span class="fc" id="L149">        o.property(&quot;caseId&quot;, r.caseId()).property(&quot;family&quot;, r.family()).property(&quot;source&quot;, r.source())</span>
+<span class="fc" id="L150">            .property(&quot;target&quot;, r.target()).property(&quot;backend&quot;, r.backend()).property(&quot;policy&quot;, r.policy())</span>
+<span class="fc" id="L151">            .property(&quot;maxDepth&quot;, r.maxDepth()).property(&quot;maxStates&quot;, r.maxStates())</span>
+<span class="fc" id="L152">            .property(&quot;targetReached&quot;, r.targetReached()).property(&quot;replayVerified&quot;, r.replayVerified())</span>
+<span class="fc" id="L153">            .property(&quot;explored&quot;, r.explored()).property(&quot;distinctSyntax&quot;, r.distinctSyntax())</span>
+<span class="fc" id="L154">            .property(&quot;engineCalls&quot;, r.engineCalls()).property(&quot;generatedProposals&quot;, r.generatedProposals())</span>
+<span class="fc" id="L155">            .property(&quot;generatedPrimitiveSteps&quot;, r.generatedPrimitiveSteps()).property(&quot;duplicatePrunes&quot;, r.duplicatePrunes())</span>
+<span class="fc" id="L156">            .property(&quot;semanticNodes&quot;, r.arena().semanticNodes()).property(&quot;syntaxObservations&quot;, r.arena().syntaxObservations())</span>
+<span class="fc" id="L157">            .property(&quot;retainedLabels&quot;, r.arena().retainedLabels()).property(&quot;successorCacheHits&quot;, r.arena().successorCacheHits())</span>
+<span class="fc" id="L158">            .property(&quot;arenaEntries&quot;, r.arena().arenaEntries()).property(&quot;arenaStructuralBytes&quot;, r.arena().arenaStructuralBytes())</span>
+<span class="fc" id="L159">            .property(&quot;digestComputations&quot;, r.arena().digestComputations()).property(&quot;replayCalls&quot;, r.replayCalls())</span>
+<span class="fc" id="L160">            .property(&quot;replayProposals&quot;, r.replayProposals());</span>
+<span class="fc" id="L161">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

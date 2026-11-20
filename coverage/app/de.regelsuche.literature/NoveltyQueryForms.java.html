@@ -70,7 +70,7 @@ public final class NoveltyQueryForms {
 <span class="fc" id="L70">    }</span>
     private static String render(Expr expression, Map&lt;String,String&gt; names, boolean shape) {
 <span class="fc bfc" id="L72" title="All 2 branches covered.">        if (expression instanceof VariableExpr v) return names.computeIfAbsent(v.name(), k -&gt; &quot;v&quot; + names.size());</span>
-<span class="pc bpc" id="L73" title="3 of 4 branches missed.">        if (expression instanceof NumberExpr n) return shape ? &quot;number&quot; : n.value().toString();</span>
+<span class="fc bfc" id="L73" title="All 4 branches covered.">        if (expression instanceof NumberExpr n) return shape ? &quot;number&quot; : n.value().toString();</span>
 <span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr f) {</span>
 <span class="nc" id="L75">            return f.name() + f.arguments().stream().map(a -&gt; render(a,names,shape)).collect(Collectors.joining(&quot;,&quot;, &quot;(&quot;, &quot;)&quot;));</span>
         }

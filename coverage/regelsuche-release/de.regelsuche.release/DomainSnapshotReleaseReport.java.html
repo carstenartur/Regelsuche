@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainSnapshotReleaseReport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">DomainSnapshotReleaseReport.java</span></div><h1>DomainSnapshotReleaseReport.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier;
+import de.regelsuche.discovery.domain.DomainExportWorkspace;
+import de.regelsuche.discovery.domain.DomainSnapshotAssessment;
+import de.regelsuche.discovery.domain.ExpressionRewriteDiscoveryDomain;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+/** Binds research-record release to independently reproduced assessments, separate from v1 architecture qualification. */
+final class DomainSnapshotReleaseReport {
+    static final String FILE = &quot;snapshot-product-release.json&quot;;
+<span class="fc" id="L19">    private static final JsonMapper JSON = new JsonMapper();</span>
+<span class="fc" id="L20">    private record Source(String name, String domain) { }</span>
+<span class="fc" id="L21">    private static final List&lt;Source&gt; SOURCES = List.of(</span>
+        new Source(&quot;expression&quot;, ExpressionRewriteDiscoveryDomain.DOMAIN_ID),
+        new Source(&quot;sequence&quot;, FiniteDifferenceSequenceDomain.DOMAIN_ID),
+        new Source(&quot;recurrence&quot;, LinearRecurrenceSequenceDomain.DOMAIN_ID));
+    private DomainSnapshotReleaseReport() { }
+
+    static String reconstruct(Path root, String architectureHash) throws IOException {
+<span class="fc" id="L28">        var report = JSON.createObjectNode().put(&quot;schema&quot;, &quot;regelsuche.domain-snapshot-product-release/v1&quot;)</span>
+<span class="fc" id="L29">            .put(&quot;architectureRunHash&quot;, architectureHash).put(&quot;domainCount&quot;, SOURCES.size());</span>
+<span class="fc" id="L30">        var records = report.putArray(&quot;records&quot;);</span>
+<span class="fc" id="L31">        var first = new LinkedHashMap&lt;String,String&gt;();</span>
+<span class="fc" id="L32">        boolean identical = true;</span>
+<span class="fc" id="L33">        var verifier = new DomainDiscoveryExportVerifier();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (int run = 1; run &lt;= DomainGenericQualificationRunner.CLEAN_RUN_COUNT; run++) {</span>
+<span class="fc" id="L35">            Path directory = root.resolve(&quot;runs/run-&quot; + run);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            for (var source : SOURCES) {</span>
+<span class="fc" id="L37">                var snapshot = verifier.requireVerified(directory.resolve(source.name()));</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                if (!source.domain().equals(snapshot.manifest().domainId())) {</span>
+<span class="nc" id="L39">                    throw new IllegalArgumentException(&quot;Domain differs at retained release input &quot; + source.name());</span>
+                }
+<span class="fc" id="L41">                DomainGenericQualificationRunner.requireOriginal(directory.resolve(&quot;verification-receipts&quot;).resolve(source.name() + &quot;.json&quot;),</span>
+<span class="fc" id="L42">                    snapshot.verification().toCanonicalJson());</span>
+<span class="fc" id="L43">                var assessment = DomainSnapshotAssessment.assess(DomainExportWorkspace.fromVerified(snapshot));</span>
+<span class="fc" id="L44">                DomainGenericQualificationRunner.requireOriginal(directory.resolve(&quot;assessments&quot;).resolve(source.name() + &quot;.json&quot;),</span>
+<span class="fc" id="L45">                    assessment.toCanonicalJson());</span>
+<span class="fc" id="L46">                var checked = JSON.readTree(assessment.toCanonicalJson());</span>
+<span class="fc" id="L47">                var record = records.addObject().put(&quot;run&quot;, run).put(&quot;domainId&quot;, source.domain())</span>
+<span class="fc" id="L48">                    .put(&quot;assessmentHash&quot;, assessment.contentHash()).put(&quot;architectureRunHash&quot;, architectureHash);</span>
+<span class="fc" id="L49">                record.set(&quot;source&quot;, checked.required(&quot;source&quot;));</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                for (String gate : List.of(&quot;validation&quot;,&quot;proof&quot;,&quot;lifecycle&quot;,&quot;externalNovelty&quot;,&quot;promotion&quot;,&quot;publicEvidence&quot;,&quot;release&quot;)) {</span>
+<span class="fc" id="L51">                    record.put(gate, checked.required(gate).required(&quot;status&quot;).asText());</span>
+<span class="fc" id="L52">                }</span>
+<span class="fc" id="L53">                String previous = first.putIfAbsent(source.domain(), assessment.contentHash());</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">                identical &amp;= (previous == null || previous.equals(assessment.contentHash()))</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    &amp;&amp; &quot;REPRODUCIBLE_RESEARCH_RECORD&quot;.equals(record.required(&quot;release&quot;).asText());</span>
+<span class="fc" id="L56">            }</span>
+        }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        report.put(&quot;status&quot;,identical ? &quot;IDENTICAL_RESEARCH_RECORDS&quot; : &quot;BLOCKED&quot;)</span>
+<span class="fc" id="L59">            .put(&quot;publicMathematicalClaimAuthorized&quot;, false);</span>
+<span class="fc" id="L60">        report.put(&quot;contentHash&quot;,AutonomousResearchBriefV2.hash(JSON.writeValueAsString(report)));</span>
+<span class="fc" id="L61">        return JSON.writeValueAsString(report);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

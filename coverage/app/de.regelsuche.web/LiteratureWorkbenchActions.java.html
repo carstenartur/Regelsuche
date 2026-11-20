@@ -99,129 +99,138 @@ final class LiteratureWorkbenchActions {
 
     private Optional&lt;Subject&gt; retainedSubject(String runId, String candidateId) throws IOException {
 <span class="fc" id="L101">        var retained = RepresentationDiscoveryRunWorkspace.findRetained(runs, runId);</span>
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (retained.isEmpty()) return Optional.empty();</span>
-<span class="fc" id="L103">        var run = retained.get();</span>
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        var reference = run.artifacts().stream().filter(item -&gt; item.role() == CANDIDATE_DOSSIERS).findFirst().orElseThrow();</span>
-<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (reference.status() != AVAILABLE) return Optional.empty();</span>
-<span class="pc bpc" id="L106" title="2 of 3 branches missed.">        boolean matches = switch (reference.artifactSchema()) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (retained.isEmpty()) {</span>
+<span class="fc" id="L103">            var domainExports = new de.regelsuche.discovery.domain.DomainExportWorkspaceRepository(</span>
+<span class="fc" id="L104">                runs.resolveSibling(runs.getFileName() + &quot;-domain-exports&quot;));</span>
+<span class="fc" id="L105">            var source = domainExports.find(runId);</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">            if (source.isEmpty() || !source.get().replaySupported()</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                    || !candidateId.equals(source.get().evidence().selectedCandidateHash())) return Optional.empty();</span>
+            // Never disclose an imported candidate based solely on the exporter's certificate or hash.
+<span class="fc" id="L109">            var replayed = source.get().replay();</span>
+<span class="fc" id="L110">            return Optional.of(new Subject(runId, replayed.selectedCandidateHash(), replayed.contentHash()));</span>
+        }
+<span class="fc" id="L112">        var run = retained.get();</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        var reference = run.artifacts().stream().filter(item -&gt; item.role() == CANDIDATE_DOSSIERS).findFirst().orElseThrow();</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (reference.status() != AVAILABLE) return Optional.empty();</span>
+<span class="pc bpc" id="L115" title="2 of 3 branches missed.">        boolean matches = switch (reference.artifactSchema()) {</span>
             case TargetFreeSearchExecution.SCHEMA -&gt; {
-<span class="nc" id="L108">                var artifact = TargetFreeSearchArtifactStore.read(runs, run);</span>
-<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (artifact.isEmpty()) yield false;</span>
-<span class="nc" id="L110">                var states = JSON.readTree(artifact.get()).path(&quot;content&quot;).path(&quot;states&quot;);</span>
-<span class="nc" id="L111">                boolean found = false;</span>
-<span class="nc bnc" id="L112" title="All 2 branches missed.">                for (var state : states) {</span>
-<span class="nc bnc" id="L113" title="All 4 branches missed.">                    if (candidateId.equals(state.path(&quot;stateId&quot;).asText()) &amp;&amp; !state.path(&quot;generationSequences&quot;).isEmpty()) {</span>
-<span class="nc" id="L114">                        found = true;</span>
-<span class="nc" id="L115">                        break;</span>
+<span class="nc" id="L117">                var artifact = TargetFreeSearchArtifactStore.read(runs, run);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                if (artifact.isEmpty()) yield false;</span>
+<span class="nc" id="L119">                var states = JSON.readTree(artifact.get()).path(&quot;content&quot;).path(&quot;states&quot;);</span>
+<span class="nc" id="L120">                boolean found = false;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                for (var state : states) {</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">                    if (candidateId.equals(state.path(&quot;stateId&quot;).asText()) &amp;&amp; !state.path(&quot;generationSequences&quot;).isEmpty()) {</span>
+<span class="nc" id="L123">                        found = true;</span>
+<span class="nc" id="L124">                        break;</span>
                     }
-<span class="nc" id="L117">                }</span>
-<span class="nc" id="L118">                yield found;</span>
+<span class="nc" id="L126">                }</span>
+<span class="nc" id="L127">                yield found;</span>
             }
             case TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA -&gt; {
-<span class="fc" id="L121">                var artifact = RetainedCandidateDossierRepository.read(runs, run);</span>
-<span class="pc bpc" id="L122" title="1 of 4 branches missed.">                yield artifact.isPresent() &amp;&amp; candidateId.equals(JSON.readTree(artifact.get())</span>
-<span class="fc" id="L123">                    .path(&quot;content&quot;).path(&quot;discoveredBridge&quot;).path(&quot;stateHash&quot;).asText());</span>
+<span class="fc" id="L130">                var artifact = RetainedCandidateDossierRepository.read(runs, run);</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">                yield artifact.isPresent() &amp;&amp; candidateId.equals(JSON.readTree(artifact.get())</span>
+<span class="fc" id="L132">                    .path(&quot;content&quot;).path(&quot;discoveredBridge&quot;).path(&quot;stateHash&quot;).asText());</span>
             }
-<span class="nc" id="L125">            default -&gt; false;</span>
+<span class="nc" id="L134">            default -&gt; false;</span>
         };
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        return matches ? Optional.of(new Subject(runId, candidateId, reference.targetContentHash())) : Optional.empty();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        return matches ? Optional.of(new Subject(runId, candidateId, reference.targetContentHash())) : Optional.empty();</span>
     }
 
     private void read(HttpExchange exchange, Subject subject) throws IOException {
-<span class="fc" id="L131">        var response = JSON.createObjectNode().put(&quot;onlineEnabled&quot;, client.enabled())</span>
-<span class="fc" id="L132">            .put(&quot;endpoint&quot;, TheoremSearchClient.ENDPOINT.toString())</span>
-<span class="fc" id="L133">            .put(&quot;maxQueryChars&quot;, TheoremSearchClient.MAX_QUERY_CHARS)</span>
-<span class="fc" id="L134">            .put(&quot;resultLimit&quot;, TheoremSearchClient.RESULT_LIMIT);</span>
-<span class="fc" id="L135">        response.set(&quot;subject&quot;, JSON.valueToTree(subject));</span>
-<span class="fc" id="L136">        response.set(&quot;receipts&quot;, JSON.valueToTree(receipts.list(subject)));</span>
-<span class="fc" id="L137">        response.set(&quot;assessments&quot;, JSON.valueToTree(assessments.list(subject)));</span>
-<span class="fc" id="L138">        send(exchange, 200, response);</span>
-<span class="fc" id="L139">    }</span>
+<span class="fc" id="L140">        var response = JSON.createObjectNode().put(&quot;onlineEnabled&quot;, client.enabled())</span>
+<span class="fc" id="L141">            .put(&quot;endpoint&quot;, TheoremSearchClient.ENDPOINT.toString())</span>
+<span class="fc" id="L142">            .put(&quot;maxQueryChars&quot;, TheoremSearchClient.MAX_QUERY_CHARS)</span>
+<span class="fc" id="L143">            .put(&quot;resultLimit&quot;, TheoremSearchClient.RESULT_LIMIT);</span>
+<span class="fc" id="L144">        response.set(&quot;subject&quot;, JSON.valueToTree(subject));</span>
+<span class="fc" id="L145">        response.set(&quot;receipts&quot;, JSON.valueToTree(receipts.list(subject)));</span>
+<span class="fc" id="L146">        response.set(&quot;assessments&quot;, JSON.valueToTree(assessments.list(subject)));</span>
+<span class="fc" id="L147">        send(exchange, 200, response);</span>
+<span class="fc" id="L148">    }</span>
 
     private void lookup(HttpExchange exchange, Subject subject, Map&lt;String, Object&gt; body) throws IOException {
-<span class="nc bnc" id="L142" title="All 4 branches missed.">        if (!body.keySet().equals(Set.of(&quot;query&quot;, &quot;confirmed&quot;)) || !(body.get(&quot;query&quot;) instanceof String query)) {</span>
-<span class="nc" id="L143">            error(exchange, 400, &quot;INVALID_LITERATURE_QUERY&quot;);</span>
-<span class="nc" id="L144">            return;</span>
-        }
-<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (!Boolean.TRUE.equals(body.get(&quot;confirmed&quot;))) {</span>
-<span class="nc" id="L147">            error(exchange, 403, &quot;LITERATURE_CONFIRMATION_REQUIRED&quot;);</span>
-<span class="nc" id="L148">            return;</span>
-        }
-<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (!lookupInProgress.compareAndSet(false, true)) {</span>
-<span class="nc" id="L151">            exchange.getResponseHeaders().set(&quot;Retry-After&quot;, &quot;1&quot;);</span>
-<span class="nc" id="L152">            error(exchange, 429, &quot;LITERATURE_LOOKUP_IN_PROGRESS&quot;);</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        if (!body.keySet().equals(Set.of(&quot;query&quot;, &quot;confirmed&quot;)) || !(body.get(&quot;query&quot;) instanceof String query)) {</span>
+<span class="nc" id="L152">            error(exchange, 400, &quot;INVALID_LITERATURE_QUERY&quot;);</span>
 <span class="nc" id="L153">            return;</span>
         }
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (!Boolean.TRUE.equals(body.get(&quot;confirmed&quot;))) {</span>
+<span class="nc" id="L156">            error(exchange, 403, &quot;LITERATURE_CONFIRMATION_REQUIRED&quot;);</span>
+<span class="nc" id="L157">            return;</span>
+        }
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (!lookupInProgress.compareAndSet(false, true)) {</span>
+<span class="nc" id="L160">            exchange.getResponseHeaders().set(&quot;Retry-After&quot;, &quot;1&quot;);</span>
+<span class="nc" id="L161">            error(exchange, 429, &quot;LITERATURE_LOOKUP_IN_PROGRESS&quot;);</span>
+<span class="nc" id="L162">            return;</span>
+        }
         try {
-<span class="nc" id="L156">            var pending = receipts.begin(subject, query);</span>
-<span class="nc" id="L157">            Thread.startVirtualThread(() -&gt; finishLookup(exchange, pending));</span>
-<span class="nc" id="L158">        } catch (IOException | RuntimeException exception) {</span>
-<span class="nc" id="L159">            lookupInProgress.set(false);</span>
-<span class="nc" id="L160">            throw exception;</span>
-<span class="nc" id="L161">        }</span>
-<span class="nc" id="L162">    }</span>
+<span class="nc" id="L165">            var pending = receipts.begin(subject, query);</span>
+<span class="nc" id="L166">            Thread.startVirtualThread(() -&gt; finishLookup(exchange, pending));</span>
+<span class="nc" id="L167">        } catch (IOException | RuntimeException exception) {</span>
+<span class="nc" id="L168">            lookupInProgress.set(false);</span>
+<span class="nc" id="L169">            throw exception;</span>
+<span class="nc" id="L170">        }</span>
+<span class="nc" id="L171">    }</span>
 
     private void finishLookup(HttpExchange exchange, LiteratureReviewRepository.Receipt pending) {
         try {
-<span class="nc" id="L166">            var result = client.search(pending.query(), true);</span>
-<span class="nc" id="L167">            var receipt = receipts.complete(pending, result);</span>
-<span class="nc bnc" id="L168" title="All 3 branches missed.">            int status = switch (result.status()) {</span>
-<span class="nc" id="L169">                case SUCCESS -&gt; 201;</span>
-<span class="nc" id="L170">                case RATE_LIMITED -&gt; 429;</span>
-<span class="nc" id="L171">                default -&gt; 502;</span>
+<span class="nc" id="L175">            var result = client.search(pending.query(), true);</span>
+<span class="nc" id="L176">            var receipt = receipts.complete(pending, result);</span>
+<span class="nc bnc" id="L177" title="All 3 branches missed.">            int status = switch (result.status()) {</span>
+<span class="nc" id="L178">                case SUCCESS -&gt; 201;</span>
+<span class="nc" id="L179">                case RATE_LIMITED -&gt; 429;</span>
+<span class="nc" id="L180">                default -&gt; 502;</span>
             };
-<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (status == 429) exchange.getResponseHeaders().set(&quot;Retry-After&quot;, Long.toString(result.retryAfterSeconds()));</span>
-<span class="nc" id="L174">            send(exchange, status, JSON.valueToTree(receipt));</span>
-<span class="nc" id="L175">        } catch (IOException | RuntimeException exception) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (status == 429) exchange.getResponseHeaders().set(&quot;Retry-After&quot;, Long.toString(result.retryAfterSeconds()));</span>
+<span class="nc" id="L183">            send(exchange, status, JSON.valueToTree(receipt));</span>
+<span class="nc" id="L184">        } catch (IOException | RuntimeException exception) {</span>
             try {
-<span class="nc" id="L177">                error(exchange, 500, &quot;PRIVATE_LITERATURE_LOOKUP_UNAVAILABLE&quot;);</span>
-<span class="nc" id="L178">            } catch (IOException ignored) {</span>
-<span class="nc" id="L179">                exchange.close();</span>
-<span class="nc" id="L180">            }</span>
+<span class="nc" id="L186">                error(exchange, 500, &quot;PRIVATE_LITERATURE_LOOKUP_UNAVAILABLE&quot;);</span>
+<span class="nc" id="L187">            } catch (IOException ignored) {</span>
+<span class="nc" id="L188">                exchange.close();</span>
+<span class="nc" id="L189">            }</span>
         } finally {
-<span class="nc" id="L182">            lookupInProgress.set(false);</span>
+<span class="nc" id="L191">            lookupInProgress.set(false);</span>
         }
-<span class="nc" id="L184">    }</span>
+<span class="nc" id="L193">    }</span>
 
     private boolean sameOriginAction(HttpExchange exchange) {
-<span class="fc" id="L187">        var headers = exchange.getRequestHeaders();</span>
-<span class="fc" id="L188">        String fetchSite = headers.getFirst(&quot;Sec-Fetch-Site&quot;);</span>
-<span class="fc" id="L189">        String authority = headers.getFirst(&quot;Host&quot;);</span>
-<span class="pc bpc" id="L190" title="2 of 6 branches missed.">        if (authority == null || !&quot;workbench&quot;.equals(headers.getFirst(CONSENT_HEADER))</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">                || (fetchSite != null &amp;&amp; !&quot;same-origin&quot;.equals(fetchSite))) return false;</span>
+<span class="fc" id="L196">        var headers = exchange.getRequestHeaders();</span>
+<span class="fc" id="L197">        String fetchSite = headers.getFirst(&quot;Sec-Fetch-Site&quot;);</span>
+<span class="fc" id="L198">        String authority = headers.getFirst(&quot;Host&quot;);</span>
+<span class="pc bpc" id="L199" title="2 of 6 branches missed.">        if (authority == null || !&quot;workbench&quot;.equals(headers.getFirst(CONSENT_HEADER))</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                || (fetchSite != null &amp;&amp; !&quot;same-origin&quot;.equals(fetchSite))) return false;</span>
         try {
-<span class="fc" id="L193">            var host = URI.create(&quot;http://&quot; + authority);</span>
-<span class="pc bpc" id="L194" title="4 of 8 branches missed.">            if (host.getHost() == null || !authority.equals(host.getRawAuthority()) || host.getRawUserInfo() != null</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">                    || (requireLoopbackAuthority &amp;&amp; !LOCAL_HOSTS.contains(host.getHost().toLowerCase(Locale.ROOT)))) {</span>
-<span class="fc" id="L196">                return false;</span>
+<span class="fc" id="L202">            var host = URI.create(&quot;http://&quot; + authority);</span>
+<span class="pc bpc" id="L203" title="4 of 8 branches missed.">            if (host.getHost() == null || !authority.equals(host.getRawAuthority()) || host.getRawUserInfo() != null</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                    || (requireLoopbackAuthority &amp;&amp; !LOCAL_HOSTS.contains(host.getHost().toLowerCase(Locale.ROOT)))) {</span>
+<span class="fc" id="L205">                return false;</span>
             }
-<span class="fc" id="L198">            String origin = headers.getFirst(&quot;Origin&quot;);</span>
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (origin == null) return true;</span>
-<span class="nc" id="L200">            var uri = URI.create(origin);</span>
-<span class="nc bnc" id="L201" title="All 4 branches missed.">            return (&quot;http&quot;.equals(uri.getScheme()) || &quot;https&quot;.equals(uri.getScheme()))</span>
-<span class="nc bnc" id="L202" title="All 2 branches missed.">                &amp;&amp; authority.equalsIgnoreCase(uri.getRawAuthority());</span>
-<span class="nc" id="L203">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L204">            return false;</span>
+<span class="fc" id="L207">            String origin = headers.getFirst(&quot;Origin&quot;);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (origin == null) return true;</span>
+<span class="nc" id="L209">            var uri = URI.create(origin);</span>
+<span class="nc bnc" id="L210" title="All 4 branches missed.">            return (&quot;http&quot;.equals(uri.getScheme()) || &quot;https&quot;.equals(uri.getScheme()))</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                &amp;&amp; authority.equalsIgnoreCase(uri.getRawAuthority());</span>
+<span class="nc" id="L212">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L213">            return false;</span>
         }
     }
 
     private static void requireJson(HttpExchange exchange) {
-<span class="fc" id="L209">        String type = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
-<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (type == null || !&quot;application/json&quot;.equals(type.split(&quot;;&quot;, 2)[0].strip().toLowerCase(Locale.ROOT))) {</span>
-<span class="nc" id="L211">            throw new IllegalArgumentException(&quot;expected JSON&quot;);</span>
+<span class="fc" id="L218">        String type = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        if (type == null || !&quot;application/json&quot;.equals(type.split(&quot;;&quot;, 2)[0].strip().toLowerCase(Locale.ROOT))) {</span>
+<span class="nc" id="L220">            throw new IllegalArgumentException(&quot;expected JSON&quot;);</span>
         }
-<span class="fc" id="L213">    }</span>
+<span class="fc" id="L222">    }</span>
 
     private static void error(HttpExchange exchange, int status, String code) throws IOException {
-<span class="fc" id="L216">        send(exchange, status, JSON.createObjectNode().put(&quot;error&quot;, true).put(&quot;code&quot;, code).put(&quot;message&quot;, code));</span>
-<span class="fc" id="L217">    }</span>
+<span class="fc" id="L225">        send(exchange, status, JSON.createObjectNode().put(&quot;error&quot;, true).put(&quot;code&quot;, code).put(&quot;message&quot;, code));</span>
+<span class="fc" id="L226">    }</span>
 
     private static void send(HttpExchange exchange, int status, JsonNode body) throws IOException {
-<span class="fc" id="L220">        byte[] bytes = JSON.writeValueAsBytes(body);</span>
-<span class="fc" id="L221">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
-<span class="fc" id="L222">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
-<span class="fc" id="L223">        exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L224">        try (var output = exchange.getResponseBody()) { output.write(bytes); }</span>
-<span class="fc" id="L225">    }</span>
+<span class="fc" id="L229">        byte[] bytes = JSON.writeValueAsBytes(body);</span>
+<span class="fc" id="L230">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L231">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
+<span class="fc" id="L232">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L233">        try (var output = exchange.getResponseBody()) { output.write(bytes); }</span>
+<span class="fc" id="L234">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

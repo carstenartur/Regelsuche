@@ -94,100 +94,102 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
     @Override
     public SolverExecution execute(Obligation obligation) {
 <span class="fc" id="L96">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
-<span class="fc" id="L97">        Map&lt;String, String&gt; terms = Map.of(</span>
-<span class="fc" id="L98">            &quot;goal.left&quot;, expressions.render(obligation.goal().left()),</span>
-<span class="fc" id="L99">            &quot;goal.right&quot;, expressions.render(obligation.goal().right()));</span>
-<span class="fc" id="L100">        List&lt;String&gt; issues = issues(obligation);</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!issues.isEmpty()) {</span>
-<span class="fc" id="L102">            return rejected(obligation, terms, issues);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (!SolverIr.OBLIGATION_SCHEMA.equals(obligation.schema()))</span>
+<span class="nc" id="L98">            return rejected(obligation, Map.of(), List.of(&quot;UNSUPPORTED_SCHEMA:&quot; + obligation.schema()));</span>
+<span class="fc" id="L99">        Map&lt;String, String&gt; terms = Map.of(</span>
+<span class="fc" id="L100">            &quot;goal.left&quot;, expressions.render(obligation.goal().left()),</span>
+<span class="fc" id="L101">            &quot;goal.right&quot;, expressions.render(obligation.goal().right()));</span>
+<span class="fc" id="L102">        List&lt;String&gt; issues = issues(obligation);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!issues.isEmpty()) {</span>
+<span class="fc" id="L104">            return rejected(obligation, terms, issues);</span>
         }
 
-<span class="fc" id="L105">        SolverTranslation translation = SolverTranslation.create(</span>
+<span class="fc" id="L107">        SolverTranslation translation = SolverTranslation.create(</span>
             obligation, descriptor, TranslationStatus.LOSSLESS,
-<span class="fc" id="L107">            List.of(), terms);</span>
-<span class="fc" id="L108">        ExternalCommand.Output output = ExternalCommand.run(</span>
-<span class="fc" id="L109">            List.of(python, &quot;-c&quot;, SCRIPT,</span>
-<span class="fc" id="L110">                terms.get(&quot;goal.left&quot;), terms.get(&quot;goal.right&quot;)),</span>
+<span class="fc" id="L109">            List.of(), terms);</span>
+<span class="fc" id="L110">        ExternalCommand.Output output = ExternalCommand.run(</span>
+<span class="fc" id="L111">            List.of(python, &quot;-c&quot;, SCRIPT,</span>
+<span class="fc" id="L112">                terms.get(&quot;goal.left&quot;), terms.get(&quot;goal.right&quot;)),</span>
             timeout);
-<span class="fc" id="L112">        SolverResult result = interpret(obligation, output);</span>
-<span class="fc" id="L113">        return SolverExecution.create(obligation, translation, result);</span>
+<span class="fc" id="L114">        SolverResult result = interpret(obligation, output);</span>
+<span class="fc" id="L115">        return SolverExecution.create(obligation, translation, result);</span>
     }
 
     private SolverResult interpret(
         Obligation obligation,
         ExternalCommand.Output output
     ) {
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (!output.available()) {</span>
-<span class="fc" id="L121">            return result(obligation, ResultStatus.ERROR,</span>
-<span class="fc" id="L122">                &quot;SymPy process unavailable: &quot; + normalize(output.stderr()),</span>
-<span class="fc" id="L123">                &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_UNAVAILABLE&quot;));</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!output.available()) {</span>
+<span class="fc" id="L123">            return result(obligation, ResultStatus.ERROR,</span>
+<span class="fc" id="L124">                &quot;SymPy process unavailable: &quot; + normalize(output.stderr()),</span>
+<span class="fc" id="L125">                &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_UNAVAILABLE&quot;));</span>
         }
-<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (output.timedOut()) {</span>
-<span class="nc" id="L126">            return result(obligation, ResultStatus.TIMEOUT,</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (output.timedOut()) {</span>
+<span class="nc" id="L128">            return result(obligation, ResultStatus.TIMEOUT,</span>
                 &quot;SymPy equality validation timed out&quot;,
-<span class="nc" id="L128">                &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_TIMEOUT&quot;));</span>
+<span class="nc" id="L130">                &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_TIMEOUT&quot;));</span>
         }
-<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (output.exitCode() != 0) {</span>
-<span class="nc" id="L131">            return result(obligation, ResultStatus.ERROR,</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (output.exitCode() != 0) {</span>
+<span class="nc" id="L133">            return result(obligation, ResultStatus.ERROR,</span>
                 &quot;SymPy equality validation failed: &quot;
-<span class="nc" id="L133">                    + normalize(output.stdout() + &quot; &quot; + output.stderr()),</span>
-<span class="nc" id="L134">                &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_FAILED&quot;));</span>
+<span class="nc" id="L135">                    + normalize(output.stdout() + &quot; &quot; + output.stderr()),</span>
+<span class="nc" id="L136">                &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_FAILED&quot;));</span>
         }
 
-<span class="nc" id="L137">        List&lt;String&gt; lines = output.stdout().lines()</span>
-<span class="nc" id="L138">            .map(String::trim)</span>
-<span class="nc bnc" id="L139" title="All 2 branches missed.">            .filter(line -&gt; !line.isBlank())</span>
-<span class="nc" id="L140">            .toList();</span>
-<span class="nc bnc" id="L141" title="All 2 branches missed.">        String verdict = lines.isEmpty()</span>
-<span class="nc" id="L142">            ? &quot;&quot;</span>
-<span class="nc" id="L143">            : lines.getFirst().toUpperCase(Locale.ROOT);</span>
-<span class="nc bnc" id="L144" title="All 2 branches missed.">        String normalForm = lines.size() &lt;= 1</span>
-<span class="nc" id="L145">            ? &quot;&quot;</span>
-<span class="nc" id="L146">            : String.join(&quot;\n&quot;, lines.subList(1, lines.size()));</span>
-<span class="nc bnc" id="L147" title="All 4 branches missed.">        return switch (verdict) {</span>
-<span class="nc" id="L148">            case &quot;CONFIRMED&quot; -&gt; result(obligation, ResultStatus.CONFIRMED,</span>
+<span class="nc" id="L139">        List&lt;String&gt; lines = output.stdout().lines()</span>
+<span class="nc" id="L140">            .map(String::trim)</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            .filter(line -&gt; !line.isBlank())</span>
+<span class="nc" id="L142">            .toList();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        String verdict = lines.isEmpty()</span>
+<span class="nc" id="L144">            ? &quot;&quot;</span>
+<span class="nc" id="L145">            : lines.getFirst().toUpperCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        String normalForm = lines.size() &lt;= 1</span>
+<span class="nc" id="L147">            ? &quot;&quot;</span>
+<span class="nc" id="L148">            : String.join(&quot;\n&quot;, lines.subList(1, lines.size()));</span>
+<span class="nc bnc" id="L149" title="All 4 branches missed.">        return switch (verdict) {</span>
+<span class="nc" id="L150">            case &quot;CONFIRMED&quot; -&gt; result(obligation, ResultStatus.CONFIRMED,</span>
                 &quot;SymPy reduced the polynomial difference to zero&quot;,
-<span class="nc" id="L150">                certificate(verdict, normalForm),</span>
-<span class="nc" id="L151">                List.of(&quot;EXTERNAL_SYMPY&quot;,</span>
+<span class="nc" id="L152">                certificate(verdict, normalForm),</span>
+<span class="nc" id="L153">                List.of(&quot;EXTERNAL_SYMPY&quot;,</span>
                     &quot;POLYNOMIAL_DIFFERENCE_NORMAL_FORM&quot;));
-<span class="nc" id="L153">            case &quot;REFUTED&quot; -&gt; result(obligation, ResultStatus.REFUTED,</span>
+<span class="nc" id="L155">            case &quot;REFUTED&quot; -&gt; result(obligation, ResultStatus.REFUTED,</span>
                 &quot;SymPy produced a non-zero polynomial difference normal form&quot;,
-<span class="nc" id="L155">                certificate(verdict, normalForm),</span>
-<span class="nc" id="L156">                List.of(&quot;EXTERNAL_SYMPY&quot;,</span>
+<span class="nc" id="L157">                certificate(verdict, normalForm),</span>
+<span class="nc" id="L158">                List.of(&quot;EXTERNAL_SYMPY&quot;,</span>
                     &quot;POLYNOMIAL_DIFFERENCE_NORMAL_FORM&quot;));
-<span class="nc" id="L158">            case &quot;UNKNOWN&quot; -&gt; result(obligation, ResultStatus.UNKNOWN,</span>
+<span class="nc" id="L160">            case &quot;UNKNOWN&quot; -&gt; result(obligation, ResultStatus.UNKNOWN,</span>
                 &quot;SymPy could not decide the polynomial difference&quot;,
-<span class="nc" id="L160">                &quot;&quot;, List.of(&quot;EXTERNAL_SYMPY&quot;));</span>
-<span class="nc" id="L161">            default -&gt; result(obligation, ResultStatus.ERROR,</span>
-<span class="nc" id="L162">                &quot;Unrecognized SymPy output: &quot; + normalize(output.stdout()),</span>
-<span class="nc" id="L163">                &quot;&quot;, List.of(&quot;EXTERNAL_SYMPY&quot;, &quot;UNRECOGNIZED_OUTPUT&quot;));</span>
+<span class="nc" id="L162">                &quot;&quot;, List.of(&quot;EXTERNAL_SYMPY&quot;));</span>
+<span class="nc" id="L163">            default -&gt; result(obligation, ResultStatus.ERROR,</span>
+<span class="nc" id="L164">                &quot;Unrecognized SymPy output: &quot; + normalize(output.stdout()),</span>
+<span class="nc" id="L165">                &quot;&quot;, List.of(&quot;EXTERNAL_SYMPY&quot;, &quot;UNRECOGNIZED_OUTPUT&quot;));</span>
         };
     }
 
     private List&lt;String&gt; issues(Obligation obligation) {
-<span class="fc" id="L168">        List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L169">        if (!obligation.theories().stream()</span>
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                .allMatch(descriptor.supportedTheories()::contains)) {</span>
-<span class="nc" id="L171">            issues.add(&quot;UNSUPPORTED_THEORY&quot;);</span>
+<span class="fc" id="L170">        List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L171">        if (!obligation.theories().stream()</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                .allMatch(descriptor.supportedTheories()::contains)) {</span>
+<span class="nc" id="L173">            issues.add(&quot;UNSUPPORTED_THEORY&quot;);</span>
         }
-<span class="fc" id="L173">        if (!descriptor.supportedRelations()</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                .contains(obligation.goal().relation())) {</span>
-<span class="nc" id="L175">            issues.add(&quot;UNSUPPORTED_RELATION:&quot;</span>
-<span class="nc" id="L176">                + obligation.goal().relation().name());</span>
+<span class="fc" id="L175">        if (!descriptor.supportedRelations()</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                .contains(obligation.goal().relation())) {</span>
+<span class="nc" id="L177">            issues.add(&quot;UNSUPPORTED_RELATION:&quot;</span>
+<span class="nc" id="L178">                + obligation.goal().relation().name());</span>
         }
-<span class="fc" id="L178">        if (!descriptor.supportedEvidence()</span>
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                .contains(obligation.requestedEvidence())) {</span>
-<span class="nc" id="L180">            issues.add(&quot;UNSUPPORTED_EVIDENCE:&quot;</span>
-<span class="nc" id="L181">                + obligation.requestedEvidence().name());</span>
+<span class="fc" id="L180">        if (!descriptor.supportedEvidence()</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                .contains(obligation.requestedEvidence())) {</span>
+<span class="nc" id="L182">            issues.add(&quot;UNSUPPORTED_EVIDENCE:&quot;</span>
+<span class="nc" id="L183">                + obligation.requestedEvidence().name());</span>
         }
-<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (!obligation.assumptions().isEmpty()) {</span>
-<span class="fc" id="L184">            issues.add(&quot;ASSUMPTIONS_NOT_SUPPORTED&quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (!obligation.assumptions().isEmpty()) {</span>
+<span class="fc" id="L186">            issues.add(&quot;ASSUMPTIONS_NOT_SUPPORTED&quot;);</span>
         }
-<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (!polynomial(obligation.goal().left())</span>
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                || !polynomial(obligation.goal().right())) {</span>
-<span class="fc" id="L188">            issues.add(&quot;UNSUPPORTED_EXPRESSION_FRAGMENT:POLYNOMIAL_ONLY&quot;);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (!polynomial(obligation.goal().left())</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                || !polynomial(obligation.goal().right())) {</span>
+<span class="fc" id="L190">            issues.add(&quot;UNSUPPORTED_EXPRESSION_FRAGMENT:POLYNOMIAL_ONLY&quot;);</span>
         }
-<span class="fc" id="L190">        return issues.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L192">        return issues.stream().distinct().sorted().toList();</span>
     }
 
     private SolverExecution rejected(
@@ -195,14 +197,14 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
         Map&lt;String, String&gt; terms,
         List&lt;String&gt; issues
     ) {
-<span class="fc" id="L198">        SolverTranslation translation = SolverTranslation.create(</span>
+<span class="fc" id="L200">        SolverTranslation translation = SolverTranslation.create(</span>
             obligation, descriptor, TranslationStatus.REJECTED, issues, terms);
-<span class="fc" id="L200">        SolverResult result = SolverResult.create(</span>
+<span class="fc" id="L202">        SolverResult result = SolverResult.create(</span>
             obligation, descriptor, ResultStatus.UNSUPPORTED,
-<span class="fc" id="L202">            TranslationStatus.REJECTED, List.of(), issues,</span>
+<span class="fc" id="L204">            TranslationStatus.REJECTED, List.of(), issues,</span>
             &quot;SymPy baseline rejected the obligation before execution&quot;,
-<span class="fc" id="L204">            Map.of(), &quot;&quot;);</span>
-<span class="fc" id="L205">        return SolverExecution.create(obligation, translation, result);</span>
+<span class="fc" id="L206">            Map.of(), &quot;&quot;);</span>
+<span class="fc" id="L207">        return SolverExecution.create(obligation, translation, result);</span>
     }
 
     private SolverResult result(
@@ -212,78 +214,78 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
         String certificateHash,
         List&lt;String&gt; capabilities
     ) {
-<span class="fc" id="L215">        return SolverResult.create(</span>
+<span class="fc" id="L217">        return SolverResult.create(</span>
             obligation, descriptor, status, TranslationStatus.LOSSLESS,
-<span class="fc" id="L217">            capabilities, List.of(), message, Map.of(), certificateHash);</span>
+<span class="fc" id="L219">            capabilities, List.of(), message, Map.of(), certificateHash);</span>
     }
 
     private String certificate(String verdict, String normalForm) {
-<span class="nc" id="L221">        return SolverIr.sha256(</span>
-<span class="nc" id="L222">            &quot;backend=&quot; + descriptor.backendId() + '@'</span>
-<span class="nc" id="L223">                + descriptor.backendVersion()</span>
+<span class="nc" id="L223">        return SolverIr.sha256(</span>
+<span class="nc" id="L224">            &quot;backend=&quot; + descriptor.backendId() + '@'</span>
+<span class="nc" id="L225">                + descriptor.backendVersion()</span>
                 + &quot;\nconfiguration=&quot; + configurationHash
                 + &quot;\nverdict=&quot; + verdict
                 + &quot;\nnormalForm=&quot; + normalForm);
     }
 
     private static boolean polynomial(Expression expression) {
-<span class="fc bfc" id="L230" title="All 4 branches covered.">        if (expression instanceof Literal || expression instanceof Symbol) {</span>
-<span class="fc" id="L231">            return true;</span>
+<span class="fc bfc" id="L232" title="All 4 branches covered.">        if (expression instanceof Literal || expression instanceof Symbol) {</span>
+<span class="fc" id="L233">            return true;</span>
         }
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (expression instanceof Call) {</span>
-<span class="nc" id="L234">            return false;</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (expression instanceof Call) {</span>
+<span class="nc" id="L236">            return false;</span>
         }
-<span class="fc" id="L236">        Binary binary = (Binary) expression;</span>
-<span class="pc bpc" id="L237" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L238">        Binary binary = (Binary) expression;</span>
+<span class="pc bpc" id="L239" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
             case ADD, SUBTRACT, MULTIPLY -&gt;
-<span class="pc bpc" id="L239" title="2 of 4 branches missed.">                polynomial(binary.left()) &amp;&amp; polynomial(binary.right());</span>
-<span class="fc" id="L240">            case DIVIDE -&gt; false;</span>
-<span class="nc bnc" id="L241" title="All 2 branches missed.">            case POWER -&gt; polynomial(binary.left())</span>
-<span class="nc bnc" id="L242" title="All 2 branches missed.">                &amp;&amp; nonNegativeInteger(binary.right());</span>
+<span class="pc bpc" id="L241" title="2 of 4 branches missed.">                polynomial(binary.left()) &amp;&amp; polynomial(binary.right());</span>
+<span class="fc" id="L242">            case DIVIDE -&gt; false;</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            case POWER -&gt; polynomial(binary.left())</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                &amp;&amp; nonNegativeInteger(binary.right());</span>
         };
     }
 
     private static boolean nonNegativeInteger(Expression expression) {
-<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
-<span class="nc" id="L248">            return false;</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
+<span class="nc" id="L250">            return false;</span>
         }
         try {
-<span class="nc" id="L251">            BigDecimal value =</span>
-<span class="nc" id="L252">                new BigDecimal(literal.value()).stripTrailingZeros();</span>
-<span class="nc bnc" id="L253" title="All 4 branches missed.">            return value.signum() &gt;= 0 &amp;&amp; value.scale() &lt;= 0;</span>
-<span class="nc" id="L254">        } catch (NumberFormatException exception) {</span>
-<span class="nc" id="L255">            return false;</span>
+<span class="nc" id="L253">            BigDecimal value =</span>
+<span class="nc" id="L254">                new BigDecimal(literal.value()).stripTrailingZeros();</span>
+<span class="nc bnc" id="L255" title="All 4 branches missed.">            return value.signum() &gt;= 0 &amp;&amp; value.scale() &lt;= 0;</span>
+<span class="nc" id="L256">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L257">            return false;</span>
         }
     }
 
     public static Detection detectSystemSymPy() {
-<span class="nc" id="L260">        String python = System.getenv().getOrDefault(</span>
+<span class="nc" id="L262">        String python = System.getenv().getOrDefault(</span>
             &quot;REGELSUCHE_SYMPY_PYTHON&quot;, &quot;python3&quot;);
-<span class="nc" id="L262">        ExternalCommand.Output output = ExternalCommand.run(</span>
-<span class="nc" id="L263">            List.of(python, &quot;-c&quot;,</span>
+<span class="nc" id="L264">        ExternalCommand.Output output = ExternalCommand.run(</span>
+<span class="nc" id="L265">            List.of(python, &quot;-c&quot;,</span>
                 &quot;import sympy; print(sympy.__version__)&quot;),
-<span class="nc" id="L265">            Duration.ofSeconds(5));</span>
-<span class="nc bnc" id="L266" title="All 4 branches missed.">        if (!output.available() || output.timedOut()</span>
-<span class="nc bnc" id="L267" title="All 2 branches missed.">                || output.exitCode() != 0) {</span>
-<span class="nc" id="L268">            return new Detection(</span>
+<span class="nc" id="L267">            Duration.ofSeconds(5));</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">        if (!output.available() || output.timedOut()</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                || output.exitCode() != 0) {</span>
+<span class="nc" id="L270">            return new Detection(</span>
                 new ExternalSymPySolverBackend(
-<span class="nc" id="L270">                    &quot;unavailable&quot;, python, Duration.ofSeconds(20)),</span>
+<span class="nc" id="L272">                    &quot;unavailable&quot;, python, Duration.ofSeconds(20)),</span>
                 false,
-<span class="nc" id="L272">                normalize(output.stdout() + &quot; &quot; + output.stderr()));</span>
+<span class="nc" id="L274">                normalize(output.stdout() + &quot; &quot; + output.stderr()));</span>
         }
-<span class="nc" id="L274">        String version = normalize(output.stdout());</span>
-<span class="nc" id="L275">        return new Detection(</span>
+<span class="nc" id="L276">        String version = normalize(output.stdout());</span>
+<span class="nc" id="L277">        return new Detection(</span>
             new ExternalSymPySolverBackend(
-<span class="nc bnc" id="L277" title="All 2 branches missed.">                version.isBlank() ? &quot;system&quot; : version,</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                version.isBlank() ? &quot;system&quot; : version,</span>
                 python,
-<span class="nc" id="L279">                Duration.ofSeconds(20)),</span>
+<span class="nc" id="L281">                Duration.ofSeconds(20)),</span>
             true,
             version);
     }
 
     private static String normalize(String value) {
-<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        return value == null ? &quot;&quot;</span>
-<span class="fc" id="L286">            : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        return value == null ? &quot;&quot;</span>
+<span class="fc" id="L288">            : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     public record Detection(
@@ -291,10 +293,10 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
         boolean available,
         String detail
     ) {
-<span class="nc" id="L294">        public Detection {</span>
-<span class="nc" id="L295">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
-<span class="nc bnc" id="L296" title="All 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="nc" id="L297">        }</span>
+<span class="nc" id="L296">        public Detection {</span>
+<span class="nc" id="L297">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="nc" id="L299">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

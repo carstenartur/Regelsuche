@@ -63,7 +63,7 @@ final class DomainSequenceAffineModel {
 <span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (order &lt; 1 || order &gt; 3) throw new UnsupportedModel(&quot;MODEL_DIMENSION_EXCEEDS_THREE&quot;);</span>
 <span class="fc" id="L64">    }</span>
 
-    /** Caller must first obtain the candidate from exact replay and independently check its finite witness. */
+    /** Projects a replayed candidate. Projection alone grants no evidence about agreement with retained terms. */
     static DomainSequenceAffineModel from(Object candidate) {
 <span class="fc" id="L68">        requireSupported(candidate);</span>
 <span class="fc bfc" id="L69" title="All 2 branches covered.">        if (candidate instanceof FiniteDifferenceCandidate value) {</span>

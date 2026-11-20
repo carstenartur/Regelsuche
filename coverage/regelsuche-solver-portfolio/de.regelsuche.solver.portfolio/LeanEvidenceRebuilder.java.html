@@ -35,77 +35,89 @@ public final class LeanEvidenceRebuilder {
 <span class="fc" id="L35">        require(obligation.equals(read(retained, &quot;obligation.json&quot;)), &quot;retained obligation differs&quot;);</span>
 <span class="fc" id="L36">        String originalAuditText = read(retained, &quot;audit.json&quot;);</span>
 <span class="fc" id="L37">        var originalAudit = LeanSolverBackend.checkedAuditDocument(originalAuditText, expected.contentHash(), null);</span>
-<span class="fc" id="L38">        String source = new LeanSourceRenderer().source(expected, originalAudit.nonce());</span>
-<span class="fc" id="L39">        require(source.equals(read(retained, &quot;proof.lean&quot;)), &quot;retained source differs from the generated theorem&quot;);</span>
-<span class="fc" id="L40">        require(originalAuditText.equals(LeanSolverBackend.checkedAudit(read(retained, &quot;proof.stdout&quot;),</span>
-<span class="fc" id="L41">            expected.contentHash(), originalAudit.nonce())), &quot;retained audit differs from Lean output&quot;);</span>
+<span class="fc" id="L38">        var plan = LeanLemmaPlan.retained(retained);</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">        require(plan == null || originalAudit.scoped(), &quot;lemma plan requires a scoped audit&quot;);</span>
+<span class="fc" id="L40">        String source = new LeanSourceRenderer().source(expected, originalAudit.nonce(), plan);</span>
+<span class="fc" id="L41">        require(source.equals(read(retained, &quot;proof.lean&quot;)), &quot;retained source differs from the generated theorem&quot;);</span>
+<span class="fc" id="L42">        require(originalAuditText.equals(LeanSolverBackend.checkedProcessAudit(read(retained, &quot;proof.stdout&quot;),</span>
+<span class="fc" id="L43">            expected, originalAudit.nonce()).text()), &quot;retained audit differs from Lean output&quot;);</span>
 
-<span class="fc" id="L43">        String version = read(retained, &quot;version.stdout&quot;).strip();</span>
-<span class="fc" id="L44">        require(version.startsWith(&quot;Lean (version &quot;), &quot;retained Lean version is missing&quot;);</span>
-<span class="fc" id="L45">        String retainedCertificate = read(retained, &quot;certificate.txt&quot;);</span>
-<span class="fc" id="L46">        require(SolverIr.sha256(retainedCertificate).equals(originalCertificateHash), &quot;original Lean certificate differs&quot;);</span>
-<span class="fc" id="L47">        var lines = retainedCertificate.lines().toList();</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        require(lines.size() &gt;= 9, &quot;Lean certificate has no certified rebuild environment&quot;);</span>
-<span class="fc" id="L49">        String configurationHash = hashField(lines.get(4), &quot;configuration=&quot;);</span>
-<span class="fc" id="L50">        String originalProjectHash = hashField(lines.get(lines.size() - 3), &quot;project=&quot;);</span>
-<span class="fc" id="L51">        String toolchainPin = read(retained, TOOLCHAIN);</span>
-<span class="fc" id="L52">        String dependencyPin = read(retained, MANIFEST);</span>
-<span class="fc" id="L53">        var originalEnvironment = new LeanSolverBackend.PinnedEnvironment(originalProjectHash,</span>
-<span class="fc" id="L54">            SolverIr.sha256(toolchainPin), SolverIr.sha256(dependencyPin));</span>
-<span class="fc" id="L55">        require(Files.isRegularFile(retained.resolve(&quot;proof.olean&quot;), LinkOption.NOFOLLOW_LINKS),</span>
+<span class="fc" id="L45">        String version = read(retained, &quot;version.stdout&quot;).strip();</span>
+<span class="fc" id="L46">        require(version.startsWith(&quot;Lean (version &quot;), &quot;retained Lean version is missing&quot;);</span>
+<span class="fc" id="L47">        String retainedCertificate = read(retained, &quot;certificate.txt&quot;);</span>
+<span class="fc" id="L48">        require(SolverIr.sha256(retainedCertificate).equals(originalCertificateHash), &quot;original Lean certificate differs&quot;);</span>
+<span class="fc" id="L49">        var lines = retainedCertificate.lines().toList();</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        require(lines.size() &gt;= 9, &quot;Lean certificate has no certified rebuild environment&quot;);</span>
+<span class="fc" id="L51">        String configurationHash = hashField(lines.get(4), &quot;configuration=&quot;);</span>
+<span class="fc" id="L52">        String originalProjectHash = hashField(lines.get(lines.size() - 3), &quot;project=&quot;);</span>
+<span class="fc" id="L53">        String toolchainPin = read(retained, TOOLCHAIN);</span>
+<span class="fc" id="L54">        String dependencyPin = read(retained, MANIFEST);</span>
+<span class="fc" id="L55">        var originalEnvironment = new LeanSolverBackend.PinnedEnvironment(originalProjectHash,</span>
+<span class="fc" id="L56">            SolverIr.sha256(toolchainPin), SolverIr.sha256(dependencyPin));</span>
+<span class="fc" id="L57">        require(Files.isRegularFile(retained.resolve(&quot;proof.olean&quot;), LinkOption.NOFOLLOW_LINKS),</span>
             &quot;retained compiled proof is missing&quot;);
-<span class="fc" id="L57">        String originalCertificate = LeanSolverBackend.certificate(expected, source,</span>
-<span class="fc" id="L58">            LeanSolverBackend.compiledHash(retained), originalAuditText, configurationHash, version, originalEnvironment);</span>
-<span class="fc" id="L59">        require(originalCertificate.equals(retainedCertificate), &quot;Lean artifacts differ from the original certificate&quot;);</span>
+<span class="fc" id="L59">        String originalCertificate = LeanSolverBackend.certificate(expected, source,</span>
+<span class="fc" id="L60">            LeanSolverBackend.compiledHash(retained), originalAuditText, configurationHash, version, originalEnvironment);</span>
+<span class="fc" id="L61">        require(originalCertificate.equals(retainedCertificate), &quot;Lean artifacts differ from the original certificate&quot;);</span>
 
-<span class="fc" id="L61">        String rebuildConfiguration = toolchain.configurationHash();</span>
-<span class="fc" id="L62">        var rebuildEnvironment = toolchain.pinnedEnvironment();</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">        require(!rebuildEnvironment.projectHash().equals(originalProjectHash), &quot;rebuild requires a separate Lean project&quot;);</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        require(rebuildEnvironment.toolchainHash().equals(originalEnvironment.toolchainHash())</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">            &amp;&amp; rebuildEnvironment.dependencyHash().equals(originalEnvironment.dependencyHash()),</span>
+<span class="fc" id="L63">        String rebuildConfiguration = toolchain.configurationHash();</span>
+<span class="fc" id="L64">        var rebuildEnvironment = toolchain.pinnedEnvironment();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        require(!rebuildEnvironment.projectHash().equals(originalProjectHash), &quot;rebuild requires a separate Lean project&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        require(rebuildEnvironment.toolchainHash().equals(originalEnvironment.toolchainHash())</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            &amp;&amp; rebuildEnvironment.dependencyHash().equals(originalEnvironment.dependencyHash()),</span>
             &quot;rebuild project Lean pins differ from the original certificate&quot;);
-<span class="fc" id="L67">        Path output = toolchain.newEvidenceDirectory(&quot;lean-rebuild-&quot;);</span>
-<span class="fc" id="L68">        Files.writeString(output.resolve(&quot;obligation.json&quot;), obligation);</span>
-<span class="fc" id="L69">        Files.writeString(output.resolve(&quot;proof.lean&quot;), source);</span>
-<span class="fc" id="L70">        Files.writeString(output.resolve(TOOLCHAIN), toolchainPin);</span>
-<span class="fc" id="L71">        Files.writeString(output.resolve(MANIFEST), dependencyPin);</span>
+<span class="fc" id="L69">        Path output = toolchain.newEvidenceDirectory(&quot;lean-rebuild-&quot;);</span>
+<span class="fc" id="L70">        Files.writeString(output.resolve(&quot;obligation.json&quot;), obligation);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        String independent = originalAudit.scoped() ? LeanStatementReconstruction.theorem(expected) : &quot;&quot;;</span>
+<span class="fc" id="L72">        String rebuildSource = source + independent;</span>
+<span class="fc" id="L73">        Files.writeString(output.resolve(&quot;proof.lean&quot;), rebuildSource);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (plan != null) Files.writeString(output.resolve(LeanLemmaPlan.FILE), plan.material());</span>
+<span class="fc" id="L75">        Files.writeString(output.resolve(TOOLCHAIN), toolchainPin);</span>
+<span class="fc" id="L76">        Files.writeString(output.resolve(MANIFEST), dependencyPin);</span>
 
-<span class="fc" id="L73">        var observedVersion = toolchain.version(output);</span>
-<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        require(observedVersion.success() &amp;&amp; version.equals(observedVersion.stdout().strip()), &quot;Lean version differs&quot;);</span>
-<span class="fc" id="L75">        var proof = toolchain.compile(output);</span>
-<span class="fc" id="L76">        require(proof.success(), &quot;Lean rebuild failed in &quot; + output);</span>
-<span class="fc bfc" id="L77" title="All 2 branches covered.">        require(rebuildConfiguration.equals(toolchain.configurationHash())</span>
-<span class="pc bpc" id="L78" title="2 of 4 branches missed.">            &amp;&amp; rebuildEnvironment.equals(toolchain.pinnedEnvironment()) &amp;&amp; rebuildEnvironment.pinsMatch(output),</span>
+<span class="fc" id="L78">        var observedVersion = toolchain.version(output);</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">        require(observedVersion.success() &amp;&amp; version.equals(observedVersion.stdout().strip()), &quot;Lean version differs&quot;);</span>
+<span class="fc" id="L80">        var proof = toolchain.compile(output);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!proof.success()) {</span>
+<span class="nc" id="L82">            String diagnostics = proof.stdout() + &quot;\n&quot; + read(output, &quot;proof.stderr&quot;);</span>
+<span class="nc" id="L83">            throw new IOException(&quot;Lean rebuild failed in &quot; + output + &quot;\n&quot;</span>
+<span class="nc" id="L84">                + diagnostics.substring(Math.max(0, diagnostics.length() - 2400)));</span>
+        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        require(rebuildConfiguration.equals(toolchain.configurationHash())</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">            &amp;&amp; rebuildEnvironment.equals(toolchain.pinnedEnvironment()) &amp;&amp; rebuildEnvironment.pinsMatch(output),</span>
             &quot;Lean rebuild configuration changed&quot;);
-<span class="fc" id="L80">        require(source.equals(read(output, &quot;proof.lean&quot;)), &quot;Lean rebuild source changed&quot;);</span>
-<span class="fc" id="L81">        var audit = LeanSolverBackend.checkedProcessAudit(proof.stdout(), expected.contentHash(), originalAudit.nonce());</span>
-<span class="fc" id="L82">        require(audit.axioms().equals(originalAudit.axioms()), &quot;Lean rebuild axiom dependencies differ&quot;);</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        require(Files.isRegularFile(output.resolve(&quot;proof.olean&quot;), LinkOption.NOFOLLOW_LINKS)</span>
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            &amp;&amp; Files.size(output.resolve(&quot;proof.olean&quot;)) &gt; 0, &quot;Lean rebuild compiled proof is missing or empty&quot;);</span>
-<span class="fc" id="L85">        String rebuiltCertificate = LeanSolverBackend.certificate(expected, source, LeanSolverBackend.compiledHash(output),</span>
-<span class="fc" id="L86">            audit.text(), rebuildConfiguration, observedVersion.stdout(), rebuildEnvironment);</span>
-<span class="fc" id="L87">        Files.writeString(output.resolve(&quot;audit.json&quot;), audit.text());</span>
-<span class="fc" id="L88">        Files.writeString(output.resolve(&quot;certificate.txt&quot;), rebuiltCertificate);</span>
-<span class="fc" id="L89">        String receipt = &quot;regelsuche.lean-evidence-rebuild/v1\noriginal=&quot; + originalCertificateHash</span>
-<span class="fc" id="L90">            + &quot;\nrebuild=&quot; + SolverIr.sha256(rebuiltCertificate) + &quot;\n&quot;;</span>
-<span class="fc" id="L91">        Files.writeString(output.resolve(&quot;rebuild.txt&quot;), receipt);</span>
-<span class="fc" id="L92">        return new Receipt(output, SolverIr.sha256(receipt));</span>
+<span class="fc" id="L89">        require(rebuildSource.equals(read(output, &quot;proof.lean&quot;)), &quot;Lean rebuild source changed&quot;);</span>
+<span class="fc" id="L90">        var audit = LeanSolverBackend.checkedProcessAudit(proof.stdout(), expected, originalAudit.nonce());</span>
+<span class="fc" id="L91">        require(audit.imports().equals(originalAudit.imports()), &quot;Lean rebuild imported declarations differ&quot;);</span>
+<span class="fc" id="L92">        require(audit.axioms().equals(originalAudit.axioms()), &quot;Lean rebuild axiom dependencies differ&quot;);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        require(Files.isRegularFile(output.resolve(&quot;proof.olean&quot;), LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            &amp;&amp; Files.size(output.resolve(&quot;proof.olean&quot;)) &gt; 0, &quot;Lean rebuild compiled proof is missing or empty&quot;);</span>
+<span class="fc" id="L95">        String rebuiltCertificate = LeanSolverBackend.certificate(expected, rebuildSource, LeanSolverBackend.compiledHash(output),</span>
+<span class="fc" id="L96">            audit.text(), rebuildConfiguration, observedVersion.stdout(), rebuildEnvironment);</span>
+<span class="fc" id="L97">        Files.writeString(output.resolve(&quot;audit.json&quot;), audit.text());</span>
+<span class="fc" id="L98">        Files.writeString(output.resolve(&quot;certificate.txt&quot;), rebuiltCertificate);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        String schema = originalAudit.scoped() ? &quot;regelsuche.lean-evidence-rebuild/v2&quot; : &quot;regelsuche.lean-evidence-rebuild/v1&quot;;</span>
+<span class="fc" id="L100">        String receipt = schema + &quot;\noriginal=&quot; + originalCertificateHash</span>
+<span class="fc" id="L101">            + &quot;\nrebuild=&quot; + SolverIr.sha256(rebuiltCertificate) + &quot;\n&quot;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            + (originalAudit.scoped() ? &quot;reconstructed=&quot; + SolverIr.sha256(independent) + &quot;\n&quot; : &quot;&quot;);</span>
+<span class="fc" id="L103">        Files.writeString(output.resolve(&quot;rebuild.txt&quot;), receipt);</span>
+<span class="fc" id="L104">        return new Receipt(output, SolverIr.sha256(receipt));</span>
     }
 
     private static String hashField(String line, String prefix) throws IOException {
-<span class="pc bpc" id="L96" title="2 of 4 branches missed.">        require(line.startsWith(prefix) &amp;&amp; line.substring(prefix.length()).matches(&quot;sha256:[0-9a-f]{64}&quot;),</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        require(line.startsWith(prefix) &amp;&amp; line.substring(prefix.length()).matches(&quot;sha256:[0-9a-f]{64}&quot;),</span>
             &quot;invalid retained Lean certificate field &quot; + prefix);
-<span class="fc" id="L98">        return line.substring(prefix.length());</span>
+<span class="fc" id="L110">        return line.substring(prefix.length());</span>
     }
 
     private static String read(Path directory, String name) throws IOException {
-<span class="fc" id="L102">        Path path = directory.resolve(name);</span>
-<span class="fc" id="L103">        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS), &quot;missing Lean evidence file &quot; + name);</span>
-<span class="fc" id="L104">        return Files.readString(path);</span>
+<span class="fc" id="L114">        Path path = directory.resolve(name);</span>
+<span class="fc" id="L115">        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS), &quot;missing Lean evidence file &quot; + name);</span>
+<span class="fc" id="L116">        return Files.readString(path);</span>
     }
 
     private static void require(boolean condition, String message) throws IOException {
-<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!condition) throw new IOException(message);</span>
-<span class="fc" id="L109">    }</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!condition) throw new IOException(message);</span>
+<span class="fc" id="L121">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

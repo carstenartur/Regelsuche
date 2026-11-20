@@ -42,16 +42,21 @@ import java.util.Set;
         DiscoverySeed seed,
         DiscoveryBudget budget
     ) {
-<span class="fc" id="L45">        DomainCanonical.requireIdentifier(campaignId, &quot;campaignId&quot;);</span>
-<span class="fc" id="L46">        Objects.requireNonNull(domain, &quot;domain&quot;);</span>
-<span class="fc" id="L47">        Objects.requireNonNull(seed, &quot;seed&quot;);</span>
-<span class="fc" id="L48">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!domain.domainId().equals(seed.domainId())) {</span>
-<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
-<span class="nc" id="L51">                &quot;seed domain &quot; + seed.domainId()</span>
-<span class="nc" id="L52">                    + &quot; does not match &quot; + domain.domainId());</span>
+<span class="fc" id="L45">        return run(campaignId, domain, seed, budget, (candidate, attempt) -&gt; { });</span>
+    }
+
+    &lt;S,C,K&gt; RunResult&lt;C,K&gt; run(String campaignId, DiscoveryDomain&lt;S,C,K&gt; domain, DiscoverySeed seed,
+            DiscoveryBudget budget, java.util.function.BiConsumer&lt;C, CandidateAttempt&gt; observer) {
+<span class="fc" id="L50">        DomainCanonical.requireIdentifier(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L51">        Objects.requireNonNull(domain, &quot;domain&quot;);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(seed, &quot;seed&quot;);</span>
+<span class="fc" id="L53">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!domain.domainId().equals(seed.domainId())) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L56">                &quot;seed domain &quot; + seed.domainId()</span>
+<span class="nc" id="L57">                    + &quot; does not match &quot; + domain.domainId());</span>
         }
-<span class="fc" id="L54">        return new Execution&lt;&gt;(campaignId, domain, seed, budget).execute();</span>
+<span class="fc" id="L59">        return new Execution&lt;&gt;(campaignId, domain, seed, budget, observer).execute();</span>
     }
 
     public record RunResult&lt;C, K&gt;(
@@ -59,15 +64,15 @@ import java.util.Set;
         Optional&lt;K&gt; selectedCertificate,
         DomainDiscoveryEvidence evidence
     ) {
-<span class="fc" id="L62">        public RunResult {</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            selectedCandidate = selectedCandidate == null</span>
-<span class="nc" id="L64">                ? Optional.empty()</span>
-<span class="fc" id="L65">                : selectedCandidate;</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            selectedCertificate = selectedCertificate == null</span>
-<span class="nc" id="L67">                ? Optional.empty()</span>
-<span class="fc" id="L68">                : selectedCertificate;</span>
-<span class="fc" id="L69">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
-<span class="fc" id="L70">        }</span>
+<span class="fc" id="L67">        public RunResult {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            selectedCandidate = selectedCandidate == null</span>
+<span class="nc" id="L69">                ? Optional.empty()</span>
+<span class="fc" id="L70">                : selectedCandidate;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            selectedCertificate = selectedCertificate == null</span>
+<span class="nc" id="L72">                ? Optional.empty()</span>
+<span class="fc" id="L73">                : selectedCertificate;</span>
+<span class="fc" id="L74">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L75">        }</span>
     }
 
     private static final class Execution&lt;S, C, K&gt; {
@@ -76,12 +81,13 @@ import java.util.Set;
         private final DiscoverySeed seed;
         private final DiscoveryBudget budget;
         private final DiscoveryDomainDescriptor descriptor;
+        private final java.util.function.BiConsumer&lt;C, CandidateAttempt&gt; observer;
         private final PriorityQueue&lt;Node&lt;S&gt;&gt; frontier;
-<span class="fc" id="L80">        private final Set&lt;String&gt; visitedStates = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L81">        private final Set&lt;String&gt; attemptedCandidates = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L82">        private final List&lt;StateTrace&gt; stateTraces = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L83">        private final List&lt;TransitionTrace&gt; transitionTraces = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L84">        private final List&lt;CandidateAttempt&gt; candidateAttempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L86">        private final Set&lt;String&gt; visitedStates = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L87">        private final Set&lt;String&gt; attemptedCandidates = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L88">        private final List&lt;StateTrace&gt; stateTraces = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L89">        private final List&lt;TransitionTrace&gt; transitionTraces = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L90">        private final List&lt;CandidateAttempt&gt; candidateAttempts = new ArrayList&lt;&gt;();</span>
 
         private S firstGeneratedState;
         private S firstValidInitialState;
@@ -89,7 +95,7 @@ import java.util.Set;
         private C selectedCandidate;
         private K selectedCertificateObject;
         private RenderedCertificate selectedCertificate;
-<span class="fc" id="L92">        private String selectedCandidateHash = &quot;&quot;;</span>
+<span class="fc" id="L98">        private String selectedCandidateHash = &quot;&quot;;</span>
 
         private int exploredStates;
         private int generatedSuccessors;
@@ -107,160 +113,164 @@ import java.util.Set;
             String campaignId,
             DiscoveryDomain&lt;S, C, K&gt; domain,
             DiscoverySeed seed,
-            DiscoveryBudget budget
-<span class="fc" id="L111">        ) {</span>
-<span class="fc" id="L112">            this.campaignId = campaignId;</span>
-<span class="fc" id="L113">            this.domain = domain;</span>
-<span class="fc" id="L114">            this.seed = seed;</span>
-<span class="fc" id="L115">            this.budget = budget;</span>
-<span class="fc" id="L116">            this.descriptor = domain.descriptor();</span>
-<span class="fc" id="L117">            this.frontier = new PriorityQueue&lt;&gt;(Comparator</span>
-<span class="pc" id="L118">                .&lt;Node&lt;S&gt;&gt;comparingInt(node -&gt; node.objective().score())</span>
-<span class="fc" id="L119">                .reversed()</span>
-<span class="fc" id="L120">                .thenComparingInt(Node::depth)</span>
-<span class="fc" id="L121">                .thenComparing(Node::stateHash));</span>
-<span class="fc" id="L122">        }</span>
+            DiscoveryBudget budget,
+            java.util.function.BiConsumer&lt;C, CandidateAttempt&gt; observer
+<span class="fc" id="L118">        ) {</span>
+<span class="fc" id="L119">            this.observer = observer;</span>
+<span class="fc" id="L120">            this.campaignId = campaignId;</span>
+<span class="fc" id="L121">            this.domain = domain;</span>
+<span class="fc" id="L122">            this.seed = seed;</span>
+<span class="fc" id="L123">            this.budget = budget;</span>
+<span class="fc" id="L124">            this.descriptor = domain.descriptor();</span>
+<span class="fc" id="L125">            this.frontier = new PriorityQueue&lt;&gt;(Comparator</span>
+<span class="pc" id="L126">                .&lt;Node&lt;S&gt;&gt;comparingInt(node -&gt; node.objective().score())</span>
+<span class="fc" id="L127">                .reversed()</span>
+<span class="fc" id="L128">                .thenComparingInt(Node::depth)</span>
+<span class="fc" id="L129">                .thenComparing(Node::stateHash));</span>
+<span class="fc" id="L130">        }</span>
 
         private RunResult&lt;C, K&gt; execute() {
-<span class="fc" id="L125">            initializeFrontier();</span>
-<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (frontier.isEmpty()) {</span>
-<span class="nc" id="L127">                return finish(Outcome.INVALID_SEED);</span>
+<span class="fc" id="L133">            initializeFrontier();</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (frontier.isEmpty()) {</span>
+<span class="nc" id="L135">                return finish(Outcome.INVALID_SEED);</span>
             }
-<span class="fc bfc" id="L129" title="All 2 branches covered.">            while (canExplore()) {</span>
-<span class="fc" id="L130">                Node&lt;S&gt; node = frontier.remove();</span>
-<span class="fc" id="L131">                retainState(node);</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (node.objective().candidateReady()) {</span>
-<span class="fc" id="L133">                    evaluateCandidate(node);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            while (canExplore()) {</span>
+<span class="fc" id="L138">                Node&lt;S&gt; node = frontier.remove();</span>
+<span class="fc" id="L139">                retainState(node);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                if (node.objective().candidateReady()) {</span>
+<span class="fc" id="L141">                    evaluateCandidate(node);</span>
                 }
-<span class="fc bfc" id="L135" title="All 2 branches covered.">                if (selectedCandidate != null) {</span>
-<span class="fc" id="L136">                    break;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                if (selectedCandidate != null) {</span>
+<span class="fc" id="L144">                    break;</span>
                 }
-<span class="fc" id="L138">                expand(node);</span>
-<span class="fc" id="L139">            }</span>
-<span class="fc" id="L140">            return finish(determineOutcome());</span>
+<span class="fc" id="L146">                expand(node);</span>
+<span class="fc" id="L147">            }</span>
+<span class="fc" id="L148">            return finish(determineOutcome());</span>
         }
 
         private void initializeFrontier() {
-<span class="fc" id="L144">            List&lt;S&gt; generated = Objects.requireNonNull(</span>
-<span class="fc" id="L145">                domain.generator().generate(seed),</span>
+<span class="fc" id="L152">            List&lt;S&gt; generated = Objects.requireNonNull(</span>
+<span class="fc" id="L153">                domain.generator().generate(seed),</span>
                 &quot;domain generator returned null&quot;);
-<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (!generated.isEmpty()) {</span>
-<span class="fc" id="L148">                firstGeneratedState = generated.getFirst();</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (!generated.isEmpty()) {</span>
+<span class="fc" id="L156">                firstGeneratedState = generated.getFirst();</span>
             }
-<span class="fc" id="L150">            List&lt;PreparedState&lt;S&gt;&gt; prepared = generated.stream()</span>
-<span class="fc" id="L151">                .map(state -&gt; prepareState(domain, state))</span>
-<span class="fc" id="L152">                .sorted(Comparator.comparing(PreparedState::canonicalState))</span>
-<span class="fc" id="L153">                .toList();</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (PreparedState&lt;S&gt; state : prepared) {</span>
-<span class="fc" id="L155">                addInitialState(state);</span>
-<span class="fc" id="L156">            }</span>
-<span class="fc" id="L157">            evidenceInitialState = firstValidInitialState;</span>
-<span class="fc" id="L158">        }</span>
+<span class="fc" id="L158">            List&lt;PreparedState&lt;S&gt;&gt; prepared = generated.stream()</span>
+<span class="fc" id="L159">                .map(state -&gt; prepareState(domain, state))</span>
+<span class="fc" id="L160">                .sorted(Comparator.comparing(PreparedState::canonicalState))</span>
+<span class="fc" id="L161">                .toList();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (PreparedState&lt;S&gt; state : prepared) {</span>
+<span class="fc" id="L163">                addInitialState(state);</span>
+<span class="fc" id="L164">            }</span>
+<span class="fc" id="L165">            evidenceInitialState = firstValidInitialState;</span>
+<span class="fc" id="L166">        }</span>
 
         private void addInitialState(PreparedState&lt;S&gt; prepared) {
-<span class="fc" id="L161">            List&lt;String&gt; blockers = invariantBlockers(domain, prepared.state());</span>
-<span class="pc bpc" id="L162" title="2 of 4 branches missed.">            if (!blockers.isEmpty() || !visitedStates.add(prepared.stateHash())) {</span>
-<span class="nc" id="L163">                return;</span>
+<span class="fc" id="L169">            List&lt;String&gt; blockers = invariantBlockers(domain, prepared.state());</span>
+<span class="pc bpc" id="L170" title="2 of 4 branches missed.">            if (!blockers.isEmpty() || !visitedStates.add(prepared.stateHash())) {</span>
+<span class="nc" id="L171">                return;</span>
             }
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (firstValidInitialState == null) {</span>
-<span class="fc" id="L166">                firstValidInitialState = prepared.state();</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (firstValidInitialState == null) {</span>
+<span class="fc" id="L174">                firstValidInitialState = prepared.state();</span>
             }
-<span class="fc" id="L168">            frontier.add(new Node&lt;&gt;(</span>
-<span class="fc" id="L169">                prepared.state(),</span>
-<span class="fc" id="L170">                prepared.state(),</span>
-<span class="fc" id="L171">                prepared.canonicalState(),</span>
-<span class="fc" id="L172">                prepared.stateHash(),</span>
+<span class="fc" id="L176">            frontier.add(new Node&lt;&gt;(</span>
+<span class="fc" id="L177">                prepared.state(),</span>
+<span class="fc" id="L178">                prepared.state(),</span>
+<span class="fc" id="L179">                prepared.canonicalState(),</span>
+<span class="fc" id="L180">                prepared.stateHash(),</span>
                 0,
                 &quot;&quot;,
                 &quot;&quot;,
-<span class="fc" id="L176">                domain.objective().assess(prepared.state()),</span>
-<span class="fc" id="L177">                List.of()));</span>
-<span class="fc" id="L178">        }</span>
+<span class="fc" id="L184">                domain.objective().assess(prepared.state()),</span>
+<span class="fc" id="L185">                List.of()));</span>
+<span class="fc" id="L186">        }</span>
 
         private boolean canExplore() {
-<span class="fc bfc" id="L181" title="All 2 branches covered.">            return !frontier.isEmpty()</span>
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                &amp;&amp; exploredStates &lt; budget.maxExploredStates();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            return !frontier.isEmpty()</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                &amp;&amp; exploredStates &lt; budget.maxExploredStates();</span>
         }
 
         private void retainState(Node&lt;S&gt; node) {
-<span class="fc" id="L186">            exploredStates++;</span>
-<span class="fc" id="L187">            stateSequence++;</span>
-<span class="fc" id="L188">            stateTraces.add(new StateTrace(</span>
+<span class="fc" id="L194">            exploredStates++;</span>
+<span class="fc" id="L195">            stateSequence++;</span>
+<span class="fc" id="L196">            stateTraces.add(new StateTrace(</span>
                 stateSequence,
-<span class="fc" id="L190">                node.stateHash(),</span>
-<span class="fc" id="L191">                node.canonicalState(),</span>
-<span class="fc" id="L192">                node.depth(),</span>
-<span class="fc" id="L193">                node.objective().score(),</span>
-<span class="fc" id="L194">                node.objective().candidateReady(),</span>
-<span class="fc" id="L195">                node.parentStateHash(),</span>
-<span class="fc" id="L196">                node.actionId(),</span>
-<span class="fc" id="L197">                node.objective().metrics()));</span>
-<span class="fc" id="L198">        }</span>
+<span class="fc" id="L198">                node.stateHash(),</span>
+<span class="fc" id="L199">                node.canonicalState(),</span>
+<span class="fc" id="L200">                node.depth(),</span>
+<span class="fc" id="L201">                node.objective().score(),</span>
+<span class="fc" id="L202">                node.objective().candidateReady(),</span>
+<span class="fc" id="L203">                node.parentStateHash(),</span>
+<span class="fc" id="L204">                node.actionId(),</span>
+<span class="fc" id="L205">                node.objective().metrics()));</span>
+<span class="fc" id="L206">        }</span>
 
         private void evaluateCandidate(Node&lt;S&gt; node) {
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            if (candidateAttempts.size() &gt;= budget.maxCandidateAttempts()) {</span>
-<span class="nc" id="L202">                candidateBudgetReached = true;</span>
-<span class="nc" id="L203">                return;</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (candidateAttempts.size() &gt;= budget.maxCandidateAttempts()) {</span>
+<span class="nc" id="L210">                candidateBudgetReached = true;</span>
+<span class="nc" id="L211">                return;</span>
             }
-<span class="fc" id="L205">            C candidate = extractCandidate(node);</span>
-<span class="fc" id="L206">            String candidateHash = domain.candidateCodec().contentHash(candidate);</span>
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (!attemptedCandidates.add(candidateHash)) {</span>
-<span class="nc" id="L208">                return;</span>
+<span class="fc" id="L213">            C candidate = extractCandidate(node);</span>
+<span class="fc" id="L214">            String candidateHash = domain.candidateCodec().contentHash(candidate);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (!attemptedCandidates.add(candidateHash)) {</span>
+<span class="nc" id="L216">                return;</span>
             }
-<span class="fc" id="L210">            CounterexampleResult counterexample = searchCounterexamples(candidate);</span>
-<span class="pc bpc" id="L211" title="2 of 4 branches missed.">            CandidateAttemptResult&lt;K&gt; result = switch (counterexample.status()) {</span>
-<span class="nc" id="L212">                case FOUND -&gt; skippedEvaluation(</span>
-<span class="nc" id="L213">                    CandidateAttemptResult.counterexample(candidateHash, counterexample));</span>
-<span class="fc" id="L214">                case INCONCLUSIVE -&gt; skippedEvaluation(</span>
-<span class="fc" id="L215">                    CandidateAttemptResult.inconclusive(candidateHash, counterexample));</span>
-<span class="nc" id="L216">                case UNSUPPORTED -&gt; skippedEvaluation(</span>
-<span class="nc" id="L217">                    CandidateAttemptResult.unsupported(candidateHash, counterexample));</span>
-<span class="fc" id="L218">                case NONE_FOUND -&gt; evaluateAfterCounterexamples(</span>
+<span class="fc" id="L218">            CounterexampleResult counterexample = searchCounterexamples(candidate);</span>
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">            CandidateAttemptResult&lt;K&gt; result = switch (counterexample.status()) {</span>
+<span class="nc" id="L220">                case FOUND -&gt; skippedEvaluation(</span>
+<span class="nc" id="L221">                    CandidateAttemptResult.counterexample(candidateHash, counterexample));</span>
+<span class="fc" id="L222">                case INCONCLUSIVE -&gt; skippedEvaluation(</span>
+<span class="fc" id="L223">                    CandidateAttemptResult.inconclusive(candidateHash, counterexample));</span>
+<span class="nc" id="L224">                case UNSUPPORTED -&gt; skippedEvaluation(</span>
+<span class="nc" id="L225">                    CandidateAttemptResult.unsupported(candidateHash, counterexample));</span>
+<span class="fc" id="L226">                case NONE_FOUND -&gt; evaluateAfterCounterexamples(</span>
                     candidate, candidateHash, counterexample);
             };
-<span class="fc" id="L221">            candidateAttempts.add(result.toEvidence(candidateAttempts.size() + 1));</span>
-<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (result.disposition() == AttemptDisposition.CONFIRMED) {</span>
-<span class="fc" id="L223">                selectedCandidate = candidate;</span>
-<span class="fc" id="L224">                selectedCandidateHash = candidateHash;</span>
-<span class="fc" id="L225">                evidenceInitialState = node.initialState();</span>
+<span class="fc" id="L229">            var row = result.toEvidence(candidateAttempts.size() + 1);</span>
+<span class="fc" id="L230">            candidateAttempts.add(row);</span>
+<span class="fc" id="L231">            observer.accept(candidate, row);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (result.disposition() == AttemptDisposition.CONFIRMED) {</span>
+<span class="fc" id="L233">                selectedCandidate = candidate;</span>
+<span class="fc" id="L234">                selectedCandidateHash = candidateHash;</span>
+<span class="fc" id="L235">                evidenceInitialState = node.initialState();</span>
             }
-<span class="fc" id="L227">        }</span>
+<span class="fc" id="L237">        }</span>
 
         private C extractCandidate(Node&lt;S&gt; node) {
-<span class="fc" id="L230">            CandidateContext&lt;S&gt; context = new CandidateContext&lt;&gt;(</span>
-<span class="fc" id="L231">                node.initialState(), node.state(), node.path());</span>
-<span class="fc" id="L232">            return Objects.requireNonNull(</span>
-<span class="fc" id="L233">                domain.candidateExtractor().extract(context),</span>
+<span class="fc" id="L240">            CandidateContext&lt;S&gt; context = new CandidateContext&lt;&gt;(</span>
+<span class="fc" id="L241">                node.initialState(), node.state(), node.path());</span>
+<span class="fc" id="L242">            return Objects.requireNonNull(</span>
+<span class="fc" id="L243">                domain.candidateExtractor().extract(context),</span>
                 &quot;candidate extractor returned null&quot;);
         }
 
         private CounterexampleResult searchCounterexamples(C candidate) {
-<span class="fc" id="L238">            int remaining = Math.max(</span>
+<span class="fc" id="L248">            int remaining = Math.max(</span>
                 0,
-<span class="fc" id="L240">                budget.maxCounterexampleAttempts() - counterexampleAttemptsUsed);</span>
-<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (remaining == 0) {</span>
-<span class="nc" id="L242">                return new CounterexampleResult(</span>
+<span class="fc" id="L250">                budget.maxCounterexampleAttempts() - counterexampleAttemptsUsed);</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (remaining == 0) {</span>
+<span class="nc" id="L252">                return new CounterexampleResult(</span>
                     CounterexampleStatus.INCONCLUSIVE,
                     0,
                     &quot;counterexample budget exhausted&quot;,
-<span class="nc" id="L246">                    Map.of(&quot;budget&quot;, &quot;0&quot;));</span>
+<span class="nc" id="L256">                    Map.of(&quot;budget&quot;, &quot;0&quot;));</span>
             }
-<span class="fc" id="L248">            CounterexampleResult result = Objects.requireNonNull(</span>
-<span class="fc" id="L249">                domain.counterexampleGenerator().search(candidate, remaining),</span>
+<span class="fc" id="L258">            CounterexampleResult result = Objects.requireNonNull(</span>
+<span class="fc" id="L259">                domain.counterexampleGenerator().search(candidate, remaining),</span>
                 &quot;counterexample generator returned null&quot;);
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (result.attempts() &gt; remaining) {</span>
-<span class="nc" id="L252">                throw new IllegalStateException(</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            if (result.attempts() &gt; remaining) {</span>
+<span class="nc" id="L262">                throw new IllegalStateException(</span>
                     &quot;counterexample generator exceeded its attempt budget&quot;);
             }
-<span class="fc" id="L255">            counterexampleAttemptsUsed += result.attempts();</span>
-<span class="fc" id="L256">            return result;</span>
+<span class="fc" id="L265">            counterexampleAttemptsUsed += result.attempts();</span>
+<span class="fc" id="L266">            return result;</span>
         }
 
         private CandidateAttemptResult&lt;K&gt; skippedEvaluation(
             CandidateAttemptResult&lt;K&gt; result
         ) {
-<span class="fc" id="L262">            candidateEvaluationsSkipped++;</span>
-<span class="fc" id="L263">            return result;</span>
+<span class="fc" id="L272">            candidateEvaluationsSkipped++;</span>
+<span class="fc" id="L273">            return result;</span>
         }
 
         private CandidateAttemptResult&lt;K&gt; evaluateAfterCounterexamples(
@@ -268,16 +278,16 @@ import java.util.Set;
             String candidateHash,
             CounterexampleResult counterexample
         ) {
-<span class="fc" id="L271">            candidateEvaluationsExecuted++;</span>
-<span class="fc" id="L272">            Evaluation&lt;K&gt; evaluation = Objects.requireNonNull(</span>
-<span class="fc" id="L273">                domain.evaluator().evaluate(candidate),</span>
+<span class="fc" id="L281">            candidateEvaluationsExecuted++;</span>
+<span class="fc" id="L282">            Evaluation&lt;K&gt; evaluation = Objects.requireNonNull(</span>
+<span class="fc" id="L283">                domain.evaluator().evaluate(candidate),</span>
                 &quot;candidate evaluator returned null&quot;);
-<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (evaluation.status() != EvaluationStatus.CONFIRMED) {</span>
-<span class="fc" id="L276">                certificateAttemptsSkipped++;</span>
-<span class="fc" id="L277">                return CandidateAttemptResult.evaluated(</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            if (evaluation.status() != EvaluationStatus.CONFIRMED) {</span>
+<span class="fc" id="L286">                certificateAttemptsSkipped++;</span>
+<span class="fc" id="L287">                return CandidateAttemptResult.evaluated(</span>
                     candidateHash, counterexample, evaluation);
             }
-<span class="fc" id="L280">            return confirm(candidateHash, counterexample, evaluation);</span>
+<span class="fc" id="L290">            return confirm(candidateHash, counterexample, evaluation);</span>
         }
 
         private CandidateAttemptResult&lt;K&gt; confirm(
@@ -285,16 +295,16 @@ import java.util.Set;
             CounterexampleResult counterexample,
             Evaluation&lt;K&gt; evaluation
         ) {
-<span class="fc" id="L288">            selectedCertificateObject = Objects.requireNonNull(</span>
-<span class="fc" id="L289">                evaluation.certificate(),</span>
+<span class="fc" id="L298">            selectedCertificateObject = Objects.requireNonNull(</span>
+<span class="fc" id="L299">                evaluation.certificate(),</span>
                 &quot;confirmed evaluation certificate&quot;);
-<span class="fc" id="L291">            String objectHash = domain.certificateCodec()</span>
-<span class="fc" id="L292">                .contentHash(selectedCertificateObject);</span>
-<span class="fc" id="L293">            selectedCertificate = RenderedCertificate.create(</span>
-<span class="fc" id="L294">                domain.certificateRenderer().render(selectedCertificateObject),</span>
+<span class="fc" id="L301">            String objectHash = domain.certificateCodec()</span>
+<span class="fc" id="L302">                .contentHash(selectedCertificateObject);</span>
+<span class="fc" id="L303">            selectedCertificate = RenderedCertificate.create(</span>
+<span class="fc" id="L304">                domain.certificateRenderer().render(selectedCertificateObject),</span>
                 objectHash);
-<span class="fc" id="L296">            certificateAttemptsExecuted++;</span>
-<span class="fc" id="L297">            return CandidateAttemptResult.confirmed(</span>
+<span class="fc" id="L306">            certificateAttemptsExecuted++;</span>
+<span class="fc" id="L307">            return CandidateAttemptResult.confirmed(</span>
                 candidateHash,
                 counterexample,
                 evaluation,
@@ -302,52 +312,52 @@ import java.util.Set;
         }
 
         private void expand(Node&lt;S&gt; node) {
-<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (node.depth() &gt;= budget.maxDepth()) {</span>
-<span class="nc" id="L306">                return;</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (node.depth() &gt;= budget.maxDepth()) {</span>
+<span class="fc" id="L316">                return;</span>
             }
-<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (generatedSuccessors &gt;= budget.maxGeneratedSuccessors()) {</span>
-<span class="nc" id="L309">                generationBudgetReached = true;</span>
-<span class="nc" id="L310">                return;</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (generatedSuccessors &gt;= budget.maxGeneratedSuccessors()) {</span>
+<span class="nc" id="L319">                generationBudgetReached = true;</span>
+<span class="nc" id="L320">                return;</span>
             }
-<span class="fc" id="L312">            List&lt;PreparedSuccessor&lt;S&gt;&gt; successors = prepareSuccessors(</span>
-<span class="fc" id="L313">                domain, node.state());</span>
-<span class="fc" id="L314">            int processed = 0;</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">            for (PreparedSuccessor&lt;S&gt; successor : successors) {</span>
-<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                if (processed &gt;= budget.maxCandidatesPerState()) {</span>
-<span class="nc" id="L317">                    break;</span>
+<span class="fc" id="L322">            List&lt;PreparedSuccessor&lt;S&gt;&gt; successors = prepareSuccessors(</span>
+<span class="fc" id="L323">                domain, node.state());</span>
+<span class="fc" id="L324">            int processed = 0;</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            for (PreparedSuccessor&lt;S&gt; successor : successors) {</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                if (processed &gt;= budget.maxCandidatesPerState()) {</span>
+<span class="nc" id="L327">                    break;</span>
                 }
-<span class="pc bpc" id="L319" title="1 of 2 branches missed.">                if (generatedSuccessors &gt;= budget.maxGeneratedSuccessors()) {</span>
-<span class="nc" id="L320">                    generationBudgetReached = true;</span>
-<span class="nc" id="L321">                    break;</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                if (generatedSuccessors &gt;= budget.maxGeneratedSuccessors()) {</span>
+<span class="nc" id="L330">                    generationBudgetReached = true;</span>
+<span class="nc" id="L331">                    break;</span>
                 }
-<span class="fc" id="L323">                processed++;</span>
-<span class="fc" id="L324">                processSuccessor(node, successor);</span>
-<span class="fc" id="L325">            }</span>
-<span class="fc" id="L326">        }</span>
+<span class="fc" id="L333">                processed++;</span>
+<span class="fc" id="L334">                processSuccessor(node, successor);</span>
+<span class="fc" id="L335">            }</span>
+<span class="fc" id="L336">        }</span>
 
         private void processSuccessor(
             Node&lt;S&gt; node,
             PreparedSuccessor&lt;S&gt; prepared
         ) {
-<span class="fc" id="L332">            generatedSuccessors++;</span>
-<span class="fc" id="L333">            transitionSequence++;</span>
-<span class="fc" id="L334">            List&lt;String&gt; blockers = transitionBlockers(prepared);</span>
-<span class="fc" id="L335">            boolean accepted = blockers.isEmpty();</span>
-<span class="fc" id="L336">            retainTransition(node, prepared, accepted, blockers);</span>
-<span class="fc bfc" id="L337" title="All 2 branches covered.">            if (!accepted) {</span>
-<span class="fc" id="L338">                return;</span>
+<span class="fc" id="L342">            generatedSuccessors++;</span>
+<span class="fc" id="L343">            transitionSequence++;</span>
+<span class="fc" id="L344">            List&lt;String&gt; blockers = transitionBlockers(prepared);</span>
+<span class="fc" id="L345">            boolean accepted = blockers.isEmpty();</span>
+<span class="fc" id="L346">            retainTransition(node, prepared, accepted, blockers);</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (!accepted) {</span>
+<span class="fc" id="L348">                return;</span>
             }
-<span class="fc" id="L340">            visitedStates.add(prepared.stateHash());</span>
-<span class="fc" id="L341">            frontier.add(successorNode(node, prepared));</span>
-<span class="fc" id="L342">        }</span>
+<span class="fc" id="L350">            visitedStates.add(prepared.stateHash());</span>
+<span class="fc" id="L351">            frontier.add(successorNode(node, prepared));</span>
+<span class="fc" id="L352">        }</span>
 
         private List&lt;String&gt; transitionBlockers(PreparedSuccessor&lt;S&gt; prepared) {
-<span class="fc" id="L345">            List&lt;String&gt; blockers = new ArrayList&lt;&gt;(</span>
-<span class="fc" id="L346">                invariantBlockers(domain, prepared.successor().state()));</span>
-<span class="fc bfc" id="L347" title="All 2 branches covered.">            if (visitedStates.contains(prepared.stateHash())) {</span>
-<span class="fc" id="L348">                blockers.add(&quot;duplicate-state&quot;);</span>
+<span class="fc" id="L355">            List&lt;String&gt; blockers = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L356">                invariantBlockers(domain, prepared.successor().state()));</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            if (visitedStates.contains(prepared.stateHash())) {</span>
+<span class="fc" id="L358">                blockers.add(&quot;duplicate-state&quot;);</span>
             }
-<span class="fc" id="L350">            return DomainCanonical.sortedDistinct(blockers);</span>
+<span class="fc" id="L360">            return DomainCanonical.sortedDistinct(blockers);</span>
         }
 
         private void retainTransition(
@@ -356,91 +366,91 @@ import java.util.Set;
             boolean accepted,
             List&lt;String&gt; blockers
         ) {
-<span class="fc" id="L359">            Successor&lt;S&gt; successor = prepared.successor();</span>
-<span class="fc" id="L360">            transitionTraces.add(new TransitionTrace(</span>
+<span class="fc" id="L369">            Successor&lt;S&gt; successor = prepared.successor();</span>
+<span class="fc" id="L370">            transitionTraces.add(new TransitionTrace(</span>
                 transitionSequence,
-<span class="fc" id="L362">                node.stateHash(),</span>
-<span class="fc" id="L363">                prepared.stateHash(),</span>
-<span class="fc" id="L364">                successor.actionId(),</span>
-<span class="fc" id="L365">                successor.cost(),</span>
-<span class="fc" id="L366">                successor.semanticsPreserving(),</span>
-<span class="fc" id="L367">                successor.assumptions(),</span>
-<span class="fc" id="L368">                withComponentOperator(</span>
-<span class="fc" id="L369">                    successor.metadata(), prepared.componentOperatorId()),</span>
+<span class="fc" id="L372">                node.stateHash(),</span>
+<span class="fc" id="L373">                prepared.stateHash(),</span>
+<span class="fc" id="L374">                successor.actionId(),</span>
+<span class="fc" id="L375">                successor.cost(),</span>
+<span class="fc" id="L376">                successor.semanticsPreserving(),</span>
+<span class="fc" id="L377">                successor.assumptions(),</span>
+<span class="fc" id="L378">                withComponentOperator(</span>
+<span class="fc" id="L379">                    successor.metadata(), prepared.componentOperatorId()),</span>
                 accepted,
                 blockers));
-<span class="fc" id="L372">        }</span>
+<span class="fc" id="L382">        }</span>
 
         private Node&lt;S&gt; successorNode(
             Node&lt;S&gt; parent,
             PreparedSuccessor&lt;S&gt; prepared
         ) {
-<span class="fc" id="L378">            Successor&lt;S&gt; successor = prepared.successor();</span>
-<span class="fc" id="L379">            List&lt;PathStep&lt;S&gt;&gt; path = new ArrayList&lt;&gt;(parent.path());</span>
-<span class="fc" id="L380">            path.add(new PathStep&lt;&gt;(</span>
-<span class="fc" id="L381">                parent.stateHash(),</span>
-<span class="fc" id="L382">                successor.actionId(),</span>
-<span class="fc" id="L383">                successor.state(),</span>
-<span class="fc" id="L384">                prepared.stateHash(),</span>
-<span class="fc" id="L385">                successor.cost(),</span>
-<span class="fc" id="L386">                successor.semanticsPreserving(),</span>
-<span class="fc" id="L387">                successor.assumptions(),</span>
-<span class="fc" id="L388">                withComponentOperator(</span>
-<span class="fc" id="L389">                    successor.metadata(), prepared.componentOperatorId())));</span>
-<span class="fc" id="L390">            return new Node&lt;&gt;(</span>
-<span class="fc" id="L391">                parent.initialState(),</span>
-<span class="fc" id="L392">                successor.state(),</span>
-<span class="fc" id="L393">                prepared.canonicalState(),</span>
+<span class="fc" id="L388">            Successor&lt;S&gt; successor = prepared.successor();</span>
+<span class="fc" id="L389">            List&lt;PathStep&lt;S&gt;&gt; path = new ArrayList&lt;&gt;(parent.path());</span>
+<span class="fc" id="L390">            path.add(new PathStep&lt;&gt;(</span>
+<span class="fc" id="L391">                parent.stateHash(),</span>
+<span class="fc" id="L392">                successor.actionId(),</span>
+<span class="fc" id="L393">                successor.state(),</span>
 <span class="fc" id="L394">                prepared.stateHash(),</span>
-<span class="fc" id="L395">                parent.depth() + 1,</span>
-<span class="fc" id="L396">                parent.stateHash(),</span>
-<span class="fc" id="L397">                successor.actionId(),</span>
-<span class="fc" id="L398">                domain.objective().assess(successor.state()),</span>
-<span class="fc" id="L399">                List.copyOf(path));</span>
+<span class="fc" id="L395">                successor.cost(),</span>
+<span class="fc" id="L396">                successor.semanticsPreserving(),</span>
+<span class="fc" id="L397">                successor.assumptions(),</span>
+<span class="fc" id="L398">                withComponentOperator(</span>
+<span class="fc" id="L399">                    successor.metadata(), prepared.componentOperatorId())));</span>
+<span class="fc" id="L400">            return new Node&lt;&gt;(</span>
+<span class="fc" id="L401">                parent.initialState(),</span>
+<span class="fc" id="L402">                successor.state(),</span>
+<span class="fc" id="L403">                prepared.canonicalState(),</span>
+<span class="fc" id="L404">                prepared.stateHash(),</span>
+<span class="fc" id="L405">                parent.depth() + 1,</span>
+<span class="fc" id="L406">                parent.stateHash(),</span>
+<span class="fc" id="L407">                successor.actionId(),</span>
+<span class="fc" id="L408">                domain.objective().assess(successor.state()),</span>
+<span class="fc" id="L409">                List.copyOf(path));</span>
         }
 
         private Outcome determineOutcome() {
-<span class="fc bfc" id="L403" title="All 2 branches covered.">            if (selectedCandidate != null) {</span>
-<span class="fc" id="L404">                return Outcome.CONFIRMED;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">            if (selectedCandidate != null) {</span>
+<span class="fc" id="L414">                return Outcome.CONFIRMED;</span>
             }
-<span class="fc" id="L406">            boolean explorationBudgetReached =</span>
-<span class="pc bpc" id="L407" title="3 of 4 branches missed.">                exploredStates &gt;= budget.maxExploredStates() &amp;&amp; !frontier.isEmpty();</span>
-<span class="pc bpc" id="L408" title="3 of 6 branches missed.">            if (generationBudgetReached</span>
+<span class="fc" id="L416">            boolean explorationBudgetReached =</span>
+<span class="pc bpc" id="L417" title="3 of 4 branches missed.">                exploredStates &gt;= budget.maxExploredStates() &amp;&amp; !frontier.isEmpty();</span>
+<span class="pc bpc" id="L418" title="3 of 6 branches missed.">            if (generationBudgetReached</span>
                     || candidateBudgetReached
                     || explorationBudgetReached) {
-<span class="nc" id="L411">                return Outcome.BUDGET_EXHAUSTED;</span>
+<span class="nc" id="L421">                return Outcome.BUDGET_EXHAUSTED;</span>
             }
-<span class="fc bfc" id="L413" title="All 2 branches covered.">            if (candidateAttempts.isEmpty()) {</span>
-<span class="fc" id="L414">                return Outcome.INCONCLUSIVE;</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (candidateAttempts.isEmpty()) {</span>
+<span class="fc" id="L424">                return Outcome.INCONCLUSIVE;</span>
             }
-<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (candidateAttempts.stream().allMatch(Execution::isRefuted)) {</span>
-<span class="fc" id="L417">                return Outcome.REFUTED;</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">            if (candidateAttempts.stream().allMatch(Execution::isRefuted)) {</span>
+<span class="fc" id="L427">                return Outcome.REFUTED;</span>
             }
-<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (candidateAttempts.stream().allMatch(attempt -&gt;</span>
-<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                    attempt.disposition() == AttemptDisposition.UNSUPPORTED)) {</span>
-<span class="nc" id="L421">                return Outcome.UNSUPPORTED;</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (candidateAttempts.stream().allMatch(attempt -&gt;</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                    attempt.disposition() == AttemptDisposition.UNSUPPORTED)) {</span>
+<span class="nc" id="L431">                return Outcome.UNSUPPORTED;</span>
             }
-<span class="fc" id="L423">            return Outcome.INCONCLUSIVE;</span>
+<span class="fc" id="L433">            return Outcome.INCONCLUSIVE;</span>
         }
 
         private static boolean isRefuted(CandidateAttempt attempt) {
-<span class="pc bpc" id="L427" title="1 of 2 branches missed.">            return attempt.disposition()</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            return attempt.disposition()</span>
                 == AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE
-<span class="fc bfc" id="L429" title="All 2 branches covered.">                || attempt.disposition()</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                || attempt.disposition()</span>
                 == AttemptDisposition.REFUTED_BY_EVALUATOR;
         }
 
         private RunResult&lt;C, K&gt; finish(Outcome outcome) {
-<span class="fc" id="L434">            Optional&lt;C&gt; candidate = Optional.ofNullable(selectedCandidate);</span>
-<span class="fc" id="L435">            Optional&lt;K&gt; certificateObject = Optional.ofNullable(</span>
+<span class="fc" id="L444">            Optional&lt;C&gt; candidate = Optional.ofNullable(selectedCandidate);</span>
+<span class="fc" id="L445">            Optional&lt;K&gt; certificateObject = Optional.ofNullable(</span>
                 selectedCertificateObject);
-<span class="fc" id="L437">            DomainPayload payload = domain.evidenceAdapter().adapt(</span>
-<span class="pc bpc" id="L438" title="1 of 2 branches missed.">                Optional.ofNullable(evidenceInitialState != null</span>
-<span class="fc" id="L439">                    ? evidenceInitialState</span>
-<span class="nc" id="L440">                    : firstGeneratedState),</span>
+<span class="fc" id="L447">            DomainPayload payload = domain.evidenceAdapter().adapt(</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                Optional.ofNullable(evidenceInitialState != null</span>
+<span class="fc" id="L449">                    ? evidenceInitialState</span>
+<span class="nc" id="L450">                    : firstGeneratedState),</span>
                 candidate,
                 certificateObject);
-<span class="fc" id="L443">            DomainDiscoveryEvidence evidence = new DomainDiscoveryEvidence(</span>
+<span class="fc" id="L453">            DomainDiscoveryEvidence evidence = new DomainDiscoveryEvidence(</span>
                 campaignId,
                 descriptor,
                 seed,
@@ -449,29 +459,29 @@ import java.util.Set;
                 stateTraces,
                 transitionTraces,
                 candidateAttempts,
-<span class="fc" id="L452">                resourceLines(),</span>
+<span class="fc" id="L462">                resourceLines(),</span>
                 selectedCandidateHash,
                 selectedCertificate,
                 payload);
-<span class="fc" id="L456">            return new RunResult&lt;&gt;(candidate, certificateObject, evidence);</span>
+<span class="fc" id="L466">            return new RunResult&lt;&gt;(candidate, certificateObject, evidence);</span>
         }
 
         private List&lt;ResourceLine&gt; resourceLines() {
-<span class="fc" id="L460">            return List.of(</span>
-<span class="fc" id="L461">                line(Resource.EXPLORED_STATES,</span>
-<span class="fc" id="L462">                    budget.maxExploredStates(), exploredStates, 0),</span>
-<span class="fc" id="L463">                line(Resource.GENERATED_SUCCESSORS,</span>
-<span class="fc" id="L464">                    budget.maxGeneratedSuccessors(), generatedSuccessors, 0),</span>
-<span class="fc" id="L465">                line(Resource.CANDIDATE_EVALUATIONS,</span>
-<span class="fc" id="L466">                    budget.maxCandidateAttempts(),</span>
+<span class="fc" id="L470">            return List.of(</span>
+<span class="fc" id="L471">                line(Resource.EXPLORED_STATES,</span>
+<span class="fc" id="L472">                    budget.maxExploredStates(), exploredStates, 0),</span>
+<span class="fc" id="L473">                line(Resource.GENERATED_SUCCESSORS,</span>
+<span class="fc" id="L474">                    budget.maxGeneratedSuccessors(), generatedSuccessors, 0),</span>
+<span class="fc" id="L475">                line(Resource.CANDIDATE_EVALUATIONS,</span>
+<span class="fc" id="L476">                    budget.maxCandidateAttempts(),</span>
                     candidateEvaluationsExecuted,
                     candidateEvaluationsSkipped),
-<span class="fc" id="L469">                line(Resource.COUNTEREXAMPLE_ATTEMPTS,</span>
-<span class="fc" id="L470">                    budget.maxCounterexampleAttempts(),</span>
+<span class="fc" id="L479">                line(Resource.COUNTEREXAMPLE_ATTEMPTS,</span>
+<span class="fc" id="L480">                    budget.maxCounterexampleAttempts(),</span>
                     counterexampleAttemptsUsed,
                     0),
-<span class="fc" id="L473">                line(Resource.CERTIFICATE_ATTEMPTS,</span>
-<span class="fc" id="L474">                    budget.maxCandidateAttempts(),</span>
+<span class="fc" id="L483">                line(Resource.CERTIFICATE_ATTEMPTS,</span>
+<span class="fc" id="L484">                    budget.maxCandidateAttempts(),</span>
                     certificateAttemptsExecuted,
                     certificateAttemptsSkipped));
         }
@@ -481,30 +491,30 @@ import java.util.Set;
         DiscoveryDomain&lt;S, C, K&gt; domain,
         S state
     ) {
-<span class="fc" id="L484">        Objects.requireNonNull(state, &quot;generated state&quot;);</span>
-<span class="fc" id="L485">        String canonical = DomainCanonical.requireText(</span>
-<span class="fc" id="L486">            domain.stateCodec().canonicalForm(state),</span>
+<span class="fc" id="L494">        Objects.requireNonNull(state, &quot;generated state&quot;);</span>
+<span class="fc" id="L495">        String canonical = DomainCanonical.requireText(</span>
+<span class="fc" id="L496">            domain.stateCodec().canonicalForm(state),</span>
             &quot;canonical state&quot;);
-<span class="fc" id="L488">        return new PreparedState&lt;&gt;(state, canonical, DomainCanonical.sha256(canonical));</span>
+<span class="fc" id="L498">        return new PreparedState&lt;&gt;(state, canonical, DomainCanonical.sha256(canonical));</span>
     }
 
     private static &lt;S, C, K&gt; List&lt;PreparedSuccessor&lt;S&gt;&gt; prepareSuccessors(
         DiscoveryDomain&lt;S, C, K&gt; domain,
         S state
     ) {
-<span class="fc" id="L495">        List&lt;PreparedSuccessor&lt;S&gt;&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L496">        List&lt;TransitionOperator&lt;S&gt;&gt; operators = domain.operators().stream()</span>
-<span class="fc" id="L497">            .sorted(Comparator.comparing(TransitionOperator::id))</span>
-<span class="fc" id="L498">            .toList();</span>
-<span class="fc bfc" id="L499" title="All 2 branches covered.">        for (TransitionOperator&lt;S&gt; operator : operators) {</span>
-<span class="fc" id="L500">            addPreparedSuccessors(domain, state, operator, result);</span>
-<span class="fc" id="L501">        }</span>
-<span class="fc" id="L502">        result.sort(Comparator</span>
-<span class="fc" id="L503">            .comparing((PreparedSuccessor&lt;S&gt; successor) -&gt;</span>
-<span class="fc" id="L504">                successor.successor().actionId())</span>
-<span class="fc" id="L505">            .thenComparing(PreparedSuccessor::canonicalState)</span>
-<span class="fc" id="L506">            .thenComparing(PreparedSuccessor::componentOperatorId));</span>
-<span class="fc" id="L507">        return List.copyOf(result);</span>
+<span class="fc" id="L505">        List&lt;PreparedSuccessor&lt;S&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L506">        List&lt;TransitionOperator&lt;S&gt;&gt; operators = domain.operators().stream()</span>
+<span class="fc" id="L507">            .sorted(Comparator.comparing(TransitionOperator::id))</span>
+<span class="fc" id="L508">            .toList();</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        for (TransitionOperator&lt;S&gt; operator : operators) {</span>
+<span class="fc" id="L510">            addPreparedSuccessors(domain, state, operator, result);</span>
+<span class="fc" id="L511">        }</span>
+<span class="fc" id="L512">        result.sort(Comparator</span>
+<span class="fc" id="L513">            .comparing((PreparedSuccessor&lt;S&gt; successor) -&gt;</span>
+<span class="fc" id="L514">                successor.successor().actionId())</span>
+<span class="fc" id="L515">            .thenComparing(PreparedSuccessor::canonicalState)</span>
+<span class="fc" id="L516">            .thenComparing(PreparedSuccessor::componentOperatorId));</span>
+<span class="fc" id="L517">        return List.copyOf(result);</span>
     }
 
     private static &lt;S, C, K&gt; void addPreparedSuccessors(
@@ -513,31 +523,31 @@ import java.util.Set;
         TransitionOperator&lt;S&gt; operator,
         List&lt;PreparedSuccessor&lt;S&gt;&gt; result
     ) {
-<span class="fc" id="L516">        List&lt;Successor&lt;S&gt;&gt; generated = Objects.requireNonNull(</span>
-<span class="fc" id="L517">            operator.apply(state),</span>
-<span class="fc" id="L518">            &quot;transition operator returned null: &quot; + operator.id());</span>
-<span class="fc bfc" id="L519" title="All 2 branches covered.">        for (Successor&lt;S&gt; successor : generated) {</span>
-<span class="fc" id="L520">            PreparedState&lt;S&gt; prepared = prepareState(domain, successor.state());</span>
-<span class="fc" id="L521">            result.add(new PreparedSuccessor&lt;&gt;(</span>
-<span class="fc" id="L522">                operator.id(),</span>
+<span class="fc" id="L526">        List&lt;Successor&lt;S&gt;&gt; generated = Objects.requireNonNull(</span>
+<span class="fc" id="L527">            operator.apply(state),</span>
+<span class="fc" id="L528">            &quot;transition operator returned null: &quot; + operator.id());</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        for (Successor&lt;S&gt; successor : generated) {</span>
+<span class="fc" id="L530">            PreparedState&lt;S&gt; prepared = prepareState(domain, successor.state());</span>
+<span class="fc" id="L531">            result.add(new PreparedSuccessor&lt;&gt;(</span>
+<span class="fc" id="L532">                operator.id(),</span>
                 successor,
-<span class="fc" id="L524">                prepared.canonicalState(),</span>
-<span class="fc" id="L525">                prepared.stateHash()));</span>
-<span class="fc" id="L526">        }</span>
-<span class="fc" id="L527">    }</span>
+<span class="fc" id="L534">                prepared.canonicalState(),</span>
+<span class="fc" id="L535">                prepared.stateHash()));</span>
+<span class="fc" id="L536">        }</span>
+<span class="fc" id="L537">    }</span>
 
     private static &lt;S, C, K&gt; List&lt;String&gt; invariantBlockers(
         DiscoveryDomain&lt;S, C, K&gt; domain,
         S state
     ) {
-<span class="fc" id="L533">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L534">        List&lt;Invariant&lt;S&gt;&gt; invariants = domain.invariants().stream()</span>
-<span class="fc" id="L535">            .sorted(Comparator.comparing(Invariant::id))</span>
-<span class="fc" id="L536">            .toList();</span>
-<span class="fc bfc" id="L537" title="All 2 branches covered.">        for (Invariant&lt;S&gt; invariant : invariants) {</span>
-<span class="fc" id="L538">            addInvariantBlockers(state, invariant, blockers);</span>
-<span class="fc" id="L539">        }</span>
-<span class="fc" id="L540">        return DomainCanonical.sortedDistinct(blockers);</span>
+<span class="fc" id="L543">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L544">        List&lt;Invariant&lt;S&gt;&gt; invariants = domain.invariants().stream()</span>
+<span class="fc" id="L545">            .sorted(Comparator.comparing(Invariant::id))</span>
+<span class="fc" id="L546">            .toList();</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        for (Invariant&lt;S&gt; invariant : invariants) {</span>
+<span class="fc" id="L548">            addInvariantBlockers(state, invariant, blockers);</span>
+<span class="fc" id="L549">        }</span>
+<span class="fc" id="L550">        return DomainCanonical.sortedDistinct(blockers);</span>
     }
 
     private static &lt;S&gt; void addInvariantBlockers(
@@ -545,22 +555,22 @@ import java.util.Set;
         Invariant&lt;S&gt; invariant,
         List&lt;String&gt; blockers
     ) {
-<span class="fc" id="L548">        DiscoveryDomain.InvariantResult result = Objects.requireNonNull(</span>
-<span class="fc" id="L549">            invariant.check(state),</span>
-<span class="fc" id="L550">            &quot;invariant returned null: &quot; + invariant.id());</span>
-<span class="fc bfc" id="L551" title="All 2 branches covered.">        if (!result.accepted()) {</span>
-<span class="fc" id="L552">            result.blockers().forEach(blocker -&gt;</span>
-<span class="fc" id="L553">                blockers.add(invariant.id() + &quot;:&quot; + blocker));</span>
+<span class="fc" id="L558">        DiscoveryDomain.InvariantResult result = Objects.requireNonNull(</span>
+<span class="fc" id="L559">            invariant.check(state),</span>
+<span class="fc" id="L560">            &quot;invariant returned null: &quot; + invariant.id());</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">        if (!result.accepted()) {</span>
+<span class="fc" id="L562">            result.blockers().forEach(blocker -&gt;</span>
+<span class="fc" id="L563">                blockers.add(invariant.id() + &quot;:&quot; + blocker));</span>
         }
-<span class="fc" id="L555">    }</span>
+<span class="fc" id="L565">    }</span>
 
     private static Map&lt;String, String&gt; withComponentOperator(
         Map&lt;String, String&gt; metadata,
         String componentOperatorId
     ) {
-<span class="fc" id="L561">        LinkedHashMap&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;(metadata);</span>
-<span class="fc" id="L562">        result.put(&quot;componentOperatorId&quot;, componentOperatorId);</span>
-<span class="fc" id="L563">        return DomainCanonical.sortedMap(result);</span>
+<span class="fc" id="L571">        LinkedHashMap&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;(metadata);</span>
+<span class="fc" id="L572">        result.put(&quot;componentOperatorId&quot;, componentOperatorId);</span>
+<span class="fc" id="L573">        return DomainCanonical.sortedMap(result);</span>
     }
 
     private static ResourceLine line(
@@ -569,11 +579,11 @@ import java.util.Set;
         int executed,
         int skipped
     ) {
-<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        if (executed + skipped &gt; configured) {</span>
-<span class="nc" id="L573">            throw new IllegalStateException(</span>
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">        if (executed + skipped &gt; configured) {</span>
+<span class="nc" id="L583">            throw new IllegalStateException(</span>
                 resource + &quot; exceeded configured work&quot;);
         }
-<span class="fc" id="L576">        return new ResourceLine(</span>
+<span class="fc" id="L586">        return new ResourceLine(</span>
             resource,
             configured,
             executed,
@@ -581,14 +591,14 @@ import java.util.Set;
             configured - executed - skipped);
     }
 
-<span class="fc" id="L584">    private record PreparedState&lt;S&gt;(</span>
+<span class="fc" id="L594">    private record PreparedState&lt;S&gt;(</span>
         S state,
         String canonicalState,
         String stateHash
     ) {
     }
 
-<span class="fc" id="L591">    private record PreparedSuccessor&lt;S&gt;(</span>
+<span class="fc" id="L601">    private record PreparedSuccessor&lt;S&gt;(</span>
         String componentOperatorId,
         Successor&lt;S&gt; successor,
         String canonicalState,
@@ -596,7 +606,7 @@ import java.util.Set;
     ) {
     }
 
-<span class="fc" id="L599">    private record Node&lt;S&gt;(</span>
+<span class="fc" id="L609">    private record Node&lt;S&gt;(</span>
         S initialState,
         S state,
         String canonicalState,
@@ -609,7 +619,7 @@ import java.util.Set;
     ) {
     }
 
-<span class="fc" id="L612">    private record CandidateAttemptResult&lt;K&gt;(</span>
+<span class="fc" id="L622">    private record CandidateAttemptResult&lt;K&gt;(</span>
         String candidateHash,
         AttemptDisposition disposition,
         CounterexampleResult counterexample,
@@ -622,42 +632,42 @@ import java.util.Set;
             String candidateHash,
             CounterexampleResult counterexample
         ) {
-<span class="nc" id="L625">            return new CandidateAttemptResult&lt;&gt;(</span>
+<span class="nc" id="L635">            return new CandidateAttemptResult&lt;&gt;(</span>
                 candidateHash,
                 AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE,
                 counterexample,
                 EvaluationDisposition.NOT_RUN,
                 &quot;counterexample found before evaluator invocation&quot;,
                 null,
-<span class="nc" id="L632">                prefixedMetrics(&quot;counterexample.&quot;, counterexample.metrics()));</span>
+<span class="nc" id="L642">                prefixedMetrics(&quot;counterexample.&quot;, counterexample.metrics()));</span>
         }
 
         private static &lt;K&gt; CandidateAttemptResult&lt;K&gt; inconclusive(
             String candidateHash,
             CounterexampleResult counterexample
         ) {
-<span class="fc" id="L639">            return new CandidateAttemptResult&lt;&gt;(</span>
+<span class="fc" id="L649">            return new CandidateAttemptResult&lt;&gt;(</span>
                 candidateHash,
                 AttemptDisposition.INCONCLUSIVE,
                 counterexample,
                 EvaluationDisposition.NOT_RUN,
                 &quot;counterexample search was inconclusive&quot;,
                 null,
-<span class="fc" id="L646">                prefixedMetrics(&quot;counterexample.&quot;, counterexample.metrics()));</span>
+<span class="fc" id="L656">                prefixedMetrics(&quot;counterexample.&quot;, counterexample.metrics()));</span>
         }
 
         private static &lt;K&gt; CandidateAttemptResult&lt;K&gt; unsupported(
             String candidateHash,
             CounterexampleResult counterexample
         ) {
-<span class="nc" id="L653">            return new CandidateAttemptResult&lt;&gt;(</span>
+<span class="nc" id="L663">            return new CandidateAttemptResult&lt;&gt;(</span>
                 candidateHash,
                 AttemptDisposition.UNSUPPORTED,
                 counterexample,
                 EvaluationDisposition.NOT_RUN,
                 &quot;counterexample search is unsupported&quot;,
                 null,
-<span class="nc" id="L660">                prefixedMetrics(&quot;counterexample.&quot;, counterexample.metrics()));</span>
+<span class="nc" id="L670">                prefixedMetrics(&quot;counterexample.&quot;, counterexample.metrics()));</span>
         }
 
         private static &lt;K&gt; CandidateAttemptResult&lt;K&gt; confirmed(
@@ -666,14 +676,14 @@ import java.util.Set;
             Evaluation&lt;K&gt; evaluation,
             RenderedCertificate certificate
         ) {
-<span class="fc" id="L669">            return new CandidateAttemptResult&lt;&gt;(</span>
+<span class="fc" id="L679">            return new CandidateAttemptResult&lt;&gt;(</span>
                 candidateHash,
                 AttemptDisposition.CONFIRMED,
                 counterexample,
                 EvaluationDisposition.CONFIRMED,
-<span class="fc" id="L674">                evaluation.summary(),</span>
+<span class="fc" id="L684">                evaluation.summary(),</span>
                 certificate,
-<span class="fc" id="L676">                mergedMetrics(counterexample.metrics(), evaluation.metrics()));</span>
+<span class="fc" id="L686">                mergedMetrics(counterexample.metrics(), evaluation.metrics()));</span>
         }
 
         private static &lt;K&gt; CandidateAttemptResult&lt;K&gt; evaluated(
@@ -681,22 +691,22 @@ import java.util.Set;
             CounterexampleResult counterexample,
             Evaluation&lt;K&gt; evaluation
         ) {
-<span class="fc" id="L684">            return new CandidateAttemptResult&lt;&gt;(</span>
+<span class="fc" id="L694">            return new CandidateAttemptResult&lt;&gt;(</span>
                 candidateHash,
-<span class="fc" id="L686">                disposition(evaluation.status()),</span>
+<span class="fc" id="L696">                disposition(evaluation.status()),</span>
                 counterexample,
-<span class="fc" id="L688">                evaluationDisposition(evaluation.status()),</span>
-<span class="fc" id="L689">                evaluation.summary(),</span>
+<span class="fc" id="L698">                evaluationDisposition(evaluation.status()),</span>
+<span class="fc" id="L699">                evaluation.summary(),</span>
                 null,
-<span class="fc" id="L691">                mergedMetrics(counterexample.metrics(), evaluation.metrics()));</span>
+<span class="fc" id="L701">                mergedMetrics(counterexample.metrics(), evaluation.metrics()));</span>
         }
 
         private static AttemptDisposition disposition(EvaluationStatus status) {
-<span class="pc bpc" id="L695" title="3 of 4 branches missed.">            return switch (status) {</span>
-<span class="fc" id="L696">                case REFUTED -&gt; AttemptDisposition.REFUTED_BY_EVALUATOR;</span>
-<span class="nc" id="L697">                case INCONCLUSIVE -&gt; AttemptDisposition.INCONCLUSIVE;</span>
-<span class="nc" id="L698">                case UNSUPPORTED -&gt; AttemptDisposition.UNSUPPORTED;</span>
-<span class="nc" id="L699">                case CONFIRMED -&gt; throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L705" title="3 of 4 branches missed.">            return switch (status) {</span>
+<span class="fc" id="L706">                case REFUTED -&gt; AttemptDisposition.REFUTED_BY_EVALUATOR;</span>
+<span class="nc" id="L707">                case INCONCLUSIVE -&gt; AttemptDisposition.INCONCLUSIVE;</span>
+<span class="nc" id="L708">                case UNSUPPORTED -&gt; AttemptDisposition.UNSUPPORTED;</span>
+<span class="nc" id="L709">                case CONFIRMED -&gt; throw new IllegalArgumentException(</span>
                     &quot;confirmed evaluation must use confirmed factory&quot;);
             };
         }
@@ -704,25 +714,25 @@ import java.util.Set;
         private static EvaluationDisposition evaluationDisposition(
             EvaluationStatus status
         ) {
-<span class="pc bpc" id="L707" title="3 of 4 branches missed.">            return switch (status) {</span>
-<span class="nc" id="L708">                case CONFIRMED -&gt; EvaluationDisposition.CONFIRMED;</span>
-<span class="fc" id="L709">                case REFUTED -&gt; EvaluationDisposition.REFUTED;</span>
-<span class="nc" id="L710">                case INCONCLUSIVE -&gt; EvaluationDisposition.INCONCLUSIVE;</span>
-<span class="nc" id="L711">                case UNSUPPORTED -&gt; EvaluationDisposition.UNSUPPORTED;</span>
+<span class="pc bpc" id="L717" title="3 of 4 branches missed.">            return switch (status) {</span>
+<span class="nc" id="L718">                case CONFIRMED -&gt; EvaluationDisposition.CONFIRMED;</span>
+<span class="fc" id="L719">                case REFUTED -&gt; EvaluationDisposition.REFUTED;</span>
+<span class="nc" id="L720">                case INCONCLUSIVE -&gt; EvaluationDisposition.INCONCLUSIVE;</span>
+<span class="nc" id="L721">                case UNSUPPORTED -&gt; EvaluationDisposition.UNSUPPORTED;</span>
             };
         }
 
         private CandidateAttempt toEvidence(int sequence) {
-<span class="fc" id="L716">            return new CandidateAttempt(</span>
+<span class="fc" id="L726">            return new CandidateAttempt(</span>
                 sequence,
                 candidateHash,
                 disposition,
-<span class="fc" id="L720">                counterexample.status(),</span>
-<span class="fc" id="L721">                counterexample.attempts(),</span>
-<span class="fc" id="L722">                counterexample.witness(),</span>
+<span class="fc" id="L730">                counterexample.status(),</span>
+<span class="fc" id="L731">                counterexample.attempts(),</span>
+<span class="fc" id="L732">                counterexample.witness(),</span>
                 evaluationStatus,
                 evaluationSummary,
-<span class="fc bfc" id="L725" title="All 2 branches covered.">                certificate == null ? &quot;&quot; : certificate.contentHash(),</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">                certificate == null ? &quot;&quot; : certificate.contentHash(),</span>
                 metrics);
         }
 
@@ -730,19 +740,19 @@ import java.util.Set;
             Map&lt;String, String&gt; counterexample,
             Map&lt;String, String&gt; evaluation
         ) {
-<span class="fc" id="L733">            LinkedHashMap&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L734">            result.putAll(prefixedMetrics(&quot;counterexample.&quot;, counterexample));</span>
-<span class="fc" id="L735">            result.putAll(prefixedMetrics(&quot;evaluation.&quot;, evaluation));</span>
-<span class="fc" id="L736">            return DomainCanonical.sortedMap(result);</span>
+<span class="fc" id="L743">            LinkedHashMap&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L744">            result.putAll(prefixedMetrics(&quot;counterexample.&quot;, counterexample));</span>
+<span class="fc" id="L745">            result.putAll(prefixedMetrics(&quot;evaluation.&quot;, evaluation));</span>
+<span class="fc" id="L746">            return DomainCanonical.sortedMap(result);</span>
         }
 
         private static Map&lt;String, String&gt; prefixedMetrics(
             String prefix,
             Map&lt;String, String&gt; values
         ) {
-<span class="fc" id="L743">            Map&lt;String, String&gt; result = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L744">            values.forEach((key, value) -&gt; result.put(prefix + key, value));</span>
-<span class="fc" id="L745">            return DomainCanonical.sortedMap(result);</span>
+<span class="fc" id="L753">            Map&lt;String, String&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L754">            values.forEach((key, value) -&gt; result.put(prefix + key, value));</span>
+<span class="fc" id="L755">            return DomainCanonical.sortedMap(result);</span>
         }
     }
 }

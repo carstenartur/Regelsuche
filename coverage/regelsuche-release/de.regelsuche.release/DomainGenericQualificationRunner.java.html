@@ -7,8 +7,11 @@ import de.regelsuche.discovery.domain.DomainDiscoveryExport;
 import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier;
 import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier.VerifiedDomainExport;
 import de.regelsuche.discovery.domain.DomainDiscoveryRunner;
+import de.regelsuche.discovery.domain.DomainExportWorkspace;
+import de.regelsuche.discovery.domain.DomainSnapshotAssessment;
 import de.regelsuche.discovery.domain.ExpressionRewriteDiscoveryDomain;
 import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain;
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
 import de.regelsuche.json.JsonWriter;
 import java.io.IOException;
@@ -21,152 +24,187 @@ import java.util.List;
 import java.util.Objects;
 
 /** Executes three clean runs of the reference multi-domain qualification. */
-<span class="fc" id="L24">public final class DomainGenericQualificationRunner {</span>
+<span class="fc" id="L27">public final class DomainGenericQualificationRunner {</span>
     public static final String SCHEMA =
         &quot;regelsuche.domain-generic-discovery-qualification-run/v1&quot;;
     public static final int CLEAN_RUN_COUNT = 3;
 
-<span class="fc" id="L29">    private final DomainDiscoveryExport exporter = new DomainDiscoveryExport();</span>
-<span class="fc" id="L30">    private final DomainDiscoveryExportVerifier verifier =</span>
+<span class="fc" id="L32">    private final DomainDiscoveryExport exporter = new DomainDiscoveryExport();</span>
+<span class="fc" id="L33">    private final DomainDiscoveryExportVerifier verifier =</span>
         new DomainDiscoveryExportVerifier();
-<span class="fc" id="L32">    private final DomainGenericDiscoveryQualification qualification =</span>
+<span class="fc" id="L35">    private final DomainGenericDiscoveryQualification qualification =</span>
         new DomainGenericDiscoveryQualification();
 
     public QualificationRun run(Path outputDirectory) {
-<span class="fc" id="L36">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
-<span class="fc" id="L37">        Path root = outputDirectory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L39">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L40">        Path root = outputDirectory.toAbsolutePath().normalize();</span>
         try {
-<span class="fc" id="L39">            Files.createDirectories(root);</span>
+<span class="fc" id="L42">            Files.createDirectories(root);</span>
             // A completion receipt from an earlier execution cannot cover a partial refresh.
-<span class="fc" id="L41">            Files.deleteIfExists(root.resolve(&quot;qualification-run.json&quot;));</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (int run = 1; run &lt;= CLEAN_RUN_COUNT; run++) {</span>
-<span class="fc" id="L43">                executeRun(root.resolve(&quot;runs/run-&quot; + run));</span>
+<span class="fc" id="L44">            Files.deleteIfExists(root.resolve(&quot;qualification-run.json&quot;));</span>
+<span class="fc" id="L45">            Files.deleteIfExists(root.resolve(DomainSnapshotReleaseReport.FILE));</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (int run = 1; run &lt;= CLEAN_RUN_COUNT; run++) {</span>
+<span class="fc" id="L47">                executeRun(root.resolve(&quot;runs/run-&quot; + run));</span>
             }
-<span class="fc" id="L45">            QualificationRun result = compose(root);</span>
-<span class="fc" id="L46">            write(root.resolve(&quot;profile-catalog.json&quot;), result.profileCatalogJson());</span>
-<span class="fc" id="L47">            write(root.resolve(&quot;qualification-report.json&quot;),</span>
-<span class="fc" id="L48">                result.report().toCanonicalJson());</span>
-<span class="fc" id="L49">            write(root.resolve(&quot;qualification-run.json&quot;),</span>
-<span class="fc" id="L50">                result.toCanonicalJson());</span>
-<span class="fc" id="L51">            return result;</span>
-<span class="nc" id="L52">        } catch (IOException exception) {</span>
-<span class="nc" id="L53">            throw new UncheckedIOException(</span>
+<span class="fc" id="L49">            QualificationRun result = compose(root);</span>
+<span class="fc" id="L50">            write(root.resolve(&quot;profile-catalog.json&quot;), result.profileCatalogJson());</span>
+<span class="fc" id="L51">            write(root.resolve(&quot;qualification-report.json&quot;),</span>
+<span class="fc" id="L52">                result.report().toCanonicalJson());</span>
+<span class="fc" id="L53">            write(root.resolve(DomainSnapshotReleaseReport.FILE), DomainSnapshotReleaseReport.reconstruct(root, result.contentHash()));</span>
+<span class="fc" id="L54">            write(root.resolve(&quot;qualification-run.json&quot;),</span>
+<span class="fc" id="L55">                result.toCanonicalJson());</span>
+<span class="fc" id="L56">            return result;</span>
+<span class="nc" id="L57">        } catch (IOException exception) {</span>
+<span class="nc" id="L58">            throw new UncheckedIOException(</span>
                 &quot;Could not execute domain-generic qualification&quot;, exception);
         }
     }
 
     private void executeRun(Path directory)
             throws IOException {
-<span class="fc" id="L60">        DomainDiscoveryEvidence expression = expressionEvidence();</span>
-<span class="fc" id="L61">        DomainDiscoveryEvidence sequence = sequenceEvidence();</span>
-<span class="fc" id="L62">        List&lt;DomainInput&gt; inputs = List.of(</span>
+<span class="fc" id="L65">        DomainDiscoveryEvidence expression = expressionEvidence();</span>
+<span class="fc" id="L66">        DomainDiscoveryEvidence sequence = sequenceEvidence();</span>
+<span class="fc" id="L67">        List&lt;DomainInput&gt; inputs = List.of(</span>
             new DomainInput(&quot;expression&quot;, expression),
-            new DomainInput(&quot;sequence&quot;, sequence));
-<span class="fc" id="L65">        Path receipts = directory.resolve(&quot;verification-receipts&quot;);</span>
-<span class="fc" id="L66">        Files.createDirectories(receipts);</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (DomainInput input : inputs) {</span>
-<span class="fc" id="L68">            Path exportDirectory = directory.resolve(input.name());</span>
-<span class="fc" id="L69">            exporter.write(exportDirectory, input.evidence());</span>
-<span class="fc" id="L70">            VerifiedDomainExport snapshot = verifier.requireVerified(exportDirectory);</span>
-<span class="fc" id="L71">            write(</span>
-<span class="fc" id="L72">                receipts.resolve(input.name() + &quot;.json&quot;),</span>
-<span class="fc" id="L73">                snapshot.verification().toCanonicalJson());</span>
-<span class="fc" id="L74">        }</span>
-<span class="fc" id="L75">    }</span>
+            new DomainInput(&quot;sequence&quot;, sequence),
+<span class="fc" id="L70">            new DomainInput(&quot;recurrence&quot;, recurrenceEvidence()));</span>
+<span class="fc" id="L71">        Path receipts = directory.resolve(&quot;verification-receipts&quot;);</span>
+<span class="fc" id="L72">        Files.createDirectories(receipts);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (DomainInput input : inputs) {</span>
+<span class="fc" id="L74">            Path exportDirectory = directory.resolve(input.name());</span>
+<span class="fc" id="L75">            exporter.write(exportDirectory, input.evidence());</span>
+<span class="fc" id="L76">            VerifiedDomainExport snapshot = verifier.requireVerified(exportDirectory);</span>
+<span class="fc" id="L77">            write(directory.resolve(&quot;assessments&quot;).resolve(input.name() + &quot;.json&quot;),</span>
+<span class="fc" id="L78">                assess(snapshot).toCanonicalJson());</span>
+<span class="fc" id="L79">            write(</span>
+<span class="fc" id="L80">                receipts.resolve(input.name() + &quot;.json&quot;),</span>
+<span class="fc" id="L81">                snapshot.verification().toCanonicalJson());</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
 
     /** Reopens all source exports and compares every emitted public artifact with its producer. */
     public QualificationRun verifyRetained(Path root) {
         try {
-<span class="fc" id="L80">            QualificationRun result = compose(root);</span>
-<span class="fc" id="L81">            requireOriginal(root.resolve(&quot;profile-catalog.json&quot;), result.profileCatalogJson());</span>
-<span class="fc" id="L82">            requireOriginal(root.resolve(&quot;qualification-report.json&quot;), result.report().toCanonicalJson());</span>
-<span class="fc" id="L83">            requireOriginal(root.resolve(&quot;qualification-run.json&quot;), result.toCanonicalJson());</span>
-<span class="fc" id="L84">            return result;</span>
-<span class="nc" id="L85">        } catch (IOException exception) {</span>
-<span class="nc" id="L86">            throw new UncheckedIOException(&quot;Could not verify retained domain qualification&quot;, exception);</span>
+<span class="fc" id="L88">            QualificationRun result = compose(root);</span>
+<span class="fc" id="L89">            requireOriginal(root.resolve(&quot;profile-catalog.json&quot;), result.profileCatalogJson());</span>
+<span class="fc" id="L90">            requireOriginal(root.resolve(&quot;qualification-report.json&quot;), result.report().toCanonicalJson());</span>
+<span class="fc" id="L91">            requireOriginal(root.resolve(&quot;qualification-run.json&quot;), result.toCanonicalJson());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (Files.exists(root.resolve(DomainSnapshotReleaseReport.FILE), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L93">                requireOriginal(root.resolve(DomainSnapshotReleaseReport.FILE), DomainSnapshotReleaseReport.reconstruct(root, result.contentHash()));</span>
+            }
+<span class="fc" id="L95">            return result;</span>
+<span class="nc" id="L96">        } catch (IOException exception) {</span>
+<span class="nc" id="L97">            throw new UncheckedIOException(&quot;Could not verify retained domain qualification&quot;, exception);</span>
+        }
+    }
+
+    /** This entry point always requires the distinct product release, including all nine original assessments. */
+    public String verifyRetainedProduct(Path root) {
+        try {
+<span class="fc" id="L104">            QualificationRun architecture = compose(root);</span>
+<span class="fc" id="L105">            requireOriginal(root.resolve(&quot;profile-catalog.json&quot;), architecture.profileCatalogJson());</span>
+<span class="fc" id="L106">            requireOriginal(root.resolve(&quot;qualification-report.json&quot;), architecture.report().toCanonicalJson());</span>
+<span class="fc" id="L107">            requireOriginal(root.resolve(&quot;qualification-run.json&quot;), architecture.toCanonicalJson());</span>
+<span class="fc" id="L108">            String report = DomainSnapshotReleaseReport.reconstruct(root, architecture.contentHash());</span>
+<span class="fc" id="L109">            requireOriginal(root.resolve(DomainSnapshotReleaseReport.FILE), report);</span>
+<span class="fc" id="L110">            return report;</span>
+<span class="fc" id="L111">        } catch (IOException exception) {</span>
+<span class="fc" id="L112">            throw new UncheckedIOException(&quot;Could not verify retained snapshot product release&quot;, exception);</span>
         }
     }
 
     private QualificationRun compose(Path root) throws IOException {
-<span class="fc" id="L91">        List&lt;List&lt;VerifiedDomainExport&gt;&gt; runs = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (int index = 1; index &lt;= CLEAN_RUN_COUNT; index++) {</span>
-<span class="fc" id="L93">            Path directory = root.resolve(&quot;runs/run-&quot; + index);</span>
-<span class="fc" id="L94">            List&lt;VerifiedDomainExport&gt; exports = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (String name : List.of(&quot;expression&quot;, &quot;sequence&quot;)) {</span>
-<span class="fc" id="L96">                VerifiedDomainExport verified = verifier.requireVerified(directory.resolve(name));</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">                String expectedDomain = name.equals(&quot;expression&quot;) ? &quot;expression-rewrite&quot; : &quot;integer-sequence-finite-difference&quot;;</span>
-<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                if (!expectedDomain.equals(verified.manifest().domainId())) {</span>
-<span class="nc" id="L99">                    throw new IllegalArgumentException(&quot;Unexpected reference domain at &quot; + directory.resolve(name));</span>
+<span class="fc" id="L117">        List&lt;List&lt;VerifiedDomainExport&gt;&gt; runs = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int index = 1; index &lt;= CLEAN_RUN_COUNT; index++) {</span>
+<span class="fc" id="L119">            Path directory = root.resolve(&quot;runs/run-&quot; + index);</span>
+<span class="fc" id="L120">            List&lt;VerifiedDomainExport&gt; exports = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (String name : List.of(&quot;expression&quot;, &quot;sequence&quot;)) {</span>
+<span class="fc" id="L122">                VerifiedDomainExport verified = verifier.requireVerified(directory.resolve(name));</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                String expectedDomain = name.equals(&quot;expression&quot;) ? &quot;expression-rewrite&quot; : &quot;integer-sequence-finite-difference&quot;;</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                if (!expectedDomain.equals(verified.manifest().domainId())) {</span>
+<span class="nc" id="L125">                    throw new IllegalArgumentException(&quot;Unexpected reference domain at &quot; + directory.resolve(name));</span>
                 }
-<span class="fc" id="L101">                requireOriginal(directory.resolve(&quot;verification-receipts&quot;).resolve(name + &quot;.json&quot;),</span>
-<span class="fc" id="L102">                    verified.verification().toCanonicalJson());</span>
-<span class="fc" id="L103">                exports.add(verified);</span>
-<span class="fc" id="L104">            }</span>
-<span class="fc" id="L105">            runs.add(List.copyOf(exports));</span>
+<span class="fc" id="L127">                requireOriginal(directory.resolve(&quot;verification-receipts&quot;).resolve(name + &quot;.json&quot;),</span>
+<span class="fc" id="L128">                    verified.verification().toCanonicalJson());</span>
+<span class="fc" id="L129">                exports.add(verified);</span>
+<span class="fc" id="L130">            }</span>
+<span class="fc" id="L131">            runs.add(List.copyOf(exports));</span>
         }
-<span class="fc" id="L107">        String catalog = DomainGenericEvidenceProfile.catalogJson();</span>
-<span class="fc" id="L108">        return QualificationRun.create(qualification.evaluate(runs), catalog, AutonomousResearchBriefV2.hash(catalog),</span>
-<span class="fc" id="L109">            runs.stream().map(DomainGenericDiscoveryQualification::runFingerprint).toList());</span>
+<span class="fc" id="L133">        String catalog = DomainGenericEvidenceProfile.catalogJson();</span>
+<span class="fc" id="L134">        return QualificationRun.create(qualification.evaluate(runs), catalog, AutonomousResearchBriefV2.hash(catalog),</span>
+<span class="fc" id="L135">            runs.stream().map(DomainGenericDiscoveryQualification::runFingerprint).toList());</span>
     }
 
-    private static void requireOriginal(Path file, String expected) throws IOException {
-<span class="pc bpc" id="L113" title="1 of 4 branches missed.">        if (Files.isSymbolicLink(file) || Files.size(file) != expected.getBytes(StandardCharsets.UTF_8).length</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">                || !Files.readString(file, StandardCharsets.UTF_8).equals(expected)) {</span>
-<span class="fc" id="L115">            throw new IllegalArgumentException(&quot;Retained domain qualification evidence differs: &quot; + file);</span>
+    private static DomainSnapshotAssessment assess(VerifiedDomainExport verified) {
+<span class="fc" id="L139">        return DomainSnapshotAssessment.assess(DomainExportWorkspace.fromVerified(verified));</span>
+    }
+
+    static void requireOriginal(Path file, String expected) throws IOException {
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        if (Files.isSymbolicLink(file) || Files.size(file) != expected.getBytes(StandardCharsets.UTF_8).length</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                || !Files.readString(file, StandardCharsets.UTF_8).equals(expected)) {</span>
+<span class="fc" id="L145">            throw new IllegalArgumentException(&quot;Retained domain qualification evidence differs: &quot; + file);</span>
         }
-<span class="fc" id="L117">    }</span>
+<span class="fc" id="L147">    }</span>
 
     private static DomainDiscoveryEvidence expressionEvidence() {
-<span class="fc" id="L120">        var domain = new ExpressionRewriteDiscoveryDomain(&quot;x&quot;);</span>
-<span class="fc" id="L121">        return new DomainDiscoveryRunner().run(</span>
+<span class="fc" id="L150">        var domain = new ExpressionRewriteDiscoveryDomain(&quot;x&quot;);</span>
+<span class="fc" id="L151">        return new DomainDiscoveryRunner().run(</span>
             &quot;domain-generic-expression-qualification&quot;,
             domain,
-<span class="fc" id="L124">            DiscoverySeed.create(</span>
+<span class="fc" id="L154">            DiscoverySeed.create(</span>
                 &quot;domain-generic-expression-seed&quot;,
-<span class="fc" id="L126">                domain.domainId(),</span>
+<span class="fc" id="L156">                domain.domainId(),</span>
                 &quot;x + 0&quot;,
                 &quot;domain-generic-qualification/v1&quot;),
-<span class="fc" id="L129">            new DiscoveryBudget(2, 20, 100, 80, 5, 20)).evidence();</span>
+<span class="fc" id="L159">            new DiscoveryBudget(2, 20, 100, 80, 5, 20)).evidence();</span>
     }
 
     private static DomainDiscoveryEvidence sequenceEvidence() {
-<span class="fc" id="L133">        var domain = new FiniteDifferenceSequenceDomain();</span>
-<span class="fc" id="L134">        return new DomainDiscoveryRunner().run(</span>
+<span class="fc" id="L163">        var domain = new FiniteDifferenceSequenceDomain();</span>
+<span class="fc" id="L164">        return new DomainDiscoveryRunner().run(</span>
             &quot;domain-generic-sequence-qualification&quot;,
             domain,
-<span class="fc" id="L137">            DiscoverySeed.create(</span>
+<span class="fc" id="L167">            DiscoverySeed.create(</span>
                 &quot;domain-generic-sequence-seed&quot;,
-<span class="fc" id="L139">                domain.domainId(),</span>
+<span class="fc" id="L169">                domain.domainId(),</span>
                 &quot;observed=1,4,9,16;holdout=25,36&quot;,
                 &quot;domain-generic-qualification/v1&quot;),
-<span class="fc" id="L142">            new DiscoveryBudget(4, 20, 20, 10, 5, 20)).evidence();</span>
+<span class="fc" id="L172">            new DiscoveryBudget(4, 20, 20, 10, 5, 20)).evidence();</span>
+    }
+
+    private static DomainDiscoveryEvidence recurrenceEvidence() {
+<span class="fc" id="L176">        var domain = new LinearRecurrenceSequenceDomain();</span>
+<span class="fc" id="L177">        return new DomainDiscoveryRunner().run(&quot;domain-snapshot-recurrence-qualification&quot;, domain,</span>
+<span class="fc" id="L178">            DiscoverySeed.create(&quot;domain-snapshot-recurrence-seed&quot;, domain.domainId(),</span>
+                &quot;observed=1,4,11,26,57,120;holdout=247,502,1013;maximumOrder=3&quot;, &quot;domain-snapshot-product/v1&quot;),
+<span class="fc" id="L180">            new DiscoveryBudget(4, 20, 20, 10, 5, 32)).evidence();</span>
     }
 
     static DomainDiscoveryEvidence refutedSequenceEvidence() {
-<span class="fc" id="L146">        var domain = new FiniteDifferenceSequenceDomain();</span>
-<span class="fc" id="L147">        return new DomainDiscoveryRunner().run(</span>
+<span class="fc" id="L184">        var domain = new FiniteDifferenceSequenceDomain();</span>
+<span class="fc" id="L185">        return new DomainDiscoveryRunner().run(</span>
             &quot;domain-generic-refuted-sequence&quot;,
             domain,
-<span class="fc" id="L150">            DiscoverySeed.create(</span>
+<span class="fc" id="L188">            DiscoverySeed.create(</span>
                 &quot;domain-generic-refuted-sequence-seed&quot;,
-<span class="fc" id="L152">                domain.domainId(),</span>
+<span class="fc" id="L190">                domain.domainId(),</span>
                 &quot;observed=1,4,9,16;holdout=26&quot;,
                 &quot;domain-generic-qualification/v1&quot;),
-<span class="fc" id="L155">            new DiscoveryBudget(4, 20, 20, 10, 5, 20)).evidence();</span>
+<span class="fc" id="L193">            new DiscoveryBudget(4, 20, 20, 10, 5, 20)).evidence();</span>
     }
 
     private static void write(Path path, String content) throws IOException {
-<span class="fc" id="L159">        Files.createDirectories(path.getParent());</span>
-<span class="fc" id="L160">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
-<span class="fc" id="L161">    }</span>
+<span class="fc" id="L197">        Files.createDirectories(path.getParent());</span>
+<span class="fc" id="L198">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L199">    }</span>
 
     private record DomainInput(String name, DomainDiscoveryEvidence evidence) {
-<span class="fc" id="L164">        private DomainInput {</span>
-<span class="pc bpc" id="L165" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
-<span class="nc" id="L166">                throw new IllegalArgumentException(&quot;name must not be blank&quot;);</span>
+<span class="fc" id="L202">        private DomainInput {</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
+<span class="nc" id="L204">                throw new IllegalArgumentException(&quot;name must not be blank&quot;);</span>
             }
-<span class="fc" id="L168">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
-<span class="fc" id="L169">        }</span>
+<span class="fc" id="L206">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L207">        }</span>
     }
 
     public record QualificationRun(
@@ -186,46 +224,46 @@ import java.util.Objects;
         String profileCatalogJson,
         DomainGenericDiscoveryQualification.QualificationReport report
     ) {
-<span class="fc" id="L189">        public QualificationRun {</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L191">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L227">        public QualificationRun {</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L229">                throw new IllegalArgumentException(</span>
                     &quot;unsupported domain-generic qualification run schema&quot;);
             }
-<span class="fc" id="L194">            requireSha256(profileCatalogHash, &quot;profileCatalogHash&quot;);</span>
-<span class="fc" id="L195">            requireSha256(qualificationReportHash, &quot;qualificationReportHash&quot;);</span>
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            cleanRunFingerprints = cleanRunFingerprints == null</span>
-<span class="nc" id="L197">                ? List.of()</span>
-<span class="fc" id="L198">                : cleanRunFingerprints.stream()</span>
-<span class="fc" id="L199">                    .map(value -&gt; requireSha256(value, &quot;cleanRunFingerprint&quot;))</span>
-<span class="fc" id="L200">                    .toList();</span>
-<span class="pc bpc" id="L201" title="2 of 4 branches missed.">            if (profileCatalogJson == null || profileCatalogJson.isBlank()) {</span>
-<span class="nc" id="L202">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L232">            requireSha256(profileCatalogHash, &quot;profileCatalogHash&quot;);</span>
+<span class="fc" id="L233">            requireSha256(qualificationReportHash, &quot;qualificationReportHash&quot;);</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            cleanRunFingerprints = cleanRunFingerprints == null</span>
+<span class="nc" id="L235">                ? List.of()</span>
+<span class="fc" id="L236">                : cleanRunFingerprints.stream()</span>
+<span class="fc" id="L237">                    .map(value -&gt; requireSha256(value, &quot;cleanRunFingerprint&quot;))</span>
+<span class="fc" id="L238">                    .toList();</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">            if (profileCatalogJson == null || profileCatalogJson.isBlank()) {</span>
+<span class="nc" id="L240">                throw new IllegalArgumentException(</span>
                     &quot;profileCatalogJson must not be blank&quot;);
             }
-<span class="fc" id="L205">            Objects.requireNonNull(report, &quot;report&quot;);</span>
-<span class="fc" id="L206">            if (!AutonomousResearchBriefV2.hash(profileCatalogJson)</span>
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                    .equals(profileCatalogHash)</span>
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    || !report.contentHash().equals(qualificationReportHash)</span>
-<span class="fc bfc" id="L209" title="All 2 branches covered.">                    || report.cleanRunCount() != cleanRunFingerprints.size()</span>
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                    || report.cleanRunsIdentical() != cleanRunsIdentical</span>
+<span class="fc" id="L243">            Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L244">            if (!AutonomousResearchBriefV2.hash(profileCatalogJson)</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                    .equals(profileCatalogHash)</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                    || !report.contentHash().equals(qualificationReportHash)</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                    || report.cleanRunCount() != cleanRunFingerprints.size()</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    || report.cleanRunsIdentical() != cleanRunsIdentical</span>
                     || cleanRunsIdentical
-<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                        != (cleanRunFingerprints.size() &gt;= CLEAN_RUN_COUNT</span>
-<span class="pc bpc" id="L213" title="1 of 4 branches missed.">                            &amp;&amp; cleanRunFingerprints.stream().distinct().count() == 1L)</span>
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                    || !report.status().name().equals(</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                        != (cleanRunFingerprints.size() &gt;= CLEAN_RUN_COUNT</span>
+<span class="pc bpc" id="L251" title="1 of 4 branches missed.">                            &amp;&amp; cleanRunFingerprints.stream().distinct().count() == 1L)</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                    || !report.status().name().equals(</span>
                         domainGenericQualificationStatus)
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                    || report.domainGenericClaimAuthorized()</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                    || report.domainGenericClaimAuthorized()</span>
                         != domainGenericClaimAuthorized
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                    || report.autonomousCampaignClaimAuthorized()</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">                    || report.autonomousCampaignClaimAuthorized()</span>
                         != autonomousCampaignClaimAuthorized
-<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                    || !report.proofStatus().equals(proofStatus)</span>
-<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                    || !report.externalNoveltyStatus().equals(externalNoveltyStatus)</span>
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                    || !report.promotionStatus().equals(promotionStatus)</span>
-<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                    || !report.publicEvidenceStatus().equals(publicEvidenceStatus)) {</span>
-<span class="fc" id="L224">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                    || !report.proofStatus().equals(proofStatus)</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                    || !report.externalNoveltyStatus().equals(externalNoveltyStatus)</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                    || !report.promotionStatus().equals(promotionStatus)</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                    || !report.publicEvidenceStatus().equals(publicEvidenceStatus)) {</span>
+<span class="fc" id="L262">                throw new IllegalArgumentException(</span>
                     &quot;domain-generic qualification run artifacts are not linked&quot;);
             }
-<span class="fc" id="L227">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L228">            String expected = hash(</span>
+<span class="fc" id="L265">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L266">            String expected = hash(</span>
                 profileCatalogHash,
                 qualificationReportHash,
                 cleanRunFingerprints,
@@ -237,11 +275,11 @@ import java.util.Objects;
                 externalNoveltyStatus,
                 promotionStatus,
                 publicEvidenceStatus);
-<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L241">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L279">                throw new IllegalArgumentException(</span>
                     &quot;domain-generic qualification run contentHash mismatch&quot;);
             }
-<span class="fc" id="L244">        }</span>
+<span class="fc" id="L282">        }</span>
 
         private static QualificationRun create(
             DomainGenericDiscoveryQualification.QualificationReport report,
@@ -249,59 +287,59 @@ import java.util.Objects;
             String profileCatalogHash,
             List&lt;String&gt; cleanRunFingerprints
         ) {
-<span class="fc" id="L252">            List&lt;String&gt; fingerprints = List.copyOf(cleanRunFingerprints);</span>
-<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            boolean identical = fingerprints.size() &gt;= CLEAN_RUN_COUNT</span>
-<span class="fc bfc" id="L254" title="All 2 branches covered.">                &amp;&amp; fingerprints.stream().distinct().count() == 1L;</span>
-<span class="fc" id="L255">            String hash = hash(</span>
+<span class="fc" id="L290">            List&lt;String&gt; fingerprints = List.copyOf(cleanRunFingerprints);</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            boolean identical = fingerprints.size() &gt;= CLEAN_RUN_COUNT</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">                &amp;&amp; fingerprints.stream().distinct().count() == 1L;</span>
+<span class="fc" id="L293">            String hash = hash(</span>
                 profileCatalogHash,
-<span class="fc" id="L257">                report.contentHash(),</span>
+<span class="fc" id="L295">                report.contentHash(),</span>
                 fingerprints,
                 identical,
-<span class="fc" id="L260">                report.status().name(),</span>
-<span class="fc" id="L261">                report.domainGenericClaimAuthorized(),</span>
-<span class="fc" id="L262">                report.autonomousCampaignClaimAuthorized(),</span>
-<span class="fc" id="L263">                report.proofStatus(),</span>
-<span class="fc" id="L264">                report.externalNoveltyStatus(),</span>
-<span class="fc" id="L265">                report.promotionStatus(),</span>
-<span class="fc" id="L266">                report.publicEvidenceStatus());</span>
-<span class="fc" id="L267">            return new QualificationRun(</span>
+<span class="fc" id="L298">                report.status().name(),</span>
+<span class="fc" id="L299">                report.domainGenericClaimAuthorized(),</span>
+<span class="fc" id="L300">                report.autonomousCampaignClaimAuthorized(),</span>
+<span class="fc" id="L301">                report.proofStatus(),</span>
+<span class="fc" id="L302">                report.externalNoveltyStatus(),</span>
+<span class="fc" id="L303">                report.promotionStatus(),</span>
+<span class="fc" id="L304">                report.publicEvidenceStatus());</span>
+<span class="fc" id="L305">            return new QualificationRun(</span>
                 SCHEMA,
                 profileCatalogHash,
-<span class="fc" id="L270">                report.contentHash(),</span>
+<span class="fc" id="L308">                report.contentHash(),</span>
                 fingerprints,
                 identical,
-<span class="fc" id="L273">                report.status().name(),</span>
-<span class="fc" id="L274">                report.domainGenericClaimAuthorized(),</span>
-<span class="fc" id="L275">                report.autonomousCampaignClaimAuthorized(),</span>
-<span class="fc" id="L276">                report.proofStatus(),</span>
-<span class="fc" id="L277">                report.externalNoveltyStatus(),</span>
-<span class="fc" id="L278">                report.promotionStatus(),</span>
-<span class="fc" id="L279">                report.publicEvidenceStatus(),</span>
+<span class="fc" id="L311">                report.status().name(),</span>
+<span class="fc" id="L312">                report.domainGenericClaimAuthorized(),</span>
+<span class="fc" id="L313">                report.autonomousCampaignClaimAuthorized(),</span>
+<span class="fc" id="L314">                report.proofStatus(),</span>
+<span class="fc" id="L315">                report.externalNoveltyStatus(),</span>
+<span class="fc" id="L316">                report.promotionStatus(),</span>
+<span class="fc" id="L317">                report.publicEvidenceStatus(),</span>
                 hash,
                 profileCatalogJson,
                 report);
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L286">            return new JsonWriter().beginObject()</span>
-<span class="fc" id="L287">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L288">                .property(&quot;profileCatalogHash&quot;, profileCatalogHash)</span>
-<span class="fc" id="L289">                .property(&quot;qualificationReportHash&quot;, qualificationReportHash)</span>
-<span class="fc" id="L290">                .stringArray(&quot;cleanRunFingerprints&quot;, cleanRunFingerprints)</span>
-<span class="fc" id="L291">                .property(&quot;cleanRunsIdentical&quot;, cleanRunsIdentical)</span>
-<span class="fc" id="L292">                .property(&quot;domainGenericQualificationStatus&quot;,</span>
+<span class="fc" id="L324">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L325">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L326">                .property(&quot;profileCatalogHash&quot;, profileCatalogHash)</span>
+<span class="fc" id="L327">                .property(&quot;qualificationReportHash&quot;, qualificationReportHash)</span>
+<span class="fc" id="L328">                .stringArray(&quot;cleanRunFingerprints&quot;, cleanRunFingerprints)</span>
+<span class="fc" id="L329">                .property(&quot;cleanRunsIdentical&quot;, cleanRunsIdentical)</span>
+<span class="fc" id="L330">                .property(&quot;domainGenericQualificationStatus&quot;,</span>
                     domainGenericQualificationStatus)
-<span class="fc" id="L294">                .property(&quot;domainGenericClaimAuthorized&quot;,</span>
+<span class="fc" id="L332">                .property(&quot;domainGenericClaimAuthorized&quot;,</span>
                     domainGenericClaimAuthorized)
-<span class="fc" id="L296">                .property(&quot;autonomousCampaignClaimAuthorized&quot;,</span>
+<span class="fc" id="L334">                .property(&quot;autonomousCampaignClaimAuthorized&quot;,</span>
                     autonomousCampaignClaimAuthorized)
-<span class="fc" id="L298">                .property(&quot;proofStatus&quot;, proofStatus)</span>
-<span class="fc" id="L299">                .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
-<span class="fc" id="L300">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
-<span class="fc" id="L301">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
-<span class="fc" id="L302">                .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L303">                .endObject()</span>
-<span class="fc" id="L304">                .toString();</span>
+<span class="fc" id="L336">                .property(&quot;proofStatus&quot;, proofStatus)</span>
+<span class="fc" id="L337">                .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L338">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L339">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L340">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L341">                .endObject()</span>
+<span class="fc" id="L342">                .toString();</span>
         }
 
         private static String hash(
@@ -317,7 +355,7 @@ import java.util.Objects;
             String promotionStatus,
             String publicEvidenceStatus
         ) {
-<span class="fc" id="L320">            return AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L358">            return AutonomousResearchBriefV2.hash(</span>
                 SCHEMA
                     + &quot;\nprofileCatalogHash=&quot; + profileCatalogHash
                     + &quot;\nqualificationReportHash=&quot; + qualificationReportHash
@@ -337,10 +375,10 @@ import java.util.Objects;
     }
 
     private static String requireSha256(String value, String field) {
-<span class="pc bpc" id="L340" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L341">            throw new IllegalArgumentException(field + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L378" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L379">            throw new IllegalArgumentException(field + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L343">        return value;</span>
+<span class="fc" id="L381">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

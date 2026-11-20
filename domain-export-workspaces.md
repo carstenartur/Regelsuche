@@ -187,6 +187,51 @@ affinen Modells bestätigen; dass eine anderweitig definierte unendliche Quelle
 diesem Modell folgt, bleibt unbewiesen. Die Quellenansicht, der endliche Beleg
 und der Modellbeleg haben getrennte Identitäten und Aussagegrenzen.
 
-Die fokussierten Kontrollen verwenden kleine öffentliche Folgen, echte
-HTTP-Imports und den vorhandenen Browser. Sie ersetzen keine Mehrdomänen-Studie
-und keine nachgelagerte Proof-, Novelty-, Release- oder Public-Evidence-Komposition.
+## Gebundene Auswertung aller drei Domänen
+
+Im Workspace startet **Kandidat und Belege prüfen** einen gebundenen POST an
+`/{runDigest}/assessment`. Der Request enthält `expectedWorkspaceHash` und
+`expectedEvidenceHash`. Die Antwort enthält den Inhalts-Hash und einen
+`Location`-Pfad. Jeder GET dieses Pfads öffnet den gespeicherten Originalexport
+neu, führt die bounded Checks erneut aus und verlangt denselben Inhalts-Hash
+und identische Receipt-Bytes. Die Ablage ist auf 16 Belege pro Export und
+1 MiB je Beleg begrenzt. Der unveränderte Quellbeleg verweist weiter auf
+seinen historischen Validierungsstand.
+
+| Abschnitt | Aussage und benötigte Quelle |
+|---|---|
+| Validierung und Gegenbeispiele | Exakter Replay vergleicht die gesamte kanonische Evidence. Der Beleg erhält jeden Kandidatenversuch. Für den ersten widerlegten Kandidaten eines unterstützten affinen Modells prüft eine separate rationale Berechnung bis zu 64 gespeicherte Werte. Ein gefundener Gegenbeleg enthält Index, beobachteten und berechneten Wert sowie Kandidaten-Hash. |
+| Proof | Bei Folgen führt der vorhandene endliche Datencheck zum bedingten Modellbeweis. Bei Formeln prüft der exakte rationale Polynomchecker Quelle, ausgewählten Ausgangs- und Zielterm und aufgezeichnetes Ziel unter Polynomring-Semantik. Unterschiedliche Normalformen, nicht unterstützte Terme und Budgetgrenzen erteilen keine Beweisbestätigung. |
+| Ressourcen und Ablation | Ein zweiter Lauf ersetzt allein die maximale Suchtiefe durch null. Er übernimmt Seed, Adapter und alle anderen Budgets. Beide Läufe behalten die fünf Ressourceneinheiten. Das ist ein Tiefenvergleich auf dem konkreten Seed und keine allgemeine Effizienzaussage. |
+| Literatur | Der ausgewählte, reproduzierte Kandidat besitzt einen privaten Prüfschlüssel aus Manifest-, Kandidaten- und Evidence-Hash. Die vorhandene Literaturansicht verwaltet dokumentierte Recherchen und Vorarbeiten. Übertragung einer Anfrage an TheoremSearch benötigt dieselbe explizite Freigabe wie bisher. |
+| Release und Public Evidence | Die Release-Qualifikation rekonstruiert neun Auswertungen aus den drei Referenzläufen. Ein reproduzierbarer Forschungsbeleg kann berichtet werden. Promotion und öffentliche mathematische Claims verlangen eigene Belege. |
+
+Das Schema [domain-snapshot-assessment/v1](schemas/regelsuche-domain-snapshot-assessment-v1.schema.json)
+beschreibt die Auswertung. Die mathematische Nachprüfung und die Bindung der
+Originalbytes erfolgen beim Erzeugen und beim Wiederladen. Alte Workspace-,
+Validierungs-, Modell- und Qualification-Formate behalten ihre eigenen Identitäten.
+
+### Signierte Literaturentscheidung zu einer geprüften Formel
+
+Die Anwendungs-CLI gibt mit `domains review-subject EXPORT` die genaue
+Gleichung, ihren Geltungsbereich, die Rewrite-Annahmen und die Identitäten
+für einen eingefrorenen Rechercheplan aus. `formationEvidenceRoot` ist der
+Hash der vollständigen reproduzierten Domänenauswertung. Der Pfad setzt
+einen exakten rationalen Polynomnachweis voraus. Die private Dokumentation
+von Literaturbefunden steht auch den Folgendomänen offen.
+
+```text
+domains verify-review EXPORT PINNED_FREEZE PINNED_CATALOGUE TRUSTED_ROSTER.json REVIEW.json
+```
+
+Die Empfängerseite gibt die vor der Recherche gesicherten Plan- und
+Katalogwurzeln sowie ihre unabhängig festgelegte Gutachterliste an.
+Die CLI wiederholt die vorhandene Prüfung von Rechercheabdeckung, Stimmen
+und Ed25519-Signaturen. Sie vergleicht anschließend die Kandidatenidentität,
+die Gleichung, die sortierten Rewrite-Annahmen einschließlich des
+Polynom-Geltungsbereichs und die gesamte eingefrorene Evidence-Wurzel
+mit der Domänenauswertung. Ein anderer Term oder Geltungsbereich schlägt
+auch bei gültigen Signaturen fehl. Der Beleg enthält die geprüfte Entscheidung,
+Plan-, Katalog-, Paket-, Intake- und Gutachterlistenwurzel. Die Aussage
+bezieht sich auf diese Gleichung und Recherche. Promotion und Public Evidence
+behalten eigene Entscheidungen. Der Befehl arbeitet vollständig offline.

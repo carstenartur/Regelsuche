@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainSnapshotAssessmentRepository.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainSnapshotAssessmentRepository.java</span></div><h1>DomainSnapshotAssessmentRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Optional;
+
+/** Reconstructs the decision and compares every original byte before returning a retained assessment. */
+public final class DomainSnapshotAssessmentRepository {
+    private final DomainReceiptStore store;
+
+<span class="nc" id="L12">    public DomainSnapshotAssessmentRepository(Path sourceDirectory) {</span>
+<span class="nc" id="L13">        store = new DomainReceiptStore(sourceDirectory, &quot;-assessments&quot;, (source, hash, bytes) -&gt; {</span>
+<span class="nc" id="L14">            var verified = DomainSnapshotAssessment.assess(source);</span>
+<span class="nc bnc" id="L15" title="All 2 branches missed.">            if (!verified.contentHash().equals(hash)</span>
+<span class="nc bnc" id="L16" title="All 2 branches missed.">                    || !Arrays.equals(bytes, verified.toCanonicalJson().getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L17">                throw new IllegalArgumentException(&quot;retained assessment differs from the reproduced source decision&quot;);</span>
+            }
+<span class="nc" id="L19">        });</span>
+<span class="nc" id="L20">    }</span>
+
+    public void retain(DomainExportWorkspace workspace, DomainSnapshotAssessment assessment) {
+<span class="nc" id="L23">        store.retain(workspace, assessment.contentHash(), assessment.toCanonicalJson());</span>
+<span class="nc" id="L24">    }</span>
+
+    public Optional&lt;byte[]&gt; find(String runId, String receiptHash) {
+<span class="nc" id="L27">        return store.find(runId, receiptHash);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

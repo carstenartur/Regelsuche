@@ -16,28 +16,32 @@ public final class DomainGenericQualificationMain {
     }
 
     public static void main(String[] args) {
-<span class="nc bnc" id="L19" title="All 4 branches missed.">        if (args.length == 2 &amp;&amp; &quot;--verify-retained&quot;.equals(args[0])) {</span>
-<span class="nc" id="L20">            requireReady(new DomainGenericQualificationRunner().verifyRetained(Path.of(args[1])));</span>
+<span class="nc bnc" id="L19" title="All 4 branches missed.">        if (args.length == 2 &amp;&amp; &quot;--verify-product&quot;.equals(args[0])) {</span>
+<span class="nc" id="L20">            System.out.println(new DomainGenericQualificationRunner().verifyRetainedProduct(Path.of(args[1])));</span>
 <span class="nc" id="L21">            return;</span>
         }
-<span class="nc bnc" id="L23" title="All 2 branches missed.">        if (args.length &gt; 1) {</span>
-<span class="nc" id="L24">            throw new IllegalArgumentException(</span>
-                &quot;usage: DomainGenericQualificationMain [output-directory] | --verify-retained directory&quot;);
+<span class="nc bnc" id="L23" title="All 4 branches missed.">        if (args.length == 2 &amp;&amp; &quot;--verify-retained&quot;.equals(args[0])) {</span>
+<span class="nc" id="L24">            requireReady(new DomainGenericQualificationRunner().verifyRetained(Path.of(args[1])));</span>
+<span class="nc" id="L25">            return;</span>
         }
-<span class="nc bnc" id="L27" title="All 2 branches missed.">        Path output = args.length == 1</span>
-<span class="nc" id="L28">            ? Path.of(args[0])</span>
-<span class="nc" id="L29">            : Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;domain-generic-qualification&quot;);</span>
-<span class="nc" id="L30">        DomainGenericQualificationRunner.QualificationRun run =</span>
-<span class="nc" id="L31">            new DomainGenericQualificationRunner().run(output);</span>
-<span class="nc" id="L32">        requireReady(run);</span>
-<span class="nc" id="L33">    }</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        if (args.length &gt; 1) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(</span>
+                &quot;usage: DomainGenericQualificationMain [output-directory] | --verify-retained directory | --verify-product directory&quot;);
+        }
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        Path output = args.length == 1</span>
+<span class="nc" id="L32">            ? Path.of(args[0])</span>
+<span class="nc" id="L33">            : Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;domain-generic-qualification&quot;);</span>
+<span class="nc" id="L34">        DomainGenericQualificationRunner.QualificationRun run =</span>
+<span class="nc" id="L35">            new DomainGenericQualificationRunner().run(output);</span>
+<span class="nc" id="L36">        requireReady(run);</span>
+<span class="nc" id="L37">    }</span>
 
     private static void requireReady(DomainGenericQualificationRunner.QualificationRun run) {
-<span class="nc bnc" id="L36" title="All 2 branches missed.">        if (!run.domainGenericClaimAuthorized()) {</span>
-<span class="nc" id="L37">            throw new IllegalStateException(</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (!run.domainGenericClaimAuthorized()) {</span>
+<span class="nc" id="L41">            throw new IllegalStateException(</span>
                 &quot;domain-generic discovery qualification is not ready&quot;);
         }
-<span class="nc" id="L40">        System.out.println(run.toCanonicalJson());</span>
-<span class="nc" id="L41">    }</span>
+<span class="nc" id="L44">        System.out.println(run.toCanonicalJson());</span>
+<span class="nc" id="L45">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

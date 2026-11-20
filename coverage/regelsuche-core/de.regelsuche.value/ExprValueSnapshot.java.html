@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExprValueSnapshot.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.value</a> &gt; <span class="el_source">ExprValueSnapshot.java</span></div><h1>ExprValueSnapshot.java</h1><pre class="source lang-java linenums">package de.regelsuche.value;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Bounded structural transport. Node numbers refer only to this snapshot, never an arena owner. */
+public final class ExprValueSnapshot {
+    public static final String VERSION = &quot;regelsuche.expr-value-snapshot/v1&quot;;
+    private static final int MAGIC = 0x52535631;
+    private ExprValueSnapshot() {}
+
+    public record Node(String kind, String atom, List&lt;Integer&gt; edges) {
+<span class="fc" id="L19">        public Node {</span>
+<span class="fc" id="L20">            Objects.requireNonNull(kind); Objects.requireNonNull(atom);</span>
+<span class="fc" id="L21">            edges = List.copyOf(edges);</span>
+<span class="fc" id="L22">        }</span>
+    }
+    public record Snapshot(String version, int root, String digest, List&lt;Node&gt; nodes) {
+<span class="fc" id="L25">        public Snapshot {</span>
+<span class="fc" id="L26">            Objects.requireNonNull(version); Objects.requireNonNull(digest);</span>
+<span class="fc" id="L27">            nodes = List.copyOf(nodes);</span>
+<span class="fc" id="L28">        }</span>
+    }
+
+    /** Exact transport byte count, excluding JVM objects, maps and cached digests. */
+    public static long encodedSize(Snapshot snapshot) {
+<span class="fc" id="L33">        long size = 12L + stringBytes(snapshot.version()) + stringBytes(snapshot.digest());</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (var node : snapshot.nodes()) size = Math.addExact(size,</span>
+<span class="fc" id="L35">            stringBytes(node.kind()) + stringBytes(node.atom()) + 4L + 4L * node.edges().size());</span>
+<span class="fc" id="L36">        return size;</span>
+    }
+
+<span class="fc" id="L39">    private static long stringBytes(String value) { return 4L + 2L * value.length(); }</span>
+
+    public static byte[] encode(Snapshot snapshot, int maximumBytes) {
+<span class="fc" id="L42">        long size = encodedSize(snapshot);</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">        if (maximumBytes &lt; 1 || size &gt; maximumBytes) throw new IllegalArgumentException(&quot;snapshot byte limit&quot;);</span>
+        try {
+<span class="fc" id="L45">            var buffer = new ByteArrayOutputStream((int) size);</span>
+<span class="fc" id="L46">            var out = new DataOutputStream(buffer);</span>
+<span class="fc" id="L47">            out.writeInt(MAGIC); text(out, snapshot.version()); out.writeInt(snapshot.root());</span>
+<span class="fc" id="L48">            text(out, snapshot.digest()); out.writeInt(snapshot.nodes().size());</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (var node : snapshot.nodes()) {</span>
+<span class="fc" id="L50">                text(out, node.kind()); text(out, node.atom()); out.writeInt(node.edges().size());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                for (int edge : node.edges()) out.writeInt(edge);</span>
+<span class="fc" id="L52">            }</span>
+<span class="fc" id="L53">            out.flush();</span>
+<span class="fc" id="L54">            return buffer.toByteArray();</span>
+<span class="nc" id="L55">        } catch (IOException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+
+    public static Snapshot decode(byte[] bytes, int maximumNodes, int maximumBytes) {
+<span class="fc" id="L59">        Objects.requireNonNull(bytes);</span>
+<span class="pc bpc" id="L60" title="2 of 6 branches missed.">        if (maximumBytes &lt; 1 || bytes.length &gt; maximumBytes || maximumNodes &lt; 1)</span>
+<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;snapshot limit&quot;);</span>
+        try {
+<span class="fc" id="L63">            var in = new DataInputStream(new ByteArrayInputStream(bytes));</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (in.readInt() != MAGIC) throw new IllegalArgumentException(&quot;snapshot magic&quot;);</span>
+<span class="fc" id="L65">            String version = text(in);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (!VERSION.equals(version)) throw new IllegalArgumentException(&quot;snapshot version&quot;);</span>
+<span class="fc" id="L67">            int root = in.readInt();</span>
+<span class="fc" id="L68">            String digest = text(in);</span>
+<span class="fc" id="L69">            int count = in.readInt();</span>
+<span class="pc bpc" id="L70" title="2 of 6 branches missed.">            if (count &lt; 1 || count &gt; maximumNodes || count &gt; in.available() / 12)</span>
+<span class="fc" id="L71">                throw new IllegalArgumentException(&quot;snapshot node count&quot;);</span>
+<span class="fc" id="L72">            var nodes = new ArrayList&lt;Node&gt;(count);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) nodes.add(readNode(in));</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (in.available() != 0) throw new IllegalArgumentException(&quot;trailing snapshot bytes&quot;);</span>
+<span class="fc" id="L75">            return new Snapshot(version, root, digest, nodes);</span>
+<span class="fc" id="L76">        } catch (IOException malformed) { throw new IllegalArgumentException(&quot;truncated snapshot&quot;, malformed); }</span>
+    }
+
+    private static Node readNode(DataInputStream in) throws IOException {
+<span class="fc" id="L80">        String kind = text(in), atom = text(in);</span>
+<span class="fc" id="L81">        int count = in.readInt();</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        if (count &lt; 0 || count &gt; in.available() / 4) throw new IllegalArgumentException(&quot;snapshot edge count&quot;);</span>
+<span class="fc" id="L83">        var edges = new ArrayList&lt;Integer&gt;(count);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) edges.add(in.readInt());</span>
+<span class="fc" id="L85">        return new Node(kind, atom, edges);</span>
+    }
+
+    private static void text(DataOutputStream out, String value) throws IOException {
+<span class="fc" id="L89">        out.writeInt(value.length());</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) out.writeChar(value.charAt(i));</span>
+<span class="fc" id="L91">    }</span>
+    private static String text(DataInputStream in) throws IOException {
+<span class="fc" id="L93">        int length = in.readInt();</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (length &lt; 0 || length &gt; in.available() / 2) throw new IllegalArgumentException(&quot;snapshot text length&quot;);</span>
+<span class="fc" id="L95">        var value = new StringBuilder(length);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) value.append(in.readChar());</span>
+<span class="fc" id="L97">        return value.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
