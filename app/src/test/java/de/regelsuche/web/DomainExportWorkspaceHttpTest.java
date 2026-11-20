@@ -17,6 +17,8 @@ import java.security.MessageDigest;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class DomainExportWorkspaceHttpTest {
     @TempDir Path temporary;
@@ -53,7 +55,20 @@ class DomainExportWorkspaceHttpTest {
         else System.setProperty("regelsuche.discovery.runs.directory", previous);
     }
 
-    @Test void importsListsLoadsAndReplaysTheOriginalSourceIdentity() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void importsListsLoadsAndReplaysTheOriginalSourceIdentity(boolean expressionExport) throws Exception {
+        if (expressionExport) {
+            var domain = new ExpressionRewriteDiscoveryDomain("x");
+            evidence = new DomainDiscoveryRunner().run("retained-expression", domain,
+                DiscoverySeed.create("expression-source", domain.domainId(), "x + 0", "HTTP public control"),
+                new DiscoveryBudget(2, 16, 32, 8, 8, 32)).evidence();
+            Path source = temporary.resolve("expression-source");
+            runId = new DomainDiscoveryExport().write(source, evidence).contentHash();
+            for (String name : new ArrayList<>(files.keySet())) {
+                files.put(name, Base64.getEncoder().encodeToString(Files.readAllBytes(source.resolve(name))));
+            }
+        }
         var imported = request("POST", "", upload());
         assertEquals(201, imported.statusCode(), imported.body());
         var view = json.readTree(imported.body());
@@ -75,6 +90,14 @@ class DomainExportWorkspaceHttpTest {
         assertEquals(json.readTree(evidence.toCanonicalJson()), replayed.path("evidence"));
         assertEquals(imported.body(), request("GET", path(), null).body());
         assertNotEquals(200, request("GET", "/../", null).statusCode(), "path traversal must not return a workspace");
+        if (expressionExport) {
+            for (String action : List.of("validate", "model-proof")) {
+                var response = request("POST", path() + "/" + action,
+                    replayRequest(view.path("contentHash").asText(), evidence.contentHash()));
+                assertEquals(200, response.statusCode(), response.body());
+                assertEquals("UNSUPPORTED", json.readTree(response.body()).path("status").asText());
+            }
+        }
     }
 
     @Test void rejectsMissingAndMalformedSourceFiles() throws Exception {

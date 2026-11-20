@@ -95,6 +95,42 @@ class DomainExportWorkspaceBrowserTest {
         page.screenshot(new Page.ScreenshotOptions().setPath(screenshot));
     }
 
+    @Test void importsExpressionTargetReplaysAndHidesSequenceOnlyActions() throws Exception {
+        var domain = new ExpressionRewriteDiscoveryDomain("x");
+        var evidence = new DomainDiscoveryRunner().run("retained-expression", domain,
+            DiscoverySeed.create("expression-source", domain.domainId(), "x + 0", "public browser control"),
+            new DiscoveryBudget(2, 16, 32, 8, 8, 32)).evidence();
+        Path source = temporary.resolve("expression");
+        firstId = new DomainDiscoveryExport().write(source, evidence).contentHash();
+        int index = 0;
+        for (String name : List.of("domain.json", "evidence.json", "lifecycle-handoff.json", "export-manifest.json")) {
+            files[index++] = new FilePayload(name, "application/json", Files.readAllBytes(source.resolve(name)));
+        }
+        page.navigate(url("/discovery-domains.html"));
+        page.locator("#importDomainExport").setInputFiles(files);
+        waitFor(firstId);
+        String detail = page.locator("#retainedDomainExportDetail").textContent();
+        assertTrue(detail.contains("Formel und Umschreibungsnachweis"), detail);
+        assertTrue(detail.contains("expectedTarget"), detail);
+        assertTrue(detail.contains("CANONICAL_EQUIVALENCE_TRACE"), detail);
+        assertTrue(page.locator("#retainedDomainValidation").isHidden());
+        assertTrue(page.locator("#retainedDomainModelProof").isHidden());
+        assertTrue(page.locator("#validateDomainExport").isDisabled());
+        assertTrue(page.locator("#proveDomainExportModel").isDisabled());
+        page.locator("#replayDomainExport").click();
+        page.waitForFunction("document.querySelector('#retainedDomainReplayStatus')?.dataset.status === 'IDENTICAL_CANONICAL_EVIDENCE'");
+        var download = page.waitForDownload(() -> page.locator("[data-original-file='evidence.json']").click());
+        assertArrayEquals(evidence.toCanonicalJson().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(download.path()));
+        page.reload(); waitFor(firstId);
+        assertTrue(page.locator("#retainedDomainValidation").isHidden());
+        page.setViewportSize(390, 844);
+        assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
+        Path screenshot = Path.of("build/reports/domain-export-ui/expression-narrow.png");
+        Files.createDirectories(screenshot.getParent());
+        page.locator("#retainedDomainExportDetail").scrollIntoViewIfNeeded();
+        page.screenshot(new Page.ScreenshotOptions().setPath(screenshot));
+    }
+
     @Test void lateReplayCannotReplaceTheNewerSelectedExport() throws Exception {
         var repository = new DomainExportWorkspaceRepository(temporary.resolve("runs-domain-exports"));
         repository.retain(export(temporary.resolve("first"), "observed=1,4,9,16;holdout=25,36"));

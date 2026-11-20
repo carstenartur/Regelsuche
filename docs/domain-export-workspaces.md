@@ -1,8 +1,8 @@
-# Gespeicherte Sequenz-Exporte in der Workbench
+# Gespeicherte Discovery-Exporte in der Workbench
 
 Die vorhandene Seite **Eigene Discovery-Domänen** kann einen verifizierten
 Vier-Dateien-Export der eingebauten Domänen
-`integer-sequence-finite-difference@v1` und
+`expression-rewrite@v1`, `integer-sequence-finite-difference@v1` und
 `integer-sequence-linear-recurrence@v1` importieren, unveränderlich laden und
 begrenzt reproduzieren. Das ist ein produktiver Consumer von
 `VerifiedDomainExport` für einen konkreten Objekttyp. Es schließt den weiteren
@@ -12,22 +12,23 @@ Lifecycle-Umfang von #224 nicht.
 
 1. In der Workbench **Eigene Discovery-Domänen** öffnen. Die Seite ist unter
    `/static/discovery-domains.html` und `/discovery-domains.html` erreichbar.
-2. Unter **Gespeicherte Sequenz-Exporte** gemeinsam `domain.json`,
+2. Unter **Gespeicherte Discovery-Exporte** gemeinsam `domain.json`,
    `evidence.json`, `lifecycle-handoff.json` und `export-manifest.json` auswählen.
    Die vier Originaldateien dürfen zusammen höchstens 512 KiB belegen.
-3. Gespeicherte Folgen, Holdout-Werte, Kandidatenversuche, Zertifikat,
+3. Gespeicherte Formel und Suchziel oder Folge und Holdout-Werte, Kandidatenversuche, Zertifikat,
    Suchzustände, Übergänge und fünf Ressourcenzeilen prüfen. Die Quelle behält
    ihre eigene Ergebnisinterpretation, einschließlich `REFUTED` und fehlendem
    Zertifikat.
 4. Optional **Vollständige Evidence reproduzieren** ausführen. Replay verwendet
    genau den ursprünglichen Seed und das ursprüngliche Budget. Es erzeugt
    zusätzliche Arbeit; historische Zähler werden nicht geändert.
-5. Optional **Endliche Daten prüfen** für den separaten
+5. Bei Sequenz-Exporten optional **Endliche Daten prüfen** für den separaten
    [endlichen Validierungsbeleg](domain-downstream-finite-validation.md) oder
    **Modellgesetz prüfen** für einen
    [Beleg zum ausdrücklich angenommenen affinen Modell](domain-model-proof.md)
    ausführen. Beide Aktionen binden die ausgewählte unveränderte Quelle und
-   weisen ihre zusätzliche Arbeit getrennt aus.
+   weisen ihre zusätzliche Arbeit getrennt aus. Formel-Exporte zeigen diese
+   beiden Aktionen nicht an; direkte API-Aufrufe stellen keinen Sequenzbeleg aus.
 6. Originaldateien über ihre Dateilinks herunterladen. Ein Link der Form
    `#export=<64-stelliger Manifest-Digest>` lädt später dieselbe Quelle.
 
@@ -44,6 +45,14 @@ var evidence = new DomainDiscoveryRunner().run(
     new DiscoveryDomain.DiscoveryBudget(4, 16, 32, 8, 8, 32)).evidence();
 new DomainDiscoveryExport().write(Path.of("sequence-export"), evidence);
 ```
+
+Für einen Formel-Lauf verwendet derselbe Exportvertrag die bestehende
+`ExpressionRewriteDiscoveryDomain`. Ihr Konstruktor erhält das Suchziel,
+der Seed die Ausgangsformel. Das Ziel wird in
+`domainEvidence.properties.expectedTarget` gespeichert. Beim Replay wird
+genau dieses Ziel rekonstruiert. Die Startformel allein bestimmt den Lauf
+nicht: Zwei Exporte mit gleichem Seed und unterschiedlichem Ziel behalten
+getrennte Manifest- und Ansichtsidentitäten.
 
 Die Klassen stammen aus `de.regelsuche.discovery.domain`, `Path` aus
 `java.nio.file`. Eine einzelne Evidence-Datei der Provider-CLI ist kein
@@ -83,6 +92,14 @@ Die fünf Ressourcenrollen bleiben vollständig: `EXPLORED_STATES`,
 `GENERATED_SUCCESSORS`, `CANDIDATE_EVALUATIONS`, `CERTIFICATE_ATTEMPTS` und
 `COUNTEREXAMPLE_ATTEMPTS`. Jede Zeile muss zum konfigurierten Quellenbudget passen
 und `configured = executed + skipped + remaining` erfüllen.
+
+Für `expression-rewrite@v1` muss zusätzlich der Payload-Vertrag
+`expression-rewrite-evidence/v1` mit einem nichtleeren `expectedTarget`
+vorliegen. Der Import führt keine Suche aus und parst keine unbegrenzten
+Quellformeln. Fehlende oder fremde Konfigurationen werden abgewiesen.
+Eine mit neu berechneten Hashes geänderte Zielangabe kann zwar ein neues
+strukturell gültiges Quelldokument ergeben; sie reproduziert das alte
+Suchprotokoll nicht und wird beim vollständigen Replay abgewiesen.
 
 | Ansichtsrolle | Ziel und Verfügbarkeit |
 | --- | --- |
@@ -145,6 +162,13 @@ maxCounterexampleAttempts=4096)`. Größere Quellen bleiben lesbar, erhalten abe
 `PATH_REPLAY=NOT_PRODUCED`. Replay vergleicht die **vollständige** kanonische
 Evidence; ein neu gehashtes, falsches Suchprotokoll kann deshalb nicht durch
 Übereinstimmung nur des Endkandidaten bestehen.
+
+Für Formel-Exporte gilt vor jedem Parser- oder Suchaufruf eine engere
+Admission: Startformel und gespeichertes Ziel dürfen jeweils höchstens
+256 UTF-16-Codeeinheiten enthalten. Größere Formel-Exporte bleiben
+unverändert lesbar und herunterladbar, erhalten aber keine Replay-Aktion.
+Die bestehende Domain prüft ihre Zustandsinvarianten und AST-Grenzen selbst.
+Die Workspace-Identität bereits gespeicherter Sequenz-Exporte bleibt unverändert.
 
 ## Evidence-Grenze
 

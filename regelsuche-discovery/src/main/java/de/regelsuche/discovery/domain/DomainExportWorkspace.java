@@ -25,6 +25,7 @@ public final class DomainExportWorkspace {
     public static final String SCHEMA = "regelsuche.domain-export-workspace/v1";
     public static final String REPLAY_SCHEMA = "regelsuche.domain-export-replay/v1";
     public static final int MAX_EXPORT_BYTES = 524_288;
+    private static final int MAX_EXPRESSION_CHARACTERS = 256;
     private static final DiscoveryBudget REPLAY_CEILING = new DiscoveryBudget(8, 256, 1024, 128, 128, 4096);
     static final JsonMapper JSON = JsonMapper.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
@@ -38,6 +39,7 @@ public final class DomainExportWorkspace {
     private DomainExportWorkspace(VerifiedDomainExport snapshot, DomainDiscoveryEvidence evidence) {
         this.snapshot = snapshot;
         this.evidence = evidence;
+        if (expressionDomain()) expectedExpressionTarget();
         ObjectNode view = JSON.createObjectNode();
         view.put("schema", SCHEMA).put("runId", runId()).put("domainId", evidence.descriptor().domainId())
             .put("domainRevision", evidence.descriptor().revision()).put("inputHash", evidence.seed().contentHash());
@@ -58,8 +60,11 @@ public final class DomainExportWorkspace {
             unavailable(roles, role, "NOT_PRODUCED_BY_SOURCE_EXPORT");
         }
         view.put("replaySupported", replaySupported());
-        view.put("claimBoundary", "Retained finite-sequence validation evidence and bounded deterministic replay; "
-            + "not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification.");
+        view.put("claimBoundary", expressionDomain()
+            ? "Retained expression-rewrite validation evidence and bounded deterministic replay; "
+                + "not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification."
+            : "Retained finite-sequence validation evidence and bounded deterministic replay; "
+                + "not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification.");
         this.contentHash = DomainCanonical.sha256(write(view));
         view.put("contentHash", contentHash);
         this.canonicalJson = write(view);
@@ -106,6 +111,7 @@ public final class DomainExportWorkspace {
 
     ReplayObservation replayObserved() {
         if (!replaySupported()) throw new IllegalStateException("source exceeds bounded replay admission");
+        if (expressionDomain()) return replayWith(new ExpressionRewriteDiscoveryDomain(expectedExpressionTarget()));
         return replayWith(supportedDomain(evidence.descriptor().domainId(), evidence.descriptor().revision()));
     }
 
@@ -135,7 +141,23 @@ public final class DomainExportWorkspace {
         if (LinearRecurrenceSequenceDomain.DOMAIN_ID.equals(id) && LinearRecurrenceSequenceDomain.REVISION.equals(revision)) {
             return new LinearRecurrenceSequenceDomain();
         }
+        if (ExpressionRewriteDiscoveryDomain.DOMAIN_ID.equals(id) && ExpressionRewriteDiscoveryDomain.REVISION.equals(revision)) {
+            // The descriptor identifies the implementation; its configured target is retained in domainEvidence.
+            // Do not parse unbounded retained text or execute its search while loading the source view.
+            return new ExpressionRewriteDiscoveryDomain("x");
+        }
         throw new IllegalArgumentException("unsupported domain export schema or revision");
+    }
+
+    private boolean expressionDomain() {
+        return ExpressionRewriteDiscoveryDomain.DOMAIN_ID.equals(evidence.descriptor().domainId());
+    }
+
+    private String expectedExpressionTarget() {
+        if (!"expression-rewrite-evidence/v1".equals(evidence.domainEvidence().type())) {
+            throw new IllegalArgumentException("unsupported expression evidence payload contract");
+        }
+        return DomainCanonical.requireText(evidence.domainEvidence().properties().get("expectedTarget"), "expectedTarget");
     }
 
     static final class ReplayObservation {
@@ -154,6 +176,8 @@ public final class DomainExportWorkspace {
 
     public boolean replaySupported() {
         var b = evidence.budget();
+        if (expressionDomain() && (evidence.seed().payload().length() > MAX_EXPRESSION_CHARACTERS
+                || expectedExpressionTarget().length() > MAX_EXPRESSION_CHARACTERS)) return false;
         return evidence.seed().payload().length() <= 8192 && b.maxDepth() <= REPLAY_CEILING.maxDepth()
             && b.maxExploredStates() <= REPLAY_CEILING.maxExploredStates()
             && b.maxGeneratedSuccessors() <= REPLAY_CEILING.maxGeneratedSuccessors()
