@@ -22,6 +22,43 @@ class ModularKernelTest {
     static final IterationLimits WORK = new IterationLimits(1_000_000, 100_000, 60_000);
     static final Limits DEFAULT = Limits.defaults(WORK);
 
+    @Test void recoversFromAnUnluckyFirstPivotProfileAtTheSameRank() {
+        var a = matrix(new int[][]{{5,1}});
+        var result = ModularKernel.search(a, COMPLETE_KERNEL, limits(5, 7, 11), () -> false);
+        assertEquals(ModularKernel.Status.VERIFIED, result.status());
+        var c = result.certificate().orElseThrow();
+        assertEquals(List.of(0), c.pivots());
+        assertEquals(List.of(1), c.freeColumns());
+        assertEquals(q(-1, 5), c.projection().get(0, 1));
+        assertEquals(7, c.witnessPrime());
+        assertTrue(ModularKernel.verify(a, COMPLETE_KERNEL, c, DEFAULT, () -> false));
+    }
+
+    @Test void combinesMatchingPivotProfilesWithDifferentOriginalWitnessRows() {
+        var a = matrix(new int[][]{{5,10},{1,2}});
+        var result = ModularKernel.search(a, COMPLETE_KERNEL, limits(5, 7, 11), () -> false);
+        assertEquals(ModularKernel.Status.VERIFIED, result.status());
+        var c = result.certificate().orElseThrow();
+        assertEquals(List.of(1), c.selectedRows());
+        assertEquals(List.of(0), c.pivots());
+        assertEquals(q(-2, 1), c.projection().get(0, 1));
+        assertEquals(5, c.witnessPrime());
+        assertTrue(ModularKernel.verify(a, COMPLETE_KERNEL, c, DEFAULT, () -> false));
+        var changedRows = new Certificate(a, List.of(0), c.pivots(), c.freeColumns(), c.projection(), 5);
+        assertFalse(ModularKernel.verify(a, COMPLETE_KERNEL, changedRows, DEFAULT, () -> false));
+    }
+
+    @Test void recoversWhenOnlyALaterPivotColumnImproves() {
+        var a = matrix(new int[][]{{1,0,0},{0,5,1}});
+        var result = ModularKernel.search(a, COMPLETE_KERNEL, limits(5, 7, 11), () -> false);
+        assertEquals(ModularKernel.Status.VERIFIED, result.status());
+        var c = result.certificate().orElseThrow();
+        assertEquals(List.of(0, 1), c.pivots());
+        assertEquals(List.of(2), c.freeColumns());
+        assertEquals(q(-1, 5), c.projection().get(1, 2));
+        assertTrue(ModularKernel.verify(a, COMPLETE_KERNEL, c, DEFAULT, () -> false));
+    }
+
     @Test void fractionReconstructionNeedsCompatiblePrimes() {
         var a = new ExactMatrix(List.of(List.of(q(11, 13), q(7, 13))));
         // At 11 the pivot moves to column 1, at 13 a source denominator vanishes.
@@ -82,17 +119,19 @@ class ModularKernelTest {
         assertFalse(ModularKernel.verify(a, COMPLETE_KERNEL, c, DEFAULT, () -> false));
     }
 
-    @Test void everyWorkCutoffInterruptsAMultiPrimeDiscoveryIncludingItsFinalCheck() {
-        var a = matrix(new int[][]{{11,7},{22,14}});
+    @Test void everyWorkCutoffInterruptsMultiPrimeDiscoveryAndProfileRecovery() {
         var limits = limits(5, 11, 7, 17, 19);
-        var complete = ModularKernel.search(a, COMPLETE_KERNEL, limits, () -> false);
-        assertTrue(complete.certificate().isPresent());
-        for (int cap = 1; cap < complete.work(); cap++) {
-            var bounded = new Limits(WORK.withMaximumWork(cap), limits.maximumBits(), limits.primes());
-            assertEquals(ModularKernel.Status.LIMIT, ModularKernel.search(a, COMPLETE_KERNEL, bounded, () -> false).status());
-            var calls = new AtomicInteger(cap);
-            assertEquals(ModularKernel.Status.CANCELLED,
-                ModularKernel.search(a, COMPLETE_KERNEL, limits, () -> calls.getAndDecrement() <= 0).status());
+        for (var a : List.of(matrix(new int[][]{{11,7},{22,14}}), matrix(new int[][]{{5,1}}),
+                matrix(new int[][]{{5,10},{1,2}}))) {
+            var complete = ModularKernel.search(a, COMPLETE_KERNEL, limits, () -> false);
+            assertTrue(complete.certificate().isPresent());
+            for (int cap = 1; cap < complete.work(); cap++) {
+                var bounded = new Limits(WORK.withMaximumWork(cap), limits.maximumBits(), limits.primes());
+                assertEquals(ModularKernel.Status.LIMIT, ModularKernel.search(a, COMPLETE_KERNEL, bounded, () -> false).status());
+                var calls = new AtomicInteger(cap);
+                assertEquals(ModularKernel.Status.CANCELLED,
+                    ModularKernel.search(a, COMPLETE_KERNEL, limits, () -> calls.getAndDecrement() <= 0).status());
+            }
         }
     }
 
