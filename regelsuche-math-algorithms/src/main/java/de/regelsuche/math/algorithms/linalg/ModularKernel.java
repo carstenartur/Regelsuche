@@ -72,13 +72,16 @@ public final class ModularKernel {
                 var p = BigInteger.valueOf(prime);
                 if (!integers.usable(p, work)) continue;
                 var reduced = reduce(integers.mod(p, work), prime, work);
-                if (pattern == null || reduced.pivots.size() > pattern.pivots.size()) {
+                int profileOrder = pattern == null ? -1 : compareProfiles(reduced, pattern, work);
+                if (profileOrder < 0) {
                     pattern = reduced;
                     witness = prime;
                     modulus = BigInteger.ONE;
                     residues = new BigInteger[reduced.pivots.size()][reduced.free.size()];
                 }
-                if (!pattern.pivots.equals(reduced.pivots) || !pattern.rows.equals(reduced.rows)) continue;
+                if (profileOrder > 0) continue;
+                // Equal pivot profiles use the same coordinates even if elimination selected different rows.
+                // Retain the original rank witness; the exact verifier checks its equations after reconstruction.
                 BigInteger nextModulus = work.bound(modulus.multiply(p));
                 var inverse = modulus.modInverse(p);
                 for (int i = 0; i < reduced.pivots.size(); i++) {
@@ -101,6 +104,18 @@ public final class ModularKernel {
         } catch (Stopped stop) {
             return new Result(stop.status, strength, Optional.empty(), work.used);
         }
+    }
+
+    /** Prefer higher rank, then earlier pivot columns: reduction modulo a prime can only lose prefix rank. */
+    private static int compareProfiles(Reduction candidate, Reduction retained, Work work) {
+        int rankOrder = Integer.compare(retained.pivots.size(), candidate.pivots.size());
+        if (rankOrder != 0) return rankOrder;
+        for (int i = 0; i < candidate.pivots.size(); i++) {
+            work.step();
+            int columnOrder = Integer.compare(candidate.pivots.get(i), retained.pivots.get(i));
+            if (columnOrder != 0) return columnOrder;
+        }
+        return 0;
     }
 
     /** Returns false for invalid evidence, cancellation, or insufficient verification resources. */

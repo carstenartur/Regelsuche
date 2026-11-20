@@ -5,12 +5,24 @@ import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
 import de.regelsuche.math.algorithms.linalg.ModularKernel;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
+import java.math.BigInteger;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import static de.regelsuche.math.algorithms.linalg.ModularKernel.Strength.COMPLETE_KERNEL;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ModularKernelSdkTest {
+    @Test void recoversWhenTheFirstDefaultPrimeMovesThePivot() {
+        var a = new ExactMatrix(List.of(List.of(Rational.of(1_000_000_007), Rational.ONE)));
+        var result = ModularKernelSdk.search(a, COMPLETE_KERNEL, OptimizationBudget.DEFAULT, CancellationToken.NONE);
+        assertEquals(ModularKernel.Status.VERIFIED, result.status());
+        var cert = result.certificate().orElseThrow();
+        assertEquals(new Rational(BigInteger.valueOf(-1), BigInteger.valueOf(1_000_000_007)),
+            cert.projection().get(0, 1));
+        assertTrue(ModularKernelSdk.verify(a, COMPLETE_KERNEL, cert,
+            OptimizationBudget.DEFAULT, CancellationToken.NONE));
+    }
+
     @Test void forwardsSourceClaimBudgetAndCancellation() {
         var a = new ExactMatrix(List.of(List.of(Rational.ONE, Rational.ONE)));
         var budget = new OptimizationBudget(1000, 100, 1, 10000);
