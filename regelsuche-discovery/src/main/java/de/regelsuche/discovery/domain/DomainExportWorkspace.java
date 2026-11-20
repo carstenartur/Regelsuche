@@ -111,12 +111,30 @@ public final class DomainExportWorkspace {
 
     ReplayObservation replayObserved() {
         if (!replaySupported()) throw new IllegalStateException("source exceeds bounded replay admission");
-        if (expressionDomain()) return replayWith(new ExpressionRewriteDiscoveryDomain(expectedExpressionTarget()));
-        return replayWith(supportedDomain(evidence.descriptor().domainId(), evidence.descriptor().revision()));
+        return replayWith(replayDomain());
+    }
+
+    private DiscoveryDomain<?, ?, ?> replayDomain() {
+        return expressionDomain() ? new ExpressionRewriteDiscoveryDomain(expectedExpressionTarget())
+            : supportedDomain(evidence.descriptor().domainId(), evidence.descriptor().revision());
+    }
+
+    DomainDiscoveryEvidence depthZeroControl() {
+        if (!replaySupported()) throw new IllegalStateException("source exceeds bounded replay admission");
+        var b = evidence.budget();
+        var budget = new DiscoveryBudget(0, b.maxExploredStates(), b.maxGeneratedSuccessors(),
+            b.maxCandidatesPerState(), b.maxCandidateAttempts(), b.maxCounterexampleAttempts());
+        return new DomainDiscoveryRunner().run(evidence.campaignId(), replayDomain(), evidence.seed(), budget).evidence();
     }
 
     private <S, C, K> ReplayObservation replayWith(DiscoveryDomain<S, C, K> domain) {
-        var result = new DomainDiscoveryRunner().run(evidence.campaignId(), domain, evidence.seed(), evidence.budget());
+        var rejected = new ArrayList<RejectedAttempt>(1);
+        var result = new DomainDiscoveryRunner().run(evidence.campaignId(), domain, evidence.seed(), evidence.budget(), (candidate, row) -> {
+            if (rejected.isEmpty() && (row.disposition() == AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE
+                    || row.disposition() == AttemptDisposition.REFUTED_BY_EVALUATOR)) {
+                rejected.add(new RejectedAttempt(candidate, row));
+            }
+        });
         if (!evidence.toCanonicalJson().equals(result.evidence().toCanonicalJson())) {
             throw new ReplayMismatch(result.evidence());
         }
@@ -131,7 +149,7 @@ public final class DomainExportWorkspace {
         } else if (result.selectedCertificate().isPresent() || evidence.certificate() != null) {
             throw new ReplayMismatch(result.evidence());
         }
-        return new ReplayObservation(result);
+        return new ReplayObservation(result, rejected.stream().findFirst());
     }
 
     private static DiscoveryDomain<?, ?, ?> supportedDomain(String id, String revision) {
@@ -160,9 +178,16 @@ public final class DomainExportWorkspace {
         return DomainCanonical.requireText(evidence.domainEvidence().properties().get("expectedTarget"), "expectedTarget");
     }
 
+    record RejectedAttempt(Object candidate, CandidateAttempt row) { }
+
     static final class ReplayObservation {
         private final DomainDiscoveryRunner.RunResult<?, ?> result;
-        private ReplayObservation(DomainDiscoveryRunner.RunResult<?, ?> result) { this.result = result; }
+        private final java.util.Optional<RejectedAttempt> firstRefutation;
+        private ReplayObservation(DomainDiscoveryRunner.RunResult<?, ?> result, java.util.Optional<RejectedAttempt> firstRefutation) {
+            this.result = result;
+            this.firstRefutation = firstRefutation;
+        }
+        java.util.Optional<RejectedAttempt> firstRefutation() { return firstRefutation; }
         DomainDiscoveryRunner.RunResult<?, ?> result() { return result; }
     }
 

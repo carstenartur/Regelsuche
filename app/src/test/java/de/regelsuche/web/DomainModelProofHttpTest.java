@@ -43,6 +43,32 @@ class DomainModelProofHttpTest {
         else System.setProperty("regelsuche.discovery.runs.directory", previous);
     }
 
+    @Test void persistsReplaysAndProtectsAssessmentAndLiteratureSubject() throws Exception {
+        var view = importSource(false, "observed=1,4,9,16;holdout=25,36");
+        String action = path(view) + "/assessment";
+        var response = request("POST", action, bound(view));
+        assertEquals(200, response.statusCode(), response.body());
+        var assessment = json.readTree(response.body());
+        assertEquals("PROVED_MODEL", assessment.at("/proof/status").asText());
+        String retained = response.headers().firstValue("Location").orElseThrow();
+        assertEquals(action + "/" + assessment.path("contentHash").asText().substring(7), retained);
+        assertEquals(response.body(), request("GET", retained, null).body());
+        assertEquals(409, request("POST", action, bound(view).replace(view.path("contentHash").asText(),
+            "sha256:" + "a".repeat(64))).statusCode());
+        String runDigest = view.path("runId").asText().substring(7);
+        String candidate = view.at("/evidence/selectedCandidateHash").asText().substring(7);
+        String literature = "/api/discovery-runs/" + runDigest + "/literature/";
+        var literatureRequest = HttpRequest.newBuilder(uri(literature + candidate))
+            .header("X-Regelsuche-Literature", "workbench").GET().build();
+        var context = client.send(literatureRequest, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, context.statusCode(), context.body());
+        assertEquals(assessment.at("/externalNovelty/subject"), json.readTree(context.body()).path("subject"));
+        var target = temporary.resolve("runs-domain-exports-assessments").resolve(runDigest)
+            .resolve(assessment.path("contentHash").asText().substring(7) + ".json");
+        Files.writeString(target, response.body().replace("PROVED_MODEL", "FALSE_CLAIM"));
+        assertEquals(500, request("GET", retained, null).statusCode());
+    }
+
     @Test void provesBothRetainedModelsAndReloadsExactReceiptsWithoutChangingSources() throws Exception {
         for (boolean recurrence : new boolean[]{false, true}) {
             var view = importSource(recurrence, recurrence

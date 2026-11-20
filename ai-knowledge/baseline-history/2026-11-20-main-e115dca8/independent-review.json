@@ -1,0 +1,19 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-independent-review/v1",
+  "decision": "ACCEPT_PREDECESSOR_SNAPSHOT",
+  "reviewer": "Independent proof-domain implementation agent",
+  "sourceRevision": "e115dca89bba32bad516d66f408e26f99fbb6149",
+  "sourceTree": "3fd5ec1d1e4248692aa2d862113b1bd00b1b56ce",
+  "extractorRevision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorTree": "0cb8e41b91c831705f9c86633580181372da6e14",
+  "originalMainRun": 44804422507,
+  "checks": [
+    "Queried GitHub Actions artifact and job APIs. The main artifact names the source SHA above, artifact ID 14667228671 and 29,205,229 bytes. Its API digest equals the locally recomputed ZIP SHA256 6dc9675bba1af15cfa72a0cbd995d9c6478300fd9f91b507c07dedaed31b4af8.",
+    "All seven applicable verification authorities, the checkout-local ciCheck and report publication succeeded. The four precision-study jobs were skipped.",
+    "Independently read the original ZIP. Verified all 290 unique indexed payload lengths and SHA256 values. Its only extra members are index.json and index.md. The retained index decompresses byte-identically. The original CI check.json and complexity.json are byte-identical to the native reports.",
+    "Verified all nine retained file hashes and lengths, both decompressed evidence objects, and every one of 38 unique regular tar members. The four extracted check, trend, snapshot and complexity reports match the retained copies.",
+    "Read the two Git trees by immutable object. Recomputed the 14 bound repository and 12 bound extractor input file digests from their own commits. Verified the old baseline against the predecessor Git blob and original CI artifact.",
+    "Verified the candidate baseline equals the raw native snapshot bytes with SHA256 012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655. The predecessor trend compared 825210 to 814350 under the unchanged 15000 limit and passed without violations. The native log reports 14 executed tasks, eight passing coverage controls, and a passing 17-hotspot check."
+  ],
+  "scope": "The accepted object is the measured main predecessor snapshot. Feature metrics and future CI results are outside this decision. Wall-clock start and finish were not recorded; the retained native log reports 44 seconds, and the native receipt records exit code zero."
+}

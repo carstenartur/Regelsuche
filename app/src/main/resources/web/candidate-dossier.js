@@ -514,5 +514,5 @@
             }
         });
     }
-    window.RegelsucheCandidateDossier = Object.freeze({createController});
+    window.RegelsucheCandidateDossier = Object.freeze({createController, renderLiterature});
 })();

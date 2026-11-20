@@ -43,6 +43,13 @@ public enum SearchProfile {
             return new StructuralDiversitySearchStrategy();
         }
     },
+    /** Shares exact values and prunes only dominated syntax/resource/proof continuations. */
+    QUOTIENT_DISCOVERY(new SearchHeuristic(6, 2000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {
+        @Override
+        public SearchStrategy newStrategy() {
+            return new BestFirstSearchStrategy(BestFirstSearchStrategy.IdentityPolicy.CONTINUATION_QUOTIENT_V1);
+        }
+    },
     /** Mid-sized search that prefers small, easy to explain steps. */
     TEACHING(new SearchHeuristic(5, 600, 1, 3, 40, 8), TransformationGoal.TEACHING_FRIENDLY) {
         @Override

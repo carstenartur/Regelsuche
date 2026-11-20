@@ -99,7 +99,16 @@ final class LiteratureWorkbenchActions {
 
     private Optional<Subject> retainedSubject(String runId, String candidateId) throws IOException {
         var retained = RepresentationDiscoveryRunWorkspace.findRetained(runs, runId);
-        if (retained.isEmpty()) return Optional.empty();
+        if (retained.isEmpty()) {
+            var domainExports = new de.regelsuche.discovery.domain.DomainExportWorkspaceRepository(
+                runs.resolveSibling(runs.getFileName() + "-domain-exports"));
+            var source = domainExports.find(runId);
+            if (source.isEmpty() || !source.get().replaySupported()
+                    || !candidateId.equals(source.get().evidence().selectedCandidateHash())) return Optional.empty();
+            // Never disclose an imported candidate based solely on the exporter's certificate or hash.
+            var replayed = source.get().replay();
+            return Optional.of(new Subject(runId, replayed.selectedCandidateHash(), replayed.contentHash()));
+        }
         var run = retained.get();
         var reference = run.artifacts().stream().filter(item -> item.role() == CANDIDATE_DOSSIERS).findFirst().orElseThrow();
         if (reference.status() != AVAILABLE) return Optional.empty();

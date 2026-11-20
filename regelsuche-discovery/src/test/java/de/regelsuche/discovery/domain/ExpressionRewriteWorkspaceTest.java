@@ -46,6 +46,10 @@ class ExpressionRewriteWorkspaceTest {
         var changed = withPayload(original, new DomainPayload("expression-rewrite-evidence/v1", values));
         var workspace = DomainExportWorkspace.fromVerified(export(changed));
         assertThrows(IllegalStateException.class, workspace::replay);
+        var assessment = DomainExportWorkspace.read(DomainSnapshotAssessment.assess(workspace).toCanonicalJson());
+        assertEquals("REPLAY_MISMATCH", assessment.path("replayStatus").asText());
+        assertEquals("NOT_EVALUATED", assessment.at("/proof/status").asText());
+        assertEquals("NO_VERIFIED_SUBJECT", assessment.at("/externalNovelty/status").asText());
     }
 
     @Test void missingTargetAndForeignPayloadContractAreRejected() {
@@ -63,6 +67,9 @@ class ExpressionRewriteWorkspaceTest {
             var workspace = DomainExportWorkspace.fromVerified(export(source));
             assertEquals(source.toCanonicalJson(), workspace.evidence().toCanonicalJson());
             assertFalse(workspace.replaySupported());
+            var assessment = DomainExportWorkspace.read(DomainSnapshotAssessment.assess(workspace).toCanonicalJson());
+            assertEquals("OUTSIDE_REPLAY_BUDGET", assessment.path("replayStatus").asText());
+            assertEquals("NOT_EVALUATED", assessment.at("/ablation/status").asText());
             assertThrows(IllegalStateException.class, workspace::replay);
         }
     }

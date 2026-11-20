@@ -16,13 +16,17 @@ public final class DomainGenericQualificationMain {
     }
 
     public static void main(String[] args) {
+        if (args.length == 2 && "--verify-product".equals(args[0])) {
+            System.out.println(new DomainGenericQualificationRunner().verifyRetainedProduct(Path.of(args[1])));
+            return;
+        }
         if (args.length == 2 && "--verify-retained".equals(args[0])) {
             requireReady(new DomainGenericQualificationRunner().verifyRetained(Path.of(args[1])));
             return;
         }
         if (args.length > 1) {
             throw new IllegalArgumentException(
-                "usage: DomainGenericQualificationMain [output-directory] | --verify-retained directory");
+                "usage: DomainGenericQualificationMain [output-directory] | --verify-retained directory | --verify-product directory");
         }
         Path output = args.length == 1
             ? Path.of(args[0])

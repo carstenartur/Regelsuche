@@ -1,0 +1,300 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "status": "independently-reviewed-accepted-predecessor",
+  "sourceCommit": "c268eedc94032b65293d09b4e3d9d6af256b1074",
+  "sourceTree": "8dc43f34aa9af5b06299468f9424933184de0086",
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorTree": "0cb8e41b91c831705f9c86633580181372da6e14",
+  "sourceBaselineSha256": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655",
+  "snapshotSha256": "2ce47efd856b26d4f90fdcdcc1a0ef8306dc926b5443d0c363055e4669240756",
+  "qualification": {
+    "mainCiRun": 44824761437,
+    "event": "push",
+    "branch": "main",
+    "conclusion": "success",
+    "successfulVerificationAuthorities": 7,
+    "aggregateCiCheckConclusion": "success",
+    "reportPublicationConclusion": "success",
+    "nativePredecessorExitCode": 0,
+    "actionableTasksExecuted": 14,
+    "coverageControlsPassed": 8,
+    "hotspotChecksPassed": 17,
+    "previousBaselineTokens": 825210,
+    "acceptedPredecessorTokens": 829570,
+    "contextTokenIncrease": 4360,
+    "unchangedTokenIncreaseLimit": 15000
+  },
+  "acceptedCiArtifact": {
+    "archiveId": 14676146384,
+    "bytes": 29205310,
+    "sha256": "ad0e228e8c4ddc6ba4e0a89f38a5cd89f6a56e00e2c0ab62cff6faddd8dec9d4",
+    "indexSha256": "30f5bedfa692cef8cea007037b605588b366fcd7b8bcf733f5173e6b2186bc7c",
+    "checkout": {
+      "revision": "c268eedc94032b65293d09b4e3d9d6af256b1074",
+      "trackedChangesPresent": false,
+      "tree": "8dc43f34aa9af5b06299468f9424933184de0086"
+    },
+    "verifiedFileCount": 290
+  },
+  "nativeMatchesCi": {
+    "check.json": {
+      "sha256": "0f49ff7668c2abc6500a18d3665ac933081a1710724f4bc814cc720f5fbed86e",
+      "archiveMember": "files/build/ai-knowledge/check.json",
+      "byteIdentical": true
+    },
+    "complexity.json": {
+      "sha256": "2eea0bc13bacc37931ebaaf5473633e80dd1f8d124f54a98b4825991825d75de",
+      "archiveMember": "files/build/ai-knowledge/complexity.json",
+      "byteIdentical": true
+    }
+  },
+  "repositoryBindingsAtMeasurement": {
+    "ai-knowledge-verification/build.gradle": "d98aab126212c0a594a46faf9b94fc01b3adcbb98c491d6b2aeb5549792b891b",
+    "gradle/ai-knowledge-verification.gradle": "dc0d8833e2fbb0cf045326b4a6924abc0717dfa21247b6a026d4ad5915176368",
+    "ai-knowledge/complexity-baseline.json": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655",
+    "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+    "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+    "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "config/quality/complexity-hotspots.json": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4",
+    "scripts/verify-ai-knowledge-artifacts.py": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+    "scripts/test_ai_knowledge_coverage.py": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+    "settings.gradle": "94a43f75ca24cdba052ff86535c03cf287ac1b207ab571fd7b56d19f67a195cc",
+    "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+    "gradle/wrapper/gradle-wrapper.properties": "12144a4fea99618e77d772324f9410b796b09021caed589c4f2e7573eaa23ede",
+    "gradle/wrapper/gradle-wrapper.jar": "621008afc4f5d59357fcf06ffa644dd5aade5e091bdc363742710445f73cdaf8"
+  },
+  "extractorBindings": {
+    "build.gradle": "c49482b2bdbaaf82f507135314df3b96eb42e21f1e135cf2d10510d03c1e4158",
+    "settings.gradle": "e5b4053a579890380d9b1e9e3a63a79246f7bde39426e0af1eb59f8be15fef76",
+    "gradle.properties": "ce5127016f4158cad59c63c96b11a5292a5a0066e76991a5e9ea7271d8ce7496",
+    "core/build.gradle": "09fcb94672f4b3200fc25817e5ac6e7f2d1049f26a078a58c11f276183cd62ca",
+    "gradle-plugin/build.gradle": "2d42f5c384da203e8ec03d70c42f16a6285748cb91d97eecf8837282f4b32f6a",
+    "core/src/main/java/org/aiknowledge/core/repositoryscan/RepositoryFileInventoryScanner.java": "b89b02132c1f4f4fc753ef3bbe7b4752a8696dc9b3a12d1c37b79052a56756e0",
+    "core/src/main/java/org/aiknowledge/core/ReportAnalyzer.java": "7d7bc7cd0220a5424c287c1c019d3bf488c578b81f3a303633cbd85ee13bd700",
+    "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae",
+    "core/src/main/java/org/aiknowledge/core/ModelProfileSupport.java": "bef8660d98b698de5fcca5fb092436de2e99ba18b7c9bcbf97cc224f8439b4c0",
+    "core/src/main/java/org/aiknowledge/core/KnowledgeExtractionPipeline.java": "ac405ba819f41cd9f5deb59682dac10b36be6e7facf1f015a04ec9f85fb6cdf9",
+    "gradle-plugin/src/main/java/org/aiknowledge/gradle/AiKnowledgePlugin.java": "4f418fe79ebab1439d032d9340c5a4781936d247d823e0eb04d269cb6c78d850",
+    "gradle-plugin/src/main/java/org/aiknowledge/gradle/AiKnowledgeExtension.java": "eee09031ba2bd1402325160c7f1f09dc6429eddec35a9554b7124a4ab84aad58"
+  },
+  "retainedFiles": {
+    "accepted-check.json": {
+      "bytes": 10186,
+      "sha256": "0f49ff7668c2abc6500a18d3665ac933081a1710724f4bc814cc720f5fbed86e"
+    },
+    "accepted-complexity.json": {
+      "bytes": 20797,
+      "sha256": "2eea0bc13bacc37931ebaaf5473633e80dd1f8d124f54a98b4825991825d75de"
+    },
+    "accepted-trend.json": {
+      "bytes": 2010,
+      "sha256": "95ddbd98abc960c05a62e2f805798c99f1e9e6e73d72b2dd2170b3578584460f"
+    },
+    "aiKnowledgeCheck.log.gz": {
+      "bytes": 959,
+      "sha256": "e8d2e6ae2a1f1e94105f274147474a1dc9ae26e3938998351c8330993de283b0"
+    },
+    "metrics-snapshot.json": {
+      "bytes": 339,
+      "sha256": "2ce47efd856b26d4f90fdcdcc1a0ef8306dc926b5443d0c363055e4669240756"
+    },
+    "native-gate-receipt.json": {
+      "bytes": 1581,
+      "sha256": "245cb7b7a19faf7f9f55938e86d207018ddcc5bbf40dab328040ec6f265b2d2e"
+    },
+    "original-ci-index.json.gz": {
+      "bytes": 62718,
+      "sha256": "b37793e54efe0311bbaedded1e9a0dcc23160507e53228589b2256000bee1483"
+    },
+    "previous-baseline.json": {
+      "bytes": 339,
+      "sha256": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655"
+    },
+    "raw-reports.tar.gz": {
+      "bytes": 1746508,
+      "sha256": "c730e63454850cc6f67fdbbbab52eb3116594fdab8c166b82f714a3e193b0fde"
+    }
+  },
+  "rawReports": {
+    "file": "raw-reports.tar.gz",
+    "memberCount": 38,
+    "members": {
+      "measured-main/benchmark.html": {
+        "bytes": 1954,
+        "sha256": "49361c94698a13d6cc50eb4cd4ecc7c27f13f241ff34f5c52211d55492cb5c17"
+      },
+      "measured-main/benchmark.json": {
+        "bytes": 1797,
+        "sha256": "9021073a7294e960744ef958ea0273f4312732f76375b1c5eda680af5badc9b0"
+      },
+      "measured-main/capabilities.json": {
+        "bytes": 158734,
+        "sha256": "4a233cfcb0de4dbc96bc69469654f5c366e5bb55c55be9cdebe6c321eab0604a"
+      },
+      "measured-main/check.json": {
+        "bytes": 10186,
+        "sha256": "0f49ff7668c2abc6500a18d3665ac933081a1710724f4bc814cc720f5fbed86e"
+      },
+      "measured-main/claims.json": {
+        "bytes": 10730,
+        "sha256": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3"
+      },
+      "measured-main/classes.json": {
+        "bytes": 13263715,
+        "sha256": "d4361587b32872c951594ddc0f3fc479ab392a50ae3e3239e7af8fc799d7ab92"
+      },
+      "measured-main/complexity.html": {
+        "bytes": 21074,
+        "sha256": "e67cd89652db648684da674a5d17998f1b71007c1c3a94324c496833434478fd"
+      },
+      "measured-main/complexity.json": {
+        "bytes": 20797,
+        "sha256": "2eea0bc13bacc37931ebaaf5473633e80dd1f8d124f54a98b4825991825d75de"
+      },
+      "measured-main/context-packs/counterexample-search.json": {
+        "bytes": 18611,
+        "sha256": "7b8b0351fea1ee81acba84f9c5108e37dbc59eff5401006e77c579b47386f841"
+      },
+      "measured-main/context-packs/discovery.json": {
+        "bytes": 43329,
+        "sha256": "3da6ee494c4cb41ca97814c91b172a1ea394acf2c11c079040b14089d7db0a02"
+      },
+      "measured-main/context-packs/equality-saturation.json": {
+        "bytes": 3150,
+        "sha256": "d68890b1a5986c48a9cefad1da9c5ecc84074770ccd3bc2c4cb02540bf500237"
+      },
+      "measured-main/context-packs/exact-matrix-representation.json": {
+        "bytes": 5589,
+        "sha256": "975a23e14b1294114d1873a4cb8eeafbffc0ccfe687a3fd349f05138dbb1f3d2"
+      },
+      "measured-main/context-packs/historical-rediscovery-diagnostics.json": {
+        "bytes": 2220,
+        "sha256": "b06de43a413e676bc96452c0937861b714275743b0cdaf3e221c131f748b90b8"
+      },
+      "measured-main/context-packs/hypothesis-mining.json": {
+        "bytes": 30132,
+        "sha256": "0483cfd55fde930cb2ea5cd160c30e64e398ee1d4d9e4df5ba71f502e96c85d4"
+      },
+      "measured-main/context-packs/index.json": {
+        "bytes": 4184,
+        "sha256": "475ae5ad2e0f71d5f81cf82265ca02be78fbdd047d4eccf28f0a0c8f0956ee3e"
+      },
+      "measured-main/context-packs/maven-build-contract.json": {
+        "bytes": 619,
+        "sha256": "71ac265c052fba6d9278a11308d33ffc7333f9123e27851bf53ac069a62cfceb"
+      },
+      "measured-main/context-packs/persistence.json": {
+        "bytes": 15614,
+        "sha256": "7d5e4da483bc8287e7824144ba7dd9a13a0c9e5e4a5e3d270e2b047df2827b27"
+      },
+      "measured-main/context-packs/polynomial-factorization.json": {
+        "bytes": 19657,
+        "sha256": "22f96f927d9bd8d114ec48d5043be2f835606490b570ee85c9a8279e71f87005"
+      },
+      "measured-main/context-packs/proof-carrying-showcase.json": {
+        "bytes": 4668,
+        "sha256": "d1967d09258a552268621e3ad489be7db35556548f8dfd187a95e9ef3d6a4526"
+      },
+      "measured-main/context-packs/proof-workflows.json": {
+        "bytes": 17170,
+        "sha256": "b32899435fe54839448d2c0cedc4983b3acd7bc209a1b73768bb1f1ea5d6f1a1"
+      },
+      "measured-main/context-packs/public-java-sdk.json": {
+        "bytes": 2304,
+        "sha256": "50e1efd8602644cc600194b6b9900102d7a300f8dbbb7eb92d3db7221527669d"
+      },
+      "measured-main/context-packs/rewrite-search.json": {
+        "bytes": 71454,
+        "sha256": "e5438236743befae6570e69479e77e084686c08ed5adbc17bbe1c331098679ea"
+      },
+      "measured-main/context-packs/schematic-exact-plan-replay.json": {
+        "bytes": 7759,
+        "sha256": "64285551e31bf644e722c910f3f07878379eded4386c422175d78721bdf18583"
+      },
+      "measured-main/context-packs/static-reference-publication.json": {
+        "bytes": 736,
+        "sha256": "54339d738168b55990472c08121059b2dfadce953484e1b76c11ce4b9aa5bbf5"
+      },
+      "measured-main/context-packs/verified-trace-strategy-learning.json": {
+        "bytes": 2673,
+        "sha256": "7d365b35775efd2fa11ab17e6bbdfde4eba47bc54d27d5f5e9e8f4a3ff2b9130"
+      },
+      "measured-main/context-packs/web-workbench.json": {
+        "bytes": 28968,
+        "sha256": "b126c037ec4c94f6948f446f7e1cc889c85326137cc0e4d6d5f5f6aaf97279ec"
+      },
+      "measured-main/dependencies.json": {
+        "bytes": 49273,
+        "sha256": "0eb13ec54a471c09a708650c884b87b1c5fa737eda265e7d2631844ee37dc893"
+      },
+      "measured-main/docs.json": {
+        "bytes": 417760,
+        "sha256": "c445896ddc567ba7e302aef6405ffd9bddc53e89302f15d30d81f802bce501cb"
+      },
+      "measured-main/evidence.json": {
+        "bytes": 1817,
+        "sha256": "d99bc8457f2f68dce2b0b0da7a7b9c17ebdc59ea55111ed85d80dc18b15bf336"
+      },
+      "measured-main/index.json": {
+        "bytes": 224,
+        "sha256": "aad9bc39fecd557c74df59af4d30ec1d44d6b583d0e971a716e83ea067d28b3c"
+      },
+      "measured-main/metrics-snapshot.json": {
+        "bytes": 339,
+        "sha256": "2ce47efd856b26d4f90fdcdcc1a0ef8306dc926b5443d0c363055e4669240756"
+      },
+      "measured-main/modules.json": {
+        "bytes": 51961,
+        "sha256": "386986c750bb569d6f52358e9463c5ffa2313147bd716e04a0599f9dc78d825f"
+      },
+      "measured-main/optimization.html": {
+        "bytes": 33002,
+        "sha256": "24467af69407730fadc9572ab9990f4bcc26a1b420debc40ee55dcc58a91c393"
+      },
+      "measured-main/optimization.json": {
+        "bytes": 32385,
+        "sha256": "b76d81c645b9cf6496a94ab9ed4538cce164e4b6a173848469621eb64837d7ff"
+      },
+      "measured-main/review-context.md": {
+        "bytes": 28963,
+        "sha256": "eddeec4d1cfa9e25ea47ba11304928cd35fe813032428f668dcc60b55da87dd2"
+      },
+      "measured-main/tests.json": {
+        "bytes": 9715003,
+        "sha256": "4bf12e75ac785cc1f9f3547f5224287d6c8c3ba4f5e6756b8eb9f0c47701a84e"
+      },
+      "measured-main/trend.html": {
+        "bytes": 2159,
+        "sha256": "3b1ab939c7d68247eb9d808f0ba1cd544726367023a6d3d7cb58c6ba9848bed5"
+      },
+      "measured-main/trend.json": {
+        "bytes": 2010,
+        "sha256": "95ddbd98abc960c05a62e2f805798c99f1e9e6e73d72b2dd2170b3578584460f"
+      }
+    }
+  },
+  "compressedEvidence": {
+    "aiKnowledgeCheck.log.gz": {
+      "originalName": "aiKnowledgeCheck.log",
+      "bytes": 2546,
+      "sha256": "3d2694f9ebe2aa2f960b0e3e5c35540aaf320c6f51362a185ec12afba772be0e"
+    },
+    "original-ci-index.json.gz": {
+      "originalName": "original-ci-index.json",
+      "bytes": 517894,
+      "sha256": "30f5bedfa692cef8cea007037b605588b366fcd7b8bcf733f5173e6b2186bc7c"
+    }
+  },
+  "reproduction": {
+    "source": "Clean detached sourceCommit with its original baseline and all unchanged controls.",
+    "extractor": "Clean pinned v0.1.10 source via its explicit local composite build.",
+    "transport": "Offline dependencies from the already provisioned original cache; no initializer, selector, threshold or exception override.",
+    "measurement": "Only the complete generated accepted predecessor metrics-snapshot.json supplies proposed baseline values. No later feature result supplies values."
+  },
+  "independentReview": {
+    "file": "independent-review.json",
+    "bytes": 1857,
+    "sha256": "9af3af74deadded208095e3040dc517263902d2605f0f45853e7dcd82dbaa4d2"
+  }
+}

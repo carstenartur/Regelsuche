@@ -1,0 +1,305 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-provenance/v1",
+  "status": "independently-approved-predecessor-promotion",
+  "sourceCommit": "e115dca89bba32bad516d66f408e26f99fbb6149",
+  "sourceTree": "3fd5ec1d1e4248692aa2d862113b1bd00b1b56ce",
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorTree": "0cb8e41b91c831705f9c86633580181372da6e14",
+  "sourceBaselineSha256": "2417ce7b401bc5b41b006425ba1b415d77af59fdc3f8e6fb57f17833f7cfa982",
+  "snapshotSha256": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655",
+  "qualification": {
+    "mainCiRun": 44804422507,
+    "event": "push",
+    "branch": "main",
+    "conclusion": "success",
+    "successfulVerificationAuthorities": 7,
+    "aggregateCiCheckConclusion": "success",
+    "reportPublicationConclusion": "success",
+    "nativePredecessorExitCode": 0,
+    "actionableTasksExecuted": 14,
+    "coverageControlsPassed": 8,
+    "hotspotChecksPassed": 17,
+    "previousBaselineTokens": 814350,
+    "acceptedPredecessorTokens": 825210,
+    "contextTokenIncrease": 10860,
+    "unchangedTokenIncreaseLimit": 15000
+  },
+  "acceptedCiArtifact": {
+    "archiveId": 14667228671,
+    "bytes": 29205229,
+    "sha256": "6dc9675bba1af15cfa72a0cbd995d9c6478300fd9f91b507c07dedaed31b4af8",
+    "indexSha256": "7bd9ef2790982e612414b292f57814a520386d430c0a8308b0fac0415e6ab47b",
+    "checkout": {
+      "revision": "e115dca89bba32bad516d66f408e26f99fbb6149",
+      "trackedChangesPresent": false,
+      "tree": "3fd5ec1d1e4248692aa2d862113b1bd00b1b56ce"
+    },
+    "verifiedFileCount": 290
+  },
+  "nativeMatchesCi": {
+    "check.json": {
+      "sha256": "100135e42c707fabd6a47392c2c33ab096e7e3766a41f43ecd8676187e5b7894",
+      "archiveMember": "files/build/ai-knowledge/check.json",
+      "byteIdentical": true
+    },
+    "complexity.json": {
+      "sha256": "3bd5b30914cd7c47e520c1747555f890221d698cbb4594d9e59bb2454565193e",
+      "archiveMember": "files/build/ai-knowledge/complexity.json",
+      "byteIdentical": true
+    }
+  },
+  "repositoryBindingsAtMeasurement": {
+    "ai-knowledge-verification/build.gradle": "d98aab126212c0a594a46faf9b94fc01b3adcbb98c491d6b2aeb5549792b891b",
+    "gradle/ai-knowledge-verification.gradle": "dc0d8833e2fbb0cf045326b4a6924abc0717dfa21247b6a026d4ad5915176368",
+    "ai-knowledge/complexity-baseline.json": "2417ce7b401bc5b41b006425ba1b415d77af59fdc3f8e6fb57f17833f7cfa982",
+    "ai-knowledge/capabilities.seed.yaml": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+    "ai-knowledge/claims.seed.yaml": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+    "ai-knowledge/claims.json": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+    "config/ai-knowledge-capability-coverage.json": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+    "config/quality/complexity-hotspots.json": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4",
+    "scripts/verify-ai-knowledge-artifacts.py": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+    "scripts/test_ai_knowledge_coverage.py": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+    "settings.gradle": "94a43f75ca24cdba052ff86535c03cf287ac1b207ab571fd7b56d19f67a195cc",
+    "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+    "gradle/wrapper/gradle-wrapper.properties": "12144a4fea99618e77d772324f9410b796b09021caed589c4f2e7573eaa23ede",
+    "gradle/wrapper/gradle-wrapper.jar": "621008afc4f5d59357fcf06ffa644dd5aade5e091bdc363742710445f73cdaf8"
+  },
+  "extractorBindings": {
+    "build.gradle": "c49482b2bdbaaf82f507135314df3b96eb42e21f1e135cf2d10510d03c1e4158",
+    "settings.gradle": "e5b4053a579890380d9b1e9e3a63a79246f7bde39426e0af1eb59f8be15fef76",
+    "gradle.properties": "ce5127016f4158cad59c63c96b11a5292a5a0066e76991a5e9ea7271d8ce7496",
+    "core/build.gradle": "09fcb94672f4b3200fc25817e5ac6e7f2d1049f26a078a58c11f276183cd62ca",
+    "gradle-plugin/build.gradle": "2d42f5c384da203e8ec03d70c42f16a6285748cb91d97eecf8837282f4b32f6a",
+    "core/src/main/java/org/aiknowledge/core/repositoryscan/RepositoryFileInventoryScanner.java": "b89b02132c1f4f4fc753ef3bbe7b4752a8696dc9b3a12d1c37b79052a56756e0",
+    "core/src/main/java/org/aiknowledge/core/ReportAnalyzer.java": "7d7bc7cd0220a5424c287c1c019d3bf488c578b81f3a303633cbd85ee13bd700",
+    "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae",
+    "core/src/main/java/org/aiknowledge/core/ModelProfileSupport.java": "bef8660d98b698de5fcca5fb092436de2e99ba18b7c9bcbf97cc224f8439b4c0",
+    "core/src/main/java/org/aiknowledge/core/KnowledgeExtractionPipeline.java": "ac405ba819f41cd9f5deb59682dac10b36be6e7facf1f015a04ec9f85fb6cdf9",
+    "gradle-plugin/src/main/java/org/aiknowledge/gradle/AiKnowledgePlugin.java": "4f418fe79ebab1439d032d9340c5a4781936d247d823e0eb04d269cb6c78d850",
+    "gradle-plugin/src/main/java/org/aiknowledge/gradle/AiKnowledgeExtension.java": "eee09031ba2bd1402325160c7f1f09dc6429eddec35a9554b7124a4ab84aad58"
+  },
+  "retainedFiles": {
+    "accepted-check.json": {
+      "bytes": 10186,
+      "sha256": "100135e42c707fabd6a47392c2c33ab096e7e3766a41f43ecd8676187e5b7894"
+    },
+    "accepted-complexity.json": {
+      "bytes": 20797,
+      "sha256": "3bd5b30914cd7c47e520c1747555f890221d698cbb4594d9e59bb2454565193e"
+    },
+    "accepted-trend.json": {
+      "bytes": 2008,
+      "sha256": "976cdec089094ab02478905b23ad8272555efe7736db11754bf2e94de2d11d5b"
+    },
+    "aiKnowledgeCheck.log.gz": {
+      "bytes": 959,
+      "sha256": "ac10b1d79ad2242589c2c03003fbef3f262e3158ca3585bdc00db5a30ea29a21"
+    },
+    "metrics-snapshot.json": {
+      "bytes": 339,
+      "sha256": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655"
+    },
+    "native-gate-receipt.json": {
+      "bytes": 1581,
+      "sha256": "9ae1d618d003e4feaae0f8c9d75e0182719b33d16a3d6afd9c7e923ed9d0d654"
+    },
+    "original-ci-index.json.gz": {
+      "bytes": 62693,
+      "sha256": "62bc9a6c88e476266342c8969fcdf2141662faa8090ac568fdf0955311a216e4"
+    },
+    "previous-baseline.json": {
+      "bytes": 339,
+      "sha256": "2417ce7b401bc5b41b006425ba1b415d77af59fdc3f8e6fb57f17833f7cfa982"
+    },
+    "raw-reports.tar.gz": {
+      "bytes": 1736520,
+      "sha256": "5be5297c8fd58854b7d1a2105a2bfae304d76d4e66e4b451c5679a21138f13cf"
+    },
+    "independent-review.json": {
+      "bytes": 2339,
+      "sha256": "0cb10813e8f70a279ee151ead3bc1186f0fde854da0298b822679a69e8551ba6"
+    }
+  },
+  "rawReports": {
+    "file": "raw-reports.tar.gz",
+    "memberCount": 38,
+    "members": {
+      "measured-main/benchmark.html": {
+        "bytes": 1954,
+        "sha256": "507b2c24c25e1e4bc93fff057dbc6e2fa9406b4bf141fd6a75a0018dad5dd33a"
+      },
+      "measured-main/benchmark.json": {
+        "bytes": 1797,
+        "sha256": "7607b59fe0331d8dda23941b17fc12a4dac93f59c265b58eac39a296a64a7f74"
+      },
+      "measured-main/capabilities.json": {
+        "bytes": 158371,
+        "sha256": "945a7b5974b7ceb3ebfc95719bbb17f3baf360d10a388f21baeb802a6f2af5c0"
+      },
+      "measured-main/check.json": {
+        "bytes": 10186,
+        "sha256": "100135e42c707fabd6a47392c2c33ab096e7e3766a41f43ecd8676187e5b7894"
+      },
+      "measured-main/claims.json": {
+        "bytes": 10730,
+        "sha256": "b522704dafe348f98c21888d4c4668461ad9ae678f92be3b899cc9813055a8e3"
+      },
+      "measured-main/classes.json": {
+        "bytes": 13175684,
+        "sha256": "f744c1ec81ff4afc5719042bda47326434f02ad54f1034937436124f7274f6ba"
+      },
+      "measured-main/complexity.html": {
+        "bytes": 21074,
+        "sha256": "3eb9274102e7c1824802fc14723fd9baf74adebfa12120552e2b4b5a0af669ba"
+      },
+      "measured-main/complexity.json": {
+        "bytes": 20797,
+        "sha256": "3bd5b30914cd7c47e520c1747555f890221d698cbb4594d9e59bb2454565193e"
+      },
+      "measured-main/context-packs/counterexample-search.json": {
+        "bytes": 18611,
+        "sha256": "7b8b0351fea1ee81acba84f9c5108e37dbc59eff5401006e77c579b47386f841"
+      },
+      "measured-main/context-packs/discovery.json": {
+        "bytes": 43112,
+        "sha256": "7ddbef08fd8dbee132f87dc641823e11394dcb61b85fa930ad3ec5bf986cc1a4"
+      },
+      "measured-main/context-packs/equality-saturation.json": {
+        "bytes": 3150,
+        "sha256": "d68890b1a5986c48a9cefad1da9c5ecc84074770ccd3bc2c4cb02540bf500237"
+      },
+      "measured-main/context-packs/exact-matrix-representation.json": {
+        "bytes": 5589,
+        "sha256": "975a23e14b1294114d1873a4cb8eeafbffc0ccfe687a3fd349f05138dbb1f3d2"
+      },
+      "measured-main/context-packs/historical-rediscovery-diagnostics.json": {
+        "bytes": 2220,
+        "sha256": "b06de43a413e676bc96452c0937861b714275743b0cdaf3e221c131f748b90b8"
+      },
+      "measured-main/context-packs/hypothesis-mining.json": {
+        "bytes": 30132,
+        "sha256": "0483cfd55fde930cb2ea5cd160c30e64e398ee1d4d9e4df5ba71f502e96c85d4"
+      },
+      "measured-main/context-packs/index.json": {
+        "bytes": 4184,
+        "sha256": "4244967143401440ae0c51487f50ea5a5b6b667f2bc3026cc86fc5f193d7bb01"
+      },
+      "measured-main/context-packs/maven-build-contract.json": {
+        "bytes": 619,
+        "sha256": "71ac265c052fba6d9278a11308d33ffc7333f9123e27851bf53ac069a62cfceb"
+      },
+      "measured-main/context-packs/persistence.json": {
+        "bytes": 15294,
+        "sha256": "4f86e26359b5a24a68a1c8e640221e790558a2c5b09b20c95d50f1615ab6c1d4"
+      },
+      "measured-main/context-packs/polynomial-factorization.json": {
+        "bytes": 19657,
+        "sha256": "22f96f927d9bd8d114ec48d5043be2f835606490b570ee85c9a8279e71f87005"
+      },
+      "measured-main/context-packs/proof-carrying-showcase.json": {
+        "bytes": 4668,
+        "sha256": "d1967d09258a552268621e3ad489be7db35556548f8dfd187a95e9ef3d6a4526"
+      },
+      "measured-main/context-packs/proof-workflows.json": {
+        "bytes": 17170,
+        "sha256": "b32899435fe54839448d2c0cedc4983b3acd7bc209a1b73768bb1f1ea5d6f1a1"
+      },
+      "measured-main/context-packs/public-java-sdk.json": {
+        "bytes": 2304,
+        "sha256": "50e1efd8602644cc600194b6b9900102d7a300f8dbbb7eb92d3db7221527669d"
+      },
+      "measured-main/context-packs/rewrite-search.json": {
+        "bytes": 71233,
+        "sha256": "fa86f7a5272887d93cbced98a792db80777a9183c72fd4dd92c13b24a724804f"
+      },
+      "measured-main/context-packs/schematic-exact-plan-replay.json": {
+        "bytes": 7759,
+        "sha256": "64285551e31bf644e722c910f3f07878379eded4386c422175d78721bdf18583"
+      },
+      "measured-main/context-packs/static-reference-publication.json": {
+        "bytes": 736,
+        "sha256": "54339d738168b55990472c08121059b2dfadce953484e1b76c11ce4b9aa5bbf5"
+      },
+      "measured-main/context-packs/verified-trace-strategy-learning.json": {
+        "bytes": 2673,
+        "sha256": "7d365b35775efd2fa11ab17e6bbdfde4eba47bc54d27d5f5e9e8f4a3ff2b9130"
+      },
+      "measured-main/context-packs/web-workbench.json": {
+        "bytes": 28968,
+        "sha256": "b126c037ec4c94f6948f446f7e1cc889c85326137cc0e4d6d5f5f6aaf97279ec"
+      },
+      "measured-main/dependencies.json": {
+        "bytes": 49273,
+        "sha256": "0eb13ec54a471c09a708650c884b87b1c5fa737eda265e7d2631844ee37dc893"
+      },
+      "measured-main/docs.json": {
+        "bytes": 414950,
+        "sha256": "b3dded0bba6e584f5dafaa641cb8bb646acbb288e884236f402d65286b51f2a6"
+      },
+      "measured-main/evidence.json": {
+        "bytes": 1817,
+        "sha256": "d99bc8457f2f68dce2b0b0da7a7b9c17ebdc59ea55111ed85d80dc18b15bf336"
+      },
+      "measured-main/index.json": {
+        "bytes": 224,
+        "sha256": "8c9d1c3622dc688c826f9751fc3ff822f453ca8e262d19ed2aeff1ceaa1e9b69"
+      },
+      "measured-main/metrics-snapshot.json": {
+        "bytes": 339,
+        "sha256": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655"
+      },
+      "measured-main/modules.json": {
+        "bytes": 51961,
+        "sha256": "9bbba9b99984d61a5d6b7da4e58de074070a203ed73b52afc23567215d4de403"
+      },
+      "measured-main/optimization.html": {
+        "bytes": 33002,
+        "sha256": "32086319826a63e44a79823e35911227b3a27e4e37841a874fb5189aa09e7228"
+      },
+      "measured-main/optimization.json": {
+        "bytes": 32385,
+        "sha256": "852985d3fd908be1fb2f3a706031072d287f596ea177a2ba0c86d5048b20b91a"
+      },
+      "measured-main/review-context.md": {
+        "bytes": 28963,
+        "sha256": "63802660bce03ccb1c2c794efab75304f2fc1d7ea389f2d89e513ba6cbd2a725"
+      },
+      "measured-main/tests.json": {
+        "bytes": 9677735,
+        "sha256": "91f8c92b793990731addb7ff4e1913c7b30a7b66eafed39ee24a6bab958ef44a"
+      },
+      "measured-main/trend.html": {
+        "bytes": 2157,
+        "sha256": "b987b35ea0a2a31b1edffe6ae0b0643903338227d8ea27871598f3a2bcea1249"
+      },
+      "measured-main/trend.json": {
+        "bytes": 2008,
+        "sha256": "976cdec089094ab02478905b23ad8272555efe7736db11754bf2e94de2d11d5b"
+      }
+    }
+  },
+  "compressedEvidence": {
+    "aiKnowledgeCheck.log.gz": {
+      "originalName": "aiKnowledgeCheck.log",
+      "bytes": 2546,
+      "sha256": "643ffd4482f000130d9c853025162affba0c785b22f8b3ffe38ede7518637790"
+    },
+    "original-ci-index.json.gz": {
+      "originalName": "original-ci-index.json",
+      "bytes": 517841,
+      "sha256": "7bd9ef2790982e612414b292f57814a520386d430c0a8308b0fac0415e6ab47b"
+    }
+  },
+  "reproduction": {
+    "source": "Clean detached sourceCommit with its original baseline and all unchanged controls.",
+    "extractor": "Clean pinned v0.1.10 source via its explicit local composite build.",
+    "transport": "Offline dependencies from the already provisioned original cache; no initializer, selector, threshold or exception override.",
+    "measurement": "Only the complete generated accepted predecessor metrics-snapshot.json supplies proposed baseline values. No later feature result supplies values."
+  },
+  "independentReview": {
+    "decision": "ACCEPT_PREDECESSOR_SNAPSHOT",
+    "report": "independent-review.json",
+    "sha256": "0cb10813e8f70a279ee151ead3bc1186f0fde854da0298b822679a69e8551ba6",
+    "snapshotSha256": "012b1e6c445550da3fc405eb9e4e3291b7cd1f1f01377061dd5e866652995655"
+  }
+}

@@ -184,6 +184,9 @@ runs/run-N/
     evidence.json
     lifecycle-handoff.json
     export-manifest.json
+  assessments/
+    expression.json
+    sequence.json
   verification-receipts/
     expression.json
     sequence.json
@@ -303,3 +306,17 @@ produktive Wiederverwendung verifizierter Snapshots in weiterführenden
 Novelty-, Proof-, Release- und Public-Evidence-Komponenten. Diese späteren Gates
 müssen ihre bisherigen Bedeutungen und die vollständige Source-Evidence-Kette
 beibehalten.
+
+
+Für den getrennten Produktbericht `snapshot-product-release.json` erzeugt der
+Runner in jedem der drei Läufe zusätzlich einen verifizierten Rekurrenzexport.
+Der Bericht enthält neun quellengebundene Prüfbelege, ihre vollständige
+Quellenidentität und die Ergebnisse zu Validierung, Proof, Lebenszyklus, Neuheit,
+Promotion, Public Evidence und Forschungsfreigabe. Die drei Belege je Domäne
+müssen reproduzierbar identisch sein. `--verify-product VERZEICHNIS` verlangt
+den Bericht, alle neun Quellexporte, Verifikations- und Prüfbelege und vergleicht
+ihre Bytes mit der Rekonstruktion. Der Bericht autorisiert ausschließlich die
+Ausgabe der reproduzierten Forschungsergebnisse. `--verify-retained` prüft
+weiterhin die historische Architekturqualifikation und einen vorhandenen
+zusätzlichen Produktbericht. Für eine Produktabnahme ist `--verify-product`
+der verbindliche Einstieg. [Quellen und Geltungsbereiche](domain-export-workspaces.md)
