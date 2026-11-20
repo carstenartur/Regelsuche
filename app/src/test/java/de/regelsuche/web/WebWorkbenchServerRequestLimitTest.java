@@ -352,6 +352,8 @@ class WebWorkbenchServerRequestLimitTest {
             new Endpoint("/api/discovery-domains/exports", "/api/discovery-domains/exports", ""),
             new Endpoint("/api/discovery-domains/exports/{runDigest}/replay",
                 "/api/discovery-domains/exports/request-limit/replay", ""),
+            new Endpoint("/api/discovery-domains/exports/{runDigest}/assessment",
+                "/api/discovery-domains/exports/request-limit/assessment", ""),
             new Endpoint("/api/discovery-domains/exports/{runDigest}/validate",
                 "/api/discovery-domains/exports/request-limit/validate", ""),
             new Endpoint("/api/discovery-domains/exports/{runDigest}/model-proof",
