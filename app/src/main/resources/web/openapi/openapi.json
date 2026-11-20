@@ -2708,7 +2708,7 @@
         "properties": {
           "expression": {"type": "string"},
           "type": {"type": "string", "enum": ["TERM", "EQUATION", "SYSTEM"], "default": "TERM"},
-          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION"], "default": "FAST_SIMPLIFY"},
+          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "QUOTIENT_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION"], "default": "FAST_SIMPLIFY"},
           "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "NUMERICALLY_STABLE", "PROOF_FRIENDLY", "TEACHING_FRIENDLY", "DIDAKTIK"]}
         }
       },

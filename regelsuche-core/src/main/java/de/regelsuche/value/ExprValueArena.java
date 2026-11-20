@@ -255,6 +255,152 @@ public final class ExprValueArena implements AutoCloseable {
         return entries.size();
     }
 
+    /** Deterministic payload accounting, not an estimate of JVM heap or hash-map overhead. */
+    public synchronized long structuralBytes() {
+        requireOpen();
+        long bytes = 0;
+        for (var key : entries) bytes = Math.addExact(bytes, 12L + 2L * atomText(key).length() + 4L * key.edges().length);
+        return bytes;
+    }
+
+    public synchronized int digestComputations() { requireOpen(); return digests.size(); }
+
+    /** Canonical reachable DAG with allocation-independent local numbering. */
+    public synchronized ExprValueSnapshot.Snapshot snapshot(ValueId root) {
+        String expected = digest(root); // Validate ownership and populate the bounded Merkle cache.
+        var numbering = new HashMap<Integer, Integer>();
+        var nodes = new ArrayList<ExprValueSnapshot.Node>();
+        var pending = new ArrayDeque<Integer>();
+        pending.push(root.index);
+        while (!pending.isEmpty()) {
+            int current = pending.peek();
+            if (numbering.containsKey(current)) { pending.pop(); continue; }
+            var key = entries.get(current);
+            int[] edges = snapshotEdges(key);
+            boolean waiting = false;
+            for (int i = edges.length - (key.unordered() ? 2 : 1); i >= 0; i -= key.unordered() ? 2 : 1)
+                if (!numbering.containsKey(edges[i])) { pending.push(edges[i]); waiting = true; }
+            if (waiting) continue;
+            var mapped = new ArrayList<Integer>(edges.length);
+            for (int i = 0; i < edges.length; i++)
+                mapped.add(key.unordered() && i % 2 == 1 ? edges[i] : numbering.get(edges[i]));
+            numbering.put(current, nodes.size());
+            nodes.add(new ExprValueSnapshot.Node(key.kind().name(), atomText(key), mapped));
+            pending.pop();
+        }
+        return new ExprValueSnapshot.Snapshot(ExprValueSnapshot.VERSION, numbering.get(root.index), expected, nodes);
+    }
+
+    private int[] snapshotEdges(Key key) {
+        if (!key.unordered()) return key.edges();
+        var pairs = new ArrayList<int[]>();
+        for (int i = 0; i < key.edges().length; i += 2) pairs.add(new int[]{key.edges()[i], key.edges()[i + 1]});
+        pairs.sort((a, b) -> Arrays.compareUnsigned(digests.get(a[0]), digests.get(b[0])));
+        int[] result = new int[key.edges().length];
+        for (int i = 0; i < pairs.size(); i++) { result[2 * i] = pairs.get(i)[0]; result[2 * i + 1] = pairs.get(i)[1]; }
+        return result;
+    }
+
+    private static String atomText(Key key) {
+        return key.atom() instanceof ExactRational n ? n.canonicalText() : (String) key.atom();
+    }
+
+    /** Re-intern every node; require the digest supplied by the caller's source binding. Atomic on rejection. */
+    public synchronized ValueId restore(ExprValueSnapshot.Snapshot snapshot, String expectedDigest, int maximumBytes) {
+        requireOpen();
+        if (!ExprValueSnapshot.VERSION.equals(snapshot.version()) || !snapshot.digest().equals(expectedDigest)
+                || snapshot.nodes().isEmpty() || snapshot.nodes().size() > maximumEntries
+                || snapshot.root() != snapshot.nodes().size() - 1 || maximumBytes < 1
+                || ExprValueSnapshot.encodedSize(snapshot) > maximumBytes)
+            throw new IllegalArgumentException("snapshot binding or limit");
+        int start = entries.size(), digestStart = digests.size();
+        try {
+            var mapped = new ArrayList<ValueId>(snapshot.nodes().size());
+            var distinct = new java.util.HashSet<ValueId>();
+            for (var node : snapshot.nodes()) {
+                ValueId id = restoreNode(node, mapped);
+                if (!distinct.add(id)) throw new IllegalArgumentException("duplicate snapshot node");
+                mapped.add(id);
+            }
+            var root = mapped.get(snapshot.root());
+            if (!digest(root).equals(expectedDigest) || snapshot(root).nodes().size() != mapped.size())
+                throw new IllegalArgumentException("snapshot structure differs from binding");
+            return root;
+        } catch (RuntimeException rejected) {
+            while (entries.size() > start) index.remove(entries.removeLast());
+            while (digests.size() > digestStart) digests.removeLast();
+            throw rejected;
+        }
+    }
+
+    private ValueId restoreNode(ExprValueSnapshot.Node node, List<ValueId> mapped) {
+        Kind kind = Kind.valueOf(node.kind());
+        boolean ac = kind == Kind.ADD || kind == Kind.MUL;
+        int[] edges = new int[node.edges().size()];
+        for (int i = 0; i < edges.length; i++) {
+            int value = node.edges().get(i);
+            if (ac && i % 2 == 1) {
+                if (value < 1) throw new IllegalArgumentException("nonpositive multiplicity");
+                edges[i] = value;
+            } else {
+                if (value < 0 || value >= mapped.size()) throw new IllegalArgumentException("non-topological snapshot");
+                edges[i] = mapped.get(value).index;
+            }
+        }
+        Object atom = validateSnapshotNode(kind, node.atom(), edges);
+        if (ac) edges = canonicalAcEdges(kind, edges);
+        var key = new Key(kind, atom, edges);
+        if (kind == Kind.SUB || kind == Kind.DIV) {
+            var operator = kind == Kind.SUB ? BinaryOperator.SUB : BinaryOperator.DIV;
+            if (!key.equals(binaryKey(operator, edges[0], edges[1])))
+                throw new IllegalArgumentException("noncanonical numeric operator");
+        }
+        var existing = index.get(key);
+        if (existing != null) return existing;
+        if (entries.size() == maximumEntries) throw new IllegalArgumentException("snapshot arena capacity");
+        var id = new ValueId(owner, entries.size());
+        entries.add(key); index.put(key, id);
+        return id;
+    }
+
+    private Object validateSnapshotNode(Kind kind, String atom, int[] edges) {
+        switch (kind) {
+            case NUMBER -> {
+                var number = ExactRational.fromCanonicalText(atom);
+                if (edges.length != 0 || !number.canonicalText().equals(atom)) throw new IllegalArgumentException("noncanonical number");
+                return number;
+            }
+            case VARIABLE, SCOPED -> {
+                var variable = new VariableExpr(atom);
+                if (edges.length != 0 || variable.symbol().isPresent() != (kind == Kind.SCOPED))
+                    throw new IllegalArgumentException("invalid variable node");
+            }
+            case FUNCTION -> {
+                if (atom.isBlank() || !atom.trim().equals(atom)) throw new IllegalArgumentException("invalid function node");
+            }
+            default -> {
+                if (!atom.isEmpty() || ((kind == Kind.ADD || kind == Kind.MUL)
+                        ? edges.length < 2 || edges.length % 2 != 0 : edges.length != 2))
+                    throw new IllegalArgumentException("invalid operator node");
+            }
+        }
+        return atom;
+    }
+
+    private int[] canonicalAcEdges(Kind kind, int[] edges) {
+        var sorted = new TreeMap<Integer, Integer>();
+        int total = 0;
+        for (int i = 0; i < edges.length; i += 2) {
+            if (entries.get(edges[i]).kind() == kind || sorted.put(edges[i], edges[i + 1]) != null)
+                throw new IllegalArgumentException("noncanonical AC node");
+            total = Math.addExact(total, edges[i + 1]);
+        }
+        if (total < 2) throw new IllegalArgumentException("AC node arity");
+        int at = 0;
+        for (var term : sorted.entrySet()) { edges[at++] = term.getKey(); edges[at++] = term.getValue(); }
+        return edges;
+    }
+
     /**
      * Stable SHA-256 Merkle identity. Every field is versioned, length-framed and
      * ordered by semantic role. AC child digests sort independently of local IDs.
