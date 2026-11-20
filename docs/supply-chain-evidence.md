@@ -25,8 +25,10 @@ The raw document is generated directly from Gradle's resolved component graph.
 No separate SBOM plugin-resolution path is introduced. Generated UUID serial
 numbers, wall-clock timestamps and environment-specific build-system references
 are omitted, so an unchanged resolved dependency graph produces unchanged raw
-BOM bytes. The repository verifier then independently normalizes component and
-dependency identities and rejects unknown graph references.
+BOM bytes. The Java verifier independently normalizes component and dependency identities
+and rejects unknown graph references. The Maven control replays the original
+148-component inventory from [accepted CI run 44804422507](https://github.com/carstenartur/Regelsuche/actions/runs/44804422507),
+checking both canonical report files byte for byte.
 
 Synthetic verifier tests additionally prove that even an externally supplied raw
 CycloneDX timestamp cannot alter the canonical inventory or evidence identity.
