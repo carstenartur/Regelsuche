@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoncommutativeFormula.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.noncommutative</a> &gt; <span class="el_source">NoncommutativeFormula.java</span></div><h1>NoncommutativeFormula.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.noncommutative;
+
+import de.regelsuche.scalar.ExactRational;
+import java.util.Objects;
+
+/** Division-free formula in the free associative algebra over Q. Products are ordered. */
+public sealed interface NoncommutativeFormula {
+    record Scalar(ExactRational value) implements NoncommutativeFormula {
+<span class="fc" id="L9">        public Scalar { Objects.requireNonNull(value, &quot;value&quot;); }</span>
+    }
+
+    /** Identifier, independent of its position in the explicitly supplied generator order. */
+<span class="fc" id="L13">    record Variable(int id) implements NoncommutativeFormula {}</span>
+
+<span class="fc" id="L15">    enum Op { ADD, SUBTRACT, MULTIPLY }</span>
+
+    record Binary(Op op, NoncommutativeFormula left, NoncommutativeFormula right) implements NoncommutativeFormula {
+<span class="fc" id="L18">        public Binary {</span>
+<span class="fc" id="L19">            Objects.requireNonNull(op, &quot;op&quot;);</span>
+<span class="fc" id="L20">            Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L21">            Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L22">        }</span>
+    }
+
+    static Binary add(NoncommutativeFormula left, NoncommutativeFormula right) {
+<span class="fc" id="L26">        return new Binary(Op.ADD, left, right);</span>
+    }
+
+    static Binary subtract(NoncommutativeFormula left, NoncommutativeFormula right) {
+<span class="fc" id="L30">        return new Binary(Op.SUBTRACT, left, right);</span>
+    }
+
+    static Binary multiply(NoncommutativeFormula left, NoncommutativeFormula right) {
+<span class="fc" id="L34">        return new Binary(Op.MULTIPLY, left, right);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

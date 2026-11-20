@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MontgomeryReductionPlanner.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">MontgomeryReductionPlanner.java</span></div><h1>MontgomeryReductionPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.modular.MontgomerySchedule.*;
+
+/** Finite proposals for dot products; every proposal passes the separate schedule checker. */
+public final class MontgomeryReductionPlanner {
+    private static final int MAX_PRODUCTS = 64;
+    private MontgomeryReductionPlanner() {}
+
+<span class="fc" id="L17">    public record Product(int left, int right) {}</span>
+<span class="fc" id="L18">    public record QuadraticProduct(int left0, int left1, int right0, int right1) {}</span>
+<span class="fc" id="L19">    public enum QuadraticStrategy { THREE_REDUCTIONS, KARATSUBA_FOUR_REDUCTIONS }</span>
+
+    /** Proposes M(sum a*b) for sum M(a*b). The original additions use the explicitly supplied sum word. */
+    public static Result dotProduct(Parameters p, List&lt;Input&gt; inputs, List&lt;Product&gt; products, Word sourceSumWord,
+            Observation observation, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L24">        return plan(p, inputs, products.size(), observation, limits, cancellation, () -&gt; {</span>
+<span class="fc" id="L25">            var source = new Builder(p, inputs.size());</span>
+<span class="fc" id="L26">            var target = new Builder(p, inputs.size());</span>
+<span class="fc" id="L27">            int sourceSum = -1, targetSum = -1;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (var product : products) {</span>
+<span class="fc" id="L29">                input(product.left(), inputs);</span>
+<span class="fc" id="L30">                input(product.right(), inputs);</span>
+<span class="fc" id="L31">                int reduced = source.reduce(source.multiply(product.left(), product.right()));</span>
+<span class="fc" id="L32">                sourceSum = source.accumulate(sourceSum, reduced, sourceSumWord);</span>
+<span class="fc" id="L33">                targetSum = target.accumulate(targetSum, target.multiply(product.left(), product.right()), p.accumulatorWord());</span>
+<span class="fc" id="L34">            }</span>
+<span class="fc" id="L35">            return new Request(p, inputs, source.build(sourceSum), target.build(target.reduce(targetSum)), observation);</span>
+        });
+    }
+
+    /**
+     * Degree-two extension products with the same zeta for all terms:
+     * r0=sum(M(a0*b0)+M(zeta*M(a1*b1))), r1=sum(M(a0*b1)+M(a1*b0)).
+     * Outputs and each original block are stored in the residue word; all casts must be exact.
+     * This models a Montgomery-scaled extension coefficient zeta/R, not an ordinary zeta.
+     */
+    public static Result quadraticDotProduct(Parameters p, List&lt;Input&gt; inputs, List&lt;QuadraticProduct&gt; products,
+            int zeta, QuadraticStrategy strategy, Observation observation, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L48">        Objects.requireNonNull(strategy);</span>
+<span class="fc" id="L49">        return plan(p, inputs, products.size(), observation, limits, cancellation, () -&gt; {</span>
+<span class="fc" id="L50">            input(zeta, inputs);</span>
+<span class="fc" id="L51">            var source = new Builder(p, inputs.size());</span>
+<span class="fc" id="L52">            var target = new Builder(p, inputs.size());</span>
+<span class="fc" id="L53">            int s0 = -1, s1 = -1, a00 = -1, a11 = -1, across = -1;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            for (var term : products) {</span>
+<span class="fc" id="L55">                input(term.left0(), inputs); input(term.left1(), inputs);</span>
+<span class="fc" id="L56">                input(term.right0(), inputs); input(term.right1(), inputs);</span>
+<span class="fc" id="L57">                int diagonal = source.reduce(source.multiply(term.left1(), term.right1()));</span>
+<span class="fc" id="L58">                int r0 = source.add(source.reduce(source.multiply(zeta, diagonal)),</span>
+<span class="fc" id="L59">                        source.reduce(source.multiply(term.left0(), term.right0())));</span>
+<span class="fc" id="L60">                int r1 = source.add(source.reduce(source.multiply(term.left0(), term.right1())),</span>
+<span class="fc" id="L61">                        source.reduce(source.multiply(term.left1(), term.right0())));</span>
+<span class="fc" id="L62">                s0 = source.cast(source.accumulate(s0, source.cast(r0), p.accumulatorWord()));</span>
+<span class="fc" id="L63">                s1 = source.cast(source.accumulate(s1, source.cast(r1), p.accumulatorWord()));</span>
+<span class="fc" id="L64">                a00 = target.accumulate(a00, target.multiply(term.left0(), term.right0()), p.accumulatorWord());</span>
+<span class="fc" id="L65">                a11 = target.accumulate(a11, target.multiply(term.left1(), term.right1()), p.accumulatorWord());</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                int cross = strategy == QuadraticStrategy.THREE_REDUCTIONS</span>
+<span class="fc" id="L67">                        ? target.add(target.multiply(term.left0(), term.right1()), target.multiply(term.left1(), term.right0()))</span>
+<span class="fc" id="L68">                        : target.multiply(target.add(term.left0(), term.left1()), target.add(term.right0(), term.right1()));</span>
+<span class="fc" id="L69">                across = target.accumulate(across, cross, p.accumulatorWord());</span>
+<span class="fc" id="L70">            }</span>
+            int r0, r1;
+<span class="fc" id="L72">            int v = target.reduce(a11);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (strategy == QuadraticStrategy.THREE_REDUCTIONS) {</span>
+<span class="fc" id="L74">                r0 = target.reduce(target.add(a00, target.multiply(zeta, v)));</span>
+<span class="fc" id="L75">                r1 = target.reduce(across);</span>
+            } else {
+<span class="fc" id="L77">                int u = target.reduce(a00);</span>
+<span class="fc" id="L78">                r0 = target.add(u, target.reduce(target.multiply(zeta, v)));</span>
+<span class="fc" id="L79">                r1 = target.subtract(target.subtract(target.reduce(across), u), v);</span>
+            }
+<span class="fc" id="L81">            return new Request(p, inputs, source.build(s0, s1), target.build(target.cast(r0), target.cast(r1)), observation);</span>
+        });
+    }
+
+    private static Result plan(Parameters parameters, List&lt;Input&gt; inputs, int productCount, Observation observation,
+            IterationLimits limits, BooleanSupplier cancellation, java.util.function.Supplier&lt;Request&gt; proposal) {
+<span class="fc" id="L87">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L89">            work.charge(1);</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">            if (productCount &lt; 1 || productCount &gt; MAX_PRODUCTS) throw new Unavailable(&quot;PRODUCT_COUNT_LIMIT&quot;);</span>
+<span class="fc" id="L91">            int inputCount = inputs.size();</span>
+<span class="fc" id="L92">            work.size(inputCount);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (inputCount &gt; MAX_INPUTS) throw new Unavailable(&quot;INPUT_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L94">            Objects.requireNonNull(parameters);</span>
+<span class="fc" id="L95">            Objects.requireNonNull(observation);</span>
+            // Charge a conservative bound for constructing both finite schedules before allocation.
+<span class="fc" id="L97">            work.charge(64L * productCount + inputCount);</span>
+<span class="fc" id="L98">            var result = certify(proposal.get(), work);</span>
+<span class="fc" id="L99">            work.charge(0);</span>
+<span class="fc" id="L100">            return result;</span>
+<span class="fc" id="L101">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L102">            return new Result(Optional.empty(), unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    private static void input(int reference, List&lt;Input&gt; inputs) {
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">        if (reference &lt; 0 || reference &gt;= inputs.size()) throw new Unavailable(&quot;INVALID_INPUT_REFERENCE&quot;);</span>
+<span class="fc" id="L108">    }</span>
+
+    private static final class Builder {
+        private final Parameters parameters;
+        private final int inputCount;
+<span class="fc" id="L113">        private final List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L114">        Builder(Parameters parameters, int inputCount) { this.parameters = parameters; this.inputCount = inputCount; }</span>
+        int apply(Operation operation, Word word, int... operands) {
+<span class="fc" id="L116">            int reference = inputCount + steps.size();</span>
+<span class="fc" id="L117">            steps.add(Step.apply(operation, word, operands));</span>
+<span class="fc" id="L118">            return reference;</span>
+        }
+<span class="fc" id="L120">        int multiply(int left, int right) { return apply(Operation.MULTIPLY, parameters.accumulatorWord(), left, right); }</span>
+<span class="fc" id="L121">        int add(int left, int right) { return apply(Operation.ADD, parameters.accumulatorWord(), left, right); }</span>
+<span class="fc" id="L122">        int subtract(int left, int right) { return apply(Operation.SUBTRACT, parameters.accumulatorWord(), left, right); }</span>
+<span class="fc" id="L123">        int reduce(int value) { return apply(Operation.MONTGOMERY, parameters.residueWord(), value); }</span>
+<span class="fc" id="L124">        int cast(int value) { return apply(Operation.CAST, parameters.residueWord(), value); }</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        int accumulate(int sum, int value, Word word) { return sum &lt; 0 ? value : apply(Operation.ADD, word, sum, value); }</span>
+        Schedule build(int... outputs) {
+<span class="fc" id="L127">            var references = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (int output : outputs) references.add(output);</span>
+<span class="fc" id="L129">            return new Schedule(steps, references);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModularKernelVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ModularKernelVerifier.java</span></div><h1>ModularKernelVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import de.regelsuche.math.algorithms.linalg.ModularKernel.Certificate;
+import de.regelsuche.math.algorithms.linalg.ModularKernel.Strength;
+import de.regelsuche.math.algorithms.linalg.ModularKernel.Work;
+import java.math.BigInteger;
+import java.util.List;
+
+/** Checks the original rational matrix and selected minor without running CRT or candidate discovery. */
+final class ModularKernelVerifier {
+    private ModularKernelVerifier() {}
+
+    static boolean check(ExactMatrix a, Strength strength, Certificate c, Work work) {
+<span class="fc" id="L16">        work.shape(a);</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (!matchesSource(a, c, work)) return false;</span>
+<span class="fc" id="L18">        boolean[] selected = checkPartition(a, c, work);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        return selected != null</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">            &amp;&amp; hasProjectionBlocks(c, work)</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            &amp;&amp; invertible(a, c, work)</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            &amp;&amp; residualsVanish(a, strength, c, selected, work);</span>
+    }
+
+    private static boolean matchesSource(ExactMatrix a, Certificate c, Work work) {
+<span class="fc" id="L26">        int n = a.columns(), m = a.rowCount();</span>
+<span class="pc bpc" id="L27" title="3 of 6 branches missed.">        if (c == null || c.source().columns() != n || c.source().rowCount() != m</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">                || c.projection().columns() != n || c.projection().rowCount() != n) return false;</span>
+<span class="fc bfc" id="L29" title="All 4 branches covered.">        for (int i = 0; i &lt; m; i++) for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L30">            work.step();</span>
+<span class="fc" id="L31">            work.bound(a.get(i,j));</span>
+<span class="fc" id="L32">            work.bound(c.source().get(i,j));</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (!a.get(i,j).equals(c.source().get(i,j))) return false;</span>
+        }
+<span class="fc" id="L35">        return true;</span>
+    }
+
+    /** Returns the selected-row mask after checking that the pivot and free columns partition all coordinates. */
+    private static boolean[] checkPartition(ExactMatrix a, Certificate c, Work work) {
+<span class="fc" id="L40">        int n = a.columns(), m = a.rowCount(), r = c.pivots().size();</span>
+<span class="pc bpc" id="L41" title="3 of 6 branches missed.">        if (r &gt; Math.min(n,m) || c.selectedRows().size() != r || c.freeColumns().size() != n-r) return null;</span>
+<span class="fc" id="L42">        var selected = new boolean[m];</span>
+<span class="fc" id="L43">        var partition = new boolean[n];</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (!mark(c.selectedRows(), selected, work) || !mark(c.pivots(), partition, work)</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                || !mark(c.freeColumns(), partition, work)) return null;</span>
+<span class="fc" id="L46">        return selected;</span>
+    }
+
+    private static boolean hasProjectionBlocks(Certificate c, Work work) {
+<span class="fc" id="L50">        int n = c.projection().columns();</span>
+<span class="fc" id="L51">        var free = new boolean[n];</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int j : c.freeColumns()) free[j] = true;</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        for (int i = 0; i &lt; n; i++) for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L54">            work.step();</span>
+<span class="fc" id="L55">            var x = c.projection().get(i,j);</span>
+<span class="fc" id="L56">            work.bound(x);</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">            if (free[j] &amp;&amp; !free[i]) continue;</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">            boolean identityEntry = free[i] &amp;&amp; i == j;</span>
+<span class="fc bfc" id="L59" title="All 6 branches covered.">            if (identityEntry ? !x.isOne() : !x.isZero()) return false;</span>
+        }
+<span class="fc" id="L61">        return true;</span>
+    }
+
+    private static boolean residualsVanish(ExactMatrix a, Strength strength, Certificate c,
+            boolean[] selected, Work work) {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (int i = 0; i &lt; a.rowCount(); i++) {</span>
+<span class="fc" id="L67">            work.step();</span>
+<span class="fc bfc" id="L68" title="All 4 branches covered.">            if (strength == Strength.SUBSTITUTION &amp;&amp; !selected[i]) continue;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (int j : c.freeColumns()) {</span>
+<span class="fc" id="L70">                work.step();</span>
+                // The free-by-free block contributes precisely A[i,j].
+<span class="fc" id="L72">                Rational sum = a.get(i,j);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                for (int k : c.pivots()) {</span>
+<span class="fc" id="L74">                    work.step();</span>
+<span class="fc" id="L75">                    var term = a.get(i,k).multiply(c.projection().get(k,j));</span>
+<span class="fc" id="L76">                    work.bound(term);</span>
+<span class="fc" id="L77">                    sum = sum.add(term);</span>
+<span class="fc" id="L78">                    work.bound(sum);</span>
+<span class="fc" id="L79">                }</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (!sum.isZero()) return false;</span>
+<span class="fc" id="L81">            }</span>
+        }
+<span class="fc" id="L83">        return true;</span>
+    }
+
+    private static boolean mark(List&lt;Integer&gt; indices, boolean[] used, Work work) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (int i : indices) {</span>
+<span class="fc" id="L88">            work.step();</span>
+<span class="pc bpc" id="L89" title="2 of 6 branches missed.">            if (i &lt; 0 || i &gt;= used.length || used[i]) return false;</span>
+<span class="fc" id="L90">            used[i] = true;</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        return true;</span>
+    }
+
+    /** Forward elimination on the selected rational minor reduced directly into its prime field. */
+    private static boolean invertible(ExactMatrix a, Certificate c, Work work) {
+<span class="fc" id="L97">        int prime = c.witnessPrime(), r = c.pivots().size();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (!ModularKernel.isPrime(prime, work)) return false;</span>
+<span class="fc" id="L99">        var p = BigInteger.valueOf(prime);</span>
+<span class="fc" id="L100">        long[][] minor = new long[r][r];</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        for (int i = 0; i &lt; r; i++) for (int j = 0; j &lt; r; j++) {</span>
+<span class="fc" id="L102">            work.step();</span>
+<span class="fc" id="L103">            Rational x = a.get(c.selectedRows().get(i), c.pivots().get(j));</span>
+<span class="fc" id="L104">            long denominator = x.denominator().mod(p).longValueExact();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (denominator == 0) return false;</span>
+<span class="fc" id="L106">            minor[i][j] = x.numerator().mod(p).longValueExact() * ModularKernel.inverse(denominator, prime) % prime;</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int j = 0; j &lt; r; j++) {</span>
+<span class="fc" id="L109">            int k = j;</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">            while (k &lt; r &amp;&amp; minor[k][j] == 0) { work.step(); k++; }</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (k == r) return false;</span>
+<span class="fc" id="L112">            work.step();</span>
+<span class="fc" id="L113">            long[] swap = minor[j];</span>
+<span class="fc" id="L114">            minor[j] = minor[k];</span>
+<span class="fc" id="L115">            minor[k] = swap;</span>
+<span class="fc" id="L116">            long inverse = ModularKernel.inverse(minor[j][j], prime);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int i = j+1; i &lt; r; i++) {</span>
+<span class="fc" id="L118">                work.step();</span>
+<span class="fc" id="L119">                long factor = minor[i][j] * inverse % prime;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                for (int col = j+1; col &lt; r; col++) {</span>
+<span class="fc" id="L121">                    work.step();</span>
+<span class="fc" id="L122">                    minor[i][col] = Math.floorMod(minor[i][col] - factor * minor[j][col], prime);</span>
+                }
+            }
+        }
+<span class="fc" id="L126">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

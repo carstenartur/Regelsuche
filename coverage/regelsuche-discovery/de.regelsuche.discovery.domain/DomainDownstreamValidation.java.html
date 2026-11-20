@@ -179,9 +179,9 @@ public final class DomainDownstreamValidation {
 <span class="fc" id="L179">            Object candidate = result.selectedCandidate().orElseThrow(), witness = result.selectedCertificate().orElseThrow();</span>
 <span class="pc bpc" id="L180" title="1 of 4 branches missed.">            if (candidate instanceof FiniteDifferenceCandidate c &amp;&amp; witness instanceof FiniteDifferenceCertificate k) {</span>
 <span class="fc" id="L181">                execution.check = DomainFiniteDataCheck.check(c, k, budget.check());</span>
-<span class="pc bpc" id="L182" title="2 of 4 branches missed.">            } else if (candidate instanceof LinearRecurrenceCandidate c &amp;&amp; witness instanceof LinearRecurrenceCertificate k) {</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            } else if (candidate instanceof LinearRecurrenceCandidate c &amp;&amp; witness instanceof LinearRecurrenceCertificate k) {</span>
 <span class="fc" id="L183">                execution.check = DomainFiniteDataCheck.check(c, k, budget.check());</span>
-<span class="nc" id="L184">            } else return execution.receipt(&quot;UNSUPPORTED&quot;, &quot;NO_INDEPENDENT_CHECKER_FOR_SELECTED_TYPES&quot;);</span>
+<span class="fc" id="L184">            } else return execution.receipt(&quot;UNSUPPORTED&quot;, &quot;NO_INDEPENDENT_CHECKER_FOR_SELECTED_TYPES&quot;);</span>
 <span class="fc" id="L185">            return execution.receipt(execution.check.status().name(), &quot;INDEPENDENT_FINITE_CHECK_RETURNED&quot;);</span>
 <span class="fc" id="L186">        } catch (DomainExportWorkspace.ReplayMismatch mismatch) {</span>
 <span class="fc" id="L187">            execution.replayed = mismatch.actual(); execution.replayStatus = &quot;MISMATCH&quot;;</span>

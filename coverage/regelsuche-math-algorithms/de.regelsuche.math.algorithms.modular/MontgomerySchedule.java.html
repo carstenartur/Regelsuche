@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>MontgomerySchedule.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">MontgomerySchedule.java</span></div><h1>MontgomerySchedule.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Bounded certificates for signed Montgomery schedules and their exact canonical observations. */
+public final class MontgomerySchedule {
+    public static final int MAX_INPUTS = 128;
+    public static final int MAX_STEPS = 4096;
+    public static final int MAX_TERMS = 8192;
+    private static final int MAX_DEGREE = 64;
+    private MontgomerySchedule() {}
+
+<span class="fc" id="L24">    public enum Word {</span>
+<span class="fc" id="L25">        SHORT(16), INT(32), LONG(64);</span>
+        private final int bits;
+<span class="fc" id="L27">        Word(int bits) { this.bits = bits; }</span>
+<span class="fc" id="L28">        public int bits() { return bits; }</span>
+<span class="fc" id="L29">        BigInteger minimum() { return BigInteger.ONE.shiftLeft(bits - 1).negate(); }</span>
+<span class="fc" id="L30">        BigInteger maximum() { return BigInteger.ONE.shiftLeft(bits - 1).subtract(BigInteger.ONE); }</span>
+    }
+
+    /** Inclusive signed integer interval. Bounds are assumptions the source-language consumer must justify. */
+    public record Interval(long minimum, long maximum) {
+<span class="fc" id="L35">        public Interval {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (minimum &gt; maximum) throw new IllegalArgumentException(&quot;INVALID_INTERVAL&quot;);</span>
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        BigInteger low() { return BigInteger.valueOf(minimum); }</span>
+<span class="fc" id="L39">        BigInteger high() { return BigInteger.valueOf(maximum); }</span>
+    }
+
+    /**
+     * R=2^radixBits, positive odd q below R/2, and q*inverse=1 mod R.
+     * Reduction is u=signedLowWord(a*inverse), M(a)=(a-u*q)/R.
+     * Only the low-word multiplication intentionally wraps. Numerator arithmetic must fit 2*radixBits.
+     */
+    public record Parameters(int radixBits, long modulus, long inverse) {
+<span class="fc" id="L48">        public Parameters {</span>
+<span class="pc bpc" id="L49" title="5 of 14 branches missed.">            if ((radixBits != 16 &amp;&amp; radixBits != 32) || modulus &lt; 3 || (modulus &amp; 1) == 0</span>
+                    || modulus &gt;= (1L &lt;&lt; (radixBits - 1)) || inverse &lt; 0 || inverse &gt;= (1L &lt;&lt; radixBits)) {
+<span class="fc" id="L51">                throw new IllegalArgumentException(&quot;INVALID_MONTGOMERY_PARAMETERS&quot;);</span>
+            }
+<span class="fc" id="L53">            var radix = BigInteger.ONE.shiftLeft(radixBits);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (!BigInteger.valueOf(modulus).multiply(BigInteger.valueOf(inverse)).mod(radix).equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L55">                throw new IllegalArgumentException(&quot;INVALID_MONTGOMERY_INVERSE&quot;);</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        public Word residueWord() { return radixBits == 16 ? Word.SHORT : Word.INT; }</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        public Word accumulatorWord() { return radixBits == 16 ? Word.INT : Word.LONG; }</span>
+    }
+
+    public record Input(String name, Word word, Interval range) {
+<span class="fc" id="L63">        public Input {</span>
+<span class="pc bpc" id="L64" title="3 of 6 branches missed.">            if (name == null || name.isBlank() || name.length() &gt; 128) throw new IllegalArgumentException(&quot;INVALID_INPUT_NAME&quot;);</span>
+<span class="fc" id="L65">            Objects.requireNonNull(word);</span>
+<span class="fc" id="L66">            Objects.requireNonNull(range);</span>
+<span class="fc" id="L67">        }</span>
+    }
+
+<span class="fc" id="L70">    public enum Operation { CONSTANT, ADD, SUBTRACT, MULTIPLY, CAST, MONTGOMERY }</span>
+
+    /** Operands reference inputs first, then preceding steps. CAST is accepted only when value-preserving. */
+    public record Step(Operation operation, Word word, List&lt;Integer&gt; operands, long literal) {
+<span class="fc" id="L74">        public Step {</span>
+<span class="fc" id="L75">            Objects.requireNonNull(operation);</span>
+<span class="fc" id="L76">            Objects.requireNonNull(word);</span>
+<span class="fc bfc" id="L77" title="All 3 branches covered.">            int arity = switch (operation) {</span>
+<span class="fc" id="L78">                case CONSTANT -&gt; 0;</span>
+<span class="fc" id="L79">                case CAST, MONTGOMERY -&gt; 1;</span>
+<span class="fc" id="L80">                default -&gt; 2;</span>
+            };
+<span class="pc bpc" id="L82" title="2 of 6 branches missed.">            if (operands.size() != arity || operation != Operation.CONSTANT &amp;&amp; literal != 0) {</span>
+<span class="nc" id="L83">                throw new IllegalArgumentException(&quot;INVALID_STEP_ARITY&quot;);</span>
+            }
+<span class="fc" id="L85">            operands = List.copyOf(operands);</span>
+<span class="fc" id="L86">        }</span>
+        public static Step apply(Operation operation, Word word, int... operands) {
+<span class="fc" id="L88">            var references = new ArrayList&lt;Integer&gt;(operands.length);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            for (int operand : operands) references.add(operand);</span>
+<span class="fc" id="L90">            return new Step(operation, word, references, 0);</span>
+        }
+<span class="fc" id="L92">        public static Step constant(Word word, long value) { return new Step(Operation.CONSTANT, word, List.of(), value); }</span>
+    }
+
+    /** A finite straight-line pure arithmetic program; arrays, exceptions and memory effects belong to the adapter. */
+    public record Schedule(List&lt;Step&gt; steps, List&lt;Integer&gt; outputs) {
+<span class="fc" id="L97">        public Schedule {</span>
+<span class="pc bpc" id="L98" title="3 of 6 branches missed.">            if (steps.size() &gt; MAX_STEPS || outputs.isEmpty() || outputs.size() &gt; 64) {</span>
+<span class="nc" id="L99">                throw new IllegalArgumentException(&quot;SCHEDULE_SIZE_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L101">            steps = List.copyOf(steps);</span>
+<span class="fc" id="L102">            outputs = List.copyOf(outputs);</span>
+<span class="fc" id="L103">        }</span>
+    }
+
+    /** CANONICAL_RESIDUE means equality after the mathematical floorMod(value,q), not raw machine equality. */
+<span class="fc" id="L107">    public enum Observation { CONGRUENCE, CANONICAL_RESIDUE }</span>
+
+    public record Request(Parameters parameters, List&lt;Input&gt; inputs, Schedule source, Schedule target,
+            Observation observation) {
+<span class="fc" id="L111">        public Request {</span>
+<span class="fc" id="L112">            Objects.requireNonNull(parameters);</span>
+<span class="fc" id="L113">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L114">            Objects.requireNonNull(target);</span>
+<span class="fc" id="L115">            Objects.requireNonNull(observation);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (inputs.size() &gt; MAX_INPUTS) throw new IllegalArgumentException(&quot;INPUT_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L117">            inputs = List.copyOf(inputs);</span>
+<span class="fc" id="L118">        }</span>
+    }
+
+    /** Untrusted, source-bound evidence. Both range lists include inputs followed by steps. Replay before use. */
+    public record Certificate(Request request, List&lt;Interval&gt; sourceRanges, List&lt;Interval&gt; targetRanges,
+            int sourceReductions, int targetReductions) {
+<span class="fc" id="L124">        public Certificate {</span>
+<span class="fc" id="L125">            Objects.requireNonNull(request);</span>
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">            if (sourceRanges.size() &gt; MAX_INPUTS + MAX_STEPS || targetRanges.size() &gt; MAX_INPUTS + MAX_STEPS) {</span>
+<span class="nc" id="L127">                throw new IllegalArgumentException(&quot;EVIDENCE_SIZE_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L129">            sourceRanges = List.copyOf(sourceRanges);</span>
+<span class="fc" id="L130">            targetRanges = List.copyOf(targetRanges);</span>
+<span class="fc" id="L131">        }</span>
+    }
+
+<span class="fc" id="L134">    public record Result(Optional&lt;Certificate&gt; certificate, String reason, long work) {}</span>
+<span class="fc" id="L135">    public record Verification(boolean valid, String reason, long work) {}</span>
+
+    /** Certifies all machine ranges and the polynomial identity modulo q, accounting for every inverse radix. */
+    public static Result certify(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L139">        return certify(request, new Work(limits, cancellation));</span>
+    }
+
+    static Result certify(Request request, Work work) {
+        try {
+<span class="fc" id="L144">            var certificate = check(Objects.requireNonNull(request), work);</span>
+<span class="fc" id="L145">            return new Result(Optional.of(certificate), &quot;VERIFIED&quot;, work.used);</span>
+<span class="fc" id="L146">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L147">            return new Result(Optional.empty(), unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    /** Independently recomputes the ranges and residue identities; never calls the schedule planner. */
+    public static Verification verify(Request expected, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L154">        Objects.requireNonNull(expected);</span>
+<span class="fc" id="L155">        Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L156">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L158">            work.charge(1L + expected.inputs().size() + expected.source().steps().size() + expected.target().steps().size()</span>
+<span class="fc" id="L159">                    + certificate.request().inputs().size() + certificate.request().source().steps().size()</span>
+<span class="fc" id="L160">                    + certificate.request().target().steps().size());</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (!expected.equals(certificate.request())) return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+<span class="fc" id="L162">            var actual = check(expected, work);</span>
+<span class="fc" id="L163">            work.charge(1L + actual.sourceRanges().size() + actual.targetRanges().size());</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (!actual.sourceRanges().equals(certificate.sourceRanges())</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                    || !actual.targetRanges().equals(certificate.targetRanges())) {</span>
+<span class="fc" id="L166">                return new Verification(false, &quot;RANGE_EVIDENCE_MISMATCH&quot;, work.used);</span>
+            }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (actual.sourceReductions() != certificate.sourceReductions()</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                    || actual.targetReductions() != certificate.targetReductions()) {</span>
+<span class="nc" id="L170">                return new Verification(false, &quot;OPERATION_COUNT_MISMATCH&quot;, work.used);</span>
+            }
+<span class="fc" id="L172">            work.charge(0);</span>
+<span class="fc" id="L173">            return new Verification(true, &quot;VERIFIED&quot;, work.used);</span>
+<span class="nc" id="L174">        } catch (Unavailable unavailable) {</span>
+<span class="nc" id="L175">            return new Verification(false, unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    private static Certificate check(Request request, Work work) {
+<span class="fc" id="L180">        var names = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L181">        work.size(request.inputs().size());</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (var input : request.inputs()) {</span>
+<span class="fc" id="L183">            work.charge(1);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (!names.add(input.name())) throw new Unavailable(&quot;DUPLICATE_INPUT&quot;);</span>
+<span class="fc" id="L185">        }</span>
+<span class="fc" id="L186">        var source = analyze(request.parameters(), request.inputs(), request.source(), work);</span>
+<span class="fc" id="L187">        var target = analyze(request.parameters(), request.inputs(), request.target(), work);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (source.outputs.size() != target.outputs.size()) throw new Unavailable(&quot;OUTPUT_COUNT_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (int i = 0; i &lt; source.outputs.size(); i++) {</span>
+<span class="fc" id="L190">            work.charge(1L + source.outputs.get(i).size() + target.outputs.get(i).size());</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (!source.outputs.get(i).equals(target.outputs.get(i))) throw new Unavailable(&quot;RESIDUE_IDENTITY_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L193">        work.charge(0);</span>
+<span class="fc" id="L194">        return new Certificate(request, source.ranges, target.ranges, source.reductions, target.reductions);</span>
+    }
+
+<span class="fc" id="L197">    private record Value(Word word, Interval range, Map&lt;Monomial, BigInteger&gt; polynomial) {}</span>
+<span class="fc" id="L198">    private record Analysis(List&lt;Interval&gt; ranges, List&lt;Map&lt;Monomial, BigInteger&gt;&gt; outputs, int reductions) {}</span>
+
+    private static Analysis analyze(Parameters p, List&lt;Input&gt; inputs, Schedule schedule, Work work) {
+<span class="fc" id="L201">        work.size(inputs.size() + schedule.steps().size());</span>
+<span class="fc" id="L202">        var q = BigInteger.valueOf(p.modulus());</span>
+<span class="fc" id="L203">        var inverseRadix = BigInteger.ONE.shiftLeft(p.radixBits()).modInverse(q);</span>
+<span class="fc" id="L204">        var values = new ArrayList&lt;Value&gt;();</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (var input : inputs) {</span>
+<span class="fc" id="L206">            work.charge(1);</span>
+<span class="fc" id="L207">            fit(input.range().low(), input.range().high(), input.word());</span>
+<span class="fc" id="L208">            values.add(new Value(input.word(), input.range(), Map.of(Monomial.variable(input.name()), BigInteger.ONE)));</span>
+<span class="fc" id="L209">        }</span>
+<span class="fc" id="L210">        int reductions = 0;</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (var step : schedule.steps()) {</span>
+<span class="fc" id="L212">            work.charge(1);</span>
+<span class="pc bpc" id="L213" title="1 of 6 branches missed.">            for (int ref : step.operands()) if (ref &lt; 0 || ref &gt;= values.size()) throw new Unavailable(&quot;INVALID_REFERENCE&quot;);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            Value a = step.operands().isEmpty() ? null : values.get(step.operands().getFirst());</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            Value b = step.operands().size() &lt; 2 ? null : values.get(step.operands().get(1));</span>
+            Interval range;
+            Map&lt;Monomial, BigInteger&gt; polynomial;
+<span class="fc bfc" id="L218" title="All 4 branches covered.">            switch (step.operation()) {</span>
+                case CONSTANT -&gt; {
+<span class="fc" id="L220">                    range = fit(BigInteger.valueOf(step.literal()), BigInteger.valueOf(step.literal()), step.word());</span>
+<span class="fc" id="L221">                    var value = BigInteger.valueOf(step.literal()).mod(q);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                    polynomial = value.signum() == 0 ? Map.of() : Map.of(Monomial.constant(), value);</span>
+<span class="fc" id="L223">                }</span>
+                case CAST -&gt; {
+<span class="fc" id="L225">                    range = fit(a.range.low(), a.range.high(), step.word());</span>
+<span class="fc" id="L226">                    polynomial = a.polynomial;</span>
+<span class="fc" id="L227">                }</span>
+                case MONTGOMERY -&gt; {
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">                    if (a.word.bits() &gt; p.accumulatorWord().bits() || step.word() != p.residueWord()) {</span>
+<span class="nc" id="L230">                        throw new Unavailable(&quot;MONTGOMERY_WORD_MISMATCH&quot;);</span>
+                    }
+<span class="fc" id="L232">                    range = reductionRange(p, a.range);</span>
+<span class="fc" id="L233">                    polynomial = scale(a.polynomial, inverseRadix, q, work);</span>
+<span class="fc" id="L234">                    reductions++;</span>
+<span class="fc" id="L235">                }</span>
+                default -&gt; {
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">                    if (step.word() == Word.SHORT || step.word().bits() &lt; Math.max(a.word.bits(), b.word.bits())) {</span>
+<span class="nc" id="L238">                        throw new Unavailable(&quot;ARITHMETIC_PROMOTION_MISMATCH&quot;);</span>
+                    }
+<span class="fc" id="L240">                    range = binaryRange(step.operation(), a.range, b.range, step.word());</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                    polynomial = step.operation() == Operation.MULTIPLY</span>
+<span class="fc" id="L242">                            ? multiply(a.polynomial, b.polynomial, q, work)</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                            : add(a.polynomial, b.polynomial, step.operation() == Operation.SUBTRACT, q, work);</span>
+                }
+            }
+<span class="fc" id="L246">            values.add(new Value(step.word(), range, polynomial));</span>
+<span class="fc" id="L247">        }</span>
+<span class="fc" id="L248">        var outputs = new ArrayList&lt;Map&lt;Monomial, BigInteger&gt;&gt;();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        for (int ref : schedule.outputs()) {</span>
+<span class="fc" id="L250">            work.charge(1);</span>
+<span class="pc bpc" id="L251" title="2 of 4 branches missed.">            if (ref &lt; 0 || ref &gt;= values.size()) throw new Unavailable(&quot;INVALID_REFERENCE&quot;);</span>
+<span class="fc" id="L252">            outputs.add(values.get(ref).polynomial);</span>
+<span class="fc" id="L253">        }</span>
+<span class="fc" id="L254">        return new Analysis(values.stream().map(Value::range).toList(), outputs, reductions);</span>
+    }
+
+    private static Interval reductionRange(Parameters p, Interval input) {
+<span class="fc" id="L258">        var radix = BigInteger.ONE.shiftLeft(p.radixBits());</span>
+<span class="fc" id="L259">        var half = radix.shiftRight(1);</span>
+<span class="fc" id="L260">        var q = BigInteger.valueOf(p.modulus());</span>
+        // u ranges from -R/2 through R/2-1. Because q*inverse=1 mod R, the numerator is divisible by R.
+<span class="fc" id="L262">        var low = input.low().subtract(half.subtract(BigInteger.ONE).multiply(q));</span>
+<span class="fc" id="L263">        var high = input.high().add(half.multiply(q));</span>
+<span class="fc" id="L264">        fit(low, high, p.accumulatorWord());</span>
+<span class="fc" id="L265">        var quotientLow = low.negate().shiftRight(p.radixBits()).negate(); // ceil(low/R)</span>
+<span class="fc" id="L266">        var quotientHigh = high.shiftRight(p.radixBits()); // floor(high/R)</span>
+<span class="fc" id="L267">        return fit(quotientLow, quotientHigh, p.residueWord());</span>
+    }
+
+    private static Interval binaryRange(Operation operation, Interval a, Interval b, Word word) {
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (operation == Operation.ADD) return fit(a.low().add(b.low()), a.high().add(b.high()), word);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (operation == Operation.SUBTRACT) return fit(a.low().subtract(b.high()), a.high().subtract(b.low()), word);</span>
+<span class="fc" id="L273">        var aa = a.low().multiply(b.low());</span>
+<span class="fc" id="L274">        var ab = a.low().multiply(b.high());</span>
+<span class="fc" id="L275">        var ba = a.high().multiply(b.low());</span>
+<span class="fc" id="L276">        var bb = a.high().multiply(b.high());</span>
+<span class="fc" id="L277">        return fit(aa.min(ab).min(ba).min(bb), aa.max(ab).max(ba).max(bb), word);</span>
+    }
+
+    private static Interval fit(BigInteger low, BigInteger high, Word word) {
+<span class="fc bfc" id="L281" title="All 4 branches covered.">        if (low.compareTo(word.minimum()) &lt; 0 || high.compareTo(word.maximum()) &gt; 0) throw new Unavailable(&quot;SIGNED_OVERFLOW&quot;);</span>
+<span class="fc" id="L282">        return new Interval(low.longValueExact(), high.longValueExact());</span>
+    }
+
+    private static Map&lt;Monomial, BigInteger&gt; scale(Map&lt;Monomial, BigInteger&gt; input, BigInteger factor,
+            BigInteger modulus, Work work) {
+<span class="fc" id="L287">        var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        for (var term : input.entrySet()) {</span>
+<span class="fc" id="L289">            work.charge(1);</span>
+<span class="fc" id="L290">            merge(result, term.getKey(), term.getValue().multiply(factor), modulus, work);</span>
+<span class="fc" id="L291">        }</span>
+<span class="fc" id="L292">        return result;</span>
+    }
+
+    private static Map&lt;Monomial, BigInteger&gt; add(Map&lt;Monomial, BigInteger&gt; a, Map&lt;Monomial, BigInteger&gt; b,
+            boolean subtract, BigInteger modulus, Work work) {
+<span class="fc" id="L297">        work.charge(a.size());</span>
+<span class="fc" id="L298">        var result = new HashMap&lt;&gt;(a);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (var term : b.entrySet()) {</span>
+<span class="fc" id="L300">            work.charge(1);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            merge(result, term.getKey(), subtract ? term.getValue().negate() : term.getValue(), modulus, work);</span>
+<span class="fc" id="L302">        }</span>
+<span class="fc" id="L303">        return result;</span>
+    }
+
+    private static Map&lt;Monomial, BigInteger&gt; multiply(Map&lt;Monomial, BigInteger&gt; a, Map&lt;Monomial, BigInteger&gt; b,
+            BigInteger modulus, Work work) {
+<span class="fc" id="L308">        var result = new HashMap&lt;Monomial, BigInteger&gt;();</span>
+<span class="fc bfc" id="L309" title="All 4 branches covered.">        for (var x : a.entrySet()) for (var y : b.entrySet()) {</span>
+<span class="fc" id="L310">            work.charge(1L + x.getKey().powers().size() + y.getKey().powers().size());</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (x.getKey().totalDegree() + y.getKey().totalDegree() &gt; MAX_DEGREE) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
+<span class="fc" id="L312">            merge(result, x.getKey().multiply(y.getKey()), x.getValue().multiply(y.getValue()), modulus, work);</span>
+<span class="fc" id="L313">        }</span>
+<span class="fc" id="L314">        return result;</span>
+    }
+
+    private static void merge(Map&lt;Monomial, BigInteger&gt; result, Monomial key, BigInteger value,
+            BigInteger modulus, Work work) {
+<span class="fc" id="L319">        var coefficient = result.getOrDefault(key, BigInteger.ZERO).add(value).mod(modulus);</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (coefficient.signum() == 0) result.remove(key);</span>
+        else {
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            if (!result.containsKey(key)) work.size(result.size() + 1);</span>
+<span class="fc" id="L323">            result.put(key, coefficient);</span>
+        }
+<span class="fc" id="L325">    }</span>
+
+    static final class Work {
+        private final IterationLimits limits;
+        private final BooleanSupplier cancellation;
+<span class="fc" id="L330">        private final long start = System.nanoTime();</span>
+        private final long timeout;
+        long used;
+<span class="fc" id="L333">        Work(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L334">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L335">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L336">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L337">        }</span>
+        void charge(long amount) {
+<span class="pc bpc" id="L339" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">            if (System.nanoTime() - start &gt;= timeout) throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
+<span class="pc bpc" id="L341" title="1 of 4 branches missed.">            if (amount &lt; 0 || amount &gt; limits.maximumWork() - used) throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L342">            used += amount;</span>
+<span class="fc" id="L343">        }</span>
+        void size(int count) {
+<span class="fc" id="L345">            charge(1);</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (count &gt; Math.min(limits.maximumTerms(), MAX_TERMS)) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L347">        }</span>
+    }
+
+    static final class Unavailable extends RuntimeException {
+<span class="fc" id="L351">        Unavailable(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

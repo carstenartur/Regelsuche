@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoncommutativeIdentity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.noncommutative</a> &gt; <span class="el_source">NoncommutativeIdentity.java</span></div><h1>NoncommutativeIdentity.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.noncommutative;
+
+import de.regelsuche.math.algorithms.noncommutative.NoncommutativeFormula.*;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Experimental deterministic identity test in the free associative algebra over Q (family 116). */
+public final class NoncommutativeIdentity {
+    private NoncommutativeIdentity() {}
+
+    /** Expanded +, * tree size charges three gates for every subtraction, including the comparison root. */
+    public record Limits(int maxVariables, int maxTreeSize, int maxDepth, int maxDimension,
+                         int maxBits, long maxWork) {
+<span class="fc" id="L21">        public Limits {</span>
+<span class="pc bpc" id="L22" title="7 of 14 branches missed.">            if (maxVariables &lt; 0 || maxTreeSize &lt; 0 || maxDepth &lt; 0 || maxDepth &gt; 64</span>
+                    || maxDimension &lt; 0 || maxBits &lt; 1 || maxWork &lt; 0) {
+<span class="nc" id="L24">                throw new IllegalArgumentException(&quot;Nonnegative budgets, positive bit limit and AST depth at most 64 required&quot;);</span>
+            }
+<span class="fc" id="L26">        }</span>
+
+        public static Limits defaults() {
+<span class="fc" id="L29">            return new Limits(32, 1023, 64, 4096, 8192, 200_000);</span>
+        }
+    }
+
+<span class="fc" id="L33">    public enum Status { IDENTICAL, DISTINCT, BUDGET_EXCEEDED, CANCELLED, UNSUPPORTED }</span>
+
+    public sealed interface Result {
+        Status status();
+    }
+
+    /** In-process evidence from a completed evaluation, bound to its immutable formula and ordered generators. */
+    public static final class Completed implements Result {
+        private final Status status;
+        private final NoncommutativeFormula formula;
+        private final List&lt;Integer&gt; variableOrder;
+        private final int treeSize;
+        private final List&lt;ExactRational&gt; firstColumn;
+
+        private Completed(Status status, NoncommutativeFormula formula, List&lt;Integer&gt; order, int size,
+<span class="fc" id="L48">                          ExactRational[] column) {</span>
+<span class="fc" id="L49">            this.status = status;</span>
+<span class="fc" id="L50">            this.formula = formula;</span>
+<span class="fc" id="L51">            variableOrder = List.copyOf(order);</span>
+<span class="fc" id="L52">            treeSize = size;</span>
+<span class="fc" id="L53">            firstColumn = List.of(column);</span>
+<span class="fc" id="L54">        }</span>
+
+<span class="fc" id="L56">        public Status status() { return status; }</span>
+<span class="fc" id="L57">        public NoncommutativeFormula formula() { return formula; }</span>
+<span class="fc" id="L58">        public List&lt;Integer&gt; variableOrder() { return variableOrder; }</span>
+<span class="fc" id="L59">        public int treeSize() { return treeSize; }</span>
+<span class="fc" id="L60">        public List&lt;ExactRational&gt; firstColumn() { return firstColumn; }</span>
+    }
+
+    /** No identity verdict or partial column is available for a stopped computation. */
+    public record Stopped(Status status, String reason) implements Result {
+<span class="fc" id="L65">        public Stopped {</span>
+<span class="pc bpc" id="L66" title="1 of 6 branches missed.">            if (status != Status.BUDGET_EXCEEDED &amp;&amp; status != Status.CANCELLED &amp;&amp; status != Status.UNSUPPORTED) {</span>
+<span class="nc" id="L67">                throw new IllegalArgumentException(&quot;Stopped status required&quot;);</span>
+            }
+<span class="fc" id="L69">            Objects.requireNonNull(reason);</span>
+<span class="fc" id="L70">        }</span>
+    }
+
+    public static Result compare(NoncommutativeFormula left, NoncommutativeFormula right, List&lt;Integer&gt; variableOrder,
+                                 Limits limits, BooleanSupplier cancelled) {
+<span class="nc" id="L75">        return checkZero(NoncommutativeFormula.subtract(left, right), variableOrder, limits, cancelled);</span>
+    }
+
+    public static Result checkZero(NoncommutativeFormula formula, List&lt;Integer&gt; variableOrder,
+                                   Limits limits, BooleanSupplier cancelled) {
+<span class="fc" id="L80">        Objects.requireNonNull(formula);</span>
+<span class="fc" id="L81">        Objects.requireNonNull(variableOrder);</span>
+<span class="fc" id="L82">        var run = new Run(Objects.requireNonNull(limits), Objects.requireNonNull(cancelled));</span>
+        try {
+<span class="fc" id="L84">            return run.check(formula, variableOrder);</span>
+<span class="fc" id="L85">        } catch (Stop stop) {</span>
+<span class="fc" id="L86">            return new Stopped(stop.status, stop.getMessage());</span>
+        }
+    }
+
+    private static final class Stop extends RuntimeException {
+        final Status status;
+
+        Stop(Status status, String reason) {
+<span class="fc" id="L94">            super(reason, null, false, false);</span>
+<span class="fc" id="L95">            this.status = status;</span>
+<span class="fc" id="L96">        }</span>
+    }
+
+    private static final class Run {
+        final Limits limits;
+        final BooleanSupplier cancelled;
+<span class="fc" id="L102">        final Map&lt;Integer, Integer&gt; indices = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L103">        final Map&lt;NoncommutativeFormula, Shape&gt; shapes = new IdentityHashMap&lt;&gt;();</span>
+        int treeSize;
+        boolean hasVariable;
+
+<span class="fc" id="L107">        Run(Limits limits, BooleanSupplier cancelled) {</span>
+<span class="fc" id="L108">            this.limits = limits;</span>
+<span class="fc" id="L109">            this.cancelled = cancelled;</span>
+<span class="fc" id="L110">        }</span>
+
+        Completed check(NoncommutativeFormula formula, List&lt;Integer&gt; order) {
+<span class="fc" id="L113">            poll();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            requireBudget(order.size() &lt;= limits.maxVariables(), &quot;variable count&quot;);</span>
+<span class="fc" id="L115">            var snapshot = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            for (Integer id : order) {</span>
+<span class="fc" id="L117">                poll();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                requireBudget(snapshot.size() &lt; limits.maxVariables(), &quot;variable count&quot;);</span>
+<span class="fc bfc" id="L119" title="All 4 branches covered.">                if (id == null || indices.put(id, snapshot.size() + 1) != null) {</span>
+<span class="fc" id="L120">                    throw new Stop(Status.UNSUPPORTED, &quot;duplicate or null generator&quot;);</span>
+                }
+<span class="fc" id="L122">                snapshot.add(id);</span>
+<span class="fc" id="L123">            }</span>
+<span class="fc" id="L124">            inspect(formula, 1);</span>
+<span class="fc" id="L125">            int d = dimension(snapshot.size());</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            requireBudget((long) treeSize * d &lt;= limits.maxWork(), &quot;formula size times dimension&quot;);</span>
+<span class="fc" id="L127">            poll();</span>
+<span class="fc" id="L128">            var basis = new ExactRational[d];</span>
+<span class="fc" id="L129">            Arrays.fill(basis, ExactRational.ZERO);</span>
+<span class="fc" id="L130">            basis[0] = ExactRational.ONE;</span>
+<span class="fc" id="L131">            var column = apply(formula, basis);</span>
+<span class="fc" id="L132">            Status status = Status.IDENTICAL;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            for (var entry : column) {</span>
+<span class="fc" id="L134">                poll();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                if (!entry.isZero()) {</span>
+<span class="fc" id="L136">                    status = Status.DISTINCT;</span>
+<span class="fc" id="L137">                    break;</span>
+                }
+            }
+<span class="fc" id="L140">            var result = new Completed(status, formula, snapshot, treeSize, column);</span>
+<span class="fc" id="L141">            poll();</span>
+<span class="fc" id="L142">            return result;</span>
+        }
+
+        private int dimension(int n) {
+<span class="fc bfc" id="L146" title="All 6 branches covered.">            if (!hasVariable || n == 1 &amp;&amp; treeSize == 1) {</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                requireBudget(limits.maxDimension() &gt;= 1, &quot;dimension&quot;);</span>
+<span class="fc" id="L148">                return 1;</span>
+            }
+<span class="fc" id="L150">            long twiceN = 2L * n;</span>
+            // Check against the allocation limit before multiplying the full dimension.
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            requireBudget(treeSize &lt;= limits.maxDimension() / twiceN / treeSize, &quot;dimension&quot;);</span>
+<span class="fc" id="L153">            return (int) (twiceN * treeSize * treeSize);</span>
+        }
+
+<span class="fc" id="L156">        private record Shape(int size, int height) {}</span>
+
+        private int inspect(NoncommutativeFormula formula, int depth) {
+<span class="fc" id="L159">            poll();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            requireBudget(depth &lt;= limits.maxDepth(), &quot;AST depth&quot;);</span>
+<span class="fc" id="L161">            var known = shapes.get(formula);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (known != null) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                requireBudget(known.height() &lt;= limits.maxDepth() - depth + 1, &quot;AST depth&quot;);</span>
+<span class="fc" id="L164">                charge(known.size());</span>
+<span class="fc" id="L165">                return known.height();</span>
+            }
+<span class="fc" id="L167">            int before = treeSize;</span>
+<span class="fc bfc" id="L168" title="All 4 branches covered.">            charge(formula instanceof Binary b &amp;&amp; b.op() == Op.SUBTRACT ? 3 : 1);</span>
+<span class="fc bfc" id="L169" title="All 3 branches covered.">            int height = switch (formula) {</span>
+<span class="fc" id="L170">                case Scalar(var value) -&gt; {</span>
+<span class="fc" id="L171">                    checked(value);</span>
+<span class="fc" id="L172">                    yield 1;</span>
+                }
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                case Variable(var id) -&gt; {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                    if (!indices.containsKey(id)) throw new Stop(Status.UNSUPPORTED, &quot;undeclared generator&quot;);</span>
+<span class="fc" id="L176">                    hasVariable = true;</span>
+<span class="fc" id="L177">                    yield 1;</span>
+                }
+<span class="fc" id="L179">                case Binary(var op, var left, var right) -&gt;</span>
+<span class="fc" id="L180">                    1 + Math.max(inspect(left, depth + 1), inspect(right, depth + 1));</span>
+<span class="fc" id="L181">            };</span>
+<span class="fc" id="L182">            shapes.put(formula, new Shape(treeSize - before, height));</span>
+<span class="fc" id="L183">            return height;</span>
+        }
+
+        private void charge(int count) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            requireBudget(count &lt;= limits.maxTreeSize() - treeSize, &quot;expanded formula size&quot;);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            requireBudget(count &lt;= limits.maxWork() - treeSize, &quot;formula size times dimension&quot;);</span>
+<span class="fc" id="L189">            treeSize += count;</span>
+<span class="fc" id="L190">        }</span>
+
+        private ExactRational[] apply(NoncommutativeFormula formula, ExactRational[] input) {
+<span class="fc" id="L193">            poll();</span>
+<span class="fc bfc" id="L194" title="All 3 branches covered.">            return switch (formula) {</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                case Variable(var id) -&gt; applyGenerator(indices.get(id), input);</span>
+<span class="fc" id="L196">                case Scalar(var value) -&gt; {</span>
+<span class="fc" id="L197">                    var output = new ExactRational[input.length];</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                    for (int r = 0; r &lt; output.length; r++) {</span>
+<span class="fc" id="L199">                        poll();</span>
+<span class="fc" id="L200">                        output[r] = checked(input[r].multiply(value));</span>
+                    }
+<span class="fc" id="L202">                    yield output;</span>
+                }
+<span class="fc" id="L204">                case Binary(var op, var left, var right) -&gt; {</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                    if (op == Op.MULTIPLY) yield apply(left, apply(right, input));</span>
+<span class="fc" id="L206">                    var a = apply(left, input);</span>
+<span class="fc" id="L207">                    var b = apply(right, input);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                    for (int r = 0; r &lt; a.length; r++) {</span>
+<span class="fc" id="L209">                        poll();</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                        a[r] = checked(op == Op.ADD ? a[r].add(b[r]) : a[r].subtract(b[r]));</span>
+                    }
+<span class="fc" id="L212">                    yield a;</span>
+                }
+            };
+        }
+
+        private ExactRational[] applyGenerator(int i, ExactRational[] input) {
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (input.length == 1) return input.clone(); // n=s=1 uses T_1=[1]</span>
+<span class="fc" id="L219">            var output = new ExactRational[input.length];</span>
+<span class="fc" id="L220">            output[0] = ExactRational.ZERO;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            for (int r = 1; r &lt; output.length; r++) {</span>
+<span class="fc" id="L222">                poll();</span>
+<span class="fc" id="L223">                var factor = checked(ExactRational.integer(r - 1));</span>
+<span class="fc" id="L224">                var divisor = checked(ExactRational.integer((long) r * i));</span>
+<span class="fc" id="L225">                var previous = checked(output[r - 1].multiply(factor));</span>
+<span class="fc" id="L226">                var difference = checked(input[r - 1].subtract(previous));</span>
+<span class="fc" id="L227">                output[r] = checked(difference.divide(divisor));</span>
+            }
+<span class="fc" id="L229">            return output;</span>
+        }
+
+        private ExactRational checked(ExactRational value) {
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            requireBudget(value.numerator().bitLength() &lt;= limits.maxBits()</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                &amp;&amp; value.denominator().bitLength() &lt;= limits.maxBits()</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                &amp;&amp; value.numerator().abs().bitLength() &lt;= limits.maxBits(), &quot;rational bits&quot;);</span>
+<span class="fc" id="L236">            return value;</span>
+        }
+
+        private void poll() {
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (cancelled.getAsBoolean()) throw new Stop(Status.CANCELLED, &quot;cancelled&quot;);</span>
+<span class="fc" id="L241">        }</span>
+
+        private static void requireBudget(boolean condition, String limit) {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            if (!condition) throw new Stop(Status.BUDGET_EXCEEDED, limit);</span>
+<span class="fc" id="L245">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

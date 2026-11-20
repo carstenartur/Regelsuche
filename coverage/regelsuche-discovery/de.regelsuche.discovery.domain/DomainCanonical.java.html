@@ -26,8 +26,8 @@ final class DomainCanonical {
     }
 
     static String requireText(String value, String name) {
-<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L30">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L30">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
 <span class="fc" id="L32">        return value;</span>
     }

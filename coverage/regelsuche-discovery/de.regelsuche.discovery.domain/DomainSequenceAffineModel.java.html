@@ -51,7 +51,7 @@ final class DomainSequenceAffineModel {
         int order;
 <span class="fc bfc" id="L52" title="All 2 branches covered.">        if (candidate instanceof FiniteDifferenceCandidate value) {</span>
 <span class="fc" id="L53">            order = value.order();</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        } else if (candidate instanceof LinearRecurrenceCandidate value) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        } else if (candidate instanceof LinearRecurrenceCandidate value) {</span>
 <span class="fc" id="L55">            order = value.model().order();</span>
 <span class="fc bfc" id="L56" title="All 2 branches covered.">            if (order &gt; 3) throw new UnsupportedModel(&quot;MODEL_DIMENSION_EXCEEDS_THREE&quot;);</span>
 <span class="fc bfc" id="L57" title="All 2 branches covered.">            for (var coefficient : value.model().coefficients()) {</span>
@@ -59,7 +59,7 @@ final class DomainSequenceAffineModel {
 <span class="nc" id="L59">                    throw new UnsupportedModel(&quot;MODEL_COEFFICIENT_EXCEEDS_128_BITS&quot;);</span>
                 }
 <span class="fc" id="L61">            }</span>
-<span class="nc" id="L62">        } else throw new UnsupportedModel(&quot;NO_AFFINE_PROJECTION_FOR_SELECTED_TYPE&quot;);</span>
+<span class="fc" id="L62">        } else throw new UnsupportedModel(&quot;NO_AFFINE_PROJECTION_FOR_SELECTED_TYPE&quot;);</span>
 <span class="pc bpc" id="L63" title="1 of 4 branches missed.">        if (order &lt; 1 || order &gt; 3) throw new UnsupportedModel(&quot;MODEL_DIMENSION_EXCEEDS_THREE&quot;);</span>
 <span class="fc" id="L64">    }</span>
 

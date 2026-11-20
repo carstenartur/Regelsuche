@@ -203,11 +203,11 @@ public final class ExpressionRewriteDiscoveryDomain implements DiscoveryDomain&l
                         &quot;path contains a transition not marked semantics-preserving&quot;,
 <span class="nc" id="L204">                        Map.of(&quot;auditedRules&quot;, &quot;1&quot;));</span>
                 }
-<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (candidate.ruleIds().isEmpty()) {</span>
-<span class="nc" id="L207">                    return CounterexampleResult.inconclusive(</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (candidate.ruleIds().isEmpty()) {</span>
+<span class="fc" id="L207">                    return CounterexampleResult.inconclusive(</span>
                         0,
                         &quot;candidate has no retained rewrite step&quot;,
-<span class="nc" id="L210">                        Map.of(&quot;auditedRules&quot;, &quot;0&quot;));</span>
+<span class="fc" id="L210">                        Map.of(&quot;auditedRules&quot;, &quot;0&quot;));</span>
                 }
 <span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (candidate.ruleIds().size() &gt; attemptBudget) {</span>
 <span class="nc" id="L213">                    return CounterexampleResult.inconclusive(</span>
@@ -324,9 +324,9 @@ public final class ExpressionRewriteDiscoveryDomain implements DiscoveryDomain&l
 <span class="fc" id="L324">                    .map(ExpressionState::expression)</span>
 <span class="fc" id="L325">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
 <span class="fc" id="L326">                values.put(&quot;expectedTarget&quot;, expectedTarget);</span>
-<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                values.put(&quot;candidateStatus&quot;, candidate.isPresent()</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                values.put(&quot;candidateStatus&quot;, candidate.isPresent()</span>
 <span class="fc" id="L328">                    ? &quot;SELECTED&quot;</span>
-<span class="nc" id="L329">                    : &quot;NOT_SELECTED&quot;);</span>
+<span class="fc" id="L329">                    : &quot;NOT_SELECTED&quot;);</span>
 <span class="fc" id="L330">                values.put(&quot;candidateTarget&quot;, candidate</span>
 <span class="fc" id="L331">                    .map(ExpressionCandidate::targetExpression)</span>
 <span class="fc" id="L332">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>

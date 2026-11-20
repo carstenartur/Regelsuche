@@ -25,189 +25,213 @@ public final class DomainExportWorkspace {
     public static final String SCHEMA = &quot;regelsuche.domain-export-workspace/v1&quot;;
     public static final String REPLAY_SCHEMA = &quot;regelsuche.domain-export-replay/v1&quot;;
     public static final int MAX_EXPORT_BYTES = 524_288;
-<span class="fc" id="L28">    private static final DiscoveryBudget REPLAY_CEILING = new DiscoveryBudget(8, 256, 1024, 128, 128, 4096);</span>
-<span class="fc" id="L29">    static final JsonMapper JSON = JsonMapper.builder()</span>
-<span class="fc" id="L30">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
-<span class="fc" id="L31">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
-<span class="fc" id="L32">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
+    private static final int MAX_EXPRESSION_CHARACTERS = 256;
+<span class="fc" id="L29">    private static final DiscoveryBudget REPLAY_CEILING = new DiscoveryBudget(8, 256, 1024, 128, 128, 4096);</span>
+<span class="fc" id="L30">    static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L31">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L32">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L33">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
     private final VerifiedDomainExport snapshot;
     private final DomainDiscoveryEvidence evidence;
     private final String canonicalJson;
     private final String contentHash;
 
-<span class="fc" id="L38">    private DomainExportWorkspace(VerifiedDomainExport snapshot, DomainDiscoveryEvidence evidence) {</span>
-<span class="fc" id="L39">        this.snapshot = snapshot;</span>
-<span class="fc" id="L40">        this.evidence = evidence;</span>
-<span class="fc" id="L41">        ObjectNode view = JSON.createObjectNode();</span>
-<span class="fc" id="L42">        view.put(&quot;schema&quot;, SCHEMA).put(&quot;runId&quot;, runId()).put(&quot;domainId&quot;, evidence.descriptor().domainId())</span>
-<span class="fc" id="L43">            .put(&quot;domainRevision&quot;, evidence.descriptor().revision()).put(&quot;inputHash&quot;, evidence.seed().contentHash());</span>
-<span class="fc" id="L44">        view.set(&quot;manifest&quot;, read(snapshot.manifest().toCanonicalJson()));</span>
-<span class="fc" id="L45">        view.set(&quot;verification&quot;, read(snapshot.verification().toCanonicalJson()));</span>
-<span class="fc" id="L46">        view.set(&quot;evidence&quot;, read(evidence.toCanonicalJson()));</span>
-<span class="fc" id="L47">        view.set(&quot;lifecycleHandoff&quot;, read(snapshot.artifactBytes(ArtifactRole.LIFECYCLE_HANDOFF)));</span>
-<span class="fc" id="L48">        ArrayNode roles = view.putArray(&quot;artifacts&quot;);</span>
-<span class="fc" id="L49">        available(roles, &quot;DOMAIN_DESCRIPTOR&quot;, DiscoveryDomainDescriptor.SCHEMA, snapshot.manifest().domainDescriptorHash());</span>
-<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (String role : List.of(&quot;SEARCH_GRAPH&quot;, &quot;REPRESENTATION_CANDIDATES&quot;, &quot;CANDIDATE_DOSSIERS&quot;, &quot;PROGRESS_LEDGER&quot;)) {</span>
-<span class="fc" id="L51">            available(roles, role, DomainDiscoveryEvidence.SCHEMA, evidence.contentHash());</span>
-<span class="fc" id="L52">        }</span>
-<span class="fc" id="L53">        available(roles, &quot;LIFECYCLE_HANDOFF&quot;, DiscoveryLifecycleHandoff.SCHEMA, snapshot.manifest().lifecycleHandoffHash());</span>
-<span class="fc" id="L54">        available(roles, &quot;EXPORT_BUNDLE&quot;, DomainDiscoveryExport.SCHEMA, runId());</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (replaySupported()) available(roles, &quot;PATH_REPLAY&quot;, DomainDiscoveryEvidence.SCHEMA, evidence.contentHash());</span>
-<span class="fc" id="L56">        else unavailable(roles, &quot;PATH_REPLAY&quot;, &quot;SOURCE_EXCEEDS_BOUNDED_REPLAY_ADMISSION&quot;);</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (String role : List.of(&quot;RULE_RADAR&quot;, &quot;PROOF_OBLIGATIONS&quot;, &quot;EXTERNAL_NOVELTY&quot;, &quot;PROMOTION&quot;, &quot;PUBLIC_EVIDENCE&quot;)) {</span>
-<span class="fc" id="L58">            unavailable(roles, role, &quot;NOT_PRODUCED_BY_SOURCE_EXPORT&quot;);</span>
-<span class="fc" id="L59">        }</span>
-<span class="fc" id="L60">        view.put(&quot;replaySupported&quot;, replaySupported());</span>
-<span class="fc" id="L61">        view.put(&quot;claimBoundary&quot;, &quot;Retained finite-sequence validation evidence and bounded deterministic replay; &quot;</span>
-            + &quot;not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification.&quot;);
-<span class="fc" id="L63">        this.contentHash = DomainCanonical.sha256(write(view));</span>
-<span class="fc" id="L64">        view.put(&quot;contentHash&quot;, contentHash);</span>
-<span class="fc" id="L65">        this.canonicalJson = write(view);</span>
-<span class="fc" id="L66">    }</span>
+<span class="fc" id="L39">    private DomainExportWorkspace(VerifiedDomainExport snapshot, DomainDiscoveryEvidence evidence) {</span>
+<span class="fc" id="L40">        this.snapshot = snapshot;</span>
+<span class="fc" id="L41">        this.evidence = evidence;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expressionDomain()) expectedExpressionTarget();</span>
+<span class="fc" id="L43">        ObjectNode view = JSON.createObjectNode();</span>
+<span class="fc" id="L44">        view.put(&quot;schema&quot;, SCHEMA).put(&quot;runId&quot;, runId()).put(&quot;domainId&quot;, evidence.descriptor().domainId())</span>
+<span class="fc" id="L45">            .put(&quot;domainRevision&quot;, evidence.descriptor().revision()).put(&quot;inputHash&quot;, evidence.seed().contentHash());</span>
+<span class="fc" id="L46">        view.set(&quot;manifest&quot;, read(snapshot.manifest().toCanonicalJson()));</span>
+<span class="fc" id="L47">        view.set(&quot;verification&quot;, read(snapshot.verification().toCanonicalJson()));</span>
+<span class="fc" id="L48">        view.set(&quot;evidence&quot;, read(evidence.toCanonicalJson()));</span>
+<span class="fc" id="L49">        view.set(&quot;lifecycleHandoff&quot;, read(snapshot.artifactBytes(ArtifactRole.LIFECYCLE_HANDOFF)));</span>
+<span class="fc" id="L50">        ArrayNode roles = view.putArray(&quot;artifacts&quot;);</span>
+<span class="fc" id="L51">        available(roles, &quot;DOMAIN_DESCRIPTOR&quot;, DiscoveryDomainDescriptor.SCHEMA, snapshot.manifest().domainDescriptorHash());</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (String role : List.of(&quot;SEARCH_GRAPH&quot;, &quot;REPRESENTATION_CANDIDATES&quot;, &quot;CANDIDATE_DOSSIERS&quot;, &quot;PROGRESS_LEDGER&quot;)) {</span>
+<span class="fc" id="L53">            available(roles, role, DomainDiscoveryEvidence.SCHEMA, evidence.contentHash());</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        available(roles, &quot;LIFECYCLE_HANDOFF&quot;, DiscoveryLifecycleHandoff.SCHEMA, snapshot.manifest().lifecycleHandoffHash());</span>
+<span class="fc" id="L56">        available(roles, &quot;EXPORT_BUNDLE&quot;, DomainDiscoveryExport.SCHEMA, runId());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (replaySupported()) available(roles, &quot;PATH_REPLAY&quot;, DomainDiscoveryEvidence.SCHEMA, evidence.contentHash());</span>
+<span class="fc" id="L58">        else unavailable(roles, &quot;PATH_REPLAY&quot;, &quot;SOURCE_EXCEEDS_BOUNDED_REPLAY_ADMISSION&quot;);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (String role : List.of(&quot;RULE_RADAR&quot;, &quot;PROOF_OBLIGATIONS&quot;, &quot;EXTERNAL_NOVELTY&quot;, &quot;PROMOTION&quot;, &quot;PUBLIC_EVIDENCE&quot;)) {</span>
+<span class="fc" id="L60">            unavailable(roles, role, &quot;NOT_PRODUCED_BY_SOURCE_EXPORT&quot;);</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">        view.put(&quot;replaySupported&quot;, replaySupported());</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        view.put(&quot;claimBoundary&quot;, expressionDomain()</span>
+<span class="fc" id="L64">            ? &quot;Retained expression-rewrite validation evidence and bounded deterministic replay; &quot;</span>
+                + &quot;not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification.&quot;
+<span class="fc" id="L66">            : &quot;Retained finite-sequence validation evidence and bounded deterministic replay; &quot;</span>
+                + &quot;not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification.&quot;);
+<span class="fc" id="L68">        this.contentHash = DomainCanonical.sha256(write(view));</span>
+<span class="fc" id="L69">        view.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L70">        this.canonicalJson = write(view);</span>
+<span class="fc" id="L71">    }</span>
 
     public static DomainExportWorkspace fromVerified(VerifiedDomainExport snapshot) {
-<span class="fc" id="L69">        Objects.requireNonNull(snapshot, &quot;snapshot&quot;);</span>
-<span class="fc" id="L70">        long size = snapshot.manifestBytes().length;</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (ArtifactRole role : ArtifactRole.values()) size += snapshot.artifactBytes(role).length;</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (size &gt; MAX_EXPORT_BYTES) throw new IllegalArgumentException(&quot;domain export exceeds 512 KiB application limit&quot;);</span>
-<span class="fc" id="L73">        var domain = supportedDomain(snapshot.manifest().domainId(), snapshot.manifest().domainRevision());</span>
-<span class="fc" id="L74">        var descriptor = DiscoveryDomainDescriptor.from(domain);</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (!read(descriptor.toCanonicalJson()).equals(read(snapshot.artifactBytes(ArtifactRole.DOMAIN_DESCRIPTOR)))) {</span>
-<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;retained descriptor differs from the supported domain contract&quot;);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(snapshot, &quot;snapshot&quot;);</span>
+<span class="fc" id="L75">        long size = snapshot.manifestBytes().length;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (ArtifactRole role : ArtifactRole.values()) size += snapshot.artifactBytes(role).length;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (size &gt; MAX_EXPORT_BYTES) throw new IllegalArgumentException(&quot;domain export exceeds 512 KiB application limit&quot;);</span>
+<span class="fc" id="L78">        var domain = supportedDomain(snapshot.manifest().domainId(), snapshot.manifest().domainRevision());</span>
+<span class="fc" id="L79">        var descriptor = DiscoveryDomainDescriptor.from(domain);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!read(descriptor.toCanonicalJson()).equals(read(snapshot.artifactBytes(ArtifactRole.DOMAIN_DESCRIPTOR)))) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;retained descriptor differs from the supported domain contract&quot;);</span>
         }
         try {
-<span class="fc" id="L79">            JsonNode raw = read(snapshot.artifactBytes(ArtifactRole.DISCOVERY_EVIDENCE));</span>
-<span class="fc" id="L80">            DomainDiscoveryEvidence evidence = new DomainDiscoveryEvidence(raw.path(&quot;campaignId&quot;).asText(), descriptor,</span>
-<span class="fc" id="L81">                JSON.treeToValue(raw.required(&quot;seed&quot;), DiscoverySeed.class),</span>
-<span class="fc" id="L82">                JSON.treeToValue(raw.required(&quot;budget&quot;), DiscoveryBudget.class), Outcome.valueOf(raw.required(&quot;outcome&quot;).asText()),</span>
-<span class="fc" id="L83">                records(raw.required(&quot;states&quot;), StateTrace.class, &quot;objectiveMetrics&quot;),</span>
-<span class="fc" id="L84">                records(raw.required(&quot;transitions&quot;), TransitionTrace.class, &quot;metadata&quot;),</span>
-<span class="fc" id="L85">                records(raw.required(&quot;candidateAttempts&quot;), CandidateAttempt.class, &quot;metrics&quot;),</span>
-<span class="fc" id="L86">                records(raw.required(&quot;resources&quot;), ResourceLine.class, null),</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">                raw.required(&quot;selectedCandidateHash&quot;).isNull() ? &quot;&quot; : raw.required(&quot;selectedCandidateHash&quot;).asText(),</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">                raw.required(&quot;certificate&quot;).isNull() ? null : JSON.treeToValue(raw.required(&quot;certificate&quot;), RenderedCertificate.class),</span>
-<span class="fc" id="L89">                JSON.treeToValue(mapField(raw.required(&quot;domainEvidence&quot;), &quot;properties&quot;), DomainPayload.class));</span>
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (!read(evidence.toCanonicalJson()).equals(raw)) {</span>
-<span class="nc" id="L91">                throw new IllegalArgumentException(&quot;retained evidence does not match its typed canonical content and source hash&quot;);</span>
+<span class="fc" id="L84">            JsonNode raw = read(snapshot.artifactBytes(ArtifactRole.DISCOVERY_EVIDENCE));</span>
+<span class="fc" id="L85">            DomainDiscoveryEvidence evidence = new DomainDiscoveryEvidence(raw.path(&quot;campaignId&quot;).asText(), descriptor,</span>
+<span class="fc" id="L86">                JSON.treeToValue(raw.required(&quot;seed&quot;), DiscoverySeed.class),</span>
+<span class="fc" id="L87">                JSON.treeToValue(raw.required(&quot;budget&quot;), DiscoveryBudget.class), Outcome.valueOf(raw.required(&quot;outcome&quot;).asText()),</span>
+<span class="fc" id="L88">                records(raw.required(&quot;states&quot;), StateTrace.class, &quot;objectiveMetrics&quot;),</span>
+<span class="fc" id="L89">                records(raw.required(&quot;transitions&quot;), TransitionTrace.class, &quot;metadata&quot;),</span>
+<span class="fc" id="L90">                records(raw.required(&quot;candidateAttempts&quot;), CandidateAttempt.class, &quot;metrics&quot;),</span>
+<span class="fc" id="L91">                records(raw.required(&quot;resources&quot;), ResourceLine.class, null),</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                raw.required(&quot;selectedCandidateHash&quot;).isNull() ? &quot;&quot; : raw.required(&quot;selectedCandidateHash&quot;).asText(),</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                raw.required(&quot;certificate&quot;).isNull() ? null : JSON.treeToValue(raw.required(&quot;certificate&quot;), RenderedCertificate.class),</span>
+<span class="fc" id="L94">                JSON.treeToValue(mapField(raw.required(&quot;domainEvidence&quot;), &quot;properties&quot;), DomainPayload.class));</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (!read(evidence.toCanonicalJson()).equals(raw)) {</span>
+<span class="nc" id="L96">                throw new IllegalArgumentException(&quot;retained evidence does not match its typed canonical content and source hash&quot;);</span>
             }
-<span class="fc" id="L93">            if (!read(DiscoveryLifecycleHandoff.from(evidence).toCanonicalJson())</span>
-<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                    .equals(read(snapshot.artifactBytes(ArtifactRole.LIFECYCLE_HANDOFF)))) {</span>
-<span class="nc" id="L95">                throw new IllegalArgumentException(&quot;retained lifecycle handoff differs from source evidence&quot;);</span>
+<span class="fc" id="L98">            if (!read(DiscoveryLifecycleHandoff.from(evidence).toCanonicalJson())</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                    .equals(read(snapshot.artifactBytes(ArtifactRole.LIFECYCLE_HANDOFF)))) {</span>
+<span class="nc" id="L100">                throw new IllegalArgumentException(&quot;retained lifecycle handoff differs from source evidence&quot;);</span>
             }
-<span class="fc" id="L97">            return new DomainExportWorkspace(snapshot, evidence);</span>
-<span class="fc" id="L98">        } catch (IOException | NullPointerException exception) {</span>
-<span class="fc" id="L99">            throw new IllegalArgumentException(&quot;malformed supported domain evidence&quot;, exception);</span>
+<span class="fc" id="L102">            return new DomainExportWorkspace(snapshot, evidence);</span>
+<span class="fc" id="L103">        } catch (IOException | NullPointerException exception) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(&quot;malformed supported domain evidence&quot;, exception);</span>
         }
     }
 
     public DomainDiscoveryEvidence replay() {
-<span class="fc" id="L104">        return replayObserved().result.evidence();</span>
+<span class="fc" id="L109">        return replayObserved().result.evidence();</span>
     }
 
     ReplayObservation replayObserved() {
-<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!replaySupported()) throw new IllegalStateException(&quot;source exceeds bounded replay admission&quot;);</span>
-<span class="fc" id="L109">        return replayWith(supportedDomain(evidence.descriptor().domainId(), evidence.descriptor().revision()));</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (!replaySupported()) throw new IllegalStateException(&quot;source exceeds bounded replay admission&quot;);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (expressionDomain()) return replayWith(new ExpressionRewriteDiscoveryDomain(expectedExpressionTarget()));</span>
+<span class="fc" id="L115">        return replayWith(supportedDomain(evidence.descriptor().domainId(), evidence.descriptor().revision()));</span>
     }
 
     private &lt;S, C, K&gt; ReplayObservation replayWith(DiscoveryDomain&lt;S, C, K&gt; domain) {
-<span class="fc" id="L113">        var result = new DomainDiscoveryRunner().run(evidence.campaignId(), domain, evidence.seed(), evidence.budget());</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!evidence.toCanonicalJson().equals(result.evidence().toCanonicalJson())) {</span>
-<span class="fc" id="L115">            throw new ReplayMismatch(result.evidence());</span>
+<span class="fc" id="L119">        var result = new DomainDiscoveryRunner().run(evidence.campaignId(), domain, evidence.seed(), evidence.budget());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!evidence.toCanonicalJson().equals(result.evidence().toCanonicalJson())) {</span>
+<span class="fc" id="L121">            throw new ReplayMismatch(result.evidence());</span>
         }
         // Selected objects come only from this actual replay. Public RunResult constructors cannot issue this observation.
-<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (result.selectedCandidate().isPresent()) {</span>
-<span class="fc" id="L119">            C candidate = result.selectedCandidate().orElseThrow();</span>
-<span class="fc" id="L120">            K certificate = result.selectedCertificate().orElseThrow();</span>
-<span class="fc" id="L121">            var rendered = RenderedCertificate.create(domain.certificateRenderer().render(certificate),</span>
-<span class="fc" id="L122">                domain.certificateCodec().contentHash(certificate));</span>
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (!domain.candidateCodec().contentHash(candidate).equals(evidence.selectedCandidateHash())</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                    || !rendered.equals(evidence.certificate())) throw new ReplayMismatch(result.evidence());</span>
-<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        } else if (result.selectedCertificate().isPresent() || evidence.certificate() != null) {</span>
-<span class="nc" id="L126">            throw new ReplayMismatch(result.evidence());</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (result.selectedCandidate().isPresent()) {</span>
+<span class="fc" id="L125">            C candidate = result.selectedCandidate().orElseThrow();</span>
+<span class="fc" id="L126">            K certificate = result.selectedCertificate().orElseThrow();</span>
+<span class="fc" id="L127">            var rendered = RenderedCertificate.create(domain.certificateRenderer().render(certificate),</span>
+<span class="fc" id="L128">                domain.certificateCodec().contentHash(certificate));</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (!domain.candidateCodec().contentHash(candidate).equals(evidence.selectedCandidateHash())</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                    || !rendered.equals(evidence.certificate())) throw new ReplayMismatch(result.evidence());</span>
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">        } else if (result.selectedCertificate().isPresent() || evidence.certificate() != null) {</span>
+<span class="nc" id="L132">            throw new ReplayMismatch(result.evidence());</span>
         }
-<span class="fc" id="L128">        return new ReplayObservation(result);</span>
+<span class="fc" id="L134">        return new ReplayObservation(result);</span>
     }
 
     private static DiscoveryDomain&lt;?, ?, ?&gt; supportedDomain(String id, String revision) {
-<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        if (FiniteDifferenceSequenceDomain.DOMAIN_ID.equals(id) &amp;&amp; FiniteDifferenceSequenceDomain.REVISION.equals(revision)) {</span>
-<span class="fc" id="L133">            return new FiniteDifferenceSequenceDomain();</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        if (FiniteDifferenceSequenceDomain.DOMAIN_ID.equals(id) &amp;&amp; FiniteDifferenceSequenceDomain.REVISION.equals(revision)) {</span>
+<span class="fc" id="L139">            return new FiniteDifferenceSequenceDomain();</span>
         }
-<span class="pc bpc" id="L135" title="1 of 4 branches missed.">        if (LinearRecurrenceSequenceDomain.DOMAIN_ID.equals(id) &amp;&amp; LinearRecurrenceSequenceDomain.REVISION.equals(revision)) {</span>
-<span class="fc" id="L136">            return new LinearRecurrenceSequenceDomain();</span>
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        if (LinearRecurrenceSequenceDomain.DOMAIN_ID.equals(id) &amp;&amp; LinearRecurrenceSequenceDomain.REVISION.equals(revision)) {</span>
+<span class="fc" id="L142">            return new LinearRecurrenceSequenceDomain();</span>
         }
-<span class="fc" id="L138">        throw new IllegalArgumentException(&quot;unsupported domain export schema or revision&quot;);</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (ExpressionRewriteDiscoveryDomain.DOMAIN_ID.equals(id) &amp;&amp; ExpressionRewriteDiscoveryDomain.REVISION.equals(revision)) {</span>
+            // The descriptor identifies the implementation; its configured target is retained in domainEvidence.
+            // Do not parse unbounded retained text or execute its search while loading the source view.
+<span class="fc" id="L147">            return new ExpressionRewriteDiscoveryDomain(&quot;x&quot;);</span>
+        }
+<span class="nc" id="L149">        throw new IllegalArgumentException(&quot;unsupported domain export schema or revision&quot;);</span>
+    }
+
+    private boolean expressionDomain() {
+<span class="fc" id="L153">        return ExpressionRewriteDiscoveryDomain.DOMAIN_ID.equals(evidence.descriptor().domainId());</span>
+    }
+
+    private String expectedExpressionTarget() {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (!&quot;expression-rewrite-evidence/v1&quot;.equals(evidence.domainEvidence().type())) {</span>
+<span class="fc" id="L158">            throw new IllegalArgumentException(&quot;unsupported expression evidence payload contract&quot;);</span>
+        }
+<span class="fc" id="L160">        return DomainCanonical.requireText(evidence.domainEvidence().properties().get(&quot;expectedTarget&quot;), &quot;expectedTarget&quot;);</span>
     }
 
     static final class ReplayObservation {
         private final DomainDiscoveryRunner.RunResult&lt;?, ?&gt; result;
-<span class="fc" id="L143">        private ReplayObservation(DomainDiscoveryRunner.RunResult&lt;?, ?&gt; result) { this.result = result; }</span>
-<span class="fc" id="L144">        DomainDiscoveryRunner.RunResult&lt;?, ?&gt; result() { return result; }</span>
+<span class="fc" id="L165">        private ReplayObservation(DomainDiscoveryRunner.RunResult&lt;?, ?&gt; result) { this.result = result; }</span>
+<span class="fc" id="L166">        DomainDiscoveryRunner.RunResult&lt;?, ?&gt; result() { return result; }</span>
     }
 
     static final class ReplayMismatch extends IllegalStateException {
         private final DomainDiscoveryEvidence actual;
         private ReplayMismatch(DomainDiscoveryEvidence actual) {
-<span class="fc" id="L150">            super(&quot;replay differs from the retained source evidence&quot;); this.actual = actual;</span>
-<span class="fc" id="L151">        }</span>
-<span class="fc" id="L152">        DomainDiscoveryEvidence actual() { return actual; }</span>
+<span class="fc" id="L172">            super(&quot;replay differs from the retained source evidence&quot;); this.actual = actual;</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        DomainDiscoveryEvidence actual() { return actual; }</span>
     }
 
     public boolean replaySupported() {
-<span class="fc" id="L156">        var b = evidence.budget();</span>
-<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        return evidence.seed().payload().length() &lt;= 8192 &amp;&amp; b.maxDepth() &lt;= REPLAY_CEILING.maxDepth()</span>
-<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            &amp;&amp; b.maxExploredStates() &lt;= REPLAY_CEILING.maxExploredStates()</span>
-<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            &amp;&amp; b.maxGeneratedSuccessors() &lt;= REPLAY_CEILING.maxGeneratedSuccessors()</span>
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            &amp;&amp; b.maxCandidatesPerState() &lt;= REPLAY_CEILING.maxCandidatesPerState()</span>
-<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            &amp;&amp; b.maxCandidateAttempts() &lt;= REPLAY_CEILING.maxCandidateAttempts()</span>
-<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            &amp;&amp; b.maxCounterexampleAttempts() &lt;= REPLAY_CEILING.maxCounterexampleAttempts();</span>
+<span class="fc" id="L178">        var b = evidence.budget();</span>
+<span class="fc bfc" id="L179" title="All 4 branches covered.">        if (expressionDomain() &amp;&amp; (evidence.seed().payload().length() &gt; MAX_EXPRESSION_CHARACTERS</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                || expectedExpressionTarget().length() &gt; MAX_EXPRESSION_CHARACTERS)) return false;</span>
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">        return evidence.seed().payload().length() &lt;= 8192 &amp;&amp; b.maxDepth() &lt;= REPLAY_CEILING.maxDepth()</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">            &amp;&amp; b.maxExploredStates() &lt;= REPLAY_CEILING.maxExploredStates()</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            &amp;&amp; b.maxGeneratedSuccessors() &lt;= REPLAY_CEILING.maxGeneratedSuccessors()</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            &amp;&amp; b.maxCandidatesPerState() &lt;= REPLAY_CEILING.maxCandidatesPerState()</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            &amp;&amp; b.maxCandidateAttempts() &lt;= REPLAY_CEILING.maxCandidateAttempts()</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            &amp;&amp; b.maxCounterexampleAttempts() &lt;= REPLAY_CEILING.maxCounterexampleAttempts();</span>
     }
 
-<span class="fc" id="L165">    public String runId() { return snapshot.manifest().contentHash(); }</span>
-<span class="fc" id="L166">    public String contentHash() { return contentHash; }</span>
-<span class="fc" id="L167">    public String toCanonicalJson() { return canonicalJson; }</span>
-<span class="fc" id="L168">    public DomainDiscoveryEvidence evidence() { return evidence; }</span>
-<span class="fc" id="L169">    VerifiedDomainExport snapshot() { return snapshot; }</span>
-<span class="fc" id="L170">    public byte[] originalManifestBytes() { return snapshot.manifestBytes(); }</span>
-<span class="fc" id="L171">    public byte[] originalArtifactBytes(ArtifactRole role) { return snapshot.artifactBytes(role); }</span>
+<span class="fc" id="L189">    public String runId() { return snapshot.manifest().contentHash(); }</span>
+<span class="fc" id="L190">    public String contentHash() { return contentHash; }</span>
+<span class="fc" id="L191">    public String toCanonicalJson() { return canonicalJson; }</span>
+<span class="fc" id="L192">    public DomainDiscoveryEvidence evidence() { return evidence; }</span>
+<span class="fc" id="L193">    VerifiedDomainExport snapshot() { return snapshot; }</span>
+<span class="fc" id="L194">    public byte[] originalManifestBytes() { return snapshot.manifestBytes(); }</span>
+<span class="fc" id="L195">    public byte[] originalArtifactBytes(ArtifactRole role) { return snapshot.artifactBytes(role); }</span>
 
     private static void available(ArrayNode roles, String role, String schema, String hash) {
-<span class="fc" id="L174">        roles.addObject().put(&quot;role&quot;, role).put(&quot;status&quot;, &quot;AVAILABLE&quot;).put(&quot;artifactSchema&quot;, schema).put(&quot;targetContentHash&quot;, hash).put(&quot;detail&quot;, &quot;&quot;);</span>
-<span class="fc" id="L175">    }</span>
+<span class="fc" id="L198">        roles.addObject().put(&quot;role&quot;, role).put(&quot;status&quot;, &quot;AVAILABLE&quot;).put(&quot;artifactSchema&quot;, schema).put(&quot;targetContentHash&quot;, hash).put(&quot;detail&quot;, &quot;&quot;);</span>
+<span class="fc" id="L199">    }</span>
 
     private static void unavailable(ArrayNode roles, String role, String reason) {
-<span class="fc" id="L178">        roles.addObject().put(&quot;role&quot;, role).put(&quot;status&quot;, &quot;NOT_PRODUCED&quot;).put(&quot;artifactSchema&quot;, &quot;NOT_AVAILABLE&quot;).putNull(&quot;targetContentHash&quot;).put(&quot;detail&quot;, reason);</span>
-<span class="fc" id="L179">    }</span>
+<span class="fc" id="L202">        roles.addObject().put(&quot;role&quot;, role).put(&quot;status&quot;, &quot;NOT_PRODUCED&quot;).put(&quot;artifactSchema&quot;, &quot;NOT_AVAILABLE&quot;).putNull(&quot;targetContentHash&quot;).put(&quot;detail&quot;, reason);</span>
+<span class="fc" id="L203">    }</span>
 
     private static &lt;T&gt; List&lt;T&gt; records(JsonNode values, Class&lt;T&gt; type, String mapField) throws IOException {
-<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (!values.isArray()) throw new IllegalArgumentException(&quot;expected an evidence array&quot;);</span>
-<span class="fc" id="L183">        List&lt;T&gt; records = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L184" title="All 4 branches covered.">        for (JsonNode item : values) records.add(JSON.treeToValue(mapField == null ? item : mapField(item, mapField), type));</span>
-<span class="fc" id="L185">        return List.copyOf(records);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (!values.isArray()) throw new IllegalArgumentException(&quot;expected an evidence array&quot;);</span>
+<span class="fc" id="L207">        List&lt;T&gt; records = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L208" title="All 4 branches covered.">        for (JsonNode item : values) records.add(JSON.treeToValue(mapField == null ? item : mapField(item, mapField), type));</span>
+<span class="fc" id="L209">        return List.copyOf(records);</span>
     }
 
     private static ObjectNode mapField(JsonNode raw, String field) {
-<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        if (!raw.isObject() || !raw.required(field).isArray()) throw new IllegalArgumentException(&quot;invalid evidence map&quot;);</span>
-<span class="fc" id="L190">        ObjectNode value = ((ObjectNode) raw).deepCopy(), map = JSON.createObjectNode();</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (JsonNode entry : raw.required(field)) {</span>
-<span class="pc bpc" id="L192" title="4 of 8 branches missed.">            if (!entry.isObject() || entry.size() != 2 || !entry.path(&quot;key&quot;).isTextual() || !entry.path(&quot;value&quot;).isTextual()</span>
-<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                    || map.has(entry.path(&quot;key&quot;).asText())) throw new IllegalArgumentException(&quot;invalid or duplicate evidence map entry&quot;);</span>
-<span class="fc" id="L194">            map.put(entry.path(&quot;key&quot;).asText(), entry.path(&quot;value&quot;).asText());</span>
-<span class="fc" id="L195">        }</span>
-<span class="fc" id="L196">        value.set(field, map);</span>
-<span class="fc" id="L197">        return value;</span>
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">        if (!raw.isObject() || !raw.required(field).isArray()) throw new IllegalArgumentException(&quot;invalid evidence map&quot;);</span>
+<span class="fc" id="L214">        ObjectNode value = ((ObjectNode) raw).deepCopy(), map = JSON.createObjectNode();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (JsonNode entry : raw.required(field)) {</span>
+<span class="pc bpc" id="L216" title="4 of 8 branches missed.">            if (!entry.isObject() || entry.size() != 2 || !entry.path(&quot;key&quot;).isTextual() || !entry.path(&quot;value&quot;).isTextual()</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                    || map.has(entry.path(&quot;key&quot;).asText())) throw new IllegalArgumentException(&quot;invalid or duplicate evidence map entry&quot;);</span>
+<span class="fc" id="L218">            map.put(entry.path(&quot;key&quot;).asText(), entry.path(&quot;value&quot;).asText());</span>
+<span class="fc" id="L219">        }</span>
+<span class="fc" id="L220">        value.set(field, map);</span>
+<span class="fc" id="L221">        return value;</span>
     }
 
-<span class="fc" id="L200">    static JsonNode read(String json) { return read(json.getBytes(StandardCharsets.UTF_8)); }</span>
+<span class="fc" id="L224">    static JsonNode read(String json) { return read(json.getBytes(StandardCharsets.UTF_8)); }</span>
     static JsonNode read(byte[] bytes) {
         try {
-<span class="fc" id="L203">            JsonNode value = JSON.readTree(bytes);</span>
-<span class="pc bpc" id="L204" title="2 of 4 branches missed.">            if (value == null || !value.isObject()) throw new IllegalArgumentException(&quot;expected a JSON object&quot;);</span>
-<span class="fc" id="L205">            return value;</span>
-<span class="fc" id="L206">        } catch (IOException exception) { throw new IllegalArgumentException(&quot;invalid domain export JSON&quot;, exception); }</span>
+<span class="fc" id="L227">            JsonNode value = JSON.readTree(bytes);</span>
+<span class="pc bpc" id="L228" title="2 of 4 branches missed.">            if (value == null || !value.isObject()) throw new IllegalArgumentException(&quot;expected a JSON object&quot;);</span>
+<span class="fc" id="L229">            return value;</span>
+<span class="fc" id="L230">        } catch (IOException exception) { throw new IllegalArgumentException(&quot;invalid domain export JSON&quot;, exception); }</span>
     }
     static String write(JsonNode value) {
-<span class="fc" id="L209">        try { return JSON.writeValueAsString(value); }</span>
-<span class="nc" id="L210">        catch (IOException exception) { throw new IllegalStateException(&quot;unable to render domain workspace&quot;, exception); }</span>
+<span class="fc" id="L233">        try { return JSON.writeValueAsString(value); }</span>
+<span class="nc" id="L234">        catch (IOException exception) { throw new IllegalStateException(&quot;unable to render domain workspace&quot;, exception); }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

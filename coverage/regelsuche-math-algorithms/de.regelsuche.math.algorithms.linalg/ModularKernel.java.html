@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ModularKernel.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">ModularKernel.java</span></div><h1>ModularKernel.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Bounded modular discovery of exact substitutions for homogeneous systems over Q. */
+public final class ModularKernel {
+<span class="fc" id="L17">    private static final List&lt;Integer&gt; DEFAULT_PRIMES = List.of(1_000_000_007, 1_000_000_009, 998_244_353,</span>
+<span class="fc" id="L18">        469_762_049, 167_772_161, 754_974_721);</span>
+
+    private ModularKernel() {}
+
+<span class="fc" id="L22">    public enum Strength { SUBSTITUTION, COMPLETE_KERNEL }</span>
+<span class="fc" id="L23">    public enum Status { VERIFIED, NO_CERTIFICATE, LIMIT, CANCELLED }</span>
+
+    /** maximumTerms bounds the cells in each dense matrix, including the square projection. */
+    public record Limits(IterationLimits effort, int maximumBits, List&lt;Integer&gt; primes) {
+<span class="fc" id="L27">        public Limits {</span>
+<span class="fc" id="L28">            Objects.requireNonNull(effort);</span>
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            if (maximumBits &lt; 1 || maximumBits &gt; IterationLimits.MAX_RUNTIME_BITS</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">                    || primes.isEmpty() || primes.size() &gt; 64) throw new IllegalArgumentException(&quot;invalid limits&quot;);</span>
+<span class="fc" id="L31">            primes = List.copyOf(primes);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (new HashSet&lt;&gt;(primes).size() != primes.size()) throw new IllegalArgumentException(&quot;duplicate modulus&quot;);</span>
+<span class="fc" id="L33">        }</span>
+        public static Limits defaults(IterationLimits effort) {
+<span class="fc" id="L35">            return new Limits(effort, 4096, DEFAULT_PRIMES);</span>
+        }
+    }
+
+    /** Untrusted evidence. A verifier chooses the required strength independently of discovery. */
+    public record Certificate(ExactMatrix source, List&lt;Integer&gt; selectedRows, List&lt;Integer&gt; pivots,
+            List&lt;Integer&gt; freeColumns, ExactMatrix projection, int witnessPrime) {
+<span class="fc" id="L42">        public Certificate {</span>
+<span class="fc" id="L43">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L44">            Objects.requireNonNull(projection);</span>
+<span class="fc" id="L45">            selectedRows = List.copyOf(selectedRows);</span>
+<span class="fc" id="L46">            pivots = List.copyOf(pivots);</span>
+<span class="fc" id="L47">            freeColumns = List.copyOf(freeColumns);</span>
+<span class="fc" id="L48">        }</span>
+    }
+
+    public record Result(Status status, Strength strength, Optional&lt;Certificate&gt; certificate, long work) {
+<span class="fc" id="L52">        public Result {</span>
+<span class="fc" id="L53">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L54">            Objects.requireNonNull(strength);</span>
+<span class="pc bpc" id="L55" title="2 of 6 branches missed.">            if ((status == Status.VERIFIED) != certificate.isPresent() || work &lt; 0)</span>
+<span class="nc" id="L56">                throw new IllegalArgumentException(&quot;inconsistent search result&quot;);</span>
+<span class="fc" id="L57">        }</span>
+    }
+
+    public static Result search(ExactMatrix source, Strength strength, Limits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L61">        Objects.requireNonNull(strength);</span>
+<span class="fc" id="L62">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L64">            work.shape(source);</span>
+<span class="fc" id="L65">            var integers = clear(source, work);</span>
+<span class="fc" id="L66">            Reduction pattern = null;</span>
+<span class="fc" id="L67">            BigInteger modulus = BigInteger.ONE;</span>
+<span class="fc" id="L68">            BigInteger[][] residues = null;</span>
+<span class="fc" id="L69">            int witness = 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            for (int prime : limits.primes()) {</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                if (!isPrime(prime, work)) continue;</span>
+<span class="fc" id="L72">                var p = BigInteger.valueOf(prime);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if (!integers.usable(p, work)) continue;</span>
+<span class="fc" id="L74">                var reduced = reduce(integers.mod(p, work), prime, work);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                int profileOrder = pattern == null ? -1 : compareProfiles(reduced, pattern, work);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (profileOrder &lt; 0) {</span>
+<span class="fc" id="L77">                    pattern = reduced;</span>
+<span class="fc" id="L78">                    witness = prime;</span>
+<span class="fc" id="L79">                    modulus = BigInteger.ONE;</span>
+<span class="fc" id="L80">                    residues = new BigInteger[reduced.pivots.size()][reduced.free.size()];</span>
+                }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                if (profileOrder &gt; 0) continue;</span>
+                // Equal pivot profiles use the same coordinates even if elimination selected different rows.
+                // Retain the original rank witness; the exact verifier checks its equations after reconstruction.
+<span class="fc" id="L85">                BigInteger nextModulus = work.bound(modulus.multiply(p));</span>
+<span class="fc" id="L86">                var inverse = modulus.modInverse(p);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                for (int i = 0; i &lt; reduced.pivots.size(); i++) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                    for (int j = 0; j &lt; reduced.free.size(); j++) {</span>
+<span class="fc" id="L89">                        work.step();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                        var old = residues[i][j] == null ? BigInteger.ZERO : residues[i][j];</span>
+<span class="fc" id="L91">                        var value = BigInteger.valueOf(-reduced.matrix[i][reduced.free.get(j)]);</span>
+<span class="fc" id="L92">                        var digit = value.subtract(old).multiply(inverse).mod(p);</span>
+<span class="fc" id="L93">                        residues[i][j] = old.add(modulus.multiply(digit));</span>
+                    }
+                }
+<span class="fc" id="L96">                modulus = nextModulus;</span>
+<span class="fc" id="L97">                var projection = reconstruct(reduced, residues, modulus, work);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (projection == null) continue;</span>
+<span class="fc" id="L99">                var cert = new Certificate(source, pattern.rows, pattern.pivots, pattern.free, projection, witness);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                if (ModularKernelVerifier.check(source, strength, cert, work))</span>
+<span class="fc" id="L101">                    return new Result(Status.VERIFIED, strength, Optional.of(cert), work.used);</span>
+<span class="fc" id="L102">            }</span>
+<span class="fc" id="L103">            return new Result(Status.NO_CERTIFICATE, strength, Optional.empty(), work.used);</span>
+<span class="fc" id="L104">        } catch (Stopped stop) {</span>
+<span class="fc" id="L105">            return new Result(stop.status, strength, Optional.empty(), work.used);</span>
+        }
+    }
+
+    /** Prefer higher rank, then earlier pivot columns: reduction modulo a prime can only lose prefix rank. */
+    private static int compareProfiles(Reduction candidate, Reduction retained, Work work) {
+<span class="fc" id="L111">        int rankOrder = Integer.compare(retained.pivots.size(), candidate.pivots.size());</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (rankOrder != 0) return rankOrder;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (int i = 0; i &lt; candidate.pivots.size(); i++) {</span>
+<span class="fc" id="L114">            work.step();</span>
+<span class="fc" id="L115">            int columnOrder = Integer.compare(candidate.pivots.get(i), retained.pivots.get(i));</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (columnOrder != 0) return columnOrder;</span>
+        }
+<span class="fc" id="L118">        return 0;</span>
+    }
+
+    /** Returns false for invalid evidence, cancellation, or insufficient verification resources. */
+    public static boolean verify(ExactMatrix source, Strength strength, Certificate cert, Limits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L124">        Objects.requireNonNull(strength);</span>
+        try {
+<span class="fc" id="L126">            return ModularKernelVerifier.check(source, strength, cert, new Work(limits, cancellation));</span>
+<span class="fc" id="L127">        } catch (Stopped stop) {</span>
+<span class="fc" id="L128">            return false;</span>
+        }
+    }
+
+<span class="fc" id="L132">    private record IntegerRows(BigInteger[][] values, BigInteger[] scales) {</span>
+        boolean usable(BigInteger prime, Work work) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (var scale : scales) {</span>
+<span class="fc" id="L135">                work.step();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (scale.mod(prime).signum() == 0) return false;</span>
+            }
+<span class="fc" id="L138">            return true;</span>
+        }
+
+        long[][] mod(BigInteger prime, Work work) {
+<span class="fc" id="L142">            long[][] out = new long[values.length][values[0].length];</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">            for (int i = 0; i &lt; out.length; i++) for (int j = 0; j &lt; out[i].length; j++) {</span>
+<span class="fc" id="L144">                work.step();</span>
+<span class="fc" id="L145">                out[i][j] = values[i][j].mod(prime).longValueExact();</span>
+            }
+<span class="fc" id="L147">            return out;</span>
+        }
+    }
+
+    private static IntegerRows clear(ExactMatrix a, Work work) {
+<span class="fc" id="L152">        var values = new BigInteger[a.rowCount()][a.columns()];</span>
+<span class="fc" id="L153">        var scales = new BigInteger[a.rowCount()];</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (int i = 0; i &lt; a.rowCount(); i++) {</span>
+<span class="fc" id="L155">            var scale = BigInteger.ONE;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (var x : a.rows().get(i)) {</span>
+<span class="fc" id="L157">                work.step();</span>
+<span class="fc" id="L158">                work.bound(x);</span>
+<span class="fc" id="L159">                var d = x.denominator();</span>
+<span class="fc" id="L160">                scale = work.bound(scale.divide(scale.gcd(d)).multiply(d));</span>
+<span class="fc" id="L161">            }</span>
+<span class="fc" id="L162">            scales[i] = scale;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (int j = 0; j &lt; a.columns(); j++) {</span>
+<span class="fc" id="L164">                work.step();</span>
+<span class="fc" id="L165">                var x = a.get(i,j);</span>
+<span class="fc" id="L166">                values[i][j] = work.bound(scale.divide(x.denominator()).multiply(x.numerator()));</span>
+            }
+        }
+<span class="fc" id="L169">        return new IntegerRows(values, scales);</span>
+    }
+
+<span class="fc" id="L172">    private record Reduction(List&lt;Integer&gt; rows, List&lt;Integer&gt; pivots, List&lt;Integer&gt; free, long[][] matrix) {}</span>
+
+    private static Reduction reduce(long[][] a, int prime, Work work) {
+<span class="fc" id="L175">        int[] origins = new int[a.length];</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int i = 0; i &lt; origins.length; i++) origins[i] = i;</span>
+<span class="fc" id="L177">        var pivots = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L178">        var rows = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L179">        var free = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (int j = 0; j &lt; a[0].length; j++) {</span>
+<span class="fc" id="L181">            work.step();</span>
+<span class="fc" id="L182">            int r = rows.size(), k = r;</span>
+<span class="fc bfc" id="L183" title="All 4 branches covered.">            while (k &lt; a.length &amp;&amp; a[k][j] == 0) { work.step(); k++; }</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (k == a.length) { free.add(j); continue; }</span>
+<span class="fc" id="L185">            long[] swap = a[k];</span>
+<span class="fc" id="L186">            a[k] = a[r];</span>
+<span class="fc" id="L187">            a[r] = swap;</span>
+<span class="fc" id="L188">            int origin = origins[k];</span>
+<span class="fc" id="L189">            origins[k] = origins[r];</span>
+<span class="fc" id="L190">            origins[r] = origin;</span>
+<span class="fc" id="L191">            rows.add(origin);</span>
+<span class="fc" id="L192">            pivots.add(j);</span>
+<span class="fc" id="L193">            long inverse = inverse(a[r][j], prime);</span>
+            // Earlier free columns may be nonzero in other pivot rows, but vanish in this residual row.
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (int col = j; col &lt; a[r].length; col++) {</span>
+<span class="fc" id="L196">                work.step();</span>
+<span class="fc" id="L197">                a[r][col] = a[r][col] * inverse % prime;</span>
+            }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L200">                work.step();</span>
+<span class="fc bfc" id="L201" title="All 4 branches covered.">                if (i == r || a[i][j] == 0) continue;</span>
+<span class="fc" id="L202">                long factor = a[i][j];</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                for (int col = j; col &lt; a[i].length; col++) {</span>
+<span class="fc" id="L204">                    work.step();</span>
+<span class="fc" id="L205">                    a[i][col] = Math.floorMod(a[i][col] - factor * a[r][col], prime);</span>
+                }
+            }
+        }
+<span class="fc" id="L209">        return new Reduction(rows, pivots, free, a);</span>
+    }
+
+    private static ExactMatrix reconstruct(Reduction reduced, BigInteger[][] residues, BigInteger modulus, Work work) {
+<span class="fc" id="L213">        int n = reduced.pivots.size() + reduced.free.size();</span>
+<span class="fc" id="L214">        var bound = modulus.shiftRight(1).sqrt();</span>
+<span class="fc" id="L215">        var rows = new ArrayList&lt;List&lt;Rational&gt;&gt;(n);</span>
+<span class="fc" id="L216">        int pivot = 0;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L218">            var row = new ArrayList&lt;Rational&gt;(n);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L220">                work.step();</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                row.add(i == j ? Rational.ONE : Rational.ZERO);</span>
+            }
+<span class="fc bfc" id="L223" title="All 4 branches covered.">            if (pivot &lt; reduced.pivots.size() &amp;&amp; i == reduced.pivots.get(pivot)) {</span>
+<span class="fc" id="L224">                row.set(i, Rational.ZERO);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                for (int j = 0; j &lt; reduced.free.size(); j++) {</span>
+<span class="fc" id="L226">                    work.step();</span>
+<span class="fc" id="L227">                    var x = reconstruct(residues[pivot][j], modulus, bound, work);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                    if (x == null) return null;</span>
+<span class="fc" id="L229">                    row.set(reduced.free.get(j), x);</span>
+                }
+<span class="fc" id="L231">                pivot++;</span>
+            }
+<span class="fc" id="L233">            rows.add(row);</span>
+        }
+<span class="fc" id="L235">        return new ExactMatrix(rows);</span>
+    }
+
+    /** Balanced rational reconstruction using the extended Euclidean algorithm. */
+    private static Rational reconstruct(BigInteger residue, BigInteger modulus, BigInteger bound, Work work) {
+<span class="fc" id="L240">        var r0 = modulus;</span>
+<span class="fc" id="L241">        var r1 = residue;</span>
+<span class="fc" id="L242">        var t0 = BigInteger.ZERO;</span>
+<span class="fc" id="L243">        var t1 = BigInteger.ONE;</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        while (r1.compareTo(bound) &gt; 0) {</span>
+<span class="fc" id="L245">            work.step();</span>
+<span class="fc" id="L246">            var qr = r0.divideAndRemainder(r1);</span>
+<span class="fc" id="L247">            var t = t0.subtract(qr[0].multiply(t1));</span>
+<span class="fc" id="L248">            r0 = r1;</span>
+<span class="fc" id="L249">            r1 = qr[1];</span>
+<span class="fc" id="L250">            t0 = t1;</span>
+<span class="fc" id="L251">            t1 = t;</span>
+<span class="fc" id="L252">        }</span>
+<span class="pc bpc" id="L253" title="1 of 4 branches missed.">        if (t1.abs().compareTo(bound) &gt; 0 || !t1.gcd(modulus).equals(BigInteger.ONE)</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                || !r1.gcd(t1).equals(BigInteger.ONE)) return null;</span>
+<span class="fc" id="L255">        return new Rational(r1, t1);</span>
+    }
+
+    static long inverse(long a, int prime) {
+<span class="fc" id="L259">        return BigInteger.valueOf(a).modInverse(BigInteger.valueOf(prime)).longValueExact();</span>
+    }
+
+    // The fixed default primes are known. Other caller-provided int moduli are checked exactly.
+    static boolean isPrime(int p, Work work) {
+<span class="fc" id="L264">        work.step();</span>
+<span class="fc bfc" id="L265" title="All 4 branches covered.">        if (p == 2 || DEFAULT_PRIMES.contains(p)) return true;</span>
+<span class="pc bpc" id="L266" title="2 of 4 branches missed.">        if (p &lt; 2 || p % 2 == 0) return false;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int d = 3; (long) d * d &lt;= p; d += 2) {</span>
+<span class="fc" id="L268">            work.step();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            if (p % d == 0) return false;</span>
+        }
+<span class="fc" id="L271">        return true;</span>
+    }
+
+    static final class Work {
+        final Limits limits;
+        final BooleanSupplier cancel;
+<span class="fc" id="L277">        final long started = System.nanoTime();</span>
+        final long timeout;
+        long used;
+
+<span class="fc" id="L281">        Work(Limits limits, BooleanSupplier cancel) {</span>
+<span class="fc" id="L282">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L283">            this.cancel = Objects.requireNonNull(cancel);</span>
+<span class="fc" id="L284">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.effort.timeoutMillis());</span>
+<span class="fc" id="L285">        }</span>
+        void step() {
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">            if (cancel.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Stopped(Status.CANCELLED);</span>
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">            if (used == limits.effort.maximumWork() || System.nanoTime() - started &gt;= timeout) throw new Stopped(Status.LIMIT);</span>
+<span class="fc" id="L289">            used++;</span>
+<span class="fc" id="L290">        }</span>
+        void shape(ExactMatrix a) {
+<span class="fc" id="L292">            step();</span>
+<span class="fc" id="L293">            long m = a.rowCount(), n = a.columns();</span>
+<span class="pc bpc" id="L294" title="2 of 6 branches missed.">            if (m &gt; 4096 || n &gt; 4096 || Math.max(m*n, n*n) &gt; Math.min(limits.effort.maximumTerms(), 1_000_000))</span>
+<span class="fc" id="L295">                throw new Stopped(Status.LIMIT);</span>
+<span class="fc" id="L296">        }</span>
+        BigInteger bound(BigInteger x) {
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (x.abs().bitLength() &gt; limits.maximumBits) throw new Stopped(Status.LIMIT);</span>
+<span class="fc" id="L299">            return x;</span>
+        }
+<span class="fc" id="L301">        void bound(Rational x) { bound(x.numerator()); bound(x.denominator()); }</span>
+    }
+
+    private static final class Stopped extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final Status status;
+<span class="fc" id="L307">        Stopped(Status status) { super(null, null, false, false); this.status = status; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
