@@ -352,11 +352,6 @@ jobs:
         with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
-      - name: Install the declared independent SymPy reference
-        run: |
-          python3 -m venv "$RUNNER_TEMP/scalar-reference"
-          "$RUNNER_TEMP/scalar-reference/bin/python" -m pip install --disable-pip-version-check sympy==1.14.0 mpmath==1.3.0
-          echo "REGELSUCHE_SYMPY_PYTHON=$RUNNER_TEMP/scalar-reference/bin/python" >> "$GITHUB_ENV"
       - name: Compare two complete clean source runs with offline OCI content-ID replay
         run: scripts/reproduce-native-scalar-saturation.sh build/scalar-reproduction --with-container
       - name: Retain all canonical outputs and partial logs on failure
