@@ -78,6 +78,22 @@
         <artifactId>maven-clean-plugin</artifactId>
         <executions>
           <execution>
+            <id>delete-stale-coverage-decision</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets><fileset>
+                <directory>${maven.multiModuleProjectDirectory}</directory>
+                <includes>
+                  <include>regelsuche-quality-aggregate/target/reports/coverage</include>
+                  <include>regelsuche-quality-aggregate/target/reports/coverage/**</include>
+                </includes>
+                <followSymlinks>false</followSymlinks>
+              </fileset></filesets>
+            </configuration>
+          </execution>
+          <execution>
             <id>delete-stale-qualified-release-evidence</id>
             <phase>initialize</phase>
             <goals><goal>clean</goal></goals>
@@ -88,8 +104,6 @@
                   <!-- Keep every output component inside the no-follow scan. -->
                   <directory>${maven.multiModuleProjectDirectory}</directory>
                   <includes>
-                    <include>regelsuche-quality-aggregate/target/reports/coverage</include>
-                    <include>regelsuche-quality-aggregate/target/reports/coverage/**</include>
                     <include>regelsuche-quality-aggregate/target/reports/release-readiness-qualified</include>
                     <include>regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**</include>
                   </includes>

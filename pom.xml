@@ -225,7 +225,7 @@
         <artifactId>maven-clean-plugin</artifactId>
         <executions>
           <execution>
-            <id>delete-stale-test-reports</id>
+            <id>delete-stale-coverage-inputs</id>
             <phase>initialize</phase>
             <goals><goal>clean</goal></goals>
             <configuration>
@@ -236,6 +236,16 @@
                   <includes><include>jacoco.exec</include><include>site/jacoco/**</include></includes>
                   <followSymlinks>false</followSymlinks>
                 </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+          <execution>
+            <id>delete-stale-test-reports</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets>
                 <fileset>
                   <directory>${project.build.directory}/surefire-reports</directory>
                   <followSymlinks>false</followSymlinks>
