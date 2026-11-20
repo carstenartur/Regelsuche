@@ -19,7 +19,7 @@ class SympyFactorizationContainerIT {
         Path reports = target.resolve("reports/jmh");
         Files.createDirectories(reports);
         var image = new ImageFromDockerfile()
-            .withFileFromPath("Dockerfile", root.resolve("Dockerfile.sympy-jmh"))
+            .withFileFromPath("Dockerfile", root.resolve("Dockerfile.external-python"))
             .withFileFromPath("requirements.txt", root.resolve("regelsuche-sympy-jmh/requirements.txt"));
         try (var worker = new GenericContainer<>(image)
                 .withCopyFileToContainer(MountableFile.forHostPath(target.resolve(

@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends patchelf=0.14.3
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt /tmp/requirements.txt
 RUN python -m pip install --disable-pip-version-check --no-cache-dir --no-deps --require-hashes -r /tmp/requirements.txt \
-    && python -c "import sympy; assert sympy.__version__ == '1.14.0'" \
     && java -version
 WORKDIR /benchmark
 CMD ["sleep", "infinity"]

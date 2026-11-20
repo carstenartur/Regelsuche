@@ -93,3 +93,5 @@ java --class-path 'lib/*' examples/LinearSolve.java
 Es verwendet den öffentlichen `LinearRepresentationPlanner` und gibt denselben
 versionierten Nachweis aus. Der vorhandene [Java-Discovery-SDK](java-discovery-sdk.md)
 bleibt der Zugang für umfangreichere Entdeckungsaufgaben.
+
+The full Maven lifecycle qualifies a newly built wheel against the packaged ZIP using the pinned CPython/JDK Testcontainers worker. It installs the wheel into a fresh consumer environment without fetching dependencies, runs the offline checker and the installed unit suite, exercises the live packaged Java server, and verifies the Java example output through the installed Python CLI. Reports and the tested wheel are retained under `build/reports/python-client/`.

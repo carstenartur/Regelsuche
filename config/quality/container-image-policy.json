@@ -15,6 +15,10 @@
       "eclipse-temurin:25.0.5_8-jdk-noble",
       "eclipse-temurin:25.0.5_8-jre-noble"
     ],
+    "Dockerfile.external-python": [
+      "eclipse-temurin:25.0.5_8-jdk-noble@sha256:3c35c595580ae3342eb34e5832e8e516ded8e767efa4a5fe61b8644d44847b8e",
+      "python:3.12.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c"
+    ],
     "Dockerfile.proof": [
       "maven:3.10.0-eclipse-temurin-25-noble",
       "eclipse-temurin:25.0.5_8-jre-noble"
@@ -25,10 +29,6 @@
     ],
     "Dockerfile.safe-runtime-qualification": [
       "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
-    ],
-    "Dockerfile.sympy-jmh": [
-      "eclipse-temurin:25.0.5_8-jdk-noble@sha256:3c35c595580ae3342eb34e5832e8e516ded8e767efa4a5fe61b8644d44847b8e",
-      "python:3.12.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c"
     ],
     "Dockerfile.target-free-held-out-reproduction": [
       "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"

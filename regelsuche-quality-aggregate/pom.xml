@@ -52,6 +52,9 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>io.github.carstenartur</groupId>
       <artifactId>regelsuche-quality</artifactId>
       <scope>test</scope>
@@ -152,19 +155,22 @@
         <plugins>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
+            <artifactId>maven-failsafe-plugin</artifactId>
             <executions>
               <execution>
                 <id>verify-installed-python-client</id>
-                <phase>verify</phase>
-                <goals><goal>test</goal></goals>
+                <goals><goal>integration-test</goal><goal>verify</goal></goals>
                 <configuration>
                   <test>de.regelsuche.quality.aggregate.MavenPythonClientDistributionIT</test>
                   <skip>false</skip>
                   <skipTests>false</skipTests>
                   <failIfNoTests>true</failIfNoTests>
                   <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
-                  <forkedProcessTimeoutInSeconds>420</forkedProcessTimeoutInSeconds>
+                  <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+                  <systemPropertyVariables>
+                    <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+                    <regelsuche.distributionVersion>${releaseVersion}</regelsuche.distributionVersion>
+                  </systemPropertyVariables>
                 </configuration>
               </execution>
             </executions>
