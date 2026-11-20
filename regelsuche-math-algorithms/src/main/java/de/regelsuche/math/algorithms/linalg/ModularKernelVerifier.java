@@ -14,6 +14,15 @@ final class ModularKernelVerifier {
 
     static boolean check(ExactMatrix a, Strength strength, Certificate c, Work work) {
         work.shape(a);
+        if (!matchesSource(a, c, work)) return false;
+        boolean[] selected = checkPartition(a, c, work);
+        return selected != null
+            && hasProjectionBlocks(c, work)
+            && invertible(a, c, work)
+            && residualsVanish(a, strength, c, selected, work);
+    }
+
+    private static boolean matchesSource(ExactMatrix a, Certificate c, Work work) {
         int n = a.columns(), m = a.rowCount();
         if (c == null || c.source().columns() != n || c.source().rowCount() != m
                 || c.projection().columns() != n || c.projection().rowCount() != n) return false;
@@ -23,22 +32,38 @@ final class ModularKernelVerifier {
             work.bound(c.source().get(i,j));
             if (!a.get(i,j).equals(c.source().get(i,j))) return false;
         }
-        int r = c.pivots().size();
-        if (r > Math.min(n,m) || c.selectedRows().size() != r || c.freeColumns().size() != n-r) return false;
+        return true;
+    }
+
+    /** Returns the selected-row mask after checking that the pivot and free columns partition all coordinates. */
+    private static boolean[] checkPartition(ExactMatrix a, Certificate c, Work work) {
+        int n = a.columns(), m = a.rowCount(), r = c.pivots().size();
+        if (r > Math.min(n,m) || c.selectedRows().size() != r || c.freeColumns().size() != n-r) return null;
         var selected = new boolean[m];
         var partition = new boolean[n];
         if (!mark(c.selectedRows(), selected, work) || !mark(c.pivots(), partition, work)
-                || !mark(c.freeColumns(), partition, work)) return false;
+                || !mark(c.freeColumns(), partition, work)) return null;
+        return selected;
+    }
+
+    private static boolean hasProjectionBlocks(Certificate c, Work work) {
+        int n = c.projection().columns();
         var free = new boolean[n];
         for (int j : c.freeColumns()) free[j] = true;
         for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) {
             work.step();
             var x = c.projection().get(i,j);
             work.bound(x);
-            if ((!free[j] || free[i]) && !(free[i] && i == j ? x.isOne() : x.isZero())) return false;
+            if (free[j] && !free[i]) continue;
+            boolean identityEntry = free[i] && i == j;
+            if (identityEntry ? !x.isOne() : !x.isZero()) return false;
         }
-        if (!invertible(a, c, work)) return false;
-        for (int i = 0; i < m; i++) {
+        return true;
+    }
+
+    private static boolean residualsVanish(ExactMatrix a, Strength strength, Certificate c,
+            boolean[] selected, Work work) {
+        for (int i = 0; i < a.rowCount(); i++) {
             work.step();
             if (strength == Strength.SUBSTITUTION && !selected[i]) continue;
             for (int j : c.freeColumns()) {
