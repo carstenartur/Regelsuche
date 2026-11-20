@@ -350,6 +350,11 @@ public final class ExprValueArena implements AutoCloseable {
         Object atom = validateSnapshotNode(kind, node.atom(), edges);
         if (ac) edges = canonicalAcEdges(kind, edges);
         var key = new Key(kind, atom, edges);
+        if (kind == Kind.SUB || kind == Kind.DIV) {
+            var operator = kind == Kind.SUB ? BinaryOperator.SUB : BinaryOperator.DIV;
+            if (!key.equals(binaryKey(operator, edges[0], edges[1])))
+                throw new IllegalArgumentException("noncanonical numeric operator");
+        }
         var existing = index.get(key);
         if (existing != null) return existing;
         if (entries.size() == maximumEntries) throw new IllegalArgumentException("snapshot arena capacity");

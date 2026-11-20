@@ -97,6 +97,30 @@ class ExprValueSnapshotTest {
         }
     }
 
+    @Test void digestBoundNumericDivisionCannotBypassCanonicalValueIdentity() {
+        String digest = ExprValueArena.DIGEST_VERSION + ":87b054b4153b7e9a6c7897950db6742d9c370cc8d5c8054e368e37edd7cddcd9";
+        var snapshot = new ExprValueSnapshot.Snapshot(ExprValueSnapshot.VERSION, 2, digest, List.of(
+            new ExprValueSnapshot.Node("NUMBER", "1", List.of()),
+            new ExprValueSnapshot.Node("NUMBER", "2", List.of()),
+            new ExprValueSnapshot.Node("DIV", "", List.of(0, 1))));
+        try (var arena = new ExprValueArena(100)) {
+            arena.intern(new VariableExpr("retained"));
+            int originalSize = arena.size();
+            assertThrows(IllegalArgumentException.class, () -> arena.restore(snapshot, digest, 10_000));
+            assertEquals(originalSize, arena.size());
+            var half = arena.intern(parser.parseTerm("1/2"));
+            assertSame(half, arena.intern(parser.parseTerm("2/4")));
+        }
+    }
+
+    @Test void anUndefinedNumericDivisionKeepsItsOrderedStructure() {
+        try (var source = new ExprValueArena(20); var destination = new ExprValueArena(20)) {
+            var value = source.intern(parser.parseTerm("1/0"));
+            var restored = destination.restore(source.snapshot(value), source.digest(value), 10_000);
+            assertSame(restored, destination.intern(parser.parseTerm("1/0")));
+        }
+    }
+
     @Test void deepSharedDagUsesLinearSnapshotStorage() {
         Expr expression = new VariableExpr("x");
         for (int i = 0; i < 4000; i++) expression = new BinaryExpr(expression, BinaryOperator.POW, expression);

@@ -53,6 +53,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     public BestFirstSearchStrategy(IdentityPolicy identityPolicy, TieOrder tieOrder) {
         this.identityPolicy = Objects.requireNonNull(identityPolicy, "identityPolicy");
         this.tieOrder = Objects.requireNonNull(tieOrder, "tieOrder");
+        if (identityPolicy == IdentityPolicy.CONTINUATION_QUOTIENT_V1 && getClass() != BestFirstSearchStrategy.class)
+            throw new IllegalArgumentException("continuation quotient requires the concrete state-local BestFirst controller");
     }
 
     public record QuotientMetrics(int semanticNodes, int syntaxObservations, int retainedLabels,

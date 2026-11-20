@@ -24,7 +24,10 @@ replay, but do not define the new node key.
 
 Expression-local successor lists are frozen on first use and reused within that
 run. This contract assumes a state-local transformation engine. Hidden mutable
-engine state is not a supported continuation controller. Historical repeated
+engine state is not a supported continuation controller. The quotient rejects
+BestFirst subclasses: their ordering/priority hooks can inspect the complete
+path and need a separately specified finite controller identity. Both historical
+identity policies continue to allow these hooks. Historical repeated
 application identifiers do not prohibit a new legal edge under this policy;
 resource dominance terminates already visited cycles instead. Durable project
 memory remains observational and cannot prune a fresh run.
@@ -80,6 +83,9 @@ Snapshots include exact rational atoms, ordered roles and AC multiplicities.
 Byte decoding checks text, edge and node lengths before allocation. Import
 rejects cycles, forward references, duplicate nodes, unreachable nodes,
 different root bindings and exhausted capacities; rejected imports roll back.
+Numeric SUB/DIV nodes that ordinary interning would fold are rejected even if
+their supplied structural digest is internally consistent. Division by zero
+retains its ordered expression shape and receives no mathematical proof status.
 
 The codec preserves UTF-16 code units exactly. Equivalent AC grouping and
 different arena allocation orders produce the same bytes. A 4,001-node shared

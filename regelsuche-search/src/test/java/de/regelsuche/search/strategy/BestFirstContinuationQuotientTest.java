@@ -11,6 +11,8 @@ import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
+import java.util.function.ToIntFunction;
 import org.junit.jupiter.api.Test;
 
 class BestFirstContinuationQuotientTest {
@@ -153,6 +155,33 @@ class BestFirstContinuationQuotientTest {
         assertEquals(order, arena.tieOrder());
         assertTrue(arena.quotient().arenaStructuralBytes() > 0);
         assertEquals(arena.quotient().arenaEntries(), arena.quotient().digestComputations());
+    }
+
+    @Test void historyDependentSubclassCannotClaimTheStateLocalContinuationPolicy() {
+        TransformationEngine engine = expression -> switch (expression) {
+            case "x" -> List.of(step("left", "a"), step("right", "b"));
+            case "a", "b" -> List.of(step("join-" + expression, "y"));
+            case "y" -> List.of(step("dead1", "d"), step("dead2", "e"), step("finish", "z"));
+            default -> List.of();
+        };
+        var problem = new SearchProblem("x", engine, new ExpressionScorer(), new ExpressionCanonicalizer(),
+            new SearchHeuristic(5, 100, 1, 3, 2, 20));
+        for (var policy : List.of(BestFirstSearchStrategy.IdentityPolicy.APPLICATION_HISTORY_V1,
+                BestFirstSearchStrategy.IdentityPolicy.ARENA_APPLICATION_HISTORY_V1)) {
+            assertTrue(new HistoryOrderedSearch(policy).search(problem).stream().anyMatch(s -> s.expression().equals("z")));
+        }
+        assertThrows(IllegalArgumentException.class, () ->
+            new HistoryOrderedSearch(BestFirstSearchStrategy.IdentityPolicy.CONTINUATION_QUOTIENT_V1));
+    }
+
+    private static final class HistoryOrderedSearch extends BestFirstSearchStrategy {
+        HistoryOrderedSearch(IdentityPolicy policy) { super(policy, TieOrder.SYNTAX_V1); }
+        @Override protected List<Transformation> orderTransformations(SearchProblem problem, SearchState state,
+                List<Transformation> moves, boolean target, ToIntFunction<Transformation> distance) {
+            moves.sort(Comparator.comparing(t -> state.path().contains("b") && t.transformedExpression().equals("z")
+                ? "0" : t.transformedExpression()));
+            return moves;
+        }
     }
 
     private static BestFirstSearchStrategy quotient() {
