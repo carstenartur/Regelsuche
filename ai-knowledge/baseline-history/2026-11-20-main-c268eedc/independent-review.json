@@ -1,0 +1,20 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-independent-review/v1",
+  "decision": "ACCEPT_PREDECESSOR_SNAPSHOT",
+  "reviewer": "Independent Maven authority implementation agent",
+  "sourceRevision": "c268eedc94032b65293d09b4e3d9d6af256b1074",
+  "sourceTree": "8dc43f34aa9af5b06299468f9424933184de0086",
+  "extractorRevision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorTree": "0cb8e41b91c831705f9c86633580181372da6e14",
+  "originalMainRun": 44824761437,
+  "checks": [
+    "Independently queried GitHub: all seven verification authorities, ciCheck and report publication succeeded for main/c268.",
+    "Verified original artifact 14676146384: 29205310 bytes, SHA256 ad0e228e8c4ddc6ba4e0a89f38a5cd89f6a56e00e2c0ab62cff6faddd8dec9d4.",
+    "Read the original ZIP and verified all 290 unique indexed file lengths and SHA256 values. Both accepted CI check.json and complexity.json equal the native measurement bytes.",
+    "Verified the clean original c268 and pinned b409 checkouts, 14 repository and 12 extractor Git-blob bindings, 38 of 38 retained raw tar entries and all 9 original retained-file bindings.",
+    "Proposed baseline equals the complete raw snapshot SHA256 2ce47efd856b26d4f90fdcdcc1a0ef8306dc926b5443d0c363055e4669240756. The unchanged 825210 baseline measured 829570 units and concept radius 114\u2192115, with no violations.",
+    "Original native log: 14 executed tasks, 8 passing coverage controls and 17 passing hotspot checks.",
+    "The preparation helper now rejects an existing history directory, addressing the reviewed repeat-run self-reference bug. The reviewed dataset was generated once and contains no self-reference."
+  ],
+  "scope": "Only the already accepted main snapshot is qualified. Pending feature trees must satisfy their own complete gates; no policy, selector, threshold or exception is relaxed."
+}

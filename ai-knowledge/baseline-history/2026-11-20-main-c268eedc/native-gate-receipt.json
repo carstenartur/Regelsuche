@@ -1,0 +1,42 @@
+{
+  "sourceCheckout": {
+    "revision": "c268eedc94032b65293d09b4e3d9d6af256b1074",
+    "tree": "8dc43f34aa9af5b06299468f9424933184de0086",
+    "status": ""
+  },
+  "extractorCheckout": {
+    "revision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "tree": "0cb8e41b91c831705f9c86633580181372da6e14",
+    "status": ""
+  },
+  "command": [
+    "./gradlew",
+    "--offline",
+    "--no-daemon",
+    "--no-configuration-cache",
+    "--rerun-tasks",
+    "-PuseLocalAiKnowledgeExtractor=true",
+    "-PaiKnowledgeExtractorCheckout=/workspace/scratch/88dfe664ca8e/build-support/ai-knowledge-extractor",
+    "aiKnowledgeCheck"
+  ],
+  "environment": {
+    "AI_KNOWLEDGE_EXTRACTOR_ENABLED": "true",
+    "JAVA_HOME": "/workspace/scratch/88dfe664ca8e/build-support/jdk-25.0.5+8",
+    "GRADLE_USER_HOME": "/workspace/scratch/88dfe664ca8e/build-support/gradle-user-home"
+  },
+  "executionDate": "2026-11-20",
+  "elapsedReportedByGradle": "43s",
+  "exitCode": 0,
+  "sourceAfter": {
+    "revision": "c268eedc94032b65293d09b4e3d9d6af256b1074",
+    "tree": "8dc43f34aa9af5b06299468f9424933184de0086",
+    "status": ""
+  },
+  "extractorAfter": {
+    "revision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "tree": "0cb8e41b91c831705f9c86633580181372da6e14",
+    "status": ""
+  },
+  "logSha256": "3d2694f9ebe2aa2f960b0e3e5c35540aaf320c6f51362a185ec12afba772be0e",
+  "recordingBoundary": "Source checkout was newly created detached at the named commit; tracked cleanliness was confirmed after execution. Wall-clock start/end timestamps were not captured. Log and exit code are retained exactly."
+}
