@@ -172,9 +172,40 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main before the November 20 mathematical integrations (2026-11-20)
+
+The reference is clean main `f10e4c0875e1e76288b2332191bba5b78b2f53dc`, tree
+`e199300eb814dbe2e829ae0128f6746900d05f87`. Its
+[main CI](https://github.com/carstenartur/Regelsuche/actions/runs/44712656489)
+passed all seven verification authorities, `Checkout-local ciCheck` and report
+publication. The original quality-acceptance archive binds all 290 indexed
+files to their lengths and SHA-256 hashes.
+
+A fresh clean checkout passed the complete root `aiKnowledgeCheck` with the
+unchanged pinned v0.1.10 extractor and original 802120-unit baseline: 814350
+context units, an increase of 12230 within the existing 15000 allowance.
+All eight coverage controls and 17 hotspot checks passed. The generated
+`check.json` and `complexity.json` are byte-identical to the accepted CI reports.
+The baseline is a byte-for-byte copy of the complete generated
+[metrics snapshot](../ai-knowledge/baseline-history/2026-11-20-main-f10e4c08/metrics-snapshot.json).
+[Provenance](../ai-knowledge/baseline-history/2026-11-20-main-f10e4c08/provenance.json)
+retains source and extractor identities, the execution receipt, policy hashes,
+the previous baseline and all 39 raw measurement reports. The
+[independent review](../ai-knowledge/baseline-history/2026-11-20-main-f10e4c08/independent-review.md)
+checks this predecessor promotion separately from later feature verification.
+
+The later main `c621a1949d29c391ceb6f1bdb5e79bf6e263ccf1`
+[failed its context trend](https://github.com/carstenartur/Regelsuche/actions/runs/44746311416)
+at 818250 units: an increase of 16130 against the previous reference and 3900
+against the accepted predecessor. Its original
+[rejected trend](../ai-knowledge/baseline-history/2026-11-20-main-f10e4c08/rejected-trend.json)
+is retained and supplies no baseline values. Thresholds, selectors, claims and
+hotspot exceptions are unchanged. Each later checkout still requires its own
+complete quality gates and CI.
+
 ### Accepted main after verified affine observation evaluation (2026-11-16)
 
-The reference is clean main `e1a36d34f6d3652df05b95fc5fd0e8d416b5e301`.
+The previous reference is clean main `e1a36d34f6d3652df05b95fc5fd0e8d416b5e301`.
 All seven verification authorities, the aggregate `Checkout-local ciCheck`
 and report publication passed. The pinned extractor measured 802120 context
 units, up 14940 from 787180 within the unchanged allowance of 15000. The
