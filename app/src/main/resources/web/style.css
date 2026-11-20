@@ -106,6 +106,26 @@ fieldset.field { border: 1px solid #e5e7eb; padding: 0.6rem 0.8rem; border-radiu
 .runtime-assumption-row .field { flex: 1 1 11rem; min-width: 0; margin: 0; }
 .hint { font-size: 0.85rem; color: #6b7280; margin: 0.4rem 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; align-items: center; }
+#formulaTools { margin-bottom: 0.75rem; }
+.formula-display {
+    overflow-x: auto;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid #dbe3ed;
+    border-radius: 6px;
+    background: #f8fafc;
+    font-size: 1.35rem;
+}
+.formula-display:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.formula-display [data-formula-part] { cursor: pointer; }
+.formula-display .is-selected { background: #dbeafe; outline: 2px solid #2563eb; outline-offset: 2px; }
+#formulaPreview details { margin-top: 0.5rem; }
+#formulaPreview code { overflow-wrap: anywhere; }
+#formulaStatus:empty { margin: 0; }
+#formulaEditor { margin-top: 0.65rem; }
+.formula-editor-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.5rem 0.75rem; }
+.formula-editor-fields .field, .formula-editor-fields select, .formula-editor-fields input { min-width: 0; }
+.formula-editor-fields .field { margin-bottom: 0.35rem; }
+#applyFormulaEdit:is(:disabled, [aria-disabled="true"]) { color: #6b7280; cursor: default; background: #f3f4f6; }
 button {
     cursor: pointer;
     padding: 0.45rem 0.85rem;

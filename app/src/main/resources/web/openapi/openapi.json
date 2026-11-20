@@ -1813,7 +1813,7 @@
           }
         }}}},
         "responses": {
-          "200": {"description": "Vom Parser erzeugter AST", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FormulaAstNode"}}}},
+          "200": {"description": "Vom Parser erzeugter AST mit Quellbereichen für konkrete Termvorkommen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FormulaAstNode"}}}},
           "422": {"description": "Parserfehler mit halboffenem UTF-16-Bereich im Originaltext. Fehlende Zeichen haben einen leeren Bereich.", "content": {"application/json": {"schema": {
             "type": "object", "required": ["message", "startInclusive", "endExclusive"],
             "properties": {"message": {"type": "string"}, "startInclusive": {"type": "integer", "minimum": 0}, "endExclusive": {"type": "integer", "minimum": 0}}
@@ -1917,6 +1917,15 @@
         "properties": {
           "kind": {"type": "string", "enum": ["EQUATION", "NUMBER", "VARIABLE", "FUNCTION", "ADD", "SUB", "MUL", "DIV", "POW"]},
           "value": {"type": "string"},
+          "sourceRange": {
+            "type": "object",
+            "description": "Halboffener UTF-16-Bereich im ursprünglichen Wert von expression. Beide Gleichungsseiten verwenden Positionen in der gesamten Eingabe. Der Gleichungsknoten und die synthetische Null des unären Minus haben keinen Quellbereich.",
+            "required": ["startInclusive", "endExclusive"],
+            "properties": {
+              "startInclusive": {"type": "integer", "minimum": 0},
+              "endExclusive": {"type": "integer", "minimum": 1}
+            }
+          },
           "children": {"type": "array", "items": {"$ref": "#/components/schemas/FormulaAstNode"}}
         }
       },

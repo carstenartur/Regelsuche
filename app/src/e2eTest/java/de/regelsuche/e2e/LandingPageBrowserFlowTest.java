@@ -1,5 +1,6 @@
 package de.regelsuche.e2e;
 
+import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,7 +10,9 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.LoadState;
+import de.regelsuche.json.JsonReader;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterAll;
@@ -18,6 +21,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Browser-driven tests for the simplified landing-page UX from PR #16
@@ -218,6 +223,184 @@ class LandingPageBrowserFlowTest {
                 "type", "TERM", "expression", "x".repeat(257))));
         assertEquals(400, tooLong.status());
         assertTrue(tooLong.text().contains("256"));
+    }
+
+    @Test
+    void editsTheSecondRenderedOccurrenceWithTheKeyboardAndSubmitsTheExactSource() {
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        page.locator("#searchForm select[name='type']").selectOption("EQUATION");
+        page.locator("#searchForm select[name='profile']").selectOption("FAST_SIMPLIFY");
+        input.fill("f(x, x) = -(0.50)^2");
+        page.locator("#previewFormula").click();
+
+        var part = page.getByLabel("Teilausdruck wählen");
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        assertThat(part).isVisible();
+        part.press("ArrowDown");
+        part.press("ArrowDown");
+        part.press("ArrowDown");
+        assertEquals("5:6", part.inputValue());
+        assertEquals("x", replacement.inputValue());
+        assertTrue(page.locator("math [data-formula-part='5:6'].is-selected").isVisible());
+
+        replacement.fill("y + 1");
+        replacement.press("Enter");
+        var ast = page.locator("#formulaPreview code");
+        String expected = "f(x, (y + 1)) = -(0.50)^2";
+        assertThat(input).hasValue(expected);
+        assertEquals("EQUATION(f(x, ADD(y, 1)), SUB(0, POW(1/2, 2)))", ast.textContent());
+        var response = page.waitForResponse("**/api/search",
+            () -> page.locator("#searchForm button[type='submit']").click());
+        assertEquals(200, response.status());
+        var payload = new JsonReader(response.request().postData()).readObject();
+        assertEquals(expected, payload.get("expression"));
+        assertEquals("EQUATION", payload.get("type"));
+        assertEquals(expected, new JsonReader(response.text()).readObject().get("expression"));
+    }
+
+    @Test
+    void selectsInMathMlAndRejectsInvalidOrMultiPartReplacement() {
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        input.fill("f(x, x)");
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='5:6']").click();
+        assertEquals("5:6", page.getByLabel("Teilausdruck wählen").inputValue());
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        assertThat(replacement).isFocused();
+        var apply = page.getByRole(AriaRole.BUTTON,
+            new Page.GetByRoleOptions().setName("Änderung prüfen und übernehmen"));
+        var status = page.locator("#formulaStatus");
+
+        replacement.fill("y +");
+        apply.click();
+        assertThat(status).containsText("Änderung nicht übernommen");
+        assertThat(input).hasValue("f(x, x)");
+        assertThat(page.locator("#formulaPreview code")).hasText("f(x, x)");
+        replacement.fill("y), (z");
+        apply.click();
+        assertThat(status).containsText("einen einzelnen Teilausdruck");
+        assertThat(input).hasValue("f(x, x)");
+        replacement.fill("y)+z+(w");
+        apply.click();
+        // The surrounding parentheses can balance an invalid draft inside a function argument.
+        assertThat(status).containsText("Änderung nicht übernommen");
+        assertThat(input).hasValue("f(x, x)");
+
+        input.fill("2 * (0.50 + x)");
+        assertFalse(replacement.isVisible());
+        assertEquals(0, page.locator("#formulaPreview math").count());
+        page.locator("#previewFormula").click();
+        assertThat(page.locator("#formulaPreview code")).hasText("MUL(2, ADD(1/2, x))");
+        page.locator("math [data-formula-part='0:1']").click();
+        replacement.fill("a + b");
+        apply.click();
+        assertThat(input).hasValue("(a + b) * (0.50 + x)");
+        assertThat(page.locator("#formulaPreview code")).hasText("MUL(ADD(a, b), ADD(1/2, x))");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"source", "type", "profile", "draft"})
+    void pendingVisualEditCannotOverwriteANewerContext(String change) {
+        var input = page.locator("#searchForm input[name='expression']");
+        var inputType = page.locator("#searchForm select[name='type']");
+        var profile = page.locator("#runtimeProfile");
+        page.locator("#formulaTools summary").click();
+        input.fill("f(x, x)");
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='5:6']").click();
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        replacement.fill("y");
+        // Hold the actual server response after it has been delivered to fetch.
+        page.evaluate("""
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async (...args) => {
+                const response = await originalFetch(...args);
+                if (args[0] === '/api/inspect/formula' && JSON.parse(args[1].body).expression === 'f(x, (y))') {
+                    await new Promise(resolve => { window.releaseVisualEdit = resolve; });
+                }
+                return response;
+            };
+            """);
+        replacement.press("Enter");
+        page.waitForFunction("() => typeof window.releaseVisualEdit === 'function'");
+        switch (change) {
+            case "source" -> input.fill("z^2");
+            case "type" -> {
+                inputType.selectOption("EQUATION");
+                inputType.selectOption("TERM");
+            }
+            case "profile" -> {
+                profile.selectOption("DIRECT_V1");
+                assertFalse(page.locator("#formulaTools").isVisible());
+                profile.selectOption("");
+            }
+            case "draft" -> replacement.fill("new_draft");
+            default -> throw new AssertionError(change);
+        }
+        page.evaluate("""
+            async () => {
+                window.releaseVisualEdit();
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            }
+            """);
+        assertThat(input).hasValue(change.equals("source") ? "z^2" : "f(x, x)");
+        if (change.equals("draft")) {
+            assertThat(replacement).hasValue("new_draft");
+            assertThat(page.locator("#formulaPreview math")).isVisible();
+        } else {
+            assertFalse(replacement.isVisible());
+            assertEquals(0, page.locator("#formulaPreview math").count());
+        }
+        assertEquals("", page.locator("#formulaStatus").textContent());
+    }
+
+    @Test
+    void longFormulaScrollsWithinThePreviewOnANarrowViewport() {
+        page.setViewportSize(390, 844);
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        String source = "f(" + "long_variable_name,".repeat(12) + "x)";
+        input.fill(source);
+        page.locator("#previewFormula").click();
+        var part = page.getByLabel("Teilausdruck wählen");
+        assertThat(part).isVisible();
+        assertTrue((boolean) page.locator(".formula-display").evaluate("el => el.scrollWidth > el.clientWidth"));
+        assertTrue((boolean) page.evaluate("() => document.documentElement.scrollWidth === window.innerWidth"));
+        part.press("End");
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        assertThat(replacement).hasValue("x");
+        replacement.fill("z".repeat(32));
+        replacement.press("Enter");
+        assertThat(page.locator("#formulaStatus")).containsText("256 Zeichen");
+        assertThat(input).hasValue(source);
+        replacement.fill("0.50");
+        replacement.press("Enter");
+        assertThat(input).hasValue(source.substring(0, source.length() - 2) + "(0.50))");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1140, 390})
+    void editsTheSophieGermainSummandInThePreview(int width) throws IOException {
+        page.setViewportSize(width, width == 390 ? 844 : 900);
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        input.fill("x^4 + 4*y^4");
+        page.locator("#previewFormula").click();
+        var product = page.locator("math [data-formula-part='6:11']");
+        product.getByText("*", new com.microsoft.playwright.Locator.GetByTextOptions().setExact(true)).click();
+        assertThat(product).hasClass("is-selected");
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        assertThat(replacement).hasValue("4*y^4");
+        replacement.fill("4*(y^2)^2");
+        String file = width == 390 ? "visual-formula-edit-mobile.png" : "visual-formula-edit.png";
+        DocumentationScreenshots.capture(page, page.locator("#formulaInputArea"), file,
+            "Select and edit the second summand of the Sophie-Germain input in the typeset preview",
+            "x^4 + 4*y^4; selected 4*y^4; draft 4*(y^2)^2");
+        replacement.press("Enter");
+        assertThat(input).hasValue("x^4 + (4*(y^2)^2)");
+        assertThat(page.locator("#formulaPreview code")).hasText("ADD(POW(x, 4), MUL(4, POW(POW(y, 2), 2)))");
     }
 
     @Test

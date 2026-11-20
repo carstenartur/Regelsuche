@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.json.JsonReader;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.proof.ProofBridge;
@@ -25,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -258,6 +260,40 @@ class WebWorkbenchServerTest {
             stream.write("{\"expression\":\"\"}".getBytes(StandardCharsets.UTF_8));
         }
         assertEquals(400, connection.getResponseCode());
+    }
+
+    @Test
+    void formulaInspectionReturnsOriginalOccurrenceRangesForBothEquationSides() throws IOException {
+        var connection = open("/api/inspect/formula");
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setRequestProperty("Content-Type", "application/json");
+        try (var stream = connection.getOutputStream()) {
+            stream.write("""
+                {"expression":"  f(x, x) = -(0.50)^2  ","type":"EQUATION"}
+                """.getBytes(StandardCharsets.UTF_8));
+        }
+        assertEquals(200, connection.getResponseCode());
+        var root = new JsonReader(new String(connection.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+            .readObject();
+        assertEquals("EQUATION", root.get("kind"));
+        assertFalse(root.containsKey("sourceRange"), "the equation wrapper is not a term occurrence");
+        var function = childOf(root, 0);
+        var minus = childOf(root, 1);
+        assertEquals(Map.of("startInclusive", 2, "endExclusive", 9), function.get("sourceRange"));
+        assertEquals(Map.of("startInclusive", 4, "endExclusive", 5), childOf(function, 0).get("sourceRange"));
+        assertEquals(Map.of("startInclusive", 7, "endExclusive", 8), childOf(function, 1).get("sourceRange"));
+        assertEquals(Map.of("startInclusive", 12, "endExclusive", 21), minus.get("sourceRange"));
+        assertEquals("0", childOf(minus, 0).get("value"));
+        assertFalse(childOf(minus, 0).containsKey("sourceRange"), "synthetic unary zero has no source");
+        var base = childOf(childOf(minus, 1), 0);
+        assertEquals("1/2", base.get("value"));
+        assertEquals(Map.of("startInclusive", 13, "endExclusive", 19), base.get("sourceRange"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> childOf(Map<String, Object> node, int index) {
+        return ((List<Map<String, Object>>) node.get("children")).get(index);
     }
 
     @Test

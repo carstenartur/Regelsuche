@@ -79,8 +79,11 @@ public class ExpressionParser implements RetainedGraph.View {
      * exact {@link NumberExpr} values.
      */
     public ExactParsedTerm parseExactTerm(String term) {
-        String source = Objects.requireNonNull(term, "term");
-        Cursor cursor = Cursor.exact(source);
+        return parseExactTerm(Objects.requireNonNull(term, "term"), 0);
+    }
+
+    private ExactParsedTerm parseExactTerm(String source, int offset) {
+        Cursor cursor = new Cursor(source, true, offset);
         Expr expr = parseExpression(cursor);
         requireEnd(cursor);
         return new ExactParsedTerm(
@@ -102,6 +105,22 @@ public class ExpressionParser implements RetainedGraph.View {
     }
 
     private Equation parseEquation(String equation, int offset) {
+        int separator = requireEquationSeparator(equation, offset);
+        return new Equation(parseTerm(equation.substring(0, separator), offset),
+            parseTerm(equation.substring(separator + 1), offset + separator + 1));
+    }
+
+    /** Parses one equation and retains source ranges in the original equation text. */
+    public ExactParsedEquation parseExactEquation(String equation) {
+        int separator = requireEquationSeparator(equation, 0);
+        int rightStart = separator + 1;
+        return new ExactParsedEquation(
+            parseExactTerm(equation.substring(0, separator), 0),
+            parseExactTerm(equation.substring(rightStart), rightStart),
+            rightStart);
+    }
+
+    private static int requireEquationSeparator(String equation, int offset) {
         int separator = equation.indexOf('=');
         if (separator <= 0 || separator == equation.length() - 1) {
             int missing = separator == 0 ? offset : offset + equation.length();
@@ -111,8 +130,7 @@ public class ExpressionParser implements RetainedGraph.View {
         if (extra >= 0) {
             throw new Diagnostic("Equation must contain exactly one '='", offset + extra, offset + extra + 1, null);
         }
-        return new Equation(parseTerm(equation.substring(0, separator), offset),
-            parseTerm(equation.substring(separator + 1), offset + separator + 1));
+        return separator;
     }
 
     /** Parser-issued half-open UTF-16 interval in the original input. End-of-input is an empty interval. */
@@ -350,10 +368,6 @@ public class ExpressionParser implements RetainedGraph.View {
                 ? new IdentityHashMap<>()
                 : null;
             this.position = 0;
-        }
-
-        private static Cursor exact(String value) {
-            return new Cursor(value, true, 0);
         }
 
         private Diagnostic atCurrent(String message) {
