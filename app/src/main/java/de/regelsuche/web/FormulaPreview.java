@@ -1,17 +1,19 @@
 package de.regelsuche.web;
 
 import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputType;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExactParsedTerm.SourceRange;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 
-/** Read-only view of the AST produced by the ordinary Workbench input parser. */
+/** AST and source occurrences produced by the ordinary Workbench input parser. */
 final class FormulaPreview {
     static final int MAX_SOURCE_LENGTH = 256;
 
@@ -23,23 +25,43 @@ final class FormulaPreview {
         var parser = new ExpressionParser();
         var result = new JsonWriter().beginObject();
         if (inputType == InputType.EQUATION) {
-            Equation equation = parser.parseEquation(source);
-            node(result, "EQUATION", "=", List.of(equation.left(), equation.right()));
-        } else write(result, parser.parseTerm(source));
+            var parsed = parser.parseExactEquation(source);
+            var equation = parsed.equation();
+            result.property("kind", "EQUATION").property("value", "=");
+            writeChildren(result, List.of(equation.left(), equation.right()), parsed::sourceRangeFor);
+        } else {
+            var parsed = parser.parseExactTerm(source);
+            write(result, parsed.expression(), parsed::sourceRangeFor);
+        }
         return result.endObject().toString();
     }
 
-    private static void write(JsonWriter writer, Expr expression) {
-        switch (expression) {
-            case NumberExpr n -> node(writer, "NUMBER", n.value().canonicalText(), List.of());
-            case VariableExpr v -> node(writer, "VARIABLE", v.name(), List.of());
-            case FunctionExpr f -> node(writer, "FUNCTION", f.name(), f.arguments());
-            case BinaryExpr b -> node(writer, b.operator().name(), b.operator().symbol(), List.of(b.left(), b.right()));
-        }
+    private static void write(JsonWriter writer, Expr expression, Function<Expr, Optional<SourceRange>> ranges) {
+        List<Expr> children = switch (expression) {
+            case NumberExpr n -> {
+                writer.property("kind", "NUMBER").property("value", n.value().canonicalText());
+                yield List.of();
+            }
+            case VariableExpr v -> {
+                writer.property("kind", "VARIABLE").property("value", v.name());
+                yield List.of();
+            }
+            case FunctionExpr f -> {
+                writer.property("kind", "FUNCTION").property("value", f.name());
+                yield f.arguments();
+            }
+            case BinaryExpr b -> {
+                writer.property("kind", b.operator().name()).property("value", b.operator().symbol());
+                yield List.of(b.left(), b.right());
+            }
+        };
+        ranges.apply(expression).ifPresent(range -> writer.object("sourceRange", source -> source
+            .property("startInclusive", range.startInclusive())
+            .property("endExclusive", range.endExclusive())));
+        writeChildren(writer, children, ranges);
     }
 
-    private static void node(JsonWriter writer, String kind, String value, List<Expr> children) {
-        writer.property("kind", kind).property("value", value)
-            .array("children", list -> children.forEach(child -> list.objectValue(item -> write(item, child))));
+    private static void writeChildren(JsonWriter writer, List<Expr> children, Function<Expr, Optional<SourceRange>> ranges) {
+        writer.array("children", list -> children.forEach(child -> list.objectValue(item -> write(item, child, ranges))));
     }
 }

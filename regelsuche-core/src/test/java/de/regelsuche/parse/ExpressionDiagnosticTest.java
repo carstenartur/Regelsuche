@@ -33,6 +33,20 @@ class ExpressionDiagnosticTest {
         assertEquals(4, exact.endExclusive());
     }
 
+    @Test void exactEquationsKeepTheOrdinaryAstAndDiagnosticPositions() {
+        String equation = "  f(x, x) = -(0.50)^2  ";
+        var exact = parser.parseExactEquation(equation);
+        assertEquals(parser.parseEquation(equation), exact.equation());
+        assertEquals("-(0.50)^2", exact.sourceRangeFor(exact.equation().right()).orElseThrow().textFrom(equation));
+        for (String invalid : new String[] {"  α = 2💡 + β", "= 2", "x =   ", "x + 3", "x = 2 = 3"}) {
+            var ordinaryError = assertThrows(ExpressionParser.Diagnostic.class, () -> parser.parseEquation(invalid));
+            var exactError = assertThrows(ExpressionParser.Diagnostic.class, () -> parser.parseExactEquation(invalid));
+            assertEquals(ordinaryError.getMessage(), exactError.getMessage(), invalid);
+            assertEquals(ordinaryError.startInclusive(), exactError.startInclusive(), invalid);
+            assertEquals(ordinaryError.endExclusive(), exactError.endExclusive(), invalid);
+        }
+    }
+
     private void check(InputType type, String text, int start, int end) {
         var error = assertThrows(ExpressionParser.Diagnostic.class, () -> parser.parse(new InputRequest(type, text)));
         assertEquals(start, error.startInclusive(), text);
