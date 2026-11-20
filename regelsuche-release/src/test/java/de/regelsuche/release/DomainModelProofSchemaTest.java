@@ -25,6 +25,21 @@ class DomainModelProofSchemaTest {
     private final JsonMapper json = new JsonMapper();
     private int exports;
 
+    @Test void snapshotSchemaChecksIndependentGatesAcrossDomains() throws Exception {
+        var schema = registry().getSchema(SchemaLocation.of("urn:regelsuche:domain-snapshot-assessment:v1"));
+        for (var workspace : List.of(differences("observed=1,4,9,16;holdout=25,36"),
+                differences("observed=1,4,9,16;holdout=26"),
+                workspace(new ExpressionRewriteDiscoveryDomain("x"), "x + 0"))) {
+            var report = (ObjectNode) json.readTree(DomainSnapshotAssessment.assess(workspace).toCanonicalJson());
+            assertTrue(schema.validate(report).isEmpty(), () -> schema.validate(report).toString());
+            for (String gate : List.of("externalNovelty", "promotion", "publicEvidence")) {
+                var forged = report.deepCopy();
+                ((ObjectNode) forged.path(gate)).put("status", "APPROVED");
+                assertFalse(schema.validate(forged).isEmpty(), gate);
+            }
+        }
+    }
+
     @Test void schemaAcceptsActualProofsForBothDomainsAndEverySupportedDimension() throws Exception {
         var schema = registry().getSchema(SchemaLocation.of("urn:regelsuche:domain-model-proof:v1"));
         var sources = List.of(
@@ -177,7 +192,7 @@ class DomainModelProofSchemaTest {
         while (root != null && !Files.isDirectory(root.resolve("docs/schemas"))) root = root.getParent();
         assertNotNull(root, "checkout schema directory");
         var schemas = new LinkedHashMap<String, String>();
-        for (String name : List.of("finite-data-check", "downstream-validation", "model-proof")) {
+        for (String name : List.of("finite-data-check", "downstream-validation", "model-proof", "snapshot-assessment")) {
             Path path = root.resolve("docs/schemas/regelsuche-domain-" + name + "-v1.schema.json");
             assertTrue(Files.isRegularFile(path), "missing published schema: " + path);
             String schema = Files.readString(path);

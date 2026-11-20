@@ -42,6 +42,11 @@ public final class DomainDiscoveryRunner {
         DiscoverySeed seed,
         DiscoveryBudget budget
     ) {
+        return run(campaignId, domain, seed, budget, (candidate, attempt) -> { });
+    }
+
+    <S,C,K> RunResult<C,K> run(String campaignId, DiscoveryDomain<S,C,K> domain, DiscoverySeed seed,
+            DiscoveryBudget budget, java.util.function.BiConsumer<C, CandidateAttempt> observer) {
         DomainCanonical.requireIdentifier(campaignId, "campaignId");
         Objects.requireNonNull(domain, "domain");
         Objects.requireNonNull(seed, "seed");
@@ -51,7 +56,7 @@ public final class DomainDiscoveryRunner {
                 "seed domain " + seed.domainId()
                     + " does not match " + domain.domainId());
         }
-        return new Execution<>(campaignId, domain, seed, budget).execute();
+        return new Execution<>(campaignId, domain, seed, budget, observer).execute();
     }
 
     public record RunResult<C, K>(
@@ -76,6 +81,7 @@ public final class DomainDiscoveryRunner {
         private final DiscoverySeed seed;
         private final DiscoveryBudget budget;
         private final DiscoveryDomainDescriptor descriptor;
+        private final java.util.function.BiConsumer<C, CandidateAttempt> observer;
         private final PriorityQueue<Node<S>> frontier;
         private final Set<String> visitedStates = new HashSet<>();
         private final Set<String> attemptedCandidates = new HashSet<>();
@@ -107,8 +113,10 @@ public final class DomainDiscoveryRunner {
             String campaignId,
             DiscoveryDomain<S, C, K> domain,
             DiscoverySeed seed,
-            DiscoveryBudget budget
+            DiscoveryBudget budget,
+            java.util.function.BiConsumer<C, CandidateAttempt> observer
         ) {
+            this.observer = observer;
             this.campaignId = campaignId;
             this.domain = domain;
             this.seed = seed;
@@ -218,7 +226,9 @@ public final class DomainDiscoveryRunner {
                 case NONE_FOUND -> evaluateAfterCounterexamples(
                     candidate, candidateHash, counterexample);
             };
-            candidateAttempts.add(result.toEvidence(candidateAttempts.size() + 1));
+            var row = result.toEvidence(candidateAttempts.size() + 1);
+            candidateAttempts.add(row);
+            observer.accept(candidate, row);
             if (result.disposition() == AttemptDisposition.CONFIRMED) {
                 selectedCandidate = candidate;
                 selectedCandidateHash = candidateHash;

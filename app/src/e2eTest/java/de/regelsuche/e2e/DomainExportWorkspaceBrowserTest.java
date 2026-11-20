@@ -109,6 +109,15 @@ class DomainExportWorkspaceBrowserTest {
         page.navigate(url("/discovery-domains.html"));
         page.locator("#importDomainExport").setInputFiles(files);
         waitFor(firstId);
+        var assessment = page.locator("#assessDomainExport");
+        assertEquals(1, assessment.count());
+        assessment.focus();
+        page.keyboard().press("Enter");
+        page.waitForFunction("document.querySelector('#domainAssessmentStatus')?.dataset.status === 'PROVED_POLYNOMIAL_IDENTITY'");
+        var report = page.locator("#domainAssessmentResult");
+        assertTrue(report.textContent().contains("POST_FREEZE_REVIEW_REQUIRED"));
+        assertTrue(report.textContent().contains("MAX_DEPTH_ZERO"));
+        assertTrue(page.locator("#downloadDomainAssessment").isVisible());
         String detail = page.locator("#retainedDomainExportDetail").textContent();
         assertTrue(detail.contains("Formel und Umschreibungsnachweis"), detail);
         assertTrue(detail.contains("expectedTarget"), detail);

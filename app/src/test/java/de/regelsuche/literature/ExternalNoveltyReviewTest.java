@@ -61,6 +61,74 @@ class ExternalNoveltyReviewTest {
         assertThrows(IllegalArgumentException.class,()->review.evaluate(review.freeze(other),review.catalogueRoot(catalog),
             p,new Intake(review.packetRoot(p),List.of()),List.of()));
     }
+    @Test void domainReviewRequiresTheExactFrozenEquationAndDomainEvidence(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        var domain = new de.regelsuche.discovery.domain.ExpressionRewriteDiscoveryDomain("x");
+        var evidence = new de.regelsuche.discovery.domain.DomainDiscoveryRunner().run("review", domain,
+            de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed.create("seed", domain.domainId(), "x + 0", "fixture"),
+            new de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget(2, 16, 32, 8, 8, 32)).evidence();
+        new de.regelsuche.discovery.domain.DomainDiscoveryExport().write(directory.resolve("source"), evidence);
+        var workspace = de.regelsuche.discovery.domain.DomainExportWorkspace.fromVerified(
+            new de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier().requireVerified(directory.resolve("source")));
+        var baseline = DomainSnapshotNoveltyReview.subject(workspace);
+        assertEquals("x + 0 = x", baseline.equation());
+        var frozen = new Plan(baseline.subject(), baseline.equation(), baseline.assumptions(), baseline.formationEvidenceRoot(),
+            hash("5"), Disclosure.POST_FREEZE_ONLY, "2026-11-01T12:00:00Z");
+        var packet = noHitPacket(frozen);
+        var first = signer("6"); var second = signer("7");
+        var roster = List.of(first.eligible(), second.eligible());
+        var intake = new Intake(review.packetRoot(packet), List.of(sign(packet,first,Vote.SUPPORT_SCOPED_NOVELTY),
+            sign(packet,second,Vote.SUPPORT_SCOPED_NOVELTY)));
+        var verified = review.evaluate(review.freeze(frozen),review.catalogueRoot(catalog),packet,intake,roster);
+        var receipt = DomainSnapshotNoveltyReview.verify(workspace,review.freeze(frozen),review.catalogueRoot(catalog),roster,review.encode(verified));
+        assertEquals(Decision.EXTERNALLY_NOVEL_CONFIRMED,receipt.decision());
+        assertEquals(evidence.contentHash(),receipt.subject().artifactHash());
+        assertEquals("NOT_EVALUATED",receipt.publicEvidenceStatus());
+        var mapper = new com.fasterxml.jackson.databind.json.JsonMapper();
+        var trusted = directory.resolve("roster.json");
+        var artifact = directory.resolve("submitted-review.json");
+        mapper.writeValue(trusted.toFile(),roster);
+        java.nio.file.Files.write(artifact,review.encode(verified));
+        var output = new java.io.ByteArrayOutputStream();
+        var router = new de.regelsuche.cli.CliRouter(new java.io.PrintStream(output),null,null,null,false);
+        String export = directory.resolve("source").toString();
+        assertEquals(0,router.run(new String[]{"domains","review-subject",export}));
+        assertEquals(baseline.equation(),mapper.readTree(output.toByteArray()).required("equation").textValue());
+        output.reset();
+        assertEquals(0,router.run(new String[]{"domains","verify-review",export,review.freeze(frozen),
+            review.catalogueRoot(catalog),trusted.toString(),artifact.toString()}));
+        assertEquals("EXTERNALLY_NOVEL_CONFIRMED",mapper.readTree(output.toByteArray()).required("decision").textValue());
+        for (var shifted : List.of(
+                new Plan(frozen.subject(),"x = x",frozen.assumptions(),frozen.formationEvidenceRoot(),frozen.exposureLedgerRoot(),
+                    frozen.formationAccess(),frozen.frozenAt()),
+                new Plan(frozen.subject(),frozen.equation(),List.of("different domain"),frozen.formationEvidenceRoot(),
+                    frozen.exposureLedgerRoot(),frozen.formationAccess(),frozen.frozenAt()),
+                new Plan(frozen.subject(),frozen.equation(),frozen.assumptions(),hash("9"),frozen.exposureLedgerRoot(),
+                    frozen.formationAccess(),frozen.frozenAt()))) {
+            var packetForOtherClaim = noHitPacket(shifted);
+            var signed = new Intake(review.packetRoot(packetForOtherClaim),List.of(
+                sign(packetForOtherClaim,first,Vote.SUPPORT_SCOPED_NOVELTY),sign(packetForOtherClaim,second,Vote.SUPPORT_SCOPED_NOVELTY)));
+            var accepted = review.evaluate(review.freeze(shifted),review.catalogueRoot(catalog),packetForOtherClaim,signed,roster);
+            assertEquals(Decision.EXTERNALLY_NOVEL_CONFIRMED,accepted.outcome().decision());
+            assertThrows(IllegalArgumentException.class, () -> DomainSnapshotNoveltyReview.verify(workspace,review.freeze(shifted),
+                review.catalogueRoot(catalog),roster,review.encode(accepted)));
+        }
+        var other = packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
+        var foreign = decide(other,List.of());
+        assertThrows(IllegalArgumentException.class, () -> DomainSnapshotNoveltyReview.verify(workspace,review.freeze(plan),
+            review.catalogueRoot(catalog),List.of(),review.encode(foreign)));
+    }
+
+    private Packet noHitPacket(Plan frozen) {
+        var forms = NoveltyQueryForms.forEquation(frozen.equation(), frozen.assumptions());
+        var rows = forms.entrySet().stream().map(e -> new Query(0,e.getKey(),e.getValue(),e.getValue(),
+            "2026-11-01T13:00:00Z",0,List.of())).toList();
+        var log = new QueryLog(review.freeze(frozen), review.catalogueRoot(catalog), rows);
+        var assessment = new Assessment(CandidateLiteratureAssessments.COVERAGE_SCHEMA,frozen.subject(),"2026-11-01","synthetic test",
+            List.of(new Scope("fixture","v1",new Coverage(Access.SEARCHED,"fixture",List.of()))),
+            rows.stream().map(Query::expression).distinct().toList(), Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,List.of());
+        return new Packet(frozen,catalog,log,new Dossier(review.logRoot(log),assessment,List.of()));
+    }
+
     @Test void twoEligibleSignaturesAndConservativeOutcomesReplay() throws Exception {
         var p=packet(Status.NO_PRIOR_ART_FOUND_WITHIN_SCOPE,Access.SEARCHED,false,false);
         var a=signer("6");var b=signer("7");var elig=List.of(a.eligible(),b.eligible());
