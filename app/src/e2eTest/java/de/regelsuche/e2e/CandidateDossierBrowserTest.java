@@ -93,9 +93,17 @@ class CandidateDossierBrowserTest {
         assertTrue(detail.textContent().contains("semanticValueOccurrences"));
         assertEquals("EXECUTED", detail.locator("[data-capability-evidence]").getAttribute("data-capability-evidence"));
         assertTrue(detail.locator("[data-capability-evidence]").textContent().contains("rule:sympy.trig.pythagorean"));
-        assertTrue(detail.textContent().contains("UNKNOWN"));
-        assertTrue(detail.textContent().contains("FALSE"));
-        assertTrue(detail.textContent().contains("Konflikt"));
+        // A legend mentioning TRUE/FALSE/CONFLICT is not a real guard
+        // evaluation. This public retained fixture does not carry one.
+        var observedGuard = detail.locator("[data-guard-evidence-status]");
+        assertEquals(1, observedGuard.count());
+        assertEquals("UNKNOWN", observedGuard.getAttribute("data-guard-evidence-status"));
+        assertEquals("NOT_RETAINED", observedGuard.getAttribute("data-guard-evidence-source"));
+        assertTrue(observedGuard.textContent().contains("Keine Guard-Auswertungen"));
+        assertEquals(0, detail.locator("[data-guard-evidence-status='TRUE'], "
+            + "[data-guard-evidence-status='FALSE'], "
+            + "[data-guard-evidence-status='CONFLICT']").count());
+        assertTrue(detail.textContent().contains("Statuslegende: TRUE"));
         assertTrue(detail.textContent().contains("Nicht im Artefakt"));
         assertTrue(page.url().contains("candidate="));
         page.locator("[data-dossier-edge]").first().click();

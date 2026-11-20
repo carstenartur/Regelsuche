@@ -387,6 +387,14 @@
         const guards = section(detail, 'Annahmen und Guard-Evidenz');
         table(guards, [['Deklarierte Run-Annahmen', run.input.assumptions], ['Aufgezeichnete Pfad-Annahmen', candidate.assumptions],
             ['Guard-Auswertung', 'UNKNOWN · ' + missing], ['Erfüllte / widerlegte Annahmen', missing], ['Konfliktstatus', 'UNKNOWN · Keine Guard-Auswertungen gespeichert']]);
+        // The possible statuses in the legend are not observations. Retained
+        // data has no guard-evaluator receipt, so do not infer TRUE/FALSE or
+        // conflict from the candidate's plain assumption strings.
+        const observedGuard = text('p',
+            'Tatsächlicher Guard-Befund für diesen Kandidaten: UNKNOWN · Keine Guard-Auswertungen im gespeicherten Artefakt.',
+            guards);
+        observedGuard.dataset.guardEvidenceStatus = 'UNKNOWN';
+        observedGuard.dataset.guardEvidenceSource = 'NOT_RETAINED';
         text('p', 'Statuslegende: TRUE = erfüllt; FALSE = widerlegt; UNKNOWN = unbelegt; Konflikt = widersprüchliche Belege. Diese Legende ist keine Auswertung.', guards);
 
         const validation = section(detail, 'Validierung und Beweis');
