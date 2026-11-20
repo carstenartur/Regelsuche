@@ -119,7 +119,13 @@ class ResidualPlanComparisonTest {
         while (!reference.state().done()) complete.addAll(reference.advance().proofRoots());
         assertEquals(roots, complete.stream().sorted().toList());
         assertTrue(fast.state().work() < reference.state().work());
-        assertEquals(fast.state().key(), reference.state().key());
+        // Same exact roots can have different export work and authority after different enumeration prefixes.
+        assertNotEquals(fast.state().key(), reference.state().key());
+        var exhausted = ResidualPlanController.open(SOURCE, ResidualPlanController.Mode.DISCOVERY, 7, 1);
+        assertTrue(exhausted.state().done());
+        assertNotEquals(fast.state().key(), exhausted.state().key());
+        assertThrows(IllegalArgumentException.class, () -> exhausted.compileAccepted(roots.getFirst(), 100_000));
+        assertNotNull(fast.compileAccepted(roots.getFirst(), 100_000));
         assertThrows(IllegalStateException.class, fast::advance);
     }
 

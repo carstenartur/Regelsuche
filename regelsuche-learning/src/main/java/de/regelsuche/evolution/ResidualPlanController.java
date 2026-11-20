@@ -36,7 +36,7 @@ public final class ResidualPlanController {
     /** A suspended run of this controller, sharing its native checker and selectors. */
     public static final class Session {
         private record Issued(List<String> effects, long acquisitionWork, int pairCount) { }
-        private final Map<String,Issued> issued = new HashMap<>();
+        private final Map<String,Issued> issued = new TreeMap<>();
         private final String source;
         private final String sourceHash;
         private final int mask;
@@ -70,10 +70,10 @@ public final class ResidualPlanController {
             boolean done = !status.equals("ACTIVE");
             long remaining = budget - work.units();
             // Cache contents are deterministic from the source, mask and enumeration prefix.
-            // Terminal states have no legal controller action. Charges and proof labels remain observable.
-            String future = done ? "terminal" : mask + "|" + cursor.offset() + "|" + remaining
-                + "|" + (pending == null ? "select" : pending.key());
-            return new State(SolverIr.sha256(sourceHash + "|" + future), status, done, work.units(), remaining,
+            // Completed prefixes also determine which proof roots can be compiled and their required work.
+            String continuation = done ? status : cursor.offset() + "|" + (pending == null ? "select" : pending.key());
+            String future = sourceHash + "|" + mask + "|" + remaining + "|" + continuation + "|" + issued;
+            return new State(SolverIr.sha256(future), status, done, work.units(), remaining,
                 controller.preparedGrowth(), pending == null ? 0 : 4);
         }
 

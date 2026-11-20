@@ -53,8 +53,9 @@ compares the entire receipt before constructing a budgeted rewrite program.
 `ResidualPlanController.open(source, mode, mask, budget)` exposes one action at
 a time. A selected pair has four open obligations until the native checker
 returns. The continuation key binds the source, selector, cursor, pending
-pair and remaining work. Equal source states with no future controller action
-share a terminal key. Proof roots and work remain available as observations.
+pair and remaining work. Terminal keys retain each issued proof root and its acquisition
+prefix because those roots remain available for compilation. Keys also bind
+terminal status and remaining budget.
 The length change of the prepared expression and the number of unresolved
 obligations are distinct diagnostics. Reference mode enumerates all pairs.
 Discovery mode applies the supplied structural conjunction. Both call the
