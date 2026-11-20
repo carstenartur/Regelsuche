@@ -50,7 +50,8 @@ public final class FlatAcMatchPlan {
         return new FlatAcMatchPlan(top.operator(), arity, counts);
     }
 
-    public record Result(List<EGraphPatternMatcher.Match> matches, int work, boolean complete) {
+    public record Result(List<EGraphPatternMatcher.Match> matches, int work, boolean complete, int candidateRoots, int nodesScanned, int tupleAttempts, int duplicateBindings) {
+        public Result(List<EGraphPatternMatcher.Match> matches,int work,boolean complete) { this(matches,work,complete,0,0,0,0); }
         public Result { matches = List.copyOf(matches); }
     }
 
@@ -68,7 +69,7 @@ public final class FlatAcMatchPlan {
     private final class Scan {
         private final EGraph graph;
         private final int limit;
-        private int work;
+        private int work, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings;
         private boolean complete = true;
         private final LinkedHashSet<EGraphPatternMatcher.Match> matches = new LinkedHashSet<>();
 
@@ -89,9 +90,11 @@ public final class FlatAcMatchPlan {
         private Result run(java.util.Collection<EClassId> roots) {
             for (var candidate : roots) {
                 if (!spend()) break;
+                candidateRoots++;
                 var root = graph.find(candidate);
                 for (var node : graph.classOrThrow(root).nodes()) {
                     if (!spend()) break;
+                    nodesScanned++;
                     if (!signature.symbol().equals(node.symbol()) || signature.arity() != node.children().size()) continue;
                     var counts = new TreeMap<EClassId, Integer>();
                     for (var child : node.children()) {
@@ -107,18 +110,19 @@ public final class FlatAcMatchPlan {
                 }
                 if (!complete) break;
             }
-            return new Result(List.copyOf(matches), work, complete);
+            return new Result(List.copyOf(matches), work, complete, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings);
         }
 
         private void bind(EClassId root, List<EClassId> ids, int[] remaining,
                           int depth, Map<String, EClassId> bindings) {
             if (depth == slots.size()) {
-                matches.add(new EGraphPatternMatcher.Match(root, bindings));
+                if (!matches.add(new EGraphPatternMatcher.Match(root, bindings))) duplicateBindings++;
                 return;
             }
             var slot = slots.get(depth);
             for (int i = 0; i < ids.size(); i++) {
                 if (!spend()) return;
+                tupleAttempts++;
                 if (remaining[i] < slot.occurrences()) continue;
                 remaining[i] -= slot.occurrences();
                 bindings.put(slot.name(), ids.get(i));

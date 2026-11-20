@@ -38,7 +38,10 @@ final class NativeScalarRules {
         var matched = DOUBLE.matchRoots(run.graph, roots,left);
         work.spend(matched.work(),run.budget.perRuleFuel());
         work.capped |= !matched.complete();
-        work.roots += Math.min(roots.size(),matched.work());
+        work.roots += matched.candidateRoots();
+        work.nodes += matched.nodesScanned();
+        work.tuples += matched.tupleAttempts();
+        work.duplicates += matched.duplicateBindings();
         for (var match : matched.matches()) {
             var subject = match.bindings().get("term");
             var two = run.graph.add(ENode.leaf("num:2"));
@@ -110,7 +113,7 @@ final class NativeScalarRules {
                 work.tuples++;
                 if (!run.graph.find(product.children().get(i)).equals(denominator)) continue;
                 var factor = run.syntax(denominator);
-                var truth = run.facts.get(denominator).nonzero();
+                var truth = run.facts.get(denominator).evaluate(ScalarGuardFacts.Predicate.NONZERO);
                 if (truth != ScalarGuardFacts.Truth.TRUE) {
                     work.rejected++;
                     run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),false));

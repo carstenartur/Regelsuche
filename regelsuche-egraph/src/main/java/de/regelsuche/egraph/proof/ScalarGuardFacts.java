@@ -6,6 +6,7 @@ import java.util.List;
 
 /** Refinement lattice of possible signs and integral sorts over exact rational values; the empty set records contradiction. */
 public record ScalarGuardFacts(int signs, int integral, boolean defined) {
+    public enum Predicate { NONZERO, POSITIVE, NONNEGATIVE, INTEGER, NATURAL, EXACT_RATIONAL, INVERTIBLE }
     public enum Truth { TRUE, FALSE, UNKNOWN, CONFLICT }
     public static final int NEG = 1, ZERO = 2, POS = 4, ALL = 7;
     private static final int INTEGER = 1, FRACTION = 2;
@@ -19,6 +20,18 @@ public record ScalarGuardFacts(int signs, int integral, boolean defined) {
     public Truth nonnegative() { return signQuery(ZERO | POS); }
     public Truth invertible() { return nonzero(); }
     public Truth integer() { return conflict() ? Truth.CONFLICT : !defined ? Truth.UNKNOWN : integral == INTEGER ? Truth.TRUE : integral == FRACTION ? Truth.FALSE : Truth.UNKNOWN; }
+    public Truth evaluate(Predicate predicate) {
+        if (conflict()) return Truth.CONFLICT;
+        return switch (predicate) {
+            case NONZERO, INVERTIBLE -> nonzero();
+            case POSITIVE -> positive();
+            case NONNEGATIVE -> nonnegative();
+            case INTEGER -> integer();
+            case EXACT_RATIONAL -> defined ? Truth.TRUE : Truth.UNKNOWN;
+            case NATURAL -> integer() == Truth.FALSE || nonnegative() == Truth.FALSE ? Truth.FALSE
+                : integer() == Truth.TRUE && nonnegative() == Truth.TRUE ? Truth.TRUE : Truth.UNKNOWN;
+        };
+    }
     private Truth signQuery(int admitted) {
         if (conflict()) return Truth.CONFLICT;
         if (!defined) return Truth.UNKNOWN;
@@ -40,10 +53,10 @@ public record ScalarGuardFacts(int signs, int integral, boolean defined) {
         for (var premise : assumptions) {
             if (!premise.symbols().equals(List.of(symbol))) continue;
             if (premise.equals(Assumption.positive(symbol))) facts = facts.merge(new ScalarGuardFacts(POS,3));
-            else if (premise.equals(Assumption.nonZero(symbol))) facts = facts.merge(new ScalarGuardFacts(NEG|POS,3));
+            else if (premise.equals(Assumption.nonZero(symbol)) || premise.equals(Assumption.invertible(symbol))) facts = facts.merge(new ScalarGuardFacts(NEG|POS,3));
             else if (premise.equals(Assumption.nonNegative(symbol))) facts = facts.merge(new ScalarGuardFacts(ZERO|POS,3));
-            else if (premise.equals(Assumption.natural(symbol))) facts = facts.merge(new ScalarGuardFacts(ZERO|POS,INTEGER));
-            else if (premise.equals(Assumption.integer(symbol))) facts = facts.merge(new ScalarGuardFacts(ALL,INTEGER));
+            else if ((premise.equals(Assumption.natural(symbol)) || premise.equals(Assumption.domainMembership(symbol,"N")))) facts = facts.merge(new ScalarGuardFacts(ZERO|POS,INTEGER));
+            else if ((premise.equals(Assumption.integer(symbol)) || premise.equals(Assumption.domainMembership(symbol,"Z")))) facts = facts.merge(new ScalarGuardFacts(ALL,INTEGER));
             else if (premise.kind() == Assumption.Kind.CUSTOM_PREDICATE) {
                 String statement = premise.expression().replace(" ","");
                 if (statement.equals(symbol+"=0") || statement.equals(symbol+"==0")) facts = facts.merge(new ScalarGuardFacts(ZERO,INTEGER));
