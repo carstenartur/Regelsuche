@@ -37,6 +37,37 @@ class RecurrenceInvariantSynthesisTest {
         check(result.work().consumedWorkUnits() > 0, "all formation and proof work is paid");
     }
 
+    @Test void optInModularKernelFindsTheSameVerifiedLawsAndPaysForTheWork() {
+        var request = new Request(fibonacci(), values(0, 1), 2, BUDGET);
+        var modular = synthesis.solveWithModularKernel(request);
+        equal(Status.COMPLETE, modular.status());
+        equal(synthesis.solve(request).laws().stream().map(law -> law.proposal()).toList(),
+            modular.laws().stream().map(law -> law.proposal()).toList());
+        var exhausted = synthesis.solveWithModularKernel(new Request(fibonacci(), values(0, 1), 2,
+            new Budget(modular.work().consumedWorkUnits() - 1)));
+        equal(Status.BUDGET_INCONCLUSIVE, exhausted.status());
+        check(exhausted.laws().isEmpty(), "incomplete proofs publish no laws");
+    }
+
+    @Test void fallsBackToExactRrefWhenEveryDefaultPrimeDividesASourceDenominator() {
+        var primes = ModularKernel.Limits.defaults(
+            new de.regelsuche.math.algorithms.iteration.IterationLimits(1000, 100, 1000)).primes();
+        BigInteger first = BigInteger.ONE, second = BigInteger.ONE;
+        for (int i = 0; i < primes.size(); i++) {
+            if (i % 2 == 0) first = first.multiply(BigInteger.valueOf(primes.get(i)));
+            else second = second.multiply(BigInteger.valueOf(primes.get(i)));
+        }
+        var diagonal = new Transition(new ExactMatrix(List.of(values(1,0,0),
+            List.of(Rational.ZERO, new Rational(BigInteger.ONE, first), Rational.ZERO),
+            List.of(Rational.ZERO, Rational.ZERO, new Rational(BigInteger.ONE, second)))), new ExactVector(values(0,0,0)));
+        var request = new Request(diagonal, values(1,0,0), 1, BUDGET);
+        var exact = synthesis.solve(request);
+        var modular = synthesis.solveWithModularKernel(request);
+        equal(Status.COMPLETE, modular.status());
+        equal(List.of(new Proposal("x0", Evolution.FIXED)), modular.laws().stream().map(law -> law.proposal()).toList());
+        check(modular.work().consumedWorkUnits() > exact.work().consumedWorkUnits(), "the miss is paid before fallback");
+    }
+
     @Test void transfersToPellAndExactRationalTransitions() {
         var pell = transition(new long[][] {{0, 1}, {1, 2}}, 0, 0);
         var result = synthesis.solve(new Request(pell, values(0, 1), 2, BUDGET));
