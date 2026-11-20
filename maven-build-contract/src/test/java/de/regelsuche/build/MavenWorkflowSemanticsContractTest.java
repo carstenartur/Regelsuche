@@ -112,8 +112,9 @@ class MavenWorkflowSemanticsContractTest {
     );
     private static final Pattern DIRECT_HOST_INTERPRETER = Pattern.compile(
         "(?<![A-Za-z0-9_.-])"
-            + "(?:python(?:3(?:\\.\\d+)?)?|node|npm|npx|perl|ruby"
-            + "|pwsh|powershell)(?=\\s+|$)"
+            + "(?:python(?:3(?:\\.\\d+)?)?|pypy(?:3(?:\\.\\d+)?)?"
+            + "|pip(?:3)?|pipx|uvx?|node|npm|npx|pnpm|yarn|corepack|deno|bun"
+            + "|perl|ruby|pwsh|powershell)(?=\\s+|$)"
     );
 
     // These five folded YAML commands are retained only until their Maven
@@ -286,6 +287,16 @@ class MavenWorkflowSemanticsContractTest {
                 "env python3 -c 'print(1)'",
                 "node scripts/new-check.mjs",
                 "npm test",
+                "pypy3 -B scripts/new-check.py",
+                "uv run python3 scripts/new-check.py",
+                "uvx check-tool",
+                "pip3 install package",
+                "pipx run check-tool",
+                "pnpm test",
+                "yarn test",
+                "corepack pnpm test",
+                "deno test",
+                "bun run scripts/new-check.js",
                 "- run: " + allowed)) {
             assertViolation(
                 workflow + "\n          " + forbidden + "\n",
@@ -325,6 +336,15 @@ class MavenWorkflowSemanticsContractTest {
                 "env python3 -B scripts/undeclared-release.py",
                 "node scripts/undeclared-release.mjs",
                 "npm run release",
+                "pypy3 -B scripts/undeclared-release.py",
+                "uv run python3 scripts/undeclared-release.py",
+                "uvx build-wheel",
+                "pipx run package",
+                "pnpm run release",
+                "yarn release",
+                "corepack pnpm release",
+                "deno run release.ts",
+                "bun run release.ts",
                 "pwsh scripts/undeclared-release.ps1")) {
             String changed = release + "          " + extra + "\n";
             assertTrue(hasCategory(scanPlatformHostRuntimes(
@@ -383,6 +403,21 @@ class MavenWorkflowSemanticsContractTest {
             + "          -B scripts/new-release.py\n";
         assertTrue(hasCategory(scanPlatformHostRuntimes(
             "release.yml", separated), "undeclared-host-runtime"));
+    }
+
+    @Test
+    void foldedYamlCannotHideNewHostRuntimesInEitherWorkflow() {
+        MergeGovernance governance = validGovernance();
+        for (String tool : List.of("pypy3", "uv", "uvx", "pnpm",
+                "yarn", "corepack", "deno", "bun", "pipx")) {
+            String folded = "jobs:\n  verification:\n    steps:\n"
+                + "      - run: >-\n          " + tool
+                + "\n          --version\n";
+            assertViolation(validWorkflow() + "\n" + folded,
+                governance, "undeclared-host-runtime");
+            assertTrue(hasCategory(scanPlatformHostRuntimes(
+                "release.yml", folded), "undeclared-host-runtime"), tool);
+        }
     }
 
     @Test
