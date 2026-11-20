@@ -28,6 +28,21 @@ Jedes Java-Modul besitzt JUnit-5-Tests für seine fachliche Verantwortung. Diese
 Tests sollen schnell, deterministisch und frei von nicht benötigter
 Infrastruktur sein.
 
+Die portablen SymPy-Tests laufen mit
+`mvn -pl regelsuche-math-sympy -am verify`. Das Vollprofil führt die gesamte
+ursprüngliche Suite einschließlich GraalPy-Kaltstart, Timeout-Erholung und
+CPython-Kontrolllauf in einem per Digest fixierten Linux-Container aus.
+
+```bash
+mvn -Pfull -pl regelsuche-math-sympy -am verify
+```
+
+Jede Testklasse erhält eine frische JVM mit JaCoCo-Instrumentierung. Maven
+erhält je Klasse das JUnit-XML und beide Ausgabeströme unter
+`regelsuche-math-sympy/target/reports/sympy-runtime/`. Die JaCoCo-Daten des
+Workers fließen in den regulären Modulbericht unter `target/site/jacoco/` ein.
+Der unabhängige CI-Lauf behält die bisherigen Gradle-Messungen für den Vergleich.
+
 ### Browser-E2E
 
 `:app:e2eTest` startet eine reale lokale Workbench auf einem zufälligen Port und

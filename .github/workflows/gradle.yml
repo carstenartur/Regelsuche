@@ -168,6 +168,18 @@ jobs:
             python3-venv
       - name: Run the complete Gradle SymPy runtime test authority
         run: bash gradle/run-isolated-sympy-runtime-authority.sh
+      - name: Qualify the same complete SymPy suite and coverage in the pinned Maven worker
+        run: mvn --batch-mode --no-transfer-progress -Pfull -pl regelsuche-math-sympy -am verify
+      - name: Retain native SymPy runtime evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: maven-sympy-runtime-verification
+          path: |
+            regelsuche-math-sympy/target/reports/sympy-runtime/**
+            regelsuche-math-sympy/target/site/jacoco/**
+            regelsuche-math-sympy/target/failsafe-reports/**
+          if-no-files-found: error
       - name: Retain isolated SymPy runtime evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -233,10 +245,11 @@ jobs:
           mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
           -Dregelsuche.tests.mavenPages=true verify
       - name: Reproduce full Maven lifecycle from a Git-free source archive
+        id: source_archive
         run: |
           set -euo pipefail
           source_root="$(mktemp -d "${RUNNER_TEMP}/regelsuche-maven-source.XXXXXXXX")"
-          trap 'rm -rf "$source_root"' EXIT
+          echo "root=$source_root" >> "$GITHUB_OUTPUT"
           git archive --format=tar HEAD | tar -xf - -C "$source_root"
           (
             cd "$source_root"
@@ -252,6 +265,17 @@ jobs:
             # real PostgreSQL and Neo4j container suites, and no .git.
             mvn --batch-mode --no-transfer-progress               -pl maven-build-contract               -Dregelsuche.sourceArchiveMode=true               -Dregelsuche.sourceArchiveContainerMode=true               -DfailIfNoTests=true test
           )
+      - name: Retain evidence produced independently inside the Git-free source archive
+        if: ${{ always() && !cancelled() && steps.source_archive.outputs.root != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: git-free-maven-verification
+          path: |
+            ${{ steps.source_archive.outputs.root }}/**/target/surefire-reports/**
+            ${{ steps.source_archive.outputs.root }}/**/target/failsafe-reports/**
+            ${{ steps.source_archive.outputs.root }}/**/target/reports/**
+            ${{ steps.source_archive.outputs.root }}/build/reports/python-client/**
+          if-no-files-found: error
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
