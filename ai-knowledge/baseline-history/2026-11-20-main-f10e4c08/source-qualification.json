@@ -1,0 +1,220 @@
+{
+  "id": 44712656489,
+  "name": "CI",
+  "event": "push",
+  "branch": "main",
+  "sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc",
+  "tree": "e199300eb814dbe2e829ae0128f6746900d05f87",
+  "status": "completed",
+  "conclusion": "success",
+  "attempt": 1,
+  "html_url": "https://github.com/carstenartur/Regelsuche/actions/runs/44712656489",
+  "jobs": [
+    {
+      "id": 136207992329,
+      "name": "Isolated JMH authority",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207992585,
+      "name": "Isolated SymPy runtime authority",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207992608,
+      "name": "Checkout-local Gradle authority",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207992649,
+      "name": "Typed source-only learning comparison",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207992656,
+      "name": "Complete Maven product and Docker authority",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207992690,
+      "name": "External polynomial comparison",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207992741,
+      "name": "Checked Lean and SMT proof authority",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136207994960,
+      "name": "Retained JMH precision study analysis",
+      "conclusion": "skipped",
+      "status": "completed"
+    },
+    {
+      "id": 136207995158,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "conclusion": "skipped",
+      "status": "completed"
+    },
+    {
+      "id": 136207995206,
+      "name": "Retained JMH precision study v2 analysis",
+      "conclusion": "skipped",
+      "status": "completed"
+    },
+    {
+      "id": 136207995469,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "conclusion": "skipped",
+      "status": "completed"
+    },
+    {
+      "id": 136236882855,
+      "name": "Checkout-local ciCheck",
+      "conclusion": "success",
+      "status": "completed"
+    },
+    {
+      "id": 136237373069,
+      "name": "Publish generated reports",
+      "conclusion": "success",
+      "status": "completed"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14622400445,
+      "name": "maven-product-verification",
+      "size_in_bytes": 46988153,
+      "digest": "sha256:70ab58aeb65278f4d05e43616f0dd1f1f602590deaa0154731b82a9b3ba4a42a",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14621363258,
+      "name": "quality-acceptance-evidence",
+      "size_in_bytes": 29205335,
+      "digest": "sha256:f46c71950dfd711affa26ec8bc6e92ffcb17e3735b1a9e501134489aef5b3416",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14620922691,
+      "name": "repository-verification",
+      "size_in_bytes": 656047558,
+      "digest": "sha256:e0efc5033f9bd6935a2c5f98c71b6a84bb078324dc29e3588a2e99ae6211cfbc",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14620884153,
+      "name": "coverage-verification",
+      "size_in_bytes": 17783170,
+      "digest": "sha256:9c5516577e096d4659c114bdfb77524a8b718af3c4a467e50900529eddb661b4",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14618780552,
+      "name": "sympy-runtime-verification",
+      "size_in_bytes": 53596723,
+      "digest": "sha256:10cfa0f0eea69632c0d68f54ba6908102d5e34a198eca8c0549715d9e38c52a6",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14618618949,
+      "name": "jmh-verification",
+      "size_in_bytes": 36132,
+      "digest": "sha256:1d95edc3c2c045d2fdb7a75a6805bbc0a96aef14bd5b073307d95b88e29557ed",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14618476335,
+      "name": "typed-external-polynomial-f10e4c0875e1e76288b2332191bba5b78b2f53dc",
+      "size_in_bytes": 37166496,
+      "digest": "sha256:d6aa6a37cbf000984095cf6033c6b24a7c856f4d6818173439def2ede10770a8",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14618215726,
+      "name": "external-polynomial-comparison-f10e4c0875e1e76288b2332191bba5b78b2f53dc",
+      "size_in_bytes": 496479,
+      "digest": "sha256:d02a15d04b4786c366ec724cd90f74cfb6a92b9e2978e5ce8e7cb7aa1122c2d8",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    },
+    {
+      "id": 14618027937,
+      "name": "checked-proof-evidence-44712656489-1",
+      "size_in_bytes": 46749259,
+      "digest": "sha256:b638c511277068039cd7b1267ab67cdc7b36f38fe5beec2ab1360a823513a766",
+      "expired": false,
+      "workflow_run": {
+        "id": 44712656489,
+        "repository_id": 1243764016,
+        "head_repository_id": 1243764016,
+        "head_branch": "main",
+        "head_sha": "f10e4c0875e1e76288b2332191bba5b78b2f53dc"
+      }
+    }
+  ]
+}

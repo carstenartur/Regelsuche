@@ -1,0 +1,41 @@
+{
+  "sourceBefore": {
+    "revision": "f10e4c0875e1e76288b2332191bba5b78b2f53dc",
+    "tree": "e199300eb814dbe2e829ae0128f6746900d05f87",
+    "status": ""
+  },
+  "extractorBefore": {
+    "revision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "tree": "0cb8e41b91c831705f9c86633580181372da6e14",
+    "status": ""
+  },
+  "command": [
+    "./gradlew",
+    "--no-daemon",
+    "--offline",
+    "--no-configuration-cache",
+    "--rerun-tasks",
+    "-PuseLocalAiKnowledgeExtractor=true",
+    "-PaiKnowledgeExtractorCheckout=/workspace/scratch/88dfe664ca8e/build-support/ai-knowledge-extractor",
+    "aiKnowledgeCheck"
+  ],
+  "environment": {
+    "AI_KNOWLEDGE_EXTRACTOR_ENABLED": "true",
+    "JAVA_HOME": "/workspace/scratch/88dfe664ca8e/build-support/jdk-25.0.5+8",
+    "GRADLE_USER_HOME": "/workspace/scratch/88dfe664ca8e/build-support/gradle-user-home"
+  },
+  "startedAt": "2026-11-20T14:20:13.219599+00:00",
+  "finishedAt": "2026-11-20T14:20:59.346774+00:00",
+  "exitCode": 0,
+  "sourceAfter": {
+    "revision": "f10e4c0875e1e76288b2332191bba5b78b2f53dc",
+    "tree": "e199300eb814dbe2e829ae0128f6746900d05f87",
+    "status": ""
+  },
+  "extractorAfter": {
+    "revision": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "tree": "0cb8e41b91c831705f9c86633580181372da6e14",
+    "status": ""
+  },
+  "logSha256": "88639f6a4db008299e8eb517bb687d2f8968b72799c22cc35bce4bb9f5639966"
+}
