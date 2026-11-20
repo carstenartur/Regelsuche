@@ -852,6 +852,7 @@
     });
 
     $('searchForm').addEventListener('submit', async (event) => {
+        if (event.defaultPrevented) return;
         event.preventDefault();
         markSearchStarted();
         const form = event.target;

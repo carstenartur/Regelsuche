@@ -84,13 +84,16 @@ entscheidet über das retained Ergebnis.
    Unter **Interpretierter Syntaxbaum** siehst du, wie die Suche die Eingabe liest.
 3. Klicke auf den gewünschten Teil der Formel oder wähle ihn mit der Tastatur
    unter **Teilausdruck wählen**. Die Zeichenposition unterscheidet gleiche
-   Vorkommen. Bei einer Gleichung kannst du Teilausdrücke auf beiden Seiten wählen.
+   Vorkommen. Die Textwerkzeuge über der Vorschau verwenden dieselbe Auswahl.
+   Bei einer Gleichung kannst du Teilausdrücke auf beiden Seiten wählen.
 4. Gib unter **Teilausdruck ersetzen** die neue Schreibweise ein und wähle
-   **Änderung prüfen und übernehmen**. Die Workbench prüft die gesamte Formel
-   und setzt bei eingefügten Teilausdrücken Klammern zur Gruppierung. Bei
-   erfolgreicher Prüfung aktualisiert sie **Ausdruck** und die Vorschau.
+   **Änderung prüfen und übernehmen**. Die Workbench prüft den Ersatz und die
+   gesamte Formel. Sie setzt zusätzliche Klammern zur Gruppierung von
+   Teilausdrücken. Am Zeichenlimit kann eine Ersetzung gelingen, wenn die
+   neue Formel auch ohne diese Klammern dieselbe Struktur hat.
+   Bei erfolgreicher Prüfung aktualisiert sie **Ausdruck** und die Vorschau.
    Bei einem Fehler bleibt **Ausdruck** erhalten und du kannst den Ersatz
-   korrigieren.
+   korrigieren. Nach Abschluss der Prüfung kannst du die Suche starten.
 5. Starte die Suche mit dem aktualisierten Ausdruck. Nach einer Änderung im
    Textfeld öffnest du mit **Parser-Vorschau** die aktuelle Formel erneut.
 
