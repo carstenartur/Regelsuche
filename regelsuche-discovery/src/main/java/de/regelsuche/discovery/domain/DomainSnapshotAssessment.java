@@ -68,6 +68,10 @@ public final class DomainSnapshotAssessment {
                 root.put("replayStatus", "REPLAY_MISMATCH").put("actualEvidenceHash", mismatch.actual().contentHash());
             }
         }
+        var handoff = DiscoveryLifecycleHandoff.from(workspace.evidence());
+        gate(root, "lifecycle").put("status", lifecycle(reproduced, validation, proof))
+            .put("fromHandoffHash", handoff.contentHash()).put("sourceStage", handoff.stage().name())
+            .put("sourceDisposition", handoff.disposition().name());
         gate(root, "release").put("status", reproduced ? "REPRODUCIBLE_RESEARCH_RECORD" : "BLOCKED")
             .put("scope", "Retained source, resource comparison and delimited checker findings");
         boolean selected = reproduced && !workspace.evidence().selectedCandidateHash().isEmpty();
@@ -85,6 +89,19 @@ public final class DomainSnapshotAssessment {
         gate(root, "publicEvidence").put("status", "BLOCKED").putArray("blockers")
             .add("MISSING_PUBLIC_PROMOTION_RECORD").add("MISSING_EXTERNAL_NOVELTY_DECISION");
         return new DomainSnapshotAssessment(root);
+    }
+
+    private static String lifecycle(boolean reproduced, ObjectNode validation, ObjectNode proof) {
+        if (!reproduced) return "SOURCE_NOT_REPRODUCED";
+        return switch (proof.required("status").asText()) {
+            case "PROVED_POLYNOMIAL_IDENTITY" -> "CHECKED_IDENTITY";
+            case "PROVED_MODEL" -> "CHECKED_CONDITIONAL_MODEL";
+            default -> switch (validation.required("status").asText()) {
+                case "REFUTED", "REFUTED_FINITE_DATA" -> "REPRODUCED_REFUTATION";
+                case "CONFIRMED", "CONFIRMED_FINITE_DATA" -> "VALIDATED_WITHIN_SOURCE_SCOPE";
+                default -> "REPRODUCED_OBSERVATION";
+            };
+        };
     }
 
     private static ObjectNode gate(ObjectNode root, String name) {

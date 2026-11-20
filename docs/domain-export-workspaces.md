@@ -204,7 +204,7 @@ seinen historischen Validierungsstand.
 | Proof | Bei Folgen führt der vorhandene endliche Datencheck zum bedingten Modellbeweis. Bei Formeln prüft der exakte rationale Polynomchecker Quelle, ausgewählten Ausgangs- und Zielterm und aufgezeichnetes Ziel unter Polynomring-Semantik. Unterschiedliche Normalformen, nicht unterstützte Terme und Budgetgrenzen erteilen keine Beweisbestätigung. |
 | Ressourcen und Ablation | Ein zweiter Lauf ersetzt allein die maximale Suchtiefe durch null. Er übernimmt Seed, Adapter und alle anderen Budgets. Beide Läufe behalten die fünf Ressourceneinheiten. Das ist ein Tiefenvergleich auf dem konkreten Seed und keine allgemeine Effizienzaussage. |
 | Literatur | Der ausgewählte, reproduzierte Kandidat besitzt einen privaten Prüfschlüssel aus Manifest-, Kandidaten- und Evidence-Hash. Die vorhandene Literaturansicht verwaltet dokumentierte Recherchen und Vorarbeiten. Übertragung einer Anfrage an TheoremSearch benötigt dieselbe explizite Freigabe wie bisher. |
-| Release und Public Evidence | Die Release-Qualifikation rekonstruiert sechs Auswertungen aus den drei Referenzläufen. Ein reproduzierbarer Forschungsbeleg kann berichtet werden. Promotion und öffentliche mathematische Claims verlangen eigene Belege. |
+| Release und Public Evidence | Die Release-Qualifikation rekonstruiert neun Auswertungen aus den drei Referenzläufen. Ein reproduzierbarer Forschungsbeleg kann berichtet werden. Promotion und öffentliche mathematische Claims verlangen eigene Belege. |
 
 Das Schema [domain-snapshot-assessment/v1](schemas/regelsuche-domain-snapshot-assessment-v1.schema.json)
 beschreibt die Auswertung. Die mathematische Nachprüfung und die Bindung der

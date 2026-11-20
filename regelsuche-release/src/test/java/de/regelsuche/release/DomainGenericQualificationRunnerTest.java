@@ -90,6 +90,28 @@ class DomainGenericQualificationRunnerTest {
         assertThrows(IllegalArgumentException.class, () -> runner.verifyRetained(independent));
     }
 
+    @Test void productReportBindsThreeDomainsWithoutChangingHistoricalAcceptance(@TempDir Path copy) throws Exception {
+        var original = runner.run(copy);
+        var jackson = new com.fasterxml.jackson.databind.json.JsonMapper();
+        var report = jackson.readTree(runner.verifyRetainedProduct(copy));
+        assertEquals(9, report.required("records").size());
+        assertEquals(3, report.required("domainCount").asInt());
+        assertEquals("IDENTICAL_RESEARCH_RECORDS", report.required("status").asText());
+        assertFalse(report.required("publicMathematicalClaimAuthorized").asBoolean());
+        for (int i=1; i<=3; i++) {
+            var directory = copy.resolve("runs/run-" + i);
+            java.nio.file.Files.delete(directory.resolve("assessments/recurrence.json"));
+            java.nio.file.Files.delete(directory.resolve("assessments/sequence.json"));
+            java.nio.file.Files.delete(directory.resolve("assessments/expression.json"));
+            java.nio.file.Files.delete(directory.resolve("assessments"));
+        }
+        assertThrows(RuntimeException.class, () -> runner.verifyRetainedProduct(copy));
+        java.nio.file.Files.delete(copy.resolve("snapshot-product-release.json"));
+        assertEquals(original.toCanonicalJson(),runner.verifyRetained(copy).toCanonicalJson(),
+            "historical architecture v1 has independent acceptance");
+        assertThrows(RuntimeException.class, () -> runner.verifyRetainedProduct(copy));
+    }
+
     @Test
     void duplicateSingleDomainCannotQualify() {
         VerifiedDomainExport expression = verifier.requireVerified(

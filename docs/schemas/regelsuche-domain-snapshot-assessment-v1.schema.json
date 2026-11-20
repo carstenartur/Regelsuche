@@ -16,7 +16,8 @@
     "externalNovelty",
     "promotion",
     "publicEvidence",
-    "release"
+    "release",
+    "lifecycle"
   ],
   "properties": {
     "schema": {
@@ -337,6 +338,41 @@
           ]
         },
         "scope": {
+          "type": "string"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "status",
+        "fromHandoffHash",
+        "sourceStage",
+        "sourceDisposition"
+      ],
+      "properties": {
+        "contract": {
+          "const": "regelsuche.domain-snapshot-assessment/v1#lifecycle"
+        },
+        "status": {
+          "enum": [
+            "SOURCE_NOT_REPRODUCED",
+            "CHECKED_IDENTITY",
+            "CHECKED_CONDITIONAL_MODEL",
+            "REPRODUCED_REFUTATION",
+            "VALIDATED_WITHIN_SOURCE_SCOPE",
+            "REPRODUCED_OBSERVATION"
+          ]
+        },
+        "fromHandoffHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sourceStage": {
+          "const": "DISCOVERY_VALIDATION"
+        },
+        "sourceDisposition": {
           "type": "string"
         }
       }

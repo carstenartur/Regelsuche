@@ -18,6 +18,8 @@ class DomainSnapshotAssessmentTest {
         assertEquals("x + 0", result.at("/proof/originalSource").asText());
         assertEquals("x", result.at("/proof/requestedTarget").asText());
         assertEquals(source.evidence().contentHash(), result.at("/source/evidenceHash").asText());
+        assertEquals("CHECKED_IDENTITY", result.at("/lifecycle/status").asText());
+        assertEquals(result.at("/source/handoffHash"), result.at("/lifecycle/fromHandoffHash"));
         assertEquals("POST_FREEZE_REVIEW_REQUIRED", result.at("/externalNovelty/status").asText());
         assertEquals("BLOCKED", result.at("/promotion/status").asText());
         assertEquals("BLOCKED", result.at("/publicEvidence/status").asText());
@@ -38,6 +40,7 @@ class DomainSnapshotAssessmentTest {
                 workspace(new LinearRecurrenceSequenceDomain(), "observed=0,1,1,2,3,5;holdout=8,13;maximumOrder=3")}) {
             var result = assess(source);
             assertEquals("PROVED_MODEL", result.at("/proof/status").asText(), result::toString);
+            assertEquals("CHECKED_CONDITIONAL_MODEL", result.at("/lifecycle/status").asText());
             assertEquals("CONFIRMED_FINITE_DATA", result.at("/validation/status").asText());
             assertEquals("CONFIRMED_FINITE_DATA", result.at("/proof/modelReceipt/finiteCheck/status").asText());
             assertEquals(source.evidence().certificate().contentHash(), result.at("/source/renderedCertificateHash").asText());
@@ -47,6 +50,7 @@ class DomainSnapshotAssessmentTest {
     @Test void refutationIncludesReproducedWitnessWithoutIssuingProof() {
         var result = assess(workspace(new FiniteDifferenceSequenceDomain(), "observed=1,4,9,16;holdout=26"));
         assertEquals("REFUTED", result.at("/validation/status").asText());
+        assertEquals("REPRODUCED_REFUTATION", result.at("/lifecycle/status").asText());
         assertFalse(result.at("/counterexamples/attempts").isEmpty());
         var witness = result.at("/counterexamples/independentCheck");
         assertEquals("REFUTED_FINITE_MODEL", witness.path("status").asText());

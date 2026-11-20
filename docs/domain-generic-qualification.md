@@ -308,12 +308,15 @@ müssen ihre bisherigen Bedeutungen und die vollständige Source-Evidence-Kette
 beibehalten.
 
 
-Bei der aktuellen Referenzausführung schreibt der Runner zu jedem der sechs
-verifizierten Exporte eine quellgebundene Auswertung in
-`runs/run-N/assessments/{expression,sequence}.json`. `--verify-retained`
-vergleicht die vollständigen Bytes jeder Auswertung mit einer Rekonstruktion.
-Ältere Verzeichnisse ohne diese Dateien können keinen Nachweis für diese
-zusätzliche Produktprüfung liefern. Eine neue Referenzausführung erzeugt die
-Belege. Die Statusgrenzen des v1-Qualifikationsreports gelten weiterhin für
-dessen Architektur-Claim. Details der getrennten Kandidatenentscheidungen
-stehen im [Workspace-Vertrag](domain-export-workspaces.md).
+Für den getrennten Produktbericht `snapshot-product-release.json` erzeugt der
+Runner in jedem der drei Läufe zusätzlich einen verifizierten Rekurrenzexport.
+Der Bericht enthält neun quellengebundene Prüfbelege, ihre vollständige
+Quellenidentität und die Ergebnisse zu Validierung, Proof, Lebenszyklus, Neuheit,
+Promotion, Public Evidence und Forschungsfreigabe. Die drei Belege je Domäne
+müssen reproduzierbar identisch sein. `--verify-product VERZEICHNIS` verlangt
+den Bericht, alle neun Quellexporte, Verifikations- und Prüfbelege und vergleicht
+ihre Bytes mit der Rekonstruktion. Der Bericht autorisiert ausschließlich die
+Ausgabe der reproduzierten Forschungsergebnisse. `--verify-retained` prüft
+weiterhin die historische Architekturqualifikation und einen vorhandenen
+zusätzlichen Produktbericht. Für eine Produktabnahme ist `--verify-product`
+der verbindliche Einstieg. [Quellen und Geltungsbereiche](domain-export-workspaces.md)

@@ -11,6 +11,7 @@ import de.regelsuche.discovery.domain.DomainExportWorkspace;
 import de.regelsuche.discovery.domain.DomainSnapshotAssessment;
 import de.regelsuche.discovery.domain.ExpressionRewriteDiscoveryDomain;
 import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain;
+import de.regelsuche.discovery.domain.LinearRecurrenceSequenceDomain;
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
 import de.regelsuche.json.JsonWriter;
 import java.io.IOException;
@@ -41,6 +42,7 @@ public final class DomainGenericQualificationRunner {
             Files.createDirectories(root);
             // A completion receipt from an earlier execution cannot cover a partial refresh.
             Files.deleteIfExists(root.resolve("qualification-run.json"));
+            Files.deleteIfExists(root.resolve(DomainSnapshotReleaseReport.FILE));
             for (int run = 1; run <= CLEAN_RUN_COUNT; run++) {
                 executeRun(root.resolve("runs/run-" + run));
             }
@@ -48,6 +50,7 @@ public final class DomainGenericQualificationRunner {
             write(root.resolve("profile-catalog.json"), result.profileCatalogJson());
             write(root.resolve("qualification-report.json"),
                 result.report().toCanonicalJson());
+            write(root.resolve(DomainSnapshotReleaseReport.FILE), DomainSnapshotReleaseReport.reconstruct(root, result.contentHash()));
             write(root.resolve("qualification-run.json"),
                 result.toCanonicalJson());
             return result;
@@ -63,7 +66,8 @@ public final class DomainGenericQualificationRunner {
         DomainDiscoveryEvidence sequence = sequenceEvidence();
         List<DomainInput> inputs = List.of(
             new DomainInput("expression", expression),
-            new DomainInput("sequence", sequence));
+            new DomainInput("sequence", sequence),
+            new DomainInput("recurrence", recurrenceEvidence()));
         Path receipts = directory.resolve("verification-receipts");
         Files.createDirectories(receipts);
         for (DomainInput input : inputs) {
@@ -85,9 +89,27 @@ public final class DomainGenericQualificationRunner {
             requireOriginal(root.resolve("profile-catalog.json"), result.profileCatalogJson());
             requireOriginal(root.resolve("qualification-report.json"), result.report().toCanonicalJson());
             requireOriginal(root.resolve("qualification-run.json"), result.toCanonicalJson());
+            if (Files.exists(root.resolve(DomainSnapshotReleaseReport.FILE), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                requireOriginal(root.resolve(DomainSnapshotReleaseReport.FILE), DomainSnapshotReleaseReport.reconstruct(root, result.contentHash()));
+            }
             return result;
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not verify retained domain qualification", exception);
+        }
+    }
+
+    /** This entry point always requires the distinct product release, including all nine original assessments. */
+    public String verifyRetainedProduct(Path root) {
+        try {
+            QualificationRun architecture = compose(root);
+            requireOriginal(root.resolve("profile-catalog.json"), architecture.profileCatalogJson());
+            requireOriginal(root.resolve("qualification-report.json"), architecture.report().toCanonicalJson());
+            requireOriginal(root.resolve("qualification-run.json"), architecture.toCanonicalJson());
+            String report = DomainSnapshotReleaseReport.reconstruct(root, architecture.contentHash());
+            requireOriginal(root.resolve(DomainSnapshotReleaseReport.FILE), report);
+            return report;
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Could not verify retained snapshot product release", exception);
         }
     }
 
@@ -104,7 +126,6 @@ public final class DomainGenericQualificationRunner {
                 }
                 requireOriginal(directory.resolve("verification-receipts").resolve(name + ".json"),
                     verified.verification().toCanonicalJson());
-                requireOriginal(directory.resolve("assessments").resolve(name + ".json"), assess(verified).toCanonicalJson());
                 exports.add(verified);
             }
             runs.add(List.copyOf(exports));
@@ -118,7 +139,7 @@ public final class DomainGenericQualificationRunner {
         return DomainSnapshotAssessment.assess(DomainExportWorkspace.fromVerified(verified));
     }
 
-    private static void requireOriginal(Path file, String expected) throws IOException {
+    static void requireOriginal(Path file, String expected) throws IOException {
         if (Files.isSymbolicLink(file) || Files.size(file) != expected.getBytes(StandardCharsets.UTF_8).length
                 || !Files.readString(file, StandardCharsets.UTF_8).equals(expected)) {
             throw new IllegalArgumentException("Retained domain qualification evidence differs: " + file);
@@ -149,6 +170,14 @@ public final class DomainGenericQualificationRunner {
                 "observed=1,4,9,16;holdout=25,36",
                 "domain-generic-qualification/v1"),
             new DiscoveryBudget(4, 20, 20, 10, 5, 20)).evidence();
+    }
+
+    private static DomainDiscoveryEvidence recurrenceEvidence() {
+        var domain = new LinearRecurrenceSequenceDomain();
+        return new DomainDiscoveryRunner().run("domain-snapshot-recurrence-qualification", domain,
+            DiscoverySeed.create("domain-snapshot-recurrence-seed", domain.domainId(),
+                "observed=1,4,11,26,57,120;holdout=247,502,1013;maximumOrder=3", "domain-snapshot-product/v1"),
+            new DiscoveryBudget(4, 20, 20, 10, 5, 32)).evidence();
     }
 
     static DomainDiscoveryEvidence refutedSequenceEvidence() {

@@ -383,7 +383,7 @@
                     || retained.headers.get('X-Regelsuche-Run-Id') !== view.runId) throw new Error('Der gespeicherte Beleg weicht ab.');
             result.append(table(['Prüfung', 'Ergebnis'], [
                 ['Quelllauf', report.replayStatus], ['Validierung', report.validation.status], ['Gegenbeispiele', report.counterexamples.status],
-                ['Beweis', report.proof.status], ['Externe Neuheit', report.externalNovelty.status], ['Promotion', report.promotion.status],
+                ['Beweis', report.proof.status], ['Lebenszyklus', report.lifecycle.status], ['Externe Neuheit', report.externalNovelty.status], ['Promotion', report.promotion.status],
                 ['Öffentlicher Nachweis', report.publicEvidence.status], ['Vergleich mit Suchtiefe null', report.ablation.control || report.ablation.status]
             ]));
             if (report.ablation.resources) {
