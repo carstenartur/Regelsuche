@@ -121,9 +121,14 @@ final class ReleasedSdkArchive {
                     require(digest(in, entry.getSize()).equals(checksum.getValue()), "internal checksum mismatch: " + checksum.getKey());
                 }
             }
-            Files.createDirectory(destination);
+            Path extractionRoot = destination.toAbsolutePath().normalize();
+            Files.createDirectory(extractionRoot);
             for (Path member : names.stream().sorted().toList()) {
-                Path child = destination.resolve(member);
+                Path child = extractionRoot.resolve(member).normalize();
+                if (!child.startsWith(extractionRoot) || child.equals(extractionRoot)) {
+                    throw new IOException("ZIP member escapes the qualified SDK extraction root: " + member);
+                }
+                noSymlinks(child);
                 String relative = member.subpath(1, member.getNameCount()).toString().replace('\\', '/');
                 ZipArchiveEntry entry = files.get(relative);
                 if (entry == null) Files.createDirectories(child);
