@@ -40,6 +40,21 @@ Gesamtarbeit. Formale Lean-Beweise haben einen eigenen Prüfablauf. [Proof-Jobs]
 [schmale Ansicht](assets/screenshots/historical-sophie-germain-mobile.json) ·
 [Rechenweg, Budget und Prüfmethode](research/structural-construction-learning.md#the-frozen-catalog-through-one-source-only-task-solver)
 
+### Eingabe in der Formelvorschau bearbeiten
+
+Gib `x^4 + 4*y^4` im Feld **Ausdruck** ein. Öffne **Formel bearbeiten und
+Vorschau öffnen** und wähle **Parser-Vorschau**. Klicke auf den zweiten
+Summanden `4*y^4` oder wähle ihn aus der Liste. Gib `4*(y^2)^2` als
+Ersatz ein. **Änderung prüfen und übernehmen** aktualisiert den Ausdruck,
+sobald der Parser die bearbeitete Formel akzeptiert.
+
+![Formelvorschau mit markiertem Summanden 4*y^4, seiner Position im Eingabetext und dem eingetragenen Ersatz 4*(y^2)^2](assets/screenshots/visual-formula-edit.png)
+
+[Ansicht bei 390 Pixel Breite](assets/screenshots/visual-formula-edit-mobile.png) ·
+[Aufnahmedaten für Desktop](assets/screenshots/visual-formula-edit.json) und
+[schmale Ansicht](assets/screenshots/visual-formula-edit-mobile.json) ·
+[Bedienung im Workbench-Handbuch](web-workbench.md#einen-teilausdruck-in-der-formel-bearbeiten)
+
 ## Ein Durchlauf für eine Paarsumme
 
 1. Öffne **Berechnung optimieren** und wähle **Quadrierte Abstände**. Der

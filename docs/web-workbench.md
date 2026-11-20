@@ -99,6 +99,7 @@ entscheidet über das retained Ergebnis.
 
 Die Vorschau unterstützt bis zu 256 Zeichen. Lange Formeln lassen sich im
 Vorschaubereich seitlich rollen.
+[Formelbearbeitung am Sophie-Germain-Ausdruck](demo-gallery.md#eingabe-in-der-formelvorschau-bearbeiten)
 
 ### Sichtbares Ergebnis
 
