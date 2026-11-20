@@ -944,6 +944,148 @@
         }
       }
     },
+    "/api/certificate-demos/hall": {
+      "get": {
+        "tags": ["Analysis"],
+        "operationId": "runHallDeficitDemo",
+        "summary": "Ein Hall-Defizit für den festen Demographen berechnen und prüfen",
+        "x-regelsuche-context": "/api/certificate-demos",
+        "responses": {
+          "200": {
+            "description": "Geprüfter Graph mit Matching und Hall-Zeugen. Bei UNAVAILABLE enthält die Antwort nur Status und Grund.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status", "leftCount", "rightCount", "edges", "matching",
+                        "witness", "neighbors", "countDeficit", "hallDeficit", "searchWork",
+                        "verificationWork"
+                      ],
+                      "properties": {
+                        "status": {"const": "VERIFIED"},
+                        "leftCount": {"type": "integer"},
+                        "rightCount": {"type": "integer"},
+                        "edges": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}}, "description": "Kanten als nullbasierte Indexpaarung links und rechts"},
+                        "matching": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}}},
+                        "witness": {"type": "array", "items": {"type": "integer"}},
+                        "neighbors": {"type": "array", "items": {"type": "integer"}},
+                        "countDeficit": {"type": "integer"},
+                        "hallDeficit": {"type": "integer"},
+                        "searchWork": {"type": "integer"},
+                        "verificationWork": {"type": "integer"}
+                      }
+                    },
+                    {"$ref": "#/components/schemas/CertificateDemoUnavailable"}
+                  ]
+                }
+              }
+            }
+          },
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      }
+    },
+    "/api/certificate-demos/montgomery": {
+      "get": {
+        "tags": ["Analysis"],
+        "operationId": "runMontgomeryPlanningDemo",
+        "summary": "Montgomery-Reduktionen für ein festes Skalarprodukt planen und prüfen",
+        "x-regelsuche-context": "/api/certificate-demos",
+        "responses": {
+          "200": {
+            "description": "Geprüfte Operationszahlen und ganzzahlige Intervallgrenzen. Bei UNAVAILABLE enthält die Antwort nur Status und Grund.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status", "modulus", "radixBits", "inverse", "productCount",
+                        "residueBits", "accumulatorBits", "observation", "sourceReductions", "targetReductions",
+                        "leftRange", "rightRange", "sourceOutputRange", "targetAccumulatorRange", "targetOutputRange",
+                        "planningWork", "verificationWork"
+                      ],
+                      "properties": {
+                        "status": {"const": "VERIFIED"},
+                        "modulus": {"type": "integer"},
+                        "radixBits": {"type": "integer"},
+                        "inverse": {"type": "integer"},
+                        "productCount": {"type": "integer"},
+                        "residueBits": {"type": "integer"},
+                        "accumulatorBits": {"type": "integer"},
+                        "observation": {"type": "string", "enum": ["CANONICAL_RESIDUE"]},
+                        "sourceReductions": {"type": "integer"},
+                        "targetReductions": {"type": "integer"},
+                        "leftRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
+                        "rightRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
+                        "sourceOutputRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
+                        "targetAccumulatorRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
+                        "targetOutputRange": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer"}},
+                        "planningWork": {"type": "integer"},
+                        "verificationWork": {"type": "integer"}
+                      }
+                    },
+                    {"$ref": "#/components/schemas/CertificateDemoUnavailable"}
+                  ]
+                }
+              }
+            }
+          },
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      }
+    },
+    "/api/certificate-demos/pair-reduction": {
+      "get": {
+        "tags": ["Analysis"],
+        "operationId": "runLargePairReductionDemo",
+        "summary": "Die geprüfte Paarsumme für 100.000 Zeilen ausführen",
+        "x-regelsuche-context": "/api/certificate-demos",
+        "responses": {
+          "200": {
+            "description": "Resultat der Ausführung und eines direkten Präfixvergleichs. Bei UNAVAILABLE enthält die Antwort nur Status und Grund.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status", "evaluatedRows", "value", "firstValue", "lastValue",
+                        "baselinePairs", "prefixRows", "prefixPairs", "prefixReducedValue", "prefixDirectValue",
+                        "evaluationWork"
+                      ],
+                      "properties": {
+                        "status": {"const": "VERIFIED"},
+                        "evaluatedRows": {"type": "integer"},
+                        "value": {"type": "string", "description": "Exakte Summe als Dezimaltext"},
+                        "firstValue": {"type": "integer"},
+                        "lastValue": {"type": "integer"},
+                        "baselinePairs": {"type": "string", "description": "Rechnerische Paaranzahl als Dezimaltext"},
+                        "prefixRows": {"type": "integer"},
+                        "prefixPairs": {"type": "integer"},
+                        "prefixReducedValue": {"type": "string"},
+                        "prefixDirectValue": {"type": "string"},
+                        "evaluationWork": {"type": "integer"}
+                      }
+                    },
+                    {"$ref": "#/components/schemas/CertificateDemoUnavailable"}
+                  ]
+                }
+              }
+            }
+          },
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      }
+    },
     "/api/pair-reductions": {
       "post": {
         "tags": ["Analysis"],
@@ -1912,6 +2054,15 @@
       "Unavailable": {"description": "Funktion ist in der aktuellen Konfiguration deaktiviert oder nicht verfügbar"}
     },
     "schemas": {
+      "CertificateDemoUnavailable": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "reason"],
+        "properties": {
+          "status": {"const": "UNAVAILABLE"},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      },
       "FormulaAstNode": {
         "type": "object", "required": ["kind", "value", "children"],
         "properties": {

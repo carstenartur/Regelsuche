@@ -40,8 +40,8 @@ class OpenApiRouteRegistryTest {
     void loadsEveryCanonicalOperationAndContext() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
-        assertEquals(82, registry.routes().size());
-        assertEquals(26, registry.contexts().size());
+        assertEquals(85, registry.routes().size());
+        assertEquals(27, registry.contexts().size());
         assertTrue(registry.contexts().containsAll(Set.of(
             "/api/search",
             "/api/paths",
@@ -50,7 +50,8 @@ class OpenApiRouteRegistryTest {
             "/api/rule-radar",
             "/api/discovery-runs",
             "/api/discovery-domains",
-            "/api/pair-reductions"
+            "/api/pair-reductions",
+            "/api/certificate-demos"
         )));
     }
 
@@ -93,6 +94,12 @@ class OpenApiRouteRegistryTest {
             "listInstalledDiscoveryDomains");
         assertAllowed(registry, "/api/discovery-domains", "/api/discovery-domains/run", "POST",
             "runInstalledDiscoveryDomain");
+        assertAllowed(registry, "/api/certificate-demos", "/api/certificate-demos/hall", "GET",
+            "runHallDeficitDemo");
+        assertAllowed(registry, "/api/certificate-demos", "/api/certificate-demos/montgomery", "GET",
+            "runMontgomeryPlanningDemo");
+        assertAllowed(registry, "/api/certificate-demos", "/api/certificate-demos/pair-reduction", "GET",
+            "runLargePairReductionDemo");
         assertAllowed(registry, "/api/discovery-domains",
             "/api/discovery-domains/exports/" + "a".repeat(64) + "/validate/" + "b".repeat(64), "GET",
             "loadDomainValidationReceipt");

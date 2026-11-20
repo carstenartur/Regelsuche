@@ -39,6 +39,8 @@ Screenshots.
 | Bereich | Aufgabe | Sichtbares Ergebnis |
 | --- | --- | --- |
 | **Demo-Bereich** | vorbereitete mathematische Aufgabe ausführen | Zusammenfassung, Pfade, Graph, Replay und Exportzugänge |
+| **Exakte Rechennachweise** | ein Hall-Defizit oder einen Montgomery-Plan berechnen und prüfen | Eingabe, Nachweis und Aussagegrenzen |
+| **Berechnung optimieren** | einen geprüften Algorithmus für Summenschleifen herleiten oder die feste große Paarsumme ausführen | Formel, exakte Auswertung und Operationszahlen |
 | **Workbench** | Ausdruck, optionales Ziel, Profil und Regelbereiche festlegen | Suchstatus und Ergebniszusammenfassung |
 | **Pfade** | gefundene Rechenwege laden und vergleichen | sortierte Alternativen mit lesbarer Erklärung |
 | **Graph** | erkundeten Suchraum untersuchen | interaktiver Graph mit Hauptpfad, Alternativen und Inspector |

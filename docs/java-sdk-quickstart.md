@@ -14,10 +14,12 @@ Download- und Installationszeiten werden separat erfasst.
 </dependency>
 ```
 
-Die Regelsuche-BOM hat dieselbe Group-ID und Version. Die folgenden Schritte
-beschreiben das archivierte SDK 0.5.2.
+Die Regelsuche-BOM hat dieselbe Group-ID und Version. Für neue Maven-Projekte
+ist dies der Einstieg. Die [Verfügbarkeitsmatrix](mathematical-capabilities.md)
+trennt diesen Release von neueren Quellcode-APIs. Die folgenden Schritte
+beschreiben das archivierte SDK 0.5.2 samt dessen unveränderten Prüfsummen.
 
-## 1. Bevorzugter Weg: das veröffentlichte SDK-Repository
+## 1. Archivierter Weg: das SDK-Repository 0.5.2
 
 [Release v0.5.2](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2)
 ist seit **7. November 2026** veröffentlicht. Verwende

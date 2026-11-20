@@ -330,6 +330,7 @@ public class WebWorkbenchServer {
         handlers.put("/api/inspect", this::handleInspect);
         handlers.put("/api/representations", this::handleMatrixRepresentations);
         handlers.put("/api/pair-reductions", this::handlePairReductions);
+        handlers.put("/api/certificate-demos", this::handleCertificateDemos);
         handlers.put("/api/discovery-domains", this::handleDiscoveryDomains);
         handlers.put("/api/rule-radar", ruleRadarHandler);
         handlers.put(
@@ -407,6 +408,19 @@ public class WebWorkbenchServer {
         } catch (IllegalArgumentException exception) {
             sendStatus(exchange, 400, exception.getMessage());
         }
+    }
+
+    private void handleCertificateDemos(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        String demoPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        String result = switch (demoPath) {
+            case "/api/certificate-demos/hall" -> CertificateDemoWorkbench.hall();
+            case "/api/certificate-demos/montgomery" -> CertificateDemoWorkbench.montgomery();
+            case "/api/certificate-demos/pair-reduction" -> CertificateDemoWorkbench.pairReduction();
+            default -> throw new IllegalStateException("Unknown certificate demo route: " + path);
+        };
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        sendJson(exchange, 200, result);
     }
 
     private void handleMatrixRepresentations(HttpExchange exchange) throws IOException {
