@@ -87,7 +87,7 @@ import java.util.Objects;
         try {
 <span class="fc" id="L88">            authority.consume(&quot;projection.study-source-parse-code-units&quot;, formation.sourceExpression().length());</span>
 <span class="fc" id="L89">            parsed = new ExpressionParser().parseExactTerm(formation.sourceExpression());</span>
-<span class="pc" id="L90">        } catch (PolynomialWorkAuthority.LimitReached exhausted) { /* retain every unexecuted occurrence below */ }</span>
+<span class="fc" id="L90">        } catch (PolynomialWorkAuthority.LimitReached exhausted) { /* retain every unexecuted occurrence below */ }</span>
 <span class="fc" id="L91">        var preparation = authority.ledger();</span>
 <span class="fc" id="L92">        var transitions = new ArrayList&lt;PolynomialTheoryUtilityTransitionOutcome&gt;();</span>
 <span class="fc" id="L93">        var traces = new ArrayList&lt;PolynomialTheoryUtilityTransitionTrace&gt;();</span>
@@ -201,7 +201,7 @@ import java.util.Objects;
 <span class="fc" id="L201">            VerifiedPolynomialTransitionCacheStore.MeasuredRetention retained = null;</span>
 <span class="fc" id="L202">            String exhaustedDetail = &quot;SHARED_POLYNOMIAL_WORK_AUTHORITY_EXHAUSTED&quot;;</span>
             try {
-<span class="pc bpc" id="L204" title="1 of 4 branches missed.">                if (parsed == null || authority.remainingPrimitiveWork() &lt; PRIMITIVE_STEPS) throw new PolynomialWorkAuthority.LimitReached();</span>
+<span class="fc bfc" id="L204" title="All 4 branches covered.">                if (parsed == null || authority.remainingPrimitiveWork() &lt; PRIMITIVE_STEPS) throw new PolynomialWorkAuthority.LimitReached();</span>
 <span class="fc" id="L205">                authority.consume(&quot;study.evidence.occurrence-records&quot;, 1);</span>
 <span class="fc" id="L206">                authority.consume(&quot;projection.study-path-navigation&quot;, path.size() + 1L);</span>
 <span class="fc" id="L207">                var selected = new TreePosition(path, &quot;pending&quot;).subtreeAt(parsed.expression()).orElseThrow();</span>

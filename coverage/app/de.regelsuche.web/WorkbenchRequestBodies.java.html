@@ -49,13 +49,13 @@ final class WorkbenchRequestBodies {
 <span class="fc" id="L49">            boolean otherFields = false;</span>
 <span class="fc bfc" id="L50" title="All 2 branches covered.">            while (object.nextField()) {</span>
 <span class="fc bfc" id="L51" title="All 4 branches covered.">                if (!object.fieldName().equals(&quot;runtimeRequest&quot;) &amp;&amp; !object.fieldName().equals(&quot;runtimeArtifact&quot;)) otherFields = true;</span>
-<span class="pc bpc" id="L52" title="1 of 7 branches missed.">                switch (object.fieldName()) {</span>
+<span class="fc bfc" id="L52" title="All 7 branches covered.">                switch (object.fieldName()) {</span>
 <span class="fc" id="L53">                    case &quot;runtimeRequest&quot; -&gt; runtimeRequest = object.readNullableObject(StreamingJsonRequestBody.ObjectCursor::readRemainingObject);</span>
 <span class="fc" id="L54">                    case &quot;runtimeArtifact&quot; -&gt; runtimeArtifact = object.readNullableObject(StreamingJsonRequestBody.ObjectCursor::readRemainingObject);</span>
 <span class="fc" id="L55">                    case &quot;expression&quot; -&gt; expression = stringOr(</span>
 <span class="fc" id="L56">                        object.readNullableString(), &quot;&quot;);</span>
-<span class="nc" id="L57">                    case &quot;type&quot; -&gt; type = stringOr(</span>
-<span class="nc" id="L58">                        object.readNullableString(), InputType.TERM.name());</span>
+<span class="fc" id="L57">                    case &quot;type&quot; -&gt; type = stringOr(</span>
+<span class="fc" id="L58">                        object.readNullableString(), InputType.TERM.name());</span>
 <span class="fc" id="L59">                    case &quot;profile&quot; -&gt; profile = stringOr(</span>
 <span class="fc" id="L60">                        object.readNullableString(),</span>
 <span class="fc" id="L61">                        SearchProfile.FAST_SIMPLIFY.name());</span>

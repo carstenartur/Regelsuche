@@ -1,46 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FormulaPreview.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">FormulaPreview.java</span></div><h1>FormulaPreview.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
 
 import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.Equation;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.input.InputType;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExactParsedTerm.SourceRange;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 
-/** Read-only view of the AST produced by the ordinary Workbench input parser. */
-<span class="nc" id="L15">final class FormulaPreview {</span>
+/** AST and source occurrences produced by the ordinary Workbench input parser. */
+<span class="nc" id="L17">final class FormulaPreview {</span>
     static final int MAX_SOURCE_LENGTH = 256;
 
     static String parse(String source, String type) {
-<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (source.length() &gt; MAX_SOURCE_LENGTH)</span>
-<span class="nc" id="L20">            throw new IllegalArgumentException(&quot;Die Formelvorschau unterstützt bis zu &quot; + MAX_SOURCE_LENGTH + &quot; Zeichen.&quot;);</span>
-<span class="fc" id="L21">        InputType inputType = InputType.valueOf(type);</span>
-<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (inputType == InputType.SYSTEM) throw new IllegalArgumentException(&quot;TERM oder EQUATION erforderlich.&quot;);</span>
-<span class="fc" id="L23">        var parser = new ExpressionParser();</span>
-<span class="fc" id="L24">        var result = new JsonWriter().beginObject();</span>
-<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (inputType == InputType.EQUATION) {</span>
-<span class="nc" id="L26">            Equation equation = parser.parseEquation(source);</span>
-<span class="nc" id="L27">            node(result, &quot;EQUATION&quot;, &quot;=&quot;, List.of(equation.left(), equation.right()));</span>
-<span class="pc" id="L28">        } else write(result, parser.parseTerm(source));</span>
-<span class="fc" id="L29">        return result.endObject().toString();</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (source.length() &gt; MAX_SOURCE_LENGTH)</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;Die Formelvorschau unterstützt bis zu &quot; + MAX_SOURCE_LENGTH + &quot; Zeichen.&quot;);</span>
+<span class="fc" id="L23">        InputType inputType = InputType.valueOf(type);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (inputType == InputType.SYSTEM) throw new IllegalArgumentException(&quot;TERM oder EQUATION erforderlich.&quot;);</span>
+<span class="fc" id="L25">        var parser = new ExpressionParser();</span>
+<span class="fc" id="L26">        var result = new JsonWriter().beginObject();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (inputType == InputType.EQUATION) {</span>
+<span class="fc" id="L28">            var parsed = parser.parseExactEquation(source);</span>
+<span class="fc" id="L29">            var equation = parsed.equation();</span>
+<span class="fc" id="L30">            result.property(&quot;kind&quot;, &quot;EQUATION&quot;).property(&quot;value&quot;, &quot;=&quot;);</span>
+<span class="fc" id="L31">            writeChildren(result, List.of(equation.left(), equation.right()), parsed::sourceRangeFor);</span>
+<span class="fc" id="L32">        } else {</span>
+<span class="fc" id="L33">            var parsed = parser.parseExactTerm(source);</span>
+<span class="fc" id="L34">            write(result, parsed.expression(), parsed::sourceRangeFor);</span>
+        }
+<span class="fc" id="L36">        return result.endObject().toString();</span>
     }
 
-    private static void write(JsonWriter writer, Expr expression) {
-<span class="pc bpc" id="L33" title="3 of 4 branches missed.">        switch (expression) {</span>
-<span class="nc" id="L34">            case NumberExpr n -&gt; node(writer, &quot;NUMBER&quot;, n.value().canonicalText(), List.of());</span>
-<span class="fc" id="L35">            case VariableExpr v -&gt; node(writer, &quot;VARIABLE&quot;, v.name(), List.of());</span>
-<span class="nc" id="L36">            case FunctionExpr f -&gt; node(writer, &quot;FUNCTION&quot;, f.name(), f.arguments());</span>
-<span class="nc" id="L37">            case BinaryExpr b -&gt; node(writer, b.operator().name(), b.operator().symbol(), List.of(b.left(), b.right()));</span>
-        }
-<span class="fc" id="L39">    }</span>
+    private static void write(JsonWriter writer, Expr expression, Function&lt;Expr, Optional&lt;SourceRange&gt;&gt; ranges) {
+<span class="fc bfc" id="L40" title="All 4 branches covered.">        List&lt;Expr&gt; children = switch (expression) {</span>
+<span class="fc" id="L41">            case NumberExpr n -&gt; {</span>
+<span class="fc" id="L42">                writer.property(&quot;kind&quot;, &quot;NUMBER&quot;).property(&quot;value&quot;, n.value().canonicalText());</span>
+<span class="fc" id="L43">                yield List.of();</span>
+            }
+<span class="fc" id="L45">            case VariableExpr v -&gt; {</span>
+<span class="fc" id="L46">                writer.property(&quot;kind&quot;, &quot;VARIABLE&quot;).property(&quot;value&quot;, v.name());</span>
+<span class="fc" id="L47">                yield List.of();</span>
+            }
+<span class="fc" id="L49">            case FunctionExpr f -&gt; {</span>
+<span class="fc" id="L50">                writer.property(&quot;kind&quot;, &quot;FUNCTION&quot;).property(&quot;value&quot;, f.name());</span>
+<span class="fc" id="L51">                yield f.arguments();</span>
+            }
+<span class="fc" id="L53">            case BinaryExpr b -&gt; {</span>
+<span class="fc" id="L54">                writer.property(&quot;kind&quot;, b.operator().name()).property(&quot;value&quot;, b.operator().symbol());</span>
+<span class="fc" id="L55">                yield List.of(b.left(), b.right());</span>
+            }
+<span class="fc" id="L57">        };</span>
+<span class="fc" id="L58">        ranges.apply(expression).ifPresent(range -&gt; writer.object(&quot;sourceRange&quot;, source -&gt; source</span>
+<span class="fc" id="L59">            .property(&quot;startInclusive&quot;, range.startInclusive())</span>
+<span class="fc" id="L60">            .property(&quot;endExclusive&quot;, range.endExclusive())));</span>
+<span class="fc" id="L61">        writeChildren(writer, children, ranges);</span>
+<span class="fc" id="L62">    }</span>
 
-    private static void node(JsonWriter writer, String kind, String value, List&lt;Expr&gt; children) {
-<span class="fc" id="L42">        writer.property(&quot;kind&quot;, kind).property(&quot;value&quot;, value)</span>
-<span class="pc" id="L43">            .array(&quot;children&quot;, list -&gt; children.forEach(child -&gt; list.objectValue(item -&gt; write(item, child))));</span>
-<span class="fc" id="L44">    }</span>
+    private static void writeChildren(JsonWriter writer, List&lt;Expr&gt; children, Function&lt;Expr, Optional&lt;SourceRange&gt;&gt; ranges) {
+<span class="fc" id="L65">        writer.array(&quot;children&quot;, list -&gt; children.forEach(child -&gt; list.objectValue(item -&gt; write(item, child, ranges))));</span>
+<span class="fc" id="L66">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

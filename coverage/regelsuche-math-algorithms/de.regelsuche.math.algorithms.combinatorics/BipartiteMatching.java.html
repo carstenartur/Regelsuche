@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BipartiteMatching.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">BipartiteMatching.java</span></div><h1>BipartiteMatching.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Bounded maximum matching and independently replayable Hall deficiency for finite bipartite graphs. */
+public final class BipartiteMatching {
+    // A caller may request a larger budget, but the dense working arrays still have a runtime cap.
+    private static final int MAX_GRAPH_SIZE = 1_000_000;
+
+    private BipartiteMatching() {}
+
+    /** An edge from a left vertex to a right vertex, in separate zero-based index spaces. */
+<span class="fc" id="L20">    public record Edge(int left, int right) {}</span>
+
+    /** Immutable simple graph. Repetitions and input order do not change graph identity. */
+    public record Request(int leftCount, int rightCount, List&lt;Edge&gt; edges) {
+<span class="fc" id="L24">        public Request {</span>
+<span class="fc bfc" id="L25" title="All 4 branches covered.">            if (leftCount &lt; 0 || rightCount &lt; 0) {</span>
+<span class="fc" id="L26">                throw new IllegalArgumentException(&quot;INVALID_GRAPH_DIMENSIONS&quot;);</span>
+            }
+<span class="fc" id="L28">            var canonical = new ArrayList&lt;&gt;(edges);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            for (var edge : canonical) {</span>
+<span class="fc" id="L30">                Objects.requireNonNull(edge);</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">                if (!inRange(edge.left(), leftCount) || !inRange(edge.right(), rightCount)) {</span>
+<span class="fc" id="L32">                    throw new IllegalArgumentException(&quot;INVALID_EDGE_ENDPOINT&quot;);</span>
+                }
+<span class="fc" id="L34">            }</span>
+<span class="fc" id="L35">            canonical.sort(Comparator.comparingInt(Edge::left).thenComparingInt(Edge::right));</span>
+<span class="fc" id="L36">            int unique = 0;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (var edge : canonical) {</span>
+<span class="fc bfc" id="L38" title="All 4 branches covered.">                if (unique == 0 || !edge.equals(canonical.get(unique - 1))) {</span>
+<span class="fc" id="L39">                    canonical.set(unique++, edge);</span>
+                }
+<span class="fc" id="L41">            }</span>
+<span class="fc" id="L42">            edges = List.copyOf(canonical.subList(0, unique));</span>
+<span class="fc" id="L43">        }</span>
+    }
+
+    /**
+     * Source graph, matching and left vertex subset W. Treat externally constructed evidence
+     * as untrusted until it passes {@link #verify}.
+     */
+    public record Certificate(Request source, List&lt;Edge&gt; matching, List&lt;Integer&gt; witness) {
+<span class="fc" id="L51">        public Certificate {</span>
+<span class="fc" id="L52">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L53">            matching = List.copyOf(matching);</span>
+<span class="fc" id="L54">            witness = List.copyOf(witness);</span>
+<span class="fc" id="L55">        }</span>
+
+        public int matchingSize() {
+<span class="fc" id="L58">            return matching.size();</span>
+        }
+
+        /** Maximum Hall deficiency for a certificate that passes replay. */
+        public int deficiency() {
+<span class="fc" id="L63">            return source.leftCount() - matchingSize();</span>
+        }
+    }
+
+<span class="fc" id="L67">    public enum Status { COMPLETE, UNAVAILABLE }</span>
+
+    /** A completed search carries a certificate. Interruption produces no claim. */
+    public record Result(Status status, Optional&lt;Certificate&gt; certificate, String reason, long work) {
+<span class="fc" id="L71">        public Result {</span>
+<span class="fc" id="L72">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L73">            Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L74">            Objects.requireNonNull(reason);</span>
+<span class="pc bpc" id="L75" title="2 of 6 branches missed.">            if (work &lt; 0 || (status == Status.COMPLETE) != certificate.isPresent()) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(&quot;INVALID_MATCHING_RESULT&quot;);</span>
+            }
+<span class="fc" id="L78">        }</span>
+    }
+
+    /** A verifier failure includes invalid evidence and resource exhaustion. */
+<span class="fc" id="L82">    public record Verification(boolean valid, String reason, long work) {}</span>
+
+    /**
+     * Searches by iterative augmenting paths in ascending vertex and neighbor order. Both
+     * operations use {@code maximumTerms} to bound the sum of both vertex counts and the number
+     * of distinct edges, with a runtime cap of one million graph entries.
+     */
+    public static Result search(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L90">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L91">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L93">            work.checkSize(request);</span>
+<span class="fc" id="L94">            var proof = new Search(request, work).certificate();</span>
+<span class="fc" id="L95">            work.charge(1);</span>
+<span class="fc" id="L96">            return new Result(Status.COMPLETE, Optional.of(proof), &quot;COMPLETE&quot;, work.used);</span>
+<span class="fc" id="L97">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L98">            return new Result(Status.UNAVAILABLE, Optional.empty(), unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    /**
+     * Replays the matching and the vertex cover formed by the left complement of W and
+     * all right neighbors of W. Equal cardinalities certify optimality. Replay is linear
+     * in the graph and the certificate and does not run the search.
+     */
+    public static Verification verify(Request request, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L109">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L110">        Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L111">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L113">            work.checkSize(request);</span>
+<span class="fc" id="L114">            var source = certificate.source();</span>
+<span class="fc" id="L115">            int leftCount = request.leftCount();</span>
+<span class="fc" id="L116">            int rightCount = request.rightCount();</span>
+<span class="fc" id="L117">            int edgeCount = request.edges().size();</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">            if (leftCount != source.leftCount() || rightCount != source.rightCount()</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                    || edgeCount != source.edges().size()) {</span>
+<span class="fc" id="L120">                return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+            }
+
+<span class="fc" id="L123">            int matchingSize = certificate.matchingSize();</span>
+<span class="fc" id="L124">            int witnessSize = certificate.witness().size();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            if (matchingSize &gt; Math.min(leftCount, rightCount)) {</span>
+<span class="nc" id="L126">                return new Verification(false, &quot;INVALID_MATCHING&quot;, work.used);</span>
+            }
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (witnessSize &gt; leftCount) {</span>
+<span class="nc" id="L129">                return new Verification(false, &quot;INVALID_WITNESS&quot;, work.used);</span>
+            }
+
+<span class="fc" id="L132">            work.charge(2L * leftCount + 2L * rightCount);</span>
+<span class="fc" id="L133">            int[] matchedRight = new int[leftCount];</span>
+<span class="fc" id="L134">            boolean[] usedRight = new boolean[rightCount];</span>
+<span class="fc" id="L135">            boolean[] inWitness = new boolean[leftCount];</span>
+<span class="fc" id="L136">            boolean[] inNeighborhood = new boolean[rightCount];</span>
+
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (var edge : certificate.matching()) {</span>
+<span class="fc" id="L139">                work.charge(1);</span>
+<span class="fc" id="L140">                int left = edge.left();</span>
+<span class="fc" id="L141">                int right = edge.right();</span>
+<span class="fc bfc" id="L142" title="All 8 branches covered.">                if (!inRange(left, leftCount) || !inRange(right, rightCount)</span>
+                        || matchedRight[left] != 0 || usedRight[right]) {
+<span class="fc" id="L144">                    return new Verification(false, &quot;INVALID_MATCHING&quot;, work.used);</span>
+                }
+<span class="fc" id="L146">                matchedRight[left] = right + 1;</span>
+<span class="fc" id="L147">                usedRight[right] = true;</span>
+<span class="fc" id="L148">            }</span>
+
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (int left : certificate.witness()) {</span>
+<span class="fc" id="L151">                work.charge(1);</span>
+<span class="fc bfc" id="L152" title="All 4 branches covered.">                if (!inRange(left, leftCount) || inWitness[left]) {</span>
+<span class="fc" id="L153">                    return new Verification(false, &quot;INVALID_WITNESS&quot;, work.used);</span>
+                }
+<span class="fc" id="L155">                inWitness[left] = true;</span>
+<span class="fc" id="L156">            }</span>
+
+<span class="fc" id="L158">            int checkedMatches = 0;</span>
+<span class="fc" id="L159">            int neighborhoodSize = 0;</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            for (int i = 0; i &lt; edgeCount; i++) {</span>
+<span class="fc" id="L161">                work.charge(1);</span>
+<span class="fc" id="L162">                var edge = request.edges().get(i);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (!edge.equals(source.edges().get(i))) {</span>
+<span class="fc" id="L164">                    return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+                }
+<span class="fc" id="L166">                int left = edge.left();</span>
+<span class="fc" id="L167">                int right = edge.right();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                if (matchedRight[left] == right + 1) {</span>
+<span class="fc" id="L169">                    checkedMatches++;</span>
+                }
+<span class="fc bfc" id="L171" title="All 4 branches covered.">                if (inWitness[left] &amp;&amp; !inNeighborhood[right]) {</span>
+<span class="fc" id="L172">                    inNeighborhood[right] = true;</span>
+<span class="fc" id="L173">                    neighborhoodSize++;</span>
+                }
+            }
+
+<span class="fc" id="L177">            work.charge(1);</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (checkedMatches != matchingSize) {</span>
+<span class="fc" id="L179">                return new Verification(false, &quot;INVALID_MATCHING&quot;, work.used);</span>
+            }
+<span class="fc" id="L181">            long coverSize = (long) leftCount - witnessSize + neighborhoodSize;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (coverSize != matchingSize) {</span>
+<span class="fc" id="L183">                return new Verification(false, &quot;CARDINALITY_MISMATCH&quot;, work.used);</span>
+            }
+<span class="fc" id="L185">            return new Verification(true, &quot;VERIFIED&quot;, work.used);</span>
+<span class="fc" id="L186">        } catch (Unavailable unavailable) {</span>
+<span class="fc" id="L187">            return new Verification(false, unavailable.getMessage(), work.used);</span>
+        }
+    }
+
+    private static boolean inRange(int index, int count) {
+<span class="fc bfc" id="L192" title="All 4 branches covered.">        return index &gt;= 0 &amp;&amp; index &lt; count;</span>
+    }
+
+    private static final class Search {
+        private final Request request;
+        private final Work work;
+        private final int[] edgeStarts;
+        // Matches store index plus one, leaving zero for an unmatched vertex.
+        private final int[] leftMatch;
+        private final int[] rightMatch;
+        private final int[] reachedLeft;
+        private final int[] reachedRight;
+        private final int[] rightPredecessor;
+        private final int[] queue;
+
+<span class="fc" id="L207">        private Search(Request request, Work work) {</span>
+<span class="fc" id="L208">            this.request = request;</span>
+<span class="fc" id="L209">            this.work = work;</span>
+<span class="fc" id="L210">            int leftCount = request.leftCount();</span>
+<span class="fc" id="L211">            int rightCount = request.rightCount();</span>
+<span class="fc" id="L212">            work.charge(4L * leftCount + 3L * rightCount + 1);</span>
+<span class="fc" id="L213">            edgeStarts = new int[leftCount + 1];</span>
+<span class="fc" id="L214">            leftMatch = new int[leftCount];</span>
+<span class="fc" id="L215">            rightMatch = new int[rightCount];</span>
+<span class="fc" id="L216">            reachedLeft = new int[leftCount];</span>
+<span class="fc" id="L217">            reachedRight = new int[rightCount];</span>
+<span class="fc" id="L218">            rightPredecessor = new int[rightCount];</span>
+<span class="fc" id="L219">            queue = new int[leftCount];</span>
+
+<span class="fc" id="L221">            int index = 0;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (int left = 0; left &lt; leftCount; left++) {</span>
+<span class="fc" id="L223">                work.charge(1);</span>
+<span class="fc bfc" id="L224" title="All 4 branches covered.">                while (index &lt; request.edges().size() &amp;&amp; request.edges().get(index).left() == left) {</span>
+<span class="fc" id="L225">                    work.charge(1);</span>
+<span class="fc" id="L226">                    index++;</span>
+                }
+<span class="fc" id="L228">                edgeStarts[left + 1] = index;</span>
+            }
+<span class="fc" id="L230">        }</span>
+
+        private Certificate certificate() {
+            // Once the previous prefix has a maximum matching, only the new left vertex
+            // can start an augmenting path that increases it.
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            for (int left = 0; left &lt; leftMatch.length; left++) {</span>
+<span class="fc" id="L236">                work.charge(1);</span>
+<span class="fc" id="L237">                queue[0] = left;</span>
+<span class="fc" id="L238">                int freeRight = findFreeRight(1, left + 1);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                if (freeRight &gt;= 0) {</span>
+<span class="fc" id="L240">                    augment(freeRight);</span>
+                }
+            }
+
+<span class="fc" id="L244">            int queued = 0;</span>
+<span class="fc" id="L245">            int witnessMark = -1;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (int left = 0; left &lt; leftMatch.length; left++) {</span>
+<span class="fc" id="L247">                work.charge(1);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                if (leftMatch[left] == 0) {</span>
+<span class="fc" id="L249">                    queue[queued++] = left;</span>
+<span class="fc" id="L250">                    reachedLeft[left] = witnessMark;</span>
+                }
+            }
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            if (findFreeRight(queued, witnessMark) &gt;= 0) {</span>
+<span class="nc" id="L254">                throw new IllegalStateException(&quot;MATCHING_HAS_AUGMENTING_PATH&quot;);</span>
+            }
+
+<span class="fc" id="L257">            var matching = new ArrayList&lt;Edge&gt;();</span>
+<span class="fc" id="L258">            var witness = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            for (int left = 0; left &lt; leftMatch.length; left++) {</span>
+<span class="fc" id="L260">                work.charge(1);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                if (leftMatch[left] != 0) {</span>
+<span class="fc" id="L262">                    matching.add(new Edge(left, leftMatch[left] - 1));</span>
+                }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">                if (reachedLeft[left] == witnessMark) {</span>
+<span class="fc" id="L265">                    witness.add(left);</span>
+                }
+            }
+<span class="fc" id="L268">            work.charge(1L + matching.size() + witness.size());</span>
+<span class="fc" id="L269">            return new Certificate(request, matching, witness);</span>
+        }
+
+        private int findFreeRight(int queued, int mark) {
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (int next = 0; next &lt; queued; next++) {</span>
+<span class="fc" id="L274">                work.charge(1);</span>
+<span class="fc" id="L275">                int left = queue[next];</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                for (int i = edgeStarts[left]; i &lt; edgeStarts[left + 1]; i++) {</span>
+<span class="fc" id="L277">                    work.charge(1);</span>
+<span class="fc" id="L278">                    int right = request.edges().get(i).right();</span>
+<span class="fc bfc" id="L279" title="All 4 branches covered.">                    if (leftMatch[left] == right + 1 || reachedRight[right] == mark) {</span>
+<span class="fc" id="L280">                        continue;</span>
+                    }
+<span class="fc" id="L282">                    reachedRight[right] = mark;</span>
+<span class="fc" id="L283">                    rightPredecessor[right] = left;</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                    if (rightMatch[right] == 0) {</span>
+<span class="fc" id="L285">                        return right;</span>
+                    }
+                    // A matched left vertex is reached only through its unique matched right.
+<span class="fc" id="L288">                    int matchedLeft = rightMatch[right] - 1;</span>
+<span class="fc" id="L289">                    reachedLeft[matchedLeft] = mark;</span>
+<span class="fc" id="L290">                    queue[queued++] = matchedLeft;</span>
+                }
+            }
+<span class="fc" id="L293">            return -1;</span>
+        }
+
+        private void augment(int right) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            while (right &gt;= 0) {</span>
+<span class="fc" id="L298">                work.charge(1);</span>
+<span class="fc" id="L299">                int left = rightPredecessor[right];</span>
+<span class="fc" id="L300">                int previousRight = leftMatch[left] - 1;</span>
+<span class="fc" id="L301">                leftMatch[left] = right + 1;</span>
+<span class="fc" id="L302">                rightMatch[right] = left + 1;</span>
+<span class="fc" id="L303">                right = previousRight;</span>
+<span class="fc" id="L304">            }</span>
+<span class="fc" id="L305">        }</span>
+    }
+
+    private static final class Work {
+        private final IterationLimits limits;
+        private final BooleanSupplier cancellation;
+<span class="fc" id="L311">        private final long started = System.nanoTime();</span>
+        private final long timeoutNanos;
+        private long used;
+
+<span class="fc" id="L315">        private Work(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L316">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L317">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L318">            timeoutNanos = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L319">        }</span>
+
+        private void checkSize(Request request) {
+<span class="fc" id="L322">            charge(1);</span>
+<span class="fc" id="L323">            long size = (long) request.leftCount() + request.rightCount() + request.edges().size();</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            if (size &gt; Math.min(limits.maximumTerms(), MAX_GRAPH_SIZE)) {</span>
+<span class="fc" id="L325">                throw new Unavailable(&quot;GRAPH_SIZE_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L327">        }</span>
+
+        private void charge(long units) {
+<span class="pc bpc" id="L330" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) {</span>
+<span class="fc" id="L331">                throw new Unavailable(&quot;CANCELLED&quot;);</span>
+            }
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (System.nanoTime() - started &gt;= timeoutNanos) {</span>
+<span class="fc" id="L334">                throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
+            }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            if (units &gt; limits.maximumWork() - used) {</span>
+<span class="fc" id="L337">                throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L339">            used += units;</span>
+<span class="fc" id="L340">        }</span>
+    }
+
+    private static final class Unavailable extends RuntimeException {
+        private Unavailable(String reason) {
+<span class="fc" id="L345">            super(reason, null, false, false);</span>
+<span class="fc" id="L346">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

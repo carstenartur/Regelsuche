@@ -54,7 +54,50 @@ is derived from the immutable tracked-file snapshot and excludes mutable
 `build`/`target` outputs. The public source and license files required
 by the distribution descriptor remain available to Maven.
 
-This is **one image-production path**, not a claim that the standard image,
-all evidence producers, browser and SymPy profiles or CI have migrated away
-from Gradle/host scripts. Neither this image build nor green image tests
-establish a fix for the previously intermittent Docker daemon failure.
+The default `Dockerfile` Web Workbench runtime now uses the same checked Maven
+producer, tar layout and `bin/regelsuche` launcher as `Dockerfile.proof`.
+The `--target walkthrough` stage retains its separate legacy Gradle builder,
+including its original research command. It is *not* redirected to a different
+application workflow or silently removed. The standard image's runtime stage
+depends only on the Maven distribution; the separate Gradle walkthrough stage
+is not a prerequisite for it. The image policy explicitly retains the two
+builder identities and the Temurin runtime image in their actual FROM order.
+
+These are **two application image-production paths**, not a claim that the
+walkthrough, all evidence producers, browser/SymPy profiles, other Dockerfiles,
+CI or the release authority have migrated away from Gradle/host scripts.
+Image construction still skips tests; actual Testcontainers Web Workbench and
+proof-image checks must pass on the PR head and after integration. A green image
+build cannot explain or repair the earlier sporadic Docker daemon failure.
+No frozen reproduction Dockerfile, scientific receipt, quality threshold or
+historical test corpus is changed.
+
+
+## Maven-owned standard Web Workbench image verification
+
+The hosted verification workflow now invokes the existing full Maven product
+authority unchanged, then runs a dedicated checkout-owned Maven/JUnit authority:
+
+```sh
+mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image \
+  -pl regelsuche-integration-tests -am verify
+```
+
+The opt-in Maven Failsafe profile compiles and executes the **existing**
+`WebWorkbenchDockerImageTest` with Testcontainers. It builds the final
+`Dockerfile` image from the immutable tracked-file snapshot, allocates a
+Testcontainers-managed random host port, waits for HTTP readiness and checks
+HTML, JavaScript, styles, bundled vendor assets, the OpenAPI reference,
+path-traversal rejection and both discovery API response structures.
+`DockerAvailabilityIT` requires an actual reachable daemon, so an absent
+Docker engine does not silently count as an image acceptance. This preserves
+the repository's workflow-semantics contract: no manual `docker build`,
+`docker run`, port binding or inline Python assertions in GitHub Actions.
+
+The image suite is **explicitly checkout-only** because its current
+reproducible build-context helper enumerates Git-tracked sources. The separate
+Git-free `mvn -Pfull verify` archive replay remains unchanged and continues
+to enforce the independent Postgres/Neo4j container suites. No result from the
+new image suite may be claimed before its exact-head hosted Failsafe report
+shows executed tests with zero failures, errors and skips. This does not yet
+close #749's Maven-only A–E acceptance or diagnose an intermittent daemon failure.

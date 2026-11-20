@@ -5,7 +5,7 @@ import de.regelsuche.math.algorithms.modular.CongruenceCoverage;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 
-/** SDK access to exact coverage of finite progressions by activated congruences. */
+/** SDK access to exact coverage and survivor bounds for finite progressions. */
 public final class CongruenceCoverageSdk {
     private CongruenceCoverageSdk() {}
 
@@ -20,8 +20,19 @@ public final class CongruenceCoverageSdk {
 <span class="fc" id="L20">        return CongruenceCoverage.verify(request, certificate, limits(budget), cancellation::isCancelled);</span>
     }
 
+    public static CongruenceCoverage.BoundsResult bounds(CongruenceCoverage.Request request, int order,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L25">        return CongruenceCoverage.bounds(request, order, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static CongruenceCoverage.Verification verifyBounds(CongruenceCoverage.Request request, int order,
+            CongruenceCoverage.BoundsCertificate certificate, OptimizationBudget budget,
+            CancellationToken cancellation) {
+<span class="fc" id="L31">        return CongruenceCoverage.verifyBounds(request, order, certificate, limits(budget), cancellation::isCancelled);</span>
+    }
+
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="fc" id="L24">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L35">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
