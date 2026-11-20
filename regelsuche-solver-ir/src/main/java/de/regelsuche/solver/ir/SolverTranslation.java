@@ -20,10 +20,11 @@ public record SolverTranslation(
     Map<String, String> termMapping,
     String contentHash
 ) {
+    public static final String SCOPED_SCHEMA = "regelsuche.solver-translation/v2";
     public static final String SCHEMA = "regelsuche.solver-translation/v1";
 
     public SolverTranslation {
-        if (!SCHEMA.equals(schema)) {
+        if (!SCHEMA.equals(schema) && !SCOPED_SCHEMA.equals(schema)) {
             throw new IllegalArgumentException("unsupported solver translation schema");
         }
         requireSha(obligationHash, "obligationHash");
@@ -47,6 +48,7 @@ public record SolverTranslation(
                 "rejected translation requires visible issues");
         }
         if (status == TranslationStatus.LOSSLESS
+                && !(SCOPED_SCHEMA.equals(schema) && termMapping.containsKey("goal.proposition"))
                 && (!termMapping.containsKey("goal.left")
                     || !termMapping.containsKey("goal.right"))) {
             throw new IllegalArgumentException(
@@ -54,7 +56,7 @@ public record SolverTranslation(
         }
         requireSha(contentHash, "contentHash");
         String expected = hash(
-            obligationHash, backendId, backendVersion, status, issues, termMapping);
+            schema, obligationHash, backendId, backendVersion, status, issues, termMapping);
         if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
                 "solver translation hash does not match canonical fields");
@@ -77,11 +79,18 @@ public record SolverTranslation(
         if (termMapping != null) {
             termMapping.forEach(orderedTerms::put);
         }
+        String schema = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()) ? SCOPED_SCHEMA : SCHEMA;
+        if (status == TranslationStatus.LOSSLESS && obligation.goal().relation() == SolverIr.Relation.HOLDS
+                && !orderedTerms.containsKey("goal.proposition"))
+            throw new IllegalArgumentException("a proposition requires its exact term mapping");
+        if (status == TranslationStatus.LOSSLESS && obligation.goal().relation() != SolverIr.Relation.HOLDS
+                && (!orderedTerms.containsKey("goal.left") || !orderedTerms.containsKey("goal.right")))
+            throw new IllegalArgumentException("a binary relation requires both term mappings");
         String contentHash = hash(
-            obligation.contentHash(), descriptor.backendId(),
+            schema, obligation.contentHash(), descriptor.backendId(),
             descriptor.backendVersion(), status, orderedIssues, orderedTerms);
         return new SolverTranslation(
-            SCHEMA,
+            schema,
             obligation.contentHash(),
             descriptor.backendId(),
             descriptor.backendVersion(),
@@ -106,7 +115,7 @@ public record SolverTranslation(
     }
 
     private static String hash(
-        String obligationHash,
+        String schema, String obligationHash,
         String backendId,
         String backendVersion,
         TranslationStatus status,
@@ -114,7 +123,7 @@ public record SolverTranslation(
         Map<String, String> termMapping
     ) {
         return SolverIr.sha256(
-            SCHEMA
+            schema
                 + "\nobligation=" + obligationHash
                 + "\nbackend=" + backendId + '@' + backendVersion
                 + "\nstatus=" + status.name()
