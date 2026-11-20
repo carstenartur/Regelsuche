@@ -112,8 +112,8 @@ class MavenWorkflowSemanticsContractTest {
     );
     private static final Pattern DIRECT_HOST_INTERPRETER = Pattern.compile(
         "(?<![A-Za-z0-9_.-])"
-            + "(?:python(?:3(?:\\.\\d+)?)?|pypy(?:3(?:\\.\\d+)?)?"
-            + "|pip(?:3)?|pipx|uvx?|node|npm|npx|pnpm|yarn|corepack|deno|bun"
+            + "(?:python(?:[23](?:\\.\\d+)?)?|pypy(?:[23](?:\\.\\d+)?)?"
+            + "|pip(?:[23](?:\\.\\d+)?)?|pipx|uvx?|node(?:js)?|npm|npx|pnpm|yarn|corepack|deno|bunx?"
             + "|perl|ruby|pwsh|powershell)(?=\\s+|$)"
     );
 
@@ -288,6 +288,11 @@ class MavenWorkflowSemanticsContractTest {
                 "node scripts/new-check.mjs",
                 "npm test",
                 "pypy3 -B scripts/new-check.py",
+                "python2 -B scripts/new-check.py",
+                "pip3.13 install package",
+                "pip2.7 install package",
+                "nodejs scripts/new-check.js",
+                "bunx eslint .",
                 "uv run python3 scripts/new-check.py",
                 "uvx check-tool",
                 "pip3 install package",
@@ -337,6 +342,11 @@ class MavenWorkflowSemanticsContractTest {
                 "node scripts/undeclared-release.mjs",
                 "npm run release",
                 "pypy3 -B scripts/undeclared-release.py",
+                "python2 -B scripts/undeclared-release.py",
+                "pip3.13 install package",
+                "pip2.7 install package",
+                "nodejs scripts/undeclared-release.js",
+                "bunx eslint .",
                 "uv run python3 scripts/undeclared-release.py",
                 "uvx build-wheel",
                 "pipx run package",
@@ -408,7 +418,8 @@ class MavenWorkflowSemanticsContractTest {
     @Test
     void foldedYamlCannotHideNewHostRuntimesInEitherWorkflow() {
         MergeGovernance governance = validGovernance();
-        for (String tool : List.of("pypy3", "uv", "uvx", "pnpm",
+        for (String tool : List.of("pypy3", "python2", "pip3.13", "nodejs", "bunx",
+                "uv", "uvx", "pnpm",
                 "yarn", "corepack", "deno", "bun", "pipx")) {
             String folded = "jobs:\n  verification:\n    steps:\n"
                 + "      - run: >-\n          " + tool
