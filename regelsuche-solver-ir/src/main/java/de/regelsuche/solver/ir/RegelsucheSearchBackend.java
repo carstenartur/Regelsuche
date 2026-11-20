@@ -49,6 +49,10 @@ public final class RegelsucheSearchBackend implements SolverBackend {
     @Override
     public SolverExecution execute(Obligation obligation) {
         Objects.requireNonNull(obligation, "obligation");
+        if (!SolverIr.OBLIGATION_SCHEMA.equals(obligation.schema())) {
+            return SolverBackendSupport.rejectedExecution(obligation, DESCRIPTOR,
+                List.of("UNSUPPORTED_SCHEMA:" + obligation.schema()), Map.of());
+        }
         String left = expressions.render(obligation.goal().left());
         String right = expressions.render(obligation.goal().right());
         Map<String, String> terms = Map.of(

@@ -205,6 +205,8 @@ public record BackendCapabilityProfile(
             operators.add(binary.operator());
             inspect(binary.left(), operators, calls);
             inspect(binary.right(), operators, calls);
+        } else if (expression instanceof SolverIr.Binder binder) {
+            inspect(binder.body(), operators, calls);
         } else if (expression instanceof Call call) {
             calls[0] = true;
             call.arguments().forEach(argument -> inspect(argument, operators, calls));

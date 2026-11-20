@@ -29,7 +29,7 @@ public final class LeanSolverBackend implements SolverBackend {
     private static final String AUDIT = "REGELSUCHE_LEAN_AUDIT ";
     private static final Set<String> AXIOMS = Set.of("propext", "Classical.choice", "Quot.sound");
     private static final BackendDescriptor DESCRIPTOR = new BackendDescriptor(
-        "lean-kernel-checked", "1", List.of(Theory.REAL_ARITHMETIC, Theory.TRANSCENDENTAL_FUNCTIONS),
+        "lean-kernel-checked", "1", List.of(Theory.REAL_ARITHMETIC, Theory.TRANSCENDENTAL_FUNCTIONS, Theory.SCOPED_ANALYSIS),
         Arrays.stream(Relation.values()).filter(r -> r != Relation.IS_INTEGER).toList(),
         List.of(RequestedEvidence.DECISION, RequestedEvidence.SYMBOLIC_CERTIFICATE,
                 RequestedEvidence.FORMAL_PROOF), true);
@@ -121,7 +121,7 @@ public final class LeanSolverBackend implements SolverBackend {
             if (!proof.success()) return finish(obligation, translation,
                 proof.timedOut() ? ResultStatus.TIMEOUT : proof.outputLimit() ? ResultStatus.ERROR : ResultStatus.UNKNOWN,
                 "Lean did not produce a checked theorem; inspect retained diagnostics", "", directory);
-            String audit = checkedAudit(proof.stdout(), obligation.contentHash(), nonce);
+            String audit = checkedProcessAudit(proof.stdout(), obligation, nonce).text();
             if (!before.equals(configurationHash()) || !environment.equals(pinnedEnvironment())
                     || !environment.pinsMatch(directory) || !Files.isRegularFile(directory.resolve("proof.olean")))
                 throw new IOException("toolchain changed or compiled proof missing");
@@ -156,7 +156,15 @@ public final class LeanSolverBackend implements SolverBackend {
         return checkedAuditDocument(lines.getFirst().substring(AUDIT.length()), hash, nonce);
     }
 
-    record AuditDocument(String text, String nonce, Set<String> axioms) { }
+    record ImportedDeclaration(String name, String module) { }
+    record AuditDocument(String text, String nonce, Set<String> axioms, Set<ImportedDeclaration> imports, boolean scoped) { }
+
+    static AuditDocument checkedProcessAudit(String stdout, Obligation expected, String nonce) throws IOException {
+        var audit = checkedProcessAudit(stdout, expected.contentHash(), nonce);
+        if (audit.scoped() != SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(expected.schema()))
+            throw new IOException("Lean audit schema differs from obligation");
+        return audit;
+    }
 
     static AuditDocument checkedAuditDocument(String text, String hash, String expectedNonce) throws IOException {
         JsonNode json = new ObjectMapper().readTree(text);
@@ -164,8 +172,10 @@ public final class LeanSolverBackend implements SolverBackend {
         if ((expectedNonce != null && !expectedNonce.equals(nonce)) || !nonce.matches("[0-9a-f]{32}"))
             throw new IOException("wrong audit nonce");
         if (!json.path("nonce").isTextual()) throw new IOException("expected textual audit nonce");
-        if (!json.isObject() || json.size() != 5
-                || !json.path("schema").asText().equals("regelsuche.lean-audit/v1")
+        String schema = json.path("schema").asText();
+        boolean scoped = schema.equals("regelsuche.lean-audit/v2");
+        if (!json.isObject() || json.size() != (scoped ? 6 : 5)
+                || !(scoped || schema.equals("regelsuche.lean-audit/v1"))
                 || !json.path("obligationHash").asText().equals(hash)
                 || !json.path("theorem").asText().equals("regelsuche_bound")
                 || !json.path("axioms").isArray()) throw new IOException("wrong audit binding");
@@ -174,7 +184,20 @@ public final class LeanSolverBackend implements SolverBackend {
             if (!axiom.isTextual() || !AXIOMS.contains(axiom.asText()) || !seen.add(axiom.asText()))
                 throw new IOException("unapproved or duplicated proof axiom");
         }
-        return new AuditDocument(text, nonce, Set.copyOf(seen));
+        Set<ImportedDeclaration> imports = new java.util.HashSet<>();
+        if (scoped) {
+            JsonNode entries = json.path("imports");
+            if (!entries.isArray()) throw new IOException("missing imported declarations");
+            Set<String> names = new java.util.HashSet<>();
+            for (JsonNode entry : entries) {
+                if (!entry.isObject() || entry.size() != 2 || !entry.path("module").isTextual()
+                        || !entry.path("name").isTextual() || entry.path("module").asText().isBlank()
+                        || entry.path("name").asText().isBlank() || !names.add(entry.path("name").asText()))
+                    throw new IOException("invalid or ambiguous imported declaration");
+                imports.add(new ImportedDeclaration(entry.path("name").asText(), entry.path("module").asText()));
+            }
+        }
+        return new AuditDocument(text, nonce, Set.copyOf(seen), Set.copyOf(imports), scoped);
     }
 
     static String compiledHash(Path directory) throws IOException {

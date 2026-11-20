@@ -29,6 +29,7 @@ public final class LeanSourceRenderer {
     }
 
     public Material render(Obligation obligation) {
+        if (SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema())) return new ScopedLeanRenderer(obligation).render();
         List<String> issues = new ArrayList<>();
         if (obligation.declarations().size() > 128 || obligation.assumptions().size() > 128) {
             return new Material("", "", Map.of(), List.of("OBLIGATION_SIZE_LIMIT"));
@@ -71,7 +72,7 @@ public final class LeanSourceRenderer {
             case LESS_OR_EQUAL -> "≤";
             case GREATER_THAN -> ">";
             case GREATER_OR_EQUAL -> "≥";
-            case IS_INTEGER -> throw new IllegalStateException();
+            case IS_INTEGER, HOLDS -> throw new IllegalStateException();
         };
         return "(" + expression(left, obligation, issues, 0) + " " + op + " "
             + expression(right, obligation, issues, 0) + ")";
@@ -86,7 +87,7 @@ public final class LeanSourceRenderer {
         return call((Call) expression, obligation, issues, depth);
     }
 
-    private static String literal(Literal literal, List<String> issues) {
+    static String literal(Literal literal, List<String> issues) {
         if (literal.value().length() > 4096) { issues.add("LITERAL_SIZE_LIMIT"); return "0"; }
         BigDecimal d = new BigDecimal(literal.value());
         if (d.scale() <= 0) return "(" + d.toBigIntegerExact() + " : Real)";
@@ -96,6 +97,10 @@ public final class LeanSourceRenderer {
     private static String binary(Binary b, Obligation obligation, List<String> issues, int depth) {
         String left = expression(b.left(), obligation, issues, depth + 1);
         String right = expression(b.right(), obligation, issues, depth + 1);
+        return binary(b, obligation, issues, left, right);
+    }
+
+    static String binary(Binary b, Obligation obligation, List<String> issues, String left, String right) {
         if (b.operator() == BinaryOperator.DIVIDE && !nonzero(b.right(), obligation))
             issues.add("DIVISION_DOMAIN_NOT_ENCODED:" + b.right().canonicalMaterial());
         if (b.operator() == BinaryOperator.POWER) {
@@ -119,7 +124,13 @@ public final class LeanSourceRenderer {
         if (call.arguments().size() != arity) { issues.add("UNSUPPORTED_ARITY:" + call.function()); return "0"; }
         Expression argument = call.arguments().get(0);
         String a = expression(argument, obligation, issues, depth + 1);
-        return switch (call.function()) {
+        if (call.function().equals("pow"))
+            return expression(new Binary(BinaryOperator.POWER, argument, call.arguments().get(1)), obligation, issues, depth + 1);
+        return realCall(call.function(), argument, a, obligation, issues);
+    }
+
+    static String realCall(String function, Expression argument, String a, Obligation obligation, List<String> issues) {
+        return switch (function) {
             case "exp" -> "(Real.exp " + a + ")";
             case "log", "ln" -> {
                 if (!positive(argument, obligation)) issues.add("LOG_POSITIVE_ARGUMENT_REQUIRED:" + argument.canonicalMaterial());
@@ -130,9 +141,7 @@ public final class LeanSourceRenderer {
                 yield "(Real.sqrt " + a + ")";
             }
             case "abs" -> "(abs " + a + ")";
-            case "pow" -> expression(new Binary(BinaryOperator.POWER, argument,
-                call.arguments().get(1)), obligation, issues, depth + 1);
-            default -> { issues.add("UNSUPPORTED_CALL:" + call.function()); yield "0"; }
+            default -> { issues.add("UNSUPPORTED_CALL:" + function); yield "0"; }
         };
     }
 
@@ -164,14 +173,20 @@ public final class LeanSourceRenderer {
     public String source(Obligation obligation, String nonce) {
         Material material = render(obligation);
         if (!material.supported()) throw new IllegalArgumentException(String.join(",", material.issues()));
+        boolean scoped = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema());
         return "import Mathlib\nimport Lean.Util.CollectAxioms\n"
+            + (scoped ? "import Lean.Util.FoldConsts\n" : "")
             + "set_option autoImplicit false\nset_option Elab.async false\nset_option maxHeartbeats 1000000\n"
             + "theorem regelsuche_lemma : " + material.theoremType() + " := " + material.proof()
-            + audit(material.theoremType(), obligation.contentHash(), nonce);
+            + audit(material.theoremType(), obligation.contentHash(), nonce, scoped);
     }
 
     /** The wrapper kernel-checks the exact closed request, not merely the printed goal. */
     public String audit(String expectedType, String obligationHash, String nonce) {
+        return audit(expectedType, obligationHash, nonce, false);
+    }
+
+    private String audit(String expectedType, String obligationHash, String nonce, boolean scoped) {
         if (!obligationHash.matches("sha256:[0-9a-f]{64}") || !nonce.matches("[0-9a-f]{32}"))
             throw new IllegalArgumentException("invalid audit binding");
         return "\ntheorem regelsuche_bound : " + expectedType + " := @regelsuche_lemma\n"
@@ -185,11 +200,33 @@ public final class LeanSourceRenderer {
             + "  for ax in axioms do\n"
             + "    unless allowed.contains ax do\n"
             + "      throwError m!\"unapproved proof axiom: {ax}\"\n"
-            + "  let report := Json.mkObj [(\"schema\", toJson \"regelsuche.lean-audit/v1\"),\n"
+            + (scoped ? IMPORT_AUDIT : "")
+            + "  let report := Json.mkObj [(\"schema\", toJson \"regelsuche.lean-audit/v" + (scoped ? "2" : "1") + "\"),\n"
+            + (scoped ? "    (\"imports\", toJson imports),\n" : "")
             + "    (\"obligationHash\", toJson \"" + obligationHash + "\"),\n"
             + "    (\"nonce\", toJson \"" + nonce + "\"),\n"
             + "    (\"theorem\", toJson \"regelsuche_bound\"),\n"
             + "    (\"axioms\", toJson (axioms.map Name.toString))]\n"
             + "  liftIO <| IO.println (\"REGELSUCHE_LEAN_AUDIT \" ++ report.compress)\n";
     }
+
+    // Walk locally generated helper declarations until each branch reaches an imported
+    // declaration. The separately collected axioms follow dependencies through the imports too.
+    private static final String IMPORT_AUDIT = """
+          let mut todo := [`regelsuche_lemma]
+          let mut seen : NameSet := {}
+          let mut imports : Array Json := #[]
+          while !todo.isEmpty do
+            let name := todo.head!
+            todo := todo.tail!
+            unless seen.contains name do
+              seen := seen.insert name
+              if let some idx := env.getModuleIdxFor? name then
+                let modName := env.header.moduleNames[idx.toNat]!
+                imports := imports.push (Json.mkObj [("name", toJson name.toString), ("module", toJson modName.toString)])
+              else
+                let some info := env.find? name | throwError m!"missing local declaration: {name}"
+                for dep in info.getUsedConstantsAsSet do
+                  todo := dep :: todo
+        """;
 }

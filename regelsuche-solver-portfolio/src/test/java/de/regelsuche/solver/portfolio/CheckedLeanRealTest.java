@@ -85,6 +85,56 @@ class CheckedLeanRealTest {
             +new LeanSourceRenderer().audit(type,SolverIr.sha256("audit-fixture"),"3".repeat(32));
         assertEquals(0,compile(text));
     }
+    @Test void scopedStatementsUseTheKernelAndAnIndependentTypeReconstruction() throws Exception {
+        // In the required real-tool lane a missing second project is a failure.
+        String second = System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT");
+        assertNotNull(second, "The real scoped proof lane requires the independent pinned project");
+        var checker = new LeanEvidenceRebuilder(Path.of(second), root());
+        var zero = ScopedLeanContractTest.zero;
+        var declarations = List.of(new SymbolDeclaration("f", Sort.REAL_SEQUENCE));
+        var f = ScopedLeanContractTest.f;
+        var hasSum = ScopedLeanContractTest.app("has_sum", f, zero);
+        var fromSum = ScopedLeanContractTest.theorem(declarations, List.of(Predicate.holds("sum", hasSum)),
+            ScopedLeanContractTest.app("summable", f));
+        for (var request : List.of(ScopedLeanContractTest.witness(), ScopedLeanContractTest.sets(),
+                ScopedLeanContractTest.limit(zero), ScopedLeanContractTest.summableAdd(), fromSum)) {
+            var original = backend().executeWithEvidence(request);
+            assertEquals(ResultStatus.CONFIRMED, original.execution().result().status(), diagnostics(original.directory()));
+            var audit = LeanSolverBackend.checkedProcessAudit(Files.readString(original.directory().resolve("proof.stdout")),
+                request, null);
+            assertTrue(audit.scoped());
+            assertFalse(audit.imports().isEmpty());
+            if (request.equals(ScopedLeanContractTest.summableAdd()))
+                assertTrue(audit.imports().stream().anyMatch(d -> d.name().equals("Summable.add")
+                    && d.module().startsWith("Mathlib.")), audit.imports().toString());
+
+            String cert = original.execution().result().certificateHash();
+            var receipt = checker.rebuild(request, cert, original.directory());
+            String rebuilt = Files.readString(receipt.directory().resolve("proof.lean"));
+            assertTrue(rebuilt.endsWith(LeanStatementReconstruction.theorem(request)));
+            String report = Files.readString(receipt.directory().resolve("rebuild.txt"));
+            assertTrue(report.contains("reconstructed=" + SolverIr.sha256(LeanStatementReconstruction.theorem(request))));
+            assertEquals(receipt.receiptHash(), SolverIr.sha256(report));
+            if (request.equals(fromSum)) {
+                var stronger = ScopedLeanContractTest.theorem(declarations, List.of(), ScopedLeanContractTest.app("summable", f));
+                assertThrows(IOException.class, () -> checker.rebuild(stronger, cert, original.directory()));
+                // The second rendering is accepted by Lean only if its type really matches.
+                String attack = rebuilt.replace(LeanStatementReconstruction.theorem(request), LeanStatementReconstruction.theorem(stronger));
+                assertNotEquals(0, compile(attack));
+            }
+        }
+    }
+
+    @Test void falseScopedLimitAndCapturedWitnessNeverConfirm() throws Exception {
+        var badCapture = ScopedLeanContractTest.theorem(List.of(), List.of(), new Binder(BinderKind.EXISTS, Sort.REAL,
+            new Binder(BinderKind.FORALL, Sort.REAL, ScopedLeanContractTest.app("eq", new Bound(1), new Bound(0)))));
+        for (var request : List.of(ScopedLeanContractTest.limit(new Literal("1")), badCapture)) {
+            var attempt = backend().executeWithEvidence(request);
+            assertEquals(ResultStatus.UNKNOWN, attempt.execution().result().status(), diagnostics(attempt.directory()));
+            assertTrue(attempt.execution().result().certificateHash().isEmpty());
+        }
+    }
+
     private static String diagnostics(Path directory) throws Exception {
         StringBuilder out = new StringBuilder(directory.toString());
         for (String file : List.of("proof.stdout", "proof.stderr", "FAILED.txt")) {

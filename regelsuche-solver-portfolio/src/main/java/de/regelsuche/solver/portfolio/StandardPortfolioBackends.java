@@ -64,6 +64,18 @@ public final class StandardPortfolioBackends {
                 SolverIr.sha256("polynomial-normal-form/exact-rational/v1")));
     }
 
+    public static PortfolioBackend lean(LeanSolverBackend backend, BackendAvailability availability) {
+        var descriptor = backend.descriptor();
+        return new DeclaredPortfolioBackend(backend, BackendCapabilityProfile.create(
+            descriptor.backendId(), descriptor.backendVersion(),
+            List.of(SolverIr.OBLIGATION_SCHEMA, SolverIr.SCOPED_OBLIGATION_SCHEMA),
+            descriptor.supportedTheories(), descriptor.supportedRelations(), descriptor.supportedRelations(),
+            List.of(Sort.REAL, Sort.NATURAL, Sort.REAL_SEQUENCE, Sort.REAL_SET, Sort.REAL_FUNCTION, Sort.PROPOSITION),
+            Arrays.asList(BinaryOperator.values()), true, descriptor.supportedEvidence(),
+            List.of(BackendRole.FORMAL_PROOF), CostClass.HIGH, 100L, true, true,
+            availability, backend.configurationHash()));
+    }
+
     public static PortfolioBackend z3(
         Z3SmtSolverBackend backend,
         BackendAvailability availability
@@ -75,7 +87,7 @@ public final class StandardPortfolioBackends {
                 List.of(SolverIr.OBLIGATION_SCHEMA),
                 backend.descriptor().supportedTheories(),
                 backend.descriptor().supportedRelations(),
-                Arrays.asList(Relation.values()),
+                Arrays.stream(Relation.values()).filter(r -> r != Relation.HOLDS).toList(),
                 List.of(Sort.REAL),
                 Arrays.asList(BinaryOperator.values()),
                 false,

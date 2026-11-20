@@ -94,6 +94,8 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
     @Override
     public SolverExecution execute(Obligation obligation) {
         Objects.requireNonNull(obligation, "obligation");
+        if (!SolverIr.OBLIGATION_SCHEMA.equals(obligation.schema()))
+            return rejected(obligation, Map.of(), List.of("UNSUPPORTED_SCHEMA:" + obligation.schema()));
         Map<String, String> terms = Map.of(
             "goal.left", expressions.render(obligation.goal().left()),
             "goal.right", expressions.render(obligation.goal().right()));
