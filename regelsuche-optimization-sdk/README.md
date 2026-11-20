@@ -10,7 +10,7 @@ Its retained `publiclyPublished=false` field predates the actual GitHub release;
 publication is established by the release entry, not by rewriting the record.
 Read its own consumer and qualification metadata when using that archive.
 
-The following API documentation describes current `0.5.3-SNAPSHOT` source.
+The following API documentation describes current `0.5.4-SNAPSHOT` source.
 It is not a retroactive compatibility or qualification claim for 0.5.2 JARs.
 
 Finite reductions have a separate scoped API alongside scalar computations. See
@@ -29,6 +29,21 @@ thresholds. The mathematics and certificate replay live in
 limits and cancellation token. See [the mathematical contract and
 reproduction](../docs/research/congruence-coverage.md), including the
 trillion-slot scheduling example and the limits of finite certificates.
+
+`CongruenceCoverageSdk.bounds` and `verifyBounds` provide a separate count-bound
+mode. Complete Bonferroni intersection layers certify lower and upper bounds
+when constructing the exact union would exceed the term budget. A positive
+lower bound proves existence in the supplied finite progression; it does not
+locate the first free value. The source request and requested order are part
+of the certificate.
+
+`de.regelsuche.sdk.optimization.combinatorics.BipartiteMatchingSdk.search` and
+`verify` expose maximum bipartite matching and Hall-deficiency certificates.
+CORE constructs a matching and a left-side witness; an independent verifier
+derives its full neighborhood and an equal-size vertex cover. Applications
+using the deficit as a survivor bound must establish that all actual blockers
+are represented and have capacity one. See [the graph contract, examples and
+verification](../docs/research/bipartite-matching.md).
 
 The `0.5.4-SNAPSHOT` source also exposes
 `de.regelsuche.sdk.optimization.modular.PolynomialCongruenceSdk.solve` and

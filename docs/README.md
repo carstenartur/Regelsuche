@@ -176,6 +176,10 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 
 ### Domänen und Solver
 
+- [Bipartite Matchings und Hall-Zertifikate](research/bipartite-matching.md) —
+  maximale Zuordnungen und nachprüfbare Defizite in endlichen Graphen.
+- [Aktivierte Kongruenzüberdeckungen](research/congruence-coverage.md) —
+  exakte Vereinigungen, kleinste freie Werte und begrenzte Bonferroni-Zählgrenzen.
 - [Geprüfte endliche Summen und Iterationen](../regelsuche-optimization-sdk/FINITE_SERIES.md) —
   Polynomsummen, Komposition, lineare Zustände, Paar-/Fenster-/Tupelreduktionen
   und Inversionspläne mit expliziten Definitionsbereichen.

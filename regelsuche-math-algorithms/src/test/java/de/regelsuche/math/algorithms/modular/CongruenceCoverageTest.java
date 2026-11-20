@@ -3,6 +3,7 @@ package de.regelsuche.math.algorithms.modular;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -26,6 +27,175 @@ class CongruenceCoverageTest {
         assertEquals(Optional.of(ZERO), certificate.leastIndex());
         assertEquals(Optional.of(integer(-17)), result.leastUncovered());
         assertTrue(CongruenceCoverage.verify(request, certificate, LIMITS, () -> false).valid());
+    }
+
+    @Test
+    void matchesPointwiseLayerCountsAndBoundsAcrossOrders() {
+        var duplicate = rule(4, -1, -5);
+        for (var request : List.of(
+                request(-17, 6, 15, duplicate, duplicate, rule(9, 1, 1),
+                    rule(12, 1, -17), rule(12, 7, -17), rule(4, 0, -17), rule(1, 0, 68)),
+                request(7, 3, 0, rule(1, 0, -100)),
+                request(7, 3, 9, rule(3, 0, 7), rule(1, 0, 32)),
+                request(-3, 7, 4))) {
+            var progression = request.progression();
+            var points = new ArrayList<BigInteger>();
+            for (int index = 0; index < progression.count().intValueExact(); index++) {
+                points.add(progression.first().add(progression.step().multiply(integer(index))));
+            }
+            int effectiveRules = Math.toIntExact(request.rules().stream()
+                .filter(rule -> points.stream().anyMatch(point -> coversPoint(rule, point))).count());
+            var layerSums = new ArrayList<>(Collections.nCopies(effectiveRules, ZERO));
+            int survivors = 0;
+            for (var point : points) {
+                long hits = request.rules().stream().filter(rule -> coversPoint(rule, point)).count();
+                if (hits == 0) survivors++;
+                // Count the subsets containing this point by the binomial recurrence.
+                long subsets = 1;
+                for (int layer = 1; layer <= hits; layer++) {
+                    subsets = subsets * (hits - layer + 1) / layer;
+                    layerSums.set(layer - 1, layerSums.get(layer - 1).add(integer(subsets)));
+                }
+            }
+            var lower = ZERO;
+            var upper = progression.count();
+            var partial = progression.count();
+            for (int order = 0; order <= effectiveRules + 1; order++) {
+                int depth = Math.min(order, effectiveRules);
+                if (order > 0 && order <= effectiveRules) {
+                    var layerSum = layerSums.get(depth - 1);
+                    if (order % 2 == 0) {
+                        partial = partial.add(layerSum);
+                        upper = upper.min(partial);
+                    } else {
+                        partial = partial.subtract(layerSum);
+                        lower = lower.max(partial);
+                    }
+                }
+                if (order >= effectiveRules) lower = upper = integer(survivors);
+                var result = CongruenceCoverage.bounds(request, order, LIMITS, () -> false);
+                assertEquals(CongruenceCoverage.BoundsStatus.CERTIFIED, result.status());
+                var certificate = result.certificate().orElseThrow();
+                assertEquals(layerSums.subList(0, depth), certificate.layerTotals());
+                assertEquals(lower, certificate.lowerBound());
+                assertEquals(upper, certificate.upperBound());
+                assertTrue(certificate.lowerBound().compareTo(integer(survivors)) <= 0);
+                assertTrue(certificate.upperBound().compareTo(integer(survivors)) >= 0);
+                assertTrue(CongruenceCoverage.verifyBounds(request, order, certificate, LIMITS, () -> false).valid());
+            }
+        }
+    }
+
+    @Test
+    void retainsTighterEarlierBoundsWhenHigherSameParitySumsAreWeaker() {
+        var duplicates = new CongruenceCoverage.Request(request(0, 1, 100).progression(),
+            Collections.nCopies(6, rule(10, 0, 0)));
+        var odd = CongruenceCoverage.bounds(duplicates, 3, LIMITS, () -> false).certificate().orElseThrow();
+        assertEquals(List.of(integer(60), integer(150), integer(200)), odd.layerTotals());
+        assertEquals(integer(40), odd.lowerBound());
+        assertEquals(integer(100), odd.upperBound());
+
+        var rules = new ArrayList<>(Collections.nCopies(8, rule(100, 0, 0)));
+        rules.add(rule(2, 1, 0));
+        var isolatedDuplicates = new CongruenceCoverage.Request(duplicates.progression(), rules);
+        var even = CongruenceCoverage.bounds(isolatedDuplicates, 4, LIMITS, () -> false)
+            .certificate().orElseThrow();
+        assertEquals(List.of(integer(58), integer(28), integer(56), integer(70)), even.layerTotals());
+        assertEquals(integer(42), even.lowerBound());
+        assertEquals(integer(70), even.upperBound());
+    }
+
+    @Test
+    void certifiesEightPrimeLowerBoundsWhenExactUnionExceedsTermLimit() {
+        var request = eightPrimePeriod();
+        var limited = new IterationLimits(LIMITS.maximumWork(), 128, LIMITS.timeoutMillis());
+        assertUnavailable(CongruenceCoverage.search(request, limited, () -> false), "TERM_LIMIT");
+        var exactSearch = CongruenceCoverage.search(request, LIMITS, () -> false).certificate().orElseThrow();
+        assertEquals(255, exactSearch.terms().size());
+        var exact = integer(22_992_076_800L); // Product of (p - 1) over the eight primes.
+        var first = CongruenceCoverage.bounds(request, 1, limited, () -> false).certificate().orElseThrow();
+        var third = CongruenceCoverage.bounds(request, 3, limited, () -> false).certificate().orElseThrow();
+        assertEquals(integer(20_617_871_161L), first.lowerBound());
+        assertEquals(integer(22_976_886_861L), third.lowerBound());
+        assertEquals(integer(35_336_848_261L), first.upperBound());
+        assertEquals(integer(23_236_997_481L), third.upperBound());
+        assertEquals(exact, request.progression().count().subtract(exactSearch.coveredCount()));
+        assertTrue(CongruenceCoverage.verifyBounds(request, 1, first, limited, () -> false).valid());
+        assertTrue(CongruenceCoverage.verifyBounds(request, 3, third, limited, () -> false).valid());
+        var full = CongruenceCoverage.bounds(request, Integer.MAX_VALUE, limited, () -> false)
+            .certificate().orElseThrow();
+        assertEquals(8, full.layerTotals().size());
+        assertEquals(exact, full.lowerBound());
+        assertEquals(exact, full.upperBound());
+    }
+
+    @Test
+    void rejectsChangedSourceOrderLayerTotalsAndEndpoints() {
+        var request = eightPrimePeriod();
+        var proof = CongruenceCoverage.bounds(request, 3, LIMITS, () -> false).certificate().orElseThrow();
+        var rules = new ArrayList<>(request.rules());
+        rules.set(0, rule(11, 0, -1)); // Identical point set with a different activation.
+        var changed = new CongruenceCoverage.Request(request.progression(), rules);
+        assertFalse(CongruenceCoverage.verifyBounds(changed, 3, proof, LIMITS, () -> false).valid());
+        assertFalse(CongruenceCoverage.verifyBounds(request, 2, proof, LIMITS, () -> false).valid());
+        var exhausted = CongruenceCoverage.bounds(request, 8, LIMITS, () -> false).certificate().orElseThrow();
+        assertFalse(CongruenceCoverage.verifyBounds(request, 9, exhausted, LIMITS, () -> false).valid());
+        var totals = new ArrayList<>(proof.layerTotals());
+        totals.set(0, totals.getFirst().add(ONE));
+        var altered = new CongruenceCoverage.BoundsCertificate(request, 3, totals,
+            proof.lowerBound(), proof.upperBound());
+        totals.clear();
+        assertEquals(3, altered.layerTotals().size());
+        assertFalse(CongruenceCoverage.verifyBounds(request, 3, altered, LIMITS, () -> false).valid());
+        var falseEndpoint = new CongruenceCoverage.BoundsCertificate(request, 3, proof.layerTotals(),
+            proof.lowerBound().add(ONE), proof.upperBound());
+        assertFalse(CongruenceCoverage.verifyBounds(request, 3, falseEndpoint, LIMITS, () -> false).valid());
+        var falseUpperEndpoint = new CongruenceCoverage.BoundsCertificate(request, 3, proof.layerTotals(),
+            proof.lowerBound(), proof.upperBound().subtract(ONE));
+        assertFalse(CongruenceCoverage.verifyBounds(request, 3, falseUpperEndpoint, LIMITS, () -> false).valid());
+    }
+
+    @Test
+    void rejectsNegativeOrderAndDiscardsInterruptedBounds() {
+        var request = eightPrimePeriod();
+        var checks = new AtomicInteger();
+        var first = CongruenceCoverage.bounds(request, 1, LIMITS, () -> {
+            checks.incrementAndGet();
+            return false;
+        });
+        int firstOrderChecks = checks.getAndSet(0);
+        var third = CongruenceCoverage.bounds(request, 3, LIMITS, () -> {
+            checks.incrementAndGet();
+            return false;
+        });
+        assertTrue(checks.get() > firstOrderChecks);
+        int cutoff = firstOrderChecks + (checks.get() - firstOrderChecks) / 2;
+        checks.set(0);
+        var cancelled = CongruenceCoverage.bounds(request, 3, LIMITS, () -> checks.incrementAndGet() > cutoff);
+        assertBoundsUnavailable(cancelled, "CANCELLED");
+        assertTrue(cancelled.work() > first.work());
+        long midLayerWork = first.work() + (third.work() - first.work()) / 2;
+        assertBoundsUnavailable(CongruenceCoverage.bounds(request, 3,
+            LIMITS.withMaximumWork(midLayerWork), () -> false), "WORK_LIMIT");
+        assertBoundsUnavailable(CongruenceCoverage.bounds(request, 3,
+            new IterationLimits(LIMITS.maximumWork(), 1, LIMITS.timeoutMillis()), () -> false), "TERM_LIMIT");
+        var proof = third.certificate().orElseThrow();
+        assertEquals("CANCELLED", CongruenceCoverage.verifyBounds(request, 3, proof, LIMITS, () -> true).reason());
+        assertEquals("WORK_LIMIT", CongruenceCoverage.verifyBounds(request, 3, proof,
+            LIMITS.withMaximumWork(1), () -> false).reason());
+        assertThrows(IllegalArgumentException.class, () -> CongruenceCoverage.bounds(request, -1, LIMITS, () -> false));
+        assertThrows(IllegalArgumentException.class,
+            () -> CongruenceCoverage.verifyBounds(request, -1, proof, LIMITS, () -> false));
+    }
+
+    @Test
+    void rejectsOversizedIntermediateLayerTotals() {
+        // Each single count fits, and two coinciding rules have an exact survivor count of zero.
+        // The first inclusion–exclusion layer still exceeds the intermediate integer limit.
+        var size = ONE.shiftLeft(IterationLimits.MAX_RUNTIME_BITS - 1);
+        var request = new CongruenceCoverage.Request(new CongruenceCoverage.Progression(ZERO, ONE, size),
+            List.of(rule(1, 0, 0), rule(1, 0, 0)));
+        assertBoundsUnavailable(CongruenceCoverage.bounds(request, 1, LIMITS, () -> false), "RUNTIME_BIT_LIMIT");
     }
 
     @Test
@@ -234,6 +404,22 @@ class CongruenceCoverageTest {
         assertEquals(reason, result.reason());
         assertTrue(result.certificate().isEmpty());
         assertTrue(result.leastUncovered().isEmpty());
+    }
+
+    private static void assertBoundsUnavailable(CongruenceCoverage.BoundsResult result, String reason) {
+        assertEquals(CongruenceCoverage.BoundsStatus.UNAVAILABLE, result.status());
+        assertEquals(reason, result.reason());
+        assertTrue(result.certificate().isEmpty());
+    }
+
+    private static boolean coversPoint(CongruenceCoverage.Rule rule, BigInteger point) {
+        return point.compareTo(rule.activeFrom()) >= 0
+            && point.subtract(rule.residue()).mod(rule.modulus()).signum() == 0;
+    }
+
+    private static CongruenceCoverage.Request eightPrimePeriod() {
+        return request(0, 1, 35_336_848_261L, rule(11, 0, 0), rule(13, 0, 0), rule(17, 0, 0),
+            rule(19, 0, 0), rule(23, 0, 0), rule(29, 0, 0), rule(31, 0, 0), rule(37, 0, 0));
     }
 
     private static CongruenceCoverage.Request request(long first, long step, long count,
