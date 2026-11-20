@@ -10,10 +10,13 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Route;
 import com.microsoft.playwright.options.AriaRole;
 import com.microsoft.playwright.options.LoadState;
 import de.regelsuche.json.JsonReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -300,6 +303,43 @@ class LandingPageBrowserFlowTest {
         assertThat(page.locator("#formulaPreview code")).hasText("MUL(ADD(a, b), ADD(1/2, x))");
     }
 
+    @Test
+    void emptyDraftRejectionPreservesTheFormulaAndAllowsAValidRetry() {
+        String original = "f(x, x)";
+        String draft = "y)+z+(w";
+        var input = page.locator("#searchForm input[name='expression']");
+        var ast = page.locator("#formulaPreview code");
+        page.locator("#formulaTools summary").click();
+        input.fill(original);
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='5:6']").click();
+
+        var inspected = new ArrayList<String>();
+        page.route("**/api/inspect/formula", route -> {
+            String expression = (String) new JsonReader(route.request().postData()).readObject().get("expression");
+            inspected.add(expression);
+            if (expression.equals(draft)) {
+                route.fulfill(new Route.FulfillOptions().setStatus(400).setContentType("text/plain").setBody(""));
+            } else {
+                route.resume();
+            }
+        });
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        replacement.fill(draft);
+        replacement.press("Enter");
+        page.waitForFunction("() => document.getElementById('formulaStatus').textContent.includes('übernommen')");
+        assertEquals(List.of(draft), inspected, "The rejected draft must not trigger full-proposal inspection");
+        assertThat(page.locator("#formulaStatus")).hasText("Änderung nicht übernommen. Der Parser hat die Eingabe abgelehnt.");
+        assertThat(input).hasValue(original);
+        assertThat(ast).hasText(original);
+
+        replacement.fill("y");
+        replacement.press("Enter");
+        assertThat(input).hasValue("f(x, (y))");
+        assertThat(ast).hasText("f(x, y)");
+        assertEquals(List.of(draft, "y", "f(x, (y))"), inspected);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"source", "type", "profile", "draft"})
     void pendingVisualEditCannotOverwriteANewerContext(String change) {
@@ -354,6 +394,106 @@ class LandingPageBrowserFlowTest {
             assertEquals(0, page.locator("#formulaPreview math").count());
         }
         assertEquals("", page.locator("#formulaStatus").textContent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"z", "z +"})
+    void searchWaitsUntilFormulaValidationHasFinished(String draft) {
+        boolean valid = draft.equals("z");
+        String original = "x + 1";
+        String edited = "(z) + 1";
+        var input = page.locator("#searchForm input[name='expression']");
+        var submit = page.locator("#searchForm button[type='submit']");
+        page.locator("#formulaTools summary").click();
+        page.locator("#searchForm select[name='profile']").selectOption("FAST_SIMPLIFY");
+        input.fill(original);
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='0:1']").click();
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        replacement.fill(draft);
+
+        var outgoingSearches = new ArrayList<Object>();
+        page.onRequest(request -> {
+            if (request.url().endsWith("/api/search") && request.method().equals("POST")) {
+                outgoingSearches.add(new JsonReader(request.postData()).readObject().get("expression"));
+            }
+        });
+        page.evaluate("""
+            heldExpression => {
+                const originalFetch = window.fetch.bind(window);
+                window.fetch = async (...args) => {
+                    const response = await originalFetch(...args);
+                    if (args[0] === '/api/inspect/formula' && JSON.parse(args[1].body).expression === heldExpression) {
+                        await new Promise(resolve => { window.releaseSearchGuardProbe = resolve; });
+                    }
+                    return response;
+                };
+            }
+            """, valid ? edited : draft);
+        replacement.press("Enter");
+        page.waitForFunction("() => typeof window.releaseSearchGuardProbe === 'function'");
+
+        submit.click();
+        input.press("Enter");
+        page.evaluate("async () => { await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); }");
+        assertEquals(List.of(), outgoingSearches, "Pointer and keyboard must not submit the old expression");
+        var status = page.locator("#formulaStatus");
+        assertThat(status).containsText("Änderung wird noch geprüft");
+
+        page.evaluate("() => window.releaseSearchGuardProbe()");
+        assertThat(status).containsText(valid ? "Änderung übernommen" : "Änderung nicht übernommen");
+        assertThat(input).hasValue(valid ? edited : original);
+        assertEquals(List.of(), outgoingSearches, "A blocked submit must stay blocked");
+
+        var result = page.waitForResponse("**/api/search", () -> {
+            if (valid) submit.click();
+            else input.press("Enter");
+        });
+        assertEquals(200, result.status());
+        assertEquals(List.of(valid ? edited : original), outgoingSearches);
+    }
+
+    @Test
+    void editsAnOccurrenceAtTheSourceLimitWithoutChangingEnclosingPrecedence() {
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        String prefix = "f(" + "a".repeat(251) + ",";
+        input.fill(prefix + "x)");
+        page.locator("#previewFormula").click();
+        var part = page.getByLabel("Teilausdruck wählen");
+        assertThat(part).isVisible();
+        part.press("End");
+        var replacement = page.getByLabel("Teilausdruck ersetzen");
+        assertThat(replacement).hasValue("x");
+        replacement.fill("y");
+        replacement.press("Enter");
+        assertThat(input).hasValue(prefix + "y)");
+        assertThat(page.locator("#formulaPreview code")).hasText("f(" + "a".repeat(251) + ", y)");
+
+        String product = "x * " + "a".repeat(248);
+        input.fill(product);
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='0:1']").click();
+        replacement.fill("y + z");
+        replacement.press("Enter");
+        assertThat(page.locator("#formulaStatus")).containsText("braucht Klammern");
+        assertThat(input).hasValue(product);
+        assertThat(page.locator("#formulaPreview code")).hasText("MUL(x, " + "a".repeat(248) + ")");
+    }
+
+    @Test
+    void formulaShortcutUsesTheOccurrenceSelectedInMathMl() {
+        var input = page.locator("#searchForm input[name='expression']");
+        page.locator("#formulaTools summary").click();
+        input.fill("x^4 + 4*y^4");
+        input.evaluate("node => node.setSelectionRange(0, 0)");
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='6:11']")
+            .getByText("*", new com.microsoft.playwright.Locator.GetByTextOptions().setExact(true)).click();
+        assertThat(page.getByLabel("Teilausdruck ersetzen")).isFocused();
+
+        page.locator("button[data-formula='square']").click();
+        assertThat(input).hasValue("x^4 + (4*y^4)^2");
     }
 
     @Test

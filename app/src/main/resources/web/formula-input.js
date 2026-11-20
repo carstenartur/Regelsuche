@@ -12,6 +12,7 @@
     const replacement = document.getElementById('formulaReplacement');
     const apply = document.getElementById('applyFormulaEdit');
     const parts = new Map();
+    const formulaRejected = 'Der Parser hat die Eingabe abgelehnt.';
     let snapshot = null;
     let selected = null;
     let activeEdit = null;
@@ -35,6 +36,7 @@
         replacement.value = selected?.source || '';
         replacement.disabled = apply.disabled = !selected;
         showStatus('');
+        if (selected) input.setSelectionRange(selected.range.startInclusive, selected.range.endExclusive);
         if (selected && focusReplacement) {
             replacement.focus();
             replacement.select();
@@ -63,6 +65,7 @@
         const response = await fetch('/api/inspect/formula', {method: 'POST',
             headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expression, type})});
         if (response.status === 422) return {diagnostic: await response.json()};
+        if (response.status === 400) return {rejection: (await response.text()).trim() || formulaRejected};
         if (!response.ok) throw new Error(await response.text());
         return {tree: await response.json()};
     }
@@ -124,6 +127,7 @@
     }
 
     function renderPreview(tree) {
+        snapshot.tree = tree;
         const display = document.createElement('div');
         display.className = 'formula-display';
         display.tabIndex = 0;
@@ -161,6 +165,20 @@
         output.replaceChildren(select);
     }
 
+    function withReplacement(node, path, replacement) {
+        if (!path.length) return replacement;
+        const [index, ...rest] = path;
+        const children = node.children.slice();
+        children[index] = withReplacement(children[index], rest, replacement);
+        return {...node, children};
+    }
+
+    function sameTree(left, right) {
+        return left.kind === right.kind && left.value === right.value
+            && left.children.length === right.children.length
+            && left.children.every((child, index) => sameTree(child, right.children[index]));
+    }
+
     async function applyEdit() {
         if (!selected || activeEdit || !snapshot || !isCurrent(snapshot)) return;
         const draft = replacement.value.trim();
@@ -173,26 +191,41 @@
         const token = activeEdit = {};
         const current = () => activeEdit === token && isCurrent(source);
         const {startInclusive: start, endExclusive: end} = range;
-        const inserted = path.length ? '(' + draft + ')' : draft;
-        const proposal = source.expression.slice(0, start) + inserted + source.expression.slice(end);
+        const prefix = source.expression.slice(0, start);
+        const suffix = source.expression.slice(end);
+        let inserted = path.length ? '(' + draft + ')' : draft;
         apply.setAttribute('aria-disabled', 'true');
         showStatus('Änderung wird geprüft …');
         try {
+            let draftTree;
             // Verify the draft before wrapping it. Inserted parentheses can balance an invalid draft.
             if (path.length) {
-                const {diagnostic} = await inspect(draft, 'TERM');
+                const {tree, diagnostic, rejection} = await inspect(draft, 'TERM');
                 if (!current()) return;
                 if (diagnostic) throw new Error('Gib einen einzelnen Teilausdruck ein. ' + diagnostic.message);
+                if (!tree) throw new Error(rejection || formulaRejected);
+                draftTree = tree;
             }
-            const {tree, diagnostic} = await inspect(proposal, source.type);
+            let result = await inspect(prefix + inserted + suffix, source.type);
             if (!current()) return;
+            // The server can reject the extra parentheses at its input-length limit.
+            const unwrapped = path.length > 0 && result.rejection !== undefined;
+            if (unwrapped) {
+                inserted = draft;
+                result = await inspect(prefix + inserted + suffix, source.type);
+                if (!current()) return;
+            }
+            const {tree, diagnostic, rejection} = result;
+            if (rejection) throw new Error(rejection);
             if (diagnostic) throw new Error(diagnostic.message);
             // The same AST position must own the whole insertion in the accepted source.
             const newRange = path.reduce((part, index) => part?.children[index], tree)?.sourceRange;
-            if (newRange?.startInclusive !== start || newRange.endExclusive !== start + inserted.length) {
-                throw new Error('Gib einen einzelnen Teilausdruck ein.');
+            const wholeInsertion = newRange?.startInclusive === start && newRange.endExclusive === start + inserted.length;
+            if (unwrapped && (!wholeInsertion || !sameTree(tree, withReplacement(source.tree, path, draftTree)))) {
+                throw new Error('Dieser Teilausdruck braucht Klammern. Kürze die Formel und versuche es erneut.');
             }
-            input.value = proposal;
+            if (!wholeInsertion) throw new Error('Gib einen einzelnen Teilausdruck ein.');
+            input.value = prefix + inserted + suffix;
             input.dispatchEvent(new Event('input', {bubbles: true}));
             snapshot = captureSource();
             renderPreview(tree);
@@ -212,6 +245,13 @@
         invalidate();
     });
     tools.hidden = Boolean(profile.value);
+    form.addEventListener('submit', event => {
+        if (!activeEdit) return;
+        event.preventDefault();
+        tools.open = true;
+        showStatus('Änderung wird noch geprüft. Starte die Suche nach der Prüfung.');
+        status.scrollIntoView({block: 'nearest'});
+    }, {capture: true});
     selector.addEventListener('change', () => selectPart(selector.value));
     replacement.addEventListener('input', () => {
         cancelEdit();
@@ -246,8 +286,9 @@
         const source = snapshot = captureSource();
         showStatus('Formel wird gelesen …');
         try {
-            const {tree, diagnostic} = await inspect(source.expression, source.type);
+            const {tree, diagnostic, rejection} = await inspect(source.expression, source.type);
             if (!isCurrent(source)) return;
+            if (rejection) throw new Error(rejection);
             if (diagnostic) {
                 showDiagnostic(diagnostic);
                 return;

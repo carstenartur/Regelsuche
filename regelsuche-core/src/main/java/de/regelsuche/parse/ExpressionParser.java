@@ -57,8 +57,8 @@ public class ExpressionParser implements RetainedGraph.View {
     /**
      * Parses one term with exact rational numeric leaves. Integer and finite
      * decimal tokens share the bounded exact scalar grammar.
-     * Exact source certificates and node ranges are created only by
-     * {@link #parseExactTerm}.
+     * For source provenance, use {@link #parseExactTerm} for terms and
+     * {@link #parseExactEquation} for equations.
      */
     public Expr parseTerm(String term) {
         String source = Objects.requireNonNull(term, "term");
