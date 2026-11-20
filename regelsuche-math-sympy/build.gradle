@@ -172,21 +172,6 @@ if (separateSympyRuntimeAuthority) {
     }
 }
 
-tasks.register('sympyRuntimeAuthority') {
-    group = 'verification'
-    description = 'Runs the complete Gradle SymPy runtime test and JaCoCo graph on an isolated required runner.'
-    dependsOn tasks.named('jacocoTestReport')
-    doFirst {
-        if (separateSympyRuntimeAuthority
-                || sympyRuntimeAuthorization != null
-                || !tasks.named('test').get().enabled
-                || !tasks.named('jacocoTestReport').get().enabled) {
-            throw new GradleException(
-                'sympyRuntimeAuthority must execute the complete enabled test and JaCoCo graph without separation markers')
-        }
-    }
-}
-
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport'),
         verifySymPyFactorizationBenchmark

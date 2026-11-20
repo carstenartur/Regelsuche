@@ -78,7 +78,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
         var result = evaluate(repositoryRoot());
         assertTrue(result.violations().isEmpty(), result.violations().toString());
         assertEquals(Set.of("Dockerfile", "Dockerfile.autopilot", "Dockerfile.comparative-benchmarks",
-            "Dockerfile.external-python", "Dockerfile.proof", "Dockerfile.release-readiness", "Dockerfile.visual-regression"),
+            "Dockerfile.external-proofs", "Dockerfile.external-python", "Dockerfile.proof", "Dockerfile.release-readiness", "Dockerfile.visual-regression"),
             result.routineDockerfiles());
     }
 

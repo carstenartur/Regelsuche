@@ -56,6 +56,21 @@ class MavenCheckedProofWorkflowContractTest {
         assertTrue(commandsText.contains("mvn -B -pl app -am"));
         assertFalse(commandsText.contains("-DskipTests"));
         assertFalse(commandsText.contains("|| true"));
+        JsonNode worker = jobs.required("maven-proof-qualification");
+        assertFalse(worker.has("continue-on-error"));
+        String workerSteps = worker.required("steps").toString();
+        assertTrue(workerSteps.contains("-Pchecked-proofs -pl regelsuche-proof-tests -am"));
+        assertTrue(workerSteps.contains("target/reports/checked-proof"));
+        Path module = root.resolve("regelsuche-proof-tests");
+        for (String line : Files.readAllLines(module.resolve("src/test/resources/checked-proof-suites.txt"))) {
+            String simpleName = line.substring(line.lastIndexOf('.') + 1);
+            assertTrue(commandsText.contains(simpleName), simpleName);
+        }
+        var nativeNames = Files.readAllLines(module.resolve("src/test/resources/checked-proof-suites.txt")).stream()
+            .map(line -> line.substring(line.lastIndexOf('.') + 1)).collect(java.util.stream.Collectors.toSet());
+        var originalNames = java.util.regex.Pattern.compile("-Dtest=([^\\s]+)").matcher(commandsText);
+        assertTrue(originalNames.find());
+        assertEquals(java.util.Set.of(originalNames.group(1).split(",")), nativeNames);
         List<String> needs = new ArrayList<>();
         jobs.path("verification").path("needs").forEach(n -> needs.add(n.asText()));
         assertTrue(needs.contains("checked-proofs"));

@@ -48,20 +48,22 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
 
     assertTrue(sympy.contains("actions/checkout@"),
         "the runtime authority must start from a separate fresh checkout");
-    assertTrue(sympy.contains("gradle/actions/setup-gradle@"));
+    assertFalse(sympy.contains("gradle/actions/setup-gradle@"));
+    assertFalse(sympy.contains("apt-get"));
     assertTrue(sympy.contains(
-        "bash gradle/run-isolated-sympy-runtime-authority.sh"));
+        "mvn --batch-mode --no-transfer-progress -Pfull -pl regelsuche-math-sympy -am verify"));
+    assertFalse(sympy.contains("gradle/run-isolated-sympy-runtime-authority.sh"));
     assertFalse(sympy.contains(
         "bash gradle/run-isolated-jmh-authority.sh"));
     assertFalse(sympy.contains("working-directory: sympy-runtime-checkout"));
     assertFalse(sympy.contains("needs:"),
         "the runtime authority must start concurrently with JMH");
     assertTrue(sympy.contains(
-        "regelsuche-math-sympy/build/test-results/**"));
+        "regelsuche-math-sympy/target/failsafe-reports/**"));
     assertTrue(sympy.contains(
-        "regelsuche-math-sympy/build/reports/tests/**"));
+        "regelsuche-math-sympy/target/reports/sympy-runtime/**"));
     assertTrue(sympy.contains(
-        "regelsuche-math-sympy/build/reports/jacoco/**"));
+        "regelsuche-math-sympy/target/site/jacoco/**"));
     assertFalse(sympy.contains(
         "REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY"),
         "the isolated authority must not inherit the delegation marker");
@@ -74,8 +76,7 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
     Path root = repositoryRoot();
     String build = Files.readString(root.resolve(
         "regelsuche-math-sympy/build.gradle"));
-    String entrypoint = Files.readString(root.resolve(
-        "gradle/run-isolated-sympy-runtime-authority.sh"));
+    assertFalse(Files.exists(root.resolve("gradle/run-isolated-sympy-runtime-authority.sh")));
     String bootstrapTest = Files.readString(root.resolve(
         "regelsuche-math-sympy/src/test/java/de/regelsuche/math/sympy/"
             + "GraalPySymPyRuntimeBootstrapTest.java"));
@@ -92,22 +93,9 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
         "separateSympyRuntimeAuthority != sympyRuntimeAuthorityAuthorized"));
     assertTrue(build.contains("tasks.named('test').configure"));
     assertTrue(build.contains("tasks.named('jacocoTestReport').configure"));
-    assertTrue(build.contains("tasks.register('sympyRuntimeAuthority')"));
-    assertTrue(build.contains(
-        "dependsOn tasks.named('jacocoTestReport')"));
-    assertTrue(build.contains("!tasks.named('test').get().enabled"));
-    assertTrue(build.contains(
-        "!tasks.named('jacocoTestReport').get().enabled"));
+    assertFalse(build.contains("tasks.register('sympyRuntimeAuthority')"));
     assertFalse(build.contains("maxParallelForks"));
     assertFalse(build.contains("filter {"));
-
-    assertTrue(entrypoint.contains("set -euo pipefail"));
-    assertTrue(entrypoint.contains(
-        ":regelsuche-math-sympy:sympyRuntimeAuthority"));
-    assertTrue(entrypoint.contains("--no-configuration-cache"));
-    assertTrue(entrypoint.contains("separateSympyRuntimeAuthority"));
-    assertTrue(entrypoint.contains(
-        "REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY"));
 
     assertTrue(bootstrapTest.contains("Duration.ofSeconds(20)"),
         "the bootstrap cold-start assertion must remain bounded");

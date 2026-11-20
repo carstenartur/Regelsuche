@@ -54,9 +54,6 @@ class MavenGradleHostRuntimeInventoryContractTest {
       Map.entry("run-isolated-jmh-authority.sh", List.of(
           "exec ./gradlew \\"
       )),
-      Map.entry("run-isolated-sympy-runtime-authority.sh", List.of(
-          "exec ./gradlew \\"
-      )),
       Map.entry("run-knowledge-lifecycle-improvement.sh", List.of(
           "python_executable=\"${PYTHON_EXECUTABLE:-python3}\"",
           "\"$python_executable\" -m venv \"$venv\"",

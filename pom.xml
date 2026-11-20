@@ -232,6 +232,11 @@
               <excludeDefaultDirectories>true</excludeDefaultDirectories>
               <filesets>
                 <fileset>
+                  <directory>${project.build.directory}</directory>
+                  <includes><include>jacoco.exec</include><include>site/jacoco/**</include></includes>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+                <fileset>
                   <directory>${project.build.directory}/surefire-reports</directory>
                   <followSymlinks>false</followSymlinks>
                 </fileset>
@@ -251,6 +256,23 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>jmh-qualification</id>
+      <modules>
+        <module>regelsuche-persistence-hibernate</module>
+        <module>app</module>
+        <module>regelsuche-jmh</module>
+        <module>regelsuche-sympy-jmh</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>checked-proofs</id>
+      <modules>
+        <module>regelsuche-persistence-hibernate</module>
+        <module>app</module>
+        <module>regelsuche-proof-tests</module>
+      </modules>
+    </profile>
     <profile>
       <id>maven-central</id>
       <properties>
@@ -326,6 +348,7 @@
         <module>regelsuche-jmh</module>
         <module>regelsuche-sympy-jmh</module>
         <module>regelsuche-browser-tests</module>
+        <module>regelsuche-proof-tests</module>
         <module>regelsuche-quality-aggregate</module>
       </modules>
     </profile>
