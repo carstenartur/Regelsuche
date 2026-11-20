@@ -78,7 +78,7 @@ class ProofDockerfileBuildContextTest {
                 "COPY --from=walkthrough-build /workspace/app/build/install/app/ ./")));
         assertThrows(AssertionError.class,
             () -> verifyStandardImage(valid.replace(
-                "ENTRYPOINT [\\\"./bin/regelsuche\\\"]", "ENTRYPOINT [\\\"./bin/app\\\"]")));
+                "ENTRYPOINT [\"./bin/regelsuche\"]", "ENTRYPOINT [\"./bin/app\"]")));
         assertThrows(AssertionError.class,
             () -> verifyStandardImage(valid.replace(
                 "FROM maven:3.10.0-eclipse-temurin-25-noble AS build",
@@ -99,7 +99,7 @@ class ProofDockerfileBuildContextTest {
             "Unpack the Maven distribution rather than Gradle installDist");
         assertTrue(dockerfile.contains("COPY --from=build /workspace/app-distribution/ ./"),
             "Runtime must consume only the Maven-built distribution");
-        assertTrue(dockerfile.contains("ENTRYPOINT [\\\"./bin/regelsuche\\\"]"),
+        assertTrue(dockerfile.contains("ENTRYPOINT [\"./bin/regelsuche\"]"),
             "Use the Maven distribution launcher");
     }
 
