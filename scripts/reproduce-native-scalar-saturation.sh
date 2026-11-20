@@ -20,8 +20,17 @@ for name in first second; do
     git -C "$root" archive --format=tar "$revision" | tar -xf - -C "$checkout"
     (
         cd "$checkout"
-        REGELSUCHE_PREPARATION_REVISION="$revision" ./gradlew --no-daemon --no-configuration-cache --max-workers=2 "$@" :regelsuche-benchmarks:installDist
-        ./regelsuche-benchmarks/build/install/regelsuche-benchmarks/bin/regelsuche-benchmarks --native-scalar-comparison \
+        # Reproduce through the Maven reactor, not an additional Gradle host driver.
+        # The runtime classpath is generated from this clean, unpacked source tree.
+        REGELSUCHE_PREPARATION_REVISION="$revision" mvn -B -ntp -pl regelsuche-benchmarks -am \
+            -DskipTests package \
+            org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath \
+            -DincludeScope=runtime -Dmdep.outputFile=target/native-scalar-runtime-classpath.txt
+        runtime_classpath=$(cat regelsuche-benchmarks/target/native-scalar-runtime-classpath.txt)
+        [[ -n "$runtime_classpath" ]]
+        REGELSUCHE_PREPARATION_REVISION="$revision" java \
+            -cp "regelsuche-benchmarks/target/classes:$runtime_classpath" \
+            de.regelsuche.benchmarks.ComparativeBenchmarkMain --native-scalar-comparison \
             scripts/sympy_rule_reference/reference.py "$revision" "$output/$name"
     ) > "$output/$name.log" 2>&1
 done
