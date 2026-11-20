@@ -55,8 +55,8 @@ final class SearchTelemetry {
 <span class="fc" id="L55">    }</span>
 
     void statePrunedTransposition(SearchState state, int frontierSize, int visitedCount) {
-<span class="fc" id="L58">        emit(SearchEventType.STATE_PRUNED_TRANSPOSITION, state, frontierSize, visitedCount, 0, &quot;transposition-gate&quot;);</span>
-<span class="fc" id="L59">    }</span>
+<span class="nc" id="L58">        emit(SearchEventType.STATE_PRUNED_TRANSPOSITION, state, frontierSize, visitedCount, 0, &quot;transposition-gate&quot;);</span>
+<span class="nc" id="L59">    }</span>
 
     void statePrunedDepth(SearchState state, int frontierSize, int visitedCount) {
 <span class="fc" id="L62">        emit(SearchEventType.STATE_PRUNED_DEPTH, state, frontierSize, visitedCount, 0, &quot;max-depth&quot;);</span>

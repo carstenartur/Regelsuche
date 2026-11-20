@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Z3PolynomialProofRewrites.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">Z3PolynomialProofRewrites.java</span></div><h1>Z3PolynomialProofRewrites.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import static de.regelsuche.solver.portfolio.Z3ProofSyntax.*;
+import static de.regelsuche.solver.portfolio.Z3ProofValues.*;
+
+import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
+import de.regelsuche.solver.ir.SolverIr.Goal;
+import de.regelsuche.solver.ir.SolverIr.Literal;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Every rewrite is checked without premises; a native rule label is never sufficient. */
+final class Z3PolynomialProofRewrites {
+    private final Obligation source;
+<span class="fc" id="L20">    private final PolynomialNormalFormSolverBackend backend = new PolynomialNormalFormSolverBackend();</span>
+<span class="fc" id="L21">    private final Map&lt;Pair, Boolean&gt; cache = new HashMap&lt;&gt;();</span>
+    private int calls;
+    private long admittedWork;
+
+<span class="fc" id="L25">    Z3PolynomialProofRewrites(Obligation source) { this.source = source; }</span>
+
+<span class="fc" id="L27">    boolean verifies(Equality equality) { return equivalent(equality.left(), equality.right(), 0); }</span>
+
+    private boolean equivalent(Value left, Value right, int depth) {
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new Invalid();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (left.equals(right)) return true;</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) return polynomial(a, b);</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if (!(left instanceof Formula a) || !(right instanceof Formula b)) return false;</span>
+<span class="fc" id="L34">        Truth first = truth(a, depth + 1), second = truth(b, depth + 1);</span>
+<span class="pc bpc" id="L35" title="1 of 6 branches missed.">        if (first != null &amp;&amp; second != null) return first == second;</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">        if (a instanceof Negation n &amp;&amp; b instanceof Negation m) {</span>
+<span class="nc" id="L37">            return equivalent(n.operand(), m.operand(), depth + 1);</span>
+        }
+<span class="pc bpc" id="L39" title="3 of 4 branches missed.">        if (a instanceof Equality n &amp;&amp; b instanceof Equality m) {</span>
+<span class="nc bnc" id="L40" title="All 4 branches missed.">            return equivalent(n.left(), m.left(), depth + 1) &amp;&amp; equivalent(n.right(), m.right(), depth + 1)</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">                || equivalent(n.left(), m.right(), depth + 1) &amp;&amp; equivalent(n.right(), m.left(), depth + 1);</span>
+        }
+<span class="fc" id="L43">        return false;</span>
+    }
+
+    /** null means not proved constant; REFUTED polynomial identity is not universal disequality. */
+    private Truth truth(Formula formula, int depth) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new Invalid();</span>
+<span class="fc bfc" id="L49" title="All 3 branches covered.">        return switch (formula) {</span>
+<span class="fc" id="L50">            case Truth constant -&gt; constant;</span>
+<span class="fc" id="L51">            case Negation negation -&gt; {</span>
+<span class="fc" id="L52">                Truth child = truth(negation.operand(), depth + 1);</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">                yield child == null ? null : child == Truth.TRUE ? Truth.FALSE : Truth.TRUE;</span>
+            }
+<span class="fc" id="L55">            case Equality equality -&gt; equalityTruth(equality, depth + 1);</span>
+        };
+    }
+
+    private Truth equalityTruth(Equality equality, int depth) {
+<span class="fc" id="L60">        Value left = equality.left(), right = equality.right();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (left.equals(right)) return Truth.TRUE;</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (polynomial(a, b)) return Truth.TRUE;</span>
+<span class="pc bpc" id="L64" title="3 of 4 branches missed.">            if (a.expression() instanceof Literal &amp;&amp; b.expression() instanceof Literal) return Truth.FALSE;</span>
+<span class="fc" id="L65">            return null;</span>
+        }
+<span class="nc" id="L67">        Truth a = truth(asFormula(left), depth + 1), b = truth(asFormula(right), depth + 1);</span>
+<span class="nc bnc" id="L68" title="All 6 branches missed.">        return a == null || b == null ? null : a == b ? Truth.TRUE : Truth.FALSE;</span>
+    }
+
+    private boolean polynomial(Real left, Real right) {
+<span class="fc" id="L72">        var key = new Pair(left, right);</span>
+<span class="fc" id="L73">        Boolean old = cache.get(key);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (old != null) return old;</span>
+<span class="fc" id="L75">        long estimate = (long) (left.size() + right.size()) * (left.monomials() + right.monomials());</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (++calls &gt; 128 || (admittedWork += estimate) &gt; 262_144) throw new Invalid();</span>
+<span class="fc" id="L77">        var obligation = Obligation.create(&quot;native-polynomial-rewrite&quot;, source.declarations(), source.theories(),</span>
+<span class="fc" id="L78">            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),</span>
+<span class="fc" id="L79">            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        boolean result = backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;</span>
+<span class="fc" id="L81">        cache.put(key, result);</span>
+<span class="fc" id="L82">        return result;</span>
+    }
+
+<span class="fc" id="L85">    private record Pair(Real left, Real right) { }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

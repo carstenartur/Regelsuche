@@ -2533,7 +2533,7 @@ public class WebWorkbenchServer {
 <span class="fc" id="L2533">        String path = exchange.getRequestURI().getPath();</span>
 <span class="fc" id="L2534">        String suffix = path.substring(&quot;/api/memory&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
 <span class="fc" id="L2535">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
-<span class="pc bpc" id="L2536" title="4 of 6 branches missed.">        switch (suffix) {</span>
+<span class="pc bpc" id="L2536" title="3 of 6 branches missed.">        switch (suffix) {</span>
             case &quot;states&quot; -&gt; {
 <span class="nc" id="L2538">                w.beginObject();</span>
 <span class="nc" id="L2539">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
@@ -2553,7 +2553,7 @@ public class WebWorkbenchServer {
 <span class="nc" id="L2553">                w.endObject();</span>
 <span class="nc" id="L2554">                sendJson(exchange, 200, w.toString());</span>
 <span class="nc" id="L2555">            }</span>
-<span class="nc" id="L2556">            case &quot;pruning&quot; -&gt; sendJson(exchange, 200, renderPruningDecisionsJson());</span>
+<span class="fc" id="L2556">            case &quot;pruning&quot; -&gt; sendJson(exchange, 200, renderPruningDecisionsJson());</span>
             case &quot;macros&quot; -&gt; {
 <span class="nc" id="L2558">                w.beginObject();</span>
 <span class="nc" id="L2559">                w.array(&quot;macros&quot;, arr -&gt; inventoryRepository.findAll().stream()</span>
