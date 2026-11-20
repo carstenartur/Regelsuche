@@ -43,6 +43,11 @@ jobs:
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
           sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+          # The 22.04 hosted mirrorlist can stall for an hour on its Azure HTTP entry.
+          # Prefer the same official Ubuntu archive over HTTPS; retain package pins.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            sudo sed -i 's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get update
           # GraalPy isolates native modules beside the private extracted tree
           # and invokes patchelf to relocate each context-local ELF copy.
@@ -107,6 +112,11 @@ jobs:
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
           sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+          # The 22.04 hosted mirrorlist can stall for an hour on its Azure HTTP entry.
+          # Prefer the same official Ubuntu archive over HTTPS; retain package pins.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            sudo sed -i 's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             patchelf=0.14.3-1 \
@@ -147,6 +157,11 @@ jobs:
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
           sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+          # The 22.04 hosted mirrorlist can stall for an hour on its Azure HTTP entry.
+          # Prefer the same official Ubuntu archive over HTTPS; retain package pins.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            sudo sed -i 's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             patchelf=0.14.3-1 \
@@ -188,6 +203,11 @@ jobs:
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
           sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+          # The 22.04 hosted mirrorlist can stall for an hour on its Azure HTTP entry.
+          # Prefer the same official Ubuntu archive over HTTPS; retain package pins.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            sudo sed -i 's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             patchelf=0.14.3-1 \
