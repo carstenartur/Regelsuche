@@ -17,8 +17,8 @@ Missing benchmarks, altered policy bytes, INCONCLUSIVE, stale raw output and wor
 
 ## Tasks
 
-- [ ] Add mandatory Failsafe raw replay in regelsuche-quality with CI archive provenance, checked-in exact raw inputs and original reports; compare all decisions, all 29 rows and failure behavior.
-- [ ] Compile app/src/jmh via the real pinned annotation processor in a dedicated full Maven module. Execute fresh forks for latency and allocation and apply production publication, v3 and allocation validators. Run the new Maven producer.
-- [ ] Move the diagnostic SymPy JMH matrix and independent runtime tests behind the pinned external-tool boundary before retiring the old isolated workflow.
+- [x] Add mandatory Failsafe raw replay in regelsuche-quality with CI archive provenance, checked-in exact raw inputs and original reports; compare all decisions, all 29 rows and failure behavior.
+- [x] Compile app/src/jmh via the real pinned annotation processor in a dedicated full Maven module. Execute fresh forks for latency and allocation and apply production publication, v3 and allocation validators. Run the new Maven producer.
+- [x] Move the diagnostic SymPy JMH matrix and independent runtime tests behind the pinned external-tool boundary before retiring the old isolated workflow.
 - [ ] Migrate remaining build, quality collection, browser, solver and release obligations identified in the spec. Exercise negative controls, then retire the corresponding adapter.
 - [ ] Exercise clean checkout, unfiltered full source archive, packaged distribution and release qualification. Update README, testing and release docs to reflect observed authority.

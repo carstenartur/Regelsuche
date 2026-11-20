@@ -60,8 +60,6 @@ jobs:
           mvn --batch-mode --no-transfer-progress \
             -f playwright-bootstrap/pom.xml \
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
-      - name: Provision the pinned OSV Scanner
-        run: bash gradle/provision-osv-scanner.sh
       - name: Run the checkout-owned Gradle authority without duplicate JMH or loaded SymPy runtime work
         run: |
           set -o pipefail
@@ -97,33 +95,20 @@ jobs:
     name: Isolated JMH authority
     if: github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0 }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, problem-matcher: true }
-      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
-        with: { cache-cleanup: on-success }
-      - name: Install isolated benchmark prerequisites
-        run: |
-          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
-          # The 22.04 hosted mirrorlist can stall for an hour on its Azure HTTP entry.
-          # Prefer the same official Ubuntu archive over HTTPS; retain package pins.
-          if test -f /etc/apt/apt-mirrors.txt; then
-            sudo sed -i 's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
-          fi
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            patchelf=0.14.3-1 \
-            python3-venv
-      - name: Run every JMH benchmark and fail-closed validator
-        run: bash gradle/run-isolated-jmh-authority.sh
-      - name: Retain isolated JMH evidence
+        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+      - name: Verify the unchanged measurement rules and replay both original decisions
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
+          -Dtest=JmhWarmupMigrationTest,JmhRegressionV3VerifierTest,JmhPublicationTest,JmhAllocationReportMainTest,SympyFactorizationReportTest verify
+      - name: Measure the fresh application and factorization forks and decide every gate
+        run: >-
+          mvn --batch-mode --no-transfer-progress --fail-at-end -Pjmh-qualification
+          -pl regelsuche-jmh,regelsuche-sympy-jmh -am -DskipTests verify
+      - name: Retain all successful or rejected native benchmark measurements
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
@@ -135,7 +120,10 @@ jobs:
             build/reports/quality/jmh-regression-report.json
             build/reports/quality/jmh-regression-report.md
             public/dev/bench/**
-          include-hidden-files: true
+            regelsuche-jmh/target/reports/jmh/**
+            regelsuche-jmh/target/failsafe-reports/**
+            regelsuche-sympy-jmh/target/reports/jmh/**
+            regelsuche-sympy-jmh/target/failsafe-reports/**
           if-no-files-found: error
 
   sympy-runtime-verification:
@@ -200,11 +188,6 @@ jobs:
           mvn --batch-mode --no-transfer-progress \
             -f playwright-bootstrap/pom.xml \
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
-      - name: Provision the pinned OSV Scanner
-        run: bash gradle/provision-osv-scanner.sh
-      - name: Qualify current Maven consumers against the released SDK
-        timeout-minutes: 30
-        run: bash gradle/run-released-sdk-maven-consumers.sh
       - name: Verify the complete Maven product and Docker contract
         run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
       - name: Verify Maven Web Workbench Docker image through JUnit/Testcontainers
@@ -247,6 +230,7 @@ jobs:
             ${{ steps.source_archive.outputs.root }}/**/target/failsafe-reports/**
             ${{ steps.source_archive.outputs.root }}/**/target/reports/**
             ${{ steps.source_archive.outputs.root }}/build/reports/python-client/**
+            ${{ steps.source_archive.outputs.root }}/build/reports/released-sdk-maven-consumers/**
           if-no-files-found: error
       - name: Retain Maven product verification evidence
         if: ${{ always() && !cancelled() }}
@@ -390,35 +374,6 @@ jobs:
             app/target/surefire-reports/
             .ci/lean-proof/lake-manifest.json
             ${{ runner.temp }}/regelsuche-lean-rebuild/lake-manifest.json
-          if-no-files-found: error
-
-  maven-jmh-qualification:
-    name: Isolated native Maven JMH qualification
-    if: github.event_name != 'create'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 150
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
-      - name: Verify the unchanged measurement rules and replay both original decisions
-        run: >-
-          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
-          -Dtest=JmhWarmupMigrationTest,JmhRegressionV3VerifierTest,JmhPublicationTest,JmhAllocationReportMainTest,SympyFactorizationReportTest verify
-      - name: Measure the fresh application and factorization forks and decide every gate
-        run: >-
-          mvn --batch-mode --no-transfer-progress --fail-at-end -Pjmh-qualification
-          -pl regelsuche-jmh,regelsuche-sympy-jmh -am -DskipTests verify
-      - name: Retain all successful or rejected native benchmark measurements
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: native-maven-jmh-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            regelsuche-jmh/target/reports/jmh/**
-            regelsuche-jmh/target/failsafe-reports/**
-            regelsuche-sympy-jmh/target/reports/jmh/**
-            regelsuche-sympy-jmh/target/failsafe-reports/**
           if-no-files-found: error
 
   maven-proof-qualification:

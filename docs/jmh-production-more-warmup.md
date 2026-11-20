@@ -54,10 +54,8 @@ acceptance collection retains both old and current policy instances.
 ## Verification
 
 ```bash
-python3 -B scripts/test-jmh-more-warmup-policy.py
-python3 -B scripts/test-verify-jmh-regression-v3.py --verifier scripts/verify-jmh-regression-v3.py
-python3 -B scripts/test-quality-acceptance-evidence.py
-bash gradle/run-isolated-jmh-authority.sh
+mvn -pl regelsuche-quality -Dtest=JmhWarmupMigrationTest,JmhRegressionV3VerifierTest,JmhPublicationTest,JmhAllocationReportMainTest,SympyFactorizationReportTest verify
+mvn --fail-at-end -Pjmh-qualification -pl regelsuche-jmh,regelsuche-sympy-jmh -am -DskipTests verify
 ```
 
 The migration controls use synthetic measurements. They check unchanged
@@ -75,7 +73,7 @@ The full Maven reactor compiles the application benchmark sources with the JMH 1
 mvn -Pfull -pl regelsuche-jmh -am verify
 ```
 
-Ordinary `mvn verify` also replays the two [original CI captures](../regelsuche-quality/src/test/resources/jmh-ci/README.md), including their respective six- and two-warmup policies and the recorded INCONCLUSIVE result. This replay runs without Git metadata, Docker, host Python or new timings. The independent isolated Gradle authority remains until the Maven producers have passed their hosted qualification.
+Ordinary `mvn verify` also replays the two [original CI captures](../regelsuche-quality/src/test/resources/jmh-ci/README.md), including their respective six- and two-warmup policies and the recorded INCONCLUSIVE result. This replay runs without Git metadata, Docker, host Python or new timings. Both independent producers passed in [CI run 44814506351](https://github.com/carstenartur/Regelsuche/actions/runs/44814506351) with the same 29 latency, six allocation and 42 factorization contracts. The required isolated job now runs Maven. Its artifact retains the complete native outputs and the ten established files consumed by the quality index and Pages.
 
 The full reactor also builds the two original factorization benchmark classes and stages their resolved JAR dependencies. The `regelsuche-sympy-jmh` Failsafe test runs JMH inside one Testcontainers worker. Its JDK and CPython base images are pinned by digest, its SymPy and mpmath wheels by SHA-256, and its native patchelf package by version. It keeps raw JMH JSON, stdout, stderr and the verified v2 report in `regelsuche-sympy-jmh/target/reports/jmh/`. This separate 42-row factorization matrix is diagnostic. A missing runtime or incomplete matrix fails verification.
 

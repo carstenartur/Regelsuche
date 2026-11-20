@@ -3,6 +3,7 @@ package de.regelsuche.benchmark;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import de.regelsuche.quality.jmh.SympyFactorizationReport;
+import de.regelsuche.quality.jmh.JmhPublishedFiles;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ class SympyFactorizationContainerIT {
             assertEquals(0, run.getExitCode(), () -> "Factorization worker failed. Evidence: " + reports);
             SympyFactorizationReport.main(new String[]{raw.toString(), reports.resolve("summary.json").toString(),
                 reports.resolve("index.html").toString()});
+            JmhPublishedFiles.FACTORIZATION.publish(root, reports);
         }
     }
 }

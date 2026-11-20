@@ -37,8 +37,8 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
     assertFalse(gradle.contains("sympyRuntimeAuthority"),
         "the loaded correctness runner must not execute the isolated runtime graph");
 
-    assertTrue(jmh.contains(
-        "bash gradle/run-isolated-jmh-authority.sh"));
+    assertTrue(jmh.contains("-pl regelsuche-jmh,regelsuche-sympy-jmh -am -DskipTests verify"));
+    assertFalse(jmh.contains("setup-gradle"));
     assertFalse(jmh.contains(
         "bash gradle/run-isolated-sympy-runtime-authority.sh"),
         "runtime tests must not remain serialized after benchmark measurement");

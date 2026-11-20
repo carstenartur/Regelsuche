@@ -163,7 +163,7 @@ unabhängige, frische Checkouts beginnen gleichzeitig:
 
 1. die checkout-lokale Gradle-Korrektheitsautorität ohne doppelte JMH- und
    geladene SymPy-Laufzeitarbeit;
-2. die unveränderte vollständige JMH-Autorität auf einem eigenen Runner;
+2. den isolierten Maven-JMH-Lauf für 29 Latenzmessungen, sechs Allokationsmessungen und 42 Faktorisierungsfälle;
 3. die vollständige SymPy-Laufzeit- und JaCoCo-Prüfung im gepinnten Maven-Worker
    auf einem eigenen Runner;
 4. der vollständige Maven-Produkt- und Docker-Vertrag.

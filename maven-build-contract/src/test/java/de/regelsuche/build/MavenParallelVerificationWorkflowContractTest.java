@@ -107,9 +107,11 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(jmh.contains("name: Isolated JMH authority"));
     assertTrue(jmh.contains("actions/checkout@"),
         "the JMH authority must start from an independent checkout");
-    assertTrue(jmh.contains("gradle/actions/setup-gradle@"));
-    assertTrue(jmh.contains(
-        "bash gradle/run-isolated-jmh-authority.sh"));
+    assertFalse(jmh.contains("gradle/actions/setup-gradle@"));
+    assertFalse(jmh.contains("apt-get"));
+    assertTrue(jmh.contains("--fail-at-end -Pjmh-qualification"));
+    assertTrue(jmh.contains("-pl regelsuche-jmh,regelsuche-sympy-jmh -am -DskipTests verify"));
+    assertTrue(jmh.contains("JmhWarmupMigrationTest,JmhRegressionV3VerifierTest"));
     assertFalse(jmh.contains("run-isolated-sympy-runtime-authority.sh"),
         "SymPy runtime tests must not remain serialized behind JMH");
     assertFalse(jmh.contains("sympy-runtime-checkout"));
@@ -347,8 +349,7 @@ class MavenParallelVerificationWorkflowContractTest {
     String settings = Files.readString(root.resolve("settings.gradle"));
     String separation = Files.readString(root.resolve(
         "gradle/separated-jmh-authority.gradle"));
-    String entrypoint = Files.readString(root.resolve(
-        "gradle/run-isolated-jmh-authority.sh"));
+    assertFalse(Files.exists(root.resolve("gradle/run-isolated-jmh-authority.sh")));
 
     int sympyPolicy = settings.indexOf(
         "gradle/sympy-factorization-verification.gradle");
@@ -365,13 +366,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(separation.contains("'verifyJmhAllocationBenchmark'"));
     assertTrue(separation.contains(
         "'verifySymPyFactorizationBenchmark'"));
-    assertTrue(separation.contains("tasks.register('jmhAuthority')"));
-    assertTrue(separation.contains(
-        "dependsOn 'verifyJmhRegression',\n"
-            + "        'verifyJmhBenchmark',\n"
-            + "        'verifyJmhAllocationBenchmark',\n"
-            + "        ':regelsuche-math-sympy:"
-            + "verifySymPyFactorizationBenchmark'"));
+    assertFalse(separation.contains("tasks.register('jmhAuthority')"));
     assertFalse(separation.contains("warmup"));
     assertFalse(separation.contains("iteration"));
     assertFalse(separation.contains("fork"));
@@ -379,11 +374,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(separation.contains("exclude"),
         "the separation layer must not alter benchmark selection or policy");
 
-    assertTrue(entrypoint.contains("set -euo pipefail"));
-    assertTrue(entrypoint.contains("exec ./gradlew"));
-    assertTrue(entrypoint.contains("jmhAuthority"));
-    assertTrue(entrypoint.contains("--no-configuration-cache"));
-    assertFalse(entrypoint.contains("-PseparateJmhAuthority=true"));
+
   }
 
   @Test

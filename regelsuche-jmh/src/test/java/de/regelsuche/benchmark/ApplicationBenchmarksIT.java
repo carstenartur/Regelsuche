@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.quality.jmh.JmhAllocationReportMain;
+import de.regelsuche.quality.jmh.JmhPublishedFiles;
 import de.regelsuche.quality.jmh.JmhPublicationMain;
 import de.regelsuche.quality.jmh.JmhRegressionV3Main;
 import java.nio.file.Files;
@@ -49,6 +50,7 @@ class ApplicationBenchmarksIT {
             () -> JmhPublicationMain.main(new String[]{raw.toString(),
                 ROOT.resolve("config/quality/jmh-baseline-more-warmup-v1.json").toString(),
                 OUTPUT.resolve("badge.json").toString(), OUTPUT.resolve("index.html").toString()}));
+        JmhPublishedFiles.LATENCY.publish(ROOT, OUTPUT);
 
     }
 
@@ -63,5 +65,6 @@ class ApplicationBenchmarksIT {
             .shouldFailOnError(true).jvmArgs().resultFormat(ResultFormatType.JSON).result(raw.toString());
         new Runner(options.build()).run();
         JmhAllocationReportMain.main(new String[]{raw.toString(), OUTPUT.resolve("allocation.json").toString()});
+        JmhPublishedFiles.ALLOCATION.publish(ROOT, OUTPUT);
     }
 }

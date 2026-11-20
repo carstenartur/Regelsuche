@@ -99,12 +99,14 @@
     <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
     <maven.site.plugin.version>3.22.0</maven.site.plugin.version>
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
+    <commons.compress.version>1.28.0</commons.compress.version>
     <jacoco.version>0.8.16</jacoco.version>
     <jacoco.report.version>0.8.16</jacoco.report.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <dependency><groupId>org.apache.commons</groupId><artifactId>commons-compress</artifactId><version>${commons.compress.version}</version></dependency>
       <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-console</artifactId><version>${junit.version}</version></dependency>
       <dependency><groupId>com.microsoft.playwright</groupId><artifactId>playwright</artifactId><version>${playwright.version}</version></dependency>
       <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>${jmh.version}</version></dependency>
