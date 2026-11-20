@@ -173,6 +173,18 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`OrderedPairStateProjection.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateProjection.java#L25) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateProjection.java | public record OrderedPairStateProjection(boolean pairFirst, List<Term> pairTerms, List<RowTerm> rowTerms) { -->
 - [`OrderedPairStateTransferTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateTransferTest.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedPairStateTransferTest.java | class OrderedPairStateTransferTest { -->
 
+## Identitätsprüfung für nichtkommutative Formeln
+
+- **Hypothese.** Ein einziges rationales Matrizentupel entscheidet die Gleichheit begrenzter geordneter Polynomausdrücke über den rationalen Zahlen.
+- **Umsetzungsstand.** EXPERIMENTAL. Mathematischer Kern und opt-in SDK berechnen die erste Spalte exakt und binden die Ausgabe an Differenzformel und Variablenreihenfolge. Die Baumgröße zählt jede Verwendung und die zur Subtraktion nötigen Gatter.
+- **Befund.** 20 deterministische kleine Formelpaare werden mit einer unabhängigen Wortentwicklung verglichen. Der Kommutator stimmt in acht Koordinaten mit dichten Matrizen überein. Beim geordneten Produkt von neun binären Summen bewältigt die Referenz 512 Wörter, während die erforderliche Dimension 4.900 das Standardbudget 4.096 übersteigt. [Satz, Vergleich und Reproduktion](noncommutative-identity.md)
+- **Folgerung.** Die Prüfung eignet sich für kleine, ausdrücklich als freie Polynome modellierte Formeln. Das Dimensionsbudget kann vor der Wortentwicklung zum Engpass werden. Die Kontrollen belegen keinen allgemeinen Laufzeitvorteil.
+
+- [`NoncommutativeIdentity.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/NoncommutativeIdentity.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/NoncommutativeIdentity.java | public final class NoncommutativeIdentity { -->
+- [`NoncommutativeIdentityTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/noncommutative/NoncommutativeIdentityTest.java#L18) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/noncommutative/NoncommutativeIdentityTest.java | class NoncommutativeIdentityTest { -->
+- [`NoncommutativeIdentitySdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/noncommutative/NoncommutativeIdentitySdk.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/noncommutative/NoncommutativeIdentitySdk.java | public final class NoncommutativeIdentitySdk { -->
+- [`NoncommutativeIdentitySdkTest.java`](../../regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/noncommutative/NoncommutativeIdentitySdkTest.java#L11) <!-- strategy-code: regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/noncommutative/NoncommutativeIdentitySdkTest.java | class NoncommutativeIdentitySdkTest { -->
+
 ## Gemeinsamer Faktor für quadratische und kubische Nenner
 
 - **Hypothese.** Für zwei monische Nenner (X = D^2) und (Y = D^3) lässt sich (D) durch die Division (Y / X) herleiten und anhand beider Potenzen prüfen.
