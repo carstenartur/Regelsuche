@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 2 || ( "$2" != "--host-only" && "$2" != "--with-container" ) ]]; then
-    echo "Usage: $0 <new evidence directory> --host-only|--with-container [Gradle options]" >&2
+    echo "Usage: $0 <new evidence directory> --host-only|--with-container [Maven options]" >&2
     exit 2
 fi
 output=$(realpath -m "$1")
@@ -22,7 +22,7 @@ for name in first second; do
         cd "$checkout"
         # Reproduce through the Maven reactor, not an additional Gradle host driver.
         # The runtime classpath is generated from this clean, unpacked source tree.
-        REGELSUCHE_PREPARATION_REVISION="$revision" mvn -B -ntp -pl regelsuche-benchmarks -am \
+        REGELSUCHE_PREPARATION_REVISION="$revision" mvn -B -ntp -pl regelsuche-benchmarks -am "$@" \
             -DskipTests package \
             org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath \
             -DincludeScope=runtime -Dmdep.outputFile=target/native-scalar-runtime-classpath.txt
