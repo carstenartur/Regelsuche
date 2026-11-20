@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteProofDagJson.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.proof</a> &gt; <span class="el_source">FiniteProofDagJson.java</span></div><h1>FiniteProofDagJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.proof;
+
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.util.StdConverter;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage;
+import de.regelsuche.math.algorithms.proof.FiniteProofDag.*;
+import java.io.IOException;
+import java.io.Writer;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Versioned, integer-preserving proof transport. Decoding alone never validates a claim. */
+public final class FiniteProofDagJson {
+    private static final int MAX_CHARACTERS = 2_000_000;
+<span class="fc" id="L28">    private static final JsonFactory FACTORY = JsonFactory.builder()</span>
+<span class="fc" id="L29">        .streamReadConstraints(StreamReadConstraints.builder().maxNumberLength(20_000).maxNestingDepth(32).build())</span>
+<span class="fc" id="L30">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L31">        .build();</span>
+<span class="fc" id="L32">    private static final ObjectMapper MAPPER = JsonMapper.builder(FACTORY)</span>
+<span class="fc" id="L33">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES,</span>
+            DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+<span class="fc" id="L35">        .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)</span>
+<span class="fc" id="L36">        .addMixIn(Node.class, NodeKinds.class)</span>
+<span class="fc" id="L37">        .addMixIn(CongruenceCoverage.Certificate.class, ExactShape.class)</span>
+<span class="fc" id="L38">        .build();</span>
+
+    private FiniteProofDagJson() {}
+
+    public static String write(Proof proof) throws JsonProcessingException {
+<span class="fc" id="L43">        var output = new PacketWriter();</span>
+        try {
+<span class="fc" id="L45">            MAPPER.writeValue(output, new Packet(1, proof));</span>
+<span class="fc" id="L46">        } catch (IOException failure) {</span>
+            // Jackson may wrap a writer failure with the path to the current node.
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (output.exceededLimit) throw new IllegalArgumentException(&quot;PROOF_TRANSPORT_SIZE_LIMIT&quot;);</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            if (failure instanceof JsonProcessingException json) throw json;</span>
+<span class="nc" id="L50">            throw JsonMappingException.fromUnexpectedIOE(failure);</span>
+<span class="fc" id="L51">        }</span>
+<span class="fc" id="L52">        return output.text.toString();</span>
+    }
+
+    public static Proof read(String json) throws JsonProcessingException {
+<span class="fc" id="L56">        var packet = MAPPER.readValue(checkedSize(json), Packet.class);</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (packet == null || packet.version() != 1) throw new IllegalArgumentException(&quot;INVALID_PROOF_VERSION&quot;);</span>
+<span class="fc" id="L58">        return packet.proof();</span>
+    }
+
+    private static String checkedSize(String text) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (text.length() &gt; MAX_CHARACTERS) throw new IllegalArgumentException(&quot;PROOF_TRANSPORT_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L63">        return text;</span>
+    }
+
+    /** Count UTF-16 code units before retaining each chunk from the JSON generator. */
+<span class="fc" id="L67">    private static final class PacketWriter extends Writer {</span>
+<span class="fc" id="L68">        private final StringBuilder text = new StringBuilder();</span>
+        private boolean exceededLimit;
+
+        @Override public void write(char[] chunk, int offset, int length) throws IOException {
+<span class="fc" id="L72">            checkRoom(length);</span>
+<span class="fc" id="L73">            text.append(chunk, offset, length);</span>
+<span class="fc" id="L74">        }</span>
+
+        @Override public void write(String chunk, int offset, int length) throws IOException {
+<span class="nc" id="L77">            checkRoom(length);</span>
+<span class="nc" id="L78">            text.append(chunk, offset, offset + length);</span>
+<span class="nc" id="L79">        }</span>
+
+        private void checkRoom(int length) throws IOException {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (length &gt; MAX_CHARACTERS - text.length()) {</span>
+<span class="fc" id="L83">                exceededLimit = true;</span>
+<span class="fc" id="L84">                throw new IOException(&quot;PROOF_TRANSPORT_SIZE_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L86">        }</span>
+
+<span class="nc" id="L88">        @Override public void flush() {}</span>
+<span class="fc" id="L89">        @Override public void close() {}</span>
+    }
+
+    private record Packet(int version, Proof proof) {
+<span class="fc" id="L93">        private Packet { Objects.requireNonNull(proof); }</span>
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = &quot;kind&quot;)
+    @JsonSubTypes({
+        @JsonSubTypes.Type(value = ExactLeaf.class, name = &quot;exact&quot;),
+        @JsonSubTypes.Type(value = HunterLeaf.class, name = &quot;hunter&quot;),
+        @JsonSubTypes.Type(value = HallLeaf.class, name = &quot;hall&quot;),
+        @JsonSubTypes.Type(value = Maximum.class, name = &quot;maximum&quot;),
+        @JsonSubTypes.Type(value = Exists.class, name = &quot;exists&quot;)
+    })
+    private interface NodeKinds {}
+
+    @JsonSerialize(converter = ToExactFields.class)
+    @JsonDeserialize(converter = FromExactFields.class)
+    private interface ExactShape {}
+<span class="fc" id="L109">    private record ExactFields(CongruenceCoverage.Request source, List&lt;CongruenceCoverage.Term&gt; terms,</span>
+            BigInteger coveredCount, BigInteger leastIndex) {}
+    private static final class ToExactFields extends StdConverter&lt;CongruenceCoverage.Certificate, ExactFields&gt; {
+        @Override public ExactFields convert(CongruenceCoverage.Certificate certificate) {
+<span class="fc" id="L113">            return new ExactFields(certificate.source(), certificate.terms(), certificate.coveredCount(),</span>
+<span class="fc" id="L114">                certificate.leastIndex().orElse(null));</span>
+        }
+    }
+    private static final class FromExactFields extends StdConverter&lt;ExactFields, CongruenceCoverage.Certificate&gt; {
+        @Override public CongruenceCoverage.Certificate convert(ExactFields fields) {
+<span class="fc" id="L119">            return new CongruenceCoverage.Certificate(fields.source(), fields.terms(), fields.coveredCount(),</span>
+<span class="fc" id="L120">                Optional.ofNullable(fields.leastIndex()));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

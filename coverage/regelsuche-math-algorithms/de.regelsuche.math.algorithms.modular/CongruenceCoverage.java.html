@@ -264,13 +264,13 @@ public final class CongruenceCoverage {
 <span class="fc bfc" id="L264" title="All 2 branches covered.">        if (order &lt; 0) throw new IllegalArgumentException(&quot;INVALID_COVERAGE_BOUNDS_ORDER&quot;);</span>
 <span class="fc" id="L265">    }</span>
 
-    private static boolean sameSource(Request request, Request source, Work work) {
+    static boolean sameSource(Request request, Request source, Work work) {
 <span class="fc" id="L268">        validateInput(source, work);</span>
 <span class="fc" id="L269">        work.charge(1L + request.rules().size());</span>
 <span class="fc" id="L270">        return request.equals(source);</span>
     }
 
-    private static void validateInput(Request request, Work work) {
+    static void validateInput(Request request, Work work) {
 <span class="fc" id="L274">        work.charge(1);</span>
 <span class="fc" id="L275">        var progression = request.progression();</span>
 <span class="fc" id="L276">        work.integer(progression.first());</span>
@@ -297,7 +297,7 @@ public final class CongruenceCoverage {
 <span class="fc" id="L297">        }</span>
 <span class="fc" id="L298">    }</span>
 
-<span class="fc" id="L300">    private record Ray(BigInteger first, BigInteger period) {}</span>
+<span class="fc" id="L300">    record Ray(BigInteger first, BigInteger period) {}</span>
 
 <span class="fc" id="L302">    private record IntersectedRule(int position, Ray intersection) {}</span>
 
@@ -403,7 +403,7 @@ public final class CongruenceCoverage {
 <span class="fc" id="L403">        work.terms(terms.size());</span>
 <span class="fc" id="L404">    }</span>
 
-    private static Ray indexRay(Progression progression, Rule rule, Work work) {
+    static Ray indexRay(Progression progression, Rule rule, Work work) {
 <span class="fc" id="L407">        var divisor = work.gcd(progression.step(), rule.modulus());</span>
 <span class="fc" id="L408">        var difference = work.subtract(rule.residue(), progression.first());</span>
 <span class="fc bfc" id="L409" title="All 2 branches covered.">        if (work.mod(difference, divisor).signum() != 0) return null;</span>
@@ -417,7 +417,7 @@ public final class CongruenceCoverage {
 <span class="fc" id="L417">        return clipped(lift(residue, period, threshold, work), period, progression.count(), work);</span>
     }
 
-    private static Ray intersect(Ray left, Ray right, BigInteger count, Work work) {
+    static Ray intersect(Ray left, Ray right, BigInteger count, Work work) {
 <span class="fc" id="L421">        work.charge(1);</span>
 <span class="fc bfc" id="L422" title="All 2 branches covered.">        if (left.period().equals(count)) return singletonIntersection(left, right, work);</span>
 <span class="fc bfc" id="L423" title="All 2 branches covered.">        if (right.period().equals(count)) return singletonIntersection(right, left, work);</span>
@@ -467,7 +467,7 @@ public final class CongruenceCoverage {
 <span class="fc" id="L467">        return sum;</span>
     }
 
-    private static BigInteger rayCount(BigInteger first, BigInteger period, BigInteger boundary, Work work) {
+    static BigInteger rayCount(BigInteger first, BigInteger period, BigInteger boundary, Work work) {
 <span class="fc" id="L471">        return work.add(work.divide(work.subtract(work.subtract(boundary, ONE), first), period), ONE);</span>
     }
 
@@ -493,27 +493,27 @@ public final class CongruenceCoverage {
 <span class="fc" id="L493">        return false;</span>
     }
 
-    private static final class Unavailable extends RuntimeException {
+    static final class Unavailable extends RuntimeException {
 <span class="fc" id="L497">        private Unavailable(String reason) { super(reason, null, false, false); }</span>
     }
 
     /** Word-based accounting for this integer algorithm; no polynomial semantics are involved. */
-    private static final class Work {
+    static final class Work {
         private final IterationLimits limits;
         private final BooleanSupplier cancellation;
 <span class="fc" id="L504">        private final long start = System.nanoTime();</span>
         private final long timeout;
-        private long used;
+        long used;
 
-<span class="fc" id="L508">        private Work(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L508">        Work(IterationLimits limits, BooleanSupplier cancellation) {</span>
 <span class="fc" id="L509">            this.limits = Objects.requireNonNull(limits);</span>
 <span class="fc" id="L510">            this.cancellation = Objects.requireNonNull(cancellation);</span>
 <span class="fc" id="L511">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
 <span class="fc" id="L512">        }</span>
 
-        private void charge(long amount) {
+        void charge(long amount) {
 <span class="pc bpc" id="L515" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Unavailable(&quot;CANCELLED&quot;);</span>
-<span class="pc bpc" id="L516" title="1 of 2 branches missed.">            if (System.nanoTime() - start &gt;= timeout) throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
+<span class="fc bfc" id="L516" title="All 2 branches covered.">            if (System.nanoTime() - start &gt;= timeout) throw new Unavailable(&quot;TIME_LIMIT&quot;);</span>
 <span class="pc bpc" id="L517" title="1 of 4 branches missed.">            if (amount &lt; 0 || amount &gt; limits.maximumWork() - used) throw new Unavailable(&quot;WORK_LIMIT&quot;);</span>
 <span class="fc" id="L518">            used += amount;</span>
 <span class="fc" id="L519">        }</span>
@@ -521,23 +521,23 @@ public final class CongruenceCoverage {
 <span class="fc" id="L521">        private static int bits(BigInteger value) { return value.abs().bitLength(); }</span>
 <span class="fc" id="L522">        private static long words(BigInteger value) { return 1L + bits(value) / 64L; }</span>
 
-        private BigInteger integer(BigInteger value) {
+        BigInteger integer(BigInteger value) {
 <span class="fc" id="L525">            charge(words(value));</span>
 <span class="fc bfc" id="L526" title="All 2 branches covered.">            if (bits(value) &gt; IterationLimits.MAX_RUNTIME_BITS) throw new Unavailable(&quot;RUNTIME_BIT_LIMIT&quot;);</span>
 <span class="fc" id="L527">            return value;</span>
         }
 
-        private void terms(int count) {
+        void terms(int count) {
 <span class="fc" id="L531">            charge(1);</span>
 <span class="fc bfc" id="L532" title="All 2 branches covered.">            if (count &gt; limits.maximumTerms()) throw new Unavailable(&quot;TERM_LIMIT&quot;);</span>
 <span class="fc" id="L533">        }</span>
 
-        private BigInteger add(BigInteger left, BigInteger right) {
+        BigInteger add(BigInteger left, BigInteger right) {
 <span class="fc" id="L536">            charge(1L + Math.max(words(left), words(right)));</span>
 <span class="fc" id="L537">            return integer(left.add(right));</span>
         }
 
-        private BigInteger subtract(BigInteger left, BigInteger right) {
+        BigInteger subtract(BigInteger left, BigInteger right) {
 <span class="fc" id="L541">            charge(1L + Math.max(words(left), words(right)));</span>
 <span class="fc" id="L542">            return integer(left.subtract(right));</span>
         }

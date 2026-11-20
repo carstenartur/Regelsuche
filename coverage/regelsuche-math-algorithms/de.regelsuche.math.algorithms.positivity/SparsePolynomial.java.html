@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SparsePolynomial.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">SparsePolynomial.java</span></div><h1>SparsePolynomial.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.scalar.ExactRational;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** A canonical sparse rational polynomial with separate declared degrees for one or two variables. */
+public record SparsePolynomial(List&lt;Integer&gt; degrees, Map&lt;Exponent, ExactRational&gt; terms) {
+    public record Exponent(int x, int y) implements Comparable&lt;Exponent&gt; {
+<span class="fc" id="L12">        public Exponent {</span>
+<span class="pc bpc" id="L13" title="2 of 4 branches missed.">            if (x &lt; 0 || y &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_EXPONENT&quot;);</span>
+<span class="fc" id="L14">        }</span>
+
+        @Override public int compareTo(Exponent other) {
+<span class="fc" id="L17">            int first = Integer.compare(x, other.x);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">            return first == 0 ? Integer.compare(y, other.y) : first;</span>
+        }
+    }
+
+<span class="fc" id="L22">    public SparsePolynomial {</span>
+<span class="fc" id="L23">        degrees = List.copyOf(degrees);</span>
+<span class="pc bpc" id="L24" title="4 of 8 branches missed.">        if (degrees.isEmpty() || degrees.size() &gt; 2 || degrees.stream().anyMatch(d -&gt; d &lt; 0)) {</span>
+<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;INVALID_DEGREES&quot;);</span>
+        }
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        int dy = degrees.size() == 2 ? degrees.get(1) : 0;</span>
+<span class="fc" id="L28">        var normalized = new TreeMap&lt;Exponent, ExactRational&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (var term : terms.entrySet()) {</span>
+<span class="fc" id="L30">            var exponent = term.getKey();</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if (exponent.x() &gt; degrees.get(0) || exponent.y() &gt; dy) {</span>
+<span class="fc" id="L32">                throw new IllegalArgumentException(&quot;EXPONENT_EXCEEDS_DEGREE&quot;);</span>
+            }
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if (!term.getValue().isZero()) normalized.put(exponent, term.getValue());</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        terms = Collections.unmodifiableMap(normalized);</span>
+<span class="fc" id="L37">    }</span>
+
+<span class="fc bfc" id="L39" title="All 2 branches covered.">    int degreeY() { return degrees.size() == 2 ? degrees.get(1) : 0; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GramPositivity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">GramPositivity.java</span></div><h1>GramPositivity.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Exact symmetric Schur tests and source-bound monomial Gram witnesses. */
+public final class GramPositivity {
+    private GramPositivity() {}
+<span class="fc" id="L14">    public enum Classification { POSITIVE_DEFINITE, POSITIVE_SEMIDEFINITE, NOT_PSD, INVALID, UNAVAILABLE }</span>
+<span class="fc" id="L15">    public record MatrixResult(Classification classification, String reason, long work) {}</span>
+    public record Certificate(SparsePolynomial source, List&lt;SparsePolynomial.Exponent&gt; basis,
+                              List&lt;List&lt;ExactRational&gt;&gt; matrix) {
+<span class="fc" id="L18">        public Certificate {</span>
+<span class="fc" id="L19">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L20">            basis = List.copyOf(basis);</span>
+<span class="fc" id="L21">            matrix = matrix.stream().map(List::copyOf).toList();</span>
+<span class="fc" id="L22">        }</span>
+    }
+<span class="fc" id="L24">    public record PolynomialVerification(Optional&lt;BernsteinPositivity.Claim&gt; claim, String reason, long work) {</span>
+<span class="fc" id="L25">        public boolean valid() { return claim.isPresent(); }</span>
+    }
+
+    public static MatrixResult checkMatrix(List&lt;List&lt;ExactRational&gt;&gt; matrix, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L30">        var work = new PositivityWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L32">            return classify(matrix, work);</span>
+<span class="fc" id="L33">        } catch (PositivityWork.Stop stop) {</span>
+<span class="fc" id="L34">            return new MatrixResult(Classification.UNAVAILABLE, stop.getMessage(), work.used);</span>
+        }
+    }
+
+    private static MatrixResult classify(List&lt;List&lt;ExactRational&gt;&gt; matrix, PositivityWork work) {
+<span class="fc" id="L39">        int n = matrix.size();</span>
+<span class="fc" id="L40">        work.terms((long) n * n);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (n == 0) return new MatrixResult(Classification.INVALID, &quot;EMPTY_MATRIX&quot;, work.used);</span>
+<span class="fc" id="L42">        work.charge((long) n * n);</span>
+<span class="fc" id="L43">        var a = new ExactRational[n][];</span>
+<span class="fc" id="L44">        int rowIndex = 0;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var row : matrix) {</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            if (row == null || row.size() != n) return new MatrixResult(Classification.INVALID, &quot;MATRIX_SHAPE&quot;, work.used);</span>
+<span class="fc" id="L47">            a[rowIndex] = new ExactRational[n];</span>
+<span class="fc" id="L48">            int col = 0;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (var value : row) {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                if (value == null) return new MatrixResult(Classification.INVALID, &quot;NULL_ENTRY&quot;, work.used);</span>
+<span class="fc" id="L51">                a[rowIndex][col] = work.check(value);</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">                if (col &lt; rowIndex &amp;&amp; !value.equals(a[col][rowIndex])) {</span>
+<span class="fc" id="L53">                    return new MatrixResult(Classification.INVALID, &quot;ASYMMETRIC_MATRIX&quot;, work.used);</span>
+                }
+<span class="fc" id="L55">                col++;</span>
+<span class="fc" id="L56">            }</span>
+<span class="fc" id="L57">            rowIndex++;</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc" id="L59">        boolean singular = false;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="fc" id="L61">            work.charge(1);</span>
+<span class="fc" id="L62">            var pivot = a[k][k];</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (pivot.signum() &lt; 0) return new MatrixResult(Classification.NOT_PSD, &quot;NEGATIVE_PIVOT&quot;, work.used);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (pivot.isZero()) {</span>
+<span class="fc" id="L65">                singular = true;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                for (int i = k+1; i &lt; n; i++) {</span>
+<span class="fc" id="L67">                    work.charge(1);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                    if (!a[k][i].isZero()) {</span>
+<span class="fc" id="L69">                        return new MatrixResult(Classification.NOT_PSD, &quot;NONZERO_ZERO_PIVOT_ROW&quot;, work.used);</span>
+                    }
+                }
+<span class="fc" id="L72">                continue;</span>
+            }
+            // Only the upper triangle of the trailing symmetric Schur complement is needed.
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            for (int i = k+1; i &lt; n; i++) {</span>
+<span class="fc" id="L76">                var multiplier = work.div(a[k][i], pivot);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                for (int j = i; j &lt; n; j++) {</span>
+<span class="fc" id="L78">                    a[i][j] = work.sub(a[i][j], work.mul(multiplier, a[k][j]));</span>
+                }
+            }
+        }
+<span class="fc" id="L82">        work.charge(0);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        return new MatrixResult(singular ? Classification.POSITIVE_SEMIDEFINITE : Classification.POSITIVE_DEFINITE,</span>
+            &quot;VERIFIED&quot;, work.used);
+    }
+
+    // Adding two int exponents can exceed Integer.MAX_VALUE even when their terms eventually cancel.
+<span class="fc" id="L88">    private record Product(long x, long y) {}</span>
+
+    public static PolynomialVerification verifyPolynomial(SparsePolynomial source, Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L92">        var work = new PositivityWork(limits, cancellation);</span>
+        try {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (!work.samePolynomial(source, certificate.source())) return rejected(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc" id="L95">            var basis = certificate.basis();</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (basis.size() != certificate.matrix().size()) return rejected(&quot;BASIS_DIMENSION&quot;, work);</span>
+<span class="fc" id="L97">            var matrix = classify(certificate.matrix(), work);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (matrix.classification() != Classification.POSITIVE_DEFINITE</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                    &amp;&amp; matrix.classification() != Classification.POSITIVE_SEMIDEFINITE) {</span>
+<span class="fc" id="L100">                return rejected(matrix.reason(), work);</span>
+            }
+<span class="fc" id="L102">            var expanded = new HashMap&lt;Product, ExactRational&gt;();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc" id="L104">                var left = basis.get(i);</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">                if (source.degrees().size() == 1 &amp;&amp; left.y() != 0) return rejected(&quot;BASIS_DIMENSION&quot;, work);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                for (int j = 0; j &lt; basis.size(); j++) {</span>
+<span class="fc" id="L107">                    work.charge(1);</span>
+<span class="fc" id="L108">                    var entry = certificate.matrix().get(i).get(j);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                    if (entry.isZero()) continue;</span>
+<span class="fc" id="L110">                    var right = basis.get(j);</span>
+<span class="fc" id="L111">                    var key = new Product((long) left.x()+right.x(), (long) left.y()+right.y());</span>
+<span class="fc" id="L112">                    var sum = work.add(expanded.getOrDefault(key, ExactRational.ZERO), entry);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    if (sum.isZero()) expanded.remove(key);</span>
+<span class="fc" id="L114">                    else expanded.put(key, sum);</span>
+                }
+            }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (expanded.size() != source.terms().size()) return rejected(&quot;GRAM_IDENTITY&quot;, work);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (var term : source.terms().entrySet()) {</span>
+<span class="fc" id="L119">                work.charge(1);</span>
+<span class="fc" id="L120">                var key = new Product(term.getKey().x(), term.getKey().y());</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                if (!term.getValue().equals(expanded.get(key))) return rejected(&quot;GRAM_IDENTITY&quot;, work);</span>
+<span class="fc" id="L122">            }</span>
+<span class="fc" id="L123">            work.charge(0);</span>
+<span class="fc" id="L124">            return new PolynomialVerification(Optional.of(BernsteinPositivity.Claim.NONNEGATIVE), &quot;VERIFIED&quot;, work.used);</span>
+<span class="fc" id="L125">        } catch (PositivityWork.Stop stop) {</span>
+<span class="fc" id="L126">            return rejected(stop.getMessage(), work);</span>
+        }
+    }
+
+    private static PolynomialVerification rejected(String reason, PositivityWork work) {
+<span class="fc" id="L131">        return new PolynomialVerification(Optional.empty(), reason, work.used);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

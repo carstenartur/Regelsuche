@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteProofDag.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.proof</a> &gt; <span class="el_source">FiniteProofDag.java</span></div><h1>FiniteProofDag.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.proof;
+
+import de.regelsuche.math.algorithms.combinatorics.BipartiteMatching;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage;
+import de.regelsuche.math.algorithms.modular.HunterCoverage;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Source-bound finite deductions. The final node is the root, with zero-based preceding premises. */
+public final class FiniteProofDag {
+    private FiniteProofDag() {}
+
+    public sealed interface Source permits CoverageSource, HallSource {}
+    /** The counted objects are uncovered indices in exactly this progression and rule family. */
+    public record CoverageSource(CongruenceCoverage.Request request) implements Source {
+<span class="fc" id="L22">        public CoverageSource { Objects.requireNonNull(request); }</span>
+    }
+    /** The count is a lower bound on unmatched left vertices in every unit-capacity matching. */
+    public record HallSource(BipartiteMatching.Request request) implements Source {
+<span class="fc" id="L26">        public HallSource { Objects.requireNonNull(request); }</span>
+    }
+
+    public sealed interface Node permits ExactLeaf, HunterLeaf, HallLeaf, Maximum, Exists {}
+    public record ExactLeaf(CongruenceCoverage.Certificate certificate) implements Node {
+<span class="fc" id="L31">        public ExactLeaf { Objects.requireNonNull(certificate); }</span>
+    }
+    public record HunterLeaf(HunterCoverage.Certificate certificate) implements Node {
+<span class="fc" id="L34">        public HunterLeaf { Objects.requireNonNull(certificate); }</span>
+    }
+    public record HallLeaf(BipartiteMatching.Certificate certificate) implements Node {
+<span class="fc" id="L37">        public HallLeaf { Objects.requireNonNull(certificate); }</span>
+    }
+    /** Two lower bounds on the one expected source imply their maximum. */
+<span class="fc" id="L40">    public record Maximum(int left, int right) implements Node {}</span>
+    /** A positive lower bound implies that at least one counted object exists. */
+<span class="fc" id="L42">    public record Exists(int premise) implements Node {}</span>
+    public record Proof(List&lt;Node&gt; nodes) {
+<span class="fc" id="L44">        public Proof { nodes = List.copyOf(nodes); }</span>
+    }
+
+    public sealed interface Claim permits LowerBound, Existence {
+        Source source();
+    }
+<span class="fc" id="L50">    public record LowerBound(Source source, BigInteger value) implements Claim {}</span>
+<span class="fc" id="L51">    public record Existence(Source source) implements Claim {}</span>
+<span class="fc" id="L52">    public record Verification(Optional&lt;Claim&gt; conclusion, String reason, long work) {</span>
+<span class="fc" id="L53">        public boolean valid() { return conclusion.isPresent(); }</span>
+    }
+
+    /** Every leaf is replayed against the caller's source, sharing one work and wall-clock budget. */
+    public static Verification verify(Source expected, Proof proof, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L59">        Objects.requireNonNull(expected);</span>
+<span class="fc" id="L60">        Objects.requireNonNull(proof);</span>
+<span class="fc" id="L61">        var replay = new Replay(limits, cancellation);</span>
+        try {
+<span class="fc" id="L63">            replay.charge();</span>
+<span class="fc" id="L64">            int count = proof.nodes().size();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (count == 0) throw new Rejected(&quot;EMPTY_PROOF&quot;);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (count &gt; limits.maximumTerms()) throw new Rejected(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L67">            var previous = new ArrayList&lt;Claim&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            for (var node : proof.nodes()) {</span>
+<span class="fc" id="L69">                replay.charge();</span>
+<span class="fc bfc" id="L70" title="All 5 branches covered.">                previous.add(switch (node) {</span>
+<span class="fc" id="L71">                    case ExactLeaf leaf -&gt; {</span>
+<span class="fc" id="L72">                        var source = coverage(expected);</span>
+<span class="fc" id="L73">                        var cert = leaf.certificate();</span>
+<span class="fc" id="L74">                        var result = CongruenceCoverage.verify(source.request(), cert, replay.remaining(), cancellation);</span>
+<span class="fc" id="L75">                        replay.accept(result.valid(), result.reason(), result.work());</span>
+<span class="fc" id="L76">                        yield new LowerBound(expected, source.request().progression().count().subtract(cert.coveredCount()));</span>
+                    }
+<span class="fc" id="L78">                    case HunterLeaf leaf -&gt; {</span>
+<span class="fc" id="L79">                        var source = coverage(expected);</span>
+<span class="fc" id="L80">                        var cert = leaf.certificate();</span>
+<span class="fc" id="L81">                        var result = HunterCoverage.verify(source.request(), cert, replay.remaining(), cancellation);</span>
+<span class="fc" id="L82">                        replay.accept(result.valid(), result.reason(), result.work());</span>
+<span class="fc" id="L83">                        yield new LowerBound(expected, cert.lowerBound());</span>
+                    }
+<span class="fc" id="L85">                    case HallLeaf leaf -&gt; {</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                        if (!(expected instanceof HallSource source)) throw new Rejected(&quot;DOMAIN_MISMATCH&quot;);</span>
+<span class="fc" id="L87">                        var cert = leaf.certificate();</span>
+<span class="fc" id="L88">                        var result = BipartiteMatching.verify(source.request(), cert, replay.remaining(), cancellation);</span>
+<span class="fc" id="L89">                        replay.accept(result.valid(), result.reason(), result.work());</span>
+<span class="fc" id="L90">                        yield new LowerBound(expected, BigInteger.valueOf(cert.deficiency()));</span>
+                    }
+<span class="fc" id="L92">                    case Maximum join -&gt; {</span>
+<span class="fc" id="L93">                        var left = bound(previous, join.left());</span>
+<span class="fc" id="L94">                        var right = bound(previous, join.right());</span>
+<span class="fc" id="L95">                        yield new LowerBound(expected, left.max(right));</span>
+                    }
+<span class="fc" id="L97">                    case Exists step -&gt; {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                        if (bound(previous, step.premise()).signum() &lt;= 0) throw new Rejected(&quot;NONPOSITIVE_BOUND&quot;);</span>
+<span class="fc" id="L99">                        yield new Existence(expected);</span>
+                    }
+                });
+<span class="fc" id="L102">            }</span>
+<span class="fc" id="L103">            replay.charge();</span>
+<span class="fc" id="L104">            return new Verification(Optional.of(previous.getLast()), &quot;VERIFIED&quot;, replay.used);</span>
+<span class="fc" id="L105">        } catch (Rejected rejected) {</span>
+<span class="fc" id="L106">            return new Verification(Optional.empty(), rejected.getMessage(), replay.used);</span>
+        }
+    }
+
+    private static CoverageSource coverage(Source expected) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (expected instanceof CoverageSource source) return source;</span>
+<span class="fc" id="L112">        throw new Rejected(&quot;DOMAIN_MISMATCH&quot;);</span>
+    }
+
+    private static BigInteger bound(List&lt;Claim&gt; previous, int index) {
+<span class="fc bfc" id="L116" title="All 4 branches covered.">        if (index &lt; 0 || index &gt;= previous.size()) throw new Rejected(&quot;INVALID_PREMISE&quot;);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (previous.get(index) instanceof LowerBound bound) return bound.value();</span>
+<span class="fc" id="L118">        throw new Rejected(&quot;PREMISE_IS_NOT_BOUND&quot;);</span>
+    }
+
+    private static final class Replay {
+        private final IterationLimits limits;
+        private final BooleanSupplier cancellation;
+<span class="fc" id="L124">        private final long start = System.nanoTime();</span>
+        private final long timeout;
+        private long used;
+
+<span class="fc" id="L128">        private Replay(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L129">            this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L130">            this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L131">            timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L132">        }</span>
+
+        private long nanosLeft() {
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">            if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Rejected(&quot;CANCELLED&quot;);</span>
+<span class="fc" id="L136">            long remaining = timeout - (System.nanoTime() - start);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (remaining &lt;= 0) throw new Rejected(&quot;TIME_LIMIT&quot;);</span>
+<span class="fc" id="L138">            return remaining;</span>
+        }
+
+        private void charge() {
+<span class="fc" id="L142">            nanosLeft();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            if (used &gt;= limits.maximumWork()) throw new Rejected(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L144">            used++;</span>
+<span class="fc" id="L145">        }</span>
+
+        private IterationLimits remaining() {
+<span class="fc" id="L148">            long nanos = nanosLeft();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (used &gt;= limits.maximumWork()) throw new Rejected(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L150">            return new IterationLimits(limits.maximumWork() - used, limits.maximumTerms(),</span>
+<span class="fc" id="L151">                1 + TimeUnit.NANOSECONDS.toMillis(nanos - 1));</span>
+        }
+
+        private void accept(boolean valid, String reason, long work) {
+<span class="fc" id="L155">            used += work;</span>
+<span class="fc" id="L156">            nanosLeft();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!valid) throw new Rejected(reason);</span>
+<span class="fc" id="L158">        }</span>
+    }
+
+    private static final class Rejected extends RuntimeException {
+<span class="fc" id="L162">        private Rejected(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

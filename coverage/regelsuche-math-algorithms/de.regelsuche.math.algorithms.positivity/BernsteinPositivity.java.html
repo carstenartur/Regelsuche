@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BernsteinPositivity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">BernsteinPositivity.java</span></div><h1>BernsteinPositivity.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Exact tensor-product Bernstein witnesses for closed rational intervals and rectangles. */
+public final class BernsteinPositivity {
+    private BernsteinPositivity() {}
+
+    public record Interval(ExactRational lower, ExactRational upper) {
+<span class="fc" id="L17">        public Interval {</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">            if (lower.compareTo(upper) &gt;= 0) throw new IllegalArgumentException(&quot;INVALID_INTERVAL&quot;);</span>
+<span class="fc" id="L19">        }</span>
+    }
+    public record Request(SparsePolynomial polynomial, List&lt;Interval&gt; box) {
+<span class="fc" id="L22">        public Request {</span>
+<span class="fc" id="L23">            box = List.copyOf(box);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            if (box.size() != polynomial.degrees().size()) throw new IllegalArgumentException(&quot;BOX_DIMENSION&quot;);</span>
+<span class="fc" id="L25">        }</span>
+    }
+<span class="fc" id="L27">    public enum Claim { NONNEGATIVE, STRICTLY_POSITIVE }</span>
+<span class="fc" id="L28">    public enum Status { CERTIFIED, INCONCLUSIVE, UNAVAILABLE }</span>
+    public sealed interface Step permits Split, Leaf {}
+<span class="fc" id="L30">    public record Split(int axis) implements Step {}</span>
+    /** Tensor order is x-major: (0,0), (0,1), ..., (1,0), ... . */
+    public record Leaf(List&lt;Interval&gt; box, List&lt;ExactRational&gt; coefficients) implements Step {
+<span class="fc" id="L33">        public Leaf { box = List.copyOf(box); coefficients = List.copyOf(coefficients); }</span>
+    }
+    public record Certificate(Request source, Claim claim, List&lt;Step&gt; steps) {
+<span class="fc" id="L36">        public Certificate {</span>
+<span class="fc" id="L37">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L38">            Objects.requireNonNull(claim);</span>
+<span class="fc" id="L39">            steps = List.copyOf(steps);</span>
+<span class="fc" id="L40">        }</span>
+    }
+<span class="fc" id="L42">    public record Result(Status status, Optional&lt;Certificate&gt; certificate, String reason, long work) {}</span>
+<span class="fc" id="L43">    public record Verification(boolean valid, String reason, long work) {}</span>
+
+    /** Convex-hull enclosure on the original box, including signed coefficient nets. */
+    public record Bounds(Request source, List&lt;ExactRational&gt; coefficients, ExactRational lower, ExactRational upper) {
+<span class="fc" id="L47">        public Bounds {</span>
+<span class="fc" id="L48">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L49">            coefficients = List.copyOf(coefficients);</span>
+<span class="fc" id="L50">            Objects.requireNonNull(lower);</span>
+<span class="fc" id="L51">            Objects.requireNonNull(upper);</span>
+<span class="fc" id="L52">        }</span>
+    }
+<span class="fc" id="L54">    public record BoundsResult(Optional&lt;Bounds&gt; bounds, String reason, long work) {}</span>
+
+    public static BoundsResult bounds(Request source, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L57">        var work = new PositivityWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L59">            int size = BernsteinTensors.size(source, work);</span>
+<span class="fc" id="L60">            work.polynomial(source.polynomial());</span>
+<span class="fc" id="L61">            BernsteinTensors.checkBox(source.box(), work);</span>
+<span class="fc" id="L62">            var coefficients = List.of(BernsteinTensors.root(source, size, work));</span>
+<span class="fc" id="L63">            var extrema = extrema(coefficients, work);</span>
+<span class="fc" id="L64">            var bounds = new Bounds(source, coefficients, extrema[0], extrema[1]);</span>
+<span class="fc" id="L65">            work.charge(0);</span>
+<span class="fc" id="L66">            return new BoundsResult(Optional.of(bounds), &quot;COMPLETE&quot;, work.used);</span>
+<span class="fc" id="L67">        } catch (PositivityWork.Stop stop) {</span>
+<span class="fc" id="L68">            return new BoundsResult(Optional.empty(), stop.getMessage(), work.used);</span>
+        }
+    }
+
+    public static Verification verifyBounds(Request source, Bounds bounds, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L74">        var work = new PositivityWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L76">            int size = BernsteinTensors.size(source, work);</span>
+<span class="fc" id="L77">            BernsteinTensors.checkBox(source.box(), work);</span>
+<span class="fc" id="L78">            BernsteinTensors.checkBox(bounds.source().box(), work);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (!source.box().equals(bounds.source().box())</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                    || !work.samePolynomial(source.polynomial(), bounds.source().polynomial())) {</span>
+<span class="fc" id="L81">                return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+            }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (bounds.coefficients().size() != size) return new Verification(false, &quot;TENSOR_SIZE&quot;, work.used);</span>
+<span class="fc" id="L84">            var extrema = extrema(bounds.coefficients(), work);</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">            boolean valid = extrema[0].equals(work.check(bounds.lower())) &amp;&amp; extrema[1].equals(work.check(bounds.upper()))</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                &amp;&amp; BernsteinReplay.identity(source.polynomial(), new Leaf(source.box(), bounds.coefficients()), work);</span>
+<span class="fc" id="L87">            work.charge(0);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            return new Verification(valid, valid ? &quot;VERIFIED&quot; : &quot;BOUNDS_MISMATCH&quot;, work.used);</span>
+<span class="nc" id="L89">        } catch (PositivityWork.Stop stop) {</span>
+<span class="nc" id="L90">            return new Verification(false, stop.getMessage(), work.used);</span>
+        }
+    }
+
+    private static ExactRational[] extrema(List&lt;ExactRational&gt; coefficients, PositivityWork work) {
+<span class="fc" id="L95">        var lower = coefficients.getFirst();</span>
+<span class="fc" id="L96">        var upper = lower;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (var coefficient : coefficients) {</span>
+<span class="fc" id="L98">            work.check(coefficient);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (coefficient.compareTo(lower) &lt; 0) lower = coefficient;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (coefficient.compareTo(upper) &gt; 0) upper = coefficient;</span>
+<span class="fc" id="L101">        }</span>
+<span class="fc" id="L102">        return new ExactRational[]{lower, upper};</span>
+    }
+
+<span class="fc" id="L105">    private record Patch(List&lt;Interval&gt; box, ExactRational[] coefficients, int depth) {}</span>
+
+    /** Searches to the requested midpoint depth. A signed control net alone proves no counterexample. */
+    public static Result prove(Request source, int maxDepth, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (maxDepth &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_SUBDIVISION_DEPTH&quot;);</span>
+<span class="fc" id="L110">        var work = new PositivityWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L112">            int size = BernsteinTensors.size(source, work);</span>
+<span class="fc" id="L113">            work.polynomial(source.polynomial());</span>
+<span class="fc" id="L114">            BernsteinTensors.checkBox(source.box(), work);</span>
+<span class="fc" id="L115">            var pending = new ArrayDeque&lt;Patch&gt;();</span>
+<span class="fc" id="L116">            var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L117">            long cells = size;</span>
+<span class="fc" id="L118">            pending.push(new Patch(source.box(), BernsteinTensors.root(source, size, work), 0));</span>
+<span class="fc" id="L119">            Claim claim = Claim.STRICTLY_POSITIVE;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            while (!pending.isEmpty()) {</span>
+<span class="fc" id="L121">                var patch = pending.pop();</span>
+<span class="fc" id="L122">                int sign = 1;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                for (var coefficient : patch.coefficients()) {</span>
+<span class="fc" id="L124">                    work.charge(1);</span>
+<span class="fc" id="L125">                    sign = Math.min(sign, coefficient.signum());</span>
+                }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                if (sign &gt;= 0) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                    if (sign == 0) claim = Claim.NONNEGATIVE;</span>
+<span class="fc" id="L129">                    steps.add(new Leaf(patch.box(), List.of(patch.coefficients())));</span>
+<span class="fc" id="L130">                    continue;</span>
+                }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (patch.depth() == maxDepth) {</span>
+<span class="fc" id="L133">                    return new Result(Status.INCONCLUSIVE, Optional.empty(), &quot;DEPTH_LIMIT&quot;, work.used);</span>
+                }
+<span class="fc" id="L135">                int dx = source.polynomial().degrees().getFirst();</span>
+<span class="fc" id="L136">                int dy = source.polynomial().degreeY();</span>
+                // A constant net cannot improve on subdivision.
+<span class="pc bpc" id="L138" title="3 of 4 branches missed.">                if (dx == 0 &amp;&amp; dy == 0) {</span>
+<span class="nc" id="L139">                    return new Result(Status.INCONCLUSIVE, Optional.empty(), &quot;SIGNED_COEFFICIENT&quot;, work.used);</span>
+                }
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">                int axis = dy == 0 ? 0 : dx == 0 ? 1 : patch.depth() % 2;</span>
+<span class="fc" id="L142">                cells += 2L * size;</span>
+<span class="fc" id="L143">                work.terms(cells);</span>
+<span class="fc" id="L144">                var halves = BernsteinTensors.split(patch.coefficients(), dx, dy, axis, work);</span>
+<span class="fc" id="L145">                steps.add(new Split(axis));</span>
+<span class="fc" id="L146">                pending.push(new Patch(BernsteinTensors.halfBox(patch.box(), axis, true, work),</span>
+<span class="fc" id="L147">                    halves.right(), patch.depth() + 1));</span>
+<span class="fc" id="L148">                pending.push(new Patch(BernsteinTensors.halfBox(patch.box(), axis, false, work),</span>
+<span class="fc" id="L149">                    halves.left(), patch.depth() + 1));</span>
+<span class="fc" id="L150">            }</span>
+<span class="fc" id="L151">            var certificate = new Certificate(source, claim, steps);</span>
+<span class="fc" id="L152">            work.charge(0);</span>
+<span class="fc" id="L153">            return new Result(Status.CERTIFIED, Optional.of(certificate), &quot;CERTIFIED&quot;, work.used);</span>
+<span class="fc" id="L154">        } catch (PositivityWork.Stop stop) {</span>
+<span class="fc" id="L155">            return new Result(Status.UNAVAILABLE, Optional.empty(), stop.getMessage(), work.used);</span>
+        }
+    }
+
+    /** Checks a complete midpoint partition and tensor identities against the independently supplied source. */
+    public static Verification verify(Request source, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L162">        return BernsteinReplay.verify(source, certificate, new PositivityWork(limits, cancellation));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

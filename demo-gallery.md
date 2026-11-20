@@ -57,27 +57,78 @@ sobald der Parser die bearbeitete Formel akzeptiert.
 
 ## Ein Durchlauf für eine Paarsumme
 
-1. Öffne **Berechnung optimieren** und wähle **Quadrierte Abstände**. Der
-   Summand `(x_i-x_j)^2` beschreibt den quadrierten Abstand zweier Zeilen.
-   Lass `100000` als **Zeilenanzahl für den Vergleich** und `2`, `-1`, `5`
-   unter **Beispielwerte zur exakten Auswertung (optional)** stehen.
-2. Wähle **Algorithmus herleiten**. Der Plan liest jede Zeile einmal und
-   summiert Werte und Quadrate. Für $n$ Zeilen ergibt sich die Paarsumme
-   $n\sum_i x_i^2-(\sum_i x_i)^2$. Die Workbench berechnet für die drei
-   eingegebenen Zeilen exakt **54**.
-3. Öffne **Herleitung und Prüfung**. Die symbolische Prüfung vergleicht
-   Einzel- und Paarbeiträge mit dem ursprünglichen Polynom. Für 100.000 Zeilen
-   stellt die **Hochrechnung** die **4.999.950.000 Paare** der direkten
-   Schleife einem Durchlauf über 100.000 Zeilen gegenüber. Die Zahl folgt aus
-   $n(n-1)/2$. Ausgeführt wird die exakte Auswertung der drei Beispielzeilen.
+1. Öffne **Berechnung optimieren** und springe über **Zum Lauf mit 100.000
+   Zeilen** zur festen Demo. Wähle **100.000 Zeilen auswerten**. Die Workbench
+   erzeugt die aufeinanderfolgenden Werte von −50.000 bis 49.999 und
+   summiert die quadrierten Abstände aller ungeordneten Paare.
+2. Der hergeleitete Plan liest jede Zeile einmal. Er berechnet die Summe
+   $n\sum_i x_i^2-(\sum_i x_i)^2$ und liefert exakt
+   **8.333.333.332.500.000.000**. Die symbolische Prüfung bindet den Plan an
+   den Summanden `(x_i-x_j)^2`.
+3. Die Workbench vergleicht den Plan für die ersten **64 Werte** mit der
+   direkten Schleife über **2.016 Paare**. Beide ergeben **1.397.760**.
+   Die **4.999.950.000 Paare** für den ganzen Datensatz sind die rechnerische
+   Paaranzahl $n(n-1)/2$. Der direkte Lauf und seine Kontrolle beziehen sich
+   auf das Präfix.
 
-![Paarsummenplan in der Workbench mit Zwischensummen, exaktem Beispielergebnis 54 und Hochrechnung über 100.000 Zeilen](assets/screenshots/pair-reduction-result.png)
+![Ausgeführte Paarsumme über 100.000 Zeilen mit exaktem Ergebnis, rechnerischer Paaranzahl und direkter Präfixkontrolle](assets/screenshots/pair-reduction-large.png)
 
-[Ansicht bei 390 Pixel Breite](assets/screenshots/pair-reduction-mobile.png) ·
-[Aufnahmedaten für Desktop](assets/screenshots/pair-reduction-result.json) und
-[schmale Ansicht](assets/screenshots/pair-reduction-mobile.json) ·
+[Ansicht bei 390 Pixel Breite](assets/screenshots/pair-reduction-large-mobile.png) ·
+[Aufnahmedaten für Desktop](assets/screenshots/pair-reduction-large.json) und
+[schmale Ansicht](assets/screenshots/pair-reduction-large-mobile.json) ·
 [Varianten und Eingabehilfe](user-workflows.md#summenschleifen-optimieren) ·
 [SDK und Nachweis](../regelsuche-optimization-sdk/FINITE_SERIES.md#one-pass-pair-reductions)
+
+Im frei editierbaren Formular liefert **Algorithmus herleiten** für die
+Beispielwerte `2`, `-1` und `5` den exakten Wert **54**. Unter **Herleitung
+und Prüfung** siehst du die Zwischensummen und den symbolischen Vergleich
+der Einzel- und Paarbeiträge. [Geprüfter Plan im Formular](assets/screenshots/pair-reduction-result.png) ·
+[Formularansicht bei 390 Pixel Breite](assets/screenshots/pair-reduction-mobile.png)
+
+## Ein lokales Hall-Defizit nachweisen
+
+Öffne unter den Demo-Karten **Exakte Rechennachweise** und wähle **Hall-Defizit
+berechnen**. Vier Kandidaten stehen vier Blockierern mit Kapazität eins
+gegenüber. $A_1$, $A_2$ und $A_3$ haben ausschließlich $B_1$ als Nachbarn.
+$A_4$ hat $B_2$, $B_3$ und $B_4$ als Nachbarn.
+
+Der Vergleich der Gesamtzahlen ergibt **0**. Das größte Matching enthält
+**2 Zuordnungen**, etwa $A_1$–$B_1$ und $A_4$–$B_2$. Die Workbench zeigt die
+Zeugenmenge $S=\{A_1,A_2,A_3\}$ und ihre vollständige Nachbarschaft
+$N(S)=\{B_1\}$. Daraus folgt das **Hall-Defizit 2**. Der Prüfer gewinnt aus
+$S$ und $N(S)$ die Knotenüberdeckung $\{A_4,B_1\}$. Deren Größe stimmt mit
+der Größe des Matchings überein und beweist seine Optimalität in diesem
+endlichen Graphen. Für Anwendungen müssen Kanten und Kapazität aus dem
+jeweiligen Problem begründet werden.
+
+![Workbench mit Eingabegraph, größtem Matching und Hall-Zeugen für ein Defizit von zwei](assets/screenshots/hall-deficit.png)
+
+[Ansicht bei 390 Pixel Breite](assets/screenshots/hall-deficit-mobile.png) ·
+[Aufnahmedaten für Desktop](assets/screenshots/hall-deficit.json) und
+[schmale Ansicht](assets/screenshots/hall-deficit-mobile.json) ·
+[Kernprüfung und Vergleich](research/bipartite-matching.md)
+
+## Montgomery-Reduktionen im Skalarprodukt verschieben
+
+Wähle unter **Exakte Rechennachweise** die Aktion **Montgomery-Plan prüfen**.
+Die Workbench plant ein Skalarprodukt aus vier Produkten mit $q=3329$,
+$R=2^{16}$ und $q^{-1}\bmod R=62209$. Die vorzeichenbehafteten Eingaben
+liegen in $[-100,100]$ und $[-200,200]$. Der direkte Plan reduziert jedes
+Produkt. Der geprüfte Zielplan summiert die Produkte in einem
+32-Bit-Akkumulator und reduziert einmal am Ende. Der Akkumulator bleibt
+im Intervall $[-80000,80000]$.
+
+Der Prüfer berechnet die Wortgrenzen erneut und prüft, dass beide Pläne
+für die angegebenen Eingabebereiche denselben kanonischen Rest modulo $q$
+liefern. **4 → 1** zählt die Reduktionen der beiden endlichen Rechenpläne.
+Eine konkrete Laufzeit hängt auch von Implementierung und Hardware ab.
+
+![Workbench mit vier Montgomery-Reduktionen im direkten Plan und einer im geprüften Plan einschließlich Wortgrenzen](assets/screenshots/montgomery-planning.png)
+
+[Ansicht bei 390 Pixel Breite](assets/screenshots/montgomery-planning-mobile.png) ·
+[Aufnahmedaten für Desktop](assets/screenshots/montgomery-planning.json) und
+[schmale Ansicht](assets/screenshots/montgomery-planning-mobile.json) ·
+[Kernprüfung und Vergleich](research/montgomery-schedules.md)
 
 ## Eine gelernte Regel im Vergleich
 

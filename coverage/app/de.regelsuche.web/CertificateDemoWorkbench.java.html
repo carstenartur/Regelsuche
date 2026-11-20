@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CertificateDemoWorkbench.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">CertificateDemoWorkbench.java</span></div><h1>CertificateDemoWorkbench.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import de.regelsuche.ast.iteration.PairReduction;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.math.algorithms.combinatorics.BipartiteMatching;
+import de.regelsuche.math.algorithms.combinatorics.BipartiteMatching.Edge;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.PairReductionSearch;
+import de.regelsuche.math.algorithms.modular.MontgomeryReductionPlanner;
+import de.regelsuche.math.algorithms.modular.MontgomeryReductionPlanner.Product;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Input;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Interval;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Observation;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Operation;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Parameters;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Schedule;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Step;
+import de.regelsuche.math.algorithms.modular.MontgomerySchedule.Word;
+import de.regelsuche.symbol.SymbolScope;
+import de.regelsuche.symbol.SymbolicExpression;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.stream.IntStream;
+
+/** Fixed inputs for live, source-bound checks in the Workbench. */
+final class CertificateDemoWorkbench {
+<span class="fc" id="L31">    private static final IterationLimits LIMITS = new IterationLimits(1_000_000, 128, 5_000);</span>
+<span class="fc" id="L32">    private static final BooleanSupplier RUN = () -&gt; false;</span>
+    private static final int DISTANCE_ROWS = 100_000;
+    private static final int DISTANCE_FIRST = -50_000;
+    private static final int PREFIX_ROWS = 64;
+
+    private CertificateDemoWorkbench() {}
+
+    static String hall() {
+<span class="fc" id="L40">        var source = new BipartiteMatching.Request(4, 4, List.of(new Edge(0, 0), new Edge(1, 0),</span>
+            new Edge(2, 0), new Edge(3, 1), new Edge(3, 2), new Edge(3, 3)));
+<span class="fc" id="L42">        var result = BipartiteMatching.search(source, LIMITS, RUN);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (result.certificate().isEmpty()) return unavailable(result.reason());</span>
+
+<span class="fc" id="L45">        var certificate = result.certificate().orElseThrow();</span>
+<span class="fc" id="L46">        var verification = BipartiteMatching.verify(source, certificate, LIMITS, RUN);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (!verification.valid()) return unavailable(verification.reason());</span>
+
+<span class="fc" id="L49">        var witness = new HashSet&lt;&gt;(certificate.witness());</span>
+<span class="fc" id="L50">        var neighbors = source.edges().stream().filter(edge -&gt; witness.contains(edge.left()))</span>
+<span class="fc" id="L51">            .map(Edge::right).distinct().sorted().toList();</span>
+<span class="fc" id="L52">        return verified().property(&quot;leftCount&quot;, source.leftCount()).property(&quot;rightCount&quot;, source.rightCount())</span>
+<span class="fc" id="L53">            .array(&quot;edges&quot;, array -&gt; source.edges().forEach(edge -&gt; writeEdge(array, edge)))</span>
+<span class="fc" id="L54">            .array(&quot;matching&quot;, array -&gt; certificate.matching().forEach(edge -&gt; writeEdge(array, edge)))</span>
+<span class="fc" id="L55">            .array(&quot;witness&quot;, array -&gt; certificate.witness().forEach(array::value))</span>
+<span class="fc" id="L56">            .array(&quot;neighbors&quot;, array -&gt; neighbors.forEach(array::value))</span>
+<span class="fc" id="L57">            .property(&quot;countDeficit&quot;, Math.max(0, source.leftCount() - source.rightCount()))</span>
+<span class="fc" id="L58">            .property(&quot;hallDeficit&quot;, certificate.deficiency())</span>
+<span class="fc" id="L59">            .property(&quot;searchWork&quot;, result.work()).property(&quot;verificationWork&quot;, verification.work())</span>
+<span class="fc" id="L60">            .endObject().toString();</span>
+    }
+
+    static String montgomery() {
+<span class="fc" id="L64">        var parameters = new Parameters(16, 3_329, 62_209);</span>
+<span class="fc" id="L65">        var leftRange = new Interval(-100, 100);</span>
+<span class="fc" id="L66">        var rightRange = new Interval(-200, 200);</span>
+<span class="fc" id="L67">        var inputs = new ArrayList&lt;Input&gt;();</span>
+<span class="fc" id="L68">        var products = new ArrayList&lt;Product&gt;();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int index = 1; index &lt;= 4; index++) {</span>
+<span class="fc" id="L70">            int left = inputs.size();</span>
+<span class="fc" id="L71">            inputs.add(new Input(&quot;a&quot; + index, Word.SHORT, leftRange));</span>
+<span class="fc" id="L72">            inputs.add(new Input(&quot;b&quot; + index, Word.SHORT, rightRange));</span>
+<span class="fc" id="L73">            products.add(new Product(left, left + 1));</span>
+        }
+
+<span class="fc" id="L76">        var observation = Observation.CANONICAL_RESIDUE;</span>
+<span class="fc" id="L77">        var source = directMontgomerySource(inputs.size(), products);</span>
+<span class="fc" id="L78">        var result = MontgomeryReductionPlanner.dotProduct(parameters, inputs, products, Word.INT, observation,</span>
+            LIMITS, RUN);
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (result.certificate().isEmpty()) return unavailable(result.reason());</span>
+
+<span class="fc" id="L82">        var certificate = result.certificate().orElseThrow();</span>
+<span class="fc" id="L83">        var target = certificate.request().target();</span>
+        // Only the target is taken from the proposal. The input, baseline and observation belong to the demo.
+<span class="fc" id="L85">        var expected = new MontgomerySchedule.Request(parameters, inputs, source, target, observation);</span>
+<span class="fc" id="L86">        var verification = MontgomerySchedule.verify(expected, certificate, LIMITS, RUN);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!verification.valid()) return unavailable(verification.reason());</span>
+
+<span class="fc" id="L89">        int sourceOutput = source.outputs().getFirst();</span>
+<span class="fc" id="L90">        int targetOutput = target.outputs().getFirst();</span>
+<span class="fc" id="L91">        int accumulator = target.steps().get(targetOutput - inputs.size()).operands().getFirst();</span>
+<span class="fc" id="L92">        return verified().property(&quot;modulus&quot;, parameters.modulus()).property(&quot;radixBits&quot;, parameters.radixBits())</span>
+<span class="fc" id="L93">            .property(&quot;inverse&quot;, parameters.inverse()).property(&quot;productCount&quot;, products.size())</span>
+<span class="fc" id="L94">            .property(&quot;residueBits&quot;, parameters.residueWord().bits())</span>
+<span class="fc" id="L95">            .property(&quot;accumulatorBits&quot;, parameters.accumulatorWord().bits())</span>
+<span class="fc" id="L96">            .property(&quot;observation&quot;, observation.name())</span>
+<span class="fc" id="L97">            .property(&quot;sourceReductions&quot;, certificate.sourceReductions())</span>
+<span class="fc" id="L98">            .property(&quot;targetReductions&quot;, certificate.targetReductions())</span>
+<span class="fc" id="L99">            .array(&quot;leftRange&quot;, array -&gt; writeInterval(array, leftRange))</span>
+<span class="fc" id="L100">            .array(&quot;rightRange&quot;, array -&gt; writeInterval(array, rightRange))</span>
+<span class="fc" id="L101">            .array(&quot;sourceOutputRange&quot;, array -&gt; writeInterval(array, certificate.sourceRanges().get(sourceOutput)))</span>
+<span class="fc" id="L102">            .array(&quot;targetAccumulatorRange&quot;,</span>
+<span class="fc" id="L103">                array -&gt; writeInterval(array, certificate.targetRanges().get(accumulator)))</span>
+<span class="fc" id="L104">            .array(&quot;targetOutputRange&quot;, array -&gt; writeInterval(array, certificate.targetRanges().get(targetOutput)))</span>
+<span class="fc" id="L105">            .property(&quot;planningWork&quot;, result.work()).property(&quot;verificationWork&quot;, verification.work())</span>
+<span class="fc" id="L106">            .endObject().toString();</span>
+    }
+
+    private static Schedule directMontgomerySource(int inputCount, List&lt;Product&gt; products) {
+<span class="fc" id="L110">        var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L111">        int sum = -1;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (var product : products) {</span>
+<span class="fc" id="L113">            int productReference = inputCount + steps.size();</span>
+<span class="fc" id="L114">            steps.add(Step.apply(Operation.MULTIPLY, Word.INT, product.left(), product.right()));</span>
+<span class="fc" id="L115">            int reduction = inputCount + steps.size();</span>
+<span class="fc" id="L116">            steps.add(Step.apply(Operation.MONTGOMERY, Word.SHORT, productReference));</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (sum &lt; 0) {</span>
+<span class="fc" id="L118">                sum = reduction;</span>
+            } else {
+<span class="fc" id="L120">                steps.add(Step.apply(Operation.ADD, Word.INT, sum, reduction));</span>
+<span class="fc" id="L121">                sum = inputCount + steps.size() - 1;</span>
+            }
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return new Schedule(steps, List.of(sum));</span>
+    }
+
+    static String pairReduction() {
+<span class="fc" id="L128">        var scope = new SymbolScope();</span>
+<span class="fc" id="L129">        var column = new PairReduction.Column(scope.declare(&quot;x_i&quot;), scope.declare(&quot;x_j&quot;));</span>
+<span class="fc" id="L130">        var source = new PairReduction(List.of(column), SymbolicExpression.parse(&quot;(x_i-x_j)^2&quot;, scope).expression());</span>
+<span class="fc" id="L131">        var result = PairReductionSearch.search(source, LIMITS, 3, RUN);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (result.verified().isEmpty()) return unavailable(result.reason());</span>
+
+<span class="fc" id="L134">        var checked = result.verified().orElseThrow();</span>
+        try {
+<span class="fc" id="L136">            var evaluation = checked.evaluate(() -&gt; distanceRows(DISTANCE_ROWS).iterator(), LIMITS, RUN);</span>
+<span class="fc" id="L137">            var prefix = distanceRows(PREFIX_ROWS).toList();</span>
+<span class="fc" id="L138">            var reducedPrefix = checked.evaluate(prefix, LIMITS, RUN);</span>
+<span class="fc" id="L139">            BigInteger directPrefix = BigInteger.ZERO;</span>
+<span class="fc" id="L140">            int directPairs = 0;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            for (int left = 0; left &lt; prefix.size(); left++) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                for (int right = left + 1; right &lt; prefix.size(); right++) {</span>
+<span class="fc" id="L143">                    var difference = prefix.get(left).getFirst().subtract(prefix.get(right).getFirst());</span>
+<span class="fc" id="L144">                    directPrefix = directPrefix.add(difference.multiply(difference));</span>
+<span class="fc" id="L145">                    directPairs++;</span>
+                }
+            }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (!reducedPrefix.value().equals(directPrefix)) return unavailable(&quot;PREFIX_MISMATCH&quot;);</span>
+
+<span class="fc" id="L150">            return verified().property(&quot;evaluatedRows&quot;, evaluation.rows()).property(&quot;value&quot;, evaluation.value().toString())</span>
+<span class="fc" id="L151">                .property(&quot;firstValue&quot;, DISTANCE_FIRST).property(&quot;lastValue&quot;, DISTANCE_FIRST + DISTANCE_ROWS - 1)</span>
+<span class="fc" id="L152">                .property(&quot;baselinePairs&quot;, PairReduction.originalPairs(evaluation.rows()).toString())</span>
+<span class="fc" id="L153">                .property(&quot;prefixRows&quot;, reducedPrefix.rows()).property(&quot;prefixPairs&quot;, directPairs)</span>
+<span class="fc" id="L154">                .property(&quot;prefixReducedValue&quot;, reducedPrefix.value().toString())</span>
+<span class="fc" id="L155">                .property(&quot;prefixDirectValue&quot;, directPrefix.toString())</span>
+<span class="fc" id="L156">                .property(&quot;evaluationWork&quot;, evaluation.work())</span>
+<span class="fc" id="L157">                .endObject().toString();</span>
+<span class="nc" id="L158">        } catch (IllegalArgumentException resourceStop) {</span>
+<span class="nc" id="L159">            return unavailable(resourceStop.getMessage());</span>
+        }
+    }
+
+    private static java.util.stream.Stream&lt;List&lt;BigInteger&gt;&gt; distanceRows(int count) {
+<span class="fc" id="L164">        return IntStream.range(0, count).mapToObj(index -&gt; List.of(BigInteger.valueOf(DISTANCE_FIRST + index)));</span>
+    }
+
+    private static void writeEdge(JsonWriter array, Edge edge) {
+<span class="fc" id="L168">        array.arrayValue(pair -&gt; pair.value(edge.left()).value(edge.right()));</span>
+<span class="fc" id="L169">    }</span>
+
+    private static void writeInterval(JsonWriter array, Interval range) {
+<span class="fc" id="L172">        array.value(Math.toIntExact(range.minimum())).value(Math.toIntExact(range.maximum()));</span>
+<span class="fc" id="L173">    }</span>
+
+    private static JsonWriter verified() {
+<span class="fc" id="L176">        return new JsonWriter().beginObject().property(&quot;status&quot;, &quot;VERIFIED&quot;);</span>
+    }
+
+    private static String unavailable(String reason) {
+<span class="nc" id="L180">        return new JsonWriter().beginObject().property(&quot;status&quot;, &quot;UNAVAILABLE&quot;).property(&quot;reason&quot;, reason)</span>
+<span class="nc" id="L181">            .endObject().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

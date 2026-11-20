@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearPairCandidates.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearPairCandidates.java</span></div><h1>BilinearPairCandidates.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.LongConsumer;
+
+/**
+ * Proposes the three-product identity for joint commutative bilinear outputs.
+ * These are candidates, not equality certificates; the consumer must verify them.
+ * The adapter admits exact algebraic operations and owns its language's type semantics.
+ */
+public final class BilinearPairCandidates {
+    private BilinearPairCandidates() {}
+
+<span class="fc" id="L17">    public enum Operation { ADD, SUBTRACT, MULTIPLY, MOD }</span>
+
+    public record Binary&lt;E&gt;(Operation operation, E left, E right) {
+<span class="fc" id="L20">        public Binary {</span>
+<span class="fc" id="L21">            Objects.requireNonNull(operation);</span>
+<span class="fc" id="L22">            Objects.requireNonNull(left);</span>
+<span class="fc" id="L23">            Objects.requireNonNull(right);</span>
+<span class="fc" id="L24">        }</span>
+    }
+
+    /** An empty view excludes a term from algebraic pattern matching. */
+    public interface Algebra&lt;E&gt; {
+        Optional&lt;Binary&lt;E&gt;&gt; view(E expression);
+        E make(Operation operation, E left, E right);
+    }
+
+<span class="fc" id="L33">    private record Eligible&lt;E&gt;(int index, Binary&lt;E&gt; expression, E modulus) {}</span>
+
+    /**
+     * Returns immutable full output lists, changing only the paired sum output.
+     * The caller's work callback is invoked before scans, pairing and allocation;
+     * it may throw to enforce a shared budget or cooperative cancellation.
+     */
+    public static &lt;E&gt; List&lt;List&lt;E&gt;&gt; generate(List&lt;E&gt; outputs, int maximum,
+            Algebra&lt;E&gt; algebra, LongConsumer charge) {
+<span class="fc" id="L42">        Objects.requireNonNull(outputs);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(algebra);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(charge);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (maximum &lt;= 0) return List.of();</span>
+<span class="fc" id="L46">        var subtractions = new ArrayList&lt;Eligible&lt;E&gt;&gt;();</span>
+<span class="fc" id="L47">        var additions = new ArrayList&lt;Eligible&lt;E&gt;&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (var iterator = outputs.listIterator(); iterator.hasNext();) {</span>
+<span class="fc" id="L49">            charge.accept(1);</span>
+<span class="fc" id="L50">            int index = iterator.nextIndex();</span>
+<span class="fc" id="L51">            var eligible = eligible(index, iterator.next(), algebra);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (eligible == null) continue;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            (eligible.expression().operation() == Operation.SUBTRACT ? subtractions : additions).add(eligible);</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        var proposals = new ArrayList&lt;List&lt;E&gt;&gt;();</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        for (var subtraction : subtractions) for (var addition : additions) {</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (appendPair(outputs, maximum, algebra, charge, subtraction, addition, proposals))</span>
+<span class="fc" id="L58">                return List.copyOf(proposals);</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        return List.copyOf(proposals);</span>
+    }
+
+    private static &lt;E&gt; Eligible&lt;E&gt; eligible(int index, E output, Algebra&lt;E&gt; algebra) {
+<span class="fc" id="L64">        var expression = algebra.view(output).orElse(null);</span>
+<span class="fc" id="L65">        E modulus = null;</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (expression != null &amp;&amp; expression.operation() == Operation.MOD) {</span>
+<span class="fc" id="L67">            modulus = expression.right();</span>
+<span class="fc" id="L68">            expression = algebra.view(expression.left()).orElse(null);</span>
+        }
+<span class="fc bfc" id="L70" title="All 4 branches covered.">        if (expression == null || (expression.operation() != Operation.ADD</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                &amp;&amp; expression.operation() != Operation.SUBTRACT)) return null;</span>
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">        if (!isProduct(expression.left(), algebra) || !isProduct(expression.right(), algebra)) return null;</span>
+<span class="fc" id="L73">        return new Eligible&lt;&gt;(index, expression, modulus);</span>
+    }
+
+    /** Appends orientations for one eligible pair, stopping at the shared output limit. */
+    private static &lt;E&gt; boolean appendPair(List&lt;E&gt; outputs, int maximum, Algebra&lt;E&gt; algebra,
+            LongConsumer charge, Eligible&lt;E&gt; subtraction, Eligible&lt;E&gt; addition, List&lt;List&lt;E&gt;&gt; proposals) {
+<span class="fc" id="L79">        charge.accept(1);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (!Objects.equals(subtraction.modulus(), addition.modulus())) return false;</span>
+<span class="fc" id="L81">        var left = subtraction.expression();</span>
+<span class="fc" id="L82">        var right = addition.expression();</span>
+<span class="fc" id="L83">        var p = algebra.view(left.left()).orElseThrow();</span>
+<span class="fc" id="L84">        var q = algebra.view(left.right()).orElseThrow();</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">        for (int first = 0; first &lt; 2; first++) for (int second = 0; second &lt; 2; second++) {</span>
+<span class="fc" id="L86">            charge.accept(1);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            E a = first == 0 ? p.left() : p.right();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            E c = first == 0 ? p.right() : p.left();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            E b = second == 0 ? q.left() : q.right();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            E d = second == 0 ? q.right() : q.left();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (!isCrossSum(right, a, b, c, d, algebra)) continue;</span>
+<span class="fc" id="L92">            charge.accept(2L * outputs.size());</span>
+<span class="fc" id="L93">            E shared = algebra.make(Operation.MULTIPLY, algebra.make(Operation.ADD, a, b),</span>
+<span class="fc" id="L94">                algebra.make(Operation.ADD, c, d));</span>
+<span class="fc" id="L95">            E imaginary = algebra.make(Operation.SUBTRACT,</span>
+<span class="fc" id="L96">                algebra.make(Operation.SUBTRACT, shared, left.left()), left.right());</span>
+<span class="fc" id="L97">            var changed = new ArrayList&lt;&gt;(outputs);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            changed.set(addition.index(), addition.modulus() == null ? imaginary</span>
+<span class="fc" id="L99">                : algebra.make(Operation.MOD, imaginary, addition.modulus()));</span>
+<span class="fc" id="L100">            proposals.add(List.copyOf(changed));</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (proposals.size() == maximum) return true;</span>
+            break; // Keep the next first-factor orientation, even when this one matched.
+        }
+<span class="fc" id="L104">        return false;</span>
+    }
+
+    private static &lt;E&gt; boolean isCrossSum(Binary&lt;E&gt; sum, E a, E b, E c, E d, Algebra&lt;E&gt; algebra) {
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        return (product(sum.left(), a, d, algebra) &amp;&amp; product(sum.right(), b, c, algebra))</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">            || (product(sum.right(), a, d, algebra) &amp;&amp; product(sum.left(), b, c, algebra));</span>
+    }
+
+    private static &lt;E&gt; boolean isProduct(E expression, Algebra&lt;E&gt; algebra) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        return algebra.view(expression).map(b -&gt; b.operation() == Operation.MULTIPLY).orElse(false);</span>
+    }
+
+    private static &lt;E&gt; boolean product(E expression, E a, E b, Algebra&lt;E&gt; algebra) {
+<span class="fc" id="L117">        var value = algebra.view(expression).orElse(null);</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.operation() == Operation.MULTIPLY</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">            &amp;&amp; ((value.left().equals(a) &amp;&amp; value.right().equals(b))</span>
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">                || (value.left().equals(b) &amp;&amp; value.right().equals(a)));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

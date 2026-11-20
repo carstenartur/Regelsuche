@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>HunterCoverage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">HunterCoverage.java</span></div><h1>HunterCoverage.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage.Ray;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage.Request;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage.Unavailable;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage.Verification;
+import de.regelsuche.math.algorithms.modular.CongruenceCoverage.Work;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static java.math.BigInteger.ZERO;
+
+/** Hunter's spanning-tree lower bound on survivors of a finite activated-congruence request. */
+public final class HunterCoverage {
+    private HunterCoverage() {}
+
+    /** Endpoints index original rule positions, including repeated and inactive rules. */
+    public record Edge(int left, int right, BigInteger intersectionCount) {
+<span class="fc" id="L24">        public Edge { Objects.requireNonNull(intersectionCount); }</span>
+    }
+
+    /** An arbitrary spanning tree suffices for replay. Its maximum weight is not a certified claim. */
+    public record Certificate(Request source, List&lt;BigInteger&gt; singletonCounts, List&lt;Edge&gt; tree,
+            BigInteger lowerBound) {
+<span class="fc" id="L30">        public Certificate {</span>
+<span class="fc" id="L31">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L32">            singletonCounts = List.copyOf(singletonCounts);</span>
+<span class="fc" id="L33">            tree = List.copyOf(tree);</span>
+<span class="fc" id="L34">            Objects.requireNonNull(lowerBound);</span>
+<span class="fc" id="L35">        }</span>
+    }
+
+<span class="fc" id="L38">    public record Result(Optional&lt;Certificate&gt; certificate, String reason, long work) {}</span>
+
+    /** Dense Prim search with exact pair counts and linear auxiliary storage in the rule count. */
+    public static Result bounds(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L42">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L43">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L45">            int n = request.rules().size();</span>
+<span class="fc" id="L46">            work.terms(n);</span>
+<span class="fc" id="L47">            CongruenceCoverage.validateInput(request, work);</span>
+<span class="fc" id="L48">            var size = request.progression().count();</span>
+<span class="fc" id="L49">            var rays = rays(request, work);</span>
+<span class="fc" id="L50">            var singles = new ArrayList&lt;BigInteger&gt;(n);</span>
+<span class="fc" id="L51">            var bound = size;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (var ray : rays) {</span>
+<span class="fc" id="L53">                var count = count(ray, size, work);</span>
+<span class="fc" id="L54">                singles.add(count);</span>
+<span class="fc" id="L55">                bound = work.subtract(bound, count);</span>
+            }
+<span class="fc" id="L57">            var tree = maximumTree(rays, size, work);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (var edge : tree) bound = work.add(bound, edge.intersectionCount());</span>
+<span class="fc" id="L59">            work.charge(1L + n + tree.size());</span>
+<span class="fc" id="L60">            var certificate = new Certificate(request, singles, tree, bound.max(ZERO));</span>
+<span class="fc" id="L61">            work.charge(1);</span>
+<span class="fc" id="L62">            return new Result(Optional.of(certificate), &quot;CERTIFIED&quot;, work.used);</span>
+<span class="fc" id="L63">        } catch (Unavailable stopped) {</span>
+<span class="fc" id="L64">            return new Result(Optional.empty(), stopped.getMessage(), work.used);</span>
+        }
+    }
+
+    private static Ray[] rays(Request request, Work work) {
+<span class="fc" id="L69">        int n = request.rules().size();</span>
+<span class="fc" id="L70">        work.charge(1L + n);</span>
+<span class="fc" id="L71">        var rays = new Ray[n];</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (request.progression().count().signum() &gt; 0) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L74">                rays[i] = CongruenceCoverage.indexRay(request.progression(), request.rules().get(i), work);</span>
+            }
+        }
+<span class="fc" id="L77">        return rays;</span>
+    }
+
+    private static BigInteger count(Ray ray, BigInteger size, Work work) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        return ray == null ? ZERO : CongruenceCoverage.rayCount(ray.first(), ray.period(), size, work);</span>
+    }
+
+    private static BigInteger intersection(Ray left, Ray right, BigInteger size, Work work) {
+<span class="fc" id="L85">        work.charge(1);</span>
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        return left == null || right == null ? ZERO : count(CongruenceCoverage.intersect(left, right, size, work), size, work);</span>
+    }
+
+    private static List&lt;Edge&gt; maximumTree(Ray[] rays, BigInteger size, Work work) {
+<span class="fc" id="L90">        int n = rays.length;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (n &lt; 2) return List.of();</span>
+<span class="fc" id="L92">        work.charge(4L * n);</span>
+<span class="fc" id="L93">        var tree = new ArrayList&lt;Edge&gt;(n - 1);</span>
+<span class="fc" id="L94">        boolean[] inTree = new boolean[n];</span>
+<span class="fc" id="L95">        int[] parent = new int[n];</span>
+<span class="fc" id="L96">        var best = new BigInteger[n];</span>
+<span class="fc" id="L97">        int current = 0;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (int added = 1; added &lt; n; added++) {</span>
+<span class="fc" id="L99">            inTree[current] = true;</span>
+<span class="fc" id="L100">            int next = -1;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L102">                work.charge(1);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (inTree[i]) continue;</span>
+<span class="fc" id="L104">                var weight = intersection(rays[current], rays[i], size, work);</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">                if (best[i] == null || weight.compareTo(best[i]) &gt; 0) {</span>
+<span class="fc" id="L106">                    best[i] = weight;</span>
+<span class="fc" id="L107">                    parent[i] = current;</span>
+                }
+<span class="fc bfc" id="L109" title="All 4 branches covered.">                if (next &lt; 0 || best[i].compareTo(best[next]) &gt; 0) next = i;</span>
+            }
+<span class="fc" id="L111">            tree.add(new Edge(parent[next], next, best[next]));</span>
+<span class="fc" id="L112">            current = next;</span>
+        }
+<span class="fc" id="L114">        return tree;</span>
+    }
+
+    /** Independently checks the selected edges, counts, tree structure and clipped arithmetic. */
+    public static Verification verify(Request request, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L120">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L121">        Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L122">        var work = new Work(limits, cancellation);</span>
+        try {
+<span class="fc" id="L124">            int n = request.rules().size();</span>
+<span class="fc" id="L125">            work.terms(n);</span>
+<span class="fc" id="L126">            work.terms(certificate.source().rules().size());</span>
+<span class="fc" id="L127">            CongruenceCoverage.validateInput(request, work);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!CongruenceCoverage.sameSource(request, certificate.source(), work))</span>
+<span class="fc" id="L129">                return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+<span class="fc bfc" id="L130" title="All 4 branches covered.">            if (certificate.singletonCounts().size() != n || certificate.tree().size() != Math.max(0, n - 1))</span>
+<span class="fc" id="L131">                return new Verification(false, &quot;SHAPE_MISMATCH&quot;, work.used);</span>
+<span class="fc" id="L132">            work.integer(certificate.lowerBound());</span>
+<span class="fc" id="L133">            var size = request.progression().count();</span>
+<span class="fc" id="L134">            var rays = rays(request, work);</span>
+<span class="fc" id="L135">            var bound = size;</span>
+<span class="fc" id="L136">            work.charge(n);</span>
+<span class="fc" id="L137">            int[] component = new int[n];</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L139">                var actual = count(rays[i], size, work);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                if (!work.integer(certificate.singletonCounts().get(i)).equals(actual))</span>
+<span class="fc" id="L141">                    return new Verification(false, &quot;SINGLETON_MISMATCH&quot;, work.used);</span>
+<span class="fc" id="L142">                bound = work.subtract(bound, actual);</span>
+<span class="fc" id="L143">                component[i] = i;</span>
+            }
+            // With exactly n-1 edges, acyclicity implies connectivity (n &gt; 0).
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            for (var edge : certificate.tree()) {</span>
+<span class="fc" id="L147">                int a = edge.left();</span>
+<span class="fc" id="L148">                int b = edge.right();</span>
+<span class="pc bpc" id="L149" title="2 of 8 branches missed.">                if (a &lt; 0 || b &lt; 0 || a &gt;= n || b &gt;= n) return new Verification(false, &quot;INVALID_ENDPOINT&quot;, work.used);</span>
+<span class="fc" id="L150">                int rootA = root(component, a, work);</span>
+<span class="fc" id="L151">                int rootB = root(component, b, work);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                if (rootA == rootB) return new Verification(false, &quot;INVALID_TREE&quot;, work.used);</span>
+<span class="fc" id="L153">                component[rootA] = rootB;</span>
+<span class="fc" id="L154">                var actual = intersection(rays[a], rays[b], size, work);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                if (!work.integer(edge.intersectionCount()).equals(actual))</span>
+<span class="fc" id="L156">                    return new Verification(false, &quot;INTERSECTION_MISMATCH&quot;, work.used);</span>
+<span class="fc" id="L157">                bound = work.add(bound, actual);</span>
+<span class="fc" id="L158">            }</span>
+<span class="fc" id="L159">            work.charge(1);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (!bound.max(ZERO).equals(certificate.lowerBound()))</span>
+<span class="fc" id="L161">                return new Verification(false, &quot;BOUND_MISMATCH&quot;, work.used);</span>
+<span class="fc" id="L162">            return new Verification(true, &quot;VERIFIED&quot;, work.used);</span>
+<span class="fc" id="L163">        } catch (Unavailable stopped) {</span>
+<span class="fc" id="L164">            return new Verification(false, stopped.getMessage(), work.used);</span>
+        }
+    }
+
+    private static int root(int[] component, int index, Work work) {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        while (component[index] != index) {</span>
+<span class="fc" id="L170">            work.charge(1);</span>
+<span class="fc" id="L171">            component[index] = component[component[index]];</span>
+<span class="fc" id="L172">            index = component[index];</span>
+        }
+<span class="fc" id="L174">        return index;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

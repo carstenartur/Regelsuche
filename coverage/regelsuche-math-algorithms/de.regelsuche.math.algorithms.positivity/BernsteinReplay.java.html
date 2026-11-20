@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BernsteinReplay.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">BernsteinReplay.java</span></div><h1>BernsteinReplay.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.List;
+import static de.regelsuche.math.algorithms.positivity.BernsteinPositivity.*;
+import static de.regelsuche.scalar.ExactRational.*;
+
+/** Independent leaf identity test by exact interpolation on a unisolvent tensor grid. */
+final class BernsteinReplay {
+    private BernsteinReplay() {}
+
+    static Verification verify(Request source, Certificate certificate, PositivityWork work) {
+        try {
+<span class="fc" id="L16">            int size = BernsteinTensors.size(source, work);</span>
+<span class="fc" id="L17">            BernsteinTensors.checkBox(source.box(), work);</span>
+<span class="fc" id="L18">            BernsteinTensors.checkBox(certificate.source().box(), work);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">            if (!source.box().equals(certificate.source().box())</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">                    || !work.samePolynomial(source.polynomial(), certificate.source().polynomial())) {</span>
+<span class="fc" id="L21">                return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used);</span>
+            }
+<span class="fc" id="L23">            work.terms(certificate.steps().size());</span>
+<span class="fc" id="L24">            var boxes = new ArrayDeque&lt;List&lt;Interval&gt;&gt;();</span>
+<span class="fc" id="L25">            boxes.push(source.box());</span>
+<span class="fc" id="L26">            long cells = size;</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (var step : certificate.steps()) {</span>
+<span class="fc" id="L28">                work.charge(1);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">                if (boxes.isEmpty()) return new Verification(false, &quot;EXCESS_STEP&quot;, work.used);</span>
+<span class="fc" id="L30">                var box = boxes.pop();</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">                if (step instanceof Split(int axis)) {</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">                    if (axis &lt; 0 || axis &gt;= box.size()) return new Verification(false, &quot;INVALID_AXIS&quot;, work.used);</span>
+<span class="fc" id="L33">                    cells += 2L * size;</span>
+<span class="fc" id="L34">                    work.terms(cells);</span>
+<span class="fc" id="L35">                    var parent = box.get(axis);</span>
+<span class="fc" id="L36">                    var midpoint = work.div(work.add(parent.lower(), parent.upper()), integer(2));</span>
+<span class="fc" id="L37">                    var child = box.toArray(Interval[]::new);</span>
+<span class="fc" id="L38">                    child[axis] = new Interval(midpoint, parent.upper());</span>
+<span class="fc" id="L39">                    boxes.push(List.of(child));</span>
+<span class="fc" id="L40">                    child[axis] = new Interval(parent.lower(), midpoint);</span>
+<span class="fc" id="L41">                    boxes.push(List.of(child));</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                } else if (step instanceof Leaf leaf) {</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">                    if (!box.equals(leaf.box()) || leaf.coefficients().size() != size) {</span>
+<span class="fc" id="L44">                        return new Verification(false, &quot;LEAF_SHAPE&quot;, work.used);</span>
+                    }
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                    if (!coefficientsHaveRequiredSign(leaf.coefficients(), certificate.claim(), work))</span>
+<span class="fc" id="L47">                        return new Verification(false, &quot;COEFFICIENT_SIGN&quot;, work.used);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                    if (!identity(source.polynomial(), leaf, work)) return new Verification(false, &quot;LEAF_IDENTITY&quot;, work.used);</span>
+                }
+<span class="fc" id="L50">            }</span>
+<span class="fc" id="L51">            work.charge(0);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            return new Verification(boxes.isEmpty(), boxes.isEmpty() ? &quot;VERIFIED&quot; : &quot;INCOMPLETE_PARTITION&quot;, work.used);</span>
+<span class="fc" id="L53">        } catch (PositivityWork.Stop stop) {</span>
+<span class="fc" id="L54">            return new Verification(false, stop.getMessage(), work.used);</span>
+        }
+    }
+
+    private static boolean coefficientsHaveRequiredSign(List&lt;ExactRational&gt; coefficients,
+            Claim claim, PositivityWork work) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (var value : coefficients) {</span>
+<span class="fc" id="L61">            int sign = work.check(value).signum();</span>
+<span class="pc bpc" id="L62" title="1 of 6 branches missed.">            if (sign &lt; 0 || (sign == 0 &amp;&amp; claim == Claim.STRICTLY_POSITIVE)) return false;</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        return true;</span>
+    }
+
+<span class="fc" id="L67">    private record Node(ExactRational coordinate, ExactRational[] weights) {}</span>
+    private static Node node(Interval interval, int index, int degree, PositivityWork work) {
+<span class="fc" id="L69">        work.charge(degree + 1L);</span>
+<span class="fc" id="L70">        var weights = new ExactRational[degree + 1];</span>
+<span class="fc bfc" id="L71" title="All 4 branches covered.">        if (index == 0 || index == degree) {</span>
+<span class="fc" id="L72">            Arrays.fill(weights, ZERO);</span>
+<span class="fc" id="L73">            weights[index] = ONE;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            return new Node(index == 0 ? interval.lower() : interval.upper(), weights);</span>
+        }
+<span class="fc" id="L76">        var t = work.div(integer(index), integer(degree));</span>
+<span class="fc" id="L77">        var s = work.sub(ONE, t);</span>
+<span class="fc" id="L78">        var coordinate = work.add(work.mul(s, interval.lower()), work.mul(t, interval.upper()));</span>
+<span class="fc" id="L79">        weights[0] = work.pow(s, degree);</span>
+<span class="fc" id="L80">        var ratio = work.div(t, s);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (int i = 1; i &lt;= degree; i++) {</span>
+<span class="fc" id="L82">            var factor = work.div(integer(degree-i+1), integer(i));</span>
+<span class="fc" id="L83">            weights[i] = work.mul(weights[i-1], work.mul(factor, ratio));</span>
+        }
+<span class="fc" id="L85">        return new Node(coordinate, weights);</span>
+    }
+
+    static boolean identity(SparsePolynomial p, Leaf leaf, PositivityWork work) {
+<span class="fc" id="L89">        int nx = p.degrees().getFirst();</span>
+<span class="fc" id="L90">        int ny = p.degreeY();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt;= nx; i++) {</span>
+<span class="fc" id="L92">            var x = node(leaf.box().getFirst(), i, nx, work);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (int j = 0; j &lt;= ny; j++) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                var y = leaf.box().size() == 1 ? new Node(ZERO, new ExactRational[]{ONE})</span>
+<span class="fc" id="L95">                    : node(leaf.box().get(1), j, ny, work);</span>
+<span class="fc" id="L96">                var value = ZERO;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                for (var term : p.terms().entrySet()) {</span>
+<span class="fc" id="L98">                    var xPower = work.pow(x.coordinate(), term.getKey().x());</span>
+<span class="fc" id="L99">                    var yPower = work.pow(y.coordinate(), term.getKey().y());</span>
+<span class="fc" id="L100">                    value = work.add(value, work.mul(term.getValue(), work.mul(xPower, yPower)));</span>
+<span class="fc" id="L101">                }</span>
+<span class="fc" id="L102">                var represented = ZERO;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                for (int k = 0; k &lt;= nx; k++) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    for (int l = 0; l &lt;= ny; l++) {</span>
+<span class="fc" id="L105">                        var coefficient = leaf.coefficients().get(k * (ny + 1) + l);</span>
+<span class="fc" id="L106">                        var weight = work.mul(x.weights()[k], y.weights()[l]);</span>
+<span class="fc" id="L107">                        represented = work.add(represented, work.mul(coefficient, weight));</span>
+                    }
+                }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                if (!represented.equals(value)) return false;</span>
+            }
+        }
+<span class="fc" id="L113">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

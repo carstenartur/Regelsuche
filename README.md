@@ -20,6 +20,7 @@ English entry: [Start here](start-here.md). Without installation:
 | die Grenze für selbst gelernte Regeln verstehen | [Promotion gelernter Pattern-Regeln](learned-pattern-rule-promotion.md) und [Evolutionäre Suche](evolutionary-search.md) |
 | einen generationenbasierten Mining-Lauf reproduzieren | [Generationenbasiertes Regelmining](generational-rule-mining.md) |
 | die Polynom- und Faktorisierungsarchitektur verstehen | [Domänenbewusste Polynomfaktorisierung](domain-aware-polynomial-factorization.md), [parsergebundene exakte Faktorisierung](exact-parsed-factorization-pipeline.md), [verifizierte Faktorisierungstransformation](exact-factorization-transformation-pipeline.md), [univariate Polynomgrundlage](univariate-polynomial-foundation.md), [Inhalts- und Primitivteilnormalisierung](univariate-content-normalization.md), [Primkörperfaktorisierung](finite-field-factorization.md), [Primzahlauswahl](suitable-prime-selection.md) und [quartische Zerlegungsengine](polynomial-decomposition-synthesis.md) |
+| verfügbare mathematische APIs, Releases und Demos vergleichen | [Mathematische Verfügbarkeit](mathematical-capabilities.md) |
 | den aktuellen Forschungsstand verstehen | [Discovery- und Forschungsstand](discovery-status.md) |
 | verfolgen, was bei einer Strategie schon versucht wurde | [Strategien-Index mit Befunden und Codeverweisen](research/strategies.md) |
 | Forschungsfragen und Vergleichsverfahren einordnen | [Forschungsmethodik](research-methodology.md) und [externe Polynomvergleiche](external-polynomial-comparison.md) |

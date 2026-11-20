@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PositivityWork.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">PositivityWork.java</span></div><h1>PositivityWork.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
+
+/** Bounds rational operations, dense allocations and proof size for a single call. */
+final class PositivityWork {
+    private static final int MAX_CELLS = 1_000_000;
+    private final IterationLimits limits;
+    private final BooleanSupplier cancellation;
+<span class="fc" id="L14">    private final long start = System.nanoTime();</span>
+    private final long timeout;
+    long used;
+
+<span class="fc" id="L18">    PositivityWork(IterationLimits limits, BooleanSupplier cancellation) {</span>
+<span class="fc" id="L19">        this.limits = Objects.requireNonNull(limits);</span>
+<span class="fc" id="L20">        this.cancellation = Objects.requireNonNull(cancellation);</span>
+<span class="fc" id="L21">        timeout = TimeUnit.MILLISECONDS.toNanos(limits.timeoutMillis());</span>
+<span class="fc" id="L22">    }</span>
+
+    void charge(long count) {
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">        if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Stop(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (System.nanoTime() - start &gt;= timeout) throw new Stop(&quot;TIME_LIMIT&quot;);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (count &gt; limits.maximumWork() - used) throw new Stop(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L28">        used += count;</span>
+<span class="fc" id="L29">    }</span>
+
+    void terms(long count) {
+<span class="fc" id="L32">        charge(0);</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (count &gt; limits.maximumTerms() || count &gt; MAX_CELLS) throw new Stop(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L34">    }</span>
+
+    ExactRational check(ExactRational value) {
+<span class="fc" id="L37">        int bits = Math.max(value.numerator().abs().bitLength(), value.denominator().bitLength());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (bits &gt; IterationLimits.MAX_RUNTIME_BITS) throw new Stop(&quot;RUNTIME_BIT_LIMIT&quot;);</span>
+<span class="fc" id="L39">        charge(1L + bits / 64);</span>
+<span class="fc" id="L40">        return value;</span>
+    }
+
+    void polynomial(SparsePolynomial source) {
+<span class="fc" id="L44">        terms(source.terms().size());</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (var coefficient : source.terms().values()) check(coefficient);</span>
+<span class="fc" id="L46">    }</span>
+
+    boolean samePolynomial(SparsePolynomial a, SparsePolynomial b) {
+<span class="fc" id="L49">        polynomial(a);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (!a.degrees().equals(b.degrees()) || a.terms().size() != b.terms().size()) return false;</span>
+<span class="fc" id="L52">        var it = b.terms().entrySet().iterator();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        for (var term : a.terms().entrySet()) {</span>
+<span class="fc" id="L54">            var other = it.next();</span>
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">            if (!term.getKey().equals(other.getKey()) || !term.getValue().equals(check(other.getValue()))) return false;</span>
+<span class="nc" id="L56">        }</span>
+<span class="nc" id="L57">        return true;</span>
+    }
+
+<span class="fc" id="L60">    ExactRational add(ExactRational a, ExactRational b) { return check(a.add(b)); }</span>
+<span class="fc" id="L61">    ExactRational sub(ExactRational a, ExactRational b) { return check(a.subtract(b)); }</span>
+<span class="fc" id="L62">    ExactRational mul(ExactRational a, ExactRational b) { return check(a.multiply(b)); }</span>
+<span class="fc" id="L63">    ExactRational div(ExactRational a, ExactRational b) { return check(a.divide(b)); }</span>
+
+    ExactRational pow(ExactRational value, int exponent) {
+<span class="fc" id="L66">        ExactRational result = ExactRational.ONE;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        while (exponent &gt; 0) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if ((exponent &amp; 1) != 0) result = mul(result, value);</span>
+<span class="fc" id="L69">            exponent &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (exponent != 0) value = mul(value, value);</span>
+        }
+<span class="fc" id="L72">        return result;</span>
+    }
+
+    static final class Stop extends RuntimeException {
+<span class="fc" id="L76">        Stop(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

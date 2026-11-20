@@ -53,6 +53,18 @@ siehst du das Ergebnis für die eingegebenen Zeilen. Bei leerem Wertefeld zeigt
 die Workbench **Keine Beispieldaten eingegeben.** Sobald du eine Eingabe oder
 Berechnungsart änderst, verschwindet das bisherige Ergebnis. [Bedienablauf und Varianten](user-workflows.md#summenschleifen-optimieren)
 
+Über **Zum Lauf mit 100.000 Zeilen** gelangst du zur separaten Demo mit
+deterministischen Eingabewerten. **100.000 Zeilen auswerten** führt den
+geprüften Plan aus. Der direkte Vergleich umfasst die ersten 64 Werte.
+[Ergebnis und Bildschirmaufnahmen](demo-gallery.md#ein-durchlauf-für-eine-paarsumme)
+
+### Exakte Rechennachweise
+
+**Exakte Rechennachweise** führt von den Demo-Karten zu zwei live geprüften
+Beispielen. Die Hall-Demo zeigt das Matching, die Zeugenmenge und deren
+vollständige Nachbarschaft. Die Montgomery-Demo zeigt den Rechenplan mit
+verschobener Reduktion und seine geprüften Wortgrenzen. [Bedienablauf](user-workflows.md#exakte-rechennachweise-ausführen)
+
 ## Oberfläche
 
 ### Workbench
