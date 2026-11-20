@@ -161,6 +161,23 @@ class WebWorkbenchDockerImageTest {
     }
 
     @Test
+    void discoveryApiEndpointsReturnStructuredJson() throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper json =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+        HttpResponse<String> paths = get("/api/paths");
+        assertEquals(200, paths.statusCode(), paths::body);
+        assertTrue(json.readTree(paths.body()).path("transformations").isArray(),
+            paths::body);
+
+        HttpResponse<String> inventory = get("/api/inventory");
+        assertEquals(200, inventory.statusCode(), inventory::body);
+        assertTrue(json.readTree(inventory.body()).path("rules").isArray(),
+            inventory::body);
+    }
+
+
+    @Test
     void pathTraversalIsRejected() throws Exception {
         HttpResponse<String> resp = get("/vendor/..%2F..%2F..%2F..%2Fetc%2Fpasswd");
         assertTrue(resp.statusCode() >= 400,
