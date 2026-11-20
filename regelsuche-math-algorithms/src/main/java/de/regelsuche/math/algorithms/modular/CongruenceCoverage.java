@@ -2,7 +2,9 @@ package de.regelsuche.math.algorithms.modular;
 
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import java.math.BigInteger;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +17,7 @@ import static java.math.BigInteger.ONE;
 import static java.math.BigInteger.ZERO;
 
 /**
- * Exact finite coverage by congruence classes with inclusive activation thresholds.
+ * Finite coverage and survivor bounds for congruence classes with inclusive activation thresholds.
  *
  * <p>A request examines {@code first + step * k}, {@code 0 <= k < count}. A rule
  * covers a value {@code n} exactly when {@code n >= activeFrom} and
@@ -111,6 +113,35 @@ public final class CongruenceCoverage {
     public record Verification(boolean valid, String reason, long work) {}
 
     /**
+     * Finite survivor bounds with exact intersection sums for layers 1 through the
+     * smaller of the requested order and the number of nonempty rules. Layer zero
+     * is the source progression's count. Repeated rules occupy distinct positions.
+     * Constructed certificates can be checked with {@link #verifyBounds}.
+     */
+    public record BoundsCertificate(Request source, int order, List<BigInteger> layerTotals,
+            BigInteger lowerBound, BigInteger upperBound) {
+        public BoundsCertificate {
+            Objects.requireNonNull(source);
+            layerTotals = List.copyOf(layerTotals);
+            Objects.requireNonNull(lowerBound);
+            Objects.requireNonNull(upperBound);
+        }
+    }
+
+    public enum BoundsStatus { CERTIFIED, UNAVAILABLE }
+
+    /** A certified interval or an unavailable result with no partial evidence. */
+    public record BoundsResult(BoundsStatus status, Optional<BoundsCertificate> certificate, String reason, long work) {
+        public BoundsResult {
+            Objects.requireNonNull(status);
+            Objects.requireNonNull(certificate);
+            Objects.requireNonNull(reason);
+            if (work < 0 || (status == BoundsStatus.UNAVAILABLE) == certificate.isPresent())
+                throw new IllegalArgumentException("INVALID_COVERAGE_BOUNDS_RESULT");
+        }
+    }
+
+    /**
      * Counts the union exactly and, if needed, locates its least missing index by prefix counts.
      * {@code maximumTerms} bounds the terms in each union map, including intermediate merges.
      * The old and new maps coexist while adding a rule. Integer magnitudes are limited by
@@ -150,9 +181,7 @@ public final class CongruenceCoverage {
         var work = new Work(limits, cancellation);
         try {
             validateInput(request, work);
-            validateInput(certificate.source(), work);
-            work.charge(1L + request.rules().size());
-            if (!request.equals(certificate.source())) return invalid("SOURCE_MISMATCH", work);
+            if (!sameSource(request, certificate.source(), work)) return invalid("SOURCE_MISMATCH", work);
             validateCertificate(certificate, work);
             var terms = reconstruct(request, work);
             work.charge(1L + terms.size());
@@ -178,8 +207,67 @@ public final class CongruenceCoverage {
         }
     }
 
+    /**
+     * Bounds the total number of uncovered elements using complete Bonferroni layers
+     * through the requested nonnegative order. Order zero yields [0, count] when
+     * any rule is effective. Exhausting the effective rules gives an exact count.
+     * The normalized rule positions are bounded by {@code maximumTerms}.
+     */
+    public static BoundsResult bounds(Request request, int order, IterationLimits limits,
+            BooleanSupplier cancellation) {
+        Objects.requireNonNull(request);
+        validateOrder(order);
+        var work = new Work(limits, cancellation);
+        try {
+            validateInput(request, work);
+            var proof = reconstructBounds(request, order, work);
+            return new BoundsResult(BoundsStatus.CERTIFIED, Optional.of(proof), BoundsStatus.CERTIFIED.name(), work.used);
+        } catch (Unavailable unavailable) {
+            return new BoundsResult(BoundsStatus.UNAVAILABLE, Optional.empty(), unavailable.getMessage(), work.used);
+        }
+    }
+
+    /** Recomputes every required layer and both endpoints against the expected request and order. */
+    public static Verification verifyBounds(Request request, int order, BoundsCertificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        Objects.requireNonNull(request);
+        Objects.requireNonNull(certificate);
+        validateOrder(order);
+        var work = new Work(limits, cancellation);
+        try {
+            validateInput(request, work);
+            if (!sameSource(request, certificate.source(), work)) return invalid("SOURCE_MISMATCH", work);
+            if (order != certificate.order()) return invalid("ORDER_MISMATCH", work);
+            work.terms(certificate.layerTotals().size());
+            for (var total : certificate.layerTotals()) work.integer(total);
+            work.integer(certificate.lowerBound());
+            work.integer(certificate.upperBound());
+            var expected = reconstructBounds(request, order, work);
+            work.charge(1L + expected.layerTotals().size());
+            if (!expected.layerTotals().equals(certificate.layerTotals())) return invalid("LAYER_TOTALS_MISMATCH", work);
+            if (!expected.lowerBound().equals(certificate.lowerBound())
+                    || !expected.upperBound().equals(certificate.upperBound())) {
+                return invalid("BOUNDS_MISMATCH", work);
+            }
+            work.charge(1);
+            return new Verification(true, "VERIFIED", work.used);
+        } catch (Unavailable unavailable) {
+            return invalid(unavailable.getMessage(), work);
+        }
+    }
+
     private static Verification invalid(String reason, Work work) {
         return new Verification(false, reason, work.used);
+    }
+
+    private static void validateOrder(int order) {
+        if (order < 0) throw new IllegalArgumentException("INVALID_COVERAGE_BOUNDS_ORDER");
+    }
+
+    private static boolean sameSource(Request request, Request source, Work work) {
+        validateInput(source, work);
+        work.charge(1L + request.rules().size());
+        return request.equals(source);
     }
 
     private static void validateInput(Request request, Work work) {
@@ -210,6 +298,71 @@ public final class CongruenceCoverage {
     }
 
     private record Ray(BigInteger first, BigInteger period) {}
+
+    private record IntersectedRule(int position, Ray intersection) {}
+
+    private static BoundsCertificate reconstructBounds(Request request, int order, Work work) {
+        var size = request.progression().count();
+        var rays = new ArrayList<Ray>();
+        if (size.signum() > 0) {
+            for (var rule : request.rules()) {
+                var ray = indexRay(request.progression(), rule, work);
+                if (ray == null) continue;
+                work.terms(rays.size() + 1);
+                rays.add(ray);
+                // At order zero one ray is enough to rule out exhaustion.
+                if (order == 0) break;
+            }
+        }
+        int depth = Math.min(order, rays.size());
+        var totals = layerTotals(rays, depth, size, work);
+        var lower = ZERO;
+        var upper = size;
+        var partial = size;
+        for (int layer = 0; layer < depth; layer++) {
+            if (layer % 2 == 0) {
+                partial = work.subtract(partial, totals.get(layer));
+                lower = lower.max(partial);
+            } else {
+                partial = work.add(partial, totals.get(layer));
+                upper = upper.min(partial);
+            }
+        }
+        if (depth == rays.size()) {
+            lower = partial;
+            upper = partial;
+        }
+        work.charge(1L + depth);
+        return new BoundsCertificate(request, order, totals, lower, upper);
+    }
+
+    private static List<BigInteger> layerTotals(List<Ray> rays, int depth, BigInteger size, Work work) {
+        if (depth == 0) return List.of();
+        work.charge(1L + depth);
+        var totals = new ArrayList<>(Collections.nCopies(depth, ZERO));
+        var path = new ArrayDeque<IntersectedRule>();
+        // Visit each subset in increasing rule order, bypassing every extension of an empty intersection.
+        int position = 0;
+        while (true) {
+            work.charge(1);
+            if (position == rays.size()) {
+                if (path.isEmpty()) return totals;
+                position = path.removeLast().position() + 1;
+                continue;
+            }
+            var ray = rays.get(position);
+            if (!path.isEmpty()) ray = intersect(path.getLast().intersection(), ray, size, work);
+            if (ray != null) {
+                int layer = path.size();
+                var occurrences = rayCount(ray.first(), ray.period(), size, work);
+                totals.set(layer, work.add(totals.get(layer), occurrences));
+                if (layer + 1 < depth && position + 1 < rays.size()) {
+                    path.addLast(new IntersectedRule(position, ray));
+                }
+            }
+            position++;
+        }
+    }
 
     private static List<Term> reconstruct(Request request, Work work) {
         var terms = new LinkedHashMap<Ray, BigInteger>();
@@ -306,13 +459,16 @@ public final class CongruenceCoverage {
         for (var term : terms) {
             work.charge(1);
             if (boundary.compareTo(term.firstIndex()) <= 0) continue;
-            var occurrences = work.add(work.divide(work.subtract(work.subtract(boundary, ONE), term.firstIndex()),
-                term.period()), ONE);
+            var occurrences = rayCount(term.firstIndex(), term.period(), boundary, work);
             sum = work.add(sum, work.multiply(occurrences, term.coefficient()));
         }
         work.charge(1);
         if (sum.signum() < 0 || sum.compareTo(boundary) > 0) throw new Unavailable("INCONSISTENT_UNION");
         return sum;
+    }
+
+    private static BigInteger rayCount(BigInteger first, BigInteger period, BigInteger boundary, Work work) {
+        return work.add(work.divide(work.subtract(work.subtract(boundary, ONE), first), period), ONE);
     }
 
     private static BigInteger leastMissing(List<Term> terms, BigInteger size, Work work) {

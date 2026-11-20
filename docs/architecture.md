@@ -262,6 +262,22 @@ Damit verhindert die Architektur same-generation feedback und eine
 nachträgliche Vermischung von Such- und Qualifikationswissen. Der Mechanismus
 ist in [Generational Rule Mining](generational-rule-mining.md) dokumentiert.
 
+## Endliche kombinatorische Zertifikate
+
+`regelsuche-math-algorithms` besitzt die Suche und Prüfung für endliche
+bipartite Matchings sowie aktivierte Kongruenzüberdeckungen. Eine Matching-Urkunde
+bindet den vollständigen Eingabegraphen, ein Matching und einen Hall-Zeugen;
+die unabhängige Prüfung leitet dessen Nachbarschaft und eine Knotenüberdeckung ab.
+Bei Kongruenzen gibt es neben der exakten Vereinigung einen getrennten Modus
+für Bonferroni-Zählgrenzen aus vollständigen Schnittschichten.
+
+Das Optimierungs-SDK vermittelt Eingaben, Budget und Abbruchsignal. Die Anwendung
+begründet Herkunft und Vollständigkeit ihres Graphen oder ihrer Sperrregeln.
+Insbesondere enthält der CORE keine kanonischen Greedy-Aktivierungsdaten und
+keine Annahme über eine unendliche Primzahlfamilie. Verträge und reproduzierbare
+Vergleiche stehen bei [Hall-Zertifikaten](research/bipartite-matching.md) und
+[Kongruenzüberdeckungen](research/congruence-coverage.md).
+
 ## Repräsentationsbrücken
 
 Nicht jede mathematische Verbesserung ist ein skalares AST-Rewrite. Exakte

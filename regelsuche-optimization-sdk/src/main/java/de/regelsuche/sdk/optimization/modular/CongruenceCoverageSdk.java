@@ -5,7 +5,7 @@ import de.regelsuche.math.algorithms.modular.CongruenceCoverage;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 
-/** SDK access to exact coverage of finite progressions by activated congruences. */
+/** SDK access to exact coverage and survivor bounds for finite progressions. */
 public final class CongruenceCoverageSdk {
     private CongruenceCoverageSdk() {}
 
@@ -18,6 +18,17 @@ public final class CongruenceCoverageSdk {
             CongruenceCoverage.Certificate certificate, OptimizationBudget budget,
             CancellationToken cancellation) {
         return CongruenceCoverage.verify(request, certificate, limits(budget), cancellation::isCancelled);
+    }
+
+    public static CongruenceCoverage.BoundsResult bounds(CongruenceCoverage.Request request, int order,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return CongruenceCoverage.bounds(request, order, limits(budget), cancellation::isCancelled);
+    }
+
+    public static CongruenceCoverage.Verification verifyBounds(CongruenceCoverage.Request request, int order,
+            CongruenceCoverage.BoundsCertificate certificate, OptimizationBudget budget,
+            CancellationToken cancellation) {
+        return CongruenceCoverage.verifyBounds(request, order, certificate, limits(budget), cancellation::isCancelled);
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {

@@ -6,6 +6,8 @@ Elemente einer endlichen arithmetischen Progression von gegebenen Kongruenzen
 sein. Die Berechnung liefert die exakte Anzahl überdeckter Elemente und,
 falls vorhanden, das kleinste nicht überdeckte Element. Ein gesonderter
 Prüfaufruf rekonstruiert die Überdeckung aus der ursprünglichen Anfrage.
+Für die Anzahl freier Elemente bietet der Kern außerdem überprüfbare
+Schranken aus abgeschnittenen Inklusions-Exklusions-Summen.
 
 Diese Fähigkeit ist unabhängig von Primzahlen und Greedy-Folgen. Sie eignet
 sich beispielsweise für periodische Termine, Sperrzeiten und modulare Siebe.
@@ -33,12 +35,13 @@ Elemente definiert. Die Aktivierungsgrenze ist einschließlich.
 
 | Teil | Verantwortung |
 | --- | --- |
-| `CongruenceCoverage` | Normalisierung, verallgemeinerter chinesischer Restsatz, exakte Vereinigungszählung, kleinster freier Wert, Zertifikate und deren Prüfung |
+| `CongruenceCoverage` | Normalisierung, verallgemeinerter chinesischer Restsatz, exakte Vereinigungszählung, kleinster freier Wert, Schranken für die Anzahl freier Elemente, Zertifikate und deren Prüfung |
 | `CongruenceCoverageSdk` | Übergabe der Anfrage und Abbildung von SDK-Budget und Abbruchsignal auf den Kern |
 | Anwendung | Herkunft und Vollständigkeit der Regeln, fachliche Grenzen, Auswahl von Vermutungen und Interpretation des Ergebnisses |
 
 Das SDK enthält keine Kopie des mathematischen Algorithmus. Es verwendet
-`maximumStates` als Obergrenze für die Terme jeder Vereinigungsdarstellung und reicht
+`maximumStates` als Obergrenze für die Terme jeder Vereinigungsdarstellung
+und für die gespeicherten Regelpositionen bei der Schrankenberechnung. Es reicht
 `maximumWork`, `timeoutMillis` und `CancellationToken` weiter. Da die Anfrage
 höchstens einen kleinsten Zeugen liefert, bestimmt `maximumCandidates` hier
 keine zusätzliche Suchdimension. Der Kern verwendet die vorhandenen
@@ -147,6 +150,69 @@ Große endliche Intervalle allein erzwingen dagegen keine Enumeration.
 Das Ergebnis gilt für die mitgelieferten Regeln. Es beweist weder deren
 Vollständigkeit in einer Anwendung noch eine Aussage über alle Primzahlen
 oder eine unendliche Progression.
+
+## Bonferroni-Schranken für freie Elemente
+
+Für die normalisierten Treffermengen \(A_i\) sei \(S_j\) die Summe der
+Größen aller Schnitte von jeweils \(j\) verschiedenen Regelpositionen.
+Leere Treffermengen können entfallen. Wiederholte Regeln behalten ihre
+einzelnen Positionen. Mit \(S_0=N\) gilt für die Teilsumme
+
+\[
+ T_k=\sum_{j=0}^{k}(-1)^j S_j.
+\]
+
+Ein freier Index trägt zu jeder Teilsumme genau eins bei. Trifft ein
+Index \(t>0\) Regeln, beträgt sein Beitrag \((-1)^k\binom{t-1}{k}\) für
+\(k<t\) und null für \(k\ge t\). Ungerade Ordnungen liefern daher
+untere Schranken und gerade Ordnungen obere Schranken für die Anzahl
+freier Elemente.
+
+`bounds` berechnet alle Schichtensummen bis zur angeforderten Ordnung
+oder bis zur Anzahl wirksamer Regeln. Die Rechnung nutzt dieselben
+Indexkongruenzen, Schnitte und Zählformeln wie die exakte Überdeckung.
+Eine Tiefensuche hält den aktuellen Schnittpfad und überspringt
+Erweiterungen leerer Schnitte. Die Anzahl der berechneten Schnitte
+kann mit der Ordnung kombinatorisch wachsen. Arbeitsbudget, Termgrenze,
+Zeit und Abbruchsignal beschränken auch die Schrankenberechnung. Bei
+einem Abbruch liefert sie `UNAVAILABLE` ohne Zertifikat.
+
+Das Intervall beginnt bei \([0,N]\). Für jede vollständige Schicht
+wird die passende Grenze verschärft, sofern ihre Teilsumme eine
+bessere Schranke liefert. Bei Ordnung null bleibt \([0,N]\), solange
+eine Regel mindestens ein Element trifft. Sobald alle wirksamen Regeln
+einbezogen sind, geben beide Endpunkte die exakte Anzahl freier
+Elemente an. Das gilt auch bei null wirksamen Regeln.
+
+Das Zertifikat bindet die ursprüngliche Anfrage und die angeforderte
+Ordnung. Es enthält die Summen \(S_1,\ldots,S_k\) und beide Endpunkte.
+`verifyBounds` prüft die Bindung und berechnet Summen und Endpunkte
+erneut. Für einen kleinsten freien Wert steht `search` zur Verfügung.
+
+### Kontrolle über eine Periode aus acht Primzahlen
+
+Auf der Progression \(0,\ldots,N-1\) mit \(N=35\,336\,848\,261\)
+streichen wir ab null alle Vielfachen der Primzahlen
+\(11,13,17,19,23,29,31,37\). Die exakte Vereinigungsdarstellung hat
+255 Terme und überschreitet die im Test gesetzte Grenze von 128.
+Unter derselben Grenze ergeben sich folgende Schranken.
+
+| Ordnung | Untere Schranke | Obere Schranke |
+| --- | ---: | ---: |
+| 1 | 20 617 871 161 | 35 336 848 261 |
+| 3 | 22 976 886 861 | 23 236 997 481 |
+| 8 | 22 992 076 800 | 22 992 076 800 |
+
+Die unabhängige Kontrolle zählt pro Primzahl \(p\) genau \(p-1\)
+freie Restklassen. Über die volle Produktperiode gibt es deshalb
+\(\prod_p(p-1)=22\,992\,076\,800\) freie Elemente. Der Kerntest
+prüft die zwei unteren Schranken, die exakte Ordnung und die
+Ablehnung geänderter Aktivierungen, Ordnungen, Schichtensummen und
+Endpunkte. Der alternierende Baum in
+[OpenAI Math, Familie 021, Abschnitt 3](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/build/sections/tree.tex#L29-L64)
+gab den Anstoß zur Anwendung der klassischen endlichen
+Bonferroni-Ungleichungen. Die punktweise Rechnung oben begründet
+das Zertifikat vollständig.
 
 ## Zweite Anwendung: periodische Termine
 

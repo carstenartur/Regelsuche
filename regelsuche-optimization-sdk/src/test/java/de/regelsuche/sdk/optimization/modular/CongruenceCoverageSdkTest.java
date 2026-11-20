@@ -52,6 +52,30 @@ class CongruenceCoverageSdkTest {
         assertFalse(CongruenceCoverageSdk.verify(request, certificate, BUDGET, () -> true).valid());
     }
 
+    @Test
+    void exposesSurvivorBoundsAndForwardsLimitsAndCancellation() {
+        var request = schedule(20);
+        var result = CongruenceCoverageSdk.bounds(request, 2, BUDGET, CancellationToken.NONE);
+        assertEquals(CongruenceCoverage.BoundsStatus.CERTIFIED, result.status());
+        var certificate = result.certificate().orElseThrow();
+        assertEquals(BigInteger.ONE, certificate.lowerBound());
+        assertEquals(BigInteger.ONE, certificate.upperBound());
+        assertTrue(CongruenceCoverageSdk.verifyBounds(request, 2, certificate, BUDGET, CancellationToken.NONE).valid());
+        assertFalse(CongruenceCoverageSdk.verifyBounds(schedule(8), 2, certificate, BUDGET,
+            CancellationToken.NONE).valid());
+        assertEquals("CANCELLED",
+            CongruenceCoverageSdk.verifyBounds(request, 2, certificate, BUDGET, () -> true).reason());
+        var cancelled = CongruenceCoverageSdk.bounds(request, 2, BUDGET, () -> true);
+        assertEquals(CongruenceCoverage.BoundsStatus.UNAVAILABLE, cancelled.status());
+        assertEquals("CANCELLED", cancelled.reason());
+        assertTrue(cancelled.certificate().isEmpty());
+        var limited = CongruenceCoverageSdk.bounds(request, 2, new OptimizationBudget(100_000, 1, 1, 10_000),
+            CancellationToken.NONE);
+        assertEquals(CongruenceCoverage.BoundsStatus.UNAVAILABLE, limited.status());
+        assertEquals("TERM_LIMIT", limited.reason());
+        assertTrue(limited.certificate().isEmpty());
+    }
+
     private static CongruenceCoverage.Request schedule(long secondActivation) {
         return new CongruenceCoverage.Request(
             new CongruenceCoverage.Progression(BigInteger.valueOf(2), BigInteger.valueOf(6),
