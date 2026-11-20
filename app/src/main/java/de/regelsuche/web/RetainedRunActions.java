@@ -17,7 +17,7 @@ import java.nio.file.Files;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.jar.JarFile;
 
 /** Run-bound HTTP actions; routed and authenticated by the existing server. */
 final class RetainedRunActions {
@@ -71,27 +71,30 @@ final class RetainedRunActions {
 
     static String nativeRevision() {
         String configured = System.getProperty("regelsuche.repository.revision", System.getenv("REGELSUCHE_REPOSITORY_REVISION"));
-        if (configured != null && !configured.isBlank()) return configured;
+        String resource = "META-INF/regelsuche/source-revision";
         try {
-            Path checkout = Path.of(RetainedRunActions.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-            while (checkout != null && !Files.isRegularFile(checkout.resolve("app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java"))) {
-                checkout = checkout.getParent();
+            Path origin = Path.of(RetainedRunActions.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            String embedded;
+            if (Files.isDirectory(origin)) {
+                // Gradle uses separate class and resource roots for an exploded application.
+                try (var input = RetainedRunActions.class.getResourceAsStream("/" + resource)) {
+                    embedded = input == null ? "" : new String(input.readNBytes(64), StandardCharsets.US_ASCII).strip();
+                }
+            } else {
+                try (var file = new JarFile(origin.toFile())) {
+                    var entry = file.getJarEntry(resource);
+                    if (entry == null) embedded = "";
+                    else try (var input = file.getInputStream(entry)) {
+                        embedded = new String(input.readNBytes(64), StandardCharsets.US_ASCII).strip();
+                    }
+                }
             }
-            if (checkout == null) return "";
-            var git = new ProcessBuilder("git", "-C", checkout.toString(), "rev-parse", "--verify", "HEAD")
-                .redirectError(ProcessBuilder.Redirect.DISCARD).start();
-            if (!git.waitFor(2, TimeUnit.SECONDS)) {
-                git.destroyForcibly();
-                return "";
-            }
-            try (var input = git.getInputStream()) {
-                return git.exitValue() == 0 ? new String(input.readNBytes(64), StandardCharsets.US_ASCII).trim() : "";
-            }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return "";
+            if (!embedded.isEmpty() && !embedded.matches("[0-9a-f]{40}")) throw new IllegalStateException("invalid embedded source revision");
+            if (configured == null || configured.isBlank()) return embedded;
+            if (!embedded.isEmpty() && !embedded.equals(configured)) throw new IllegalStateException("configured revision differs from application");
+            return configured;
         } catch (IOException | URISyntaxException unavailable) {
-            return "";
+            throw new IllegalStateException("application source revision unavailable", unavailable);
         }
     }
 

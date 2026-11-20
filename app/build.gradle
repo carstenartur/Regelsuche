@@ -179,7 +179,19 @@ tasks.register('vendorWebAssets') {
     dependsOn tasks.named('vendorKatexAssets'), tasks.named('vendorCytoscapeAssets')
 }
 
+def sourceRevisionOutput = layout.buildDirectory.dir('generated/source-revision')
+def sourceRevision = tasks.register('writeSourceRevision', JavaExec) {
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+    mainClass = file('src/buildProvenance/java/de/regelsuche/buildprovenance/SourceRevisionProcessor.java').absolutePath
+    args rootProject.projectDir.absolutePath, sourceRevisionOutput.get().asFile.absolutePath
+    inputs.file('src/buildProvenance/java/de/regelsuche/buildprovenance/SourceRevisionProcessor.java')
+    outputs.dir(sourceRevisionOutput)
+    // A ref or checked-out commit can change with identical Java application sources.
+    outputs.upToDateWhen { false }
+}
+
 tasks.named('processResources') {
+    from(sourceRevision)
     dependsOn tasks.named('vendorWebAssets')
 }
 

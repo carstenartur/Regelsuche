@@ -42,13 +42,11 @@ class RetainedRunWorkbenchBrowserTest {
     private Page page;
     private static final String TEST_REVISION = "0123456789abcdef0123456789abcdef01234567";
     private String previousDirectory;
-    private String previousRevision;
     private final List<String> errors = new ArrayList<>();
     private RepresentationDiscoveryRunWorkspace first;
     private RepresentationDiscoveryRunWorkspace second;
 
     @BeforeEach void start() throws Exception {
-        previousRevision = System.setProperty("regelsuche.repository.revision", TEST_REVISION);
         previousDirectory = System.getProperty("regelsuche.discovery.runs.directory");
         System.setProperty("regelsuche.discovery.runs.directory", temporary.resolve("runs").toString());
         server = new WebWorkbenchServer("127.0.0.1", 0, new InMemoryExpressionGraphStore(),
@@ -72,8 +70,6 @@ class RetainedRunWorkbenchBrowserTest {
             if (browser != null) browser.close();
             if (playwright != null) playwright.close();
             if (server != null) server.stop();
-            if (previousRevision == null) System.clearProperty("regelsuche.repository.revision");
-            else System.setProperty("regelsuche.repository.revision", previousRevision);
             if (previousDirectory == null) System.clearProperty("regelsuche.discovery.runs.directory");
             else System.setProperty("regelsuche.discovery.runs.directory", previousDirectory);
         }
