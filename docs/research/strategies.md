@@ -320,6 +320,13 @@ Der [Transfer-Audit zu OpenAI Math](openai-math-transfer-audit.md) ordnet die ü
 - [`DomainModelProof.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainModelProof.java#L20) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainModelProof.java | public final class DomainModelProof { -->
 - [`DomainModelProofTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainModelProofTest.java#L17) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainModelProofTest.java | class DomainModelProofTest { -->
 
+Der Workspace führt zusätzlich einen Tiefenvergleich für Formeln und Folgen aus.
+Der Kontrolllauf verwendet dieselben Startdaten und Ressourcenlimits bei Suchtiefe
+null. Die Tests prüfen die reproduzierte Identität und getrennte Arbeitszähler.
+Aus diesen Einzelfällen lässt sich kein allgemeiner Suchvorteil ableiten.
+[Vertrag, Annahmen und Grenzen](../domain-export-workspaces.md#gebundene-auswertung-aller-drei-domänen)
+
+
 ## Automatisch hergeleitete Zustände für wechselnde Übergänge
 
 - **Hypothese.** Der unter allen erlaubten Übergängen abgeschlossene Beobachtungsraum liefert in zwei Aufgabenfamilien mindestens 20 Prozent weniger Gesamtarbeit als direkte Auswertung.

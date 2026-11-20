@@ -184,6 +184,9 @@ runs/run-N/
     evidence.json
     lifecycle-handoff.json
     export-manifest.json
+  assessments/
+    expression.json
+    sequence.json
   verification-receipts/
     expression.json
     sequence.json
@@ -303,3 +306,14 @@ produktive Wiederverwendung verifizierter Snapshots in weiterführenden
 Novelty-, Proof-, Release- und Public-Evidence-Komponenten. Diese späteren Gates
 müssen ihre bisherigen Bedeutungen und die vollständige Source-Evidence-Kette
 beibehalten.
+
+
+Bei der aktuellen Referenzausführung schreibt der Runner zu jedem der sechs
+verifizierten Exporte eine quellgebundene Auswertung in
+`runs/run-N/assessments/{expression,sequence}.json`. `--verify-retained`
+vergleicht die vollständigen Bytes jeder Auswertung mit einer Rekonstruktion.
+Ältere Verzeichnisse ohne diese Dateien können keinen Nachweis für diese
+zusätzliche Produktprüfung liefern. Eine neue Referenzausführung erzeugt die
+Belege. Die Statusgrenzen des v1-Qualifikationsreports gelten weiterhin für
+dessen Architektur-Claim. Details der getrennten Kandidatenentscheidungen
+stehen im [Workspace-Vertrag](domain-export-workspaces.md).

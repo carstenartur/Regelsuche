@@ -7,6 +7,8 @@ import de.regelsuche.discovery.domain.DomainDiscoveryExport;
 import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier;
 import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier.VerifiedDomainExport;
 import de.regelsuche.discovery.domain.DomainDiscoveryRunner;
+import de.regelsuche.discovery.domain.DomainExportWorkspace;
+import de.regelsuche.discovery.domain.DomainSnapshotAssessment;
 import de.regelsuche.discovery.domain.ExpressionRewriteDiscoveryDomain;
 import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain;
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
@@ -68,6 +70,8 @@ public final class DomainGenericQualificationRunner {
             Path exportDirectory = directory.resolve(input.name());
             exporter.write(exportDirectory, input.evidence());
             VerifiedDomainExport snapshot = verifier.requireVerified(exportDirectory);
+            write(directory.resolve("assessments").resolve(input.name() + ".json"),
+                assess(snapshot).toCanonicalJson());
             write(
                 receipts.resolve(input.name() + ".json"),
                 snapshot.verification().toCanonicalJson());
@@ -100,6 +104,7 @@ public final class DomainGenericQualificationRunner {
                 }
                 requireOriginal(directory.resolve("verification-receipts").resolve(name + ".json"),
                     verified.verification().toCanonicalJson());
+                requireOriginal(directory.resolve("assessments").resolve(name + ".json"), assess(verified).toCanonicalJson());
                 exports.add(verified);
             }
             runs.add(List.copyOf(exports));
@@ -107,6 +112,10 @@ public final class DomainGenericQualificationRunner {
         String catalog = DomainGenericEvidenceProfile.catalogJson();
         return QualificationRun.create(qualification.evaluate(runs), catalog, AutonomousResearchBriefV2.hash(catalog),
             runs.stream().map(DomainGenericDiscoveryQualification::runFingerprint).toList());
+    }
+
+    private static DomainSnapshotAssessment assess(VerifiedDomainExport verified) {
+        return DomainSnapshotAssessment.assess(DomainExportWorkspace.fromVerified(verified));
     }
 
     private static void requireOriginal(Path file, String expected) throws IOException {

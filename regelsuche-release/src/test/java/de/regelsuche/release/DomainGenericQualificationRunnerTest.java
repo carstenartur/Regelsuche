@@ -79,6 +79,17 @@ class DomainGenericQualificationRunnerTest {
         }
     }
 
+    @Test void qualificationChecksDownstreamReceiptsFromEveryOriginalSnapshot(@TempDir Path independent) throws Exception {
+        var runner = new DomainGenericQualificationRunner();
+        runner.run(independent);
+        runner.verifyRetained(independent);
+        Path assessment = independent.resolve("runs/run-3/assessments/expression.json");
+        String original = Files.readString(assessment);
+        assertTrue(original.contains("PROVED_POLYNOMIAL_IDENTITY"));
+        Files.writeString(assessment, original.replace("POST_FREEZE_REVIEW_REQUIRED", "NOVEL"));
+        assertThrows(IllegalArgumentException.class, () -> runner.verifyRetained(independent));
+    }
+
     @Test
     void duplicateSingleDomainCannotQualify() {
         VerifiedDomainExport expression = verifier.requireVerified(

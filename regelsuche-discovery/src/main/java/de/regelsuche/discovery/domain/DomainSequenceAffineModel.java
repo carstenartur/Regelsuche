@@ -63,7 +63,7 @@ final class DomainSequenceAffineModel {
         if (order < 1 || order > 3) throw new UnsupportedModel("MODEL_DIMENSION_EXCEEDS_THREE");
     }
 
-    /** Caller must first obtain the candidate from exact replay and independently check its finite witness. */
+    /** Projects a replayed candidate. Projection alone grants no evidence about agreement with retained terms. */
     static DomainSequenceAffineModel from(Object candidate) {
         requireSupported(candidate);
         if (candidate instanceof FiniteDifferenceCandidate value) {

@@ -191,6 +191,12 @@
         element('retainedDomainReplay').hidden = true;
         element('replayDomainExport').disabled = true;
         replayStatus.textContent = ''; delete replayStatus.dataset.status;
+        element('domainAssessment').hidden = true;
+        element('domainAssessmentResult').replaceChildren();
+        element('domainAssessmentStatus').textContent = '';
+        delete element('domainAssessmentStatus').dataset.status;
+        element('downloadDomainAssessment').hidden = true;
+        element('downloadDomainAssessment').removeAttribute('href');
         validationPanel.hidden = true;
         validateButton.disabled = true;
         clearValidation('');
@@ -259,6 +265,8 @@
         element('replayDomainExport').disabled = !view.replaySupported;
         replayStatus.textContent = view.replaySupported ? 'Noch kein Replay für diese Auswahl ausgeführt.'
             : 'Die Quelle überschreitet das begrenzte Replay-Budget. Die gespeicherten Daten bleiben lesbar.';
+        element('domainAssessment').hidden = false;
+        element('assessDomainExport').disabled = false;
         validationPanel.hidden = !sequence;
         validateButton.disabled = !sequence;
         proofPanel.hidden = !sequence;
@@ -344,6 +352,56 @@
             replayStatus.dataset.status = result.status;
         } catch (error) { if (ticket === selectionEpoch) replayStatus.textContent = `Replay fehlgeschlagen: ${error.message}`; }
         finally { if (ticket === selectionEpoch) element('replayDomainExport').disabled = false; }
+    });
+    element('assessDomainExport').addEventListener('click', async () => {
+        const view = selected, ticket = selectionEpoch;
+        if (!view) return;
+        const button = element('assessDomainExport'), message = element('domainAssessmentStatus');
+        const result = element('domainAssessmentResult'), link = element('downloadDomainAssessment');
+        const path = `${base}/${view.runId.slice(7)}/assessment`;
+        button.disabled = true;
+        result.replaceChildren(); link.hidden = true; link.removeAttribute('href');
+        delete message.dataset.status;
+        message.textContent = 'Quelllauf, Kandidat und Vergleichslauf werden geprüft …';
+        try {
+            const response = await fetch(path, {method: 'POST', redirect: 'error', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({expectedWorkspaceHash: view.contentHash, expectedEvidenceHash: view.evidence.contentHash})});
+            const original = await response.text();
+            if (ticket !== selectionEpoch) return;
+            const report = parseResponse(response, original), source = report.source;
+            if (report.schema !== 'regelsuche.domain-snapshot-assessment/v1' || !hashPattern.test(report.contentHash)
+                    || source?.runId !== view.runId || source.workspaceHash !== view.contentHash
+                    || source.evidenceHash !== view.evidence.contentHash || source.handoffHash !== view.manifest.lifecycleHandoffHash
+                    || response.headers.get('X-Regelsuche-Run-Id') !== view.runId) throw new Error('Fremde Prüfquelle.');
+            const retainedPath = `${path}/${report.contentHash.slice(7)}`;
+            if (response.headers.get('ETag') !== `"${report.contentHash.slice(7)}"`
+                    || response.headers.get('Location') !== retainedPath) throw new Error('Fremder Prüfbeleg.');
+            const retained = await fetch(retainedPath, {redirect: 'error', cache: 'no-store'});
+            const bytes = await retained.text();
+            if (ticket !== selectionEpoch) return;
+            if (!retained.ok || original !== bytes || retained.headers.get('ETag') !== response.headers.get('ETag')
+                    || retained.headers.get('X-Regelsuche-Run-Id') !== view.runId) throw new Error('Der gespeicherte Beleg weicht ab.');
+            result.append(table(['Prüfung', 'Ergebnis'], [
+                ['Quelllauf', report.replayStatus], ['Validierung', report.validation.status], ['Gegenbeispiele', report.counterexamples.status],
+                ['Beweis', report.proof.status], ['Externe Neuheit', report.externalNovelty.status], ['Promotion', report.promotion.status],
+                ['Öffentlicher Nachweis', report.publicEvidence.status], ['Vergleich mit Suchtiefe null', report.ablation.control || report.ablation.status]
+            ]));
+            if (report.ablation.resources) {
+                result.append(table(['Ressource', 'Quelllauf ausgeführt', 'Ohne Suchschritte ausgeführt'],
+                    report.resources.map(row => [row.resource, row.executed, report.ablation.resources.find(item => item.resource === row.resource).executed])));
+            }
+            result.append(disclosure('Annahmen, Zertifikate und Gegenbeispiele', {proof: report.proof, counterexamples: report.counterexamples}));
+            if (report.externalNovelty.subject) {
+                window.RegelsucheCandidateDossier.renderLiterature(result, view.runId, report.externalNovelty.subject.candidateId);
+            }
+            message.textContent = 'Prüfbeleg an der gespeicherten Quelle bestätigt.';
+            message.dataset.status = report.proof.status;
+            link.href = retainedPath; link.hidden = false;
+        } catch (error) {
+            if (ticket === selectionEpoch) message.textContent = `Prüfung fehlgeschlagen: ${error.message}`;
+        } finally {
+            if (ticket === selectionEpoch) button.disabled = false;
+        }
     });
     validateButton.addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
