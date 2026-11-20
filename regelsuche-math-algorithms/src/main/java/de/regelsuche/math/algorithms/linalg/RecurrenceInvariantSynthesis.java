@@ -4,6 +4,7 @@ import de.regelsuche.ast.Equation;
 import de.regelsuche.math.algorithms.equivalence.Monomial;
 import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactMatrix;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.ExactVector;
 import de.regelsuche.math.algorithms.linalg.ExactLinearSystem.RowOrigin;
@@ -89,15 +90,20 @@ public final class RecurrenceInvariantSynthesis {
     }
 
     public Report solve(Request request) {
-        return solveTyped(request, false);
+        return solveTyped(request, false, false);
+    }
+
+    /** Tries a complete modular kernel first, paying for a bounded miss before exact RREF. */
+    public Report solveWithModularKernel(Request request) {
+        return solveTyped(request, false, true);
     }
 
     public FirstLaw solveFirst(Request request) {
-        var result = solveTyped(request, true);
+        var result = solveTyped(request, true, false);
         return new FirstLaw(result.status(), result.laws().stream().findFirst(), result.work());
     }
 
-    private Report solveTyped(Request request, boolean firstOnly) {
+    private Report solveTyped(Request request, boolean firstOnly, boolean modular) {
         Objects.requireNonNull(request, "request");
         var work = new Work(request.budget().maxWorkUnits());
         var laws = new ArrayList<VerifiedLaw>();
@@ -109,7 +115,7 @@ public final class RecurrenceInvariantSynthesis {
             var images = RecurrenceInvariantSupport.liftedImages(request.transition(), basis, work);
             for (Evolution evolution : Evolution.values()) {
                 for (var block : blocks) {
-                    solveLiftedBlock(request, block, images, evolution, laws, firstOnly, work);
+                    solveLiftedBlock(request, block, images, evolution, laws, firstOnly, modular, work);
                     if (firstOnly && !laws.isEmpty()) return new Report(Status.COMPLETE, laws, work.ledger());
                 }
             }
@@ -217,7 +223,7 @@ public final class RecurrenceInvariantSynthesis {
     }
 
     private static void solveLiftedBlock(Request request, List<Monomial> block, Map<Monomial, Polynomial> images,
-            Evolution evolution, List<VerifiedLaw> laws, boolean firstOnly, Work work) {
+            Evolution evolution, List<VerifiedLaw> laws, boolean firstOnly, boolean modular, Work work) {
         var rows = new ArrayList<List<Rational>>(block.size());
         var variables = new ArrayList<String>(block.size());
         var origins = new ArrayList<RowOrigin>(block.size());
@@ -239,7 +245,25 @@ public final class RecurrenceInvariantSynthesis {
             }
             rows.add(coefficients);
         }
-        var reduced = new ExactRrefSolver().solveHomogeneous(new ExactMatrix(rows), variables, origins,
+        var coefficients = new ExactMatrix(rows);
+        if (modular) {
+            if (work.remaining() == 0) throw new RecurrenceInvariantSupport.Exhausted();
+            var limits = ModularKernel.Limits.defaults(new IterationLimits(work.remaining(), 100_000, 60_000));
+            var result = ModularKernel.search(coefficients, ModularKernel.Strength.COMPLETE_KERNEL, limits, () -> false);
+            work.add(result.work());
+            if (result.status() == ModularKernel.Status.CANCELLED) throw new RecurrenceInvariantSupport.Exhausted();
+            if (result.certificate().isPresent()) {
+                var certificate = result.certificate().orElseThrow();
+                var vectors = new ArrayList<ExactVector>();
+                for (int free : certificate.freeColumns()) {
+                    work.add(coefficients.columns());
+                    vectors.add(new ExactVector(certificate.projection().rows().stream().map(row -> row.get(free)).toList()));
+                }
+                admitBasis(request, block, evolution, variables, vectors, laws, firstOnly, work);
+                return;
+            }
+        }
+        var reduced = new ExactRrefSolver().solveHomogeneous(coefficients, variables, origins,
             new Budget(work.remaining()));
         admitReduction(request, block, evolution, reduced, laws, firstOnly, work);
     }
@@ -270,8 +294,13 @@ public final class RecurrenceInvariantSynthesis {
         if (reduced.status() == ExactRrefSolver.Status.BUDGET_INCONCLUSIVE)
             throw new RecurrenceInvariantSupport.Exhausted();
         var reduction = reduced.reduction().orElseThrow(() -> new IllegalStateException("coefficient reduction failed"));
-        for (var vector : reduction.nullspaceBasis()) {
-            var polynomial = reconstruct(columns, reduction.variables(), vector, work);
+        admitBasis(request, columns, evolution, reduction.variables(), reduction.nullspaceBasis(), laws, firstOnly, work);
+    }
+
+    private static void admitBasis(Request request, List<Monomial> columns, Evolution evolution,
+            List<String> variables, List<ExactVector> basis, List<VerifiedLaw> laws, boolean firstOnly, Work work) {
+        for (var vector : basis) {
+            var polynomial = reconstruct(columns, variables, vector, work);
             if (polynomial.totalDegree() == 0) continue;
             String text = polynomial.toCanonicalString();
             // Keep the representation guard; never silently drop a direction while claiming COMPLETE.
