@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityCandidateResult.TerminalStatus;
 import de.regelsuche.benchmark.polynomial.PolynomialTheoryUtilityExecutionObservations.Occurrence;
 import de.regelsuche.json.JsonReader;
+import de.regelsuche.json.JsonWriter;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -16,18 +18,51 @@ import org.junit.jupiter.api.io.TempDir;
 /** In-memory component batches are serialization fixtures, never study evidence. */
 class PolynomialTheoryUtilityObservedFreezeContractTest {
     @Test
-    void freezesTheCompleteRawPartitionAndInterruptedReplayOutcome() {
+    void rejectsAReplaySeededOutsideTheMeasuredRun() {
         var replay = PolynomialTheoryUtilityObservedResultContractTest.interruptedReplay().measured();
-        var batch = batch(true, replay, 1);
+        var failure = assertThrows(IllegalArgumentException.class, () -> batch(true, replay, 0));
+        assertEquals("cache hit lacks an earlier insertion in this run", failure.getMessage());
+    }
+
+    @Test
+    void freezesNativeMeasurementsAlongsideIsolatedCacheRuns() {
+        var input = PolynomialTheoryUtilityObservedResultContractTest.input(
+            PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.PROFILE_ID,
+            "four-identical-occurrences", "CP03_1_OF_3");
+        var formation = PolynomialTheoryUtilityObservedResultContractTest.formation(input.caseId());
+        var nativeRow = PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
+            .executeObservedCase(input, formation).measured();
+        assertTrue(nativeRow.result().work().mechanicalWork() > 0);
+        var firstRun = PolynomialTheoryUtilityDerivedCacheAdapterTest.measuredCheckpoint("CP03_1_OF_3");
+        var secondRun = PolynomialTheoryUtilityDerivedCacheAdapterTest.measuredCheckpoint("CP06_FULL");
+        assertNotEquals(firstRun.getFirst().result().input().runId(), secondRun.getFirst().result().input().runId());
+        var retained = new ArrayList<>(firstRun);
+        retained.addAll(secondRun);
+        retained.add(nativeRow);
+        var batch = batch(true, 0, retained);
+        assertTrue(batch.measurements().containsAll(
+            retained.stream().map(PolynomialTheoryUtilityMeasuredCandidate::measurements).toList()));
         var freeze = PolynomialTheoryUtilityCandidateFreeze.create(batch);
         assertEquals("regelsuche.polynomial-theory-utility-candidate-batch/v3", batch.candidateBatch().schema());
         assertEquals("regelsuche.polynomial-theory-utility-candidate-measurement-batch/v2", batch.schema());
         assertEquals("regelsuche.polynomial-theory-utility-candidate-freeze/v2", freeze.schema());
         var document = new JsonReader(freeze.canonicalJson()).readObject();
         var rows = (List<?>) document.get("rows");
-        var replayRow = rows.stream().map(PolynomialTheoryUtilityObservedFreezeContractTest::object)
-            .filter(value -> object(value.get("result")).get("resultId").equals(replay.result().resultId()))
-            .findFirst().orElseThrow();
+        var nativeResult = rows.stream().map(PolynomialTheoryUtilityObservedFreezeContractTest::object)
+            .map(row -> object(row.get("result")))
+            .filter(result -> result.get("resultId").equals(nativeRow.result().resultId())).findFirst().orElseThrow();
+        var observations = object(nativeResult.get("observations"));
+        assertEquals(nativeRow.result().observations().observationId(), observations.get("observationId"));
+        assertEquals("HASH_ONLY_NOT_OPENED", document.get("qualificationExposure"));
+        freeze.requireVerified(freeze.bytes());
+    }
+
+    @Test
+    void serializesTheCompleteRawPartitionAndInterruptedReplayOutcomeForOneRow() {
+        var replay = PolynomialTheoryUtilityObservedResultContractTest.interruptedReplay().measured();
+        var json = new JsonWriter().beginObject();
+        PolynomialTheoryUtilityCandidateFreeze.appendRow(json, 0, replay.result(), replay.measurements());
+        var replayRow = new JsonReader(json.endObject().toString()).readObject();
         var observation = object(object(replayRow.get("result")).get("observations"));
         assertEquals(replay.result().observations().observationId(), observation.get("observationId"));
         var raw = object(observation.get("rawWork"));
@@ -53,7 +88,6 @@ class PolynomialTheoryUtilityObservedFreezeContractTest {
             ledger(object(occurrences.getFirst()).get("rawWork")));
         var cacheEvents = (List<?>) object(replayRow.get("measurements")).get("cacheEvents");
         assertEquals("BUDGET_INCONCLUSIVE", object(cacheEvents.getLast()).get("replayOutcome"));
-        assertEquals("HASH_ONLY_NOT_OPENED", document.get("qualificationExposure"));
     }
 
     @Test
@@ -95,16 +129,25 @@ class PolynomialTheoryUtilityObservedFreezeContractTest {
 
     static PolynomialTheoryUtilityCandidateMeasurementBatch batch(boolean observed,
             PolynomialTheoryUtilityMeasuredCandidate retained, long firstRawUnits) {
+        return batch(observed, firstRawUnits, retained == null ? List.of() : List.of(retained));
+    }
+
+    private static PolynomialTheoryUtilityCandidateMeasurementBatch batch(boolean observed, long firstRawUnits,
+            List<PolynomialTheoryUtilityMeasuredCandidate> retained) {
         var inputs = PolynomialTheoryUtilityExecutionInputs.freeze();
         var cases = PolynomialTheoryUtilityCaseCorpus.load().cases();
         var results = new ArrayList<PolynomialTheoryUtilityCandidateResult>();
         var measurements = new ArrayList<PolynomialTheoryUtilityCandidateMeasurements>();
+        var retainedByInput = new HashMap<
+            PolynomialTheoryUtilityExecutionInput, PolynomialTheoryUtilityMeasuredCandidate>();
+        retained.forEach(row -> retainedByInput.put(row.result().input(), row));
         for (int index = 0; index < inputs.inputs().size(); index++) {
             var input = inputs.inputs().get(index);
             var formation = cases.get(index % cases.size());
-            if (retained != null && retained.result().input().equals(input)) {
-                results.add(retained.result());
-                measurements.add(retained.measurements());
+            var measured = retainedByInput.get(input);
+            if (measured != null) {
+                results.add(measured.result());
+                measurements.add(measured.measurements());
                 continue;
             }
             String detail = "SERIALIZATION_COMPONENT_" + index;

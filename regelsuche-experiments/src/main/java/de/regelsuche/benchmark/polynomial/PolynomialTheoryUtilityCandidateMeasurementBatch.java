@@ -1,6 +1,7 @@
 package de.regelsuche.benchmark.polynomial;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -31,7 +32,8 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
         measurements = List.copyOf(
             Objects.requireNonNull(measurements, "measurements")
         );
-        requireBatch(candidateBatch, measurements);
+        requireBatchShape(candidateBatch, measurements);
+        requireOrderedMeasurements(candidateBatch, measurements);
         if (!batchId.equals(identity(candidateBatch, measurements))) {
             throw new IllegalArgumentException(
                 "candidate measurement batch identity differs from its fields"
@@ -49,7 +51,7 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
         );
         List<PolynomialTheoryUtilityCandidateMeasurements> retained =
             List.copyOf(Objects.requireNonNull(measurements, "measurements"));
-        requireBatch(retainedBatch, retained);
+        requireBatchShape(retainedBatch, retained);
         return new PolynomialTheoryUtilityCandidateMeasurementBatch(
             identity(retainedBatch, retained),
             retainedBatch,
@@ -100,7 +102,7 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
         }
     }
 
-    private static void requireBatch(
+    private static void requireBatchShape(
         PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
         List<PolynomialTheoryUtilityCandidateMeasurements> measurements
     ) {
@@ -114,15 +116,33 @@ public record PolynomialTheoryUtilityCandidateMeasurementBatch(
                 "candidate measurement batch must cover every frozen result"
             );
         }
+    }
+
+    private static void requireOrderedMeasurements(
+        PolynomialTheoryUtilityProfileAdapter.CandidateBatch candidateBatch,
+        List<PolynomialTheoryUtilityCandidateMeasurements> measurements
+    ) {
+        boolean observed = OBSERVED_SCHEMA.equals(schema(candidateBatch));
+        var cacheRuns = new HashMap<String, PolynomialTheoryUtilityCacheRunHistory>();
         Set<String> identities = new HashSet<>();
         for (int index = 0; index < measurements.size(); index++) {
+            var result = candidateBatch.results().get(index);
             var measurement = Objects.requireNonNull(
                 measurements.get(index),
                 "measurement"
             );
-            measurement.validateAgainst(
-                candidateBatch.results().get(index)
-            );
+            if (observed && PolynomialTheoryUtilityDerivedCacheAdapter.PROFILE_ID
+                    .equals(result.input().profileId())) {
+                var measured = new PolynomialTheoryUtilityMeasuredCandidate(
+                    result, measurement
+                );
+                cacheRuns.computeIfAbsent(
+                    result.input().runId(),
+                    PolynomialTheoryUtilityCacheRunHistory::new
+                ).accept(measured);
+            } else {
+                measurement.validateAgainst(result);
+            }
             if (!identities.add(measurement.measurementId())) {
                 throw new IllegalArgumentException(
                     "candidate measurement identities are not unique"

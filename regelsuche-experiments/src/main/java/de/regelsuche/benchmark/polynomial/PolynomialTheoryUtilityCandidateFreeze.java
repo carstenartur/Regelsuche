@@ -266,7 +266,7 @@ public record PolynomialTheoryUtilityCandidateFreeze(
         });
     }
 
-    private static void appendRow(
+    static void appendRow(
         JsonWriter row,
         int index,
         PolynomialTheoryUtilityCandidateResult result,

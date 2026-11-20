@@ -17,6 +17,18 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Laufgebundene Wiederverwendung verifizierter Polynomübergänge
+
+- **Hypothese.** Ein leerer Cache-Verlauf pro Lauf kann vor dem Freeze prüfen, ob jeder beobachtete Hit aus einer früheren, noch gehaltenen Einfügung desselben Laufs stammt.
+- **Umsetzungsstand.** Das beobachtete Messbatch prüft die typisierten Cache-Zeilen in kanonischer Reihenfolge mit einer eigenen Historie pro `runId`. Der historische v1-Receipt-Pfad behält seinen Zeilenvertrag.
+- **Befund.** Ein tatsächlich ausgeführter, unterbrochener Replay mit extern vorbereiteter Einfügung ließ sich als einzelne Zeile und im bisherigen Messbatch binden. Das korrigierte Batch weist die Zeile vor dem Freeze ab. Nativ gemessene Formationsarbeit bleibt im Komponenten-Freeze serialisierbar. [Entwicklungskontrollen und Reproduktion](../polynomial-theory-utility-active-adapters.md#herkunft-der-cache-belege-vor-dem-freeze)
+- **Folgerung.** Beobachtete Cache-Belege vor dem Freeze an ihren eigenen Lauf binden. Der Befund betrifft die Herkunft der Belege. Externe kanonische Arbeitsmessung und der passende Laufzeit-Lock bleiben Voraussetzungen für die Studienausführung. [Bereitschaft und Evidenzgrenze](../polynomial-theory-utility-active-adapters.md#bereitschaft-und-evidenzgrenze)
+
+- [`PolynomialTheoryUtilityCandidateMeasurementBatch.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityCandidateMeasurementBatch.java#L12) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityCandidateMeasurementBatch.java | public record PolynomialTheoryUtilityCandidateMeasurementBatch( -->
+- [`PolynomialTheoryUtilityCacheRunHistory.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityCacheRunHistory.java#L10) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityCacheRunHistory.java | public final class PolynomialTheoryUtilityCacheRunHistory { -->
+- [`PolynomialTheoryUtilityObservedFreezeContractTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityObservedFreezeContractTest.java#L19) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityObservedFreezeContractTest.java | class PolynomialTheoryUtilityObservedFreezeContractTest { -->
+- [`PolynomialTheoryUtilityDerivedCacheAdapterTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityDerivedCacheAdapterTest.java#L12) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityDerivedCacheAdapterTest.java | class PolynomialTheoryUtilityDerivedCacheAdapterTest { -->
+
 ## Unabhängige Prüfung nativer Polynom-Beweisobjekte
 
 - **Hypothese.** Ein begrenzter Java-Prüfer kann native Polynomgleichheitsbeweise unabhängig vom externen Solver nachrechnen, wenn er jede Umschreibung exakt prüft und die tatsächlich verwendeten Annahmen erhält.
