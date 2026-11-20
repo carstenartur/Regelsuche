@@ -13,6 +13,7 @@ import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
 import de.regelsuche.value.ExprValueFactory.ExprValue;
 import de.regelsuche.value.ExprValueFactory.OrderedValue;
 import de.regelsuche.value.ExprValueFactory.ValueKey;
+import de.regelsuche.value.ExprValueArena;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,6 +31,39 @@ import java.util.Set;
 import java.util.function.ToIntFunction;
 
 public class BestFirstSearchStrategy implements SearchStrategy {
+    public enum IdentityPolicy {
+        APPLICATION_HISTORY_V1("application-history/v1"),
+        ARENA_APPLICATION_HISTORY_V1("arena-application-history/v1"),
+        CONTINUATION_QUOTIENT_V1("continuation-quotient/v1");
+        private final String version;
+        IdentityPolicy(String version) { this.version = version; }
+        public String version() { return version; }
+    }
+
+    private final IdentityPolicy identityPolicy;
+    public enum TieOrder { HISTORICAL_HASH_V1, SYNTAX_V1 }
+    private final TieOrder tieOrder;
+
+    public BestFirstSearchStrategy() { this(IdentityPolicy.APPLICATION_HISTORY_V1); }
+
+    public BestFirstSearchStrategy(IdentityPolicy identityPolicy) {
+        this(identityPolicy, TieOrder.HISTORICAL_HASH_V1);
+    }
+
+    public BestFirstSearchStrategy(IdentityPolicy identityPolicy, TieOrder tieOrder) {
+        this.identityPolicy = Objects.requireNonNull(identityPolicy, "identityPolicy");
+        this.tieOrder = Objects.requireNonNull(tieOrder, "tieOrder");
+    }
+
+    public record QuotientMetrics(int semanticNodes, int syntaxObservations, int retainedLabels,
+            long duplicateArrivals, long successorCacheHits, int arenaEntries,
+            long arenaStructuralBytes, int digestComputations) {
+        static final QuotientMetrics UNUSED = new QuotientMetrics(0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    public record ExecutionDiagnostics(GoalSearchResult search, IdentityPolicy policy, TieOrder tieOrder,
+            QuotientMetrics quotient) {}
+
     @Override
     public List<SearchState> search(SearchProblem problem) {
         return searchWithDiagnostics(problem).states();
@@ -40,13 +74,18 @@ public class BestFirstSearchStrategy implements SearchStrategy {
      * returns deterministic target/failure diagnostics when a target is attached.
      */
     public GoalSearchResult searchWithDiagnostics(SearchProblem problem) {
+        return searchWithExecutionDiagnostics(problem).search();
+    }
+
+    /** Policy-bound diagnostics; the historical GoalSearchResult format is unchanged. */
+    public ExecutionDiagnostics searchWithExecutionDiagnostics(SearchProblem problem) {
         Objects.requireNonNull(problem, "problem");
-        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer())) {
+        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer(), identityPolicy)) {
             TargetSession target = new TargetSession(problem.target(), identity);
             SearchState rootState = createRootState(problem, identity);
             SearchFrame frame = createFrame(problem, identity, target);
             frame.frontier().add(rootState);
-            frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());
+            frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visitedSize());
 
             while (shouldContinue(problem, frame)) {
                 processNextState(problem, frame);
@@ -54,9 +93,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             frame.telemetry().searchFinished(
                 rootState,
                 frame.frontier().size(),
-                frame.visited().size(),
+                frame.visitedSize(),
                 frame.explored().size());
-            return GoalSearchResult.from(problem, frame, rootState);
+            var metrics = frame.quotient() == null
+                ? new QuotientMetrics(0, 0, 0, 0, 0, identity.internedValueCount(), identity.structuralBytes(), identity.digestComputations())
+                : frame.quotient().metrics();
+            return new ExecutionDiagnostics(GoalSearchResult.from(problem, frame, rootState), identityPolicy, tieOrder, metrics);
         }
     }
 
@@ -72,7 +114,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             SearchTelemetry.forProblem(problem),
             identity,
             target,
-            new GoalProgress()
+            new GoalProgress(),
+            identityPolicy == IdentityPolicy.CONTINUATION_QUOTIENT_V1 ? new SearchContinuationQuotient(identity) : null
         );
     }
 
@@ -102,7 +145,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return Comparator
             .comparingInt((SearchState state) -> target.adjustedPriority(priority(state, problem), state.expression()))
             .thenComparingInt(SearchState::depth)
-            .thenComparing(SearchState::canonicalHash)
+            .thenComparing(state -> tieOrder == TieOrder.HISTORICAL_HASH_V1 ? state.canonicalHash() : state.expression())
             .thenComparing(SearchState::expression)
             .thenComparing(state -> String.join("->", state.appliedRuleIds()))
             .thenComparing(state -> String.join("->", state.path()))
@@ -117,7 +160,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     private void processNextState(SearchProblem problem, SearchFrame frame) {
         SearchState current = frame.frontier().remove();
-        frame.telemetry().stateDequeued(current, frame.frontier().size(), frame.visited().size());
+        frame.telemetry().stateDequeued(current, frame.frontier().size(), frame.visitedSize());
         if (!markVisited(current, frame)) {
             return;
         }
@@ -136,12 +179,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     private boolean markVisited(SearchState current, SearchFrame frame) {
-        if (frame.visited().add(stateKey(current))) {
-            frame.telemetry().stateVisited(current, frame.frontier().size(), frame.visited().size());
+        if (frame.quotient() == null ? frame.visited().add(stateKey(current, frame.identity())) : frame.quotient().admit(current)) {
+            frame.telemetry().stateVisited(current, frame.frontier().size(), frame.visitedSize());
             return true;
         }
         frame.progress().duplicatePrunes++;
-        frame.telemetry().statePrunedDuplicate(current, frame.frontier().size(), frame.visited().size(), 0);
+        frame.telemetry().statePrunedDuplicate(current, frame.frontier().size(), frame.visitedSize(), 0);
         return false;
     }
 
@@ -164,12 +207,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             return false;
         }
         frame.progress().depthPrunes++;
-        frame.telemetry().statePrunedDepth(current, frame.frontier().size(), frame.visited().size());
+        frame.telemetry().statePrunedDepth(current, frame.frontier().size(), frame.visitedSize());
         return true;
     }
 
     private void expandState(SearchProblem problem, SearchState current, SearchFrame frame) {
-        List<Transformation> transformations = sortedTransformations(problem, current, frame.target());
+        List<Transformation> transformations = sortedTransformations(problem, current, frame);
         frame.progress().expandedStates++;
         frame.progress().generatedTransformations += transformations.size();
         if (transformations.isEmpty()) {
@@ -178,7 +221,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         frame.telemetry().stateExpanded(
             current,
             frame.frontier().size(),
-            frame.visited().size(),
+            frame.visitedSize(),
             transformations.size());
         int generated = 0;
         for (Transformation transformation : transformations) {
@@ -194,12 +237,14 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     private List<Transformation> sortedTransformations(
         SearchProblem problem,
         SearchState current,
-        TargetSession target
+        SearchFrame frame
     ) {
+        TargetSession target = frame.target();
         return orderTransformations(
             problem,
             current,
-            new ArrayList<>(problem.transformations(current.expression())),
+            new ArrayList<>(frame.quotient() == null ? problem.transformations(current.expression())
+                : frame.quotient().transformations(problem, current.expression())),
             target.enabled(),
             transformation -> target.distance(transformation.transformedExpression()));
     }
@@ -243,7 +288,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         frame.telemetry().statePrunedBudget(
             current,
             frame.frontier().size(),
-            frame.visited().size(),
+            frame.visitedSize(),
             generated);
         return true;
     }
@@ -262,7 +307,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 current,
                 transformation,
                 frame.frontier().size(),
-                frame.visited().size(),
+                frame.visitedSize(),
                 generated,
                 skipReason);
             return false;
@@ -271,15 +316,15 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             current,
             transformation,
             frame.frontier().size(),
-            frame.visited().size(),
+            frame.visitedSize(),
             generated);
         SearchState nextState = createNextState(problem, current, transformation, frame.identity());
-        if (frame.visited().contains(stateKey(nextState))) {
+        if (frame.quotient() == null ? frame.visited().contains(stateKey(nextState, frame.identity())) : frame.quotient().dominated(nextState)) {
             frame.progress().duplicatePrunes++;
             frame.telemetry().statePrunedDuplicate(
                 nextState,
                 frame.frontier().size(),
-                frame.visited().size(),
+                frame.visitedSize(),
                 generated);
             return false;
         }
@@ -288,13 +333,14 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         frame.telemetry().stateEnqueued(
             nextState,
             frame.frontier().size(),
-            frame.visited().size(),
+            frame.visitedSize(),
             generated + 1);
         return true;
     }
 
     private String skipReason(SearchProblem problem, SearchState current, Transformation transformation) {
-        if (current.appliedRuleApplications().contains(transformation.applicationKey())) {
+        if (identityPolicy != IdentityPolicy.CONTINUATION_QUOTIENT_V1
+                && current.appliedRuleApplications().contains(transformation.applicationKey())) {
             return "repeated-rule-application";
         }
         int expandedSteps = expandedSteps(current, transformation);
@@ -390,11 +436,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return problem.costModel() == null ? priority(state) : SearchPriority.bestFirst(state, problem);
     }
 
-    private VisitedStateKey stateKey(SearchState state) {
-        return new VisitedStateKey(state.canonicalHash(), state.appliedRuleApplications(), state.assumptions());
+    private VisitedStateKey stateKey(SearchState state, ValueIdentitySession identity) {
+        Object value = identityPolicy == IdentityPolicy.ARENA_APPLICATION_HISTORY_V1
+            ? identity.arenaValue(state.expression()).<Object>map(id -> id).orElse(state.expression()) : state.canonicalHash();
+        return new VisitedStateKey(value, state.appliedRuleApplications(), state.assumptions());
     }
 
-    private record VisitedStateKey(String canonicalHash, Set<String> appliedRuleApplications,
+    private record VisitedStateKey(Object value, Set<String> appliedRuleApplications,
                                    List<String> assumptions) {}
 
     private List<String> sortedValues(Set<String> values) {
@@ -412,8 +460,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         SearchTelemetry telemetry,
         ValueIdentitySession identity,
         TargetSession target,
-        GoalProgress progress
+        GoalProgress progress,
+        SearchContinuationQuotient quotient
     ) {
+        int visitedSize() { return quotient == null ? visited.size() : quotient.size(); }
     }
 
     private static final class GoalProgress {
@@ -693,6 +743,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         private final ExpressionCanonicalizer canonicalizer;
         private final ExpressionParser parser = new ExpressionParser();
         private final ExprValueFactory factory = new ExprValueFactory();
+        private final ExprValueArena arena;
+        private final Map<String, ExprValueArena.ValueId> arenaValues = new LinkedHashMap<>();
         private final Map<String, String> valueHashesByExpression = new LinkedHashMap<>();
         private final Map<String, ExprValue> valuesByExpression = new LinkedHashMap<>();
         private final Set<String> unparseableExpressions = new HashSet<>();
@@ -701,7 +753,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         private int cacheMisses;
 
         ValueIdentitySession(ExpressionCanonicalizer canonicalizer) {
+            this(canonicalizer, IdentityPolicy.APPLICATION_HISTORY_V1);
+        }
+
+        ValueIdentitySession(ExpressionCanonicalizer canonicalizer, IdentityPolicy policy) {
             this.canonicalizer = Objects.requireNonNull(canonicalizer, "canonicalizer");
+            arena = policy == IdentityPolicy.APPLICATION_HISTORY_V1 ? null : new ExprValueArena(1_000_000);
         }
 
         String valueHash(String expression) {
@@ -712,9 +769,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return existing;
             }
             cacheMisses++;
-            String hash = value(normalized)
+            String hash = arena == null ? value(normalized)
                 .map(value -> HASH_PREFIX + sha256(value.key().encoded()))
-                .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));
+                .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized))
+                : arenaValue(normalized).map(arena::digest)
+                    .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));
             valueHashesByExpression.put(normalized, hash);
             return hash;
         }
@@ -740,6 +799,21 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             }
         }
 
+        Optional<ExprValueArena.ValueId> arenaValue(String expression) {
+            String normalized = normalize(expression);
+            var cached = arenaValues.get(normalized);
+            if (cached != null) return Optional.of(cached);
+            if (unparseableExpressions.contains(normalized)) return Optional.empty();
+            try {
+                var id = arena.intern(canonicalizer.canonicalize(parser.parseTerm(normalized)));
+                arenaValues.put(normalized, id);
+                return Optional.of(id);
+            } catch (IllegalArgumentException unsupported) {
+                unparseableExpressions.add(normalized);
+                return Optional.empty();
+            }
+        }
+
         String legacyHash(String expression) {
             String normalized = normalize(expression);
             return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);
@@ -758,8 +832,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         }
 
         int internedValueCount() {
-            return factory.size();
+            return arena == null ? factory.size() : arena.size();
         }
+
+        long structuralBytes() { return arena == null ? 0 : arena.structuralBytes(); }
+
+        int digestComputations() { return arena == null ? 0 : arena.digestComputations(); }
 
         @Override
         public void close() {
@@ -768,6 +846,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             unparseableExpressions.clear();
             legacyHashesByExpression.clear();
             factory.close();
+            arenaValues.clear();
+            if (arena != null) arena.close();
         }
 
         private static String sha256(String value) {
