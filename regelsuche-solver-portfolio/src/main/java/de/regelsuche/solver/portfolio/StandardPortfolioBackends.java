@@ -68,7 +68,7 @@ public final class StandardPortfolioBackends {
         var descriptor = backend.descriptor();
         return new DeclaredPortfolioBackend(backend, BackendCapabilityProfile.create(
             descriptor.backendId(), descriptor.backendVersion(),
-            List.of(SolverIr.OBLIGATION_SCHEMA, SolverIr.SCOPED_OBLIGATION_SCHEMA),
+            backend.supportedSchemas(),
             descriptor.supportedTheories(), descriptor.supportedRelations(), descriptor.supportedRelations(),
             List.of(Sort.REAL, Sort.NATURAL, Sort.REAL_SEQUENCE, Sort.REAL_SET, Sort.REAL_FUNCTION, Sort.PROPOSITION),
             Arrays.asList(BinaryOperator.values()), true, descriptor.supportedEvidence(),

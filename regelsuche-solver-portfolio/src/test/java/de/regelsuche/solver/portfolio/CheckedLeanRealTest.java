@@ -115,6 +115,26 @@ class CheckedLeanRealTest {
             String report = Files.readString(receipt.directory().resolve("rebuild.txt"));
             assertTrue(report.contains("reconstructed=" + SolverIr.sha256(LeanStatementReconstruction.theorem(request))));
             assertEquals(receipt.receiptHash(), SolverIr.sha256(report));
+            if (request.equals(ScopedLeanContractTest.summableAdd())) {
+                var learned = LeanLemmaPlan.learn(request, cert, original.directory());
+                assertTrue(learned.declarations().contains("Summable.add"), learned.declarations().toString());
+                // Acquisition has already finished before the second, one-premise target exists.
+                var value = ScopedLeanContractTest.app("at", f, new Bound(0));
+                var doubled = new Binder(BinderKind.SEQUENCE, Sort.NATURAL, new Binary(BinaryOperator.ADD, value, value));
+                var goal = ScopedLeanContractTest.app("summable", doubled);
+                var target = ScopedLeanContractTest.theorem(declarations,
+                    List.of(Predicate.holds("sf", ScopedLeanContractTest.app("summable", f))), goal);
+                var trained = backend().using(learned);
+                var transfer = trained.executeWithEvidence(target);
+                assertEquals(ResultStatus.CONFIRMED, transfer.execution().result().status(), diagnostics(transfer.directory()));
+                String targetCertificate = transfer.execution().result().certificateHash();
+                checker.rebuild(target, targetCertificate, transfer.directory());
+                assertNotEquals(targetCertificate, cert);
+                var missingPremise = ScopedLeanContractTest.theorem(declarations, List.of(), goal);
+                var failed = trained.executeWithEvidence(missingPremise);
+                assertEquals(ResultStatus.UNKNOWN, failed.execution().result().status(), diagnostics(failed.directory()));
+                assertTrue(failed.execution().result().certificateHash().isEmpty());
+            }
             if (request.equals(fromSum)) {
                 var stronger = ScopedLeanContractTest.theorem(declarations, List.of(), ScopedLeanContractTest.app("summable", f));
                 assertThrows(IOException.class, () -> checker.rebuild(stronger, cert, original.directory()));

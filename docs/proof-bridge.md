@@ -310,3 +310,21 @@ It kernel-checks that the original proof inhabits that statement. The v2
 receipt binds the second theorem text. Both translators and the provisioned
 Lean installation remain inside the trust boundary. V1 obligations retain
 their original wire format, source and rebuild behavior.
+
+#### Transfer of checked lemma applications
+
+`LeanLemmaPlan.learn(training, trustedCertificateHash, retainedDirectory)`
+verifies the certificate hash, the exact training obligation and the hash of
+its dependency audit. Before receiving the target it freezes up to 32 sorted,
+representable mathlib declaration names observed at the imported boundary.
+`LeanSolverBackend.using(plan)` tries one application per candidate, with
+target assumptions as its only subgoal solver. There is no fallback to the
+ordinary search tactics in this trial. Some imported constants originate in
+types and will be inapplicable. A successful trial must compile a fresh
+kernel-checked theorem and its audit must contain a proposed declaration.
+The target certificate binds the frozen plan hash through the generated source,
+and the separate-project rebuild reconstructs the same trial. The real
+positive control trains on summability of the sum of two summable sequences
+and targets a doubled sequence with one premise. Removing that premise is the
+negative control. This public transfer control makes no speed or blinded
+generalization claim.

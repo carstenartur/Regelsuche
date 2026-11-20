@@ -83,6 +83,9 @@ public record SolverTranslation(
         if (status == TranslationStatus.LOSSLESS && obligation.goal().relation() == SolverIr.Relation.HOLDS
                 && !orderedTerms.containsKey("goal.proposition"))
             throw new IllegalArgumentException("a proposition requires its exact term mapping");
+        if (status == TranslationStatus.LOSSLESS && obligation.goal().relation() != SolverIr.Relation.HOLDS
+                && (!orderedTerms.containsKey("goal.left") || !orderedTerms.containsKey("goal.right")))
+            throw new IllegalArgumentException("a binary relation requires both term mappings");
         String contentHash = hash(
             schema, obligation.contentHash(), descriptor.backendId(),
             descriptor.backendVersion(), status, orderedIssues, orderedTerms);

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public final class LeanSolverBackend implements SolverBackend {
         Arrays.stream(Relation.values()).filter(r -> r != Relation.IS_INTEGER).toList(),
         List.of(RequestedEvidence.DECISION, RequestedEvidence.SYMBOLIC_CERTIFICATE,
                 RequestedEvidence.FORMAL_PROOF), true);
+    private final LeanLemmaPlan plan;
     private final Path project;
     private final Path evidenceRoot;
     private final List<String> command;
@@ -43,17 +45,33 @@ public final class LeanSolverBackend implements SolverBackend {
         this(project, evidenceRoot, List.of("lake", "env", "lean"), Duration.ofSeconds(90));
     }
     public LeanSolverBackend(Path project, Path evidenceRoot, List<String> command, Duration timeout) {
+        this(project, evidenceRoot, command, timeout, null);
+    }
+
+    private LeanSolverBackend(Path project, Path evidenceRoot, List<String> command, Duration timeout, LeanLemmaPlan plan) {
+        this.plan = plan;
         this.project = Objects.requireNonNull(project).toAbsolutePath().normalize();
         this.evidenceRoot = Objects.requireNonNull(evidenceRoot).toAbsolutePath().normalize();
         this.command = List.copyOf(command);
         this.timeout = Objects.requireNonNull(timeout);
         if (command.isEmpty() || timeout.isZero() || timeout.isNegative()) throw new IllegalArgumentException();
     }
+    /** Isolated checked trial of a frozen declaration-application plan. */
+    public LeanSolverBackend using(LeanLemmaPlan frozen) {
+        return new LeanSolverBackend(project, evidenceRoot, command, timeout, Objects.requireNonNull(frozen));
+    }
+
+    List<String> supportedSchemas() {
+        return plan == null ? List.of(SolverIr.OBLIGATION_SCHEMA, SolverIr.SCOPED_OBLIGATION_SCHEMA)
+            : List.of(SolverIr.SCOPED_OBLIGATION_SCHEMA);
+    }
+
     @Override public BackendDescriptor descriptor() { return DESCRIPTOR; }
     public String configurationHash() {
         return SolverIr.sha256("lean-policy/v1\n" + command + "\n" + project + "\n" + timeout
             + "\n" + fingerprint(project.resolve("lean-toolchain"))
-            + "\n" + fingerprint(project.resolve("lake-manifest.json")));
+            + "\n" + fingerprint(project.resolve("lake-manifest.json"))
+            + (plan == null ? "" : "\nplan=" + plan.hash()));
     }
     private static String fingerprint(Path path) {
         try { return SolverIr.sha256(Files.readString(path)); }
@@ -89,6 +107,8 @@ public final class LeanSolverBackend implements SolverBackend {
         Objects.requireNonNull(obligation);
         LeanSourceRenderer.Material material = renderer.render(obligation);
         List<String> issues = new ArrayList<>(material.issues());
+        if (plan != null && !SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()))
+            issues.add("LEMMA_PLAN_REQUIRES_SCOPED_OBLIGATION");
         if (!DESCRIPTOR.supportedEvidence().contains(obligation.requestedEvidence()))
             issues.add("UNSUPPORTED_EVIDENCE:" + obligation.requestedEvidence());
         boolean supported = issues.isEmpty();
@@ -115,16 +135,22 @@ public final class LeanSolverBackend implements SolverBackend {
                 return finish(obligation, translation, version.timedOut() ? ResultStatus.TIMEOUT : ResultStatus.ERROR,
                     "Lean toolchain version could not be established", "", directory);
             String nonce = UUID.randomUUID().toString().replace("-", "");
-            String source = renderer.source(obligation, nonce);
+            String source = renderer.source(obligation, nonce, plan);
+            if (plan != null) Files.writeString(directory.resolve(LeanLemmaPlan.FILE), plan.material());
             Files.writeString(directory.resolve("proof.lean"), source);
             ProcessOutput proof = compile(directory);
             if (!proof.success()) return finish(obligation, translation,
                 proof.timedOut() ? ResultStatus.TIMEOUT : proof.outputLimit() ? ResultStatus.ERROR : ResultStatus.UNKNOWN,
                 "Lean did not produce a checked theorem; inspect retained diagnostics", "", directory);
-            String audit = checkedProcessAudit(proof.stdout(), obligation, nonce).text();
+            var checked = checkedProcessAudit(proof.stdout(), obligation, nonce);
+            if (plan != null && checked.imports().stream().noneMatch(d -> plan.declarations().contains(d.name())))
+                throw new IOException("the proof term contains none of the proposed declarations");
+            String audit = checked.text();
             if (!before.equals(configurationHash()) || !environment.equals(pinnedEnvironment())
-                    || !environment.pinsMatch(directory) || !Files.isRegularFile(directory.resolve("proof.olean")))
-                throw new IOException("toolchain changed or compiled proof missing");
+                    || !environment.pinsMatch(directory) || !source.equals(Files.readString(directory.resolve("proof.lean")))
+                    || !Files.isRegularFile(directory.resolve("proof.olean"), LinkOption.NOFOLLOW_LINKS)
+                    || Files.size(directory.resolve("proof.olean")) == 0)
+                throw new IOException("Lean source or toolchain changed, or compiled proof missing or empty");
             Files.writeString(directory.resolve("audit.json"), audit);
             Files.writeString(directory.resolve("semantics.txt"),
                 "The theorem is conditional on exactly the declared premises.\n"
@@ -179,25 +205,35 @@ public final class LeanSolverBackend implements SolverBackend {
                 || !json.path("obligationHash").asText().equals(hash)
                 || !json.path("theorem").asText().equals("regelsuche_bound")
                 || !json.path("axioms").isArray()) throw new IOException("wrong audit binding");
+        return new AuditDocument(text, nonce, checkedAxioms(json.path("axioms")),
+            scoped ? checkedImports(json.path("imports")) : Set.of(), scoped);
+    }
+
+    private static Set<String> checkedAxioms(JsonNode axioms) throws IOException {
         Set<String> seen = new java.util.HashSet<>();
-        for (JsonNode axiom : json.path("axioms")) {
+        for (JsonNode axiom : axioms) {
             if (!axiom.isTextual() || !AXIOMS.contains(axiom.asText()) || !seen.add(axiom.asText()))
                 throw new IOException("unapproved or duplicated proof axiom");
         }
+        return Set.copyOf(seen);
+    }
+
+    private static Set<ImportedDeclaration> checkedImports(JsonNode entries) throws IOException {
+        if (!entries.isArray()) throw new IOException("missing imported declarations");
+        Set<String> names = new java.util.HashSet<>();
         Set<ImportedDeclaration> imports = new java.util.HashSet<>();
-        if (scoped) {
-            JsonNode entries = json.path("imports");
-            if (!entries.isArray()) throw new IOException("missing imported declarations");
-            Set<String> names = new java.util.HashSet<>();
-            for (JsonNode entry : entries) {
-                if (!entry.isObject() || entry.size() != 2 || !entry.path("module").isTextual()
-                        || !entry.path("name").isTextual() || entry.path("module").asText().isBlank()
-                        || entry.path("name").asText().isBlank() || !names.add(entry.path("name").asText()))
-                    throw new IOException("invalid or ambiguous imported declaration");
-                imports.add(new ImportedDeclaration(entry.path("name").asText(), entry.path("module").asText()));
-            }
+        for (JsonNode entry : entries) {
+            if (!entry.isObject() || entry.size() != 2) throw new IOException("invalid imported declaration");
+            String name = checkedName(entry.path("name")), module = checkedName(entry.path("module"));
+            if (!names.add(name)) throw new IOException("ambiguous imported declaration");
+            imports.add(new ImportedDeclaration(name, module));
         }
-        return new AuditDocument(text, nonce, Set.copyOf(seen), Set.copyOf(imports), scoped);
+        return Set.copyOf(imports);
+    }
+
+    private static String checkedName(JsonNode field) throws IOException {
+        if (!field.isTextual() || field.asText().isBlank()) throw new IOException("invalid imported name");
+        return field.asText();
     }
 
     static String compiledHash(Path directory) throws IOException {

@@ -35,6 +35,9 @@ final class ScopedLeanRenderer {
     private final List<String> issues = new ArrayList<>();
     private final Map<String, Sort> free = new HashMap<>();
     private final List<Sort> scope = new ArrayList<>();
+    // Keys are typed, fully rendered real terms, whose bound names encode lexical levels.
+    private record Guard(String source, boolean positive, boolean nonnegative, boolean nonzero) { }
+    private final List<Guard> guards = new ArrayList<>();
 
     ScopedLeanRenderer(Obligation obligation) { this.obligation = obligation; }
 
@@ -55,6 +58,7 @@ final class ScopedLeanRenderer {
                 String premise = relation(p.relation(), p.left(), p.right(), null);
                 mapping.put("assumption." + p.id(), premise);
                 type.append(premise).append(" → ");
+                if (p.relation() == Relation.HOLDS) collectGuards(p.left(), 0);
             }
             var goal = obligation.goal();
             type.append(relation(goal.relation(), goal.left(), goal.right(), mapping));
@@ -106,7 +110,7 @@ final class ScopedLeanRenderer {
             case Binary b -> {
                 var left = expect(term(b.left(), depth + 1), REAL);
                 var right = expect(term(b.right(), depth + 1), REAL);
-                yield new Term(LeanSourceRenderer.binary(b, obligation, issues, left, right), REAL);
+                yield binary(b, left, right);
             }
             case Call c -> application(c, depth);
         };
@@ -136,34 +140,53 @@ final class ScopedLeanRenderer {
     }
 
     private Term application(Call c, int depth) {
-        var args = c.arguments().stream().map(e -> term(e, depth + 1)).toList();
-        if (args.size() == 1) {
-            Term a = args.getFirst();
-            return switch (c.function()) {
-                case "summable" -> new Term("(Summable " + expect(a, REAL_SEQUENCE) + ")", PROPOSITION);
-                case "tsum" -> new Term("(tsum " + expect(a, REAL_SEQUENCE) + ")", REAL);
-                case "not" -> new Term("(¬ " + expect(a, PROPOSITION) + ")", PROPOSITION);
-                case "of_nat" -> new Term("((" + expect(a, NATURAL) + ") : Real)", REAL);
-                case "succ" -> new Term("(Nat.succ " + expect(a, NATURAL) + ")", NATURAL);
-                case "nat" -> {
-                    if (!(c.arguments().getFirst() instanceof Literal l)) throw new IllegalArgumentException("NAT_LITERAL_REQUIRED");
-                    BigDecimal n = new BigDecimal(l.value());
-                    require(n.scale() <= 0 && n.signum() >= 0, "NAT_LITERAL_REQUIRED");
-                    yield new Term("(" + l.value() + " : Nat)", NATURAL);
-                }
-                default -> new Term(LeanSourceRenderer.realCall(c.function(), c.arguments().getFirst(),
-                    expect(a, REAL), obligation, issues), REAL);
-            };
+        if (c.function().equals("implies") && c.arguments().size() == 2) {
+            var antecedent = term(c.arguments().getFirst(), depth + 1);
+            expect(antecedent, PROPOSITION);
+            int before = guards.size();
+            collectGuards(c.arguments().getFirst(), depth + 1);
+            var consequent = term(c.arguments().get(1), depth + 1);
+            guards.subList(before, guards.size()).clear();
+            return infix("→", antecedent, PROPOSITION, consequent, PROPOSITION, PROPOSITION);
         }
+        var args = c.arguments().stream().map(e -> term(e, depth + 1)).toList();
+        if (args.size() == 1) return unary(c, args.getFirst());
         if (args.size() == 3 && c.function().equals("limit_at"))
             return new Term("(Filter.Tendsto " + expect(args.get(0), REAL_FUNCTION) + " (nhds " + expect(args.get(1), REAL)
                 + ") (nhds " + expect(args.get(2), REAL) + "))", PROPOSITION);
         require(args.size() == 2, "UNSUPPORTED_ARITY:" + c.function());
-        Term l = args.get(0), r = args.get(1);
+        return binaryCall(c, args.get(0), args.get(1));
+    }
+
+    private Term unary(Call c, Term a) {
+        return switch (c.function()) {
+            case "summable" -> new Term("(Summable " + expect(a, REAL_SEQUENCE) + ")", PROPOSITION);
+            case "tsum" -> new Term("(tsum " + expect(a, REAL_SEQUENCE) + ")", REAL);
+            case "not" -> new Term("(¬ " + expect(a, PROPOSITION) + ")", PROPOSITION);
+            case "of_nat" -> new Term("((" + expect(a, NATURAL) + ") : Real)", REAL);
+            case "succ" -> new Term("(Nat.succ " + expect(a, NATURAL) + ")", NATURAL);
+            case "nat" -> {
+                if (!(c.arguments().getFirst() instanceof Literal l)) throw new IllegalArgumentException("NAT_LITERAL_REQUIRED");
+                BigDecimal n = new BigDecimal(l.value());
+                require(n.scale() <= 0 && n.signum() >= 0, "NAT_LITERAL_REQUIRED");
+                yield new Term("(" + l.value() + " : Nat)", NATURAL);
+            }
+            default -> {
+                Expression argument = c.arguments().getFirst();
+                String source = expect(a, REAL);
+                boolean positive = LeanSourceRenderer.positive(argument, obligation)
+                    || guards.stream().anyMatch(g -> g.source.equals(source) && g.positive);
+                boolean nonnegative = LeanSourceRenderer.nonnegative(argument, obligation)
+                    || guards.stream().anyMatch(g -> g.source.equals(source) && g.nonnegative);
+                yield new Term(LeanSourceRenderer.realCall(c.function(), argument, source, issues, positive, nonnegative), REAL);
+            }
+        };
+    }
+
+    private Term binaryCall(Call c, Term l, Term r) {
         return switch (c.function()) {
             case "eq" -> compare("=", l, r); case "ne" -> compare("≠", l, r);
             case "le" -> compare("≤", l, r); case "lt" -> compare("<", l, r);
-            case "implies" -> infix("→", l, PROPOSITION, r, PROPOSITION, PROPOSITION);
             case "and" -> infix("∧", l, PROPOSITION, r, PROPOSITION, PROPOSITION);
             case "or" -> infix("∨", l, PROPOSITION, r, PROPOSITION, PROPOSITION);
             case "mem" -> infix("∈", l, REAL, r, REAL_SET, PROPOSITION);
@@ -177,10 +200,36 @@ final class ScopedLeanRenderer {
             case "has_sum" -> new Term("(HasSum " + expect(l, REAL_SEQUENCE) + " " + expect(r, REAL) + ")", PROPOSITION);
             case "tends_to" -> new Term("(Filter.Tendsto " + expect(l, REAL_SEQUENCE) + " Filter.atTop (nhds "
                 + expect(r, REAL) + "))", PROPOSITION);
-            case "pow" -> new Term(LeanSourceRenderer.binary(new Binary(BinaryOperator.POWER, c.arguments().get(0),
-                c.arguments().get(1)), obligation, issues, expect(l, REAL), expect(r, REAL)), REAL);
+            case "pow" -> binary(new Binary(BinaryOperator.POWER, c.arguments().get(0), c.arguments().get(1)),
+                expect(l, REAL), expect(r, REAL));
             default -> throw new IllegalArgumentException("UNSUPPORTED_CALL:" + c.function());
         };
+    }
+
+    private Term binary(Binary b, String left, String right) {
+        boolean positive = LeanSourceRenderer.positive(b.left(), obligation)
+            || guards.stream().anyMatch(g -> g.source.equals(left) && g.positive);
+        boolean nonzero = LeanSourceRenderer.nonzero(b.right(), obligation)
+            || guards.stream().anyMatch(g -> g.source.equals(right) && g.nonzero);
+        return new Term(LeanSourceRenderer.binary(b, issues, left, right, positive, nonzero), REAL);
+    }
+
+    private void collectGuards(Expression condition, int depth) {
+        if (!(condition instanceof Call c) || c.arguments().size() != 2) return;
+        var left = c.arguments().get(0);
+        var right = c.arguments().get(1);
+        if (c.function().equals("and")) {
+            collectGuards(left, depth + 1);
+            collectGuards(right, depth + 1);
+            return;
+        }
+        boolean less = c.function().equals("lt"), le = c.function().equals("le"), ne = c.function().equals("ne");
+        if (!(less || le || ne)) return;
+        boolean zeroLeft = LeanSourceRenderer.zero(left);
+        if (!zeroLeft && !LeanSourceRenderer.zero(right)) return;
+        Term guarded = term(zeroLeft ? right : left, depth + 1);
+        if (guarded.sort == REAL)
+            guards.add(new Guard(guarded.source, zeroLeft && less, zeroLeft && (less || le), less || ne));
     }
 
     private static Term compare(String op, Term l, Term r) {

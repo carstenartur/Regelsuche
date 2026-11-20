@@ -50,7 +50,7 @@ class LeanProcessBoundaryTest {
     }
 
     @Test void staleAuditMissingCompiledProofAndChangedConfigurationNeverConfirm() throws Exception {
-        for (String mode : List.of("stale-audit", "missing-compiled", "changed-configuration")) {
+        for (String mode : List.of("stale-audit", "missing-compiled", "empty-compiled", "changed-source", "changed-configuration")) {
             var attempt = backend(mode).executeWithEvidence(CheckedLeanProofTest.obligation("x", "x"));
             assertRejected(attempt, ResultStatus.ERROR);
             assertTrue(Files.isRegularFile(attempt.directory().resolve("FAILED.txt")), mode);
@@ -151,6 +151,33 @@ class LeanProcessBoundaryTest {
         }
     }
 
+    @Test void scopedEvidenceLinksFrozenTrainingAndRejectsChangedImports() throws Exception {
+        var train = ScopedLeanContractTest.summableAdd();
+        var original = backend(temp.resolve("train"), "scoped").executeWithEvidence(train);
+        var result = original.execution().result();
+        assertEquals(ResultStatus.CONFIRMED, result.status());
+        var hints = LeanLemmaPlan.learn(train, result.certificateHash(), original.directory());
+        assertEquals(List.of("Summable.add"), hints.declarations());
+        assertThrows(IOException.class, () -> LeanLemmaPlan.learn(train, SolverIr.sha256("borrowed"), original.directory()));
+        var target = ScopedLeanContractTest.sets();
+        var configured = backend(temp.resolve("target"), "scoped").using(hints);
+        var transferred = configured.executeWithEvidence(target);
+        assertEquals(ResultStatus.CONFIRMED, transferred.execution().result().status());
+        String proof = Files.readString(transferred.directory().resolve("proof.lean"));
+        assertTrue(proof.contains("apply «Summable».«add»"));
+        assertFalse(proof.contains("| exact?"));
+        assertTrue(proof.contains(hints.hash()));
+        String certificate = transferred.execution().result().certificateHash();
+        var verifier = new LeanEvidenceRebuilder(backend(temp.resolve("second"), "scoped"));
+        var receipt = verifier.rebuild(target, certificate, transferred.directory());
+        assertTrue(Files.exists(receipt.directory().resolve("lemma-plan.txt")));
+        var changed = new LeanEvidenceRebuilder(backend(temp.resolve("bad"), "changed-import"));
+        assertThrows(IOException.class, () -> changed.rebuild(target, certificate, transferred.directory()));
+        var file = transferred.directory().resolve("lemma-plan.txt");
+        Files.writeString(file, Files.readString(file).replace("Summable.add", "Summable.add\n#eval IO.println 1"));
+        assertThrows(IOException.class, () -> verifier.rebuild(target, certificate, transferred.directory()));
+    }
+
     private LeanSolverBackend backend(String mode) throws Exception {
         return backend(temp, mode);
     }
@@ -198,11 +225,14 @@ class LeanProcessBoundaryTest {
             String hash = binding(text, "obligationHash");
             String nonce = mode.equals("stale-audit") ? "stale" : binding(text, "nonce");
             if (!mode.equals("missing-compiled")) Files.writeString(source.resolveSibling("proof.olean"),
-                mode.equals("different-compiled") ? "other fixture bytes" : "fixture bytes");
+                mode.equals("empty-compiled") ? "" : mode.equals("different-compiled") ? "other fixture bytes" : "fixture bytes");
             if (mode.equals("changed-configuration")) Files.writeString(Path.of("lean-toolchain"), "changed\n");
             if (mode.equals("changed-source")) Files.writeString(source, text + "\n-- changed during invocation\n");
             String axiom = mode.equals("different-axioms") ? "Quot.sound" : "propext";
-            System.out.println("REGELSUCHE_LEAN_AUDIT {\"schema\":\"regelsuche.lean-audit/v1\",\"obligationHash\":\""
+            String schema = text.contains("regelsuche.lean-audit/v2") ? "v2" : "v1";
+            String module = mode.equals("changed-import") ? "Mathlib.Other" : "Mathlib.Example";
+            String imports = schema.equals("v2") ? "\"imports\":[{\"name\":\"Summable.add\",\"module\":\"" + module + "\"}]," : "";
+            System.out.println("REGELSUCHE_LEAN_AUDIT {\"schema\":\"regelsuche.lean-audit/" + schema + "\"," + imports + "\"obligationHash\":\""
                 + hash + "\",\"nonce\":\"" + nonce + "\",\"theorem\":\"regelsuche_bound\",\"axioms\":[\"" + axiom + "\"]}");
         }
         private static String binding(String source, String field) {

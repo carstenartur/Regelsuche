@@ -101,7 +101,11 @@ public final class LeanSourceRenderer {
     }
 
     static String binary(Binary b, Obligation obligation, List<String> issues, String left, String right) {
-        if (b.operator() == BinaryOperator.DIVIDE && !nonzero(b.right(), obligation))
+        return binary(b, issues, left, right, positive(b.left(), obligation), nonzero(b.right(), obligation));
+    }
+
+    static String binary(Binary b, List<String> issues, String left, String right, boolean positiveBase, boolean nonzeroRight) {
+        if (b.operator() == BinaryOperator.DIVIDE && !nonzeroRight)
             issues.add("DIVISION_DOMAIN_NOT_ENCODED:" + b.right().canonicalMaterial());
         if (b.operator() == BinaryOperator.POWER) {
             if (b.right() instanceof Literal l) {
@@ -109,7 +113,7 @@ public final class LeanSourceRenderer {
                 if (d.signum() >= 0 && d.stripTrailingZeros().scale() <= 0)
                     return "(" + left + " ^ (" + d.toBigIntegerExact() + " : Nat))";
             }
-            if (!positive(b.left(), obligation)) issues.add("REAL_POWER_POSITIVE_BASE_REQUIRED");
+            if (!positiveBase) issues.add("REAL_POWER_POSITIVE_BASE_REQUIRED");
             return "(Real.rpow " + left + " " + right + ")";
         }
         String operator = switch (b.operator()) {
@@ -130,14 +134,18 @@ public final class LeanSourceRenderer {
     }
 
     static String realCall(String function, Expression argument, String a, Obligation obligation, List<String> issues) {
+        return realCall(function, argument, a, issues, positive(argument, obligation), nonnegative(argument, obligation));
+    }
+
+    static String realCall(String function, Expression argument, String a, List<String> issues, boolean positive, boolean nonnegative) {
         return switch (function) {
             case "exp" -> "(Real.exp " + a + ")";
             case "log", "ln" -> {
-                if (!positive(argument, obligation)) issues.add("LOG_POSITIVE_ARGUMENT_REQUIRED:" + argument.canonicalMaterial());
+                if (!positive) issues.add("LOG_POSITIVE_ARGUMENT_REQUIRED:" + argument.canonicalMaterial());
                 yield "(Real.log " + a + ")";
             }
             case "sqrt" -> {
-                if (!nonnegative(argument, obligation)) issues.add("SQRT_NONNEGATIVE_ARGUMENT_REQUIRED");
+                if (!nonnegative) issues.add("SQRT_NONNEGATIVE_ARGUMENT_REQUIRED");
                 yield "(Real.sqrt " + a + ")";
             }
             case "abs" -> "(abs " + a + ")";
@@ -145,23 +153,23 @@ public final class LeanSourceRenderer {
         };
     }
 
-    private static boolean zero(Expression expression) {
+    static boolean zero(Expression expression) {
         return expression instanceof Literal l && new BigDecimal(l.value()).signum() == 0;
     }
-    private static boolean positive(Expression e, Obligation o) {
+    static boolean positive(Expression e, Obligation o) {
         if (e instanceof Literal l) return new BigDecimal(l.value()).signum() > 0;
         if (e instanceof Call c && c.function().equals("exp") && c.arguments().size() == 1) return true;
         return o.assumptions().stream().anyMatch(p ->
             p.relation() == Relation.GREATER_THAN && p.left().equals(e) && zero(p.right())
             || p.relation() == Relation.LESS_THAN && p.right().equals(e) && zero(p.left()));
     }
-    private static boolean nonnegative(Expression e, Obligation o) {
+    static boolean nonnegative(Expression e, Obligation o) {
         if (positive(e,o) || zero(e)) return true;
         return o.assumptions().stream().anyMatch(p ->
             p.relation() == Relation.GREATER_OR_EQUAL && p.left().equals(e) && zero(p.right())
             || p.relation() == Relation.LESS_OR_EQUAL && p.right().equals(e) && zero(p.left()));
     }
-    private static boolean nonzero(Expression e, Obligation o) {
+    static boolean nonzero(Expression e, Obligation o) {
         if (positive(e,o)) return true;
         if (e instanceof Literal l) return new BigDecimal(l.value()).signum() != 0;
         return o.assumptions().stream().anyMatch(p ->
@@ -171,13 +179,18 @@ public final class LeanSourceRenderer {
     }
 
     public String source(Obligation obligation, String nonce) {
+        return source(obligation, nonce, null);
+    }
+
+    String source(Obligation obligation, String nonce, LeanLemmaPlan plan) {
         Material material = render(obligation);
         if (!material.supported()) throw new IllegalArgumentException(String.join(",", material.issues()));
         boolean scoped = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema());
+        if (!scoped && plan != null) throw new IllegalArgumentException("a lemma plan requires a v2 obligation");
         return "import Mathlib\nimport Lean.Util.CollectAxioms\n"
             + (scoped ? "import Lean.Util.FoldConsts\n" : "")
             + "set_option autoImplicit false\nset_option Elab.async false\nset_option maxHeartbeats 1000000\n"
-            + "theorem regelsuche_lemma : " + material.theoremType() + " := " + material.proof()
+            + "theorem regelsuche_lemma : " + material.theoremType() + " := " + (plan == null ? material.proof() : plan.proof())
             + audit(material.theoremType(), obligation.contentHash(), nonce, scoped);
     }
 
@@ -213,7 +226,8 @@ public final class LeanSourceRenderer {
     // Walk locally generated helper declarations until each branch reaches an imported
     // declaration. The separately collected axioms follow dependencies through the imports too.
     private static final String IMPORT_AUDIT = """
-          let mut todo := [`regelsuche_lemma]
+          let some (.thmInfo checked) := env.find? `regelsuche_lemma | throwError "missing generated theorem"
+          let mut todo := checked.value.getUsedConstants.toList
           let mut seen : NameSet := {}
           let mut imports : Array Json := #[]
           while !todo.isEmpty do

@@ -84,18 +84,23 @@ final class LeanStatementReconstruction {
 
     private static String call(Call c, List<String> args) {
         String a = args.getFirst();
-        if (args.size() == 1) {
-            return switch (c.function()) {
-                case "nat" -> "(" + ((Literal)c.arguments().getFirst()).value() + " : ℕ)";
-                case "of_nat" -> "(" + a + " : ℝ)";
-                case "succ" -> apply("Nat.succ", a); case "not" -> apply("Not", a);
-                case "summable" -> apply("Summable", a); case "tsum" -> apply("tsum", a);
-                case "exp" -> apply("Real.exp", a); case "log", "ln" -> apply("Real.log", a);
-                case "sqrt" -> apply("Real.sqrt", a); case "abs" -> apply("abs", a);
-                default -> throw new IllegalArgumentException("unsupported reconstructed call " + c.function());
-            };
-        }
-        String b = args.get(1);
+        if (args.size() == 1) return unary(c, a);
+        return multiple(c, args, a, args.get(1));
+    }
+
+    private static String unary(Call c, String a) {
+        return switch (c.function()) {
+            case "nat" -> "(" + ((Literal)c.arguments().getFirst()).value() + " : ℕ)";
+            case "of_nat" -> "(" + a + " : ℝ)";
+            case "succ" -> apply("Nat.succ", a); case "not" -> apply("Not", a);
+            case "summable" -> apply("Summable", a); case "tsum" -> apply("tsum", a);
+            case "exp" -> apply("Real.exp", a); case "log", "ln" -> apply("Real.log", a);
+            case "sqrt" -> apply("Real.sqrt", a); case "abs" -> apply("abs", a);
+            default -> throw new IllegalArgumentException("unsupported reconstructed call " + c.function());
+        };
+    }
+
+    private static String multiple(Call c, List<String> args, String a, String b) {
         return switch (c.function()) {
             case "eq" -> apply("Eq", a, b); case "ne" -> apply("Ne", a, b);
             case "lt" -> apply("LT.lt", a, b); case "le" -> apply("LE.le", a, b);
@@ -104,8 +109,8 @@ final class LeanStatementReconstruction {
             case "at" -> apply(a, b); case "has_sum" -> apply("HasSum", a, b);
             case "tends_to" -> apply("Filter.Tendsto", a, "Filter.atTop", apply("nhds", b));
             case "limit_at" -> apply("Filter.Tendsto", a, apply("nhds", b), apply("nhds", args.get(2)));
-            case "mem" -> "(" + a + " ∈ " + b + ")"; case "subset" -> "(" + a + " ⊆ " + b + ")";
-            case "union" -> "(" + a + " ∪ " + b + ")"; case "inter" -> "(" + a + " ∩ " + b + ")";
+            case "mem" -> apply("Set.Mem", b, a); case "subset" -> apply("Set.Subset", a, b);
+            case "union" -> apply("Set.union", a, b); case "inter" -> apply("Set.inter", a, b);
             case "pow" -> arithmetic(BinaryOperator.POWER, a, b, c.arguments().get(1));
             default -> throw new IllegalArgumentException("unsupported reconstructed call " + c.function());
         };

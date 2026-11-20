@@ -73,6 +73,29 @@ class ScopedLeanContractTest {
         }
     }
 
+    @Test void localDomainFactsApplyOnlyToTheCorrectVariableAndImplicationBranch() {
+        var positive = app("lt", zero, n);
+        var logIdentity = app("eq", app("log", n), app("log", n));
+        var innerLogOuter = app("eq", app("log", new Bound(1)), app("log", new Bound(1)));
+        var renderer = new LeanSourceRenderer();
+        for (var body : List.of(app("implies", positive, logIdentity),
+                app("implies", positive, new Binder(BinderKind.FORALL, Sort.REAL, innerLogOuter)))) {
+            var good = theorem(List.of(), List.of(), new Binder(BinderKind.FORALL, Sort.REAL, body));
+            assertTrue(renderer.render(good).supported(), renderer.render(good).issues().toString());
+        }
+        var captured = app("implies", positive, new Binder(BinderKind.FORALL, Sort.REAL, logIdentity));
+        // Neither disjunction nor a completed sibling implication makes its guard available.
+        for (var body : List.of(captured, app("or", positive, logIdentity),
+                app("and", app("implies", positive, logIdentity), logIdentity))) {
+            var bad = theorem(List.of(), List.of(), new Binder(BinderKind.FORALL, Sort.REAL, body));
+            assertFalse(renderer.render(bad).supported());
+        }
+        var guarded = theorem(List.of(new SymbolDeclaration("b0", Sort.REAL)),
+            List.of(Predicate.holds("positive", app("lt", zero, x))),
+            app("eq", app("log", x), app("log", x)));
+        assertTrue(renderer.render(guarded).supported());
+    }
+
     @Test void bothLoweringsBindTheVariableAndDistinguishLimitPoints() {
         var sequence = new Binder(BinderKind.SEQUENCE, Sort.NATURAL, app("of_nat", n));
         var function = new Binder(BinderKind.FUNCTION, Sort.REAL, n);
@@ -81,6 +104,7 @@ class ScopedLeanContractTest {
         var material = new LeanSourceRenderer().render(request);
         assertTrue(material.supported(), material.issues().toString());
         assertTrue(material.theoremType().contains("Filter.Tendsto (fun (b0 : Real) => b0) (nhds (0 : Real)) (nhds (0 : Real))"));
+        assertTrue(LeanStatementReconstruction.theorem(sets()).contains("(Set.Mem ((fun "));
         String rebuilt = LeanStatementReconstruction.theorem(request);
         assertTrue(rebuilt.contains("Filter.Tendsto (fun (local_0 : ℝ) => local_0) (nhds (0 : ℝ)) (nhds (0 : ℝ))"));
         assertNotEquals(LeanStatementReconstruction.theorem(limit(zero)), LeanStatementReconstruction.theorem(limit(new Literal("1"))));
