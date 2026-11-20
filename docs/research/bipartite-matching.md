@@ -6,6 +6,11 @@ linke Knotenmenge an den Graphen. Damit lässt sich die Anzahl der linken
 Knoten, die in jedem Matching unzugeordnet bleiben müssen, unabhängig von
 der Suche nachprüfen.
 
+Die [Fortsetzung über bewiesene Graphverfeinerungen](hall-progress.md)
+zeigt, wann Kantenlöschungen, bestätigte Zuordnungen oder neue Treffer
+diese Untergrenze erhalten beziehungsweise strikt erhöhen. Die Diagnose
+verwendet dieselben zertifizierten CORE- und SDK-Aufrufe.
+
 ## Quelle und Beispiel
 
 Eine Anfrage gibt die Größen der linken Seite \(U\) und der rechten Seite
