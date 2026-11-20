@@ -1,33 +1,51 @@
 package de.regelsuche.demo;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.export.DefaultTransformationExportService;
+import de.regelsuche.graph.InMemoryExpressionGraphStore;
+import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchProfile;
+import de.regelsuche.search.memory.PruningReason;
+import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.web.WebSecurityConfig;
+import de.regelsuche.web.WebWorkbenchServer;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import de.regelsuche.graph.InMemoryExpressionGraphStore;
-import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
-import de.regelsuche.export.DefaultTransformationExportService;
-import de.regelsuche.web.WebWorkbenchServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class PruningDecisionsExportTest {
 
+    private static final ObjectMapper JSON = new ObjectMapper();
     private WebWorkbenchServer server;
+    private SearchMemory memory;
     private int port;
 
     @BeforeEach
     void setUp() throws Exception {
         var graph = new InMemoryExpressionGraphStore();
         var inv = new InMemoryRuleInventoryRepository();
-        server = new WebWorkbenchServer("127.0.0.1", 0, graph, inv, new DefaultTransformationExportService());
+        memory = new SearchMemory();
+        server = new WebWorkbenchServer("127.0.0.1", 0, graph, inv,
+            new DefaultTransformationExportService(), WebSecurityConfig.none(), memory);
         server.start();
         port = server.boundPort();
     }
@@ -38,18 +56,55 @@ class PruningDecisionsExportTest {
     }
 
     @Test
-    void pruningDecisionsAreExported() throws IOException {
-        // The macro-learning demo runs four DISCOVERY_PLUS searches; the
-        // transposition table records re-visits as pruning decisions which
-        // must surface in the bundle's pruning-decisions.json.
+    void genuineBeamPruningDecisionsAreExported() throws IOException {
+        var engine = new AstRewriteTransformationEngine(
+            AstRewriteTransformationEngine.defaultRules().stream()
+                .filter(rule -> rule.id().equals("ast_add_zero_right")).toList());
+        var problem = new SearchProblem("x + 0", engine, new ExpressionScorer(),
+            new ExpressionCanonicalizer(), SearchProfile.TEACHING.heuristic()).withMemory(memory);
+        var strategy = SearchProfile.TEACHING.newStrategy();
+
+        var first = strategy.search(problem);
+        var repeated = strategy.search(problem);
+
+        assertEquals(List.of("x + 0", "x"), first.stream().map(SearchState::expression).toList());
+        assertEquals(List.of("x + 0"), repeated.stream().map(SearchState::expression).toList(),
+            "Beam must genuinely prune the previously observed reduction");
+        assertEquals(1, memory.decisions().size());
+        var decision = memory.decisions().getFirst();
+        assertEquals(PruningReason.ALREADY_KNOWN_EQUAL, decision.reason());
+
+        JsonNode pruning = pruningExport();
+        assertEquals(1, pruning.path("count").asInt());
+        assertTrue(pruning.path("decisions").isArray());
+        assertEquals(1, pruning.path("decisions").size());
+        JsonNode exported = pruning.path("decisions").get(0);
+        assertEquals("x", exported.path("expression").asText());
+        assertEquals(first.getLast().canonicalHash(), exported.path("canonicalHash").asText());
+        assertEquals(decision.reason().name(), exported.path("reason").asText());
+        assertEquals(decision.explanation(), exported.path("explanation").asText());
+        assertEquals(JSON.readTree(getBytes("/api/memory/pruning")), pruning);
+    }
+
+    @Test
+    void bestFirstDemoExportsObservationsWithoutPhantomPruning() throws IOException {
+        // DISCOVERY_PLUS runs BestFirst: durable value observations do not
+        // certify that the current run's continuations can be skipped.
         post("/api/demo/macro-learning");
-        byte[] zipBytes = getBytes("/api/exports/bundle.zip");
-        String pruning = readZipEntry(zipBytes, "pruning-decisions.json");
-        assertTrue(pruning != null && pruning.contains("\"decisions\""),
-            "bundle must contain pruning-decisions.json with a decisions array: " + pruning);
-        // Decisions list is non-empty after a DISCOVERY_PLUS demo run.
-        assertTrue(pruning.contains("\"reason\":"),
-            "expected at least one pruning decision; got: " + pruning);
+        assertFalse(memory.table().entries().isEmpty(), "The demo must record real search observations");
+        assertTrue(memory.decisions().isEmpty());
+
+        JsonNode pruning = pruningExport();
+        assertEquals(0, pruning.path("count").asInt());
+        assertTrue(pruning.path("decisions").isArray());
+        assertTrue(pruning.path("decisions").isEmpty());
+        assertEquals(JSON.readTree(getBytes("/api/memory/pruning")), pruning);
+    }
+
+    private JsonNode pruningExport() throws IOException {
+        String pruning = readZipEntry(getBytes("/api/exports/bundle.zip"), "pruning-decisions.json");
+        assertNotNull(pruning, "bundle must contain pruning-decisions.json");
+        return JSON.readTree(pruning);
     }
 
     private void post(String path) throws IOException {
