@@ -77,3 +77,26 @@ BestFirst mode; leave other strategies' gate semantics unchanged.
   `aiKnowledgeCheck` passed, including eight coverage controls and all 17
   complexity hotspots. Logs: `issue696-maven-tests.log` and
   `issue696-quality.log`. Hosted checks and integration remain pending.
+
+## App export follow-up from hosted CI
+
+The first combined CI exposed an obsolete consumer expectation in
+`PruningDecisionsExportTest`: the BestFirst macro-learning demo was required
+to export at least one durable pruning decision. Its empty decision list is
+correct under the new contract; actual observations are still recorded.
+
+- [x] Reproduce the original consumer failure locally on the unchanged test.
+- [x] Retain nonempty export coverage with real Beam searches and the built-in
+  add-zero rule. Require an actual repeated-search cutoff and the exact
+  expression, hash, reason and explanation in matching HTTP and ZIP data.
+- [x] Run the real macro-learning demo, require populated observations, and
+  verify matching empty HTTP/ZIP decision lists.
+- [x] Run the export, demo end-to-end and memory API tests with both builds:
+  10/10 tests passed without skips in Gradle and Maven; all 20 modules in the
+  affected Maven reactor succeeded. Logs: `issue696-app-export-red.log`,
+  `issue696-app-export-green.log`, `issue696-app-export-maven.log`.
+
+The parent reviewed the test correction. The production exporter and public
+demo wording already match the corrected contract; no production change or
+guard relaxation was needed. Full hosted verification must run on the updated
+head before integration.
