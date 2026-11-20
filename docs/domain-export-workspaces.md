@@ -210,3 +210,28 @@ Das Schema [domain-snapshot-assessment/v1](schemas/regelsuche-domain-snapshot-as
 beschreibt die Auswertung. Die mathematische Nachprüfung und die Bindung der
 Originalbytes erfolgen beim Erzeugen und beim Wiederladen. Alte Workspace-,
 Validierungs-, Modell- und Qualification-Formate behalten ihre eigenen Identitäten.
+
+### Signierte Literaturentscheidung zu einer geprüften Formel
+
+Die Anwendungs-CLI gibt mit `domains review-subject EXPORT` die genaue
+Gleichung, ihren Geltungsbereich, die Rewrite-Annahmen und die Identitäten
+für einen eingefrorenen Rechercheplan aus. `formationEvidenceRoot` ist der
+Hash der vollständigen reproduzierten Domänenauswertung. Der Pfad setzt
+einen exakten rationalen Polynomnachweis voraus. Die private Dokumentation
+von Literaturbefunden steht auch den Folgendomänen offen.
+
+```text
+domains verify-review EXPORT PINNED_FREEZE PINNED_CATALOGUE TRUSTED_ROSTER.json REVIEW.json
+```
+
+Die Empfängerseite gibt die vor der Recherche gesicherten Plan- und
+Katalogwurzeln sowie ihre unabhängig festgelegte Gutachterliste an.
+Die CLI wiederholt die vorhandene Prüfung von Rechercheabdeckung, Stimmen
+und Ed25519-Signaturen. Sie vergleicht anschließend die Kandidatenidentität,
+die Gleichung, die sortierten Rewrite-Annahmen einschließlich des
+Polynom-Geltungsbereichs und die gesamte eingefrorene Evidence-Wurzel
+mit der Domänenauswertung. Ein anderer Term oder Geltungsbereich schlägt
+auch bei gültigen Signaturen fehl. Der Beleg enthält die geprüfte Entscheidung,
+Plan-, Katalog-, Paket-, Intake- und Gutachterlistenwurzel. Die Aussage
+bezieht sich auf diese Gleichung und Recherche. Promotion und Public Evidence
+behalten eigene Entscheidungen. Der Befehl arbeitet vollständig offline.
