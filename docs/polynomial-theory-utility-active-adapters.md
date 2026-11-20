@@ -68,11 +68,32 @@ Ledger bleiben als `BUDGET_INCONCLUSIVE` erhalten. Insbesondere darf die
 1024-Grenze nicht entfernt werden, um in kleinen Checkpoints Cachetreffer zu
 erzwingen. Nach echter FIFO-Verdrängung ist eine neue native Ableitung nötig.
 
-`PolynomialTheoryUtilityCacheRunHistory` prüft zusätzlich die Messfolge über
-Zeilengrenzen: Jeder Hit benötigt eine frühere Einfügung dieses Runs;
-erfolgreiche Replays müssen Quell-/Zielsyntax, Backend, Transformations-ID,
-Annahmen und primitive Evidenz bewahren. Verdrängung ist nur bei voller
-eingefrorener Kapazität und für den ältesten Eintrag zulässig.
+### Herkunft der Cache-Belege vor dem Freeze
+
+Das beobachtete Messbatch prüft die Cache-Zeilen in der kanonischen Reihenfolge
+der eingefrorenen Inputs. Es bindet jedes Ergebnis an seine typisierte Messung
+und startet pro `runId` eine leere `PolynomialTheoryUtilityCacheRunHistory`.
+Jeder Hit, auch ein unterbrochener Replay, benötigt eine frühere, noch gehaltene
+Einfügung im selben Lauf. Erfolgreiche Replays müssen Quell- und Zielsyntax,
+Backend, Transformations-ID, Annahmen und primitive Evidenz bewahren.
+Verdrängung ist nur bei voller eingefrorener Kapazität und für den ältesten
+Eintrag zulässig. Der historische v1-Receipt-Pfad behält seinen Zeilenvertrag.
+
+Die Regression verwendet einen tatsächlich ausgeführten, unterbrochenen
+Replay mit einer außerhalb des Laufs vorbereiteten Einfügung. Seine einzelne
+Zeile lässt sich verlustfrei kodieren. Das beobachtete Messbatch weist sie vor
+dem Freeze ab. Der Komponenten-Freeze bindet eine nativ gemessene
+Formationszeile und gemessene Cache-Zeilen aus zwei getrennten Checkpoints.
+Die Cache-Kontrolle unter den eingefrorenen Budgets beobachtet Misses und
+Budgetabbrüche. Die größeren Komponentenbudgets decken Einfügungen, Replays
+und FIFO-Verdrängung ab.
+
+```sh
+./gradlew :regelsuche-experiments:test \
+  --tests '*PolynomialTheoryUtilityObservedFreezeContractTest' \
+  --tests '*PolynomialTheoryUtilityCacheRunHistoryTest' \
+  --tests '*PolynomialTheoryUtilityDerivedCacheAdapterTest'
+```
 
 ## Spezialkontrolle
 
@@ -215,6 +236,7 @@ verarbeiteten Bytes und Hash-Abschlüsse gegen die Cache-Dimensionen der
 Ledger, einschließlich Retention-Abbruch sowie fremder und verdrängter
 Lookup-Generationen. Die Hash-Berechnung selbst bleibt die JDK-SUN-Implementierung.
 
-Diese Arbeit führt weder die 600-Zeilen-Studie noch eine Candidate-Freeze aus.
-Die Qualifikation bleibt versiegelt. Cache-Nutzen, externe Parität und eine
-Produktentscheidung sind weiterhin nicht nachgewiesen.
+Die Komponentenprüfungen erzeugen Test-Receipts. Für die 600-Zeilen-Studie
+bleibt die Qualifikation versiegelt, und der Candidate-Freeze steht aus.
+Cache-Nutzen, externe Parität und eine Produktentscheidung erfordern
+weitere Belege.
