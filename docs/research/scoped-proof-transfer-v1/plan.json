@@ -1,0 +1,14 @@
+{
+  "schema" : "scoped-proof-plan-priorities/v1",
+  "protocolCommit" : "abf2aba070a70f1ac48ab066d134195c9182af9c",
+  "trainingHash" : "sha256:c787648c1ee2f5d7e6f8c65d10ee2048701b17d1b67e6a80bc201f24dd43ad53",
+  "witnessPriorities" : {
+    "ADD_LEFT" : [ "SUBTRACT_B_A", "ZERO", "B", "ADD", "SUBTRACT_A_B", "MULTIPLY" ],
+    "SUBTRACT_LEFT" : [ "ADD", "ZERO", "B", "SUBTRACT_B_A", "SUBTRACT_A_B", "MULTIPLY" ],
+    "SUBTRACT_RIGHT" : [ "SUBTRACT_A_B", "ZERO", "B", "ADD", "SUBTRACT_B_A", "MULTIPLY" ],
+    "UNMATCHED" : [ "ZERO", "B", "ADD", "SUBTRACT_B_A", "SUBTRACT_A_B", "MULTIPLY" ]
+  },
+  "inductionBaseFirst" : true,
+  "trainingProposals" : 42,
+  "trainingCheckerCalls" : 50
+}

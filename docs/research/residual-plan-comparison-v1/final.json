@@ -1,0 +1,3984 @@
+{
+  "cases" : [ {
+    "source" : "(a^2+b^2)*(c^2+d^2)",
+    "prepared" : "(a * c) ^ 2 + (b * c) ^ 2 + (a * d) ^ 2 + (b * d) ^ 2",
+    "localEffects" : [ {
+      "id" : "plus-0-1",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(a * c) ^ 2"
+      }, {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(b * c) ^ 2"
+      } ],
+      "sourceFragment" : "(a * c) ^ 2 + (b * c) ^ 2",
+      "transformedFragment" : "(a * c + b * c) ^ 2 - 2 * a * c * b * c",
+      "structuredFragment" : "(a * c + b * c) ^ 2",
+      "residualNormalForm" : "-2*a*b*c^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:697694721124d17fd98fe6f6->syntax-v1:42468a8fded70d7d6cc00963" ]
+    }, {
+      "id" : "reflected-0-1",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(a * c) ^ 2"
+      }, {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(b * c) ^ 2"
+      } ],
+      "sourceFragment" : "(a * c) ^ 2 + (b * c) ^ 2",
+      "transformedFragment" : "(a * c + 0 - b * c) ^ 2 - 2 * a * c * (0 - b * c)",
+      "structuredFragment" : "(a * c + 0 - b * c) ^ 2",
+      "residualNormalForm" : "2*a*b*c^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:934498f40d338ca98002fba1->syntax-v1:09336646183bc1808f54a397", "complete_sum_of_two_squares:syntax-v1:72ec9866de84e81542a8e3b3->syntax-v1:5d24698132d0402e4891c605" ]
+    }, {
+      "id" : "plus-0-2",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(a * c) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(a * d) ^ 2"
+      } ],
+      "sourceFragment" : "(a * c) ^ 2 + (a * d) ^ 2",
+      "transformedFragment" : "(a * c + a * d) ^ 2 - 2 * a * c * a * d",
+      "structuredFragment" : "(a * c + a * d) ^ 2",
+      "residualNormalForm" : "-2*a^2*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:3e6bd42cf1b5c0911d79d212->syntax-v1:3600a364e115d8d5f9d9f7e5" ]
+    }, {
+      "id" : "reflected-0-2",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(a * c) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(a * d) ^ 2"
+      } ],
+      "sourceFragment" : "(a * c) ^ 2 + (a * d) ^ 2",
+      "transformedFragment" : "(a * c + 0 - a * d) ^ 2 - 2 * a * c * (0 - a * d)",
+      "structuredFragment" : "(a * c + 0 - a * d) ^ 2",
+      "residualNormalForm" : "2*a^2*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:07409bd56ce5377068c9f35b->syntax-v1:1767c5454004cec194ea9386" ]
+    }, {
+      "id" : "plus-0-3",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(a * c) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(b * d) ^ 2"
+      } ],
+      "sourceFragment" : "(a * c) ^ 2 + (b * d) ^ 2",
+      "transformedFragment" : "(a * c + b * d) ^ 2 - 2 * a * c * b * d",
+      "structuredFragment" : "(a * c + b * d) ^ 2",
+      "residualNormalForm" : "-2*a*b*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6" ]
+    }, {
+      "id" : "reflected-0-3",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(a * c) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(b * d) ^ 2"
+      } ],
+      "sourceFragment" : "(a * c) ^ 2 + (b * d) ^ 2",
+      "transformedFragment" : "(a * c + 0 - b * d) ^ 2 - 2 * a * c * (0 - b * d)",
+      "structuredFragment" : "(a * c + 0 - b * d) ^ 2",
+      "residualNormalForm" : "2*a*b*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5" ]
+    }, {
+      "id" : "plus-1-2",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(b * c) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(a * d) ^ 2"
+      } ],
+      "sourceFragment" : "(b * c) ^ 2 + (a * d) ^ 2",
+      "transformedFragment" : "(b * c + a * d) ^ 2 - 2 * b * c * a * d",
+      "structuredFragment" : "(b * c + a * d) ^ 2",
+      "residualNormalForm" : "-2*a*b*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ]
+    }, {
+      "id" : "reflected-1-2",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(b * c) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(a * d) ^ 2"
+      } ],
+      "sourceFragment" : "(b * c) ^ 2 + (a * d) ^ 2",
+      "transformedFragment" : "(b * c + 0 - a * d) ^ 2 - 2 * b * c * (0 - a * d)",
+      "structuredFragment" : "(b * c + 0 - a * d) ^ 2",
+      "residualNormalForm" : "2*a*b*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ]
+    }, {
+      "id" : "plus-1-3",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(b * c) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(b * d) ^ 2"
+      } ],
+      "sourceFragment" : "(b * c) ^ 2 + (b * d) ^ 2",
+      "transformedFragment" : "(b * c + b * d) ^ 2 - 2 * b * c * b * d",
+      "structuredFragment" : "(b * c + b * d) ^ 2",
+      "residualNormalForm" : "-2*b^2*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:ca45c7f708348c12b109ec47->syntax-v1:a984c6c90887210b9047adac" ]
+    }, {
+      "id" : "reflected-1-3",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(b * c) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(b * d) ^ 2"
+      } ],
+      "sourceFragment" : "(b * c) ^ 2 + (b * d) ^ 2",
+      "transformedFragment" : "(b * c + 0 - b * d) ^ 2 - 2 * b * c * (0 - b * d)",
+      "structuredFragment" : "(b * c + 0 - b * d) ^ 2",
+      "residualNormalForm" : "2*b^2*c*d",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:3915fb5d5c177ce7ede97cf1->syntax-v1:5eb918acff76c69b77a00839" ]
+    }, {
+      "id" : "plus-2-3",
+      "components" : [ {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(a * d) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(b * d) ^ 2"
+      } ],
+      "sourceFragment" : "(a * d) ^ 2 + (b * d) ^ 2",
+      "transformedFragment" : "(a * d + b * d) ^ 2 - 2 * a * d * b * d",
+      "structuredFragment" : "(a * d + b * d) ^ 2",
+      "residualNormalForm" : "-2*a*b*d^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:12f5c826b8d905a5d93812af->syntax-v1:c0e554013a81055c0a3b47f4" ]
+    }, {
+      "id" : "reflected-2-3",
+      "components" : [ {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(a * d) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(b * d) ^ 2"
+      } ],
+      "sourceFragment" : "(a * d) ^ 2 + (b * d) ^ 2",
+      "transformedFragment" : "(a * d + 0 - b * d) ^ 2 - 2 * a * d * (0 - b * d)",
+      "structuredFragment" : "(a * d + 0 - b * d) ^ 2",
+      "residualNormalForm" : "2*a*b*d^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:dca373c87016c6f4f0ad8c53->syntax-v1:a96b3e2a9efa5b8314fa1d27" ]
+    } ],
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "COMPLETE",
+      "work" : 6033,
+      "prepareWork" : 3907,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035",
+        "expression" : "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6", "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce",
+        "expression" : "(a * c + 0 - b * d) ^ 2 + (b * c + a * d) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5", "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:a4b2f4740e14d3df536edbc82c158565b23230bafcfe2b622ad34394347163ea"
+    }, {
+      "arm" : "FIXED",
+      "status" : "COMPLETE",
+      "work" : 12005,
+      "prepareWork" : 3907,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035",
+        "expression" : "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6", "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce",
+        "expression" : "(a * c + 0 - b * d) ^ 2 + (b * c + a * d) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5", "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:a4b2f4740e14d3df536edbc82c158565b23230bafcfe2b622ad34394347163ea"
+    }, {
+      "arm" : "RANDOM",
+      "status" : "COMPLETE",
+      "work" : 12017,
+      "prepareWork" : 3907,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035",
+        "expression" : "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6", "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce",
+        "expression" : "(a * c + 0 - b * d) ^ 2 + (b * c + a * d) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5", "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:a4b2f4740e14d3df536edbc82c158565b23230bafcfe2b622ad34394347163ea"
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "COMPLETE",
+      "work" : 36185,
+      "prepareWork" : 3907,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035",
+        "expression" : "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6", "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce",
+        "expression" : "(a * c + 0 - b * d) ^ 2 + (b * c + a * d) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5", "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:a4b2f4740e14d3df536edbc82c158565b23230bafcfe2b622ad34394347163ea"
+    }, {
+      "arm" : "HAND",
+      "status" : "COMPLETE",
+      "work" : 6033,
+      "prepareWork" : 3907,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035",
+        "expression" : "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6", "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce",
+        "expression" : "(a * c + 0 - b * d) ^ 2 + (b * c + a * d) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5", "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:a4b2f4740e14d3df536edbc82c158565b23230bafcfe2b622ad34394347163ea"
+    }, {
+      "arm" : "ALL_AT_ONCE",
+      "status" : "COMPLETE",
+      "work" : 8284,
+      "prepareWork" : 3907,
+      "decisions" : [ {
+        "pair" : "native-composition-enumeration",
+        "status" : "NATIVE_BATCH"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035",
+        "expression" : "(a * c + b * d) ^ 2 + (b * c + 0 - a * d) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:9b49e0c22bca42ba09663804->syntax-v1:5bc7171ec163290f60ac39b6", "square_base_sign_symmetry:syntax-v1:34e60604861eb65167f2e9ba->syntax-v1:dbc642554915c750cffe3585", "complete_sum_of_two_squares:syntax-v1:6ff17152b888d6b4d1aa636b->syntax-v1:d1f9d52ec8f6bc35dda4fa5f" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce",
+        "expression" : "(a * c + 0 - b * d) ^ 2 + (b * c + a * d) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:34a0c994a2d489024ca4b773->syntax-v1:8a014fce320a76de3bd0cd72", "complete_sum_of_two_squares:syntax-v1:b5f66b613d5edf1d827ffeaa->syntax-v1:853b976208a26a1210380ee5", "complete_sum_of_two_squares:syntax-v1:6c683eb90f8d011de423e79e->syntax-v1:70fff545225612decc3d9d33" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:a4b2f4740e14d3df536edbc82c158565b23230bafcfe2b622ad34394347163ea"
+    } ]
+  }, {
+    "source" : "(4*p^2+9*q^2)*(25*r^2+49*s^2)",
+    "prepared" : "(10 * p * r) ^ 2 + (15 * q * r) ^ 2 + (14 * p * s) ^ 2 + (21 * q * s) ^ 2",
+    "localEffects" : [ {
+      "id" : "plus-0-1",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(10 * p * r) ^ 2"
+      }, {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(15 * q * r) ^ 2"
+      } ],
+      "sourceFragment" : "(10 * p * r) ^ 2 + (15 * q * r) ^ 2",
+      "transformedFragment" : "(10 * p * r + 15 * q * r) ^ 2 - 2 * 10 * p * r * 15 * q * r",
+      "structuredFragment" : "(10 * p * r + 15 * q * r) ^ 2",
+      "residualNormalForm" : "-300*p*q*r^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:212dd5a2e71c63d6467de310->syntax-v1:a9f02c55c804c3f77f3c6b69" ]
+    }, {
+      "id" : "reflected-0-1",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(10 * p * r) ^ 2"
+      }, {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(15 * q * r) ^ 2"
+      } ],
+      "sourceFragment" : "(10 * p * r) ^ 2 + (15 * q * r) ^ 2",
+      "transformedFragment" : "(10 * p * r + 0 - 15 * q * r) ^ 2 - 2 * 10 * p * r * (0 - 15 * q * r)",
+      "structuredFragment" : "(10 * p * r + 0 - 15 * q * r) ^ 2",
+      "residualNormalForm" : "300*p*q*r^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:d9fdfdc83dec5ec15aedf9bb->syntax-v1:ba22a9135462d4b551411dea", "complete_sum_of_two_squares:syntax-v1:e7158d9b051bf87012b5cca1->syntax-v1:6a9a8495362236791b408aec" ]
+    }, {
+      "id" : "plus-0-2",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(10 * p * r) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(14 * p * s) ^ 2"
+      } ],
+      "sourceFragment" : "(10 * p * r) ^ 2 + (14 * p * s) ^ 2",
+      "transformedFragment" : "(10 * p * r + 14 * p * s) ^ 2 - 2 * 10 * p * r * 14 * p * s",
+      "structuredFragment" : "(10 * p * r + 14 * p * s) ^ 2",
+      "residualNormalForm" : "-280*p^2*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:a4d1bc016692faac0d833a3c->syntax-v1:91dc180eeec584110e685e44" ]
+    }, {
+      "id" : "reflected-0-2",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(10 * p * r) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(14 * p * s) ^ 2"
+      } ],
+      "sourceFragment" : "(10 * p * r) ^ 2 + (14 * p * s) ^ 2",
+      "transformedFragment" : "(10 * p * r + 0 - 14 * p * s) ^ 2 - 2 * 10 * p * r * (0 - 14 * p * s)",
+      "structuredFragment" : "(10 * p * r + 0 - 14 * p * s) ^ 2",
+      "residualNormalForm" : "280*p^2*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:7dde7a0c389f47b22618412c->syntax-v1:926dc3e7c26045cf6b4e65fb" ]
+    }, {
+      "id" : "plus-0-3",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(10 * p * r) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(21 * q * s) ^ 2"
+      } ],
+      "sourceFragment" : "(10 * p * r) ^ 2 + (21 * q * s) ^ 2",
+      "transformedFragment" : "(10 * p * r + 21 * q * s) ^ 2 - 2 * 10 * p * r * 21 * q * s",
+      "structuredFragment" : "(10 * p * r + 21 * q * s) ^ 2",
+      "residualNormalForm" : "-420*p*q*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e" ]
+    }, {
+      "id" : "reflected-0-3",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "(10 * p * r) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(21 * q * s) ^ 2"
+      } ],
+      "sourceFragment" : "(10 * p * r) ^ 2 + (21 * q * s) ^ 2",
+      "transformedFragment" : "(10 * p * r + 0 - 21 * q * s) ^ 2 - 2 * 10 * p * r * (0 - 21 * q * s)",
+      "structuredFragment" : "(10 * p * r + 0 - 21 * q * s) ^ 2",
+      "residualNormalForm" : "420*p*q*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd" ]
+    }, {
+      "id" : "plus-1-2",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(15 * q * r) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(14 * p * s) ^ 2"
+      } ],
+      "sourceFragment" : "(15 * q * r) ^ 2 + (14 * p * s) ^ 2",
+      "transformedFragment" : "(15 * q * r + 14 * p * s) ^ 2 - 2 * 15 * q * r * 14 * p * s",
+      "structuredFragment" : "(15 * q * r + 14 * p * s) ^ 2",
+      "residualNormalForm" : "-420*p*q*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ]
+    }, {
+      "id" : "reflected-1-2",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(15 * q * r) ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(14 * p * s) ^ 2"
+      } ],
+      "sourceFragment" : "(15 * q * r) ^ 2 + (14 * p * s) ^ 2",
+      "transformedFragment" : "(15 * q * r + 0 - 14 * p * s) ^ 2 - 2 * 15 * q * r * (0 - 14 * p * s)",
+      "structuredFragment" : "(15 * q * r + 0 - 14 * p * s) ^ 2",
+      "residualNormalForm" : "420*p*q*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ]
+    }, {
+      "id" : "plus-1-3",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(15 * q * r) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(21 * q * s) ^ 2"
+      } ],
+      "sourceFragment" : "(15 * q * r) ^ 2 + (21 * q * s) ^ 2",
+      "transformedFragment" : "(15 * q * r + 21 * q * s) ^ 2 - 2 * 15 * q * r * 21 * q * s",
+      "structuredFragment" : "(15 * q * r + 21 * q * s) ^ 2",
+      "residualNormalForm" : "-630*q^2*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:239e7773241f3b40cb62b086->syntax-v1:a7a302a40e0c68f03b6d9480" ]
+    }, {
+      "id" : "reflected-1-3",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "(15 * q * r) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(21 * q * s) ^ 2"
+      } ],
+      "sourceFragment" : "(15 * q * r) ^ 2 + (21 * q * s) ^ 2",
+      "transformedFragment" : "(15 * q * r + 0 - 21 * q * s) ^ 2 - 2 * 15 * q * r * (0 - 21 * q * s)",
+      "structuredFragment" : "(15 * q * r + 0 - 21 * q * s) ^ 2",
+      "residualNormalForm" : "630*q^2*r*s",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:5b58e4907ee8d84fb907c03a->syntax-v1:f907ffae7a2320d9b6942ea4" ]
+    }, {
+      "id" : "plus-2-3",
+      "components" : [ {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(14 * p * s) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(21 * q * s) ^ 2"
+      } ],
+      "sourceFragment" : "(14 * p * s) ^ 2 + (21 * q * s) ^ 2",
+      "transformedFragment" : "(14 * p * s + 21 * q * s) ^ 2 - 2 * 14 * p * s * 21 * q * s",
+      "structuredFragment" : "(14 * p * s + 21 * q * s) ^ 2",
+      "residualNormalForm" : "-588*p*q*s^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:5a5c657c296dc99e8b97e748->syntax-v1:a5b681064d72da42d5e74c80" ]
+    }, {
+      "id" : "reflected-2-3",
+      "components" : [ {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "(14 * p * s) ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "(21 * q * s) ^ 2"
+      } ],
+      "sourceFragment" : "(14 * p * s) ^ 2 + (21 * q * s) ^ 2",
+      "transformedFragment" : "(14 * p * s + 0 - 21 * q * s) ^ 2 - 2 * 14 * p * s * (0 - 21 * q * s)",
+      "structuredFragment" : "(14 * p * s + 0 - 21 * q * s) ^ 2",
+      "residualNormalForm" : "588*p*q*s^2",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:11682fcd2385d4e65250136b->syntax-v1:b44512d59dd6a6d323e6737e" ]
+    } ],
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "COMPLETE",
+      "work" : 7831,
+      "prepareWork" : 5225,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:10d36cafacf07fcb9fe405b53ff84940a7464ee51cf32c0564742d8636071299",
+        "expression" : "(10 * p * r + 0 - 21 * q * s) ^ 2 + (15 * q * r + 14 * p * s) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd", "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:2fafdeee685c2e8093c3527526b17c1ae23f2db67739c99f6171d3ef33d8e604",
+        "expression" : "(10 * p * r + 21 * q * s) ^ 2 + (15 * q * r + 0 - 14 * p * s) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e", "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:71aebe667bc869c9c97302f241c699bca73db99bcc71ddcc2f21035e2fd99d8b"
+    }, {
+      "arm" : "FIXED",
+      "status" : "COMPLETE",
+      "work" : 15603,
+      "prepareWork" : 5225,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:10d36cafacf07fcb9fe405b53ff84940a7464ee51cf32c0564742d8636071299",
+        "expression" : "(10 * p * r + 0 - 21 * q * s) ^ 2 + (15 * q * r + 14 * p * s) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd", "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:2fafdeee685c2e8093c3527526b17c1ae23f2db67739c99f6171d3ef33d8e604",
+        "expression" : "(10 * p * r + 21 * q * s) ^ 2 + (15 * q * r + 0 - 14 * p * s) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e", "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:71aebe667bc869c9c97302f241c699bca73db99bcc71ddcc2f21035e2fd99d8b"
+    }, {
+      "arm" : "RANDOM",
+      "status" : "COMPLETE",
+      "work" : 15615,
+      "prepareWork" : 5225,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:10d36cafacf07fcb9fe405b53ff84940a7464ee51cf32c0564742d8636071299",
+        "expression" : "(10 * p * r + 0 - 21 * q * s) ^ 2 + (15 * q * r + 14 * p * s) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd", "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:2fafdeee685c2e8093c3527526b17c1ae23f2db67739c99f6171d3ef33d8e604",
+        "expression" : "(10 * p * r + 21 * q * s) ^ 2 + (15 * q * r + 0 - 14 * p * s) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e", "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:71aebe667bc869c9c97302f241c699bca73db99bcc71ddcc2f21035e2fd99d8b"
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "COMPLETE",
+      "work" : 47343,
+      "prepareWork" : 5225,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:10d36cafacf07fcb9fe405b53ff84940a7464ee51cf32c0564742d8636071299",
+        "expression" : "(10 * p * r + 0 - 21 * q * s) ^ 2 + (15 * q * r + 14 * p * s) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd", "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:2fafdeee685c2e8093c3527526b17c1ae23f2db67739c99f6171d3ef33d8e604",
+        "expression" : "(10 * p * r + 21 * q * s) ^ 2 + (15 * q * r + 0 - 14 * p * s) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e", "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:71aebe667bc869c9c97302f241c699bca73db99bcc71ddcc2f21035e2fd99d8b"
+    }, {
+      "arm" : "HAND",
+      "status" : "COMPLETE",
+      "work" : 7831,
+      "prepareWork" : 5225,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_ACCEPTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:10d36cafacf07fcb9fe405b53ff84940a7464ee51cf32c0564742d8636071299",
+        "expression" : "(10 * p * r + 0 - 21 * q * s) ^ 2 + (15 * q * r + 14 * p * s) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd", "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:2fafdeee685c2e8093c3527526b17c1ae23f2db67739c99f6171d3ef33d8e604",
+        "expression" : "(10 * p * r + 21 * q * s) ^ 2 + (15 * q * r + 0 - 14 * p * s) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e", "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:71aebe667bc869c9c97302f241c699bca73db99bcc71ddcc2f21035e2fd99d8b"
+    }, {
+      "arm" : "ALL_AT_ONCE",
+      "status" : "COMPLETE",
+      "work" : 10742,
+      "prepareWork" : 5225,
+      "decisions" : [ {
+        "pair" : "native-composition-enumeration",
+        "status" : "NATIVE_BATCH"
+      } ],
+      "candidates" : [ {
+        "root" : "sha256:10d36cafacf07fcb9fe405b53ff84940a7464ee51cf32c0564742d8636071299",
+        "expression" : "(10 * p * r + 0 - 21 * q * s) ^ 2 + (15 * q * r + 14 * p * s) ^ 2",
+        "effects" : [ "plus-1-2", "reflected-0-3" ],
+        "primitiveRules" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares", "complete_sum_of_two_squares" ],
+        "applications" : [ "square_base_sign_symmetry:syntax-v1:c1e06657824ab8b2d90bff74->syntax-v1:cbed7270401fa998310cac46", "complete_sum_of_two_squares:syntax-v1:bea15405b53406b1da5c049d->syntax-v1:af61a818218ff71f201843bd", "complete_sum_of_two_squares:syntax-v1:6b93f5921937ace2faac7886->syntax-v1:4792f5df1c1700b13fd7bfad" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      }, {
+        "root" : "sha256:2fafdeee685c2e8093c3527526b17c1ae23f2db67739c99f6171d3ef33d8e604",
+        "expression" : "(10 * p * r + 21 * q * s) ^ 2 + (15 * q * r + 0 - 14 * p * s) ^ 2",
+        "effects" : [ "plus-0-3", "reflected-1-2" ],
+        "primitiveRules" : [ "complete_sum_of_two_squares", "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+        "applications" : [ "complete_sum_of_two_squares:syntax-v1:b936cfde93876b05b4dafb4d->syntax-v1:5beab590814cdfb17e49251e", "square_base_sign_symmetry:syntax-v1:905dc87494e31d0b359a0807->syntax-v1:6a6e726325fdf55374a426fb", "complete_sum_of_two_squares:syntax-v1:3d7b6806a7e19971e3d2a02c->syntax-v1:9e2604644b24cdb1ece95384" ],
+        "assumptions" : [ ],
+        "residual" : "0"
+      } ],
+      "candidateFreeze" : "sha256:71aebe667bc869c9c97302f241c699bca73db99bcc71ddcc2f21035e2fd99d8b"
+    } ]
+  }, {
+    "source" : "j^2+k^2+l^2+m^2",
+    "prepared" : "j^2 + k^2 + l^2 + m^2",
+    "localEffects" : [ {
+      "id" : "plus-0-1",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "j ^ 2"
+      }, {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "k ^ 2"
+      } ],
+      "sourceFragment" : "j ^ 2 + k ^ 2",
+      "transformedFragment" : "(j + k) ^ 2 - 2 * j * k",
+      "structuredFragment" : "(j + k) ^ 2",
+      "residualNormalForm" : "-2*j*k",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:67652fd697cb8f699e4bb385->syntax-v1:398af807eb43299d75b1c716" ]
+    }, {
+      "id" : "reflected-0-1",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "j ^ 2"
+      }, {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "k ^ 2"
+      } ],
+      "sourceFragment" : "j ^ 2 + k ^ 2",
+      "transformedFragment" : "(j + 0 - k) ^ 2 - 2 * j * (0 - k)",
+      "structuredFragment" : "(j + 0 - k) ^ 2",
+      "residualNormalForm" : "2*j*k",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:f6de9d0967f1c0f53bd01290->syntax-v1:9eecf945451239881fecdad6", "complete_sum_of_two_squares:syntax-v1:b2c7e5468f7c624094b06bec->syntax-v1:7e91d02a5f952959a52c01f2" ]
+    }, {
+      "id" : "plus-0-2",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "j ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "l ^ 2"
+      } ],
+      "sourceFragment" : "j ^ 2 + l ^ 2",
+      "transformedFragment" : "(j + l) ^ 2 - 2 * j * l",
+      "structuredFragment" : "(j + l) ^ 2",
+      "residualNormalForm" : "-2*j*l",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:2315fe12dc521dbf4d0b5c0a->syntax-v1:5f6b0f24fa47ff6b49de50df" ]
+    }, {
+      "id" : "reflected-0-2",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "j ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "l ^ 2"
+      } ],
+      "sourceFragment" : "j ^ 2 + l ^ 2",
+      "transformedFragment" : "(j + 0 - l) ^ 2 - 2 * j * (0 - l)",
+      "structuredFragment" : "(j + 0 - l) ^ 2",
+      "residualNormalForm" : "2*j*l",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:f50fb6b6144f399d999ecdcb->syntax-v1:bbf801d577f3d0524470dc6b", "complete_sum_of_two_squares:syntax-v1:b8848e44bb379f025ed93e46->syntax-v1:12e49bf9cabce33e30501788" ]
+    }, {
+      "id" : "plus-0-3",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "j ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "m ^ 2"
+      } ],
+      "sourceFragment" : "j ^ 2 + m ^ 2",
+      "transformedFragment" : "(j + m) ^ 2 - 2 * j * m",
+      "structuredFragment" : "(j + m) ^ 2",
+      "residualNormalForm" : "-2*j*m",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:14117a23d28b45cbe13a657a->syntax-v1:3852ef8927505666bab5643b" ]
+    }, {
+      "id" : "reflected-0-3",
+      "components" : [ {
+        "id" : "term-00",
+        "occurrenceKey" : "additive-term-v1:00",
+        "expression" : "j ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "m ^ 2"
+      } ],
+      "sourceFragment" : "j ^ 2 + m ^ 2",
+      "transformedFragment" : "(j + 0 - m) ^ 2 - 2 * j * (0 - m)",
+      "structuredFragment" : "(j + 0 - m) ^ 2",
+      "residualNormalForm" : "2*j*m",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:56499f1720fb732a61e86ce3->syntax-v1:0317749cbbdba4b11cd1c7fa", "complete_sum_of_two_squares:syntax-v1:977fa99bdd392c4441cf2adf->syntax-v1:c517f38fe891ba8a83fd1404" ]
+    }, {
+      "id" : "plus-1-2",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "k ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "l ^ 2"
+      } ],
+      "sourceFragment" : "k ^ 2 + l ^ 2",
+      "transformedFragment" : "(k + l) ^ 2 - 2 * k * l",
+      "structuredFragment" : "(k + l) ^ 2",
+      "residualNormalForm" : "-2*k*l",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:63b168ab62d5c62c0602e2ad->syntax-v1:52ece04b9af274500ca2bc94" ]
+    }, {
+      "id" : "reflected-1-2",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "k ^ 2"
+      }, {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "l ^ 2"
+      } ],
+      "sourceFragment" : "k ^ 2 + l ^ 2",
+      "transformedFragment" : "(k + 0 - l) ^ 2 - 2 * k * (0 - l)",
+      "structuredFragment" : "(k + 0 - l) ^ 2",
+      "residualNormalForm" : "2*k*l",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:f50fb6b6144f399d999ecdcb->syntax-v1:bbf801d577f3d0524470dc6b", "complete_sum_of_two_squares:syntax-v1:1d64ca361f14d625e31c94d4->syntax-v1:6af7709b5425e21305c92229" ]
+    }, {
+      "id" : "plus-1-3",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "k ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "m ^ 2"
+      } ],
+      "sourceFragment" : "k ^ 2 + m ^ 2",
+      "transformedFragment" : "(k + m) ^ 2 - 2 * k * m",
+      "structuredFragment" : "(k + m) ^ 2",
+      "residualNormalForm" : "-2*k*m",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:12ac8f28fb7a2834378043d9->syntax-v1:f04a2fcef26397cac1925528" ]
+    }, {
+      "id" : "reflected-1-3",
+      "components" : [ {
+        "id" : "term-01",
+        "occurrenceKey" : "additive-term-v1:01",
+        "expression" : "k ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "m ^ 2"
+      } ],
+      "sourceFragment" : "k ^ 2 + m ^ 2",
+      "transformedFragment" : "(k + 0 - m) ^ 2 - 2 * k * (0 - m)",
+      "structuredFragment" : "(k + 0 - m) ^ 2",
+      "residualNormalForm" : "2*k*m",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:56499f1720fb732a61e86ce3->syntax-v1:0317749cbbdba4b11cd1c7fa", "complete_sum_of_two_squares:syntax-v1:813883820e824256caf04628->syntax-v1:0ea6563b58c9b25b819e8a12" ]
+    }, {
+      "id" : "plus-2-3",
+      "components" : [ {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "l ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "m ^ 2"
+      } ],
+      "sourceFragment" : "l ^ 2 + m ^ 2",
+      "transformedFragment" : "(l + m) ^ 2 - 2 * l * m",
+      "structuredFragment" : "(l + m) ^ 2",
+      "residualNormalForm" : "-2*l*m",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "complete_sum_of_two_squares:syntax-v1:ce30662ab20deb1f8bdcb024->syntax-v1:19f8c39241eebca8ab3b7eb3" ]
+    }, {
+      "id" : "reflected-2-3",
+      "components" : [ {
+        "id" : "term-02",
+        "occurrenceKey" : "additive-term-v1:02",
+        "expression" : "l ^ 2"
+      }, {
+        "id" : "term-03",
+        "occurrenceKey" : "additive-term-v1:03",
+        "expression" : "m ^ 2"
+      } ],
+      "sourceFragment" : "l ^ 2 + m ^ 2",
+      "transformedFragment" : "(l + 0 - m) ^ 2 - 2 * l * (0 - m)",
+      "structuredFragment" : "(l + 0 - m) ^ 2",
+      "residualNormalForm" : "2*l*m",
+      "assumptions" : [ ],
+      "primitiveRuleIds" : [ "square_base_sign_symmetry", "complete_sum_of_two_squares" ],
+      "applicationKeys" : [ "square_base_sign_symmetry:syntax-v1:56499f1720fb732a61e86ce3->syntax-v1:0317749cbbdba4b11cd1c7fa", "complete_sum_of_two_squares:syntax-v1:4cf03b33f80209de11c9317d->syntax-v1:b4b70eb0fb4bb8b52380ee97" ]
+    } ],
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "COMPLETE",
+      "work" : 2200,
+      "prepareWork" : 1864,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ ],
+      "candidateFreeze" : "sha256:c0552e03265b0ce615ee97e24886066415377a7fe5acf7ac41da7741aad83f14"
+    }, {
+      "arm" : "FIXED",
+      "status" : "COMPLETE",
+      "work" : 7132,
+      "prepareWork" : 1864,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ ],
+      "candidateFreeze" : "sha256:c0552e03265b0ce615ee97e24886066415377a7fe5acf7ac41da7741aad83f14"
+    }, {
+      "arm" : "RANDOM",
+      "status" : "COMPLETE",
+      "work" : 7144,
+      "prepareWork" : 1864,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      } ],
+      "candidates" : [ ],
+      "candidateFreeze" : "sha256:c0552e03265b0ce615ee97e24886066415377a7fe5acf7ac41da7741aad83f14"
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "COMPLETE",
+      "work" : 23752,
+      "prepareWork" : 1864,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "EXACT_REJECTED"
+      } ],
+      "candidates" : [ ],
+      "candidateFreeze" : "sha256:c0552e03265b0ce615ee97e24886066415377a7fe5acf7ac41da7741aad83f14"
+    }, {
+      "arm" : "HAND",
+      "status" : "COMPLETE",
+      "work" : 2200,
+      "prepareWork" : 1864,
+      "decisions" : [ {
+        "pair" : "plus-0-1|plus-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|plus-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-1",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "plus-2-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-1|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-0-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-2",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-0-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-1-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-2|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      }, {
+        "pair" : "reflected-1-3|reflected-2-3",
+        "status" : "SELECTOR_REJECTED"
+      } ],
+      "candidates" : [ ],
+      "candidateFreeze" : "sha256:c0552e03265b0ce615ee97e24886066415377a7fe5acf7ac41da7741aad83f14"
+    }, {
+      "arm" : "ALL_AT_ONCE",
+      "status" : "COMPLETE",
+      "work" : 4551,
+      "prepareWork" : 1864,
+      "decisions" : [ {
+        "pair" : "native-composition-enumeration",
+        "status" : "NATIVE_BATCH"
+      } ],
+      "candidates" : [ ],
+      "candidateFreeze" : "sha256:c0552e03265b0ce615ee97e24886066415377a7fe5acf7ac41da7741aad83f14"
+    } ]
+  } ],
+  "chargeTrainingOnceToLearned" : 366347,
+  "plan" : "sha256:bc717029c4e1dbbd555d3628a8bc915051f8b7b2506c30feb0fc11d7fe543357",
+  "split" : "final"
+}
