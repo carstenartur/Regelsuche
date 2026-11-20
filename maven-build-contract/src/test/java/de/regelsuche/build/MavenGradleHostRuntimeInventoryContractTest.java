@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
  */
 class MavenGradleHostRuntimeInventoryContractTest {
   private static final Pattern HOST_RUNTIME = Pattern.compile(
-      "(?i)\\b(?:python\\d*(?:\\.\\d+)?|pip\\d*|node|npm|npx|perl|ruby|"
+      "(?i)\\b(?:python\\d*(?:\\.\\d+)?|pypy\\d*(?:\\.\\d+)?|pip\\d*|pipx|uvx?|node|npm|npx|pnpm|yarn|corepack|deno|bun|perl|ruby|"
           + "powershell|pwsh|gradlew|schema_python|pilot_python|python_executable)\\b");
 
   // Exact lines from the authoritative gradle/*.sh scripts on main bc05c85c8976287f82b4a2eb99bcfdf38ebb6863.
@@ -235,11 +235,44 @@ class MavenGradleHostRuntimeInventoryContractTest {
         "exec ./gradlew test",
         "pilot_python=/tmp/venv/bin/python",
         "pilot_python=\\${HOST_RUNTIME:-python3}",
-        "pwsh -File build.ps1")) {
+        "pwsh -File build.ps1",
+        "pypy3 -m unittest tests",
+        "uv run python -m unittest tests",
+        "uvx my-test-runner",
+        "pipx run check-package",
+        "pnpm test",
+        "yarn test",
+        "corepack pnpm test",
+        "bun run test",
+        "deno test")) {
       assertThrows(AssertionError.class,
           () -> rejectNewRuntimeLines("new-authority.sh", "#!/bin/bash\n" + command + "\n"),
           "new runtime must not be silently authorized: " + command);
     }
+  }
+
+  @Test
+  void executableShebangsCannotSmuggleUnapprovedHostRuntimes() {
+    for (String shebang : List.of(
+        "#!/usr/bin/env python3",
+        "#!/usr/bin/python3",
+        "#!/usr/bin/env node",
+        "#!/usr/bin/env -S uv run python",
+        "#!/usr/bin/env pypy3",
+        "#!/usr/bin/env bun")) {
+      String script = shebang + "\n" + "echo fixture\n";
+      assertThrows(AssertionError.class,
+          () -> rejectNewRuntimeLines("scripts/new-verification.sh", script,
+              RETAINED_SCRIPT_WRAPPER_LINES), shebang);
+      assertThrows(AssertionError.class,
+          () -> rejectNewRuntimeLines("new-authority.sh", script), shebang);
+    }
+    // Ordinary shell shebangs and non-executable comments stay permitted.
+    rejectNewRuntimeLines("scripts/new-verification.sh",
+        "#!/usr/bin/env bash\n# python3 -m do_not_execute\necho fixture\n",
+        RETAINED_SCRIPT_WRAPPER_LINES);
+    rejectNewRuntimeLines("new-authority.sh",
+        "#!/bin/sh\n# node do_not_execute.js\necho fixture\n");
   }
 
   @Test
@@ -264,7 +297,8 @@ class MavenGradleHostRuntimeInventoryContractTest {
         retainedLegacyLines.getOrDefault(script, List.of()));
     for (String original : contents.split("\\R")) {
       String line = original.strip();
-      if (line.isEmpty() || line.startsWith("#") || !HOST_RUNTIME.matcher(line).find()) {
+      if (line.isEmpty() || (line.startsWith("#") && !line.startsWith("#!"))
+          || !HOST_RUNTIME.matcher(line).find()) {
         continue;
       }
       assertTrue(remaining.remove(line),
