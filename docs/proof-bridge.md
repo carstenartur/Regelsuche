@@ -328,3 +328,60 @@ positive control trains on summability of the sum of two summable sequences
 and targets a doubled sequence with one premise. Removing that premise is the
 negative control. This public transfer control makes no speed or blinded
 generalization claim.
+
+#### Quantified witness and induction plans
+
+`ExistentialIntroduction.Statement.toScopedObligation()` exports an existing
+witness goal, all its outer parameters and its structured premises for a fresh
+formal check. The existing polynomial or assumption leaf remains available for
+independent replay. The scoped export of an alpha-renamed witness is identical.
+
+`NaturalInduction.discover(context)` enumerates at most 128 declared natural
+predicates from the context. For a predicate `P : Nat → Prop` it matches
+two distinct premise leaves, `P 0` and `∀ n, P n → P (n+1)`. The endpoint
+of the context is never read during formation. Each returned plan carries the
+two exact premise IDs and its reconstructed conclusion `∀ n, P n`. The
+renderer chooses the matching plan only for that recipient statement. Lean
+checks the generated application of `Nat.rec` to its explicit motive and the
+two named hypotheses. The independent statement reconstruction and imported
+dependency/axiom audit also run here. This inference covers the primitive
+natural-number rule with supplied base and step. Synthesizing those premises
+or proving arbitrary well-founded recursive calls requires additional rules.
+
+### Bounded logical discovery and exact DAG replay
+
+`ScopedLogicDiscoveryDomain` implements the standard
+`DiscoveryDomain<State, ScopedProofDag, Certificate>` interface. Its seed
+payload is the canonical JSON of a v2 solver obligation. Formation inspects
+the declarations and premises, generates conclusions, and binds each proposed
+DAG to a new exact obligation. A comparison with a chosen endpoint can occur
+after formation. The domain accepts up to 32 declarations, 32 premises and
+65,536 formation units. It follows up to four rounds of implication chaining.
+The formation ledger counts its declared source inspections and graph work.
+
+The public finite grammar uses lexical local slots and topologically ordered
+children. It supports assumption references, implication and universal
+introduction, application, specialization, cuts, local definitions and
+unfolding, existential witnesses, conjunction, disjunction elimination,
+classical contradiction, equality substitution, natural induction, strong
+natural induction, normalization and checked leaf solving. A recursive use of
+the strong induction hypothesis takes both the proposed argument and its
+strict-decrease proof. The kernel checks the argument, comparison direction,
+scope and motive. An explicit hand-constructed DAG and a source-generated DAG
+enter the same receiving boundary. The source generator currently constructs
+modus ponens, universal specialization, cases, equality substitution,
+double-negation elimination, witnesses and the two natural induction forms.
+The graph allows up to 128 distinct nodes, 512 expanded visits and 64 locals.
+
+`new DomainDiscoveryRunner().run(campaignId, domain, seed, budget)` explores
+the source proposals. Its finite countermodel service evaluates constant
+propositional and natural-predicate interpretations. It records partial
+interpretations and only reports a refutation for a genuine assignment
+satisfying all premises and falsifying the goal. The evaluator uses two
+separately provisioned pinned Lean projects. The first checks the generated
+proof term. The second reads the retained canonical DAG, regenerates that
+term, reconstructs the expected theorem type independently and audits the
+compiled proof. Both receipts must exist before the domain emits a
+certificate. `lean.using(dag).executeWithEvidence(dag.obligation())` exposes
+the first receiver directly. Scope checks, candidate formation and finite
+model searches carry no proof confirmation on their own.

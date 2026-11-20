@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.net.URI;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -37,29 +39,51 @@ final class PinnedOsvScanner {
         } else {
             binary = checked(root, Path.of("build/tools/osv-scanner/" + text(manifest, "sha256").substring(7)
                 + "/osv-scanner"));
-            if (!Files.exists(binary)) download(root, manifest, binary, Duration.ofSeconds(120));
+            if (!Files.exists(binary)) {
+                JsonNode release = read(boundFile(root, manifest.path("release")));
+                download(root, manifest, binary, Duration.ofSeconds(120), assetApi(manifest, release));
+            }
         }
         verifyBinary(manifest, binary);
         require(Files.isExecutable(binary), "pinned scanner is not executable");
         return binary;
     }
 
-    static void download(Path root, JsonNode manifest, Path binary, Duration timeout) throws Exception {
+    static URI assetApi(JsonNode manifest, JsonNode release) {
+        List<JsonNode> matches = new ArrayList<>();
+        for (var asset : array(release, "assets")) {
+            if (text(asset, "browser_download_url").equals(text(manifest, "url"))
+                    && text(asset, "digest").equals(text(manifest, "sha256"))
+                    && integer(asset, "size") == integer(manifest, "bytes")) matches.add(asset);
+        }
+        require(matches.size() == 1 && integer(matches.getFirst(), "id") > 0, "release must bind exactly one scanner asset ID");
+        return URI.create("https://api.github.com/repos/google/osv-scanner/releases/assets/" + integer(matches.getFirst(), "id"));
+    }
+
+    static void download(Path root, JsonNode manifest, Path binary, Duration timeout, URI assetApi) throws Exception {
         Files.createDirectories(binary.getParent());
         Path temporary = Files.createTempFile(binary.getParent(), "download-", ".tmp");
-        try (HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30))
-                .followRedirects(HttpClient.Redirect.NORMAL).build()) {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(text(manifest, "url")))
-                .timeout(timeout).GET().build();
-            // The future completes only after the body has been written. An InputStream body handler
-            // would finish at the response headers and leave a stalled body outside the deadline.
-            var pending = client.sendAsync(request, responseInfo -> HttpResponse.BodySubscribers.limiting(
-                HttpResponse.BodySubscribers.ofFile(temporary), integer(manifest, "bytes")));
+        long deadline = System.nanoTime() + timeout.toNanos();
+        URI browser = URI.create(text(manifest, "url"));
+        var builder = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).followRedirects(HttpClient.Redirect.NORMAL);
+        String proxy = System.getenv("HTTPS_PROXY");
+        if ("https".equals(browser.getScheme()) && System.getProperty("https.proxyHost") == null && proxy != null && !proxy.isBlank()) {
+            URI route = URI.create(proxy);
+            if ("http".equals(route.getScheme()) && route.getHost() != null && route.getUserInfo() == null) {
+                builder.proxy(ProxySelector.of(new InetSocketAddress(route.getHost(), route.getPort() > 0 ? route.getPort() : 80)));
+            }
+        }
+        try (HttpClient client = builder.build()) {
             try {
-                HttpResponse<Path> response = pending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
-                require(response.statusCode() == 200, "official scanner download failed: HTTP " + response.statusCode());
-            } finally {
-                if (!pending.isDone()) pending.cancel(true);
+                fetch(client, browser, temporary, false, integer(manifest, "bytes"), deadline);
+            } catch (IOException | java.util.concurrent.ExecutionException unavailable) {
+                if (assetApi == null) throw unavailable;
+                try {
+                    fetch(client, assetApi, temporary, true, integer(manifest, "bytes"), deadline);
+                } catch (Exception fallbackFailure) {
+                    fallbackFailure.addSuppressed(unavailable);
+                    throw fallbackFailure;
+                }
             }
             verifyBinary(manifest, temporary);
             require(temporary.toFile().setExecutable(true, true), "cannot set scanner executable permission");
@@ -67,6 +91,23 @@ final class PinnedOsvScanner {
             Files.move(temporary, binary, StandardCopyOption.ATOMIC_MOVE);
         } finally {
             Files.deleteIfExists(temporary);
+        }
+    }
+
+    private static void fetch(HttpClient client, URI uri, Path temporary, boolean api, long size, long deadline) throws Exception {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) throw new java.util.concurrent.TimeoutException("scanner download deadline exceeded");
+        var request = HttpRequest.newBuilder(uri).timeout(Duration.ofNanos(remaining)).GET();
+        if (api) request.header("Accept", "application/octet-stream");
+        // Wait for the complete body under the shared deadline, including error bodies.
+        var pending = client.sendAsync(request.build(), info -> HttpResponse.BodySubscribers.limiting(
+            HttpResponse.BodySubscribers.ofFile(temporary, java.nio.file.StandardOpenOption.WRITE,
+                java.nio.file.StandardOpenOption.TRUNCATE_EXISTING), size));
+        try {
+            HttpResponse<Path> result = pending.get(remaining, TimeUnit.NANOSECONDS);
+            if (result.statusCode() != 200) throw new IOException("official scanner download failed: HTTP " + result.statusCode());
+        } finally {
+            if (!pending.isDone()) pending.cancel(true);
         }
     }
 

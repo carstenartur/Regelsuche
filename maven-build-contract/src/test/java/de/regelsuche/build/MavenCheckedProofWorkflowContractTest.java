@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /** Real prover checks must be an enforced part of the existing CI, not a third workflow. */
@@ -27,8 +29,6 @@ class MavenCheckedProofWorkflowContractTest {
         assertTrue(proof.isObject(), "missing checked-proofs authority");
         assertEquals("github.event_name != 'create'", proof.path("if").asText());
         assertFalse(proof.has("continue-on-error"));
-        assertEquals("true", proof.path("env").path("REGELSUCHE_REAL_LEAN").asText());
-        assertTrue(proof.path("env").path("REGELSUCHE_LEAN_PROJECT").asText().endsWith("/.ci/lean-proof"));
         List<String> commands = new ArrayList<>();
         boolean retained = false;
         for (JsonNode step : proof.path("steps")) {
@@ -41,21 +41,30 @@ class MavenCheckedProofWorkflowContractTest {
             }
             if (step.path("uses").asText().startsWith("actions/upload-artifact@")) {
                 assertTrue(step.path("if").asText().contains("always()"));
-                assertTrue(step.path("with").path("path").asText().contains("app/target/checked-proof/"));
-                assertTrue(step.path("with").path("include-hidden-files").asBoolean());
+                JsonNode artifact = step.required("with");
+                assertEquals("checked-proof-evidence-${{ github.run_id }}-${{ github.run_attempt }}", artifact.required("name").asText());
+                for (String path : List.of("/tmp/checked-proof-source.zip",
+                        "regelsuche-proof-tests/target/reports/checked-proof/**", "regelsuche-proof-tests/target/failsafe-reports/**"))
+                    assertTrue(artifact.required("path").asText().contains(path), path);
+                assertEquals("error", artifact.required("if-no-files-found").asText());
+                assertTrue(artifact.required("include-hidden-files").asBoolean());
                 retained = true;
             }
         }
         assertTrue(retained, "full evidence must survive failed runs");
-        String commandsText = String.join("\n", commands);
-        assertTrue(commandsText.contains("lake env lean --version"));
-        assertTrue(commandsText.contains("lake exe cache get"));
-        for (String test : List.of("CheckedLeanProofTest", "CheckedLeanRealTest", "CheckedProofBridgeRealTest",
-                "ProofCacheAdmissionTest", "ProofJobSchedulerTest", "Z3SmtSolverBackendTest"))
-            assertTrue(commandsText.contains(test), test);
-        assertTrue(commandsText.contains("mvn -B -pl app -am"));
-        assertFalse(commandsText.contains("-DskipTests"));
-        assertFalse(commandsText.contains("|| true"));
+        assertEquals(List.of("git archive --format=zip --output=/tmp/checked-proof-source.zip HEAD",
+            "mvn --batch-mode --no-transfer-progress -Pchecked-proofs -pl regelsuche-proof-tests -am -DskipTests verify"), commands);
+        assertFalse(jobs.has("maven-proof-qualification"));
+        Path module = root.resolve("regelsuche-proof-tests");
+        var registered = Files.readAllLines(module.resolve("src/test/resources/checked-proof-suites.txt")).stream()
+            .map(line -> line.substring(line.lastIndexOf('.') + 1)).collect(Collectors.toSet());
+        for (String name : Set.of("CheckedLeanProofTest", "CheckedLeanRealTest", "CheckedProofBridgeTest",
+                "CheckedProofBridgeRealTest", "ProofCacheAdmissionTest", "ProofJobSchedulerTest", "LeanProofBridgeTest",
+                "SmtProofBridgeTest", "ProverExecutorAndBridgeTest", "ProofBridgeServiceTest", "ProofBridgeFormallyProvedTest",
+                "ProofWorkerTest", "ProofScriptValidatorTest", "UnifiedMathDomainWorkbenchTest", "WebWorkbenchServerTest",
+                "Z3SmtSolverBackendTest")) assertTrue(registered.contains(name), name);
+        String pom = Files.readString(module.resolve("pom.xml"));
+        assertTrue(pom.contains("<skipTests>false</skipTests><failIfNoTests>true</failIfNoTests>"));
         List<String> needs = new ArrayList<>();
         jobs.path("verification").path("needs").forEach(n -> needs.add(n.asText()));
         assertTrue(needs.contains("checked-proofs"));

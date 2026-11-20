@@ -25,6 +25,7 @@ import java.util.*;
 /** Native target-free execution evidence. Deserialization produces observations, never executable transformations. */
 public final class TargetFreeSearchExecution {
     public static final String SCHEMA = "regelsuche.target-free-search-execution/v1";
+    public static final String DOSSIER_SIZE_LIMIT = "observed execution exceeds the bounded dossier storage admission";
     public static final int MAX_BYTES = 1_048_576;
     public static final String CLAIM_BOUNDARY = "Observed native target-free search, generation occurrences and retained execution paths; "
         + "not complete closure, formal proof, recognition, novelty, salience qualification or search superiority.";
@@ -42,6 +43,11 @@ public final class TargetFreeSearchExecution {
     private TargetFreeSearchExecution() { }
 
     static RunResult run(String source, SearchHeuristic heuristic, String repositoryRevision) {
+        return run(source, heuristic, repositoryRevision, event -> { });
+    }
+
+    static RunResult run(String source, SearchHeuristic heuristic, String repositoryRevision,
+            java.util.function.Consumer<SearchEvent> observer) {
         Objects.requireNonNull(source, "source");
         requireAdmission(source, heuristic);
         var input = RepresentationDiscoveryRunInput.expression(source, List.of());
@@ -62,7 +68,10 @@ public final class TargetFreeSearchExecution {
             });
         };
         var problem = new SearchProblem(source, observed, new ExpressionScorer(), new ExpressionCanonicalizer(), heuristic)
-            .withObserver(event -> events.add(Event.capture(event)));
+            .withObserver(event -> {
+                observer.accept(event);
+                events.add(Event.capture(event));
+            });
         var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         var states = new ArrayList<State>();
         var stateByPath = new HashMap<List<Transformation>, String>();
@@ -89,7 +98,7 @@ public final class TargetFreeSearchExecution {
             states, transitions, generations, events, work, "NOT_EVALUATED", RECORDING_OVERHEAD, CLAIM_BOUNDARY);
         var artifact = new Artifact(content, sha256(canonical(content)));
         if (artifact.toCanonicalJson().getBytes(StandardCharsets.UTF_8).length > MAX_BYTES) {
-            throw new IllegalArgumentException("observed execution exceeds the bounded dossier storage admission");
+            throw new IllegalArgumentException(DOSSIER_SIZE_LIMIT);
         }
         return new RunResult(result, artifact, workspace(artifact));
     }
@@ -103,6 +112,9 @@ public final class TargetFreeSearchExecution {
             this.artifact = Objects.requireNonNull(artifact);
             this.workspace = Objects.requireNonNull(workspace);
             requireBound(workspace, artifact);
+        }
+        public void retain(java.nio.file.Path directory) throws IOException {
+            TargetFreeSearchArtifactStore.retainRun(directory, workspace, artifact.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
         }
         public GoalSearchResult searchResult() { return searchResult; }
         public Artifact artifact() { return artifact; }

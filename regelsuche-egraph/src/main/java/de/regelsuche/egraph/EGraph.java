@@ -7,6 +7,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.value.ExprValueArena;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -93,6 +94,42 @@ public final class EGraph {
     }
 
     boolean usesArithmeticAc() { return arithmeticAc; }
+
+    /** Inserts a reachable compact value DAG directly into the exact scalar graph. */
+    public EClassId addArenaValue(ExprValueArena arena, ExprValueArena.ValueId root, int maxOperands) {
+        if (!arithmeticAc || maxOperands < 1) throw new IllegalArgumentException("requires exact scalar AC and a positive operand limit");
+        record Frame(ExprValueArena.ValueId id, ExprValueArena.NodeView node) { }
+        var pending = new ArrayDeque<Frame>();
+        var resolved = new HashMap<ExprValueArena.ValueId,EClassId>();
+        pending.push(new Frame(root, arena.describe(root)));
+        while (!pending.isEmpty()) {
+            Frame frame = pending.peek();
+            if (resolved.containsKey(frame.id())) { pending.pop(); continue; }
+            var operands = frame.node().operands();
+            long arity = operands.stream().mapToLong(ExprValueArena.Operand::multiplicity).sum();
+            if (arity > maxOperands) throw new IllegalArgumentException("e-node operand limit exceeded");
+            boolean complete = true;
+            for (var operand : operands) {
+                if (!resolved.containsKey(operand.value())) {
+                    pending.push(new Frame(operand.value(), arena.describe(operand.value())));
+                    complete = false;
+                }
+            }
+            if (!complete) continue;
+            var children = new ArrayList<EClassId>((int) arity);
+            for (var operand : operands) children.addAll(Collections.nCopies(operand.multiplicity(), resolved.get(operand.value())));
+            String symbol = switch (frame.node().kind()) {
+                case NUMBER -> "num:" + frame.node().atom();
+                case VARIABLE, SCOPED -> "var:" + frame.node().atom();
+                case FUNCTION -> "fn:" + frame.node().atom();
+                case ADD, MUL -> "ac:" + frame.node().kind().name();
+                case SUB, DIV, POW -> "op:" + frame.node().kind().name();
+            };
+            resolved.put(frame.id(), add(new ENode(symbol, children)));
+            pending.pop();
+        }
+        return resolved.get(root);
+    }
 
     /** Saturation-local insertion cap; restoring the previous limit is the caller's responsibility. */
     int setInsertionLimit(int limit) {

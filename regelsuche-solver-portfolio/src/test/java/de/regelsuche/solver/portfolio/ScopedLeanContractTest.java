@@ -146,6 +146,21 @@ class ScopedLeanContractTest {
         }
     }
 
+    @Test void inductionProofUsesOnlyTheNamedBaseAndSuccessorLeaves() {
+        var p = new Symbol("p");
+        var term = app("at", p, n);
+        var root = new Binder(BinderKind.FORALL, Sort.NATURAL, term);
+        var step = Predicate.holds("a_step", new Binder(BinderKind.FORALL, Sort.NATURAL,
+            app("implies", term, app("at", p, app("succ", n)))));
+        var initial = Predicate.holds("b_base", app("at", p, app("nat", zero)));
+        var request = theorem(List.of(new SymbolDeclaration("p", Sort.NAT_PREDICATE)), List.of(step, initial), root);
+        var material = new LeanSourceRenderer().render(request);
+        assertTrue(material.supported(), material.issues().toString());
+        assertEquals("by\n  intro rs_p h0 h1\n  exact Nat.rec (motive := rs_p) h1 h0\n", material.proof());
+        assertTrue(LeanStatementReconstruction.theorem(request).contains("free_p : ℕ → Prop"));
+        assertFalse(new LeanSourceRenderer().render(theorem(request.declarations(), List.of(step), root)).proof().contains("Nat.rec"));
+    }
+
     @Test void weakerBackendsRejectBeforeAttempt(@TempDir Path temp) {
         var request = summableAdd();
         assertEquals(ResultStatus.UNSUPPORTED, new PolynomialNormalFormSolverBackend().execute(request).result().status());

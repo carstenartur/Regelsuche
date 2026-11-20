@@ -27,7 +27,7 @@ public final class SolverIr {
     public enum Sort {
         REAL,
         INTEGER,
-        BOOLEAN, NATURAL, REAL_SET, REAL_SEQUENCE, REAL_FUNCTION, PROPOSITION
+        BOOLEAN, NATURAL, REAL_SET, REAL_SEQUENCE, REAL_FUNCTION, NAT_PREDICATE, PROPOSITION
     }
 
     public enum Theory {
@@ -630,7 +630,7 @@ public final class SolverIr {
 
     private static boolean scopedSort(Sort sort) {
         return switch (sort) {
-            case NATURAL, REAL_SEQUENCE, REAL_SET, REAL_FUNCTION, PROPOSITION -> true;
+            case NATURAL, REAL_SEQUENCE, REAL_SET, REAL_FUNCTION, NAT_PREDICATE, PROPOSITION -> true;
             default -> false;
         };
     }

@@ -27,6 +27,10 @@ public class App {
         }
 
         String firstArg = args[0].trim();
+        if ("scalar-saturation".equals(firstArg)) {
+            de.regelsuche.solver.ir.NativeScalarCommand.main(Arrays.copyOfRange(args,1,args.length));
+            return;
+        }
         if ("showcase-train-preflight".equals(firstArg)) {
             ProofCarryingShowcaseTrainPreflightCommand.main(
                 Arrays.copyOfRange(args, 1, args.length));
@@ -146,6 +150,7 @@ public class App {
         System.out.println("  inventory export --format json [--dir PATH]");
         System.out.println(
             "  path show <pathId> --format markdown|latex|mermaid|json");
+        System.out.println("  scalar-saturation run|verify|check <arguments>");
         System.out.println("Valid input types: term, equation, system");
     }
 }

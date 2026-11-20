@@ -34,6 +34,22 @@ class ExistentialIntroductionTest {
         assertFalse(ExistentialIntroduction.replay(new Statement(source.body(), "x"), proof));
     }
 
+    @Test void scopedExportBindsOnlyTheChosenWitnessAndPreservesEveryOuterPremise() {
+        var original = statement("w", "w + x", "y + x", H);
+        var scoped = original.toScopedObligation();
+        assertEquals(SolverIr.SCOPED_OBLIGATION_SCHEMA, scoped.schema());
+        assertEquals(RequestedEvidence.FORMAL_PROOF, scoped.requestedEvidence());
+        assertEquals(List.of(real("x"), real("y")), scoped.declarations());
+        assertEquals(List.of(H), scoped.assumptions());
+        assertEquals(original.body().provenance(), scoped.provenance());
+        var lhs = new Binary(BinaryOperator.ADD, new Bound(0), new Symbol("x"));
+        var equality = new Call("eq", List.of(lhs, term("y + x")));
+        assertEquals(Goal.holds(new Binder(BinderKind.EXISTS, Sort.REAL, equality)), scoped.goal());
+        assertEquals(scoped, statement("z", "z + x", "y + x", H).toScopedObligation());
+        assertNotEquals(scoped.goalHash(), new Statement(original.body(), "w").instantiate(term("x")).goalHash());
+        assertEquals(scoped, new SolverIrJsonCodec().readObligation(scoped.toCanonicalJson()));
+    }
+
     @Test void instantiationPreservesOuterSymbols() {
         for (String binder : List.of("w", "z")) {
             var target = statement(binder, binder + " + x", "y + x");

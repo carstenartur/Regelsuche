@@ -70,7 +70,7 @@ public final class StandardPortfolioBackends {
             descriptor.backendId(), descriptor.backendVersion(),
             backend.supportedSchemas(),
             descriptor.supportedTheories(), descriptor.supportedRelations(), descriptor.supportedRelations(),
-            List.of(Sort.REAL, Sort.NATURAL, Sort.REAL_SEQUENCE, Sort.REAL_SET, Sort.REAL_FUNCTION, Sort.PROPOSITION),
+            List.of(Sort.REAL, Sort.NATURAL, Sort.REAL_SEQUENCE, Sort.REAL_SET, Sort.REAL_FUNCTION, Sort.NAT_PREDICATE, Sort.PROPOSITION),
             Arrays.asList(BinaryOperator.values()), true, descriptor.supportedEvidence(),
             List.of(BackendRole.FORMAL_PROOF), CostClass.HIGH, 100L, true, true,
             availability, backend.configurationHash()));

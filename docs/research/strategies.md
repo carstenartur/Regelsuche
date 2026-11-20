@@ -17,6 +17,19 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Native bedingte Skalarsättigung
+
+- **Hypothese.** Native AC-Multimengen und bestätigte Nichtnullbedingungen können in einem endlichen rationalen Fragment Darstellungen erschließen, die eine geordnete Pfadsuche aus derselben Quelle verfehlt.
+- **Umsetzungsstand.** Ein gemeinsamer E-Graph hält n-stellige Operatoren und monotone Klassenfakten, begrenzt die Sucharbeit je Regel und extrahiert zwei Ziele mit unabhängig geprüften Beweis-DAGs. Die Quelle und die Ergebnisse lassen sich mit der Produkt-CLI erneut prüfen.
+- **Befund.** Beide historischen #620-Faktoren erreichten alle drei Verfahren. Beim Kontrollausdruck mit entgegengesetzten Faktorrollen fand BestFirst innerhalb des deklarierten Budgets keine Faktorisierung, während die native Sättigung und SymPy 1.14.0 sie erreichten. Ohne Nichtnullbeleg gab kein Arm die Kürzung frei.
+- **Folgerung.** Die zusätzliche Erreichbarkeit betrifft den geprüften Join. Matching-Fuel, Zustandszahl, DAG-Schritte und SymPy-Operationszahl erlauben keine gemeinsame Effizienzaussage.
+
+[Protokoll und Befunde](native-scalar-saturation.md)
+
+- [`NativeScalarSaturation.java`](../../regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java#L12) <!-- strategy-code: regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java | public final class NativeScalarSaturation { -->
+- [`NativeScalarComparison.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java#L25) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java | final class NativeScalarComparison { -->
+
+
 ## Geprüfte Rechenpläne in der Workbench
 
 - **Hypothese.** Ausgeführte Beispiele können einen endlichen Nachweis und tatsächliche Rechenarbeit sichtbar machen, wenn die Oberfläche Eingaben, Prüfergebnisse und Operationszahlen getrennt ausweist.
@@ -404,3 +417,35 @@ Aus diesen Einzelfällen lässt sich kein allgemeiner Suchvorteil ableiten.
 - [`MontgomeryReductionPlanner.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/MontgomeryReductionPlanner.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/MontgomeryReductionPlanner.java | public final class MontgomeryReductionPlanner { -->
 - [`MontgomeryScheduleTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/MontgomeryScheduleTest.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/MontgomeryScheduleTest.java | class MontgomeryScheduleTest { -->
 - [`MontgomeryScheduleSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/MontgomeryScheduleSdk.java#L11) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/MontgomeryScheduleSdk.java | public final class MontgomeryScheduleSdk { -->
+
+## Disjunkte Auswahl von Existenzzeugen und Induktionsplänen
+
+- **Hypothese.** Eine auf früheren Beweiszuständen gewählte Reihenfolge kann auf neuen Instanzen Zeugen und Nat-Induktionspläne mit weniger Vorschlägen zum exakten Empfänger bringen.
+- **Umsetzungsstand.** Der Versuch fixiert sechs Vergleichsarme, disjunkte synthetische Quellen und den Auswahlplan vor VALIDATION und FINAL. Der Empfänger rekonstruiert den konkreten Zeugen oder die beiden Induktionsprämissen. Rohdaten halten auch gescheiterte Vorschläge fest. [Versuchsplan](scoped-proof-transfer-v1/protocol.md)
+- **Befund.** Auf FINAL lösten die gelernte und die handgeschriebene Auswahl je acht von elf Fällen mit 13 Vorschlägen und 21 äußeren Prüferaufrufen. Die vollständige Enumeration benötigte 47 Vorschläge und 55 Aufrufe für dieselben acht Lösungen. Das einmalige Lernen kostete weitere 42 Vorschläge und 50 Aufrufe. [Vergleich aller sechs Arme](scoped-proof-transfer-v1/results.md)
+- **Folgerung.** Die Ordnung spart Prüfversuche bei der Anwendung. Die handgeschriebene Kontrolle erreicht dieselbe Leistung. Einschließlich Lernen belegt der öffentliche synthetische Versuch keinen Gesamtgewinn. Der Zähler erfasst äußere Aufrufe. Die ursprünglichen Commit- und Baumobjekte dokumentieren die lokale zeitliche Reihenfolge. [Verifizierbare Freeze-Historie](scoped-proof-transfer-v1/formation-history.json)
+
+- [`ScopedProofTransferStudy.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ScopedProofTransferStudy.java#L23) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ScopedProofTransferStudy.java | public final class ScopedProofTransferStudy { -->
+- [`ScopedProofTransferStudyTest.java`](../../regelsuche-benchmarks/src/test/java/de/regelsuche/benchmarks/ScopedProofTransferStudyTest.java#L14) <!-- strategy-code: regelsuche-benchmarks/src/test/java/de/regelsuche/benchmarks/ScopedProofTransferStudyTest.java | class ScopedProofTransferStudyTest { -->
+
+## Gelernte Auswahl disjunkter Residualpaare
+
+- **Hypothese.** Eine nur an TRAIN-Quellen gewählte Kombination aus disjunkten Termen, entgegengesetzten Vorzeichen und gleichem Restmonom kann erfolgreiche Kombinationen früher der exakten Prüfung zuführen.
+- **Umsetzungsstand.** Der Controller prüft höchstens vier Quellkomponenten und zwölf native Effekte. Zwischen Paarwahl und Nachweis bleiben vier Beweispflichten offen. Der Compiler rekonstruiert Vorkommen, Vorzeichen, primitive Anwendungen und Restnullsumme gegen die ursprüngliche Quelle. Jeder exportierbare Beweisschritt trägt Suchpräfix und unabhängige Prüfarbeit. [Präregistrierter Ablauf](residual-plan-comparison-v1/protocol.md)
+- **Befund.** Alle sechs Arme fanden auf den drei FINAL-Quellen zwei, zwei und null exakte Konstruktionen. Auf dem öffentlichen Brahmagupta-Beispiel ergab der nachgelagerte Strukturvergleich beide historischen Darstellungen. Gelernte und handgeschriebene Auswahl verbrauchten dort je 6.033 Einheiten, die vollständige native Komposition 8.284. Der Lernaufwand betrug 366.347 Einheiten. [Arbeit je Quelle und Vergleichsarm](residual-plan-comparison-v1/results.md)
+- **Folgerung.** Die Auswahl kann die Prüfung im festen Vierkomponentenfragment verbilligen. Die Gesamtkosten des gelernten Arms lagen über denen der nativen Komposition. Die öffentlichen Entwicklungsquellen und die nach dem Einfrieren geprüfte historische Entsprechung begrenzen die Aussage. [Originale Commit- und Baumobjekte](scoped-proof-transfer-v1/formation-history.json)
+
+- [`ResidualPlanController.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanController.java#L25) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanController.java | public final class ResidualPlanController { -->
+- [`ResidualPlanCompiler.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanCompiler.java#L19) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanCompiler.java | public final class ResidualPlanCompiler { -->
+- [`ResidualPlanComparisonTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/ResidualPlanComparisonTest.java#L16) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/ResidualPlanComparisonTest.java | class ResidualPlanComparisonTest { -->
+
+## Gebundene logische Beweisgraphen im DiscoveryDomain
+
+- **Hypothese.** Ein begrenzter Graph aus logischen Regeln kann aus expliziten Prämissen neue Aussagen bilden und jeden Vorschlag unverändert an zwei getrennte Kernelprojekte übergeben.
+- **Umsetzungsstand.** Die Quellgrammatik bildet unter anderem Implikationsketten, universelle Spezialisierungen, Zeugen, Fallunterscheidungen und natürliche Induktion. Rekursive Aufrufe der starken Nat-Induktion benötigen einen eigenen Beweis für das strikt kleinere Argument. Der Empfänger rekonstruiert den Graphen gegen die exakte Aussage. [Einstieg und Grenzen](../proof-bridge.md#bounded-logical-discovery-and-exact-dag-replay)
+- **Befund.** Der JVM-Test bildet aus drei Prämissen eine zweistufige Implikationskette auch bei geändertem Eingabeziel. Er findet ein konkretes Gegenmodell zu einer unberechtigten Folgerung. Fehlende Prüfwerkzeuge ergeben kein Zertifikat. Im echten Werkzeuglauf sind zusätzliche Kontrollen für die unabhängige Rekonstruktion und für einen falschen Abstieg vorgesehen.
+- **Folgerung.** Der logische Graph macht gebundene Voraussetzungen und Beweisarbeit prüfbar. Ein positiver mathematischer Befund verlangt beide Kernelquittungen im verwendeten Quellstand.
+
+- [`ScopedProofDag.java`](../../regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofDag.java#L10) <!-- strategy-code: regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofDag.java | public final class ScopedProofDag { -->
+- [`ScopedProofSearch.java`](../../regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofSearch.java#L12) <!-- strategy-code: regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofSearch.java | public final class ScopedProofSearch { -->
+- [`ScopedLogicDiscoveryDomainTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java#L14) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java | class ScopedLogicDiscoveryDomainTest { -->

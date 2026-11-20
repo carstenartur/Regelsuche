@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("sympy-runtime")
 class GraalPySymPyRuntimeTest {
     private static final Duration COMPLETION_TIMEOUT = Duration.ofMinutes(1);
     private static final String FACTORABLE_INTEGER_POLYNOMIAL = """
