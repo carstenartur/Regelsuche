@@ -189,6 +189,7 @@ tasks.named('processE2eTestResources') {
 
 dependencies {
     e2eTestImplementation 'com.microsoft.playwright:playwright:1.65.0'
+    e2eTestImplementation 'org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r'
     e2eTestImplementation platform(libs.testcontainers.bom)
     e2eTestImplementation libs.testcontainers.core
     e2eTestImplementation libs.testcontainers.junit

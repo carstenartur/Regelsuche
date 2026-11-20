@@ -64,6 +64,7 @@
     <maven.maximum.exclusive.version>4.0.0</maven.maximum.exclusive.version>
     <playwright.version>1.65.0</playwright.version>
     <jmh.version>1.36</jmh.version>
+    <jgit.version>7.8.0.202609011348-r</jgit.version>
     <maven.test.fork.timeout.seconds>600</maven.test.fork.timeout.seconds>
     <releaseVersion>${project.version}</releaseVersion>
 
@@ -106,6 +107,7 @@
 
   <dependencyManagement>
     <dependencies>
+      <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><version>${jgit.version}</version></dependency>
       <dependency><groupId>org.apache.commons</groupId><artifactId>commons-compress</artifactId><version>${commons.compress.version}</version></dependency>
       <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-console</artifactId><version>${junit.version}</version></dependency>
       <dependency><groupId>com.microsoft.playwright</groupId><artifactId>playwright</artifactId><version>${playwright.version}</version></dependency>
@@ -276,6 +278,10 @@
         <module>regelsuche-jmh</module>
         <module>regelsuche-sympy-jmh</module>
       </modules>
+    </profile>
+    <profile>
+      <id>polynomial-comparison</id>
+      <modules><module>regelsuche-autopilot</module><module>regelsuche-release</module></modules>
     </profile>
     <profile>
       <id>checked-proofs</id>

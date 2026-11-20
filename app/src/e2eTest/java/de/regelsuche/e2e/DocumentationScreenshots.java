@@ -6,7 +6,6 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.ScreenshotType;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -14,6 +13,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.stream.Stream;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 
 /** Opt-in documentation output from browser flows that already assert their real results. */
 final class DocumentationScreenshots {
@@ -56,14 +61,25 @@ final class DocumentationScreenshots {
     }
 
     static String captureSourceRevision(Path root) throws IOException {
-        String changes = git(root, "status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none",
-            "--", ".", ":(top,exclude)docs/assets/screenshots", ":(top,exclude)docs/assets/videos");
-        if (!changes.isBlank()) {
-            throw new IOException("Commit repository changes before recording documentation");
+        if (!Files.exists(root.resolve(".git"))) throw new IOException("Cannot identify capture checkout");
+        var builder = new FileRepositoryBuilder().setMustExist(true).setWorkTree(root.toFile()).findGitDir(root.toFile());
+        try (var repository = builder.build(); var git = new Git(repository)) {
+            var status = git.status().setIgnoreSubmodules(IgnoreSubmoduleMode.NONE).call();
+            if (Stream.concat(status.getUncommittedChanges().stream(), status.getUntracked().stream())
+                    .anyMatch(path -> !isCaptureOutput(path))) {
+                throw new IOException("Commit repository changes before recording documentation");
+            }
+            var head = repository.resolve(Constants.HEAD);
+            if (head == null) throw new IOException("Cannot identify capture source revision");
+            return repository.parseCommit(head).name();
+        } catch (GitAPIException exception) {
+            throw new IOException("Cannot read capture source revision", exception);
         }
-        String revision = git(root, "rev-parse", "HEAD").trim();
-        if (!revision.matches("[0-9a-f]{40}")) throw new IOException("Cannot identify capture source revision");
-        return revision;
+    }
+
+    private static boolean isCaptureOutput(String path) {
+        return path.equals("docs/assets/screenshots") || path.startsWith("docs/assets/screenshots/")
+            || path.equals("docs/assets/videos") || path.startsWith("docs/assets/videos/");
     }
 
     private static boolean enabled() {
@@ -77,21 +93,6 @@ final class DocumentationScreenshots {
                     && Files.isRegularFile(current.resolve("README.md"))) return current;
         }
         throw new IOException("Cannot locate the Regelsuche checkout from " + path);
-    }
-
-    private static String git(Path root, String... arguments) throws IOException {
-        var command = new java.util.ArrayList<String>();
-        command.add("git");
-        command.addAll(java.util.List.of(arguments));
-        Process process = new ProcessBuilder(command).directory(root.toFile()).redirectErrorStream(true).start();
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        try {
-            if (process.waitFor() != 0) throw new IOException("Cannot read capture source revision: " + output);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while reading capture source revision", exception);
-        }
-        return output;
     }
 
     private static String sha256(byte[] bytes) {

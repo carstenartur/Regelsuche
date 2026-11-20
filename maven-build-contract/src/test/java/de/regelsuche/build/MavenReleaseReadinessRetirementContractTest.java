@@ -46,14 +46,16 @@ class MavenReleaseReadinessRetirementContractTest {
     }
 
     @Test
-    void fourObsoleteFilesAreRetiredAndTheSharedCollectorReaderRemains() throws Exception {
+    void retiredHostVerifiersShareTheNativeDescriptorOwnedReader() throws Exception {
         for (String name : List.of("verify-release-readiness-evidence.py", "test-release-readiness-evidence.py",
                 "release_readiness_bindings.py", "release_readiness_identities.py")) {
             assertFalse(Files.exists(ROOT.resolve("scripts").resolve(name)), name);
         }
-        assertTrue(Files.isRegularFile(ROOT.resolve("scripts/release_readiness_files.py")));
-        assertTrue(Files.readString(ROOT.resolve("scripts/collect-quality-acceptance-evidence.py"))
-            .contains("from release_readiness_files import EvidenceFiles"));
+        for (String file : List.of("release_readiness_files.py", "collect-quality-acceptance-evidence.py",
+                "quality_acceptance_structure.py", "test-quality-acceptance-evidence.py"))
+            assertFalse(Files.exists(ROOT.resolve("scripts").resolve(file)), file);
+        assertTrue(Files.readString(ROOT.resolve("regelsuche-release/src/main/java/de/regelsuche/release/QualityAcceptanceCollection.java"))
+            .contains("new OwnedReleaseEvidenceFiles(root)"));
     }
 
     @Test

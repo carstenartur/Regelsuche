@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import org.eclipse.jgit.api.Git;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,14 +20,15 @@ class DocumentationScreenshotsTest {
 
     @BeforeEach
     void initializeRepository() throws Exception {
-        git("init", "-q");
-        write(VALIDATOR, "class Validator {}\n");
-        write("build.gradle", "plugins {}\n");
-        write(SCREENSHOT, "previous screenshot");
-        git("add", ".");
-        git("-c", "user.name=Documentation Test", "-c", "user.email=docs-test@example.invalid",
-            "-c", "commit.gpgsign=false", "commit", "-qm", "Capture source fixture");
-        revision = git("rev-parse", "HEAD").trim();
+        try (var git = Git.init().setDirectory(repository.toFile()).call()) {
+            write(VALIDATOR, "class Validator {}\n");
+            write("build.gradle", "plugins {}\n");
+            write(SCREENSHOT, "previous screenshot");
+            git.add().addFilepattern(".").call();
+            revision = git.commit().setMessage("Capture source fixture")
+                .setAuthor("Documentation Test", "docs-test@example.invalid")
+                .setCommitter("Documentation Test", "docs-test@example.invalid").setSign(false).call().name();
+        }
     }
 
     @Test
@@ -41,7 +40,9 @@ class DocumentationScreenshotsTest {
     @Test
     void rejectsAStagedBuildInputChange() throws Exception {
         write("build.gradle", "plugins { id 'java' }\n");
-        git("add", "build.gradle");
+        try (var git = Git.open(repository.toFile())) {
+            git.add().addFilepattern("build.gradle").call();
+        }
         assertThrows(IOException.class, () -> DocumentationScreenshots.captureSourceRevision(repository));
     }
 
@@ -53,19 +54,21 @@ class DocumentationScreenshotsTest {
         assertEquals(revision, DocumentationScreenshots.captureSourceRevision(repository));
     }
 
+    @Test
+    void rejectsUntrackedInputsBesideTheCaptureDirectories() throws IOException {
+        write("docs/assets/screenshots-extra/source.svg", "untracked source");
+        assertThrows(IOException.class, () -> DocumentationScreenshots.captureSourceRevision(repository));
+    }
+
+    @Test
+    void rejectsDeletedInputs() throws IOException {
+        Files.delete(repository.resolve(VALIDATOR));
+        assertThrows(IOException.class, () -> DocumentationScreenshots.captureSourceRevision(repository));
+    }
+
     private void write(String fileName, String content) throws IOException {
         Path target = repository.resolve(fileName);
         Files.createDirectories(target.getParent());
         Files.writeString(target, content);
-    }
-
-    private String git(String... arguments) throws IOException, InterruptedException {
-        var command = new ArrayList<String>();
-        command.add("git");
-        command.addAll(List.of(arguments));
-        var process = new ProcessBuilder(command).directory(repository.toFile()).redirectErrorStream(true).start();
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        assertEquals(0, process.waitFor(), output);
-        return output;
     }
 }

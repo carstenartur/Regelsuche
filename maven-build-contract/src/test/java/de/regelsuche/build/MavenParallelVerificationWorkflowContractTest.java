@@ -215,8 +215,15 @@ class MavenParallelVerificationWorkflowContractTest {
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
     assertFalse(convergence.contains("scripts/generate-ci-pages.py"));
-    assertEquals(1, occurrences(convergence, "mvn "),
-        "convergence must run only the focused Maven coverage verification");
+    JsonNode collection = YAML.readTree(workflow).required("jobs").required("verification").required("steps")
+        .valueStream().filter(step -> "Collect complete checkout-owned quality acceptance evidence".equals(step.path("name").asText()))
+        .findFirst().orElseThrow();
+    assertEquals("mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am "
+        + "-Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false "
+        + "-Dregelsuche.qualityAcceptance.collect=true verify", collection.required("run").asText().strip());
+    assertFalse(collection.has("if"));
+    assertFalse(collection.has("continue-on-error"));
+    assertEquals(2, occurrences(convergence, "mvn "), "coverage and collection must be the only converged Maven invocations");
 
     assertTrue(publication.contains("needs: verification"),
         "publication must wait for all converged authorities");

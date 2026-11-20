@@ -22,3 +22,9 @@ Missing benchmarks, altered policy bytes, INCONCLUSIVE, stale raw output and wor
 - [x] Move the diagnostic SymPy JMH matrix and independent runtime tests behind the pinned external-tool boundary before retiring the old isolated workflow.
 - [ ] Migrate remaining build, quality collection, browser, solver and release obligations identified in the spec. Exercise negative controls, then retire the corresponding adapter.
 - [ ] Exercise clean checkout, unfiltered full source archive, packaged distribution and release qualification. Update README, testing and release docs to reflect observed authority.
+
+## Frozen external polynomial producers
+
+1. Prove the original three ancestor identities and the registered schema protocol through actual Git commit, tree and blob bytes. Preserve a bounded historical object set from accepted e115 and carry the contemporary commit chain into archives. An unrelated branch or missing historical object fails qualification.
+2. Resolve the learning worker classpath from the active Maven reactor. Run the original experiment matrix, real Java worker and independent SymPy evaluator with the pinned JDK/CPython image, then replay every retained row. Compare against the separately executed hosted predecessor before promoting the Maven lane.
+3. Repeat for the typed, native and learned-schema experiments with their additional clean-source, snapshot and worker-accounting requirements. Their original lanes remain required until their separate controls, raw rows and failed-outcome evidence agree.
