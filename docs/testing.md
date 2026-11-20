@@ -34,6 +34,21 @@ Infrastruktur sein.
 steuert Chromium mit Playwright. Die Tests prüfen sichtbare Nutzerflüsse,
 Zustände, Downloads und semantische Darstellung.
 
+Das Maven-Vollprofil startet dieselben Browser- und Screenshot-Tests in dem
+per Digest fixierten Playwright-Image aus der visuellen Richtlinie. Für einen
+gezielten Lauf mit Docker, JDK 25 und Maven gilt
+
+```bash
+mvn -Pfull -pl regelsuche-browser-tests -am verify
+```
+
+Der Worker startet die echte Workbench, aktiviert den visuellen JUnit-Vertrag
+und verwendet die vier versionierten PNG-Baselines. Der Host erhält JUnit-XML,
+Screenshots, Standardausgabe und das vollständige Evidence-Archiv unter
+`regelsuche-browser-tests/target/reports/browser/`. Eine fehlende Docker-Runtime,
+fehlende Vergleichsbilder, abgebrochene Tests und Pixelabweichungen über der
+versionierten Toleranz lassen den Lauf fehlschlagen.
+
 ### Container-E2E
 
 `:app:dockerE2eTest` baut und startet die tatsächlichen Projektimages über
