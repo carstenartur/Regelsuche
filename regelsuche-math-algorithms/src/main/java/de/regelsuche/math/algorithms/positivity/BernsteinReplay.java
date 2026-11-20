@@ -43,12 +43,8 @@ final class BernsteinReplay {
                     if (!box.equals(leaf.box()) || leaf.coefficients().size() != size) {
                         return new Verification(false, "LEAF_SHAPE", work.used);
                     }
-                    for (var value : leaf.coefficients()) {
-                        int sign = work.check(value).signum();
-                        if (sign < 0 || (sign == 0 && certificate.claim() == Claim.STRICTLY_POSITIVE)) {
-                            return new Verification(false, "COEFFICIENT_SIGN", work.used);
-                        }
-                    }
+                    if (!coefficientsHaveRequiredSign(leaf.coefficients(), certificate.claim(), work))
+                        return new Verification(false, "COEFFICIENT_SIGN", work.used);
                     if (!identity(source.polynomial(), leaf, work)) return new Verification(false, "LEAF_IDENTITY", work.used);
                 }
             }
@@ -57,6 +53,15 @@ final class BernsteinReplay {
         } catch (PositivityWork.Stop stop) {
             return new Verification(false, stop.getMessage(), work.used);
         }
+    }
+
+    private static boolean coefficientsHaveRequiredSign(List<ExactRational> coefficients,
+            Claim claim, PositivityWork work) {
+        for (var value : coefficients) {
+            int sign = work.check(value).signum();
+            if (sign < 0 || (sign == 0 && claim == Claim.STRICTLY_POSITIVE)) return false;
+        }
+        return true;
     }
 
     private record Node(ExactRational coordinate, ExactRational[] weights) {}

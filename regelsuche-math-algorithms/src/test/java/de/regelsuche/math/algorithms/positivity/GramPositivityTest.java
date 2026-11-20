@@ -18,14 +18,18 @@ class GramPositivityTest {
         // This oracle uses every principal minor, including non-leading 1x1 and 2x2 minors.
         for (int a=-1; a<=1; a++) for (int b=-1; b<=1; b++) for (int c=-1; c<=1; c++)
             for (int d=-1; d<=1; d++) for (int e=-1; e<=1; e++) for (int f=-1; f<=1; f++) {
-                var m = List.of(List.of(ExactRational.integer(a),ExactRational.integer(b),ExactRational.integer(c)),
-                    List.of(ExactRational.integer(b),ExactRational.integer(d),ExactRational.integer(e)),
-                    List.of(ExactRational.integer(c),ExactRational.integer(e),ExactRational.integer(f)));
-                int det = a*d*f + 2*b*c*e - a*e*e - d*c*c - f*b*b;
-                boolean psd = a>=0 && d>=0 && f>=0 && a*d>=b*b && a*f>=c*c && d*f>=e*e && det>=0;
-                var expected = !psd ? NOT_PSD : det==0 ? POSITIVE_SEMIDEFINITE : POSITIVE_DEFINITE;
-                assertEquals(expected, GramPositivity.checkMatrix(m, LIMITS, () -> false).classification(), m.toString());
+                assertAgreesWithPrincipalMinors(a, b, c, d, e, f);
             }
+    }
+
+    private static void assertAgreesWithPrincipalMinors(int a, int b, int c, int d, int e, int f) {
+        var m = List.of(List.of(ExactRational.integer(a),ExactRational.integer(b),ExactRational.integer(c)),
+            List.of(ExactRational.integer(b),ExactRational.integer(d),ExactRational.integer(e)),
+            List.of(ExactRational.integer(c),ExactRational.integer(e),ExactRational.integer(f)));
+        int det = a*d*f + 2*b*c*e - a*e*e - d*c*c - f*b*b;
+        boolean psd = a>=0 && d>=0 && f>=0 && a*d>=b*b && a*f>=c*c && d*f>=e*e && det>=0;
+        var expected = !psd ? NOT_PSD : det==0 ? POSITIVE_SEMIDEFINITE : POSITIVE_DEFINITE;
+        assertEquals(expected, GramPositivity.checkMatrix(m, LIMITS, () -> false).classification(), m.toString());
     }
 
     @Test void rationalMatrixSymmetryAndSingularSchurPivots() {

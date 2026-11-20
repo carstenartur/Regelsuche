@@ -30,16 +30,30 @@ Produkt die Eingabe darstellt. [Aufnahmen und Herleitung](demo-gallery.md#sophie
    **Exakte Beispielauswertung** der Wert **54**. Bei leerem Wertefeld erscheint
    der Hinweis **Keine Beispieldaten eingegeben.** Mit der Vergleichsgröße
    `100000` zeigt die **Hochrechnung** 4.999.950.000 Paare für die direkte
-   Schleife und 100.000 gelesene Zeilen im hergeleiteten Plan.
+   Schleife und einen Durchlauf über 100.000 Zeilen für den hergeleiteten Plan.
 4. **Herleitung und Prüfung** öffnen. So siehst du, welche Zwischensummen der
    Plan verwendet und wie die Gleichheit geprüft wird. Nach einer Eingabeänderung
    erneut **Algorithmus herleiten** wählen. Bei einer abgelehnten Eingabe zeigt
    der Status, was zu korrigieren ist.
+5. Für den festen Lauf **Zum Lauf mit 100.000 Zeilen** und anschließend
+   **100.000 Zeilen auswerten** wählen. Die Demo führt den geprüften Plan
+   mit 100.000 erzeugten Werten aus und vergleicht die ersten 64 Werte mit
+   der direkten Paarschleife. Die Kennzahl für die Vollschleife bleibt die
+   rechnerische Paaranzahl.
 
 Unter **Berechnung** stehen auch **Geordnete Tupel** und **Gleitende Paarfenster**
 zur Wahl. Die Beispiele für Dreierketten und begrenzte Abstände zeigen passende
 Summanden und Bedingungen. Für gleitende Paarfenster steht außerdem
 **Fensterbreite** zur Verfügung. [Galerie mit Bildschirmaufnahmen](demo-gallery.md#ein-durchlauf-für-eine-paarsumme)
+
+## Exakte Rechennachweise ausführen
+
+Unter den Demo-Karten **Exakte Rechennachweise** öffnen. **Hall-Defizit
+berechnen** zeigt Eingabegraph, größtes Matching und Hall-Zeugen.
+**Montgomery-Plan prüfen** zeigt die modularen Parameter, die Wortgrenzen
+und die Reduktionszahlen der direkten und verschobenen Pläne.
+Die Workbench prüft die jeweilige Eingabe und blendet den Nachweis
+nach erfolgreicher Prüfung ein. [Galerie mit Bildschirmaufnahmen](demo-gallery.md#ein-lokales-hall-defizit-nachweisen)
 
 ---
 

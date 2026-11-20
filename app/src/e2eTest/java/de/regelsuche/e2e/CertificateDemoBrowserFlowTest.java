@@ -2,11 +2,14 @@ package de.regelsuche.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Route;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -99,6 +102,30 @@ class CertificateDemoBrowserFlowTest {
             assertThat(page.locator("#hallStatus")).containsText("Kein geprüfter Nachweis");
             assertThat(button).isEnabled();
             assertThat(button).isFocused();
+        }
+    }
+
+    @Test
+    void aSlowHallResultPreservesFocusOnAnotherDemo() {
+        try (var context = browser.newContext()) {
+            var page = context.newPage();
+            page.setDefaultTimeout(5_000);
+            page.navigate(app.baseUrl() + "/static/certificate-demos.html");
+            var pending = new AtomicReference<Route>();
+            page.route("**/api/certificate-demos/hall", pending::set);
+
+            var hall = page.locator("#hallRun");
+            var montgomery = page.locator("#montgomeryRun");
+            hall.press("Enter");
+            assertThat(hall).isDisabled();
+            page.keyboard().press("Tab");
+            assertThat(montgomery).isFocused();
+            var request = pending.get();
+            assertNotNull(request);
+            request.fulfill(new Route.FulfillOptions().setResponse(request.fetch()));
+
+            assertThat(page.locator("#hallResult")).isVisible();
+            assertThat(montgomery).isFocused();
         }
     }
 }

@@ -14,6 +14,21 @@ def verificationPython = providers.provider {
     new File(verificationVenv.get().asFile, executable)
 }
 
+def verifyWorkbenchCertificateApi = tasks.register(
+    'verifyWorkbenchCertificateApi', Exec) {
+    group = 'verification'
+    description = 'Rejects incomplete or mixed certificate-demo API receipts.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file('scripts/test-workbench-certificate-api.py')
+    inputs.file repositoryRoot.file('app/src/main/resources/web/openapi/openapi.json')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            '-B', 'scripts/test-workbench-certificate-api.py'
+    }
+}
+
 def registerEvidenceValidator = { String taskName, String description,
         String scriptName, String reportDirectory ->
     tasks.register(taskName, Exec) {
@@ -365,7 +380,8 @@ tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
     dependsOn verifyPluginArtifactIndexEvidence,
         verifyPluginArtifactTrustEvidence,
         verifyPluginTrustStoreRevisionEvidence,
-        verifyDiscoveryChallengeDevelopmentPilots
+        verifyDiscoveryChallengeDevelopmentPilots,
+        verifyWorkbenchCertificateApi
 }
 
 tasks.matching { candidate -> candidate.name == 'fullCheck' }.configureEach {

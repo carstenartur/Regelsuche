@@ -70,11 +70,11 @@ for (const section of document.querySelectorAll('[data-certificate-demo]')) {
     const output = section.querySelector('[data-demo-output]');
     const title = output.querySelector('[data-demo-title]');
     button.addEventListener('click', async () => {
-        button.disabled = true;
+        if (button.getAttribute('aria-disabled') === 'true') return;
+        button.setAttribute('aria-disabled', 'true');
         output.hidden = true;
         status.classList.remove('error');
         status.textContent = 'Wird berechnet und geprüft …';
-        let focus = button;
         try {
             const response = await fetch('/api/certificate-demos/' + demo, { cache: 'no-store' });
             if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -83,7 +83,6 @@ for (const section of document.querySelectorAll('[data-certificate-demo]')) {
                 renderers[demo](data);
                 status.textContent = '';
                 output.hidden = false;
-                focus = title;
             } else {
                 status.classList.add('error');
                 status.textContent = 'Kein geprüfter Nachweis (' + data.reason + ').';
@@ -92,8 +91,8 @@ for (const section of document.querySelectorAll('[data-certificate-demo]')) {
             status.classList.add('error');
             status.textContent = 'Kein geprüfter Nachweis. Die Demo konnte nicht geladen werden.';
         } finally {
-            button.disabled = false;
-            focus.focus();
+            button.removeAttribute('aria-disabled');
+            if (!output.hidden && document.activeElement === button) title.focus();
         }
     });
 }

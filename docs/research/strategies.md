@@ -17,6 +17,17 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Geprüfte Rechenpläne in der Workbench
+
+- **Hypothese.** Ausgeführte Beispiele können einen endlichen Nachweis und tatsächliche Rechenarbeit sichtbar machen, wenn die Oberfläche Eingaben, Prüfergebnisse und Operationszahlen getrennt ausweist.
+- **Umsetzungsstand.** Die Workbench berechnet ein größtes Matching und prüft den Hall-Zeugen gegen den festen Graphen. Sie plant verschobene Montgomery-Reduktionen und prüft den Vorschlag gegen die erwarteten Parameter, den Ausgangsplan und die Beobachtung. Ein geprüfter Paarsummenplan wertet 100.000 deterministische Zeilen aus. Ein unabhängiger direkter Paarlauf kontrolliert die ersten 64 Zeilen.
+- **Befund.** Der 4×4-Graph hat globales Defizit null und Hall-Defizit zwei. Im modularen Vierproduktbeispiel sinkt die Reduktionszahl von vier auf eins bei Gleichheit der kanonischen Reste. Die volle Paarsumme beträgt 8.333.333.332.500.000.000. Beide Präfixverfahren ergeben 1.397.760 für 2.016 direkte Paare. 4.999.950.000 ist die arithmetische Paaranzahl der vollen direkten Schleife. [Workbench-Galerie](../demo-gallery.md#ein-durchlauf-für-eine-paarsumme)
+- **Folgerung.** Die Beispiele belegen die angegebenen endlichen Instanzen und den ausgewiesenen Präfixvergleich. Für Laufzeitvergleiche ist eine Messung der konkreten Implementierungen nötig.
+
+- [`CertificateDemoWorkbench.java`](../../app/src/main/java/de/regelsuche/web/CertificateDemoWorkbench.java#L30) <!-- strategy-code: app/src/main/java/de/regelsuche/web/CertificateDemoWorkbench.java | final class CertificateDemoWorkbench { -->
+- [`CertificateDemoBrowserFlowTest.java`](../../app/src/e2eTest/java/de/regelsuche/e2e/CertificateDemoBrowserFlowTest.java#L19) <!-- strategy-code: app/src/e2eTest/java/de/regelsuche/e2e/CertificateDemoBrowserFlowTest.java | class CertificateDemoBrowserFlowTest { -->
+- [`PairReductionBrowserFlowTest.java`](../../app/src/e2eTest/java/de/regelsuche/e2e/PairReductionBrowserFlowTest.java#L20) <!-- strategy-code: app/src/e2eTest/java/de/regelsuche/e2e/PairReductionBrowserFlowTest.java | class PairReductionBrowserFlowTest { -->
+
 ## Rationale Positivitätszertifikate für Polynome
 
 - **Hypothese.** Rationale Bernstein-Netze und exakte Gram-Identitäten können endliche, unabhängig prüfbare Nachweise für Polynomungleichungen liefern.
