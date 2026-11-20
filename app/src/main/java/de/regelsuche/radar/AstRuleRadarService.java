@@ -99,6 +99,18 @@ public final class AstRuleRadarService implements AutoCloseable {
             pluginRuntimeConfig == null ? PluginRuntimeConfig.defaults() : pluginRuntimeConfig);
     }
 
+    /** Re-evaluate precisely one archived formation rule at precisely one position, without consulting current inventory. */
+    public Optional<ApplicableMove> inspectFormationOccurrence(String expression, List<Integer> path,
+            RewriteRule rule, List<String> assumptions) {
+        Expr root = parser.parseTerm(expression);
+        Context defaults = Context.defaults();
+        Context context = new Context(defaults.knowledgeProfile(), Set.of(), Set.of(), false, false,
+            defaults.minMacroProofStatus(), "RETAINED_FORMATION", "", 1, 1, assumptions, true, "", Map.of());
+        var position = positionedNodes(root).stream().filter(node -> node.path().equals(path)).findFirst().orElseThrow();
+        var source = source(rule, RuleOrigin.KNOWLEDGE_PACK, rule.descriptor().packId(), rule.descriptor().sourceReference());
+        return createOrdinaryCandidate(root, ExpressionFormatter.format(root), position, source, context, new ArrayList<>());
+    }
+
     public Snapshot inspect(String expression, Context requestedContext) {
         Context context = requestedContext == null ? Context.defaults() : requestedContext;
         if (expression == null || expression.isBlank()) {

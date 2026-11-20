@@ -145,12 +145,31 @@ the zero introduced by unary minus. On syntax errors the parser returns the
 offending half-open UTF-16 interval in the original input. Use **Fehlerstelle
 im Ausdruck auswählen** to select it or move the caret to a missing character.
 For example, `2x` selects the unexpected `x`; enter `2*x` to multiply.
-The read-only preview accepts up to 256
-characters, uses the Java search parser and does not start a search. The
-separate runtime and system profiles use their own input contracts.
+The preview accepts up to 256 UTF-16 code units. Both Runtime profiles use
+the search parser to preview and edit terms or whole systems. Each equation
+keeps its original source offsets, so an occurrence in a later row can be
+replaced and submitted from the same input field.
 
-This is a bounded product slice of #669. Broader dossier artifact schemas,
-occurrence-local evidence, exact replay/radar/proof correlations, live discovery
-search controls, navigation consolidation and structured assumption/domain editing remain
-open. No new discovery evaluation, mathematical-proof, novelty or search-quality
-claim follows from this view.
+The retained history and the new independent occurrence reviews have distinct authority. The source-bound controls and checks below describe the supported native and frozen formats.
+
+## Run a native search in the Workbench
+
+Open **Gespeicherte Runs → Zieloffene Suche ausführen**, enter a term and choose the 12- or 32-state budget. The search worker uses the same R1 native runner, CORE formation inventory and immutable dossier format as the command-line producer. **Pausiert starten** creates an observable initial checkpoint. **Pausieren**, **Fortsetzen** and **Suche stoppen** operate at search-event boundaries. A successful search publishes the usual workspace and occurrence dossier. Its operation URL remains available in the execution history. If the completed observation exceeds the 1 MiB dossier limit, the operation records DOSSIER_BYTE_BUDGET and the observed counters. A smaller budget can produce a retainable dossier.
+
+The operation record contains its exact source, source revision, six budget parameters, visited and queued states, generations and discard counts by reason. Token and AST minima come from the visited expressions. A pending search has unknown total work. This runner has one best-first frontier, with no Pareto archive or external proof queue. Event collection and the optional UI measurements are operational overhead and are separate from the canonical native work ledger.
+
+A live process holds one writer lease for the repository. It retains progress every 32 events and on control transitions. Cancellation and graceful shutdown retain their observed counters and terminal reason. Following a process crash the next reader recovers the last durable snapshot as INTERRUPTED. An interrupted worker's in-memory frontier cannot be resumed. Opening its record preserves the terminal history. Start a new operation to rerun the same input. For packaged deployments without a source checkout, supply the producing Git commit as JVM property `regelsuche.repository.revision` or environment variable `REGELSUCHE_REPOSITORY_REVISION`. Checkout execution reads the Git commit containing the application classes. A missing revision prevents admission.
+
+## Review an occurrence and its assumptions
+
+The candidate dossier's **Ausgewähltes Vorkommen prüfen** controls keep the end candidate, transition and native generation in the URL while switching between graph, replay, radar and proof. The five task groups in **Werkzeuge nach Aufgabe** also open these bound views when their inputs exist. Available frozen #663 observations remain in the historical section. The occurrence review is a separately produced receipt.
+
+For a frozen #663 transition the server resolves the retained parent, rule, application identity and successor. For a native candidate it additionally checks generation membership in its recorded path and the archived position. It matches the source formation inventory hash and independently applies the exact rule to the source. The radar uses the same occurrence and its real matching bindings. Reused expressions elsewhere in the tree cannot substitute for the selected occurrence. The receipt records the local before/after subtrees, whole roots, syntax and sharing metrics, historical assumptions, formation inventory and information boundary.
+
+**Beweisverpflichtung** builds a typed equality obligation with a source-binding hash and any required side conditions. Within the bounded polynomial fragment the installed polynomial backend executes it and retains its own translation, result and certificate references. The Workbench displays the backend's actual status. It keeps historical symbolic classification for the frozen trigonometric example and reports the scope of the current independent checker separately.
+
+**Zusätzlichen Annahmekontext untersuchen** compares a typed guard against entered predicates, for example `x != 0` and `x = 0`. Two attributed evaluators independently look for an identical predicate and its exact logical complement on the same operands. A conflict stores both witnesses and resolves to UNKNOWN. Each result is written in text. Extra premises affect only this review and cannot certify the original rewrite or change its typed equality obligation.
+
+The HTTP POST at `/api/discovery-runs/{runDigest}/candidate-evidence` accepts the selected candidate and edge, with optional review guard and premises. The response binds its hash in the ETag and returns a permanent GET location. **Gespeicherten Originalbeleg erneut prüfen und öffnen** reads those retained bytes and independently recomputes their content from the original source before returning them. The canonical JSON is downloadable for independent inspection.
+
+The occurrence review compares the original input with the selected end candidate even when the user inspects an earlier replay step. It records raw measures, a source-text syntax hash, the versioned semantic-value DAG digest and all whole/subform matches against the catalog committed by the run. Its bounded one-step formation-rule scan preserves concrete successors, their assumptions, provenance and truncation. Newly observed or lost rule IDs count unconditional returned successors only. An incomplete scan describes the observed window.
