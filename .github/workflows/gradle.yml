@@ -375,7 +375,7 @@ jobs:
       - name: Check native contracts and actual application proof admission
         run: >-
           mvn -B -pl app -am
-          -Dtest=CheckedLeanProofTest,CheckedLeanRealTest,CheckedProofBridgeTest,CheckedProofBridgeRealTest,ProofCacheAdmissionTest,ProofJobSchedulerTest,LeanProofBridgeTest,SmtProofBridgeTest,ProverExecutorAndBridgeTest,ProofBridgeServiceTest,ProofBridgeFormallyProvedTest,ProofWorkerTest,ProofScriptValidatorTest,UnifiedMathDomainWorkbenchTest,WebWorkbenchServerTest,Z3SmtSolverBackendTest
+          -Dtest=CheckedLeanProofTest,CheckedLeanRealTest,ScopedLogicDiscoveryDomainTest,CheckedProofBridgeTest,CheckedProofBridgeRealTest,ProofCacheAdmissionTest,ProofJobSchedulerTest,LeanProofBridgeTest,SmtProofBridgeTest,ProverExecutorAndBridgeTest,ProofBridgeServiceTest,ProofBridgeFormallyProvedTest,ProofWorkerTest,ProofScriptValidatorTest,UnifiedMathDomainWorkbenchTest,WebWorkbenchServerTest,Z3SmtSolverBackendTest
           -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Retain all proof inputs, outputs and failed-attempt evidence
         if: ${{ always() }}
@@ -385,6 +385,8 @@ jobs:
           include-hidden-files: true
           path: |
             /tmp/checked-proof-source.zip
+            regelsuche-discovery/target/checked-proof/
+            regelsuche-discovery/target/surefire-reports/
             regelsuche-solver-portfolio/target/checked-proof/
             regelsuche-solver-portfolio/target/surefire-reports/
             app/target/checked-proof/
