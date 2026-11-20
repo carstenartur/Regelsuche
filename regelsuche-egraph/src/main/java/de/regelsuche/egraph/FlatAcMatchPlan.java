@@ -57,7 +57,12 @@ public final class FlatAcMatchPlan {
     Result match(EGraph graph, int limit) {
         if (!graph.usesArithmeticAc()) throw new IllegalArgumentException("flat AC plans require the exact scalar AC graph");
         if (limit < 0 || limit > MAX_WORK) throw new IllegalArgumentException("invalid flat AC work limit");
-        return new Scan(graph, limit).run();
+        return matchRoots(graph, graph.classesWith(signature), limit);
+    }
+
+    Result matchRoots(EGraph graph, java.util.Collection<EClassId> roots, int limit) {
+        if (!graph.usesArithmeticAc() || limit < 0 || limit > MAX_WORK) throw new IllegalArgumentException("invalid native AC plan scope");
+        return new Scan(graph, limit).run(roots);
     }
 
     private final class Scan {
@@ -81,8 +86,8 @@ public final class FlatAcMatchPlan {
             return true;
         }
 
-        private Result run() {
-            for (var candidate : graph.classesWith(signature)) {
+        private Result run(java.util.Collection<EClassId> roots) {
+            for (var candidate : roots) {
                 if (!spend()) break;
                 var root = graph.find(candidate);
                 for (var node : graph.classOrThrow(root).nodes()) {
