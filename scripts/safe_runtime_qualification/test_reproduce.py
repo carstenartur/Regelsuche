@@ -130,8 +130,8 @@ class SafeRuntimeReproductionTest(unittest.TestCase):
             )
             with self.assertRaisesRegex(
                 module.ReproductionError,
-                r"canonical output bytes differ for container/qualification\\.json"
-                r" \\(first differing JSON field: \\$\\.cases\\)",
+                r"canonical output bytes differ for container/qualification\.json"
+                r" \(first differing JSON field: \$\.cases\)",
             ):
                 module.compare_canonical_outputs(
                     root / "checkout-a", root / "checkout-b", root / "container"
