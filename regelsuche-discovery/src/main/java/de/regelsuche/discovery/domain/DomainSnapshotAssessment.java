@@ -33,7 +33,7 @@ public final class DomainSnapshotAssessment {
         var ablation = gate(root, "ablation");
         boolean reproduced = false;
         if (!workspace.replaySupported()) {
-            root.put("replayStatus", "OUTSIDE_REPLAY_BUDGET");
+            root.put("replayStatus", workspace.scopedLogicDomain() ? "REPLAY_NOT_CONFIGURED" : "OUTSIDE_REPLAY_BUDGET");
         } else {
             try {
                 var observed = workspace.replayObserved();

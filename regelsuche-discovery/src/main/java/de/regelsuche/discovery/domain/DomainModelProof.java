@@ -79,6 +79,9 @@ public final class DomainModelProof {
         Objects.requireNonNull(workspace, "workspace");
         Objects.requireNonNull(budget, "budget");
         var execution = new Execution(workspace, budget);
+        if (workspace.scopedLogicDomain()) {
+            return execution.receipt(Status.UNSUPPORTED, workspace.replayUnavailableReason());
+        }
         if (budget.maxReplayAttempts() == 0 || !workspace.replaySupported()
                 || workspace.evidence().seed().payload().length() > budget.maxPayloadCharacters()) {
             return execution.receipt(Status.INCONCLUSIVE, "SOURCE_EXCEEDS_MODEL_PROOF_REPLAY_ADMISSION");
