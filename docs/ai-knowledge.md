@@ -172,6 +172,45 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after witness/induction integration (2026-11-21)
+
+[Main CI 44852121730](https://github.com/carstenartur/Regelsuche/actions/runs/44852121730)
+completed successfully on immutable `main` revision `a5e2efc099162723ca2f3f8ca7064a98fddb52cb` (tree `38e161b03b68bbd36261d5908b4afa14bd6a5f88`):
+all seven mandatory verification authorities, the aggregate `ciCheck`, and report publication
+passed. The original retained [quality evidence](https://github.com/carstenartur/Regelsuche/actions/runs/44852121730)
+(artifact 14691325547; ZIP SHA-256 `6321089fa1b2d4a1c1af2e7dc5c430adb1aa488cf4915e424931a2a0c77e3a01`)
+has 290 unique indexed files; all reported byte lengths and SHA-256 checksums were independently
+matched. The original `check.json` passed and the native `complexity.json` measures
+832860 context units, up 3290 from the previously accepted 829570, within the **unchanged**
+15000 limit. The verified source and CI linkage is retained in
+[provenance](../ai-knowledge/baseline-history/2026-11-21-main-a5e2efc0/provenance.json)
+and [metrics snapshot](../ai-knowledge/baseline-history/2026-11-21-main-a5e2efc0/metrics-snapshot.json).
+
+This accepts **only this green predecessor main**, not any current feature branch.
+No threshold, exception, policy, code selector, unpublished material, or protected test input is
+changed. Feature PRs still require fresh complete exact-head CI and their own functional acceptance.
+
+
+
+### Accepted main after scoped proof and continuation integrations (2026-11-20)
+
+The clean accepted reference is `c268eedc94032b65293d09b4e3d9d6af256b1074`,
+tree `8dc43f34aa9af5b06299468f9424933184de0086`.
+[Main CI 44824761437](https://github.com/carstenartur/Regelsuche/actions/runs/44824761437)
+passed all seven verification authorities, aggregate `ciCheck` and report
+publication. Its original artifact binds 290 indexed evidence files.
+
+A fresh detached checkout passed all 14 root `aiKnowledgeCheck` tasks in 43s,
+including eight coverage controls and 17 hotspot checks. The original 825210-unit
+baseline measured 829570 units and a concept radius of 115, with no violations
+under the unchanged 15000-unit and 3-radius limits. The proposed reference copies
+the complete generated [snapshot](../ai-knowledge/baseline-history/2026-11-20-main-c268eedc/metrics-snapshot.json).
+[Provenance](../ai-knowledge/baseline-history/2026-11-20-main-c268eedc/provenance.json)
+retains all 38 raw reports, the actual execution log and the original CI index.
+The native check/complexity files are byte-identical to the accepted CI files.
+The [independent review](../ai-knowledge/baseline-history/2026-11-20-main-c268eedc/independent-review.json)
+rechecked the original ZIP, every indexed file, source/tool Git objects and the
+unchanged controls. Pending feature measurements supply no baseline values.
 
 ### Accepted main with the mathematical certificates and domain workspaces (2026-11-20)
 
