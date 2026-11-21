@@ -8,14 +8,23 @@ downloaded GitHub artifact ZIP.
 
 ```bash
 AI_KNOWLEDGE_EXTRACTOR_ENABLED=true ./gradlew --no-configuration-cache ciCheck
-python3 -B scripts/collect-quality-acceptance-evidence.py --root "$PWD" --require-complete
+mvn -pl regelsuche-release -am -Dtest=QualityAcceptancePublicationTest \
+  -Dsurefire.failIfNoSpecifiedTests=false -Dregelsuche.qualityAcceptance.collect=true verify
 ```
 
-`collectQualityAcceptanceEvidence` is the Gradle reporting adapter for the same
-second command. It reads existing outputs and runs after `ciCheck` when both
-tasks are requested. The output is a **new** directory at
-`build/reports/quality/acceptance-evidence/`; move an earlier collection aside
-or choose a new checkout-relative `--output` before collecting again.
+The publication test collects the existing reports into a fresh
+`build/reports/quality/acceptance-evidence` directory. Set
+`-Dregelsuche.qualityAcceptance.output=build/reports/quality/another-collection`
+for another capture. A Git-free checkout can use a registration of the original
+commit and its complete tree. Generate it from the source checkout with
+`-Dregelsuche.qualityAcceptance.registerArchive=true` and
+`-Dregelsuche.qualityAcceptance.registration=ABSOLUTE_NEW_FILE` on the same publication test in place of
+the collection switch. Include that file as
+`build/authority-evidence/quality-source-tree.json` in the expanded archive.
+The reader reconstructs the commit tree and checks every tracked source member
+and executable flag. The archive verification and report collection need no Git
+executable. CI validates the archive before the full Maven reactor and retains
+the registration and the verification test XML with the Git-free evidence.
 
 `index.json` records the collection checkout revision/tree, whether tracked
 changes are present, each file's SHA-256 and byte length, the native outcome
@@ -29,8 +38,7 @@ the checked file bindings. It is **not** a combined PASS verdict: a fully
 retained FAILED or INCONCLUSIVE report keeps that outcome. Missing files,
 malformed reports, symbolic inputs and broken retained bindings produce
 `INCOMPLETE`, with the affected section marked `UNAVAILABLE` and each problem
-listed. `--require-complete` then exits nonzero. Without that flag the command
-can retain a partial local diagnostic. Source revision identifies collection,
+listed. The Maven publication test retains the partial diagnostic and fails. Source revision identifies collection,
 not the execution history of arbitrary pre-existing local outputs; use a clean
 checkout and the unchanged gate lifecycle for acceptance.
 
@@ -76,12 +84,12 @@ path and prints the SHA-256 of the byte-identical installed report before
 evaluating the existing coverage policy. With `-Dregelsuche.coverage.publish=true`,
 the same Failsafe execution also renders the standard JaCoCo pages from every
 module's retained execution data, classes and sources and verifies their counters
-against the canonical reports and gate. The job then invokes the collector with
-`--require-complete`. The new `quality-acceptance-evidence` artifact contains
+against the canonical reports and gate. The job then runs the Maven publication
+test, which requires a `COMPLETE` result. The `quality-acceptance-evidence` artifact contains
 only the collector's output. The existing `repository-verification`,
 `jmh-verification`, `sympy-runtime-verification`, `coverage-verification` and
-other authority artifacts remain retained. No workflow, gate selection,
-threshold or suppression is added. GitHub transfers files; the checkout owns
+other authority artifacts remain retained. The collector preserves the existing
+gate selection, thresholds and suppressions. GitHub transfers files. The checkout owns
 the completeness check and every existing quality decision.
 
 To verify downloaded coverage inputs with Maven, use a fresh evidence tree with
