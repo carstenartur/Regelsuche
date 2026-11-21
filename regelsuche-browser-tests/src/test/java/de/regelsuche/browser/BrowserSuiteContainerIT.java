@@ -46,7 +46,10 @@ class BrowserSuiteContainerIT {
                 "/workspace/app/build/reports").getExitCode());
             var run = worker.execInContainer("java", "--enable-native-access=ALL-UNNAMED", "-Dregelsuche.runVisualTests=true",
                 "-Dregelsuche.repositoryRoot=/workspace", "-cp", "/worker/tests:/worker/lib/*", "org.junit.platform.console.ConsoleLauncher",
-                "execute", "--select-package=de.regelsuche.e2e", "--fail-if-no-tests", "--disable-ansi-colors",
+                "execute", "--select-package=de.regelsuche.e2e",
+                // The Git-fixture tests run on the Maven host, not in the pinned offline image.
+                "--exclude-classname=.*\\.DocumentationScreenshotsTest",
+                "--fail-if-no-tests", "--disable-ansi-colors",
                 "--reports-dir=/workspace/results/junit");
             Files.writeString(reports.resolve("stdout.log"), run.getStdout());
             Files.writeString(reports.resolve("stderr.log"), run.getStderr());
