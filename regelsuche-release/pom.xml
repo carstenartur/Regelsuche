@@ -15,6 +15,7 @@
   <name>Regelsuche Release Evidence</name>
 
   <dependencies>
+    <dependency><groupId>org.apache.commons</groupId><artifactId>commons-compress</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope></dependency>
     <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><scope>test</scope></dependency>
     <dependency>
@@ -71,6 +72,22 @@
         <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
         <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
         <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
+      </configuration>
+    </plugin></plugins></build></profile>
+    <profile><id>native-polynomial-comparison</id><build><plugins><plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId>
+      <executions><execution><id>clear-previous-native-polynomial-reports</id><phase>initialize</phase><goals><goal>clean</goal></goals>
+        <configuration><excludeDefaultDirectories>true</excludeDefaultDirectories><filesets>
+          <fileset><directory>${project.build.directory}/reports/native-polynomial-comparison</directory><followSymlinks>false</followSymlinks></fileset>
+          <fileset><directory>${project.build.directory}/native-polynomial-worker-input</directory><followSymlinks>false</followSymlinks></fileset>
+        </filesets></configuration></execution></executions>
+    </plugin><plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
+      <executions><execution><id>run-frozen-native-polynomial-study</id><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
+      <configuration><test>de.regelsuche.release.NativePolynomialComparisonContainerIT</test>
+        <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+        <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+        <forkedProcessTimeoutInSeconds>2700</forkedProcessTimeoutInSeconds>
       </configuration>
     </plugin></plugins></build></profile>
   </profiles>
