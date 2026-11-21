@@ -3,6 +3,7 @@ package de.regelsuche.build;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +24,11 @@ class MavenDistributionArchiveGateContractTest {
         String driver = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(
             "regelsuche-quality-aggregate/src/test/java/de/regelsuche/quality/aggregate/MavenPythonClientDistributionIT.java"));
         assertFalse(driver.contains("ProcessBuilder("), "No host interpreter in external client qualification");
+        // /client/tests/test_*.py resolves parents[2] to /; it expects /docs/examples there.
+        assertTrue(driver.contains("root.resolve(\"docs/examples/linear-solution.json\")), \"/docs/examples/linear-solution.json\""),
+            "Mounted client unit-test fixture must remain at its real source-relative path");
+        assertTrue(driver.contains("root.resolve(\"docs/examples/linear-solution.json\")), \"/input/proof.json\""),
+            "Keep the distinct offline CLI proof fixture from the original distribution");
         Element configuration = child(execution, "configuration");
         assertEquals("de.regelsuche.quality.aggregate.MavenPythonClientDistributionIT", text(configuration, "test"));
         assertEquals("false", text(configuration, "skipTests"));
