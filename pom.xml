@@ -331,7 +331,10 @@
               <skipUpload>${central.skipUpload}</skipUpload>
               <autoPublish>${central.autoPublish}</autoPublish>
               <waitUntil>${central.waitUntil}</waitUntil>
-              <excludeArtifacts><excludeArtifact>regelsuche-app</excludeArtifact></excludeArtifacts>
+              <excludeArtifacts>
+                <excludeArtifact>regelsuche-app</excludeArtifact>
+                <excludeArtifact>regelsuche-solver-portfolio</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
         </plugins>
