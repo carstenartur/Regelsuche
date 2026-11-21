@@ -34,7 +34,7 @@ public final class LeanSolverBackend implements SolverBackend {
         Arrays.stream(Relation.values()).filter(r -> r != Relation.IS_INTEGER).toList(),
         List.of(RequestedEvidence.DECISION, RequestedEvidence.SYMBOLIC_CERTIFICATE,
                 RequestedEvidence.FORMAL_PROOF), true);
-    private final LeanLemmaPlan plan;
+    private final LeanProofPlan plan;
     private final Path project;
     private final Path evidenceRoot;
     private final List<String> command;
@@ -48,7 +48,7 @@ public final class LeanSolverBackend implements SolverBackend {
         this(project, evidenceRoot, command, timeout, null);
     }
 
-    private LeanSolverBackend(Path project, Path evidenceRoot, List<String> command, Duration timeout, LeanLemmaPlan plan) {
+    private LeanSolverBackend(Path project, Path evidenceRoot, List<String> command, Duration timeout, LeanProofPlan plan) {
         this.plan = plan;
         this.project = Objects.requireNonNull(project).toAbsolutePath().normalize();
         this.evidenceRoot = Objects.requireNonNull(evidenceRoot).toAbsolutePath().normalize();
@@ -59,6 +59,10 @@ public final class LeanSolverBackend implements SolverBackend {
     /** Isolated checked trial of a frozen declaration-application plan. */
     public LeanSolverBackend using(LeanLemmaPlan frozen) {
         return new LeanSolverBackend(project, evidenceRoot, command, timeout, Objects.requireNonNull(frozen));
+    }
+
+    public LeanSolverBackend using(de.regelsuche.solver.ir.ScopedProofDag dag) {
+        return new LeanSolverBackend(project, evidenceRoot, command, timeout, new LeanDagPlan(Objects.requireNonNull(dag)));
     }
 
     List<String> supportedSchemas() {
@@ -107,7 +111,7 @@ public final class LeanSolverBackend implements SolverBackend {
         Objects.requireNonNull(obligation);
         LeanSourceRenderer.Material material = renderer.render(obligation);
         List<String> issues = new ArrayList<>(material.issues());
-        if (plan != null && !SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()))
+        if (plan != null && !plan.accepts(obligation))
             issues.add("LEMMA_PLAN_REQUIRES_SCOPED_OBLIGATION");
         if (!DESCRIPTOR.supportedEvidence().contains(obligation.requestedEvidence()))
             issues.add("UNSUPPORTED_EVIDENCE:" + obligation.requestedEvidence());
@@ -136,15 +140,14 @@ public final class LeanSolverBackend implements SolverBackend {
                     "Lean toolchain version could not be established", "", directory);
             String nonce = UUID.randomUUID().toString().replace("-", "");
             String source = renderer.source(obligation, nonce, plan);
-            if (plan != null) Files.writeString(directory.resolve(LeanLemmaPlan.FILE), plan.material());
+            if (plan != null) Files.writeString(directory.resolve(plan.fileName()), plan.material());
             Files.writeString(directory.resolve("proof.lean"), source);
             ProcessOutput proof = compile(directory);
             if (!proof.success()) return finish(obligation, translation,
                 proof.timedOut() ? ResultStatus.TIMEOUT : proof.outputLimit() ? ResultStatus.ERROR : ResultStatus.UNKNOWN,
                 "Lean did not produce a checked theorem; inspect retained diagnostics", "", directory);
             var checked = checkedProcessAudit(proof.stdout(), obligation, nonce);
-            if (plan != null && checked.imports().stream().noneMatch(d -> plan.declarations().contains(d.name())))
-                throw new IOException("the proof term contains none of the proposed declarations");
+            if (plan != null) plan.verifyAudit(checked);
             String audit = checked.text();
             if (!before.equals(configurationHash()) || !environment.equals(pinnedEnvironment())
                     || !environment.pinsMatch(directory) || !source.equals(Files.readString(directory.resolve("proof.lean")))

@@ -109,35 +109,27 @@ tasks.named('jmh') { task ->
     task.dependsOn rootProject.tasks.named('prepareVerificationEnvironment')
 }
 
+// Keep the existing Gradle JMH producer during Maven qualification. Both
+// producers submit their complete 42-row matrix to the same Java authority.
+def qualityProject = project(':regelsuche-quality')
 def verifySymPyFactorizationBenchmark = tasks.register(
-    'verifySymPyFactorizationBenchmark', Exec) {
+    'verifySymPyFactorizationBenchmark', JavaExec) {
     group = 'verification'
     description = 'Validates specialist controls and the capability-matched general factorization matrix.'
-    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
-        tasks.named('jmh')
-    workingDir rootProject.projectDir
-    inputs.file rootProject.file(
-        'scripts/verify-sympy-factorization-benchmark.py')
-    inputs.file layout.buildDirectory.file(
-        'reports/jmh/sympy-factorization.json')
-    outputs.file rootProject.file(
-        'public/dev/bench/sympy-factorization.json')
-    outputs.file rootProject.file(
-        'public/dev/bench/sympy-factorization.html')
+    dependsOn tasks.named('jmh'), ':regelsuche-quality:classes'
+    classpath = qualityProject.files(qualityProject.providers.provider {
+        qualityProject.extensions.getByType(org.gradle.api.tasks.SourceSetContainer)
+            .named('main').get().runtimeClasspath
+    })
+    mainClass = 'de.regelsuche.quality.jmh.SympyFactorizationReport'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+    def raw = layout.buildDirectory.file('reports/jmh/sympy-factorization.json')
+    def summary = rootProject.file('public/dev/bench/sympy-factorization.json')
+    def page = rootProject.file('public/dev/bench/sympy-factorization.html')
+    inputs.file raw
+    outputs.files summary, page
     outputs.upToDateWhen { false }
-    doFirst {
-        commandLine verificationPython.get().asFile.absolutePath,
-            'scripts/verify-sympy-factorization-benchmark.py',
-            '--result', layout.buildDirectory.file(
-                'reports/jmh/sympy-factorization.json').get()
-                .asFile.absolutePath,
-            '--summary-output', rootProject.file(
-                'public/dev/bench/sympy-factorization.json')
-                .absolutePath,
-            '--report-output', rootProject.file(
-                'public/dev/bench/sympy-factorization.html')
-                .absolutePath
-    }
+    args raw.get().asFile.absolutePath, summary.absolutePath, page.absolutePath
 }
 
 jacoco {
@@ -177,21 +169,6 @@ if (separateSympyRuntimeAuthority) {
     }
     tasks.named('jacocoTestReport').configure {
         enabled = false
-    }
-}
-
-tasks.register('sympyRuntimeAuthority') {
-    group = 'verification'
-    description = 'Runs the complete Gradle SymPy runtime test and JaCoCo graph on an isolated required runner.'
-    dependsOn tasks.named('jacocoTestReport')
-    doFirst {
-        if (separateSympyRuntimeAuthority
-                || sympyRuntimeAuthorization != null
-                || !tasks.named('test').get().enabled
-                || !tasks.named('jacocoTestReport').get().enabled) {
-            throw new GradleException(
-                'sympyRuntimeAuthority must execute the complete enabled test and JaCoCo graph without separation markers')
-        }
     }
 }
 

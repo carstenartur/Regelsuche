@@ -35,7 +35,7 @@ public final class LeanEvidenceRebuilder {
         require(obligation.equals(read(retained, "obligation.json")), "retained obligation differs");
         String originalAuditText = read(retained, "audit.json");
         var originalAudit = LeanSolverBackend.checkedAuditDocument(originalAuditText, expected.contentHash(), null);
-        var plan = LeanLemmaPlan.retained(retained);
+        var plan = LeanProofPlan.read(expected, retained);
         require(plan == null || originalAudit.scoped(), "lemma plan requires a scoped audit");
         String source = new LeanSourceRenderer().source(expected, originalAudit.nonce(), plan);
         require(source.equals(read(retained, "proof.lean")), "retained source differs from the generated theorem");
@@ -71,7 +71,7 @@ public final class LeanEvidenceRebuilder {
         String independent = originalAudit.scoped() ? LeanStatementReconstruction.theorem(expected) : "";
         String rebuildSource = source + independent;
         Files.writeString(output.resolve("proof.lean"), rebuildSource);
-        if (plan != null) Files.writeString(output.resolve(LeanLemmaPlan.FILE), plan.material());
+        if (plan != null) Files.writeString(output.resolve(plan.fileName()), plan.material());
         Files.writeString(output.resolve(TOOLCHAIN), toolchainPin);
         Files.writeString(output.resolve(MANIFEST), dependencyPin);
 

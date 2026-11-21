@@ -51,12 +51,6 @@ class MavenGradleHostRuntimeInventoryContractTest {
           "\"$pilot_python\" -B -m external_polynomial_comparison.run_historical \\",
           "\"$pilot_python\" -B -m external_polynomial_comparison.run_historical --verify \\"
       )),
-      Map.entry("run-isolated-jmh-authority.sh", List.of(
-          "exec ./gradlew \\"
-      )),
-      Map.entry("run-isolated-sympy-runtime-authority.sh", List.of(
-          "exec ./gradlew \\"
-      )),
       Map.entry("run-knowledge-lifecycle-improvement.sh", List.of(
           "python_executable=\"${PYTHON_EXECUTABLE:-python3}\"",
           "\"$python_executable\" -m venv \"$venv\"",
@@ -72,10 +66,6 @@ class MavenGradleHostRuntimeInventoryContractTest {
           "env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2 \\",
           "\"$pilot_python\" -m external_polynomial_comparison.run_native \\",
           "\"$pilot_python\" -m external_polynomial_comparison.run_native --verify \\"
-      )),
-      Map.entry("run-released-sdk-maven-consumers.sh", List.of(
-          "python3 -m unittest discover -s scripts -p test_released_sdk_maven_consumers.py -v",
-          "exec python3 scripts/verify-released-sdk-maven-consumers.py \"$@\""
       )),
       Map.entry("run-typed-external-polynomial-comparison.sh", List.of(
           "python3 -m venv build/typed-external-polynomial-venv",
@@ -182,6 +172,21 @@ class MavenGradleHostRuntimeInventoryContractTest {
   );
 
   @Test
+  void nativeScalarReferenceRequiresAnOfflineImmutableContainerRuntime() throws IOException {
+    Path root = MavenPomTestSupport.repositoryRoot();
+    String script = Files.readString(root.resolve("scripts/reproduce-native-scalar-saturation.sh"));
+    String wrapper = Files.readString(root.resolve("scripts/sympy-container-runtime"));
+    assertTrue(script.contains("mvn -B -ntp -pl regelsuche-benchmarks -am"));
+    assertTrue(!script.contains("./gradlew"));
+    assertTrue(script.contains("REGELSUCHE_SYMPY_PYTHON=$checkout/scripts/sympy-container-runtime"));
+    assertTrue(wrapper.contains("exec docker run --rm -i --network none --read-only"));
+    assertTrue(wrapper.contains("image_id=${REGELSUCHE_SCALAR_IMAGE_ID:-}"));
+    assertTrue(wrapper.contains("[[ ! \"$image_id\" =~ ^sha256:[0-9a-f]{64}$ ]]"));
+    assertTrue(wrapper.contains("--entrypoint /opt/regelsuche-sympy/bin/python"));
+    assertTrue(wrapper.contains("sympy_rule_reference/reference.py"));
+  }
+
+  @Test
   void repositoryVerificationWrappersCannotGainUndeclaredHostRuntimeCommands() throws IOException {
     Path root = MavenPomTestSupport.repositoryRoot().resolve("scripts");
     try (Stream<Path> files = Files.walk(root)) {
@@ -277,13 +282,13 @@ class MavenGradleHostRuntimeInventoryContractTest {
 
   @Test
   void legacyLinesCannotBeDuplicatedOrReplacedByUnreviewedCommands() {
-    String oldCommand = "python3 -m unittest discover -s scripts -p test_released_sdk_maven_consumers.py -v";
-    rejectNewRuntimeLines("run-released-sdk-maven-consumers.sh", oldCommand);
+    String oldCommand = "python3 -m venv build/typed-external-polynomial-venv";
+    rejectNewRuntimeLines("run-typed-external-polynomial-comparison.sh", oldCommand);
     assertThrows(AssertionError.class,
-        () -> rejectNewRuntimeLines("run-released-sdk-maven-consumers.sh",
+        () -> rejectNewRuntimeLines("run-typed-external-polynomial-comparison.sh",
             oldCommand + "\n" + oldCommand));
     assertThrows(AssertionError.class,
-        () -> rejectNewRuntimeLines("run-released-sdk-maven-consumers.sh",
+        () -> rejectNewRuntimeLines("run-typed-external-polynomial-comparison.sh",
             "python3 -m unittest discover -s scripts -p new_suite.py -v"));
   }
 

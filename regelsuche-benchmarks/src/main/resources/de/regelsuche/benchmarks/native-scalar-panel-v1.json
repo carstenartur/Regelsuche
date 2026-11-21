@@ -1,0 +1,7 @@
+[
+  {"id":"factor-common-left","corpus":"historical-rediscovery-corpus/v1","source":"a*x + a*y","target":"a*(x+y)","assumptions":[],"operation":"factor_terms"},
+  {"id":"factor-common-right","corpus":"historical-rediscovery-corpus/v1","source":"x*a + y*a","target":"(x+y)*a","assumptions":[],"operation":"factor_terms"},
+  {"id":"opposite-factor-roles","corpus":"scalar-controls/v1","source":"x*a + a*y","target":"a*(x+y)","assumptions":[],"operation":"factor_terms"},
+  {"id":"mixed-conditional-zero","corpus":"scalar-controls/v1","source":"((b+0)*a)/a","target":"b","assumptions":["a != 0"],"operation":"cancel"},
+  {"id":"unknown-cancellation","corpus":"scalar-controls/v1","source":"(b*a)/a","target":"b","assumptions":[],"operation":"cancel"}
+]

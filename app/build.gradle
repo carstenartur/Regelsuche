@@ -179,7 +179,36 @@ tasks.register('vendorWebAssets') {
     dependsOn tasks.named('vendorKatexAssets'), tasks.named('vendorCytoscapeAssets')
 }
 
+def sourceRevisionOutput = layout.buildDirectory.dir('generated/source-revision')
+def sourceRevision = tasks.register('writeSourceRevision', JavaExec) {
+    def declaredRevision = providers.gradleProperty('regelsucheRepositoryRevision')
+    def inheritedRevision = providers.environmentVariable('REGELSUCHE_PREPARATION_REVISION')
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+    mainClass = file('src/buildProvenance/java/de/regelsuche/buildprovenance/SourceRevisionProcessor.java').absolutePath
+    args rootProject.projectDir.absolutePath, sourceRevisionOutput.get().asFile.absolutePath
+    inputs.file('src/buildProvenance/java/de/regelsuche/buildprovenance/SourceRevisionProcessor.java')
+    inputs.property('declaredSourceRevision', declaredRevision).optional(true)
+    inputs.property('inheritedSourceRevision', inheritedRevision).optional(true)
+    outputs.dir(sourceRevisionOutput)
+    // A ref or checked-out commit can change with identical Java application sources.
+    outputs.upToDateWhen { false }
+    doFirst {
+        if (declaredRevision.isPresent()) {
+            def revision = declaredRevision.get()
+            if (!(revision ==~ /[0-9a-f]{40}/)) {
+                throw new GradleException('Declared source revision must be a lowercase 40-character Git commit SHA')
+            }
+            def inherited = inheritedRevision.orNull
+            if (inherited != null && !inherited.isBlank() && inherited != revision) {
+                throw new GradleException('Gradle source revision differs from REGELSUCHE_PREPARATION_REVISION')
+            }
+            environment 'REGELSUCHE_PREPARATION_REVISION', revision
+        }
+    }
+}
+
 tasks.named('processResources') {
+    from(sourceRevision)
     dependsOn tasks.named('vendorWebAssets')
 }
 

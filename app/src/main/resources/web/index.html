@@ -17,6 +17,12 @@
         <h1>Regelsuche</h1>
         <p class="tagline">Mathematik-Workbench – Ausdrücke erkunden, Regeln entdecken, Beweise vorbereiten.</p>
     </div>
+    <details id="workbenchToolGroups">
+        <summary>Werkzeuge nach Aufgabe</summary>
+        <label>Arbeitsbereich und Werkzeug
+            <select id="workbenchToolChoice"><option value="">Werkzeug wählen</option></select>
+        </label>
+    </details>
     <nav class="tabs" aria-label="Werkzeuge">
         <button class="tab active" data-tab="workbench">Workbench</button>
         <button class="tab" data-tab="runs">Gespeicherte Runs</button>
@@ -63,6 +69,24 @@
         <h2 id="runsTitle">Gespeicherte Discovery-Runs</h2>
         <p>Öffne einen unveränderlichen Run, prüfe seine gebundenen Nachweise und vergleiche die gespeicherten Einstellungen.</p>
         <p><a id="openPublicDiscoveryFromRuns" href="/static/public-discovery-comparison.html" hreflang="en">Aufgezeichnete Vergleichsläufe mit öffentlichen Aufgaben öffnen (Englisch)</a></p>
+        <section class="card run-controls" aria-labelledby="nativeSearchTitle">
+            <h3 id="nativeSearchTitle">Zieloffene Suche ausführen</h3>
+            <form id="nativeSearchForm" class="actions">
+                <label class="field"><span>Quellausdruck</span><input id="nativeSearchSource" value="x + 0" required maxlength="256" spellcheck="false"></label>
+                <label class="field"><span>Suchbudget</span><select id="nativeSearchProfile"><option value="small">Klein · 12 Zustände</option><option value="extended">Erweitert · 32 Zustände</option></select></label>
+                <label><input type="checkbox" id="nativeStartPaused"> Pausiert starten</label>
+                <button type="submit" id="startNativeSearch">Suche starten</button>
+                <button type="button" id="pauseNativeSearch" disabled>Pausieren</button>
+                <button type="button" id="stopNativeSearch" disabled>Suche stoppen</button>
+            </form>
+            <p id="nativeSearchStatus" role="status" aria-live="polite"></p>
+            <p id="nativeSearchProgress"></p>
+            <p id="nativeSearchMinima"></p>
+            <button id="openNativeResult" type="button" hidden>Gefundene Kandidaten im Dossier öffnen</button>
+            <details id="nativeSearchHistory"><summary>Ausführungsprotokolle</summary>
+                <label class="field"><span>Gespeicherter Suchauftrag</span><select id="nativeOperationHistory"><option value="">Auftrag wählen</option></select></label>
+            </details>
+        </section>
         <div class="card run-controls">
             <form id="openRetainedRun" class="actions">
                 <label class="field"><span>Run-ID</span><input id="retainedRunInput" type="text" required spellcheck="false" placeholder="sha256:… oder 64-stelliger Digest"></label>
@@ -744,7 +768,9 @@
 <script src="app.js"></script>
 <script src="run-workspace-state.js"></script>
 <script src="candidate-dossier-state.js"></script>
+<script src="candidate-occurrence-review.js"></script>
 <script src="candidate-dossier.js"></script>
+<script src="native-search-workspace.js"></script>
 <script src="run-workspace.js"></script>
     <script src="rule-radar.js"></script>
 </body>

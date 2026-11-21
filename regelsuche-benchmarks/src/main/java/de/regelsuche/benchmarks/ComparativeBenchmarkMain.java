@@ -27,6 +27,12 @@ public final class ComparativeBenchmarkMain {
     }
 
     public static void main(String[] args) {
+        if (args.length > 0 && "--native-scalar-comparison".equals(args[0])) {
+            if (args.length != 4) throw new IllegalArgumentException("expected --native-scalar-comparison <reference.py> <revision> <output-directory>");
+            try { NativeScalarComparison.write(Path.of(args[1]),args[2],Path.of(args[3])); }
+            catch (IOException failure) { throw new UncheckedIOException(failure); }
+            return;
+        }
         if (args.length > 0 && "--shared-rewrite-fragment".equals(args[0])) {
             if (args.length != 2) {
                 throw new IllegalArgumentException("expected --shared-rewrite-fragment <output-file>");

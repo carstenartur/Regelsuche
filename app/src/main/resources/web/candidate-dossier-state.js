@@ -123,6 +123,30 @@
         return freeze({candidate, source, edges, selectedEdge, bridge,
             capabilityChange: capabilityChange(data, source, candidate, bridge)});
     }
+    function occurrenceSelection(selected) {
+        if (selected.native) {
+            const step = selected.selectedReplay || selected.replaySteps.find(s => s.edge === selected.selectedEdge) || selected.replaySteps.at(-1);
+            return step && {candidateId: selected.candidate.stateId, edge: step.edge.sequence,
+                generation: String(step.generation.sequence), rule: step.generation.ruleId, source: step.generation.sourceExpression,
+                target: step.generation.transformedExpression, application: step.generation.applicationKey};
+        }
+        const step = selected.selectedEdge || selected.edges.find(e => e.fromStateHash === selected.candidate.parentStateHash
+            && e.applicationKey === selected.candidate.incomingApplicationKey);
+        return step && {candidateId: selected.candidate.stateHash, edge: step.sequence, generation: '',
+            rule: step.ruleId, target: step.transformedExpression, application: step.applicationKey};
+    }
+    function acceptReview(run, artifact, selection, data, response) {
+        if (data.schema !== 'regelsuche.retained-candidate-occurrence-review/v1' || data.runId !== run.runId
+                || response.headers.get('X-Regelsuche-Run-Id') !== run.runId || data.candidateId !== selection.candidateId
+                || data.artifactHash !== artifact.contentHash || data.edgeSequence !== selection.edge
+                || data.selectedStep.rule !== selection.rule || data.selectedStep.application !== selection.application
+                || data.selectedStep.target !== selection.target || selection.source && data.selectedStep.source !== selection.source
+                || data.ruleInventoryHash !== run.plan.ruleInventoryHash || data.informationBoundaryHash !== run.plan.informationBoundaryHash
+                || !/^sha256:[a-f0-9]{64}$/.test(data.contentHash) || response.headers.get('ETag') !== '"' + data.contentHash.slice(7) + '"') {
+            fail('Prüfbeleg gehört nicht zur ausgewählten Ausführung.');
+        }
+        return freeze(data);
+    }
     function createStore(load, changed = () => {}) {
         let generation = 0, current = freeze({status: 'EMPTY', runId: '', artifact: null, error: ''});
         const publish = value => { current = freeze(value); changed(current); };
@@ -145,5 +169,5 @@
             }
         });
     }
-    window.RegelsucheCandidateDossierState = Object.freeze({schema: SCHEMA, nativeSchema: NATIVE, supports, decode, selection, createStore});
+    window.RegelsucheCandidateDossierState = Object.freeze({schema: SCHEMA, nativeSchema: NATIVE, supports, decode, selection, occurrenceSelection, acceptReview, createStore});
 })();

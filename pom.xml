@@ -62,6 +62,8 @@
     <maven.compiler.release>25</maven.compiler.release>
     <maven.minimum.version>3.9.9</maven.minimum.version>
     <maven.maximum.exclusive.version>4.0.0</maven.maximum.exclusive.version>
+    <playwright.version>1.65.0</playwright.version>
+    <jmh.version>1.36</jmh.version>
     <maven.test.fork.timeout.seconds>600</maven.test.fork.timeout.seconds>
     <releaseVersion>${project.version}</releaseVersion>
 
@@ -97,12 +99,18 @@
     <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
     <maven.site.plugin.version>3.22.0</maven.site.plugin.version>
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
+    <commons.compress.version>1.28.0</commons.compress.version>
     <jacoco.version>0.8.16</jacoco.version>
     <jacoco.report.version>0.8.16</jacoco.report.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
+      <dependency><groupId>org.apache.commons</groupId><artifactId>commons-compress</artifactId><version>${commons.compress.version}</version></dependency>
+      <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-console</artifactId><version>${junit.version}</version></dependency>
+      <dependency><groupId>com.microsoft.playwright</groupId><artifactId>playwright</artifactId><version>${playwright.version}</version></dependency>
+      <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-core</artifactId><version>${jmh.version}</version></dependency>
+      <dependency><groupId>org.openjdk.jmh</groupId><artifactId>jmh-generator-annprocess</artifactId><version>${jmh.version}</version></dependency>
       <dependency>
         <groupId>org.junit</groupId>
         <artifactId>junit-bom</artifactId>
@@ -219,6 +227,21 @@
         <artifactId>maven-clean-plugin</artifactId>
         <executions>
           <execution>
+            <id>delete-stale-coverage-inputs</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets>
+                <fileset>
+                  <directory>${project.build.directory}</directory>
+                  <includes><include>jacoco.exec</include><include>site/jacoco/**</include></includes>
+                  <followSymlinks>false</followSymlinks>
+                </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+          <execution>
             <id>delete-stale-test-reports</id>
             <phase>initialize</phase>
             <goals><goal>clean</goal></goals>
@@ -245,6 +268,24 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>jmh-qualification</id>
+      <modules>
+        <module>regelsuche-persistence-hibernate</module>
+        <module>app</module>
+        <module>regelsuche-jmh</module>
+        <module>regelsuche-sympy-jmh</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>checked-proofs</id>
+      <modules>
+        <module>regelsuche-persistence-hibernate</module>
+        <module>app</module>
+        <module>regelsuche-benchmarks</module>
+        <module>regelsuche-proof-tests</module>
+      </modules>
+    </profile>
     <profile>
       <id>maven-central</id>
       <properties>
@@ -290,7 +331,10 @@
               <skipUpload>${central.skipUpload}</skipUpload>
               <autoPublish>${central.autoPublish}</autoPublish>
               <waitUntil>${central.waitUntil}</waitUntil>
-              <excludeArtifacts><excludeArtifact>regelsuche-app</excludeArtifact></excludeArtifacts>
+              <excludeArtifacts>
+                <excludeArtifact>regelsuche-app</excludeArtifact>
+                <excludeArtifact>regelsuche-solver-portfolio</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
         </plugins>
@@ -317,6 +361,10 @@
         <module>regelsuche-benchmarks</module>
         <module>app</module>
         <module>regelsuche-integration-tests</module>
+        <module>regelsuche-jmh</module>
+        <module>regelsuche-sympy-jmh</module>
+        <module>regelsuche-browser-tests</module>
+        <module>regelsuche-proof-tests</module>
         <module>regelsuche-quality-aggregate</module>
       </modules>
     </profile>
