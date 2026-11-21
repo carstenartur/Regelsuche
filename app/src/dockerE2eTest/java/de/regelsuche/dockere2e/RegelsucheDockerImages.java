@@ -34,7 +34,8 @@ final class RegelsucheDockerImages {
     private static final Path BUILD_CONTEXT = createTrackedBuildContext();
 
     static final LazyFuture<String> APPLICATION = DockerBuildDiagnostics.observe(
-        new ImageFromDockerfile().withFileFromPath(".", BUILD_CONTEXT), "Dockerfile");
+        new ImageFromDockerfile().withFileFromPath(".", BUILD_CONTEXT)
+            .withBuildArg("REGELSUCHE_PREPARATION_REVISION", checkoutRevision()), "Dockerfile");
 
     static final LazyFuture<String> PROOF = DockerBuildDiagnostics.observe(
         new ImageFromDockerfile().withFileFromPath(".", BUILD_CONTEXT)
@@ -45,6 +46,23 @@ final class RegelsucheDockerImages {
 
     static Path buildContext() {
         return BUILD_CONTEXT;
+    }
+
+    private static String checkoutRevision() {
+        try {
+            Process process = new ProcessBuilder("git", "-C", PROJECT_ROOT.toString(), "rev-parse", "--verify", "HEAD")
+                .redirectErrorStream(true).start();
+            String revision = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+            if (process.waitFor() != 0 || !revision.matches("[0-9a-f]{40}")) {
+                throw new IllegalStateException("Cannot bind the Docker image to its actual source checkout");
+            }
+            return revision;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while binding Docker source revision", interrupted);
+        } catch (IOException invalid) {
+            throw new UncheckedIOException("Could not bind Docker source revision", invalid);
+        }
     }
 
     private static Path createTrackedBuildContext() {

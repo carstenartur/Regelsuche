@@ -172,6 +172,21 @@ class MavenGradleHostRuntimeInventoryContractTest {
   );
 
   @Test
+  void nativeScalarReferenceRequiresAnOfflineImmutableContainerRuntime() throws IOException {
+    Path root = MavenPomTestSupport.repositoryRoot();
+    String script = Files.readString(root.resolve("scripts/reproduce-native-scalar-saturation.sh"));
+    String wrapper = Files.readString(root.resolve("scripts/sympy-container-runtime"));
+    assertTrue(script.contains("mvn -B -ntp -pl regelsuche-benchmarks -am"));
+    assertTrue(!script.contains("./gradlew"));
+    assertTrue(script.contains("REGELSUCHE_SYMPY_PYTHON=$checkout/scripts/sympy-container-runtime"));
+    assertTrue(wrapper.contains("exec docker run --rm -i --network none --read-only"));
+    assertTrue(wrapper.contains("image_id=${REGELSUCHE_SCALAR_IMAGE_ID:-}"));
+    assertTrue(wrapper.contains("[[ ! \"$image_id\" =~ ^sha256:[0-9a-f]{64}$ ]]"));
+    assertTrue(wrapper.contains("--entrypoint /opt/regelsuche-sympy/bin/python"));
+    assertTrue(wrapper.contains("sympy_rule_reference/reference.py"));
+  }
+
+  @Test
   void repositoryVerificationWrappersCannotGainUndeclaredHostRuntimeCommands() throws IOException {
     Path root = MavenPomTestSupport.repositoryRoot().resolve("scripts");
     try (Stream<Path> files = Files.walk(root)) {

@@ -4,6 +4,8 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Eigene Discovery-Domänen – Regelsuche</title>
   <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="discovery-domains.css">
+  <script defer src="candidate-occurrence-review.js"></script>
+  <script defer src="candidate-dossier.js"></script>
   <script defer src="discovery-domains.js"></script>
 </head>
 <body>
@@ -33,6 +35,14 @@
     <p>Replay verwendet dieselben Startdaten und Budgets. Es verursacht zusätzliche Arbeit; die gespeicherten Zähler bleiben unverändert.</p>
     <button id="replayDomainExport" type="button" disabled>Vollständige Evidence reproduzieren</button>
     <p id="retainedDomainReplayStatus" role="status" aria-live="polite"></p>
+  </section>
+  <section class="card" id="domainAssessment" aria-labelledby="domainAssessmentHeading" hidden>
+    <h2 id="domainAssessmentHeading">Kandidat und Belege prüfen</h2>
+    <p>Die Prüfung wiederholt den gespeicherten Lauf und vergleicht ihn mit einem Lauf ohne weitere Suchschritte. Beide verwenden dieselben Startdaten.</p>
+    <button id="assessDomainExport" type="button">Prüfung und Vergleich ausführen</button>
+    <p id="domainAssessmentStatus" role="status" aria-live="polite"></p>
+    <div id="domainAssessmentResult"></div>
+    <a id="downloadDomainAssessment" download hidden>Gesamten Prüfbeleg herunterladen</a>
   </section>
   <section class="card" id="retainedDomainValidation" hidden>
     <h2>Gespeicherte Folgenglieder unabhängig prüfen</h2>

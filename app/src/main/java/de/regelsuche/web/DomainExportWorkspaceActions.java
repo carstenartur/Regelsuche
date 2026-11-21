@@ -18,7 +18,7 @@ final class DomainExportWorkspaceActions {
         if (suffix.endsWith("/")) suffix = suffix.substring(0, suffix.length() - 1);
         try {
             boolean post = exchange.getRequestMethod().equals("POST");
-            var boundRequest = post && (suffix.endsWith("/replay") || suffix.endsWith("/validate") || suffix.endsWith("/model-proof"))
+            var boundRequest = post && (suffix.endsWith("/replay") || suffix.endsWith("/validate") || suffix.endsWith("/model-proof") || suffix.endsWith("/assessment"))
                 ? readBoundRequest(exchange, maxBytes) : Map.<String, Object>of();
             var repository = new DomainExportWorkspaceRepository(directory);
             if (suffix.isEmpty()) {
@@ -27,29 +27,15 @@ final class DomainExportWorkspaceActions {
             }
             String[] path = suffix.substring(1).split("/", -1);
             if (!path[0].matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid export digest");
-            if (path.length == 3 && path[1].equals("model-proof")) {
-                var receipt = new DomainModelProofRepository(directory).find("sha256:" + path[0], "sha256:" + path[2]);
-                if (receipt.isEmpty()) {
-                    error(exchange, 404, "DOMAIN_MODEL_PROOF_NOT_FOUND", "retained export or model proof receipt not found");
-                    return;
-                }
-                sendReceipt(exchange, "sha256:" + path[0], path[2], receipt.orElseThrow(), "domain-model-proof");
-                return;
-            }
-            if (path.length == 3 && path[1].equals("validate")) {
-                var receipt = repository.findValidation("sha256:" + path[0], "sha256:" + path[2]);
-                if (receipt.isEmpty()) {
-                    error(exchange, 404, "DOMAIN_VALIDATION_NOT_FOUND", "retained export or validation receipt not found");
-                    return;
-                }
-                sendReceipt(exchange, "sha256:" + path[0], path[2], receipt.orElseThrow(), "domain-validation");
+            if (path.length == 3 && Set.of("assessment", "validate", "model-proof").contains(path[1])) {
+                sendRetainedReceipt(exchange, repository, directory, "sha256:" + path[0], path[1], path[2]);
                 return;
             }
             var found = findSource(repository, "sha256:" + path[0], path.length == 2 && path[1].equals("model-proof"));
             if (found.isEmpty()) { error(exchange, 404, "DOMAIN_EXPORT_NOT_FOUND", "retained export not found"); return; }
             var workspace = found.get();
             if (path.length == 1) sendWorkspace(exchange, 200, workspace);
-            else if (path.length == 2 && Set.of("replay", "validate", "model-proof").contains(path[1])) {
+            else if (path.length == 2 && Set.of("replay", "validate", "model-proof", "assessment").contains(path[1])) {
                 handleBoundAction(exchange, repository, directory, workspace, boundRequest, path[1]);
             } else if (path.length == 3 && path[1].equals("files")) {
                 sendOriginalFile(exchange, workspace, path[2]);
@@ -63,6 +49,34 @@ final class DomainExportWorkspaceActions {
         } catch (IllegalStateException exception) {
             error(exchange, 500, "DOMAIN_EXPORT_REPOSITORY_FAILURE", exception.getMessage());
         }
+    }
+
+    private static void sendRetainedReceipt(HttpExchange exchange, DomainExportWorkspaceRepository repository,
+            Path directory, String runId, String action, String digest) throws IOException {
+        String hash = "sha256:" + digest;
+        Optional<byte[]> bytes;
+        String prefix;
+        String missing;
+        switch (action) {
+            case "assessment" -> {
+                bytes = new DomainSnapshotAssessmentRepository(directory).find(runId, hash);
+                prefix = "domain-assessment";
+                missing = "DOMAIN_ASSESSMENT_NOT_FOUND";
+            }
+            case "model-proof" -> {
+                bytes = new DomainModelProofRepository(directory).find(runId, hash);
+                prefix = "domain-model-proof";
+                missing = "DOMAIN_MODEL_PROOF_NOT_FOUND";
+            }
+            case "validate" -> {
+                bytes = repository.findValidation(runId, hash);
+                prefix = "domain-validation";
+                missing = "DOMAIN_VALIDATION_NOT_FOUND";
+            }
+            default -> throw new IllegalArgumentException("unsupported receipt action");
+        }
+        if (bytes.isEmpty()) error(exchange, 404, missing, "retained export or requested receipt not found");
+        else sendReceipt(exchange, runId, digest, bytes.orElseThrow(), prefix);
     }
 
     private static Optional<DomainExportWorkspace> findSource(DomainExportWorkspaceRepository repository,
@@ -80,6 +94,14 @@ final class DomainExportWorkspaceActions {
         if (!workspace.contentHash().equals(boundRequest.get("expectedWorkspaceHash"))
                 || !workspace.evidence().contentHash().equals(boundRequest.get("expectedEvidenceHash"))) {
             error(exchange, 409, "SOURCE_BINDING_MISMATCH", "request belongs to another source view"); return;
+        }
+        if (action.equals("assessment")) {
+            var receipt = DomainSnapshotAssessment.assess(workspace);
+            new DomainSnapshotAssessmentRepository(directory).retain(workspace, receipt);
+            String digest = receipt.contentHash().substring(7);
+            exchange.getResponseHeaders().set("Location", BASE + "/" + workspace.runId().substring(7) + "/assessment/" + digest);
+            sendReceipt(exchange, workspace.runId(), digest, receipt.toCanonicalJson().getBytes(StandardCharsets.UTF_8), "domain-assessment");
+            return;
         }
         if (action.equals("model-proof")) {
             var receipt = DomainModelProof.prove(workspace);

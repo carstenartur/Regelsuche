@@ -3,12 +3,14 @@ package de.regelsuche.release;
 import static org.junit.jupiter.api.Assertions.*;
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.utility.MountableFile;
@@ -18,7 +20,7 @@ class PolynomialComparisonContainerIT {
     private static final String RESULTS = "build/reports/external-polynomial-comparison";
     private static final String PILOT = "external_polynomial_comparison.run";
 
-    @Test void reproduceTheRegisteredExperimentAndRecheckTheRetainedRows() throws Exception {
+    @Test void reproduceTheRegisteredExperimentAndRecheckTheRetainedRows() throws Throwable {
         Path root = Path.of("..").toRealPath();
         Path reports = Files.createDirectories(Path.of("target/reports/polynomial-comparison").toAbsolutePath());
         Path stage = Files.createDirectory(Path.of("target/polynomial-worker-input").toAbsolutePath());
@@ -54,14 +56,17 @@ class PolynomialComparisonContainerIT {
                 "import sys,sympy,mpmath; assert sys.version_info[:3]==(3,12,12) and sympy.__version__=='1.14.0' and mpmath.__version__=='1.3.0'; print(sys.version,sympy.__version__,mpmath.__version__)");
             run(worker, reports, "reference-controls", "python", "-m", "unittest", "discover", "-s", "scripts/sympy_rule_reference", "-p", "test_*.py", "-v");
             run(worker, reports, "pilot-controls", "python", "-m", "unittest", "external_polynomial_comparison.test_comparison", "external_polynomial_comparison.test_registered_source", "-v");
-            try {
+            runWithArchive(() -> {
                 run(worker, reports, "execute", "python", "-m", PILOT, "--classpath", "/pilot/classpath.txt",
                     "--source-proof", PolynomialSourceProof.RECEIPT.toString(), "--output", RESULTS);
                 run(worker, reports, "verify", "python", "-m", PILOT, "--verify", "--output", RESULTS);
-            } finally {
+            }, () -> {
                 var archived = worker.execInContainer("tar", "-czf", "/pilot/evidence.tgz", "-C", "/pilot", RESULTS);
-                if (archived.getExitCode() == 0) worker.copyFileFromContainer("/pilot/evidence.tgz", reports.resolve("evidence.tgz").toString());
-            }
+                Files.writeString(reports.resolve("archive.stdout"), archived.getStdout());
+                Files.writeString(reports.resolve("archive.stderr"), archived.getStderr());
+                Path archive = reports.resolve("evidence.tgz");
+                copyArchive(archived.getExitCode(), archive, () -> worker.copyFileFromContainer("/pilot/evidence.tgz", archive.toString()));
+            });
             for (String file : List.of("protocol.json", "metadata.json", "rows.json", "canonical-rows.json",
                     "paired-comparisons.json", "summary.json", "manifest.json", "report.md", "java.stderr.txt", "sympy.stderr.txt"))
                 worker.copyFileFromContainer("/pilot/" + RESULTS + "/" + file, reports.resolve(file).toString());
@@ -71,6 +76,27 @@ class PolynomialComparisonContainerIT {
             for (var name : List.of("java", "sympy"))
                 assertEquals("READY", metadata.required("setup").required(name).required("ready").required("status").textValue(), name);
         }
+    }
+
+    static void copyArchive(int exitCode, Path archive, Executable copy) throws Throwable {
+        assertEquals(0, exitCode, "could not create the complete polynomial evidence archive: " + archive);
+        copy.execute();
+        assertTrue(Files.isRegularFile(archive, LinkOption.NOFOLLOW_LINKS) && Files.size(archive) > 0,
+            "the complete polynomial evidence archive was not copied: " + archive);
+    }
+
+    static void runWithArchive(Executable experiment, Executable archive) throws Throwable {
+        try {
+            experiment.execute();
+        } catch (Throwable failure) {
+            try {
+                archive.execute();
+            } catch (Throwable retentionFailure) {
+                if (failure != retentionFailure) failure.addSuppressed(retentionFailure);
+            }
+            throw failure;
+        }
+        archive.execute();
     }
 
     static List<Path> runtime(Path root) throws Exception {

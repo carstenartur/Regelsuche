@@ -125,15 +125,24 @@ from the root of a source checkout with Docker available.
 
 ```sh
 mvn -Ppolynomial-comparison -pl regelsuche-release -am \
-  -Dtest=ExternalPolynomialComparisonWorkerTest,PolynomialSourceProofTest,PolynomialRuntimeClasspathTest \
+  -Dtest=ExternalPolynomialComparisonWorkerTest,PolynomialSourceProofTest,PolynomialRuntimeClasspathTest,PolynomialComparisonArchiveTest \
   -Dsurefire.failIfNoSpecifiedTests=false verify
 ```
 
-The worker retains stdout, stderr, the ten original study products, the complete
+The worker retains stdout, stderr, the ten original study products, the required
 raw output tarball and the verified source admission in
 `regelsuche-release/target/reports/polynomial-comparison`. Its two worker
 handshakes, original protocol bytes and complete result matrix are required.
-The older hosted lane remains active for the separate migration comparison.
+The source proof rejects modified tracked files before either the checkout or
+the registered archive can supply a verified receipt to the worker.
+The native pilot and both existing polynomial authorities must succeed before
+`ciCheck` can pass. The existing lanes stay required while the hosted
+comparison qualifies the new producer and its independent replay.
+
+A same-run comparison at the earlier source `8a38b6ff` retained 648 matching
+canonical rows from the Maven pilot and the existing lane. Timing observations
+come from independently executed workers. The recovered integration needs its
+own hosted result. [Historical comparison run](https://github.com/carstenartur/Regelsuche/actions/runs/44830486518)
 
 `config/benchmarks/polynomial-freeze-source-objects.json.gz` contains the
 original Git objects from the public history of e115. Their byte identities and

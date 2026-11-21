@@ -1,6 +1,7 @@
 package de.regelsuche.release;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -29,7 +30,8 @@ class PolynomialSourceProofTest {
         byte[] raw = builder.build();
         try (var hasher = new ObjectInserter.Formatter()) {
             String id = hasher.idFor(Constants.OBJ_COMMIT, raw).name();
-            var source = QualityAcceptanceCollection.JSON.createObjectNode().put("revision", id).put("tree", tree.name());
+            var source = QualityAcceptanceCollection.JSON.createObjectNode().put("revision", id).put("tree", tree.name())
+                .put("trackedChangesPresent", false);
             var receipt = QualityAcceptanceCollection.JSON.createObjectNode().put("schema", "regelsuche.polynomial-source-witness/v1")
                 .put("revision", id);
             receipt.putObject("objects").putObject(id).put("type", "commit").put("data", Base64.getEncoder().encodeToString(raw));
@@ -37,6 +39,9 @@ class PolynomialSourceProofTest {
             assertEquals(source.required("revision"), verified.required("revision"));
             assertEquals(PolynomialSourceProof.SCHEMA_HASH, verified.required("registeredProtocolSha256").textValue());
             for (String freeze : PolynomialSourceProof.FREEZES) assertTrue(verified.required("ancestors").has(freeze), freeze);
+            var dirtySource = source.deepCopy().put("trackedChangesPresent", true);
+            var dirty = assertThrows(IOException.class, () -> PolynomialSourceProof.verify(root, receipt, dirtySource));
+            assertEquals("polynomial proof requires an unchanged tracked source", dirty.getMessage());
             var substituted = receipt.deepCopy();
             substituted.put("revision", "0".repeat(40));
             assertThrows(Exception.class, () -> PolynomialSourceProof.verify(root, substituted, source));

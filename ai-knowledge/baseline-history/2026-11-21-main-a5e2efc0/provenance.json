@@ -1,0 +1,47 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_ONLY",
+  "sourceCommit": "a5e2efc099162723ca2f3f8ca7064a98fddb52cb",
+  "sourceTree": "38e161b03b68bbd36261d5908b4afa14bd6a5f88",
+  "originalMainCI": {
+    "runId": 44852121730,
+    "runURL": "https://github.com/carstenartur/Regelsuche/actions/runs/44852121730",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "successfulMandatoryJobs": 7,
+    "aggregateCiCheck": "success",
+    "reportPublication": "success",
+    "originalGradleJobId": 136685666790
+  },
+  "originalQualityEvidence": {
+    "artifactId": 14691325547,
+    "downloadedZipSha256": "6321089fa1b2d4a1c1af2e7dc5c430adb1aa488cf4915e424931a2a0c77e3a01",
+    "zipIndexSha256": "6346df803a662e5b3536f120397aef46dc6824e95ad79768090d5ebb35b4083c",
+    "indexCheckoutRevision": "a5e2efc099162723ca2f3f8ca7064a98fddb52cb",
+    "indexCheckoutTree": "38e161b03b68bbd36261d5908b4afa14bd6a5f88",
+    "indexTrackedChangesPresent": false,
+    "indexedFilesVerified": 290,
+    "indexedFileFailures": 0,
+    "originalCheckJson": {
+      "bytes": 10186,
+      "sha256": "49d65a128ef5169febcb6642b7b65225552db48be6d57cace57bfda47ed59211",
+      "passed": true
+    },
+    "originalComplexityJson": {
+      "bytes": 20796,
+      "sha256": "c17939b25475d277380c1525ff8fb30f075e5541a6b8113e6aaebd5a20327b59"
+    }
+  },
+  "comparator": {
+    "previousAcceptedMain": "c268eedc94032b65293d09b4e3d9d6af256b1074",
+    "previousReferenceEstimatedTokens": 829570,
+    "measuredAcceptedMainEstimatedTokens": 832860,
+    "delta": 3290,
+    "unchangedMaxIncrease": 15000,
+    "measuredConceptRadius": 115,
+    "previousConceptRadius": 115,
+    "sourceExtractorVersion": "0.1.10"
+  },
+  "boundary": "The metric is the accepted, already-green main source measurement. Verification covers the exact hosted CI, artifact digest, all 290 indexed paths, sizes and SHA-256 values, and the original native check/complexity reports. It does not constitute a fresh independent full-toolchain execution, any mathematical proof, or authorization to accept or merge pending PRs. Pending feature heads must run their complete checks and reproduce results under this unmodified gate."
+}

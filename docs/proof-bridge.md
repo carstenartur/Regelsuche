@@ -266,3 +266,122 @@ proofs. Therefore `FORMALLY_PROVED` is never admitted from a cache hit, even for
 a current identity. A fresh backend execution is required. Non-proof generation
 results remain reusable in the same scope. Old entries are not deleted or
 silently upgraded; legacy identities cannot authorize the new evidence contract.
+
+### Scoped solver obligations (v2)
+
+Construct scoped statements through the same Java `SolverIr.Obligation.create` boundary.
+Including `Theory.SCOPED_ANALYSIS` selects the [v2 schema](schemas/regelsuche-solver-obligation-v2.schema.json).
+A `Predicate.holds(id, proposition)` introduces a named assumption. A
+`Goal.holds(proposition)` requests a proof of the proposition. Arithmetic
+goals and assumptions can also be used. Declarations refer to free symbols by
+name. `Bound(0)` refers to the immediately enclosing binder and `Bound(1)` to
+its parent. Construction rejects out-of-scope indices. Alpha-equivalent
+binders use the same wire representation.
+
+| IR construct | Checked interpretation |
+| --- | --- |
+| `Binder(FORALL/EXISTS, sort, p)` | Universal or existential quantification over the supported sort |
+| `Binder(SET_OF, REAL, p)` | Set of reals satisfying the predicate |
+| `Binder(SEQUENCE, NATURAL, t)`, `Binder(FUNCTION, REAL, t)` | Natural-indexed real sequence or real-valued real function |
+| `eq`, `ne`, `le`, `lt`, `and`, `or`, `not`, `implies` | Typed comparison and propositional operations |
+| `mem`, `subset`, `union`, `inter` | Real set membership, inclusion, union, intersection |
+| `nat`, `of_nat`, `succ`, `at` | Natural numeral, real coercion, successor, function application |
+| `summable(f)`, `has_sum(f,a)`, `tsum(f)` | Mathlib `Summable`, `HasSum`, and totalized `tsum` |
+| `tends_to(f,a)`, `limit_at(f,x,a)` | Natural sequence limit at infinity, or function limit along the full neighborhood filter at x |
+
+The function limit uses `nhds x`, which includes the value at x. Statements about
+punctured neighborhoods need a separate operator. A `tsum` term alone does not
+assert convergence. The caller can state summability or an exact sum separately.
+The lossless translator checks application arities, sorts, binder domains and
+the existing real-domain conditions before execution. A bounded tactic failure
+yields `UNKNOWN`. Enumerating a witness through unification and applying
+pinned `HasSum.summable` and `Summable.add` produce ordinary Lean proof terms.
+Register the configured Lean backend via `StandardPortfolioBackends.lean`.
+Other standard profiles reject v2 requests before execution.
+
+V2 evidence records each imported declaration's name and defining module at
+the boundary of the actual proof and its local helper declarations. The
+existing axiom traversal follows dependencies through imported declarations.
+The recorded module names resolve in the pinned mathlib/Lean environment.
+The separate-project rebuild checks the same imported declarations and adds
+a second theorem built directly from the IR by an independent translator
+using different names, closure order of construction and constructor syntax.
+It kernel-checks that the original proof inhabits that statement. The v2
+receipt binds the second theorem text. Both translators and the provisioned
+Lean installation remain inside the trust boundary. V1 obligations retain
+their original wire format, source and rebuild behavior.
+
+#### Transfer of checked lemma applications
+
+`LeanLemmaPlan.learn(training, trustedCertificateHash, retainedDirectory)`
+verifies the certificate hash, the exact training obligation and the hash of
+its dependency audit. Before receiving the target it freezes up to 32 sorted,
+representable mathlib declaration names observed at the imported boundary.
+`LeanSolverBackend.using(plan)` tries one application per candidate, with
+target assumptions as its only subgoal solver. There is no fallback to the
+ordinary search tactics in this trial. Some imported constants originate in
+types and will be inapplicable. A successful trial must compile a fresh
+kernel-checked theorem and its audit must contain a proposed declaration.
+The target certificate binds the frozen plan hash through the generated source,
+and the separate-project rebuild reconstructs the same trial. The real
+positive control trains on summability of the sum of two summable sequences
+and targets a doubled sequence with one premise. Removing that premise is the
+negative control. This public transfer control makes no speed or blinded
+generalization claim.
+
+#### Quantified witness and induction plans
+
+`ExistentialIntroduction.Statement.toScopedObligation()` exports an existing
+witness goal, all its outer parameters and its structured premises for a fresh
+formal check. The existing polynomial or assumption leaf remains available for
+independent replay. The scoped export of an alpha-renamed witness is identical.
+
+`NaturalInduction.discover(context)` enumerates at most 128 declared natural
+predicates from the context. For a predicate `P : Nat → Prop` it matches
+two distinct premise leaves, `P 0` and `∀ n, P n → P (n+1)`. The endpoint
+of the context is never read during formation. Each returned plan carries the
+two exact premise IDs and its reconstructed conclusion `∀ n, P n`. The
+renderer chooses the matching plan only for that recipient statement. Lean
+checks the generated application of `Nat.rec` to its explicit motive and the
+two named hypotheses. The independent statement reconstruction and imported
+dependency/axiom audit also run here. This inference covers the primitive
+natural-number rule with supplied base and step. Synthesizing those premises
+or proving arbitrary well-founded recursive calls requires additional rules.
+
+### Bounded logical discovery and exact DAG replay
+
+`ScopedLogicDiscoveryDomain` implements the standard
+`DiscoveryDomain<State, ScopedProofDag, Certificate>` interface. Its seed
+payload is the canonical JSON of a v2 solver obligation. Formation inspects
+the declarations and premises, generates conclusions, and binds each proposed
+DAG to a new exact obligation. A comparison with a chosen endpoint can occur
+after formation. The domain accepts up to 32 declarations, 32 premises and
+65,536 formation units. It follows up to four rounds of implication chaining.
+The formation ledger counts its declared source inspections and graph work.
+
+The public finite grammar uses lexical local slots and topologically ordered
+children. It supports assumption references, implication and universal
+introduction, application, specialization, cuts, local definitions and
+unfolding, existential witnesses, conjunction, disjunction elimination,
+classical contradiction, equality substitution, natural induction, strong
+natural induction, normalization and checked leaf solving. A recursive use of
+the strong induction hypothesis takes both the proposed argument and its
+strict-decrease proof. The kernel checks the argument, comparison direction,
+scope and motive. An explicit hand-constructed DAG and a source-generated DAG
+enter the same receiving boundary. The source generator currently constructs
+modus ponens, universal specialization, cases, equality substitution,
+double-negation elimination, witnesses and the two natural induction forms.
+The graph allows up to 128 distinct nodes, 512 expanded visits and 64 locals.
+
+`new DomainDiscoveryRunner().run(campaignId, domain, seed, budget)` explores
+the source proposals. Its finite countermodel service evaluates constant
+propositional and natural-predicate interpretations. It records partial
+interpretations and only reports a refutation for a genuine assignment
+satisfying all premises and falsifying the goal. The evaluator uses two
+separately provisioned pinned Lean projects. The first checks the generated
+proof term. The second reads the retained canonical DAG, regenerates that
+term, reconstructs the expected theorem type independently and audits the
+compiled proof. Both receipts must exist before the domain emits a
+certificate. `lean.using(dag).executeWithEvidence(dag.obligation())` exposes
+the first receiver directly. Scope checks, candidate formation and finite
+model searches carry no proof confirmation on their own.

@@ -179,7 +179,19 @@ tasks.register('vendorWebAssets') {
     dependsOn tasks.named('vendorKatexAssets'), tasks.named('vendorCytoscapeAssets')
 }
 
+def sourceRevisionOutput = layout.buildDirectory.dir('generated/source-revision')
+def sourceRevision = tasks.register('writeSourceRevision', JavaExec) {
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) })
+    mainClass = file('src/buildProvenance/java/de/regelsuche/buildprovenance/SourceRevisionProcessor.java').absolutePath
+    args rootProject.projectDir.absolutePath, sourceRevisionOutput.get().asFile.absolutePath
+    inputs.file('src/buildProvenance/java/de/regelsuche/buildprovenance/SourceRevisionProcessor.java')
+    outputs.dir(sourceRevisionOutput)
+    // A ref or checked-out commit can change with identical Java application sources.
+    outputs.upToDateWhen { false }
+}
+
 tasks.named('processResources') {
+    from(sourceRevision)
     dependsOn tasks.named('vendorWebAssets')
 }
 
@@ -189,7 +201,6 @@ tasks.named('processE2eTestResources') {
 
 dependencies {
     e2eTestImplementation 'com.microsoft.playwright:playwright:1.65.0'
-    e2eTestImplementation 'org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r'
     e2eTestImplementation platform(libs.testcontainers.bom)
     e2eTestImplementation libs.testcontainers.core
     e2eTestImplementation libs.testcontainers.junit

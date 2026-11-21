@@ -132,7 +132,10 @@ public final class PortfolioSolverBackend implements SolverBackend {
         }
         Map<String, String> terms = rejected
             ? Map.of("portfolio.report", report.contentHash())
-            : Map.of(
+            : obligation.goal().relation() == Relation.HOLDS
+                ? Map.of("goal.proposition", obligation.goal().left().canonicalMaterial(),
+                    "portfolio.report", report.contentHash())
+                : Map.of(
                 "goal.left", obligation.goal().left().canonicalMaterial(),
                 "goal.right", obligation.goal().right().canonicalMaterial(),
                 "portfolio.report", report.contentHash());

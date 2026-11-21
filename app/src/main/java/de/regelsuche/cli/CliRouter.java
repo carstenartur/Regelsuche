@@ -128,11 +128,7 @@ public class CliRouter {
             String[] rest = Arrays.copyOfRange(args, 1, args.length);
             return switch (command) {
                 case "discover" -> runDiscover(rest);
-                case "domains" -> rest.length > 0 && rest[0].equals("installed")
-                    ? de.regelsuche.plugin.InstalledDiscoveryCommand.run(
-                        Arrays.copyOfRange(rest, 1, rest.length), out, System.getenv())
-                    : de.regelsuche.sdk.discovery.cli.DiscoveryCli.execute(
-                        rest, out, Thread.currentThread().getContextClassLoader());
+                case "domains" -> runDomains(rest);
                 case "transform" -> runTransform(rest);
                 case "inventory" -> runInventory(rest);
                 case "path" -> runPath(rest);
@@ -153,6 +149,17 @@ public class CliRouter {
                 close(inventoryRepository);
             }
         }
+    }
+
+    private int runDomains(String[] args) {
+        if (args.length > 0) {
+            if (args[0].equals("installed")) return de.regelsuche.plugin.InstalledDiscoveryCommand.run(
+                Arrays.copyOfRange(args, 1, args.length), out, System.getenv());
+            if (args[0].equals("review-subject") || args[0].equals("verify-review")) {
+                return de.regelsuche.literature.DomainSnapshotNoveltyReview.command(args, out);
+            }
+        }
+        return de.regelsuche.sdk.discovery.cli.DiscoveryCli.execute(args, out, Thread.currentThread().getContextClassLoader());
     }
 
     private int runDiscover(String[] args) {

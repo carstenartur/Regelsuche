@@ -37,4 +37,25 @@ class QualityCollectionCheckoutTest {
             assertThrows(IOException.class, () -> QualityCollectionCheckout.identity(source));
         }
     }
+
+    @Test void rejectsDirtySourcesBeforeAdmittingAPolynomialReceipt(@TempDir Path temp) throws Exception {
+        Path checkout = Files.createDirectory(temp.resolve("repo"));
+        Path source = Files.createDirectory(temp.resolve("source"));
+        try (var git = Git.init().setDirectory(checkout.toFile()).call()) {
+            Files.writeString(checkout.resolve("source.txt"), "registered source\n");
+            git.add().addFilepattern(".").call();
+            git.commit().setMessage("registered source").setAuthor("Fixture", "archive@example.invalid")
+                .setCommitter("Fixture", "archive@example.invalid").call();
+            Files.copy(checkout.resolve("source.txt"), source.resolve("source.txt"));
+            QualityArchiveRegistration.write(checkout, source.resolve(QualityArchiveRegistration.RECEIPT));
+            for (Path dirtyRoot : java.util.List.of(checkout, source)) {
+                Files.writeString(dirtyRoot.resolve("source.txt"), "altered source\n");
+                var identity = QualityCollectionCheckout.identity(dirtyRoot);
+                assertTrue(identity.required("trackedChangesPresent").booleanValue());
+                var problem = assertThrows(IOException.class, () -> PolynomialSourceProof.verify(dirtyRoot,
+                    QualityAcceptanceCollection.JSON.createObjectNode(), identity));
+                assertEquals("polynomial proof requires an unchanged tracked source", problem.getMessage());
+            }
+        }
+    }
 }

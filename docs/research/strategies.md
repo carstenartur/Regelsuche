@@ -17,6 +17,20 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Native bedingte Skalarsättigung
+
+- **Hypothese.** Native AC-Multimengen und bestätigte Nichtnullbedingungen können in einem endlichen rationalen Fragment Darstellungen erschließen, die eine geordnete Pfadsuche aus derselben Quelle verfehlt.
+- **Umsetzungsstand.** Ein gemeinsamer E-Graph hält n-stellige Operatoren und monotone Klassenfakten, begrenzt die Sucharbeit je Regel und extrahiert zwei Ziele mit unabhängig geprüften Beweis-DAGs. Die Annahmenprüfung trennt die exakte, symbolgebundene Prämissenerkennung von der Faktenvereinigung. Die Quelle und die Ergebnisse lassen sich mit der Produkt-CLI erneut prüfen.
+- **Befund.** Beide historischen #620-Faktoren erreichten alle drei Verfahren. Beim Kontrollausdruck mit entgegengesetzten Faktorrollen fand BestFirst innerhalb des deklarierten Budgets keine Faktorisierung, während die native Sättigung und SymPy 1.14.0 sie erreichten. Ohne Nichtnullbeleg gab kein Arm die Kürzung frei. Kontrollen prüfen alle elf zugelassenen Prämissenformen, veränderte Aussagen und Symbolbereiche sowie die reihenfolgeunabhängige Erkennung widersprüchlicher Fakten.
+- **Folgerung.** Die zusätzliche Erreichbarkeit betrifft den geprüften Join. Matching-Fuel, Zustandszahl, DAG-Schritte und SymPy-Operationszahl erlauben keine gemeinsame Effizienzaussage.
+
+[Protokoll und Befunde](native-scalar-saturation.md)
+
+- [`NativeScalarSaturation.java`](../../regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java#L12) <!-- strategy-code: regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java | public final class NativeScalarSaturation { -->
+- [`NativeScalarComparison.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java#L25) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java | final class NativeScalarComparison { -->
+- [`ScalarGuardFactsTest.java`](../../regelsuche-egraph/src/test/java/de/regelsuche/egraph/proof/ScalarGuardFactsTest.java#L11) <!-- strategy-code: regelsuche-egraph/src/test/java/de/regelsuche/egraph/proof/ScalarGuardFactsTest.java | class ScalarGuardFactsTest { -->
+
+
 ## Geprüfte Rechenpläne in der Workbench
 
 - **Hypothese.** Ausgeführte Beispiele können einen endlichen Nachweis und tatsächliche Rechenarbeit sichtbar machen, wenn die Oberfläche Eingaben, Prüfergebnisse und Operationszahlen getrennt ausweist.
@@ -320,6 +334,13 @@ Der [Transfer-Audit zu OpenAI Math](openai-math-transfer-audit.md) ordnet die ü
 - [`DomainModelProof.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainModelProof.java#L20) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainModelProof.java | public final class DomainModelProof { -->
 - [`DomainModelProofTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainModelProofTest.java#L17) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainModelProofTest.java | class DomainModelProofTest { -->
 
+Der Workspace führt zusätzlich einen Tiefenvergleich für Formeln und Folgen aus.
+Der Kontrolllauf verwendet dieselben Startdaten und Ressourcenlimits bei Suchtiefe
+null. Die Tests prüfen die reproduzierte Identität und getrennte Arbeitszähler.
+Aus diesen Einzelfällen lässt sich kein allgemeiner Suchvorteil ableiten.
+[Vertrag, Annahmen und Grenzen](../domain-export-workspaces.md#gebundene-auswertung-aller-drei-domänen)
+
+
 ## Automatisch hergeleitete Zustände für wechselnde Übergänge
 
 - **Hypothese.** Der unter allen erlaubten Übergängen abgeschlossene Beobachtungsraum liefert in zwei Aufgabenfamilien mindestens 20 Prozent weniger Gesamtarbeit als direkte Auswertung.
@@ -362,6 +383,17 @@ Der [Transfer-Audit zu OpenAI Math](openai-math-transfer-audit.md) ordnet die ü
 - [`MoveSearchVisits.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/moves/MoveSearchVisits.java#L13) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/moves/MoveSearchVisits.java | final class MoveSearchVisits<S extends SearchExecution.Position<?>> implements de.regelsuche.retention.RetainedGraph.View { -->
 - [`MoveSearchDominanceTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/moves/MoveSearchDominanceTest.java#L13) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/moves/MoveSearchDominanceTest.java | class MoveSearchDominanceTest { -->
 
+## Historienunabhängiger BestFirst-Quotient
+
+- **Hypothese.** Zustandslokale Fortsetzungen lassen sich bei gleicher Syntax, gleichen Annahmen und hinreichendem Restbudget unabhängig von der bisherigen Anwendungshistorie wiederverwenden.
+- **Umsetzungsstand.** Das optionale Profil `QUOTIENT_DISCOVERY` verwendet strukturell geprüfte Arena-IDs und getrennte Syntax-/Budget-/Beweislabels. Die ursprünglichen Profile bleiben verfügbar. Kompakte, begrenzte DAG-Snapshots werden beim Laden neu interniert.
+- **Befund.** Auf allen 14 öffentlichen historischen Fällen bestätigen beide AST-Ausführer dieselben sieben Ziele. Die besuchten Labels sinken von 2.353 auf 441 und erzeugte Vorschläge von 4.252 auf 1.790; die Summe unterschiedlicher Syntaxformen steigt von 271 auf 413. Einzelne Fälle benötigen mehr Vorschläge, und beide zusätzlichen Produktionskontrollen sparen keine Engine-Aufrufe. Jeder primitive Pfad wird unabhängig nachgerechnet. [Vollständige Daten und Grenzen](continuation-quotient.md)
+- **Folgerung.** Der Befund belegt weniger doppelte Arbeit unter den deklarierten Budgets. Laufzeit, Heap, neue mathematische Ergebnisse und die prospektiven Held-out-Studien sind getrennt zu qualifizieren.
+
+- [`SearchContinuationQuotient.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/strategy/SearchContinuationQuotient.java#L11) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/strategy/SearchContinuationQuotient.java | final class SearchContinuationQuotient { -->
+- [`ExprValueSnapshot.java`](../../regelsuche-core/src/main/java/de/regelsuche/value/ExprValueSnapshot.java#L13) <!-- strategy-code: regelsuche-core/src/main/java/de/regelsuche/value/ExprValueSnapshot.java | public final class ExprValueSnapshot { -->
+- [`ContinuationQuotientComparison.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ContinuationQuotientComparison.java#L31) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ContinuationQuotientComparison.java | public final class ContinuationQuotientComparison { -->
+
 ## BestFirst-Fortsetzungen bei dauerhaftem Suchgedächtnis
 
 - **Hypothese.** Dauerhafte Wertbeobachtungen dürfen keine Fortsetzung abschneiden, deren Zulässigkeit von der im aktuellen Lauf verwendeten Anwendungshistorie abhängt.
@@ -369,7 +401,7 @@ Der [Transfer-Audit zu OpenAI Math](openai-math-transfer-audit.md) ordnet die ü
 - **Befund.** Mit der eingebauten Potenz-von-Potenz-Regel erreicht die Suche ohne Gedächtnis aus `((x^2)^2)^2` über `(x ^ 4) ^ 2` den Ausdruck `x ^ 8`. Die frühere Variante mit frischem Gedächtnis verlor diese Fortsetzung; wiederholte und vorgewärmte Läufe konnten beim Wurzelausdruck stehen bleiben. Nach der Trennung stimmen die vollständigen erkundeten Zustände und der konkrete Pfad in den Regressionen mit der Suche ohne Gedächtnis überein, einschließlich fortgesetzter Wertzielsuchen und A*. [Vertrag, Vergleich und Grenzen](../search-intelligence.md#continuation-regression-and-limits)
 - **Folgerung.** Dauerhafte Wertstatistik getrennt von einer begründeten Wiederverwendung von Fortsetzungen behandeln. Der Befund betrifft eine reduzierte Syntax und einen besseren Score, keine neu erkannte Wertgleichheit. Allgemeine Vollständigkeit, Nutzen beim Skalieren und die Sicherheit anderer Suchstrategien sind damit nicht belegt; Issue #696 bleibt offen.
 
-- [`BestFirstSearchStrategy.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java#L32) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java | public class BestFirstSearchStrategy implements SearchStrategy { -->
+- [`BestFirstSearchStrategy.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java#L33) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java | public class BestFirstSearchStrategy implements SearchStrategy { -->
 - [`BestFirstMemoryContinuationTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/strategy/BestFirstMemoryContinuationTest.java#L15) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/strategy/BestFirstMemoryContinuationTest.java | class BestFirstMemoryContinuationTest { -->
 - [`BestFirstSearchTelemetryTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/strategy/BestFirstSearchTelemetryTest.java#L26) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/strategy/BestFirstSearchTelemetryTest.java | class BestFirstSearchTelemetryTest { -->
 - [`GoalAwareSearchTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/strategy/GoalAwareSearchTest.java#L28) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/strategy/GoalAwareSearchTest.java | class GoalAwareSearchTest { -->
@@ -386,3 +418,35 @@ Der [Transfer-Audit zu OpenAI Math](openai-math-transfer-audit.md) ordnet die ü
 - [`MontgomeryReductionPlanner.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/MontgomeryReductionPlanner.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/MontgomeryReductionPlanner.java | public final class MontgomeryReductionPlanner { -->
 - [`MontgomeryScheduleTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/MontgomeryScheduleTest.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/MontgomeryScheduleTest.java | class MontgomeryScheduleTest { -->
 - [`MontgomeryScheduleSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/MontgomeryScheduleSdk.java#L11) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/modular/MontgomeryScheduleSdk.java | public final class MontgomeryScheduleSdk { -->
+
+## Disjunkte Auswahl von Existenzzeugen und Induktionsplänen
+
+- **Hypothese.** Eine auf früheren Beweiszuständen gewählte Reihenfolge kann auf neuen Instanzen Zeugen und Nat-Induktionspläne mit weniger Vorschlägen zum exakten Empfänger bringen.
+- **Umsetzungsstand.** Der Versuch fixiert sechs Vergleichsarme, disjunkte synthetische Quellen und den Auswahlplan vor VALIDATION und FINAL. Der Empfänger rekonstruiert den konkreten Zeugen oder die beiden Induktionsprämissen. Rohdaten halten auch gescheiterte Vorschläge fest. [Versuchsplan](scoped-proof-transfer-v1/protocol.md)
+- **Befund.** Auf FINAL lösten die gelernte und die handgeschriebene Auswahl je acht von elf Fällen mit 13 Vorschlägen und 21 äußeren Prüferaufrufen. Die vollständige Enumeration benötigte 47 Vorschläge und 55 Aufrufe für dieselben acht Lösungen. Das einmalige Lernen kostete weitere 42 Vorschläge und 50 Aufrufe. [Vergleich aller sechs Arme](scoped-proof-transfer-v1/results.md)
+- **Folgerung.** Die Ordnung spart Prüfversuche bei der Anwendung. Die handgeschriebene Kontrolle erreicht dieselbe Leistung. Einschließlich Lernen belegt der öffentliche synthetische Versuch keinen Gesamtgewinn. Der Zähler erfasst äußere Aufrufe. Die ursprünglichen Commit- und Baumobjekte dokumentieren die lokale zeitliche Reihenfolge. [Verifizierbare Freeze-Historie](scoped-proof-transfer-v1/formation-history.json)
+
+- [`ScopedProofTransferStudy.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ScopedProofTransferStudy.java#L23) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/ScopedProofTransferStudy.java | public final class ScopedProofTransferStudy { -->
+- [`ScopedProofTransferStudyTest.java`](../../regelsuche-benchmarks/src/test/java/de/regelsuche/benchmarks/ScopedProofTransferStudyTest.java#L14) <!-- strategy-code: regelsuche-benchmarks/src/test/java/de/regelsuche/benchmarks/ScopedProofTransferStudyTest.java | class ScopedProofTransferStudyTest { -->
+
+## Gelernte Auswahl disjunkter Residualpaare
+
+- **Hypothese.** Eine nur an TRAIN-Quellen gewählte Kombination aus disjunkten Termen, entgegengesetzten Vorzeichen und gleichem Restmonom kann erfolgreiche Kombinationen früher der exakten Prüfung zuführen.
+- **Umsetzungsstand.** Der Controller prüft höchstens vier Quellkomponenten und zwölf native Effekte. Zwischen Paarwahl und Nachweis bleiben vier Beweispflichten offen. Der Compiler rekonstruiert Vorkommen, Vorzeichen, primitive Anwendungen und Restnullsumme gegen die ursprüngliche Quelle. Jeder exportierbare Beweisschritt trägt Suchpräfix und unabhängige Prüfarbeit. [Präregistrierter Ablauf](residual-plan-comparison-v1/protocol.md)
+- **Befund.** Alle sechs Arme fanden auf den drei FINAL-Quellen zwei, zwei und null exakte Konstruktionen. Auf dem öffentlichen Brahmagupta-Beispiel ergab der nachgelagerte Strukturvergleich beide historischen Darstellungen. Gelernte und handgeschriebene Auswahl verbrauchten dort je 6.033 Einheiten, die vollständige native Komposition 8.284. Der Lernaufwand betrug 366.347 Einheiten. [Arbeit je Quelle und Vergleichsarm](residual-plan-comparison-v1/results.md)
+- **Folgerung.** Die Auswahl kann die Prüfung im festen Vierkomponentenfragment verbilligen. Die Gesamtkosten des gelernten Arms lagen über denen der nativen Komposition. Die öffentlichen Entwicklungsquellen und die nach dem Einfrieren geprüfte historische Entsprechung begrenzen die Aussage. [Originale Commit- und Baumobjekte](scoped-proof-transfer-v1/formation-history.json)
+
+- [`ResidualPlanController.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanController.java#L25) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanController.java | public final class ResidualPlanController { -->
+- [`ResidualPlanCompiler.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanCompiler.java#L19) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanCompiler.java | public final class ResidualPlanCompiler { -->
+- [`ResidualPlanComparisonTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/ResidualPlanComparisonTest.java#L16) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/ResidualPlanComparisonTest.java | class ResidualPlanComparisonTest { -->
+
+## Gebundene logische Beweisgraphen im DiscoveryDomain
+
+- **Hypothese.** Ein begrenzter Graph aus logischen Regeln kann aus expliziten Prämissen neue Aussagen bilden und jeden Vorschlag unverändert an zwei getrennte Kernelprojekte übergeben.
+- **Umsetzungsstand.** Die Quellgrammatik bildet unter anderem Implikationsketten, universelle Spezialisierungen, Zeugen, Fallunterscheidungen und natürliche Induktion. Rekursive Aufrufe der starken Nat-Induktion benötigen einen eigenen Beweis für das strikt kleinere Argument. Der Empfänger rekonstruiert den Graphen gegen die exakte Aussage. [Einstieg und Grenzen](../proof-bridge.md#bounded-logical-discovery-and-exact-dag-replay)
+- **Befund.** Der JVM-Test bildet aus drei Prämissen eine zweistufige Implikationskette auch bei geändertem Eingabeziel. Er findet ein konkretes Gegenmodell zu einer unberechtigten Folgerung. Fehlende Prüfwerkzeuge ergeben kein Zertifikat. Im echten Werkzeuglauf sind zusätzliche Kontrollen für die unabhängige Rekonstruktion und für einen falschen Abstieg vorgesehen.
+- **Folgerung.** Der logische Graph macht gebundene Voraussetzungen und Beweisarbeit prüfbar. Ein positiver mathematischer Befund verlangt beide Kernelquittungen im verwendeten Quellstand.
+
+- [`ScopedProofDag.java`](../../regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofDag.java#L10) <!-- strategy-code: regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofDag.java | public final class ScopedProofDag { -->
+- [`ScopedProofSearch.java`](../../regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofSearch.java#L12) <!-- strategy-code: regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofSearch.java | public final class ScopedProofSearch { -->
+- [`ScopedLogicDiscoveryDomainTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java#L15) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java | class ScopedLogicDiscoveryDomainTest { -->

@@ -40,6 +40,7 @@ class RetainedRunWorkbenchBrowserTest {
     private Browser browser;
     private BrowserContext context;
     private Page page;
+    private static final String TEST_REVISION = "0123456789abcdef0123456789abcdef01234567";
     private String previousDirectory;
     private final List<String> errors = new ArrayList<>();
     private RepresentationDiscoveryRunWorkspace first;
@@ -102,6 +103,106 @@ class RetainedRunWorkbenchBrowserTest {
         assertFalse(page.locator("[data-tab='graph']").isDisabled());
         assertEquals(0, page.locator("body.retained-run").count());
         assertTrue(consoleErrors.isEmpty(), consoleErrors.toString());
+    }
+
+    @Test void realRetentionFailureIsVisibleAfterReloadWithoutAPublishedWorkspace() throws Exception {
+        Files.writeString(temporary.resolve("runs-dossiers"), "deliberately unavailable test repository");
+        page.navigate(url("/static/index.html"));
+        page.locator("[data-tab='runs']").click();
+        page.locator("#startNativeSearch").click();
+        page.waitForSelector("#nativeSearchStatus[data-state='FAILED']");
+        assertTrue(page.locator("#nativeSearchStatus").textContent().contains("FileAlreadyExistsException"));
+        page.reload();
+        page.waitForSelector("#nativeSearchStatus[data-state='FAILED']");
+        assertTrue(page.locator("#openNativeResult").isHidden());
+    }
+
+    @Test void canStopAPausedNativeOperationAndReopenItsTerminalReceipt() {
+        page.navigate(url("/static/index.html"));
+        page.locator("[data-tab='runs']").click();
+        page.locator("#nativeStartPaused").check();
+        page.locator("#startNativeSearch").click();
+        page.waitForSelector("#nativeSearchStatus[data-state='PAUSED']");
+        String operationUrl = page.url();
+        page.locator("#stopNativeSearch").click();
+        page.waitForSelector("#nativeSearchStatus[data-state='CANCELLED']");
+        assertTrue(page.locator("#nativeSearchStatus").textContent().contains("OPERATOR_STOP"));
+        page.navigate(operationUrl);
+        page.waitForSelector("#nativeSearchStatus[data-state='CANCELLED']");
+        assertTrue(page.locator("#openNativeResult").isHidden());
+    }
+
+    @Test void startsAndReopensAnActualRetainedNativeSearchAtNarrowWidth() throws Exception {
+        page.setViewportSize(390, 844);
+        page.navigate("http://127.0.0.1:" + server.boundPort() + "/#runs");
+        page.locator("[data-tab='runs']").click();
+        assertEquals(1,page.locator("#nativeSearchSource").count());
+        page.locator("#nativeSearchSource").fill("x + 0");
+        page.locator("#nativeStartPaused").check();
+        page.locator("#startNativeSearch").focus();
+        page.keyboard().press("Enter");
+        page.waitForSelector("#nativeSearchStatus[data-state='PAUSED']");
+        page.locator("#pauseNativeSearch").click();
+        page.waitForFunction("document.querySelector('#nativeSearchStatus')?.dataset.state === 'COMPLETED'");
+        assertTrue(page.locator("#nativeSearchProgress").textContent().contains("Besucht"));
+        var link = page.locator("#openNativeResult");
+        link.click();
+        page.waitForFunction("location.hash.includes('run=') && document.querySelector('#candidateDossierDetail') !== null");
+        var candidate = page.locator("#candidateDossierDetail").getAttribute("data-candidate-id");
+        page.locator("[data-review-role='RULE_RADAR']").focus();
+        page.keyboard().press("Enter");
+        page.waitForFunction("document.querySelector('#candidateOccurrenceReview')?.textContent.includes('REPRODUCED_EXACT_OCCURRENCE')");
+        var review = page.locator("#candidateOccurrenceReview");
+        review.getByText("Zusätzlichen Annahmekontext untersuchen").click();
+        review.getByLabel("Zu prüfende Voraussetzung").fill("x != 0");
+        for (var input : java.util.Map.of("UNKNOWN", "", "TRUE", "x != 0", "FALSE", "x = 0", "CONFLICT", "x != 0\nx = 0").entrySet()) {
+            review.getByLabel("Prämissen").fill(input.getValue());
+            review.getByText("Voraussetzung prüfen", new com.microsoft.playwright.Locator.GetByTextOptions().setExact(true)).click();
+            page.waitForSelector("[data-review-guard='" + input.getKey() + "']");
+        }
+        page.locator("#workbenchToolGroups summary").click();
+        page.locator("#workbenchToolChoice").selectOption("review/PROOF_OBLIGATIONS");
+        page.waitForFunction("document.querySelector('#candidateOccurrenceReview')?.textContent.includes('Gleichheitsprüfung · CONFIRMED')");
+        var receipt = review.locator("a[href*='/candidate-evidence/']");
+        try (var client = HttpClient.newHttpClient()) {
+            var reopened = client.send(HttpRequest.newBuilder(URI.create(url(receipt.getAttribute("href")))).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, reopened.statusCode(), reopened.body());
+            assertEquals(review.locator("pre").textContent(), reopened.body());
+        }
+        Path captures = Path.of("build/reports/retained-run-ui");
+        Files.createDirectories(captures);
+        review.screenshot(new com.microsoft.playwright.Locator.ScreenshotOptions().setPath(captures.resolve("bound-proof-narrow.png")));
+        assertEquals(candidate,page.locator("#candidateDossierDetail").getAttribute("data-candidate-id"));
+        String exactUrl = page.url();
+        page.reload();
+        page.waitForSelector("#candidateOccurrenceReview [data-review-role='PROOF_OBLIGATIONS'][aria-pressed='true']");
+        assertEquals(exactUrl,page.url());
+        assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"),
+            () -> String.valueOf(page.evaluate("[document.documentElement.scrollWidth, innerWidth, ...Array.from(document.querySelectorAll('body *')).filter(e => e.getBoundingClientRect().right > innerWidth + 1 || e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible').slice(0,24).map(e => [e.tagName,e.id,e.className,Math.round(e.getBoundingClientRect().right),e.scrollWidth,e.clientWidth])]")));
+    }
+
+    @Test void reviewsTheFullExtendedGraphBudgetOnANarrowScreen() throws Exception {
+        page.setViewportSize(390, 844);
+        page.navigate(url("/#runs"));
+        page.locator("[data-tab='runs']").click();
+        page.locator("#nativeSearchSource").fill("(x+0)*(x+0)");
+        page.locator("#nativeSearchProfile").selectOption("extended");
+        page.locator("#startNativeSearch").click();
+        page.waitForSelector("#nativeSearchStatus[data-state='COMPLETED']");
+        assertTrue(page.locator("#nativeSearchProgress").textContent().contains("Besucht 32 von 32"));
+        assertTrue(page.locator("#nativeSearchStatus").textContent().contains("VISITED_STATE_BUDGET"));
+        page.locator("#openNativeResult").click();
+        page.waitForSelector("#candidateDossierDetail");
+        page.locator("[data-review-role='SEARCH_GRAPH']").click();
+        var graph = page.locator("#candidateGraphEvidence");
+        assertTrue(graph.isVisible());
+        var id = page.locator("#candidateDossierDetail").getAttribute("data-candidate-id");
+        page.locator("#nativeGraphReplay").focus();
+        page.keyboard().press("Enter");
+        page.waitForSelector("#nativeReplaySelection");
+        assertEquals(id, page.locator("#candidateDossierDetail").getAttribute("data-candidate-id"));
+        assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
     }
 
     @Test void comparesExactLongSeedsAndRemainsUsableOnNarrowViewports() throws Exception {
@@ -181,7 +282,7 @@ class RetainedRunWorkbenchBrowserTest {
             "pareto-archive/v1", "representation-discovery/v1", sha("budget"), seed, List.of("internal:java25"));
     }
     private static RepresentationDiscoveryRevisionEvidence revisions() {
-        return RepresentationDiscoveryRevisionEvidence.create("0123456789abcdef0123456789abcdef01234567", "run-browser-test/v1");
+        return RepresentationDiscoveryRevisionEvidence.create(TEST_REVISION, "run-browser-test/v1");
     }
     private static String sha(String value) {
         try { return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }

@@ -27,11 +27,18 @@ Werkzeuge benötigt. Siehe [Testing](testing.md).
 ## 1. Standarddemo starten
 
 ```bash
-docker build -t regelsuche .
+docker build --build-arg "REGELSUCHE_PREPARATION_REVISION=$(git rev-parse HEAD)" -t regelsuche .
 docker run --rm -p 127.0.0.1:8080:8080 regelsuche
 ```
 
 Öffne anschließend `http://127.0.0.1:8080/`.
+
+Der Build übergibt die Revision des sauberen Quellcheckouts. Damit bewahrt die
+Anwendung ihre Herkunft auch im Docker-Kontext ohne Git-Verzeichnis; neue
+Cockpit-Läufe können sie in ihren unveränderlichen Belegen binden. Ein offizielles
+Quellarchiv trägt diese Revision bereits. Ohne überprüfbare Quellrevision bleibt
+die Belegausgabe gesperrt; eine fremde deklarierte Revision wird beim Build
+abgewiesen, wenn sie der vorhandenen Archiv- oder Checkout-Revision widerspricht.
 
 Die Bindung an `127.0.0.1` ist absichtlich lokal. Die Standardinstanz verwendet
 HTTP ohne Anmeldung und ist nicht für eine öffentliche Bereitstellung gedacht.

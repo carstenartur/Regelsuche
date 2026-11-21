@@ -288,6 +288,7 @@
       <modules>
         <module>regelsuche-persistence-hibernate</module>
         <module>app</module>
+        <module>regelsuche-benchmarks</module>
         <module>regelsuche-proof-tests</module>
       </modules>
     </profile>
@@ -336,7 +337,10 @@
               <skipUpload>${central.skipUpload}</skipUpload>
               <autoPublish>${central.autoPublish}</autoPublish>
               <waitUntil>${central.waitUntil}</waitUntil>
-              <excludeArtifacts><excludeArtifact>regelsuche-app</excludeArtifact></excludeArtifacts>
+              <excludeArtifacts>
+                <excludeArtifact>regelsuche-app</excludeArtifact>
+                <excludeArtifact>regelsuche-solver-portfolio</excludeArtifact>
+              </excludeArtifacts>
             </configuration>
           </plugin>
         </plugins>

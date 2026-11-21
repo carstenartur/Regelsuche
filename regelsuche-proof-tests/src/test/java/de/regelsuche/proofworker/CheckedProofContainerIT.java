@@ -22,6 +22,9 @@ class CheckedProofContainerIT {
     private static final String MATHLIB = "c44e0c8ee63ca166450922a373c7409c5d26b00b";
     private static final List<String> PROJECTS = List.of("reference", "rebuild");
 
+    private static final Set<String> MODULES = Set.of("app", "regelsuche-solver-portfolio", "regelsuche-discovery",
+        "regelsuche-learning", "regelsuche-benchmarks");
+
     @Test
     void twoIndependentMathlibProjectsAndTheActualSmtBinariesQualifyApplicationProofs() throws Exception {
         Path root = Path.of(System.getProperty("regelsuche.repositoryRoot"));
@@ -43,6 +46,10 @@ class CheckedProofContainerIT {
                 for (String file : List.of("lakefile.toml", "lean-toolchain")) {
                     worker.withCopyFileToContainer(MountableFile.forHostPath(input.resolve(file)), "/proof/" + project + "/" + file);
                 }
+            }
+            for (String study : List.of("residual-plan-comparison-v1", "scoped-proof-transfer-v1")) {
+                Path records = root.resolve("docs/research").resolve(study);
+                worker.withCopyFileToContainer(MountableFile.forHostPath(records), "/proof/docs/research/" + study);
             }
             worker.start();
             for (String project : PROJECTS) {
@@ -79,13 +86,13 @@ class CheckedProofContainerIT {
         for (String line : Files.readAllLines(manifest)) {
             String[] fields = line.split(" ");
             assertEquals(2, fields.length, line);
-            assertTrue(Set.of("app", "regelsuche-solver-portfolio").contains(fields[0]), line);
+            assertTrue(MODULES.contains(fields[0]), line);
             assertTrue(fields[1].matches("de\\.regelsuche\\.[a-z.]+\\.[A-Za-z0-9]+Test"), line);
             var classes = suites.computeIfAbsent(fields[0], ignored -> new ArrayList<>());
             assertFalse(classes.contains(fields[1]), line);
             classes.add(fields[1]);
         }
-        assertEquals(Set.of("app", "regelsuche-solver-portfolio"), suites.keySet());
+        assertEquals(MODULES, suites.keySet());
         return suites;
     }
 

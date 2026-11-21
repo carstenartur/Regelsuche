@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 /** Finite goal-directed introduction for the existing single-binder ring fragment. */
 public final class ExistentialWitnessSearch {
@@ -31,8 +32,10 @@ public final class ExistentialWitnessSearch {
     private final int budget;
     private final Set<Expression> seen = new HashSet<>();
     private int examined;
+    private final BiConsumer<Expression, Optional<Proof>> observer;
 
-    private ExistentialWitnessSearch(Statement target, int budget) {
+    private ExistentialWitnessSearch(Statement target, int budget, BiConsumer<Expression, Optional<Proof>> observer) {
+        this.observer = observer;
         this.target = Objects.requireNonNull(target);
         if (budget < 0 || budget > MAX_TRIALS) throw new IllegalArgumentException("require 0–4096 candidate trials");
         this.budget = budget;
@@ -40,7 +43,12 @@ public final class ExistentialWitnessSearch {
 
     /** Search seed terms, then one ordered ring operation on pairs of seeds, stopping on the first replayed proof. */
     public static Result search(Statement target, int maximumTrials) {
-        return new ExistentialWitnessSearch(target, maximumTrials).run();
+        return search(target, maximumTrials, null);
+    }
+
+    /** Observe each charged trial, including rejected terms, without altering the candidate order. */
+    public static Result search(Statement target, int maximumTrials, BiConsumer<Expression, Optional<Proof>> observer) {
+        return new ExistentialWitnessSearch(target, maximumTrials, observer).run();
     }
 
     private Result run() {
@@ -93,20 +101,24 @@ public final class ExistentialWitnessSearch {
         if (!seen.add(witness)) return null;
         if (examined == budget) return new Result(Status.BUDGET_EXHAUSTED, examined, Optional.empty());
         examined++;
+        Optional<Proof> proof = checkWitness(target, witness);
+        if (observer != null) observer.accept(witness, proof);
+        return proof.isPresent() ? new Result(Status.FOUND, examined, proof) : null;
+    }
+
+    /** Instantiate and exactly replay a suggested witness through the same leaf checker as enumeration. */
+    public static Optional<Proof> checkWitness(Statement target, Expression witness) {
         Obligation instance;
         try {
             instance = target.instantiate(witness);
         } catch (IllegalArgumentException outsideRingBounds) {
-            return null;
+            return Optional.empty();
         }
-        var proof = proofCandidate(witness, instance);
-        if (proof != null && ExistentialIntroduction.replay(target, proof)) {
-            return new Result(Status.FOUND, examined, Optional.of(proof));
-        }
-        return null;
+        var proof = proofCandidate(target, witness, instance);
+        return proof != null && ExistentialIntroduction.replay(target, proof) ? Optional.of(proof) : Optional.empty();
     }
 
-    private Proof proofCandidate(Expression witness, Obligation instance) {
+    private static Proof proofCandidate(Statement target, Expression witness, Obligation instance) {
         if (instance.assumptions().isEmpty()) return new Proof(target, witness, new NormalForm(instance));
         // The existing normal-form leaf accepts assumption-free instances only.
         for (var premise : instance.assumptions()) {

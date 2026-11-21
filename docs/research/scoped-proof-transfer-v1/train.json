@@ -1,0 +1,1892 @@
+{
+  "baseFirstHits" : 2,
+  "cases" : [ {
+    "id" : "train0-w0",
+    "binder" : "train0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train0-w0",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train0w"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "train0a"
+          }
+        },
+        "right" : {
+          "kind" : "SYMBOL",
+          "name" : "train0b"
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w0",
+        "revisionHash" : "sha256:79eea89bf506d55c5830b602181bc1b2bbfdd633549b8390b5859e58ff945758"
+      },
+      "contentHash" : "sha256:a9fe98fd7fe3481e1bc756e5992f3697ab9f10f4ed44eab1f2305d22c35a4c81"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train0-w0",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "train0a"
+              }
+            }, {
+              "kind" : "SYMBOL",
+              "name" : "train0b"
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w0",
+        "revisionHash" : "sha256:79eea89bf506d55c5830b602181bc1b2bbfdd633549b8390b5859e58ff945758"
+      },
+      "contentHash" : "sha256:b027e78ca1bf4d561296d34f3ceab3c1d701f4487b1b235452c92297068f4c97"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "train0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "train0b + train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "train0b - train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:cbeeeabe0951e5e5e5a13b36217f0218e2b15a6a9e428ae31cae3a5b081a6635",
+        "proofRoot" : "sha256:c551a4f8e1c8dc1513668841966ff641ba43498fa368fb72ba5bdb9c91eddaa2",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "train0a - train0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "train0b * train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    } ]
+  }, {
+    "id" : "train0-w1",
+    "binder" : "train0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train0-w1",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "SYMBOL",
+          "name" : "train0b"
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train0w"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "train0a"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w1",
+        "revisionHash" : "sha256:2f9223a73926d56e130c8b6e1073efb75b67ac3e840106d8e45cdbc774823dee"
+      },
+      "contentHash" : "sha256:857ecb4f88f87bc99d0ca8a1cb42deabfdf8334d807b36ab4120d61ccdde2820"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train0-w1",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "train0b"
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "train0a"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w1",
+        "revisionHash" : "sha256:2f9223a73926d56e130c8b6e1073efb75b67ac3e840106d8e45cdbc774823dee"
+      },
+      "contentHash" : "sha256:a475691e7a87808cb796455b1d7b75c6e736931783ea28b6559d71a722128034"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "train0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "train0b + train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:46f8b2bdcd9308154fe4615f6d9cacd1d29df776f0dbc1174448986c82a07d6b",
+        "proofRoot" : "sha256:a9da931151e35b26517f10e044420a4c5f0adef861dce068183b3129e2599ee0",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "train0b - train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "train0a - train0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "train0b * train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    } ]
+  }, {
+    "id" : "train0-w2",
+    "binder" : "train0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train0-w2",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train0a"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "train0w"
+          }
+        },
+        "right" : {
+          "kind" : "SYMBOL",
+          "name" : "train0b"
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w2",
+        "revisionHash" : "sha256:54a1e7bdd8d09e80f48db3367087c10e38ae49b347cbb46a3d2a554661183416"
+      },
+      "contentHash" : "sha256:2af6da3829d2530584a787c44813b1d830e1a931d9e06af6fb7278630a3ebd9d"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train0-w2",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "train0a"
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            }, {
+              "kind" : "SYMBOL",
+              "name" : "train0b"
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w2",
+        "revisionHash" : "sha256:54a1e7bdd8d09e80f48db3367087c10e38ae49b347cbb46a3d2a554661183416"
+      },
+      "contentHash" : "sha256:481947f4b7f0d5df546ecf010f517f68d14a72f8faf44bc287dbecbdf1e597d2"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "train0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "train0b + train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "train0b - train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "train0a - train0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:ef8a322fde583ab5e7673c8a2e1672680667c7c8c88eabb1a96f6d70a8b0bf55",
+        "proofRoot" : "sha256:a92abd40d670dbc334c4f1f850f0690ec5dda7403b32f5c9a2fdcce054f3a67c",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "train0b * train0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    } ]
+  }, {
+    "id" : "train0-w3",
+    "binder" : "train0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train0-w3",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "train0w"
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "train0w"
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "1"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train0w"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "train0w"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w3",
+        "revisionHash" : "sha256:a24f8a3cce3bc87e4138ec44e22bfc88487336649c62c1c5e130c1188a8e8bcd"
+      },
+      "contentHash" : "sha256:1e3003e380c72811ae2d05538c517af947e05501163f71f22aa378682fff31ca"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train0-w3",
+      "declarations" : [ {
+        "name" : "train0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                },
+                "right" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "1"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train0-w3",
+        "revisionHash" : "sha256:a24f8a3cce3bc87e4138ec44e22bfc88487336649c62c1c5e130c1188a8e8bcd"
+      },
+      "contentHash" : "sha256:54bd163d2a63a5a2ded68d2afbc760f0cb637a7bd8fcaa1797891b7177ce2cd5"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    } ]
+  }, {
+    "id" : "train1-w0",
+    "binder" : "train1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train1-w0",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train1w"
+          },
+          "right" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "train1a"
+            },
+            "right" : {
+              "kind" : "LITERAL",
+              "value" : "2"
+            }
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train1b"
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "3"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w0",
+        "revisionHash" : "sha256:6685c908eab9b123a6eeddf3a8f9d0643db253e6bebbdcd767bbdc2a05fe391b"
+      },
+      "contentHash" : "sha256:653604ff24d4a42f16a0fa0a38546d8215701951a51d90310b9a21e9293b21dc"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train1-w0",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "SYMBOL",
+                  "name" : "train1a"
+                },
+                "right" : {
+                  "kind" : "LITERAL",
+                  "value" : "2"
+                }
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "train1b"
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "3"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w0",
+        "revisionHash" : "sha256:6685c908eab9b123a6eeddf3a8f9d0643db253e6bebbdcd767bbdc2a05fe391b"
+      },
+      "contentHash" : "sha256:9ec98cf53351ca9dead6981e6f0c82d76e0c1439243fd84fd181503c48114f71"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "train1b - 3",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "train1b - 3 + train1a + 2",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "train1b - 3 - (train1a + 2)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:773c4405d799ae851dd7c5f27721bd19ea7be0b48ce63e4256694081525683d8",
+        "proofRoot" : "sha256:f18b12719e91a96883054cb49a88de850e207c7972df1ad97a7d0572acfa28ad",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "train1a + 2 - (train1b - 3)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "(train1b - 3) * (train1a + 2)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    } ]
+  }, {
+    "id" : "train1-w1",
+    "binder" : "train1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train1-w1",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train1b"
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "3"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train1w"
+          },
+          "right" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "train1a"
+            },
+            "right" : {
+              "kind" : "LITERAL",
+              "value" : "2"
+            }
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w1",
+        "revisionHash" : "sha256:5e6077f648b6fc54214a8d0c8985ed8357821a7221e82c2fa325aa807ffb8a37"
+      },
+      "contentHash" : "sha256:8aa8524900bdf62554b35a9ddfc68bfa874c6b08453edb99453f90aa8326857b"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train1-w1",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "train1b"
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "3"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "SYMBOL",
+                  "name" : "train1a"
+                },
+                "right" : {
+                  "kind" : "LITERAL",
+                  "value" : "2"
+                }
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w1",
+        "revisionHash" : "sha256:5e6077f648b6fc54214a8d0c8985ed8357821a7221e82c2fa325aa807ffb8a37"
+      },
+      "contentHash" : "sha256:709b2006768cd7ebd7323d42531115cde03ce7270eec64e9a4e10edc573262aa"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "train1b - 3",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "train1b - 3 + train1a + 2",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:2615a724def59cf3161d5fc771c6f8c55c955624edd42a6c9b01b5fae83dd17b",
+        "proofRoot" : "sha256:87970b1187233e238003055c25d6417450fdbbbd0ac0c7438d549b0911cc211c",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "train1b - 3 - (train1a + 2)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "train1a + 2 - (train1b - 3)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "(train1b - 3) * (train1a + 2)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    } ]
+  }, {
+    "id" : "train1-w2",
+    "binder" : "train1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train1-w2",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "train1a"
+            },
+            "right" : {
+              "kind" : "LITERAL",
+              "value" : "2"
+            }
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "train1w"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train1b"
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "3"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w2",
+        "revisionHash" : "sha256:7feb82c649dc6e86d02b7ad852cd359bc22bc5e2a6d32f05f3fe41c9d8552912"
+      },
+      "contentHash" : "sha256:22ee39378317e70e8a97c6567b37c17c98ac66b642d5c97baa1957ee69f7ff3a"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train1-w2",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "SYMBOL",
+                  "name" : "train1a"
+                },
+                "right" : {
+                  "kind" : "LITERAL",
+                  "value" : "2"
+                }
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "train1b"
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "3"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w2",
+        "revisionHash" : "sha256:7feb82c649dc6e86d02b7ad852cd359bc22bc5e2a6d32f05f3fe41c9d8552912"
+      },
+      "contentHash" : "sha256:a64cc4ed220be91f8f48cad476dac61db3fe14666b346794981a3eeba16031bd"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "train1b - 3",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "train1b - 3 + train1a + 2",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "train1b - 3 - (train1a + 2)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "train1a + 2 - (train1b - 3)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:faa4ea824e937431792cc8b8203f558b33fb48c2404533643559d9523a9427ce",
+        "proofRoot" : "sha256:41107e91e5d35d8b01dd273db8647378adffc8317dd062c4591beb4565275ce6",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "(train1b - 3) * (train1a + 2)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    } ]
+  }, {
+    "id" : "train1-w3",
+    "binder" : "train1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "train1-w3",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "train1w"
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "train1w"
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "1"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "train1w"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "train1w"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w3",
+        "revisionHash" : "sha256:5da38a45276d48b5f2d4928148542d360d77e471690fdcf93a4ceb0457e19ab7"
+      },
+      "contentHash" : "sha256:cac3eee3257003f4cd5c29f88099163685bbb006b4efc245e2e2b4dc8a832378"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "train1-w3",
+      "declarations" : [ {
+        "name" : "train1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "train1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                },
+                "right" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "1"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "train1-w3",
+        "revisionHash" : "sha256:5da38a45276d48b5f2d4928148542d360d77e471690fdcf93a4ceb0457e19ab7"
+      },
+      "contentHash" : "sha256:398590f9856114873509ab1c9f08aa8998fc0e90a34394fa8f866845d2522e9d"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    } ]
+  }, {
+    "id" : "trainind0",
+    "binder" : "",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "trainind0",
+      "declarations" : [ {
+        "name" : "trainind0a",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "trainind0a"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind0a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind0a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        },
+        "right" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        }
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "trainind0",
+        "revisionHash" : "sha256:954e20aef6a8922403c6effe9d698d32701360d4981912a8cdf53714e08ccbf3"
+      },
+      "contentHash" : "sha256:b911572985f3d6ad60b05309be3cd21898417c0b8714890908974eab1f1b96e7"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "trainind0",
+      "declarations" : [ {
+        "name" : "trainind0a",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "trainind0a"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind0a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind0a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "at",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "trainind0a"
+            }, {
+              "kind" : "BOUND",
+              "index" : 0
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "trainind0",
+        "revisionHash" : "sha256:954e20aef6a8922403c6effe9d698d32701360d4981912a8cdf53714e08ccbf3"
+      },
+      "contentHash" : "sha256:a9db0cf26fe92dc4233f5364b3fbf78203fb026b0b2e27b2a1328f7362b0822d"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "trainind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:a9db0cf26fe92dc4233f5364b3fbf78203fb026b0b2e27b2a1328f7362b0822d",
+        "proofRoot" : "sha256:6410b40ddbe57dd9c3d45aa3a89a24dc3f5a49e7de095819d38b7a2ee2474df5",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    } ]
+  }, {
+    "id" : "trainind1",
+    "binder" : "",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "trainind1",
+      "declarations" : [ {
+        "name" : "trainind1m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "trainind1z",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "trainind1z"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind1z"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind1z"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        },
+        "right" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        }
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "trainind1",
+        "revisionHash" : "sha256:407667e8163c59ef83700f4f3daa9d1f6a4eee0d87dd4579abf3ff9e1b9a770d"
+      },
+      "contentHash" : "sha256:b7ac135f4fbecf6e9258712f450d152e4f8b9f79358c52d88bcc29c8794ad410"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "trainind1",
+      "declarations" : [ {
+        "name" : "trainind1m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "trainind1z",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "trainind1z"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind1z"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind1z"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "at",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "trainind1z"
+            }, {
+              "kind" : "BOUND",
+              "index" : 0
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "trainind1",
+        "revisionHash" : "sha256:407667e8163c59ef83700f4f3daa9d1f6a4eee0d87dd4579abf3ff9e1b9a770d"
+      },
+      "contentHash" : "sha256:5f2b8935e2d91467b9bf0888d8ffd31e6affb202e2f07af8a64ac7f5061c868e"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "trainind1m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "trainind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:5f2b8935e2d91467b9bf0888d8ffd31e6affb202e2f07af8a64ac7f5061c868e",
+        "proofRoot" : "sha256:92bd529d62c83c175c9c76017c713a0a3df132d39d2b4f899bf025008a72ac23",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 3
+    } ]
+  }, {
+    "id" : "trainind2",
+    "binder" : "",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "trainind2",
+      "declarations" : [ {
+        "name" : "trainind2a",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind2a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind2a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        },
+        "right" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        }
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "trainind2",
+        "revisionHash" : "sha256:975122d781ff3f0a48548fe90a1c68bc3748ab3e127c0c32868a7b4c3f11041a"
+      },
+      "contentHash" : "sha256:ca1de2b17e9a5169b2c3831e0702aeea85dbf86c528ceeeae0d7a582afc62702"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "trainind2",
+      "declarations" : [ {
+        "name" : "trainind2a",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind2a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "trainind2a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "at",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "trainind2a"
+            }, {
+              "kind" : "BOUND",
+              "index" : 0
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "trainind2",
+        "revisionHash" : "sha256:975122d781ff3f0a48548fe90a1c68bc3748ab3e127c0c32868a7b4c3f11041a"
+      },
+      "contentHash" : "sha256:ca7b9601015a6df203b5933d3359c916f98f16c6bc75ec766dfc7d47abd973f8"
+    },
+    "arms" : [ {
+      "arm" : "EXHAUSTIVE",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "trainind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    } ]
+  } ],
+  "hits" : {
+    "ADD_LEFT" : {
+      "SUBTRACT_B_A" : 2
+    },
+    "SUBTRACT_LEFT" : {
+      "ADD" : 2
+    },
+    "SUBTRACT_RIGHT" : {
+      "SUBTRACT_A_B" : 2
+    },
+    "UNMATCHED" : { }
+  },
+  "protocolCommit" : "abf2aba070a70f1ac48ab066d134195c9182af9c",
+  "sortedFirstHits" : 1,
+  "split" : "TRAIN"
+}

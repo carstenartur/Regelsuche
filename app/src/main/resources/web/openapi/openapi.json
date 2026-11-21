@@ -504,6 +504,181 @@
         }
       }
     },
+    "/api/discovery-domains/exports/{runDigest}/assessment": {
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "assessDomainSnapshot",
+        "summary": "Quellgebundene Prüfung mit Domänennachweis und Tiefenablation ausführen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expectedWorkspaceHash",
+                  "expectedEvidenceHash"
+                ],
+                "properties": {
+                  "expectedWorkspaceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "expectedEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quellgebundener Prüfbeleg mit Domänen- und Ressourcenbefunden",
+            "headers": {
+              "Location": {
+                "description": "Pfad zum gespeicherten Receipt",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Originaldatei fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erwarteter Workspace- oder Evidence-Hash gehört nicht zur unveränderten Quelle",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "description": "Gespeicherte Quelle oder Auswertung konnte nicht verifiziert werden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "description": "Prüft den Originalexport und hält Validierung, Beweis, Literaturprüfung, Promotion und Public Evidence getrennt."
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}/assessment/{receiptDigest}": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "getDomainSnapshotAssessment",
+        "summary": "Prüfbeleg aus seiner gespeicherten Quelle erneut verifizieren",
+        "description": "Prüft den Originalexport und hält Validierung, Beweis, Literaturprüfung, Promotion und Public Evidence getrennt.",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "receiptDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quellgebundener Prüfbeleg mit Domänen- und Ressourcenbefunden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder zugehöriger Modellbeleg fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "description": "Gespeicherte Quelle oder Auswertung konnte nicht verifiziert werden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/discovery-domains/exports/{runDigest}/model-proof": {
       "post": {
         "tags": [
@@ -1289,6 +1464,339 @@
         }
       }
     },
+    "/api/discovery-runs/operations": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "listNativeSearchOperations",
+        "summary": "Gespeicherte Suchvorgänge öffnen",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "200": {
+            "description": "Gespeicherte Suchvorgänge öffnen"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Unbekannter Vorgang"
+          },
+          "409": {
+            "description": "Vorgang nicht verfügbar"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "startNativeSearchOperation",
+        "summary": "Begrenzte native Suche starten",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "202": {
+            "description": "Begrenzte native Suche starten"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Unbekannter Vorgang"
+          },
+          "409": {
+            "description": "Vorgang nicht verfügbar"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source",
+                  "profile"
+                ],
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "maxLength": 256
+                  },
+                  "profile": {
+                    "enum": [
+                      "small",
+                      "extended"
+                    ]
+                  },
+                  "startPaused": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/discovery-runs/operations/{operationId}": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "getNativeSearchOperation",
+        "summary": "Gebundenen Fortschritt und Endbeleg laden",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "200": {
+            "description": "Gebundenen Fortschritt und Endbeleg laden"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Unbekannter Vorgang"
+          },
+          "409": {
+            "description": "Vorgang nicht verfügbar"
+          }
+        },
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/discovery-runs/operations/{operationId}/cancel": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "cancelNativeSearchOperation",
+        "summary": "Nativen Suchvorgang stoppen",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "200": {
+            "description": "Nativen Suchvorgang stoppen"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Unbekannter Vorgang"
+          },
+          "409": {
+            "description": "Vorgang nicht verfügbar"
+          }
+        },
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/discovery-runs/{runDigest}/candidate-evidence": {
+      "post": {
+        "operationId": "reviewRetainedCandidateOccurrence",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "summary": "Re-evaluate an exact archived occurrence and its independent equality obligation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runDigest",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "candidateId",
+                  "edge"
+                ],
+                "properties": {
+                  "candidateId": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "edge": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "guard": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "premises": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Content-addressed occurrence, guard, radar and solver review"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Retained source absent"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          }
+        },
+        "tags": [
+          "Search"
+        ]
+      }
+    },
+    "/api/discovery-runs/operations/{operationId}/pause": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "pauseNativeSearchOperation",
+        "summary": "Pause bounded native search at an observation boundary",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "200": {
+            "description": "Current bound operational receipt"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Unbekannter Vorgang"
+          },
+          "409": {
+            "description": "Vorgang nicht verfügbar"
+          }
+        },
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/discovery-runs/operations/{operationId}/resume": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "resumeNativeSearchOperation",
+        "summary": "Resume bounded native search at an observation boundary",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "responses": {
+          "200": {
+            "description": "Current bound operational receipt"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Unbekannter Vorgang"
+          },
+          "409": {
+            "description": "Vorgang nicht verfügbar"
+          }
+        },
+        "parameters": [
+          {
+            "name": "operationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/discovery-runs/{runDigest}/candidate-evidence/{receiptDigest}": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "operationId": "getRetainedCandidateOccurrenceReview",
+        "summary": "Reproduce a retained candidate review against its original run and byte-compare the receipt",
+        "x-regelsuche-context": "/api/discovery-runs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "runDigest",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "receiptDigest",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reproduced stored receipt"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Receipt or original source not retained"
+          }
+        }
+      }
+    },
     "/api/discovery-runs/{runDigest}": {
       "get": {
         "tags": ["Discovery Runs"],
@@ -1950,7 +2458,7 @@
         "x-regelsuche-context": "/api/inspect",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {
           "type": "object", "required": ["expression"], "properties": {
-            "type": {"type": "string", "enum": ["TERM", "EQUATION"], "default": "TERM"},
+            "type": {"type": "string", "enum": ["TERM", "EQUATION", "SYSTEM"], "default": "TERM"},
             "expression": {"type": "string", "minLength": 1, "maxLength": 256}
           }
         }}}},
@@ -2533,7 +3041,7 @@
         "properties": {
           "expression": {"type": "string"},
           "type": {"type": "string", "enum": ["TERM", "EQUATION", "SYSTEM"], "default": "TERM"},
-          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION"], "default": "FAST_SIMPLIFY"},
+          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "QUOTIENT_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION"], "default": "FAST_SIMPLIFY"},
           "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "NUMERICALLY_STABLE", "PROOF_FRIENDLY", "TEACHING_FRIENDLY", "DIDAKTIK"]}
         }
       },

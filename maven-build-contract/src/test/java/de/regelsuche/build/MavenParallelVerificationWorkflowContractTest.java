@@ -168,7 +168,8 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(compactConvergence.contains(
         "needs: [gradle-verification, jmh-verification, "
             + "sympy-runtime-verification, maven-product-verification, "
-            + "external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs]"));
+            + "external-polynomial-comparison, typed-external-polynomial-comparison, "
+            + "checked-proofs, native-scalar-reproduction, maven-polynomial-qualification]"));
     assertTrue(compactConvergence.contains(
         "needs.gradle-verification.result != 'success' || "
             + "needs.jmh-verification.result != 'success' || "
@@ -177,7 +178,9 @@ class MavenParallelVerificationWorkflowContractTest {
             + "(needs.maven-product-verification.result != 'success' || "
             + "needs.external-polynomial-comparison.result != 'success' || "
             + "needs.typed-external-polynomial-comparison.result != 'success' || "
-            + "needs.checked-proofs.result != 'success'))"),
+            + "needs.checked-proofs.result != 'success' || "
+            + "needs.native-scalar-reproduction.result != 'success' || "
+            + "needs.maven-polynomial-qualification.result != 'success'))"),
         "the stable required check must reject any incomplete authority");
     assertTrue(convergence.contains("run: exit 1"),
         "an incomplete authority set must fail rather than become skipped-success");
@@ -240,6 +243,27 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void nativePolynomialPilotUsesTheSameSourceAndRetainsIndependentReplay() throws IOException {
+    var jobs = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml"))).required("jobs");
+    var pilot = jobs.required("maven-polynomial-qualification");
+    var steps = pilot.required("steps");
+    var checkout = steps.required(0).required("with");
+    var legacyCheckout = jobs.required("external-polynomial-comparison").required("steps").required(0).required("with");
+    assertEquals(legacyCheckout.required("ref"), checkout.required("ref"));
+    assertEquals(0, checkout.required("fetch-depth").intValue(), "proof of freeze ancestry needs the actual Git history");
+    var producer = steps.valueStream().filter(step -> step.has("run")).findFirst().orElseThrow();
+    assertEquals("mvn --batch-mode --no-transfer-progress -Ppolynomial-comparison -pl regelsuche-release -am "
+        + "-Dtest=ExternalPolynomialComparisonWorkerTest,PolynomialSourceProofTest,PolynomialRuntimeClasspathTest,PolynomialComparisonArchiveTest "
+        + "-Dsurefire.failIfNoSpecifiedTests=false verify", producer.required("run").asText().strip());
+    assertFalse(producer.has("if"));
+    assertFalse(producer.has("continue-on-error"));
+    var retention = steps.required(steps.size() - 1);
+    assertTrue(retention.required("if").asText().contains("always()"));
+    assertEquals("error", retention.required("with").required("if-no-files-found").asText());
+    assertTrue(retention.required("with").required("path").asText().contains("target/reports/polynomial-comparison/**"));
   }
 
   @Test

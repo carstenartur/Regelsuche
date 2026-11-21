@@ -191,6 +191,9 @@ public final class QualityAcceptanceCollection {
     private static void require(boolean value, String reason) {
         if (!value) throw new IllegalArgumentException(reason);
     }
+    private static boolean hasExactCount(JsonNode value, int count) {
+        return value.isIntegralNumber() && value.canConvertToInt() && value.intValue() == count;
+    }
     private static String sha256(byte[] data) { return "sha256:" + HexFormat.of().formatHex(digest("SHA-256").digest(data)); }
     private static MessageDigest digest(String algorithm) {
         try { return MessageDigest.getInstance(algorithm); }
@@ -208,7 +211,7 @@ public final class QualityAcceptanceCollection {
         var rows = history.required("benchmarks");
         sameInventory(expected, column(rows, "benchmark"), "history benchmark inventory differs");
         var charts = column(rows, "chart");
-        require(history.required("benchmarkCount").isIntegralNumber() && history.required("benchmarkCount").longValue() == expected.size()
+        require(hasExactCount(history.required("benchmarkCount"), expected.size())
             && charts.size() == Set.copyOf(charts).size(), "history chart inventory differs");
         for (String chart : charts) {
             Path child = Path.of(chart);
@@ -229,7 +232,7 @@ public final class QualityAcceptanceCollection {
                 var hash = digest("SHA-1");
                 hash.update(("blob " + data.length + "\0").getBytes(StandardCharsets.US_ASCII));
                 if (!HexFormat.of().formatHex(hash.digest(data)).equals(text(entry.getValue(), "gitBlobSha"))
-                        || data.length != entry.getValue().required("byteLength").longValue())
+                        || !hasExactCount(entry.getValue().required("byteLength"), data.length))
                     problem("visual", baseline, new IllegalArgumentException("baseline policy binding differs"));
             }
             String stem = "build/reports/visual-regression/" + name.substring(0, name.length() - 4);

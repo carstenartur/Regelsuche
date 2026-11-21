@@ -120,19 +120,28 @@ final class StructuralConstructionPrograms {
     private static List<String> residualBalance(Expr expression, String source, Work work, boolean expanded) {
         if (!(expression instanceof BinaryExpr root)
                 || (expanded ? root.operator() != BinaryOperator.ADD : root.operator() != BinaryOperator.MUL)) return List.of();
-        var exact = expanded ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);
-        var polynomial = exact.normalForm(source);
-        int count = polynomial.termCount();
-        if (count < 4 || count > 6 || count % 2 != 0) return List.of();
-        String prepared = exposeAll(polynomial.toCanonicalString(), work, expanded);
-        var composer = expanded ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);
-        var parts = composer.additiveComponents(prepared);
-        if (parts.size() != count || !allSquares(parts, work)) return List.of();
-        var effects = pairedEffects(parts, composer, work);
-        var results = composer.compose(prepared, parts, effects, count / 2, 8);
+        var prepared = prepareResidual(source, work, expanded);
+        if (prepared == null) return List.of();
+        var results = prepared.composer().compose(prepared.expression(), prepared.parts(), prepared.effects(), prepared.parts().size() / 2, 8);
         work.add(results.size());
         return results.stream().map(ExactPolynomialResidualComposer.Composition::candidateExpression).toList();
     }
+
+    record PreparedResidual(String expression, List<ExactPolynomialResidualComposer.SourceComponent> parts,
+                            List<ExactPolynomialResidualComposer.Effect> effects, ExactPolynomialResidualComposer composer) { }
+
+    static PreparedResidual prepareResidual(String source, Work work, boolean productWork) {
+        var exact = productWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);
+        var polynomial = exact.normalForm(source);
+        int count = polynomial.termCount();
+        if (count < 4 || count > 6 || count % 2 != 0) return null;
+        String prepared = exposeAll(polynomial.toCanonicalString(), work, productWork);
+        var composer = productWork ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);
+        var parts = composer.additiveComponents(prepared);
+        if (parts.size() != count || !allSquares(parts, work)) return null;
+        return new PreparedResidual(prepared, parts, pairedEffects(parts, composer, work), composer);
+    }
+
     private static String exposeAll(String source, Work work, boolean includeProductWork) {
         String current = source;
         var exposure = new ExactMonomialSquareExposureOperator(1);
@@ -197,9 +206,23 @@ final class StructuralConstructionPrograms {
         if (results.size() != 1) throw new IllegalArgumentException("one bound completion required");
         return results.getFirst();
     }
-    private static final class Work {
+    static final class Work {
+        private final long limit;
+        private final boolean strict;
         private long units;
-        private void add(long count) { units = Math.addExact(units, count); if (units > LIMIT) throw new Limit(); }
+        Work() { limit = LIMIT; strict = false; }
+        Work(long limit) {
+            if (limit < 0 || limit > LIMIT) throw new IllegalArgumentException("work limit outside the finite grammar");
+            this.limit = limit;
+            this.strict = true;
+        }
+        long units() { return units; }
+        void add(long count) {
+            long next = Math.addExact(units, count);
+            if (strict && next > limit) throw new Limit();
+            units = next;
+            if (units > limit) throw new Limit();
+        }
     }
-    private static final class Limit extends RuntimeException { }
+    static final class Limit extends RuntimeException { }
 }

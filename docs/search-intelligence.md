@@ -30,6 +30,16 @@ The web UI exposes profile and goal separately. `POST /api/search` accepts both;
 when `goal` is omitted, the profile default applies. Usage guidance is in
 [`user-workflows.md`](user-workflows.md#goal-dropdown).
 
+## Continuation quotient
+
+`QUOTIENT_DISCOVERY` selects a run-owned exact arena and a continuation policy
+that separates values, exact syntax observations and non-dominated depth,
+expansion and proof labels. It retains complete primitive paths. The existing
+profiles and the no-argument BestFirst constructor keep their historical policy.
+The [contract and 96-row comparison](research/continuation-quotient.md) describe
+the source bindings, three identity controls, both AST backends, independent
+primitive replay and the observed positive and negative work differences.
+
 ## Transposition table
 
 `DISCOVERY_PLUS` activates durable `TranspositionTable` observations for

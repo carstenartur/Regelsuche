@@ -35,10 +35,12 @@ public final class LeanEvidenceRebuilder {
         require(obligation.equals(read(retained, "obligation.json")), "retained obligation differs");
         String originalAuditText = read(retained, "audit.json");
         var originalAudit = LeanSolverBackend.checkedAuditDocument(originalAuditText, expected.contentHash(), null);
-        String source = new LeanSourceRenderer().source(expected, originalAudit.nonce());
+        var plan = LeanProofPlan.read(expected, retained);
+        require(plan == null || originalAudit.scoped(), "lemma plan requires a scoped audit");
+        String source = new LeanSourceRenderer().source(expected, originalAudit.nonce(), plan);
         require(source.equals(read(retained, "proof.lean")), "retained source differs from the generated theorem");
-        require(originalAuditText.equals(LeanSolverBackend.checkedAudit(read(retained, "proof.stdout"),
-            expected.contentHash(), originalAudit.nonce())), "retained audit differs from Lean output");
+        require(originalAuditText.equals(LeanSolverBackend.checkedProcessAudit(read(retained, "proof.stdout"),
+            expected, originalAudit.nonce()).text()), "retained audit differs from Lean output");
 
         String version = read(retained, "version.stdout").strip();
         require(version.startsWith("Lean (version "), "retained Lean version is missing");
@@ -66,28 +68,38 @@ public final class LeanEvidenceRebuilder {
             "rebuild project Lean pins differ from the original certificate");
         Path output = toolchain.newEvidenceDirectory("lean-rebuild-");
         Files.writeString(output.resolve("obligation.json"), obligation);
-        Files.writeString(output.resolve("proof.lean"), source);
+        String independent = originalAudit.scoped() ? LeanStatementReconstruction.theorem(expected) : "";
+        String rebuildSource = source + independent;
+        Files.writeString(output.resolve("proof.lean"), rebuildSource);
+        if (plan != null) Files.writeString(output.resolve(plan.fileName()), plan.material());
         Files.writeString(output.resolve(TOOLCHAIN), toolchainPin);
         Files.writeString(output.resolve(MANIFEST), dependencyPin);
 
         var observedVersion = toolchain.version(output);
         require(observedVersion.success() && version.equals(observedVersion.stdout().strip()), "Lean version differs");
         var proof = toolchain.compile(output);
-        require(proof.success(), "Lean rebuild failed in " + output);
+        if (!proof.success()) {
+            String diagnostics = proof.stdout() + "\n" + read(output, "proof.stderr");
+            throw new IOException("Lean rebuild failed in " + output + "\n"
+                + diagnostics.substring(Math.max(0, diagnostics.length() - 2400)));
+        }
         require(rebuildConfiguration.equals(toolchain.configurationHash())
             && rebuildEnvironment.equals(toolchain.pinnedEnvironment()) && rebuildEnvironment.pinsMatch(output),
             "Lean rebuild configuration changed");
-        require(source.equals(read(output, "proof.lean")), "Lean rebuild source changed");
-        var audit = LeanSolverBackend.checkedProcessAudit(proof.stdout(), expected.contentHash(), originalAudit.nonce());
+        require(rebuildSource.equals(read(output, "proof.lean")), "Lean rebuild source changed");
+        var audit = LeanSolverBackend.checkedProcessAudit(proof.stdout(), expected, originalAudit.nonce());
+        require(audit.imports().equals(originalAudit.imports()), "Lean rebuild imported declarations differ");
         require(audit.axioms().equals(originalAudit.axioms()), "Lean rebuild axiom dependencies differ");
         require(Files.isRegularFile(output.resolve("proof.olean"), LinkOption.NOFOLLOW_LINKS)
             && Files.size(output.resolve("proof.olean")) > 0, "Lean rebuild compiled proof is missing or empty");
-        String rebuiltCertificate = LeanSolverBackend.certificate(expected, source, LeanSolverBackend.compiledHash(output),
+        String rebuiltCertificate = LeanSolverBackend.certificate(expected, rebuildSource, LeanSolverBackend.compiledHash(output),
             audit.text(), rebuildConfiguration, observedVersion.stdout(), rebuildEnvironment);
         Files.writeString(output.resolve("audit.json"), audit.text());
         Files.writeString(output.resolve("certificate.txt"), rebuiltCertificate);
-        String receipt = "regelsuche.lean-evidence-rebuild/v1\noriginal=" + originalCertificateHash
-            + "\nrebuild=" + SolverIr.sha256(rebuiltCertificate) + "\n";
+        String schema = originalAudit.scoped() ? "regelsuche.lean-evidence-rebuild/v2" : "regelsuche.lean-evidence-rebuild/v1";
+        String receipt = schema + "\noriginal=" + originalCertificateHash
+            + "\nrebuild=" + SolverIr.sha256(rebuiltCertificate) + "\n"
+            + (originalAudit.scoped() ? "reconstructed=" + SolverIr.sha256(independent) + "\n" : "");
         Files.writeString(output.resolve("rebuild.txt"), receipt);
         return new Receipt(output, SolverIr.sha256(receipt));
     }

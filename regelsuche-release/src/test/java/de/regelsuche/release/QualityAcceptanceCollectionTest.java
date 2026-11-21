@@ -3,6 +3,8 @@ package de.regelsuche.release;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.ZipFile;
@@ -110,6 +112,37 @@ class QualityAcceptanceCollectionTest {
         Path link = target.resolveSibling("link");
         Files.createSymbolicLink(root.resolve(link), root.getParent());
         assertThrows(IllegalArgumentException.class, () -> QualityAcceptanceCollection.collect(root, link.resolve("escape"), identity()));
+    }
+
+    @Test void rejectsAHistoryBenchmarkCountThatWrapsToTheActualCount() throws Exception {
+        assemble();
+        Path path = root.resolve("build/reports/quality/jmh-history/history.json");
+        var history = (ObjectNode) JSON.readTree(path.toFile());
+        history.put("benchmarkCount", wrappedCount(history, "benchmarkCount"));
+        JSON.writeValue(path.toFile(), history);
+
+        assertUnavailableSection("history");
+    }
+
+    @Test void rejectsAVisualBaselineLengthThatWrapsToTheRealLength() throws Exception {
+        assemble();
+        Path path = root.resolve("app/src/e2eTest/resources/screenshots/visual-regression-policy.json");
+        var policy = JSON.readTree(path.toFile());
+        var baseline = (ObjectNode) policy.required("baselines").elements().next();
+        baseline.put("byteLength", wrappedCount(baseline, "byteLength"));
+        JSON.writeValue(path.toFile(), policy);
+
+        assertUnavailableSection("visual");
+    }
+
+    private void assertUnavailableSection(String section) throws Exception {
+        var captured = QualityAcceptanceCollection.collect(root, Path.of("build/reports/quality/wrapped-count"), identity());
+        assertEquals("INCOMPLETE", captured.required("completeness").asText());
+        assertEquals("UNAVAILABLE", captured.required("sections").required(section).required("availability").asText());
+    }
+
+    private static BigInteger wrappedCount(ObjectNode object, String field) {
+        return object.required(field).bigIntegerValue().add(BigInteger.ONE.shiftLeft(Long.SIZE));
     }
 
     private static com.fasterxml.jackson.databind.node.ObjectNode identity() {

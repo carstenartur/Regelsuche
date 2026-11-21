@@ -1,6 +1,9 @@
 package de.regelsuche.solver.portfolio;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static de.regelsuche.solver.ir.ScopedProofDag.Rule.*;
+import static de.regelsuche.solver.ir.ScopedProofDag.Node.*;
+import static de.regelsuche.solver.portfolio.ScopedLeanContractTest.app;
 import de.regelsuche.solver.ir.*;
 import de.regelsuche.solver.ir.SolverIr.*;
 import java.io.IOException;
@@ -58,6 +61,55 @@ class CheckedLeanRealTest {
             Files.writeString(source, genuine);
         }
     }
+    @Test void replaysScopedEliminationDefinitionsAndStrictNaturalInduction() throws Exception {
+        var rebuild = new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")), root());
+        for (var dag : List.of(eliminations(), strongNat(false))) {
+            var attempt = backend().using(dag).executeWithEvidence(dag.obligation());
+            var execution = attempt.execution().result();
+            assertEquals(ResultStatus.CONFIRMED, execution.status(), diagnostics(attempt.directory()));
+            var receipt = rebuild.rebuild(dag.obligation(), execution.certificateHash(), attempt.directory());
+            assertEquals(dag.canonical(), Files.readString(receipt.directory().resolve(LeanDagPlan.FILE)));
+            Path retained = attempt.directory().resolve(LeanDagPlan.FILE);
+            Files.writeString(retained, dag.canonical() + "\n");
+            try { assertThrows(IOException.class, () -> rebuild.rebuild(dag.obligation(),execution.certificateHash(),attempt.directory())); }
+            finally { Files.writeString(retained, dag.canonical()); }
+        }
+        var discovered = strongNat(false);
+        assertTrue(ScopedProofSearch.discover(discovered.obligation(),2048).proposals().stream()
+            .anyMatch(p -> p.dag().equals(discovered)));
+        var wrong = strongNat(true);
+        var invalid = backend().using(wrong).executeWithEvidence(wrong.obligation()).execution().result();
+        assertEquals(ResultStatus.UNKNOWN, invalid.status());
+        assertTrue(invalid.certificateHash().isEmpty());
+        assertEquals(ResultStatus.UNSUPPORTED, backend().using(wrong).execute(eliminations().obligation()).result().status());
+    }
+
+    static ScopedProofDag eliminations() {
+        var p = new Symbol("p"); var q = new Symbol("q");
+        var zero = app("nat", new Literal("0"));
+        var witness = new Binder(BinderKind.EXISTS, Sort.NATURAL, app("eq",new Bound(0),zero));
+        var request = ScopedLeanContractTest.theorem(List.of(new SymbolDeclaration("p",Sort.PROPOSITION),
+                new SymbolDeclaration("q",Sort.PROPOSITION)),
+            List.of(Predicate.holds("a",app("or",p,p)), Predicate.holds("b",p), Predicate.holds("c",app("eq",p,q))),
+            app("and",q,app("and",p,witness)));
+        return ScopedProofDag.create(request, List.of(
+            premise(0), local(0), of(CASES,0,1,1), of(HAVE,2,1), premise(2), of(REWRITE,4,3),
+            premise(1), of(BY_CONTRADICTION,1,6), of(ZERO), of(NORMALIZE), indexed(UNFOLD,0,9),
+            of(WITNESS,1,10), of(LET,8,11), of(PAIR,7,12), of(PAIR,5,13)));
+    }
+
+    static ScopedProofDag strongNat(boolean invalidDecrease) {
+        var p = new Symbol("p"); var n = new Bound(0); var outer = new Bound(1);
+        var pn = app("at",p,n);
+        var smaller = new Binder(BinderKind.FORALL, Sort.NATURAL, app("implies",app("lt",n,outer),pn));
+        var progress = new Binder(BinderKind.FORALL, Sort.NATURAL, app("implies",smaller,pn));
+        var request = ScopedLeanContractTest.theorem(List.of(new SymbolDeclaration("p",Sort.NAT_PREDICATE)),
+            List.of(Predicate.holds("progress",progress)), new Binder(BinderKind.FORALL,Sort.NATURAL,pn));
+        return ScopedProofDag.create(request, List.of(premise(0), local(1), of(SPECIALIZE,0,1),
+            invalidDecrease ? of(NORMALIZE) : local(0), of(DECREASE,1,3), of(INTRO,4), of(INTRO,5),
+            of(APPLY,2,6), of(STRONG_INDUCTION,7)));
+    }
+
     @Test void boundedTacticFailureIsNotARefutation() {
         var a=backend().executeWithEvidence(CheckedLeanProofTest.obligation("x+1","x"));
         assertEquals(ResultStatus.UNKNOWN,a.execution().result().status(),a.directory().toString());
@@ -85,6 +137,106 @@ class CheckedLeanRealTest {
             +new LeanSourceRenderer().audit(type,SolverIr.sha256("audit-fixture"),"3".repeat(32));
         assertEquals(0,compile(text));
     }
+    @Test void scopedStatementsUseTheKernelAndAnIndependentTypeReconstruction() throws Exception {
+        // In the required real-tool lane a missing second project is a failure.
+        String second = System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT");
+        assertNotNull(second, "The real scoped proof lane requires the independent pinned project");
+        var checker = new LeanEvidenceRebuilder(Path.of(second), root());
+        var zero = ScopedLeanContractTest.zero;
+        var declarations = List.of(new SymbolDeclaration("f", Sort.REAL_SEQUENCE));
+        var f = ScopedLeanContractTest.f;
+        var hasSum = ScopedLeanContractTest.app("has_sum", f, zero);
+        var fromSum = ScopedLeanContractTest.theorem(declarations, List.of(Predicate.holds("sum", hasSum)),
+            ScopedLeanContractTest.app("summable", f));
+        for (var request : List.of(ScopedLeanContractTest.witness(), ScopedLeanContractTest.sets(),
+                ScopedLeanContractTest.limit(zero), ScopedLeanContractTest.summableAdd(), fromSum)) {
+            var original = backend().executeWithEvidence(request);
+            assertEquals(ResultStatus.CONFIRMED, original.execution().result().status(), diagnostics(original.directory()));
+            var audit = LeanSolverBackend.checkedProcessAudit(Files.readString(original.directory().resolve("proof.stdout")),
+                request, null);
+            assertTrue(audit.scoped());
+            assertFalse(audit.imports().isEmpty());
+            if (request.equals(ScopedLeanContractTest.summableAdd()))
+                assertTrue(audit.imports().stream().anyMatch(d -> d.name().equals("Summable.add")
+                    && d.module().startsWith("Mathlib.")), audit.imports().toString());
+
+            String cert = original.execution().result().certificateHash();
+            var receipt = checker.rebuild(request, cert, original.directory());
+            String rebuilt = Files.readString(receipt.directory().resolve("proof.lean"));
+            assertTrue(rebuilt.endsWith(LeanStatementReconstruction.theorem(request)));
+            String report = Files.readString(receipt.directory().resolve("rebuild.txt"));
+            assertTrue(report.contains("reconstructed=" + SolverIr.sha256(LeanStatementReconstruction.theorem(request))));
+            assertEquals(receipt.receiptHash(), SolverIr.sha256(report));
+            if (request.equals(ScopedLeanContractTest.summableAdd())) {
+                var learned = LeanLemmaPlan.learn(request, cert, original.directory());
+                assertTrue(learned.declarations().contains("Summable.add"), learned.declarations().toString());
+                // Acquisition has already finished before the second, one-premise target exists.
+                var value = ScopedLeanContractTest.app("at", f, new Bound(0));
+                var doubled = new Binder(BinderKind.SEQUENCE, Sort.NATURAL, new Binary(BinaryOperator.ADD, value, value));
+                var goal = ScopedLeanContractTest.app("summable", doubled);
+                var target = ScopedLeanContractTest.theorem(declarations,
+                    List.of(Predicate.holds("sf", ScopedLeanContractTest.app("summable", f))), goal);
+                var trained = backend().using(learned);
+                var transfer = trained.executeWithEvidence(target);
+                assertEquals(ResultStatus.CONFIRMED, transfer.execution().result().status(), diagnostics(transfer.directory()));
+                String targetCertificate = transfer.execution().result().certificateHash();
+                checker.rebuild(target, targetCertificate, transfer.directory());
+                assertNotEquals(targetCertificate, cert);
+                var missingPremise = ScopedLeanContractTest.theorem(declarations, List.of(), goal);
+                var failed = trained.executeWithEvidence(missingPremise);
+                assertEquals(ResultStatus.UNKNOWN, failed.execution().result().status(), diagnostics(failed.directory()));
+                assertTrue(failed.execution().result().certificateHash().isEmpty());
+            }
+            if (request.equals(fromSum)) {
+                var stronger = ScopedLeanContractTest.theorem(declarations, List.of(), ScopedLeanContractTest.app("summable", f));
+                assertThrows(IOException.class, () -> checker.rebuild(stronger, cert, original.directory()));
+                // The second rendering is accepted by Lean only if its type really matches.
+                String attack = rebuilt.replace(LeanStatementReconstruction.theorem(request), LeanStatementReconstruction.theorem(stronger));
+                assertNotEquals(0, compile(attack));
+            }
+        }
+    }
+
+    @Test void falseScopedLimitAndCapturedWitnessNeverConfirm() throws Exception {
+        var badCapture = ScopedLeanContractTest.theorem(List.of(), List.of(), new Binder(BinderKind.EXISTS, Sort.REAL,
+            new Binder(BinderKind.FORALL, Sort.REAL, ScopedLeanContractTest.app("eq", new Bound(1), new Bound(0)))));
+        for (var request : List.of(ScopedLeanContractTest.limit(new Literal("1")), badCapture)) {
+            var attempt = backend().executeWithEvidence(request);
+            assertEquals(ResultStatus.UNKNOWN, attempt.execution().result().status(), diagnostics(attempt.directory()));
+            assertTrue(attempt.execution().result().certificateHash().isEmpty());
+        }
+    }
+
+    @Test void existingWitnessAndNaturalInductionPlansReachAFreshKernelAndSecondChecker() throws Exception {
+        var body = new SolverObligationFactory().equality("witness", "w", "x+1", List.of(),
+            RequestedEvidence.SYMBOLIC_CERTIFICATE, new SourceProvenance("test", "witness", SolverIr.sha256("witness")));
+        var statement = new ExistentialIntroduction.Statement(body, "w");
+        var proof = ExistentialWitnessSearch.search(statement, 256).proof().orElseThrow();
+        assertTrue(ExistentialIntroduction.replay(statement, proof));
+        var witness = statement.toScopedObligation();
+
+        var p = new Symbol("property");
+        var n = new Bound(0);
+        var pn = ScopedLeanContractTest.app("at", p, n);
+        var base = Predicate.holds("initial", ScopedLeanContractTest.app("at", p, ScopedLeanContractTest.app("nat", new Literal("0"))));
+        var next = ScopedLeanContractTest.app("at", p, ScopedLeanContractTest.app("succ", n));
+        var step = Predicate.holds("transition", new Binder(BinderKind.FORALL, Sort.NATURAL, ScopedLeanContractTest.app("implies", pn, next)));
+        var declarations = List.of(new SymbolDeclaration("property", Sort.NAT_PREDICATE));
+        var endpoint = new Binder(BinderKind.FORALL, Sort.NATURAL, pn);
+        var target = ScopedLeanContractTest.theorem(declarations, List.of(base, step), endpoint);
+        var plan = NaturalInduction.discover(target).getFirst();
+        assertTrue(NaturalInduction.matches(target, plan));
+        var rebuild = new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")), root());
+        for (var request : List.of(witness, plan.conclusion())) {
+            var checked = backend().executeWithEvidence(request);
+            assertEquals(ResultStatus.CONFIRMED, checked.execution().result().status(), diagnostics(checked.directory()));
+            rebuild.rebuild(request, checked.execution().result().certificateHash(), checked.directory());
+        }
+        var withoutBase = backend().executeWithEvidence(ScopedLeanContractTest.theorem(declarations, List.of(step), endpoint));
+        assertEquals(ResultStatus.UNKNOWN, withoutBase.execution().result().status(), diagnostics(withoutBase.directory()));
+        assertTrue(withoutBase.execution().result().certificateHash().isEmpty());
+    }
+
     private static String diagnostics(Path directory) throws Exception {
         StringBuilder out = new StringBuilder(directory.toString());
         for (String file : List.of("proof.stdout", "proof.stderr", "FAILED.txt")) {

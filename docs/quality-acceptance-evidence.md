@@ -22,8 +22,9 @@ commit and its complete tree. Generate it from the source checkout with
 the collection switch. Include that file as
 `build/authority-evidence/quality-source-tree.json` in the expanded archive.
 The reader reconstructs the commit tree and checks every tracked source member
-and executable flag. The Maven verification and report collection need no Git
-executable.
+and executable flag. The archive verification and report collection need no Git
+executable. CI validates the archive before the full Maven reactor and retains
+the registration and the verification test XML with the Git-free evidence.
 
 `index.json` records the collection checkout revision/tree, whether tracked
 changes are present, each file's SHA-256 and byte length, the native outcome
@@ -83,12 +84,12 @@ path and prints the SHA-256 of the byte-identical installed report before
 evaluating the existing coverage policy. With `-Dregelsuche.coverage.publish=true`,
 the same Failsafe execution also renders the standard JaCoCo pages from every
 module's retained execution data, classes and sources and verifies their counters
-against the canonical reports and gate. The job then invokes the collector with
-`--require-complete`. The new `quality-acceptance-evidence` artifact contains
+against the canonical reports and gate. The job then runs the Maven publication
+test, which requires a `COMPLETE` result. The `quality-acceptance-evidence` artifact contains
 only the collector's output. The existing `repository-verification`,
 `jmh-verification`, `sympy-runtime-verification`, `coverage-verification` and
-other authority artifacts remain retained. No workflow, gate selection,
-threshold or suppression is added. GitHub transfers files; the checkout owns
+other authority artifacts remain retained. The collector preserves the existing
+gate selection, thresholds and suppressions. GitHub transfers files. The checkout owns
 the completeness check and every existing quality decision.
 
 To verify downloaded coverage inputs with Maven, use a fresh evidence tree with

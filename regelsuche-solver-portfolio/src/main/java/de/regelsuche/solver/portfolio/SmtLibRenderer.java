@@ -23,6 +23,8 @@ final class SmtLibRenderer {
 
     Material render(Obligation obligation) {
         List<String> issues = new ArrayList<>();
+        if (!de.regelsuche.solver.ir.SolverIr.OBLIGATION_SCHEMA.equals(obligation.schema()))
+            return new Material("", Map.of(), List.of("UNSUPPORTED_SCHEMA:" + obligation.schema()));
         addDivisionDomainIssues(obligation, issues);
         Map<String, String> mapping = new LinkedHashMap<>();
         StringBuilder script = new StringBuilder("(set-logic ALL)\n");
@@ -123,7 +125,7 @@ final class SmtLibRenderer {
                 || denominatorOnRight && zeroOnLeft;
             case GREATER_THAN, LESS_THAN -> denominatorOnLeft && zeroOnRight
                 || denominatorOnRight && zeroOnLeft;
-            case EQUALS, LESS_OR_EQUAL, GREATER_OR_EQUAL, IS_INTEGER -> false;
+            case EQUALS, LESS_OR_EQUAL, GREATER_OR_EQUAL, IS_INTEGER, HOLDS -> false;
         };
     }
 
@@ -157,6 +159,7 @@ final class SmtLibRenderer {
             case LESS_OR_EQUAL -> "(<= " + leftTerm + ' ' + rightTerm + ')';
             case GREATER_THAN -> "(> " + leftTerm + ' ' + rightTerm + ')';
             case GREATER_OR_EQUAL -> "(>= " + leftTerm + ' ' + rightTerm + ')';
+            case HOLDS -> throw new IllegalStateException("v2 requires a scoped backend");
             case IS_INTEGER -> "(is_int " + leftTerm + ')';
         };
     }

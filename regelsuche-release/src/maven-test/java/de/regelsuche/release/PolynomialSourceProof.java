@@ -1,6 +1,7 @@
 package de.regelsuche.release;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -62,6 +63,8 @@ final class PolynomialSourceProof {
     }
 
     static ObjectNode verify(Path root, JsonNode receipt, JsonNode checkout) throws Exception {
+        if (!BooleanNode.FALSE.equals(checkout.path("trackedChangesPresent")))
+            throw new IOException("polynomial proof requires an unchanged tracked source");
         if (!FORMAT.equals(receipt.path("schema").asText()) || !checkout.required("revision").equals(receipt.required("revision")))
             throw new IOException("polynomial source witness does not identify the current source");
         try (var db = original(root)) {

@@ -18,6 +18,7 @@ import java.util.TreeMap;
 /** Versioned, solver-neutral contracts for obligations and backend results. */
 public final class SolverIr {
     public static final String OBLIGATION_SCHEMA = "regelsuche.solver-obligation/v1";
+    public static final String SCOPED_OBLIGATION_SCHEMA = "regelsuche.solver-obligation/v2";
     public static final String RESULT_SCHEMA = "regelsuche.solver-result/v1";
 
     private SolverIr() {
@@ -26,13 +27,13 @@ public final class SolverIr {
     public enum Sort {
         REAL,
         INTEGER,
-        BOOLEAN
+        BOOLEAN, NATURAL, REAL_SET, REAL_SEQUENCE, REAL_FUNCTION, NAT_PREDICATE, PROPOSITION
     }
 
     public enum Theory {
         REAL_ARITHMETIC,
         INTEGER_ARITHMETIC,
-        TRANSCENDENTAL_FUNCTIONS
+        TRANSCENDENTAL_FUNCTIONS, SCOPED_ANALYSIS
     }
 
     public enum BinaryOperator {
@@ -50,7 +51,7 @@ public final class SolverIr {
         LESS_OR_EQUAL,
         GREATER_THAN,
         GREATER_OR_EQUAL,
-        IS_INTEGER
+        IS_INTEGER, HOLDS
     }
 
     public enum RequestedEvidence {
@@ -75,7 +76,7 @@ public final class SolverIr {
         REJECTED
     }
 
-    public sealed interface Expression permits Literal, Symbol, Binary, Call {
+    public sealed interface Expression permits Literal, Symbol, Binary, Call, Bound, Binder {
         String canonicalMaterial();
 
         Set<String> referencedSymbols();
@@ -170,6 +171,29 @@ public final class SolverIr {
         }
     }
 
+    /** Lexical index zero refers to the innermost binder. A Bound never denotes a free symbol. */
+    public record Bound(int index) implements Expression {
+        public Bound {
+            if (index < 0) throw new IllegalArgumentException("negative binder index");
+        }
+        @Override public String canonicalMaterial() { return "bound(" + index + ')'; }
+        @Override public Set<String> referencedSymbols() { return Set.of(); }
+    }
+
+    public enum BinderKind { FORALL, EXISTS, SET_OF, SEQUENCE, FUNCTION }
+
+    public record Binder(BinderKind kind, Sort domain, Expression body) implements Expression {
+        public Binder {
+            Objects.requireNonNull(kind);
+            Objects.requireNonNull(domain);
+            Objects.requireNonNull(body);
+        }
+        @Override public String canonicalMaterial() {
+            return "binder(" + kind + ',' + domain + ',' + body.canonicalMaterial() + ')';
+        }
+        @Override public Set<String> referencedSymbols() { return body.referencedSymbols(); }
+    }
+
     public record SymbolDeclaration(String name, Sort sort) {
         public SymbolDeclaration {
             requireIdentifier(name, "declaration name");
@@ -191,13 +215,17 @@ public final class SolverIr {
             requireText(id, "predicate id");
             Objects.requireNonNull(relation, "relation");
             Objects.requireNonNull(left, "left");
-            if (relation == Relation.IS_INTEGER) {
+            if (relation == Relation.IS_INTEGER || relation == Relation.HOLDS) {
                 if (right != null) {
-                    throw new IllegalArgumentException("IS_INTEGER must not have a right expression");
+                    throw new IllegalArgumentException(relation + " must not have a right expression");
                 }
             } else {
                 Objects.requireNonNull(right, "right");
             }
+        }
+
+        public static Predicate holds(String id, Expression proposition) {
+            return new Predicate(id, Relation.HOLDS, proposition, null);
         }
 
         String canonicalMaterial() {
@@ -218,20 +246,28 @@ public final class SolverIr {
         public Goal {
             Objects.requireNonNull(relation, "relation");
             Objects.requireNonNull(left, "left");
-            Objects.requireNonNull(right, "right");
+            if (relation == Relation.HOLDS) {
+                if (right != null) throw new IllegalArgumentException("HOLDS takes a proposition only");
+            } else {
+                Objects.requireNonNull(right, "right");
+            }
             if (relation == Relation.IS_INTEGER) {
                 throw new IllegalArgumentException("IS_INTEGER is an assumption relation, not a goal");
             }
         }
 
+        public static Goal holds(Expression proposition) {
+            return new Goal(Relation.HOLDS, proposition, null);
+        }
+
         String canonicalMaterial() {
             return relation.name() + '|' + left.canonicalMaterial()
-                + '|' + right.canonicalMaterial();
+                + '|' + (right == null ? "" : right.canonicalMaterial());
         }
 
         Set<String> referencedSymbols() {
             LinkedHashSet<String> result = new LinkedHashSet<>(left.referencedSymbols());
-            result.addAll(right.referencedSymbols());
+            if (right != null) result.addAll(right.referencedSymbols());
             return Set.copyOf(result);
         }
     }
@@ -281,7 +317,7 @@ public final class SolverIr {
         String contentHash
     ) {
         public Obligation {
-            if (!OBLIGATION_SCHEMA.equals(schema)) {
+            if (!OBLIGATION_SCHEMA.equals(schema) && !SCOPED_OBLIGATION_SCHEMA.equals(schema)) {
                 throw new IllegalArgumentException("unsupported solver obligation schema");
             }
             requireText(obligationId, "obligationId");
@@ -291,6 +327,19 @@ public final class SolverIr {
             Objects.requireNonNull(goal, "goal");
             Objects.requireNonNull(requestedEvidence, "requestedEvidence");
             Objects.requireNonNull(provenance, "provenance");
+            boolean scoped = SCOPED_OBLIGATION_SCHEMA.equals(schema);
+            if (scoped != theories.contains(Theory.SCOPED_ANALYSIS))
+                throw new IllegalArgumentException("v2 requires the SCOPED_ANALYSIS theory");
+            if (!scoped && (declarations.stream().anyMatch(d -> scopedSort(d.sort()))
+                    || goal.relation() == Relation.HOLDS
+                    || assumptions.stream().anyMatch(p -> p.relation() == Relation.HOLDS)))
+                throw new IllegalArgumentException("scoped sorts and propositions require v2");
+            checkScope(goal.left(), 0, scoped);
+            checkScope(goal.right(), 0, scoped);
+            for (Predicate premise : assumptions) {
+                checkScope(premise.left(), 0, scoped);
+                checkScope(premise.right(), 0, scoped);
+            }
             validateDeclaredSymbols(declarations, assumptions, goal);
             requireSha(contentHash, "contentHash");
             String expected = obligationHash(
@@ -313,11 +362,12 @@ public final class SolverIr {
             List<SymbolDeclaration> orderedDeclarations = sortedDeclarations(declarations);
             List<Theory> orderedTheories = sortedEnums(theories);
             List<Predicate> orderedAssumptions = sortedPredicates(assumptions);
+            String schema = orderedTheories.contains(Theory.SCOPED_ANALYSIS) ? SCOPED_OBLIGATION_SCHEMA : OBLIGATION_SCHEMA;
             String hash = obligationHash(
-                OBLIGATION_SCHEMA, obligationId, orderedDeclarations, orderedTheories,
+                schema, obligationId, orderedDeclarations, orderedTheories,
                 orderedAssumptions, goal, requestedEvidence, provenance);
             return new Obligation(
-                OBLIGATION_SCHEMA, obligationId, orderedDeclarations, orderedTheories,
+                schema, obligationId, orderedDeclarations, orderedTheories,
                 orderedAssumptions, goal, requestedEvidence, provenance, hash);
         }
 
@@ -547,8 +597,9 @@ public final class SolverIr {
 
     private static void writeGoal(JsonWriter json, Goal goal) {
         json.property("relation", goal.relation().name())
-            .object("left", object -> writeExpression(object, goal.left()))
-            .object("right", object -> writeExpression(object, goal.right()));
+            .object("left", object -> writeExpression(object, goal.left()));
+        if (goal.right() == null) json.nullProperty("right");
+        else json.object("right", object -> writeExpression(object, goal.right()));
     }
 
     private static void writeExpression(JsonWriter json, Expression expression) {
@@ -566,8 +617,35 @@ public final class SolverIr {
                 .property("function", call.function())
                 .array("arguments", array -> call.arguments().forEach(argument ->
                     array.objectValue(object -> writeExpression(object, argument))));
+        } else if (expression instanceof Bound bound) {
+            json.property("kind", "BOUND").property("index", bound.index());
+        } else if (expression instanceof Binder binder) {
+            json.property("kind", "BINDER").property("binder", binder.kind().name())
+                .property("domain", binder.domain().name())
+                .object("body", body -> writeExpression(body, binder.body()));
         } else {
             throw new IllegalArgumentException("unsupported expression type: " + expression);
+        }
+    }
+
+    private static boolean scopedSort(Sort sort) {
+        return switch (sort) {
+            case NATURAL, REAL_SEQUENCE, REAL_SET, REAL_FUNCTION, NAT_PREDICATE, PROPOSITION -> true;
+            default -> false;
+        };
+    }
+
+    private static void checkScope(Expression term, int depth, boolean scoped) {
+        if (term instanceof Bound bound && (!scoped || bound.index() >= depth))
+            throw new IllegalArgumentException("unbound lexical index " + bound.index());
+        if (term instanceof Binder binder) {
+            if (!scoped) throw new IllegalArgumentException("binders require v2");
+            checkScope(binder.body(), depth + 1, true);
+        } else if (term instanceof Binary binary) {
+            checkScope(binary.left(), depth, scoped);
+            checkScope(binary.right(), depth, scoped);
+        } else if (term instanceof Call call) {
+            call.arguments().forEach(argument -> checkScope(argument, depth, scoped));
         }
     }
 

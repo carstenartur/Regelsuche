@@ -9,6 +9,7 @@
   <artifactId>regelsuche-proof-tests</artifactId>
   <name>Regelsuche pinned proof qualification</name>
   <dependencies>
+    <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-benchmarks</artifactId><scope>test</scope></dependency>
     <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-app</artifactId><scope>test</scope></dependency>
     <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-app</artifactId><type>test-jar</type><scope>test</scope></dependency>
     <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-console</artifactId><scope>test</scope></dependency>
@@ -26,12 +27,18 @@
         <compileSourceRoots>
           <compileSourceRoot>${project.basedir}/src/test/java</compileSourceRoot>
           <compileSourceRoot>${maven.multiModuleProjectDirectory}/regelsuche-solver-portfolio/src/test/java</compileSourceRoot>
+          <compileSourceRoot>${maven.multiModuleProjectDirectory}/regelsuche-discovery/src/test/java</compileSourceRoot>
+          <compileSourceRoot>${maven.multiModuleProjectDirectory}/regelsuche-learning/src/test/java</compileSourceRoot>
+          <compileSourceRoot>${maven.multiModuleProjectDirectory}/regelsuche-benchmarks/src/test/java</compileSourceRoot>
         </compileSourceRoots>
         <testIncludes>
           <testInclude>de/regelsuche/proofworker/*.java</testInclude>
           <testInclude>de/regelsuche/solver/portfolio/CheckedLeanProofTest.java</testInclude>
           <testInclude>de/regelsuche/solver/portfolio/CheckedLeanRealTest.java</testInclude>
           <testInclude>de/regelsuche/solver/portfolio/Z3SmtSolverBackendTest.java</testInclude>
+          <testInclude>de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java</testInclude>
+          <testInclude>de/regelsuche/evolution/ResidualPlanComparisonTest.java</testInclude>
+          <testInclude>de/regelsuche/benchmarks/ScopedProofTransferStudyTest.java</testInclude>
         </testIncludes>
       </configuration></execution></executions>
     </plugin>

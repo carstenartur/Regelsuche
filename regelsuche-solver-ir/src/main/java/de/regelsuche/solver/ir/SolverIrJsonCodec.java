@@ -63,7 +63,7 @@ public final class SolverIrJsonCodec {
             new Goal(
                 Relation.valueOf(text(goal, "relation")),
                 readExpression(required(goal, "left")),
-                readExpression(required(goal, "right"))),
+                required(goal, "right").isNull() ? null : readExpression(required(goal, "right"))),
             RequestedEvidence.valueOf(text(root, "requestedEvidence")),
             new SourceProvenance(
                 text(provenance, "sourceType"),
@@ -103,6 +103,13 @@ public final class SolverIrJsonCodec {
 
     private Expression readExpression(JsonNode node) {
         return switch (text(node, "kind")) {
+            case "BOUND" -> {
+                JsonNode index = required(node, "index");
+                if (!index.isIntegralNumber() || !index.canConvertToInt()) throw new IllegalArgumentException("invalid bound index");
+                yield new SolverIr.Bound(index.intValue());
+            }
+            case "BINDER" -> new SolverIr.Binder(SolverIr.BinderKind.valueOf(text(node, "binder")),
+                Sort.valueOf(text(node, "domain")), readExpression(required(node, "body")));
             case "LITERAL" -> new Literal(text(node, "value"));
             case "SYMBOL" -> new Symbol(text(node, "name"));
             case "BINARY" -> new Binary(

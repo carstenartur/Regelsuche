@@ -43,15 +43,24 @@ public class ExpressionParser implements RetainedGraph.View {
         }
 
         List<Equation> equations = new ArrayList<>();
-        var segments = java.util.regex.Pattern.compile("[^;\n]+").matcher(input.rawInput());
+        forEachEquation(input.rawInput(), (row, offset) -> equations.add(parseEquation(row, offset)));
+        return new ParsedInput(List.of(), equations);
+    }
+
+    /** Parses a system with the ordinary row grammar and exact spans in the entire original input. */
+    public List<ExactParsedEquation> parseExactSystem(String source) {
+        List<ExactParsedEquation> equations = new ArrayList<>();
+        forEachEquation(source, (row, offset) -> equations.add(parseExactEquation(row, offset)));
+        return List.copyOf(equations);
+    }
+
+    private static void forEachEquation(String source, java.util.function.ObjIntConsumer<String> action) {
+        var segments = java.util.regex.Pattern.compile("[^;\n]+").matcher(source);
         while (segments.find()) {
             String segment = segments.group();
             String trimmed = segment.trim();
-            if (!trimmed.isEmpty()) {
-                equations.add(parseEquation(trimmed, segments.start() + segment.indexOf(trimmed)));
-            }
+            if (!trimmed.isEmpty()) action.accept(trimmed, segments.start() + segment.indexOf(trimmed));
         }
-        return new ParsedInput(List.of(), equations);
     }
 
     /**
@@ -112,12 +121,16 @@ public class ExpressionParser implements RetainedGraph.View {
 
     /** Parses one equation and retains source ranges in the original equation text. */
     public ExactParsedEquation parseExactEquation(String equation) {
-        int separator = requireEquationSeparator(equation, 0);
+        return parseExactEquation(equation, 0);
+    }
+
+    private ExactParsedEquation parseExactEquation(String equation, int offset) {
+        int separator = requireEquationSeparator(equation, offset);
         int rightStart = separator + 1;
         return new ExactParsedEquation(
-            parseExactTerm(equation.substring(0, separator), 0),
-            parseExactTerm(equation.substring(rightStart), rightStart),
-            rightStart);
+            parseExactTerm(equation.substring(0, separator), offset),
+            parseExactTerm(equation.substring(rightStart), offset + rightStart),
+            offset, offset + rightStart);
     }
 
     private static int requireEquationSeparator(String equation, int offset) {

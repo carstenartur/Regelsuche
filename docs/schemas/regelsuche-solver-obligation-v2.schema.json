@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.solver-obligation/v2",
+  "title": "Regelsuche solver-neutral scoped obligation v2",
+  "type": "object",
+  "required": [
+    "schema", "obligationId", "declarations", "theories", "assumptions",
+    "goal", "requestedEvidence", "provenance", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.solver-obligation/v2" },
+    "obligationId": { "$ref": "#/$defs/nonBlank" },
+    "declarations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["name", "sort"],
+        "properties": {
+          "name": { "$ref": "#/$defs/identifier" },
+          "sort": { "enum": ["REAL", "INTEGER", "BOOLEAN", "NATURAL", "REAL_SET", "REAL_SEQUENCE", "REAL_FUNCTION", "NAT_PREDICATE", "PROPOSITION"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "theories": {
+      "type": "array",
+      "contains": { "const": "SCOPED_ANALYSIS" },
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "REAL_ARITHMETIC", "INTEGER_ARITHMETIC",
+          "TRANSCENDENTAL_FUNCTIONS", "SCOPED_ANALYSIS"
+        ]
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/predicate" }
+    },
+    "goal": { "$ref": "#/$defs/goal" },
+    "requestedEvidence": {
+      "enum": [
+        "DECISION", "COUNTEREXAMPLE", "SYMBOLIC_CERTIFICATE", "FORMAL_PROOF"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["sourceType", "sourceId", "revisionHash"],
+      "properties": {
+        "sourceType": { "$ref": "#/$defs/nonBlank" },
+        "sourceId": { "$ref": "#/$defs/nonBlank" },
+        "revisionHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "relation": {
+      "enum": [
+        "EQUALS", "NOT_EQUALS", "LESS_THAN", "LESS_OR_EQUAL",
+        "GREATER_THAN", "GREATER_OR_EQUAL", "IS_INTEGER", "HOLDS"
+      ]
+    },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "index"],
+          "properties": {
+            "kind": { "const": "BOUND" },
+            "index": { "type": "integer", "minimum": 0, "maximum": 2147483647 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "binder", "domain", "body"],
+          "properties": {
+            "kind": { "const": "BINDER" },
+            "binder": { "enum": ["FORALL", "EXISTS", "SET_OF", "SEQUENCE", "FUNCTION"] },
+            "domain": { "enum": ["REAL", "INTEGER", "BOOLEAN", "NATURAL", "REAL_SET", "REAL_SEQUENCE", "REAL_FUNCTION", "NAT_PREDICATE", "PROPOSITION"] },
+            "body": { "$ref": "#/$defs/expression" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": { "const": "LITERAL" },
+            "value": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "SYMBOL" },
+            "name": { "$ref": "#/$defs/identifier" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "operator", "left", "right"],
+          "properties": {
+            "kind": { "const": "BINARY" },
+            "operator": {
+              "enum": ["ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "POWER"]
+            },
+            "left": { "$ref": "#/$defs/expression" },
+            "right": { "$ref": "#/$defs/expression" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "function", "arguments"],
+          "properties": {
+            "kind": { "const": "CALL" },
+            "function": { "$ref": "#/$defs/identifier" },
+            "arguments": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/expression" }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "if": { "properties": { "relation": { "enum": ["HOLDS", "IS_INTEGER"] } } },
+      "then": { "properties": { "right": { "type": "null" } } },
+      "else": { "properties": { "right": { "$ref": "#/$defs/expression" } } },
+      "required": ["id", "relation", "left", "right"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonBlank" },
+        "relation": { "$ref": "#/$defs/relation" },
+        "left": { "$ref": "#/$defs/expression" },
+        "right": {
+          "oneOf": [
+            { "$ref": "#/$defs/expression" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "goal": {
+      "type": "object",
+      "if": { "properties": { "relation": { "enum": ["HOLDS", "IS_INTEGER"] } } },
+      "then": { "properties": { "right": { "type": "null" } } },
+      "else": { "properties": { "right": { "$ref": "#/$defs/expression" } } },
+      "required": ["relation", "left", "right"],
+      "properties": {
+        "relation": {
+          "enum": [
+            "EQUALS", "NOT_EQUALS", "LESS_THAN", "LESS_OR_EQUAL",
+            "GREATER_THAN", "GREATER_OR_EQUAL", "HOLDS"
+          ]
+        },
+        "left": { "$ref": "#/$defs/expression" },
+        "right": { "oneOf": [{ "$ref": "#/$defs/expression" }, { "type": "null" }] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

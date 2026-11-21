@@ -42,6 +42,24 @@ class MavenGitFreeFullLifecycleContractTest {
     }
 
     @Test
+    void archiveCommitWitnessAndSuccessfulPreflightAreRetainedAlongsideTheFullReactor() throws IOException {
+        String workflow = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/gradle.yml"));
+        String step = workflow.substring(workflow.indexOf(STEP), workflow.indexOf(NEXT));
+        int registration = step.indexOf("-Dregelsuche.qualityAcceptance.registerArchive=true");
+        int sourceRoot = step.indexOf("cd \"$source_root\"");
+        int verification = step.indexOf("-Dregelsuche.qualityAcceptance.verifyArchive=true");
+        int receipt = step.indexOf("build/authority-evidence/quality-source-verification.xml");
+        int reactor = step.indexOf(FULL_COMMAND);
+        assertTrue(registration >= 0 && sourceRoot > registration && verification > sourceRoot
+            && receipt > verification && reactor > receipt,
+            "register the original checkout, verify archive bytes, then run the full reactor");
+        assertTrue(step.contains("-Dregelsuche.qualityAcceptance.revision=$REGELSUCHE_AUTHORITY_GITHUB_SHA"));
+        for (String file : java.util.List.of("quality-source-tree.json", "quality-source-verification.xml")) {
+            assertTrue(step.contains("${{ steps.source_archive.outputs.root }}/build/authority-evidence/" + file));
+        }
+    }
+
+    @Test
     void selectedModuleSubsetCannotPretendToBeFullLifecycle() {
         String valid = fixture();
         verifyFullGitFreeLifecycle(valid);

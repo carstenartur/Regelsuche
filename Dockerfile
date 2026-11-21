@@ -1,5 +1,6 @@
 # ---------- Legacy Gradle builder: walkthrough target only ----------
 FROM eclipse-temurin:25.0.5_8-jdk-noble AS walkthrough-build
+ARG REGELSUCHE_PREPARATION_REVISION
 WORKDIR /workspace
 
 # Copy Gradle wrapper and build scripts first to leverage Docker layer caching
@@ -93,6 +94,7 @@ ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscov
 # Keep the legacy Gradle walkthrough target above independently reproducible.
 # The default runtime below depends only on this Maven build stage.
 FROM maven:3.10.0-eclipse-temurin-25-noble AS build
+ARG REGELSUCHE_PREPARATION_REVISION
 WORKDIR /workspace
 COPY . .
 RUN mvn --batch-mode --no-transfer-progress -Pfull -pl app -am \
