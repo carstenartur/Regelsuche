@@ -86,6 +86,8 @@ class ScopedLogicDiscoveryDomainTest {
         var rejected = new ScopedTruthAssignments(ignored -> false).search(candidate, 8);
         assertEquals(DiscoveryDomain.CounterexampleStatus.UNSUPPORTED, rejected.status());
         assertTrue(rejected.witness().isBlank());
+        assertEquals(0, rejected.attempts());
+        assertEquals("Constant interpretations require a supported scoped proposition", rejected.metrics().get("reason"));
     }
 
     @Test void generalCasesDoubleNegationAndWitnessesAreActuallyFormedFromSourceFacts() {
