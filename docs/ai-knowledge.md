@@ -695,3 +695,20 @@ was not a controlled comparison of source changes alone. None of these rejected
 integration values established a baseline. All older measurements retain their
 original source and qualification identities; the active successor is the
 independently accepted P03 snapshot described above.
+
+## Accepted predecessor after SDK integration — 21 November 2026
+
+The successful [push/main CI 44919811586](https://github.com/carstenartur/Regelsuche/actions/runs/44919811586)
+at `16a345b3d8b2cb71c50e3ad9025ea30fb8dbc4e3`, tree
+`2ba7db35d10d57c45298a99df50e70860ea01d15`, measured 847,010
+estimated context units and concept radius 117 with the pinned 0.1.10 extractor.
+Against the prior independently accepted 832,860 / 115 baseline this is
+**+14,150 / +2** — within the **unchanged +15,000 / +3** limits.
+The original ZIP digest and all 290 indexed source/report SHA-256 and byte-length
+checks are recorded under [the new accepted-main provenance](../ai-knowledge/baseline-history/2026-11-21-main-16a345b3/provenance.json).
+The byte-identical numerical projection is retained in
+[metrics-snapshot.json](../ai-knowledge/baseline-history/2026-11-21-main-16a345b3/metrics-snapshot.json).
+The original archive stays with GitHub Actions. No failing feature branch or
+unqualified local measurement was promoted. In particular, this does **not**
+qualify the pending Maven study/quality collector, which still requires its
+own full exact-head CI and review.
