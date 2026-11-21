@@ -83,24 +83,28 @@ class MavenFrozenReproductionEnvironmentContractTest {
     }
 
     @Test
-    void nativeMavenStudyMustPassAlongsideBothExistingPolynomialGates() throws IOException {
+    void nativeAndTypedMavenStudiesMustPassAlongsideExistingPolynomialGates() throws IOException {
         var jobs = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
         var verification = jobs.required("verification");
         var reject = verification.required("steps").get(0);
         assertEquals("exit 1", reject.required("run").asText());
         for (String id : List.of("external-polynomial-comparison", "typed-external-polynomial-comparison",
-                "maven-polynomial-qualification", "maven-native-polynomial-study")) {
+                "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-typed-polynomial-study")) {
             assertTrue(verification.required("needs").valueStream().anyMatch(need -> id.equals(need.asText())), id);
             assertTrue(reject.required("if").asText().contains("needs." + id + ".result != 'success'"), id);
         }
-        var study = jobs.required("maven-native-polynomial-study");
+        verifyMavenStudyJob(jobs.required("maven-native-polynomial-study"), "native-polynomial-comparison", "native-polynomial-comparison");
+        verifyMavenStudyJob(jobs.required("maven-typed-polynomial-study"), "typed-polynomial-comparison", "typed-external-polynomial-comparison");
+    }
+
+    private static void verifyMavenStudyJob(com.fasterxml.jackson.databind.JsonNode study, String profile, String report) {
         assertEquals("github.event_name != 'create'", study.required("if").asText());
         var run = study.required("steps").get(2).required("run").asText().strip();
-        assertEquals("mvn --batch-mode --no-transfer-progress -Pnative-polynomial-comparison -pl regelsuche-release -am "
+        assertEquals("mvn --batch-mode --no-transfer-progress -P" + profile + " -pl regelsuche-release -am "
             + "-Dregelsuche.skipPolynomialClasspath=false verify", run);
         var artifact = study.required("steps").get(3).required("with");
         assertEquals("error", artifact.required("if-no-files-found").asText());
-        assertEquals(Set.of("regelsuche-release/target/reports/native-polynomial-comparison/**",
+        assertEquals(Set.of("regelsuche-release/target/reports/" + report + "/**",
             "regelsuche-release/target/failsafe-reports/**", "regelsuche-learning/target/surefire-reports/**",
             "regelsuche-search/target/surefire-reports/**"), Set.copyOf(artifact.required("path").asText().lines().toList()));
     }
