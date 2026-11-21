@@ -353,6 +353,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Compare two complete clean source runs with offline OCI content-ID replay
+        env:
+          REGELSUCHE_RUN_SCALAR_DIAGNOSTICS: '1'
         run: scripts/reproduce-native-scalar-saturation.sh build/scalar-reproduction --with-container
       - name: Retain all canonical outputs and partial logs on failure
         if: ${{ always() && !cancelled() }}

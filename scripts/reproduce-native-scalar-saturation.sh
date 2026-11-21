@@ -12,6 +12,10 @@ root=$(git rev-parse --show-toplevel)
 revision=$(git -C "$root" rev-parse --verify HEAD)
 mkdir -p "$(dirname "$output")"
 mkdir "$output"
+diagnostics=${REGELSUCHE_RUN_SCALAR_DIAGNOSTICS:-0}
+if [[ "$diagnostics" == 1 ]]; then
+    mkdir "$output/diagnostics"
+fi
 source_area=$(mktemp -d)
 trap 'rm -rf "$source_area"' EXIT
 # Both candidate sources are independently extracted before building the immutable
@@ -50,6 +54,11 @@ for name in first second; do
             -cp "regelsuche-benchmarks/target/classes:$runtime_classpath" \
             de.regelsuche.benchmarks.ComparativeBenchmarkMain --native-scalar-comparison \
             scripts/sympy_rule_reference/reference.py "$revision" "$output/$name"
+        if [[ "$diagnostics" == 1 ]]; then
+            java -cp "regelsuche-benchmarks/target/classes:$runtime_classpath" \
+                de.regelsuche.benchmarks.ComparativeBenchmarkMain --native-scalar-diagnostics \
+                "$revision" "$output/diagnostics/$name.json"
+        fi
     ) > "$output/$name.log" 2>&1
 done
 diff -qr "$output/first" "$output/second"
@@ -60,5 +69,10 @@ if [[ "$mode" = "--with-container" ]]; then
     docker run --rm --network none --user "$(id -u):$(id -g)" -v "$output/container:/output" "$image_id" \
         --native-scalar-comparison /opt/regelsuche-sympy-reference/reference.py "$revision" /output > "$output/container-run.log" 2>&1
     diff -qr "$output/first" "$output/container"
+    if [[ "$diagnostics" == 1 ]]; then
+        docker run --rm --network none --user "$(id -u):$(id -g)" \
+            -e "REGELSUCHE_SCALAR_DIAGNOSTICS_OCI_ID=$image_id" -v "$output/diagnostics:/output" "$image_id" \
+            --native-scalar-diagnostics "$revision" /output/container.json > "$output/container-diagnostics.log" 2>&1
+    fi
 fi
 printf 'source=%s scope=%s canonical-files=%s\n' "$revision" "$mode" "$(wc -l < "$output/checksums.txt")"

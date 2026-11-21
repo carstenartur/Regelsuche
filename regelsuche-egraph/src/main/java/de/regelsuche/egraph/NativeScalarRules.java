@@ -113,6 +113,7 @@ final class NativeScalarRules {
                 work.tuples++;
                 if (!run.graph.find(product.children().get(i)).equals(denominator)) continue;
                 var factor = run.syntax(denominator);
+                run.chargeGuard();
                 var truth = run.facts.get(denominator).evaluate(ScalarGuardFacts.Predicate.NONZERO);
                 if (truth != ScalarGuardFacts.Truth.TRUE) {
                     work.rejected++;
