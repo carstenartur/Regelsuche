@@ -15,6 +15,8 @@
   <name>Regelsuche Release Evidence</name>
 
   <dependencies>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><scope>test</scope></dependency>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
       <artifactId>regelsuche-autopilot</artifactId>
@@ -28,9 +30,18 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
+        <executions><execution><id>default-testCompile</id><configuration><compileSourceRoots>
+          <compileSourceRoot>${project.basedir}/src/test/java</compileSourceRoot>
+          <compileSourceRoot>${project.basedir}/src/maven-test/java</compileSourceRoot>
+        </compileSourceRoots></configuration></execution></executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration><argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine></configuration>
+        <configuration><argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+          <systemPropertyVariables><regelsuche.mavenHome>${maven.home}</regelsuche.mavenHome></systemPropertyVariables>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -45,4 +56,22 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile><id>polynomial-comparison</id><build><plugins><plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId>
+      <executions><execution><id>clear-previous-polynomial-reports</id><phase>initialize</phase><goals><goal>clean</goal></goals>
+        <configuration><excludeDefaultDirectories>true</excludeDefaultDirectories><filesets>
+          <fileset><directory>${project.build.directory}/reports/polynomial-comparison</directory><followSymlinks>false</followSymlinks></fileset>
+          <fileset><directory>${project.build.directory}/polynomial-worker-input</directory><followSymlinks>false</followSymlinks></fileset>
+        </filesets></configuration></execution></executions>
+    </plugin><plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
+      <executions><execution><id>run-registered-polynomial-pilot</id><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
+      <configuration><test>de.regelsuche.release.PolynomialComparisonContainerIT</test>
+        <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+        <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+        <forkedProcessTimeoutInSeconds>1800</forkedProcessTimeoutInSeconds>
+      </configuration>
+    </plugin></plugins></build></profile>
+  </profiles>
 </project>

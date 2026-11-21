@@ -14,6 +14,7 @@
   <artifactId>regelsuche-learning</artifactId>
   <name>Regelsuche Learning</name>
 
+  <properties><regelsuche.skipPolynomialClasspath>true</regelsuche.skipPolynomialClasspath></properties>
   <dependencies>
     <dependency>
       <groupId>io.github.carstenartur</groupId>
@@ -44,4 +45,15 @@
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
   </dependencies>
+  <build><plugins><plugin>
+    <groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId>
+    <executions><execution><id>resolve-frozen-study-runtime</id><phase>prepare-package</phase><goals><goal>build-classpath</goal></goals>
+      <configuration><includeScope>runtime</includeScope><regenerateFile>true</regenerateFile>
+        <skip>${regelsuche.skipPolynomialClasspath}</skip>
+        <outputFile>${project.build.directory}/polynomial-runtime-classpath.txt</outputFile>
+      </configuration></execution></executions>
+  </plugin></plugins></build>
+  <profiles>
+    <profile><id>polynomial-comparison</id><properties><regelsuche.skipPolynomialClasspath>false</regelsuche.skipPolynomialClasspath></properties></profile>
+  </profiles>
 </project>
