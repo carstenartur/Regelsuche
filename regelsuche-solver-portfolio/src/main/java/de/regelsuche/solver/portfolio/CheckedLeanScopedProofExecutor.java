@@ -15,6 +15,12 @@ public final class CheckedLeanScopedProofExecutor implements ScopedProofExecutor
         this.independent = Objects.requireNonNull(independent, "independent");
     }
 
+    /** Preserve the concrete Lean translator's exact admission boundary. */
+    @Override
+    public boolean supports(de.regelsuche.solver.ir.SolverIr.Obligation obligation) {
+        return new LeanSourceRenderer().render(obligation).supported();
+    }
+
     @Override
     public VerifiedReplay verify(ScopedProofDag dag) {
         Objects.requireNonNull(dag, "dag");

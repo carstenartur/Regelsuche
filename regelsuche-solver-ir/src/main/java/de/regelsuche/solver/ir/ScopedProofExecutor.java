@@ -12,6 +12,11 @@ import java.util.Objects;
 public interface ScopedProofExecutor {
     VerifiedReplay verify(ScopedProofDag proposal);
 
+    /** Fail closed unless a concrete receiver independently admits this scoped theory. */
+    default boolean supports(SolverIr.Obligation obligation) {
+        return false;
+    }
+
     record VerifiedReplay(String proposalHash, SolverIr.ResultStatus status, String message,
                           String kernelHash, Path kernelDirectory,
                           String rebuildHash, Path rebuildDirectory) {

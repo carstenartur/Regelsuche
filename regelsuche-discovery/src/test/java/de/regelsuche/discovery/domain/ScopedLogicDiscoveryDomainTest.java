@@ -74,7 +74,8 @@ class ScopedLogicDiscoveryDomainTest {
             Goal.holds(Q),request.requestedEvidence(),request.provenance());
         var syntactic = de.regelsuche.solver.ir.ScopedProofDag.create(falseTarget,
             List.of(de.regelsuche.solver.ir.ScopedProofDag.Node.premise(0)));
-        var result = new ScopedTruthAssignments().search(syntactic,8);
+        var result = new ScopedTruthAssignments(o -> new de.regelsuche.solver.portfolio.LeanSourceRenderer()
+            .render(o).supported()).search(syntactic,8);
         assertEquals(DiscoveryDomain.CounterexampleStatus.FOUND,result.status());
         assertTrue(result.witness().contains("p=TRUE"));
         assertTrue(result.witness().contains("q=FALSE"));

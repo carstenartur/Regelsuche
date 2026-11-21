@@ -130,7 +130,7 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain<ScopedL
             }
         };
     }
-    @Override public CounterexampleGenerator<ScopedProofDag> counterexampleGenerator() { return new ScopedTruthAssignments(); }
+    @Override public CounterexampleGenerator<ScopedProofDag> counterexampleGenerator() { return new ScopedTruthAssignments(verifier::supports); }
     @Override public CandidateEvaluator<ScopedProofDag,Certificate> evaluator() {
         return new CandidateEvaluator<>() {
             public String id() { return "independent-lean-rebuild/v1"; }

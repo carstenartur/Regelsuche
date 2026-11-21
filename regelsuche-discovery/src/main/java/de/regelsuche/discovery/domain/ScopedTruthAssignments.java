@@ -4,13 +4,20 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleGenerator;
 import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
 import de.regelsuche.solver.ir.ScopedProofDag;
 import de.regelsuche.solver.ir.SolverIr.*;
-import de.regelsuche.solver.portfolio.LeanSourceRenderer;
+import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 /** Countermodels over constant interpretations for propositions and Nat predicates. Unknown values stay open. */
 final class ScopedTruthAssignments implements CounterexampleGenerator<ScopedProofDag> {
+    private final Predicate<Obligation> supports;
+
+    ScopedTruthAssignments(Predicate<Obligation> supports) {
+        this.supports = Objects.requireNonNull(supports, "supports");
+    }
+
     private enum Truth {
         TRUE, FALSE, UNKNOWN;
         Truth negate() { return switch(this) { case TRUE -> FALSE; case FALSE -> TRUE; case UNKNOWN -> UNKNOWN; }; }
@@ -23,7 +30,7 @@ final class ScopedTruthAssignments implements CounterexampleGenerator<ScopedProo
     @Override public CounterexampleResult search(ScopedProofDag candidate, int attemptBudget) {
         var request = candidate.obligation();
         if (attemptBudget < 1) return CounterexampleResult.inconclusive(0,"No constant interpretation budget",Map.of());
-        if (request.goal().relation()!=Relation.HOLDS || !new LeanSourceRenderer().render(request).supported())
+        if (request.goal().relation()!=Relation.HOLDS || !supports.test(request))
             return CounterexampleResult.unsupported("Constant interpretations require a supported scoped proposition");
         var variables = request.declarations().stream().filter(d -> d.sort()==Sort.PROPOSITION || d.sort()==Sort.NAT_PREDICATE).toList();
         int limit = Math.min(attemptBudget, 1 << Math.min(8, variables.size()));
