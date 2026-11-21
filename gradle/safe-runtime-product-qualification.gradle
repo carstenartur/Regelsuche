@@ -171,7 +171,7 @@ def verifyQualificationInputs = tasks.register(
 def testQualificationScripts = tasks.register(
     'testSafeRuntimeProductQualificationScripts', Exec) {
     group = 'verification'
-    description = 'Runs the pure public qualification protocol, artifact and reproduction tests.'
+    description = 'Runs public qualification protocol, artifact, build-provenance and reproduction tests.'
     dependsOn 'prepareVerificationEnvironment'
     workingDir qualificationRepository
     inputs.files fileTree(
