@@ -116,10 +116,10 @@ class ArchitectureBoundariesTest {
 
     @Test
     void physicalModuleDependencyScannerDoesNotConflateTestAdaptersWithRuntimeEdges() {
-        String fixture = "api project(':regelsuche-core')\\n"
-            + "implementation project(':regelsuche-solver-ir')\\n"
-            + "testImplementation project(':regelsuche-solver-portfolio')\\n"
-            + "testRuntimeOnly project(':regelsuche-solver-portfolio')\\n";
+        String fixture = "api project(':regelsuche-core')\n"
+            + "implementation project(':regelsuche-solver-ir')\n"
+            + "testImplementation project(':regelsuche-solver-portfolio')\n"
+            + "testRuntimeOnly project(':regelsuche-solver-portfolio')\n";
         assertEquals(List.of(":regelsuche-core", ":regelsuche-solver-ir"),
             projectDependencyTokens(fixture));
     }
