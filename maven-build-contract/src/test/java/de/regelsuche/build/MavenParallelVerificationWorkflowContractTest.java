@@ -7,17 +7,23 @@ import static de.regelsuche.build.MavenPomTestSupport.parse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -37,6 +43,17 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final String ISOLATED_COVERAGE_REPORT = "regelsuche.coverage.isolatedReport";
   private static final String COVERAGE_MAIN =
       "de.regelsuche.quality.coverage.CoverageRegressionMain";
+
+  private static final Set<String> SHOWCASE_AUTHORITIES = Set.of(
+      "gradle-verification", "jmh-verification", "sympy-runtime-verification");
+  private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
+      "maven-product-verification", "external-polynomial-comparison",
+      "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
+      "maven-polynomial-qualification", "maven-student-sdk-archive-qualification");
+  private static final Pattern FAILURE_TERM =
+      Pattern.compile("needs\\.([A-Za-z][A-Za-z0-9_-]*)\\.result != 'success'");
+  private static final String ROUTINE_FAILURE_GROUP = " || (github.event_name != 'create' && (";
+  private static final String REJECTION_STEP = "Reject incomplete verification authority";
 
   @Test
   void independentAuthoritiesRunInParallelAndConvergeFailClosed()
@@ -164,26 +181,8 @@ class MavenParallelVerificationWorkflowContractTest {
     assertEquals(1, occurrences(workflow, FULL_MAVEN_COMMAND),
         "the full Maven contract must execute exactly once per workflow run");
 
-    String compactConvergence = compact(convergence);
-    assertTrue(compactConvergence.contains(
-        "needs: [gradle-verification, jmh-verification, "
-            + "sympy-runtime-verification, maven-product-verification, "
-            + "external-polynomial-comparison, typed-external-polynomial-comparison, "
-            + "checked-proofs, native-scalar-reproduction, maven-polynomial-qualification]"));
-    assertTrue(compactConvergence.contains(
-        "needs.gradle-verification.result != 'success' || "
-            + "needs.jmh-verification.result != 'success' || "
-            + "needs.sympy-runtime-verification.result != 'success' || "
-            + "(github.event_name != 'create' && "
-            + "(needs.maven-product-verification.result != 'success' || "
-            + "needs.external-polynomial-comparison.result != 'success' || "
-            + "needs.typed-external-polynomial-comparison.result != 'success' || "
-            + "needs.checked-proofs.result != 'success' || "
-            + "needs.native-scalar-reproduction.result != 'success' || "
-            + "needs.maven-polynomial-qualification.result != 'success'))"),
-        "the stable required check must reject any incomplete authority");
-    assertTrue(convergence.contains("run: exit 1"),
-        "an incomplete authority set must fail rather than become skipped-success");
+    JsonNode jobs = YAML.readTree(workflow).required("jobs");
+    assertRequiredAuthorities(jobs);
 
     int rejection = convergence.indexOf(
         "- name: Reject incomplete verification authority");
@@ -193,7 +192,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(rejection >= 0 && checkout > rejection && sympyDownload > checkout
         && coverage > sympyDownload,
         "coverage must follow successful producers, checkout and the isolated evidence download");
-    JsonNode coverageStep = YAML.readTree(workflow).path("jobs").path("verification").path("steps")
+    JsonNode coverageStep = jobs.required("verification").required("steps")
         .valueStream().filter(step -> COVERAGE_STEP.equals(step.path("name").asText()))
         .findFirst().orElseThrow();
     assertEquals(COVERAGE_MAVEN_COMMAND, coverageStep.path("run").asText().strip());
@@ -218,7 +217,7 @@ class MavenParallelVerificationWorkflowContractTest {
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
     assertFalse(convergence.contains("scripts/generate-ci-pages.py"));
-    JsonNode collection = YAML.readTree(workflow).required("jobs").required("verification").required("steps")
+    JsonNode collection = jobs.required("verification").required("steps")
         .valueStream().filter(step -> "Collect complete checkout-owned quality acceptance evidence".equals(step.path("name").asText()))
         .findFirst().orElseThrow();
     assertEquals("mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am "
@@ -243,6 +242,95 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void additionalAuthoritiesMustBeBothDependenciesAndFailClosed() throws IOException {
+    var jobs = (ObjectNode) YAML.readTree(Files.readString(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml"))).required("jobs");
+    var convergence = jobs.required("verification");
+    var needs = (ArrayNode) convergence.required("needs");
+    var rejection = (ObjectNode) rejectionStep(convergence);
+    String original = compact(rejection.required("if").asText());
+    String expanded = original.replace(")) }}", " || needs.extra-authority.result != 'success')) }}");
+    jobs.putObject("extra-authority");
+    needs.add("extra-authority");
+    assertThrows(AssertionError.class, () -> assertRequiredAuthorities(jobs));
+    rejection.put("if", expanded);
+    assertRequiredAuthorities(jobs);
+    rejection.put("if", expanded.replace(" || needs.extra-authority", " && needs.extra-authority"));
+    assertThrows(AssertionError.class, () -> assertRequiredAuthorities(jobs));
+
+    rejection.put("if", expanded.replace(" || needs.checked-proofs.result != 'success'", ""));
+    int proofIndex = 0;
+    while (!"checked-proofs".equals(needs.get(proofIndex).asText())) proofIndex++;
+    needs.remove(proofIndex);
+    assertThrows(AssertionError.class, () -> assertRequiredAuthorities(jobs));
+  }
+
+  private static void assertRequiredAuthorities(JsonNode jobs) {
+    var convergence = jobs.required("verification");
+    assertEquals("${{ always() && (github.event_name != 'create' || "
+        + "(github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}",
+        compact(convergence.required("if").asText()));
+    var dependencies = convergence.required("needs");
+    assertTrue(dependencies.isArray());
+    var needed = new HashSet<String>();
+    for (var dependency : dependencies) {
+      String name = dependency.textValue();
+      assertNotNull(name, "authority dependency must name a job");
+      assertTrue(jobs.has(name) && needed.add(name), "undefined or duplicate authority " + name);
+    }
+    assertTrue(needed.containsAll(SHOWCASE_AUTHORITIES));
+    assertTrue(needed.containsAll(REQUIRED_ROUTINE_AUTHORITIES));
+
+    var rejection = rejectionStep(convergence);
+    assertEquals("exit 1", rejection.required("run").asText().strip());
+    assertFalse(rejection.has("continue-on-error"), "a failed rejection must fail convergence");
+    String guard = compact(rejection.required("if").asText());
+    assertTrue(guard.startsWith("${{ ") && guard.endsWith(")) }}"), "unexpected convergence guard");
+    String[] groups = guard.substring(4, guard.length() - 5).split(Pattern.quote(ROUTINE_FAILURE_GROUP), -1);
+    assertEquals(2, groups.length, "routine authorities must remain conditional on the non-showcase event");
+    assertEquals(SHOWCASE_AUTHORITIES, failureTerms(groups[0]));
+    needed.removeAll(SHOWCASE_AUTHORITIES);
+    assertEquals(needed, failureTerms(groups[1]), "every routine dependency must fail convergence when incomplete");
+  }
+
+  private static JsonNode rejectionStep(JsonNode convergence) {
+    return convergence.required("steps").valueStream()
+        .filter(step -> REJECTION_STEP.equals(step.path("name").asText())).findFirst().orElseThrow();
+  }
+
+  private static Set<String> failureTerms(String group) {
+    var names = new HashSet<String>();
+    for (String term : group.split(Pattern.quote(" || "), -1)) {
+      var failure = FAILURE_TERM.matcher(term);
+      assertTrue(failure.matches(), "authority must be an independent non-success rejection: " + term);
+      assertTrue(names.add(failure.group(1)), "duplicate authority " + term);
+    }
+    return names;
+  }
+
+  @Test
+  void studentArchiveUsesCleanMavenStagingAndRetainsOnlyQualificationEvidence() throws IOException {
+    var jobs = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
+    var job = jobs.required("maven-student-sdk-archive-qualification");
+    assertEquals("github.event_name != 'create'", job.required("if").asText());
+    var steps = job.required("steps");
+    assertEquals("${{ github.event.pull_request.head.sha || github.sha }}", steps.get(0).required("with").required("ref").asText());
+    assertEquals("false", steps.get(0).required("with").required("persist-credentials").asText());
+    String commands = steps.get(2).required("run").asText();
+    int stage = commands.indexOf("-Psdk-release");
+    int packageArchive = commands.indexOf("#packageConfiguredRepository");
+    int qualify = commands.indexOf("#qualifyConfiguredArchive");
+    assertTrue(stage >= 0 && packageArchive > stage && qualify > packageArchive);
+    assertTrue(commands.substring(stage, packageArchive).contains("-DskipTests clean install"));
+    assertTrue(commands.contains("work=$(mktemp -d \"$RUNNER_TEMP/student-sdk-archive/work.XXXXXXXX\")"));
+    assertTrue(commands.contains("-Dregelsuche.studentSdk.qualify=true"));
+    assertFalse(commands.contains("git tag") || commands.contains("gh release") || commands.contains("git push"));
+    var artifact = steps.get(3).required("with");
+    assertEquals("${{ runner.temp }}/student-sdk-archive/evidence", artifact.required("path").asText());
+    assertEquals("error", artifact.required("if-no-files-found").asText());
   }
 
   @Test

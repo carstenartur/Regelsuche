@@ -30,13 +30,19 @@ class MavenReleaseWorkflowContractTest {
             "SDK input timestamps must derive from the committed release source"
         );
         int build = sdkStep.indexOf("mvn --batch-mode --no-transfer-progress -Psdk-release");
-        int packageSdk = sdkStep.indexOf("python3 -B scripts/package-student-sdk.py", build);
+        int packageSdk = sdkStep.indexOf("-Dtest=MavenStudentSdkArchiveTest#packageConfiguredRepository", build);
         assertTrue(build >= 0 && packageSdk > build, "SDK modules must be built before packaging");
         String install = sdkStep.substring(build, packageSdk);
         assertTrue(install.contains("-Dproject.build.outputTimestamp=\"$SDK_SOURCE_EPOCH\""),
             "SDK Maven build must receive the source timestamp used by the reproduction contract");
         assertTrue(install.contains("-DskipTests clean install"),
             "SDK packaging must rebuild its Maven inputs from clean module outputs");
+        int oldTag = sdkStep.indexOf("elif [[ \"$EXISTING_TAG\" == 'true' ]]; then", packageSdk);
+        int oldProducer = sdkStep.indexOf("python3 -B scripts/package-student-sdk.py", packageSdk);
+        int missingProducer = sdkStep.indexOf("Missing Maven Student SDK archive producer in a new release", oldProducer);
+        int optimization = sdkStep.indexOf("python3 -B scripts/package-optimization-sdk.py", missingProducer);
+        assertTrue(oldTag > packageSdk && oldProducer > oldTag && missingProducer > oldProducer
+            && optimization > missingProducer, "only an existing historical tag may use the old Student SDK producer");
     }
 
     @Test

@@ -2,10 +2,13 @@
 import importlib.util
 import json
 import hashlib
+import os
 from pathlib import Path
 import re
 import shlex
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -196,5 +199,108 @@ class SdkPackageTest(unittest.TestCase):
             package.package(self.root, self.repo, '../wrong', self.root / 'invalid.zip')
 
 
+def archive_members(path):
+    """Compare the consumer-visible ZIP contract independently of the deflater."""
+    with zipfile.ZipFile(path) as archive:
+        return [(entry.filename, entry.date_time, entry.create_system, entry.external_attr >> 16,
+                 entry.compress_type, archive.read(entry)) for entry in archive.infolist()]
+
+
+def assert_archive_parity(test, oracle, candidate):
+    expected, actual = archive_members(oracle), archive_members(candidate)
+    test.assertEqual([item[0] for item in expected], [item[0] for item in actual], 'ZIP inventory or ordering')
+    for wanted, found in zip(expected, actual):
+        name = wanted[0]
+        test.assertEqual(wanted[1:5], found[1:5], name + ' ZIP metadata')
+        test.assertTrue(wanted[5] == found[5], name + ' member bytes')
+
+
+class MavenStudentSdkParityTest(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('REGELSUCHE_STUDENT_SDK_PARITY_MAVEN_ARGS'), 'requires an explicit Maven invocation')
+    def test_java_and_python_archive_the_same_release_and_snapshot_artifacts(self):
+        root = Path(__file__).resolve().parents[1]
+        modules = json.loads((root / 'config/sdk/public-api.json').read_text())['modules']
+        maven = json.loads(os.environ['REGELSUCHE_STUDENT_SDK_PARITY_MAVEN_ARGS'])
+        with tempfile.TemporaryDirectory() as directory:
+            staged = Path(directory) / 'staged'
+            for version in ('0.5.4', '0.5.4-SNAPSHOT'):
+                with self.subTest(version=version):
+                    for module in modules + ['regelsuche-bom', 'regelsuche-parent']:
+                        artifacts = staged / 'io/github/carstenartur' / module / version
+                        artifacts.mkdir(parents=True)
+                        coordinate = f'{module}-{version}'
+                        pom = f'<version>{version}</version>'
+                        if module != 'regelsuche-parent':
+                            pom = f'<parent>{pom}</parent>'
+                        (artifacts / f'{coordinate}.pom').write_text(
+                            f'<project xmlns="http://maven.apache.org/POM/4.0.0">{pom}</project>')
+                        if module not in ('regelsuche-bom', 'regelsuche-parent'):
+                            for suffix in ('.jar', '-sources.jar', '-javadoc.jar'):
+                                with zipfile.ZipFile(artifacts / (coordinate + suffix), 'x') as jar:
+                                    jar.writestr('index.html' if suffix == '-javadoc.jar' else 'fixture', coordinate + suffix)
+                    oracle = Path(directory) / f'{version}-python.zip'
+                    candidate = Path(directory) / f'{version}-java.zip'
+                    package.package(root, staged, version, oracle)
+                    subprocess.run(
+                        [*maven, '-pl', 'maven-build-contract', '-am',
+                         '-Dtest=MavenStudentSdkArchiveTest#packageConfiguredRepository',
+                         '-Dregelsuche.studentSdk.package=true', f'-Dregelsuche.studentSdk.repository={staged}',
+                         f'-Dregelsuche.studentSdk.version={version}', f'-Dregelsuche.studentSdk.output={candidate}', 'test'],
+                        cwd=root, check=True)
+                    assert_archive_parity(self, oracle, candidate)
+
+
+def qualify_staged_archive(staged, version, candidate, evidence):
+    """Compare the actual Maven package with the old producer and run its consumer."""
+    root = Path(__file__).resolve().parents[1]
+    prefix = f'regelsuche-sdk-{version}/'
+    with tempfile.TemporaryDirectory(prefix='student-sdk-parity-') as workspace:
+        workspace = Path(workspace)
+        oracle = workspace / 'python.zip'
+        package.package(root, staged, version, oracle)
+        assert_archive_parity(unittest.TestCase(), oracle, candidate)
+        files = []
+        consumer_repository = workspace / 'consumer-repository'
+        for name, date, system, mode, method, data in archive_members(candidate):
+            if not name.startswith(prefix) or system != 3 or mode not in (0o100644, 0o100755):
+                raise ValueError(f'invalid archive member: {name}')
+            relative = Path(name.removeprefix(prefix))
+            if relative.is_absolute() or '..' in relative.parts or '\\' in name:
+                raise ValueError(f'invalid archive member: {name}')
+            files.append({'path': name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                          'dateTime': date, 'unixMode': oct(mode), 'zipMethod': method})
+            if relative.parts[0] == 'repository':
+                output = consumer_repository.joinpath(*relative.parts[1:])
+                output.parent.mkdir(parents=True, exist_ok=True)
+                with output.open('xb') as stream:
+                    stream.write(data)
+        (evidence / 'parity.json').write_text(json.dumps({
+            'schema': 'regelsuche.student-sdk-archive-parity/v1', 'productVersion': version,
+            'pythonArchiveSha256': hashlib.sha256(oracle.read_bytes()).hexdigest(),
+            'javaArchiveSha256': hashlib.sha256(candidate.read_bytes()).hexdigest(),
+            'identicalMemberDataAndMetadata': True, 'members': files,
+        }, indent=2, sort_keys=True) + '\n')
+        with (evidence / 'consumer.log').open('xb') as log:
+            subprocess.run(
+                [sys.executable, '-B', str(root / 'scripts/verify-student-java-sdk-consumer.py'),
+                 '--repository-root', str(root), '--published-repository', str(consumer_repository),
+                 '--gradle', str(root / 'gradlew'), '--publication-mode', 'MAVEN_STAGED_JAVA_ARCHIVE'],
+                cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
+        report_path = root / 'build/reports/student-java-sdk/consumer-report.json'
+        report = json.loads(report_path.read_bytes())
+        if (report['publicationMode'], report['sdkVersion'], report['result']) != ('MAVEN_STAGED_JAVA_ARCHIVE', version, 'success'):
+            raise ValueError('consumer report does not identify the Maven-staged archive and version')
+        indexed = {file['path'].removeprefix(prefix): file for file in files}
+        for artifact in report['artifacts'].values():
+            member = indexed[artifact['path']]
+            if (artifact['sha256'], artifact['bytes']) != (member['sha256'], member['bytes']):
+                raise ValueError(f'consumer artifact differs from packaged bytes: {artifact["path"]}')
+        shutil.copyfile(report_path, evidence / 'consumer-report.json')
+
+
 if __name__ == '__main__':
-    unittest.main()
+    if len(sys.argv) == 6 and sys.argv[1] == '--qualify-staged-archive':
+        _, _, staged, version, candidate, evidence = sys.argv
+        qualify_staged_archive(Path(staged), version, Path(candidate), Path(evidence))
+    else:
+        unittest.main()

@@ -553,6 +553,7 @@ jobs:
         if: steps.release-state.outputs.publication_required == 'true'
         env:
           VERSION: ${{ steps.release-state.outputs.release_version }}
+          EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}
         run: |
           set -euo pipefail
           # Old tags predate the SDK archive contract and remain replayable.
@@ -563,9 +564,22 @@ jobs:
               -pl regelsuche-discovery-sdk,regelsuche-optimization-sdk,regelsuche-plugin-api,regelsuche-extension-api,regelsuche-extension-runtime,regelsuche-bom -am \
               -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH" \
               -Dmaven.repo.local="$SDK_REPOSITORY" -DskipTests clean install
-            python3 -B scripts/package-student-sdk.py \
-              --repository "$SDK_REPOSITORY" --version "$VERSION" \
-              --output "app/target/regelsuche-sdk-${VERSION}.zip"
+            if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/StudentSdkArchive.java ]]; then
+              mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+                -Dtest=MavenStudentSdkArchiveTest#packageConfiguredRepository \
+                -Dregelsuche.studentSdk.package=true \
+                "-Dregelsuche.studentSdk.repository=$SDK_REPOSITORY" \
+                "-Dregelsuche.studentSdk.version=$VERSION" \
+                "-Dregelsuche.studentSdk.output=$PWD/app/target/regelsuche-sdk-${VERSION}.zip" test
+            elif [[ "$EXISTING_TAG" == 'true' ]]; then
+              # Replay only an existing tag that predates the Java archive producer.
+              python3 -B scripts/package-student-sdk.py \
+                --repository "$SDK_REPOSITORY" --version "$VERSION" \
+                --output "app/target/regelsuche-sdk-${VERSION}.zip"
+            else
+              echo "::error::Missing Maven Student SDK archive producer in a new release" >&2
+              exit 1
+            fi
 
             # Publish the existing qualified standalone runtime closure as well.
             # Eclipse consumers can then copy released bytes instead of rebuilding

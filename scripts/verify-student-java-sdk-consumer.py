@@ -270,6 +270,8 @@ def main() -> int:
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--published-repository", type=Path, required=True)
     parser.add_argument("--gradle", default="gradle")
+    parser.add_argument("--publication-mode", choices=("CHECKOUT_OWNED_TASK_DEPENDENCIES", "MAVEN_STAGED_JAVA_ARCHIVE"),
+                        default="CHECKOUT_OWNED_TASK_DEPENDENCIES")
     arguments = parser.parse_args()
 
     root = arguments.repository_root.resolve()
@@ -409,7 +411,7 @@ def main() -> int:
     report = {
         "schema": "regelsuche.student-java-sdk-consumer-verification/v2",
         "sdkVersion": version,
-        "publicationMode": "CHECKOUT_OWNED_TASK_DEPENDENCIES",
+        "publicationMode": arguments.publication_mode,
         "dependencyCacheMode": "ISOLATED_EMPTY_GRADLE_USER_HOME_PER_CONSUMER",
         "javaFeature": java_feature,
         "externalConsumer": "geometric-sequence-domain-java25",
@@ -430,10 +432,14 @@ def main() -> int:
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    publication_description = {
+        "CHECKOUT_OWNED_TASK_DEPENDENCIES": "checkout-owned Gradle task dependencies",
+        "MAVEN_STAGED_JAVA_ARCHIVE": "Maven artifacts extracted from the Java-assembled Student SDK ZIP",
+    }[arguments.publication_mode]
     markdown = (
         "# Student Java SDK consumer verification\n\n"
         f"- SDK version: `{version}`\n"
-        "- Publication: checkout-owned Gradle task dependencies\n"
+        f"- Publication: {publication_description}\n"
         "- Dependency caches: isolated and initially empty per consumer\n"
         "- Java: `25`\n"
         "- External consumer: `geometric-sequence-domain-java25`\n"
