@@ -51,19 +51,30 @@ public record ScalarGuardFacts(int signs, int integral, boolean defined) {
     public static ScalarGuardFacts variable(String symbol, List<Assumption> assumptions) {
         var facts = new ScalarGuardFacts(ALL, INTEGER | FRACTION);
         for (var premise : assumptions) {
-            if (!premise.symbols().equals(List.of(symbol))) continue;
-            if (premise.equals(Assumption.positive(symbol))) facts = facts.merge(new ScalarGuardFacts(POS,3));
-            else if (premise.equals(Assumption.nonZero(symbol)) || premise.equals(Assumption.invertible(symbol))) facts = facts.merge(new ScalarGuardFacts(NEG|POS,3));
-            else if (premise.equals(Assumption.nonNegative(symbol))) facts = facts.merge(new ScalarGuardFacts(ZERO|POS,3));
-            else if ((premise.equals(Assumption.natural(symbol)) || premise.equals(Assumption.domainMembership(symbol,"N")))) facts = facts.merge(new ScalarGuardFacts(ZERO|POS,INTEGER));
-            else if ((premise.equals(Assumption.integer(symbol)) || premise.equals(Assumption.domainMembership(symbol,"Z")))) facts = facts.merge(new ScalarGuardFacts(ALL,INTEGER));
-            else if (premise.kind() == Assumption.Kind.CUSTOM_PREDICATE) {
-                String statement = premise.expression().replace(" ","");
-                if (statement.equals(symbol+"=0") || statement.equals(symbol+"==0")) facts = facts.merge(new ScalarGuardFacts(ZERO,INTEGER));
-                else if (statement.equals(symbol+"<0")) facts = facts.merge(new ScalarGuardFacts(NEG,3));
-            }
+            var refinement = premiseFacts(symbol, premise);
+            if (refinement.defined) facts = facts.merge(refinement);
         }
         return facts;
+    }
+
+    private static ScalarGuardFacts premiseFacts(String symbol, Assumption premise) {
+        if (!premise.symbols().equals(List.of(symbol))) return UNKNOWN;
+        if (premise.equals(Assumption.positive(symbol))) return new ScalarGuardFacts(POS, INTEGER | FRACTION);
+        if (premise.equals(Assumption.nonZero(symbol)) || premise.equals(Assumption.invertible(symbol)))
+            return new ScalarGuardFacts(NEG | POS, INTEGER | FRACTION);
+        if (premise.equals(Assumption.nonNegative(symbol))) return new ScalarGuardFacts(ZERO | POS, INTEGER | FRACTION);
+        if (premise.equals(Assumption.natural(symbol)) || premise.equals(Assumption.domainMembership(symbol, "N")))
+            return new ScalarGuardFacts(ZERO | POS, INTEGER);
+        if (premise.equals(Assumption.integer(symbol)) || premise.equals(Assumption.domainMembership(symbol, "Z")))
+            return new ScalarGuardFacts(ALL, INTEGER);
+        return premise.kind() == Assumption.Kind.CUSTOM_PREDICATE ? customFacts(symbol, premise.expression()) : UNKNOWN;
+    }
+
+    private static ScalarGuardFacts customFacts(String symbol, String expression) {
+        String statement = expression.replace(" ", "");
+        if (statement.equals(symbol + "=0") || statement.equals(symbol + "==0")) return new ScalarGuardFacts(ZERO, INTEGER);
+        if (statement.equals(symbol + "<0")) return new ScalarGuardFacts(NEG, INTEGER | FRACTION);
+        return UNKNOWN;
     }
 
     public static ScalarGuardFacts combine(BinaryOperator op, ScalarGuardFacts left, ScalarGuardFacts right) {
