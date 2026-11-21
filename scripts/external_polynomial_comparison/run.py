@@ -240,10 +240,14 @@ def verify_row(row: dict, limit_nanos: int) -> None:
             raise ValueError(f'judgment mismatch: {key}')
 
 
-def execute(protocol_path: Path, classpath_path: Path, output: Path) -> dict:
+def execute(protocol_path: Path, classpath_path: Path, output: Path, source_proof: Path | None = None) -> dict:
     protocol = load_protocol(protocol_path)
-    subprocess.run(['git','merge-base','--is-ancestor',FREEZE_COMMIT,'HEAD'], check=True, capture_output=True)
-    revision = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
+    if source_proof is None:
+        subprocess.run(['git','merge-base','--is-ancestor',FREEZE_COMMIT,'HEAD'], check=True, capture_output=True)
+        revision = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
+    else:
+        from .registered_source import require_ancestor
+        revision = require_ancestor(Path.cwd(), source_proof, FREEZE_COMMIT)
     if output.exists():
         raise ValueError('output directory already exists; never overwrite a retained run')
     output.mkdir(parents=True)
@@ -363,6 +367,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--protocol', type=Path, default=Path('config/benchmarks/external-polynomial-v1.json'))
     parser.add_argument('--classpath', type=Path)
+    parser.add_argument('--source-proof', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--verify', action='store_true')
     args = parser.parse_args()
@@ -371,7 +376,7 @@ def main() -> None:
     else:
         if args.classpath is None:
             parser.error('--classpath is required for execution')
-        summary = execute(args.protocol, args.classpath, args.output)
+        summary = execute(args.protocol, args.classpath, args.output, args.source_proof)
         print(json.dumps(summary, indent=2))
         if any(value['errors'] for value in summary.values()):
             raise SystemExit('pilot contains technical/incomplete rows; see retained artifacts')

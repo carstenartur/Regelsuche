@@ -104,7 +104,6 @@ class MavenWorkflowSemanticsContractTest {
     // Transitional host drivers are frozen, not blessed as Maven authority.
     // Each retained line may occur at most once and can disappear during migration.
     private static final Set<String> LEGACY_PYTHON_RUN_LINES = Set.of(
-        "python3 -B scripts/collect-quality-acceptance-evidence.py",
         "python3 -B scripts/run-jmh-precision-study-v1.py",
         "python3 -B scripts/report-jmh-precision-study-v1.py",
         "python3 -B scripts/run-jmh-precision-study-v2.py",
@@ -117,12 +116,10 @@ class MavenWorkflowSemanticsContractTest {
             + "|perl|ruby|pwsh|powershell)(?=\\s+|$)"
     );
 
-    // These five folded YAML commands are retained only until their Maven
+    // These four folded YAML commands are retained only until their Maven
     // replacements are authoritative. Match the entire folded scalar, not
     // just its first physical line: extra arguments must not evade the guard.
     private static final Set<String> LEGACY_FOLDED_PYTHON_COMMANDS = Set.of(
-        "python3 -B scripts/collect-quality-acceptance-evidence.py"
-            + " --root \"$PWD\" --require-complete",
         "python3 -B scripts/run-jmh-precision-study-v1.py"
             + " --replicate \"$REGELSUCHE_STUDY_REPLICATE\""
             + " --job-start-epoch \"$REGELSUCHE_STUDY_JOB_START\""
@@ -442,11 +439,11 @@ class MavenWorkflowSemanticsContractTest {
             governance,
             "undeclared-host-runtime"
         );
-        String allowed = validWorkflow()
+        String retired = validWorkflow()
             + "\n      - run: >-\n"
             + "          python3 -B scripts/collect-quality-acceptance-evidence.py\n"
             + "          --root \"$PWD\" --require-complete\n";
-        assertNoViolation(allowed, governance, "undeclared-host-runtime");
+        assertViolation(retired, governance, "undeclared-host-runtime");
         String splitExecutable = validWorkflow()
             + "\n      - run: >-\n          python3\n"
             + "          scripts/new-check.py\n";

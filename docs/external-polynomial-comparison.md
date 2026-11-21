@@ -115,3 +115,46 @@ branch-creation authority keeps its existing scope.
 A passing harness test verifies the harness. Measured quality and resource
 conclusions require an executed protocol and its retained evidence.
 
+
+## Maven qualification of the frozen pilot
+
+The dedicated Maven profile resolves the original learning worker's runtime,
+executes the original matrix in the digest-pinned JDK 25 / CPython 3.12.12
+worker with SymPy 1.14.0, and independently verifies its retained rows. Run it
+from the root of a source checkout with Docker available.
+
+```sh
+mvn -Ppolynomial-comparison -pl regelsuche-release -am \
+  -Dtest=ExternalPolynomialComparisonWorkerTest,PolynomialSourceProofTest,PolynomialRuntimeClasspathTest,PolynomialComparisonArchiveTest \
+  -Dsurefire.failIfNoSpecifiedTests=false verify
+```
+
+The worker retains stdout, stderr, the ten original study products, the required
+raw output tarball and the verified source admission in
+`regelsuche-release/target/reports/polynomial-comparison`. Its two worker
+handshakes, original protocol bytes and complete result matrix are required.
+The source proof rejects modified tracked files before either the checkout or
+the registered archive can supply a verified receipt to the worker.
+The native pilot and both existing polynomial authorities must succeed before
+`ciCheck` can pass. The existing lanes stay required while the hosted
+comparison qualifies the new producer and its independent replay.
+
+A same-run comparison at the earlier source `8a38b6ff` retained 648 matching
+canonical rows from the Maven pilot and the existing lane. Timing observations
+come from independently executed workers. The recovered integration needs its
+own hosted result. [Historical comparison run](https://github.com/carstenartur/Regelsuche/actions/runs/44830486518)
+
+`config/benchmarks/polynomial-freeze-source-objects.json.gz` contains the
+original Git objects from the public history of e115. Their byte identities and
+commit parent links prove ancestry of the three registered studies. The
+original learned-schema protocol is additionally verified via its frozen tree,
+file path and SHA-256. The source archive carries two receipts under
+`build/authority-evidence`. To register an archive, run the Maven tests
+`QualityAcceptancePublicationTest,PolynomialSourceProofTest` in the original
+checkout with `-Dregelsuche.qualityAcceptance.registerArchive=true` and
+`-Dregelsuche.polynomial.registerSource=true`. Set
+`-Dregelsuche.qualityAcceptance.registration` and
+`-Dregelsuche.polynomial.registration` to the new absolute output paths
+`quality-source-tree.json` and `polynomial-source.json` in that archive's
+evidence directory. The archive can then run the same experiment without a Git
+checkout or Git executable.
