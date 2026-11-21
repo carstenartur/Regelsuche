@@ -70,6 +70,30 @@ def require_executable(name: str, search_path: str | None = None) -> str:
     return resolved
 
 
+def first_json_difference(left: object, right: object, path: str = "$") -> str | None:
+    """Identify a changed JSON field without printing evidence values."""
+    if type(left) is not type(right):
+        return path
+    if isinstance(left, dict):
+        for key in sorted(left.keys() | right.keys()):
+            child = f"{path}.{key}"
+            if key not in left or key not in right:
+                return child
+            difference = first_json_difference(left[key], right[key], child)
+            if difference:
+                return difference
+    elif isinstance(left, list):
+        if len(left) != len(right):
+            return path + ".length"
+        for index, (a, b) in enumerate(zip(left, right)):
+            difference = first_json_difference(a, b, f"{path}[{index}]")
+            if difference:
+                return difference
+    elif left != right:
+        return path
+    return None
+
+
 def compare_canonical_outputs(first: Path, second: Path, container: Path) -> str:
     """Compare the complete canonical qualification output byte for byte."""
     roots = (first, second, container)
@@ -84,8 +108,17 @@ def compare_canonical_outputs(first: Path, second: Path, container: Path) -> str
         expected = snapshots[0][relative]
         for root, snapshot in zip(roots[1:], snapshots[1:]):
             if snapshot[relative] != expected:
+                detail = ""
+                if relative == "qualification.json":
+                    try:
+                        field = first_json_difference(
+                            json.loads(expected), json.loads(snapshot[relative])
+                        )
+                        detail = f" (first differing JSON field: {field})"
+                    except (ValueError, TypeError):
+                        detail = " (qualification JSON cannot be compared)"
                 raise ReproductionError(
-                    f"canonical output bytes differ for {root.name}/{relative}"
+                    f"canonical output bytes differ for {root.name}/{relative}{detail}"
                 )
     digest = hashlib.sha256()
     for relative in sorted(expected_paths):

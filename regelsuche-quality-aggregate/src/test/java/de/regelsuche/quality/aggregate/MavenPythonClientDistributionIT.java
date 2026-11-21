@@ -49,7 +49,8 @@ class MavenPythonClientDistributionIT {
                 .withStartupTimeout(Duration.ofMinutes(5))
                 .withEnv("REGELSUCHE_TEST_LAUNCHER", "/product/bin/regelsuche")
                 .withCopyFileToContainer(MountableFile.forHostPath(extracted.resolve(product)), "/product")
-                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("docs/examples/linear-solution.json")), "/input/proof.json")) {
+                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("docs/examples/linear-solution.json")), "/input/proof.json")
+                .withCopyFileToContainer(MountableFile.forHostPath(root.resolve("docs/examples/linear-solution.json")), "/docs/examples/linear-solution.json")) {
             for (String file : List.of("LICENSE", "README.md", "pyproject.toml", "src", "tests")) {
                 worker.withCopyFileToContainer(MountableFile.forHostPath(root.resolve("python").resolve(file)), "/client/" + file);
             }

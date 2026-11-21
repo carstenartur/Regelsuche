@@ -2,9 +2,11 @@ package de.regelsuche.math.sympy;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -60,6 +62,43 @@ class SympyRuntimeContainerIT {
             // All original module tests ran again inside this worker. Use exactly that
             // execution data for the normal module JaCoCo report at verify.
             Files.copy(coverage, target.resolve("jacoco.exec"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        retainCoverageInputs(root, target);
+    }
+
+    /** Retain the exact isolated executable inputs for the later cross-authority JaCoCo join. */
+    private static void retainCoverageInputs(Path root, Path target) throws IOException {
+        Path inputs = target.resolve("site/jacoco/inputs");
+        if (Files.exists(inputs)) {
+            try (var old = Files.walk(inputs)) {
+                for (Path path : old.sorted(Comparator.reverseOrder()).toList()) Files.delete(path);
+            }
+        }
+        copyCoverageTree(target.resolve("classes"), inputs.resolve("classes"), ".class");
+        copyCoverageTree(root.resolve("regelsuche-math-sympy/src/main/java"),
+            inputs.resolve("sources"), ".java");
+        Path execution = target.resolve("jacoco.exec");
+        if (!Files.isRegularFile(execution) || Files.size(execution) == 0) {
+            throw new IOException("Missing isolated SymPy execution data");
+        }
+        Path retainedExec = inputs.resolve("execution-data/jacoco.exec");
+        Files.createDirectories(retainedExec.getParent());
+        Files.copy(execution, retainedExec);
+    }
+
+    private static void copyCoverageTree(Path source, Path destination, String suffix)
+            throws IOException {
+        if (!Files.isDirectory(source)) throw new IOException("Missing SymPy coverage source: " + source);
+        List<Path> files;
+        try (var paths = Files.walk(source)) {
+            files = paths.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(suffix)).toList();
+        }
+        if (files.isEmpty()) throw new IOException("Empty SymPy coverage source: " + source);
+        for (Path file : files) {
+            Path retained = destination.resolve(source.relativize(file));
+            Files.createDirectories(retained.getParent());
+            Files.copy(file, retained);
         }
     }
 
