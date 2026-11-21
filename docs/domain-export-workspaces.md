@@ -8,6 +8,12 @@ begrenzt reproduzieren. Das ist ein produktiver Consumer von
 `VerifiedDomainExport` für einen konkreten Objekttyp. Es schließt den weiteren
 Lifecycle-Umfang von #224 nicht.
 
+`scoped-logic@v1` lässt sich über denselben Import als logische Quellenansicht
+laden und mit sämtlichen Originaldateien herunterladen. Der Arbeitsbereich
+führt dabei keine Obligation, Suche oder Beweisprüfung aus. Ergebnisstatus und
+Zertifikate werden als gespeicherte Angaben angezeigt. Für einen Replay dieser
+Domäne ist hier noch kein unabhängiger Kernel-/Rebuild-Empfänger eingerichtet.
+
 ## Benutzung
 
 1. In der Workbench **Eigene Discovery-Domänen** öffnen. Die Seite ist unter
@@ -79,7 +85,7 @@ Das additive Schema `regelsuche.domain-export-workspace/v1` enthält:
 | `manifest`, `verification` | Bestehende Manifest-, Artefaktwurzel- und Originalbyte-Identitäten |
 | `evidence`, `lifecycleHandoff` | Vollständige typisierte Quelle, ohne zusätzliche Proof-/Novelty-Autorität |
 | `artifacts` | Rollenprojektionen mit explizitem Quellschema, Quellhash und Status |
-| `replaySupported` | Ob die unveränderten Quellenbudgets innerhalb der lokalen Replay-Grenze liegen |
+| `replaySupported` | Ob ein lokaler Replay-Empfänger vorhanden ist und die unveränderten Quellenbudgets innerhalb seiner Grenze liegen |
 | `claimBoundary` | Grenze der Quellenansicht und der endlichen Validierung |
 | `contentHash` | SHA-256 der UTF-8-Ansicht vor Hinzufügen dieses Feldes, in der vom Renderer ausgegebenen Feldreihenfolge |
 
@@ -87,6 +93,15 @@ Der Ansichts-Hash ist eine Integritätsbindung, keine zweite Laufidentität.
 `RepresentationDiscoveryRunPlan/v1`, R1–R4 und deren skalare Arbeitsverträge
 bleiben unverändert. Es wird keine Sequenz auf R1 abgebildet und kein Summenscore
 aus unterschiedlichen Arbeitsdimensionen gebildet.
+
+Logische Exporte behalten `replaySupported=false`; die Rolle `PATH_REPLAY` nennt
+`SCOPED_PROOF_REPLAY_NOT_CONFIGURED`. Die getrennte Assessment-Antwort nennt
+`REPLAY_NOT_CONFIGURED` und lässt Proof und Gegenbeispielprüfung unbewertet.
+Die direkten Sequenzvalidierungs- und Modellbeweis-Routen geben `UNSUPPORTED`
+zurück, ohne einen Replay-Versuch oder eine mathematische Prüfung zu buchen.
+Auch ein importierter `CONFIRMED`-Status mit Zertifikat erzeugt dadurch keinen
+neuen Beweis, kein verifiziertes Neuheitssubjekt und keine Freigabe. Die drei
+bisherigen Domänen behalten ihre Ansichtsidentitäten und Replay-Verträge.
 
 Die fünf Ressourcenrollen bleiben vollständig: `EXPLORED_STATES`,
 `GENERATED_SUCCESSORS`, `CANDIDATE_EVALUATIONS`, `CERTIFICATE_ATTEMPTS` und

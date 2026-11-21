@@ -1,0 +1,2242 @@
+[
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 1.2205898444677652,
+            "scoreError" : 0.11293634279045814,
+            "scoreConfidence" : [
+                1.107653501677307,
+                1.3335261872582234
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.2167738010221771,
+                "50.0" : 1.2172633954162575,
+                "90.0" : 1.2277323369648612,
+                "95.0" : 1.2277323369648612,
+                "99.0" : 1.2277323369648612,
+                "99.9" : 1.2277323369648612,
+                "99.99" : 1.2277323369648612,
+                "99.999" : 1.2277323369648612,
+                "99.9999" : 1.2277323369648612,
+                "100.0" : 1.2277323369648612
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    1.2167738010221771,
+                    1.2172633954162575,
+                    1.2277323369648612
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 5.73659298597211,
+            "scoreError" : 0.3133505186719007,
+            "scoreConfidence" : [
+                5.423242467300209,
+                6.049943504644011
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.718312344196684,
+                "50.0" : 5.739072099522014,
+                "90.0" : 5.752394514197634,
+                "95.0" : 5.752394514197634,
+                "99.0" : 5.752394514197634,
+                "99.9" : 5.752394514197634,
+                "99.99" : 5.752394514197634,
+                "99.999" : 5.752394514197634,
+                "99.9999" : 5.752394514197634,
+                "100.0" : 5.752394514197634
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    5.739072099522014,
+                    5.752394514197634,
+                    5.718312344196684
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 3459.957374085867,
+            "scoreError" : 1144.890696116842,
+            "scoreConfidence" : [
+                2315.0666779690246,
+                4604.848070202709
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3409.288095238095,
+                "50.0" : 3440.4289037800686,
+                "90.0" : 3530.1551232394368,
+                "95.0" : 3530.1551232394368,
+                "99.0" : 3530.1551232394368,
+                "99.9" : 3530.1551232394368,
+                "99.99" : 3530.1551232394368,
+                "99.999" : 3530.1551232394368,
+                "99.9999" : 3530.1551232394368,
+                "100.0" : 3530.1551232394368
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    3530.1551232394368,
+                    3409.288095238095,
+                    3440.4289037800686
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 4.7583393157814795,
+            "scoreError" : 0.04101359443107676,
+            "scoreConfidence" : [
+                4.717325721350403,
+                4.799352910212556
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.756085011079305,
+                "50.0" : 4.758351790089683,
+                "90.0" : 4.760581146175449,
+                "95.0" : 4.760581146175449,
+                "99.0" : 4.760581146175449,
+                "99.9" : 4.760581146175449,
+                "99.99" : 4.760581146175449,
+                "99.999" : 4.760581146175449,
+                "99.9999" : 4.760581146175449,
+                "100.0" : 4.760581146175449
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    4.760581146175449,
+                    4.756085011079305,
+                    4.758351790089683
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 1095.3433926723847,
+            "scoreError" : 161.32454230064957,
+            "scoreConfidence" : [
+                934.0188503717351,
+                1256.6679349730343
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1085.9208566775244,
+                "50.0" : 1096.6479089912282,
+                "90.0" : 1103.4614123484014,
+                "95.0" : 1103.4614123484014,
+                "99.0" : 1103.4614123484014,
+                "99.9" : 1103.4614123484014,
+                "99.99" : 1103.4614123484014,
+                "99.999" : 1103.4614123484014,
+                "99.9999" : 1103.4614123484014,
+                "100.0" : 1103.4614123484014
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    1096.6479089912282,
+                    1103.4614123484014,
+                    1085.9208566775244
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 340.77299555130213,
+            "scoreError" : 37.23312151834869,
+            "scoreConfidence" : [
+                303.53987403295343,
+                378.0061170696508
+            ],
+            "scorePercentiles" : {
+                "0.0" : 338.41666644113667,
+                "50.0" : 341.9203776486671,
+                "90.0" : 341.98194256410255,
+                "95.0" : 341.98194256410255,
+                "99.0" : 341.98194256410255,
+                "99.9" : 341.98194256410255,
+                "99.99" : 341.98194256410255,
+                "99.999" : 341.98194256410255,
+                "99.9999" : 341.98194256410255,
+                "100.0" : 341.98194256410255
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    341.98194256410255,
+                    338.41666644113667,
+                    341.9203776486671
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 1.617639438759281,
+            "scoreError" : 0.11607218152664535,
+            "scoreConfidence" : [
+                1.5015672572326355,
+                1.7337116202859264
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.610444146730668,
+                "50.0" : 1.6199526425760054,
+                "90.0" : 1.6225215269711697,
+                "95.0" : 1.6225215269711697,
+                "99.0" : 1.6225215269711697,
+                "99.9" : 1.6225215269711697,
+                "99.99" : 1.6225215269711697,
+                "99.999" : 1.6225215269711697,
+                "99.9999" : 1.6225215269711697,
+                "100.0" : 1.6225215269711697
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    1.610444146730668,
+                    1.6199526425760054,
+                    1.6225215269711697
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 45.83569338785747,
+            "scoreError" : 14.767681782096513,
+            "scoreConfidence" : [
+                31.068011605760955,
+                60.60337516995398
+            ],
+            "scorePercentiles" : {
+                "0.0" : 45.355445855251226,
+                "50.0" : 45.38136939062571,
+                "90.0" : 46.77026491769547,
+                "95.0" : 46.77026491769547,
+                "99.0" : 46.77026491769547,
+                "99.9" : 46.77026491769547,
+                "99.99" : 46.77026491769547,
+                "99.999" : 46.77026491769547,
+                "99.9999" : 46.77026491769547,
+                "100.0" : 46.77026491769547
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    46.77026491769547,
+                    45.38136939062571,
+                    45.355445855251226
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 133.23087123366375,
+            "scoreError" : 2.991898034439761,
+            "scoreConfidence" : [
+                130.23897319922398,
+                136.22276926810352
+            ],
+            "scorePercentiles" : {
+                "0.0" : 133.04156344772545,
+                "50.0" : 133.32144854705413,
+                "90.0" : 133.3296017062117,
+                "95.0" : 133.3296017062117,
+                "99.0" : 133.3296017062117,
+                "99.9" : 133.3296017062117,
+                "99.99" : 133.3296017062117,
+                "99.999" : 133.3296017062117,
+                "99.9999" : 133.3296017062117,
+                "100.0" : 133.3296017062117
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    133.32144854705413,
+                    133.3296017062117,
+                    133.04156344772545
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 734.2578946694133,
+            "scoreError" : 5.118965604341462,
+            "scoreConfidence" : [
+                729.1389290650718,
+                739.3768602737548
+            ],
+            "scorePercentiles" : {
+                "0.0" : 734.0360220102715,
+                "50.0" : 734.1643587674248,
+                "90.0" : 734.5733032305433,
+                "95.0" : 734.5733032305433,
+                "99.0" : 734.5733032305433,
+                "99.9" : 734.5733032305433,
+                "99.99" : 734.5733032305433,
+                "99.999" : 734.5733032305433,
+                "99.9999" : 734.5733032305433,
+                "100.0" : 734.5733032305433
+            },
+            "scoreUnit" : "us/op",
+            "rawData" : [
+                [
+                    734.5733032305433,
+                    734.0360220102715,
+                    734.1643587674248
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedFixedWorkSearch",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 14.232121879432148,
+            "scoreError" : 3.751509579748749,
+            "scoreConfidence" : [
+                10.480612299683399,
+                17.9836314591809
+            ],
+            "scorePercentiles" : {
+                "0.0" : 14.059582166666667,
+                "50.0" : 14.177120985915494,
+                "90.0" : 14.459662485714286,
+                "95.0" : 14.459662485714286,
+                "99.0" : 14.459662485714286,
+                "99.9" : 14.459662485714286,
+                "99.99" : 14.459662485714286,
+                "99.999" : 14.459662485714286,
+                "99.9999" : 14.459662485714286,
+                "100.0" : 14.459662485714286
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    14.177120985915494,
+                    14.059582166666667,
+                    14.459662485714286
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+            "enqueuedStates" : {
+                "score" : 71355.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    71355.0,
+                    71355.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 23450.0,
+                    "50.0" : 23785.0,
+                    "90.0" : 24120.0,
+                    "95.0" : 24120.0,
+                    "99.0" : 24120.0,
+                    "99.9" : 24120.0,
+                    "99.99" : 24120.0,
+                    "99.999" : 24120.0,
+                    "99.9999" : 24120.0,
+                    "100.0" : 24120.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        23785.0,
+                        24120.0,
+                        23450.0
+                    ]
+                ]
+            },
+            "expandedStates" : {
+                "score" : 14910.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    14910.0,
+                    14910.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 4900.0,
+                    "50.0" : 4970.0,
+                    "90.0" : 5040.0,
+                    "95.0" : 5040.0,
+                    "99.0" : 5040.0,
+                    "99.9" : 5040.0,
+                    "99.99" : 5040.0,
+                    "99.999" : 5040.0,
+                    "99.9999" : 5040.0,
+                    "100.0" : 5040.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        4970.0,
+                        5040.0,
+                        4900.0
+                    ]
+                ]
+            },
+            "exploredStates" : {
+                "score" : 27264.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    27264.0,
+                    27264.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 8960.0,
+                    "50.0" : 9088.0,
+                    "90.0" : 9216.0,
+                    "95.0" : 9216.0,
+                    "99.0" : 9216.0,
+                    "99.9" : 9216.0,
+                    "99.99" : 9216.0,
+                    "99.999" : 9216.0,
+                    "99.9999" : 9216.0,
+                    "100.0" : 9216.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        9088.0,
+                        9216.0,
+                        8960.0
+                    ]
+                ]
+            },
+            "generatedTransformations" : {
+                "score" : 74763.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    74763.0,
+                    74763.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 24570.0,
+                    "50.0" : 24921.0,
+                    "90.0" : 25272.0,
+                    "95.0" : 25272.0,
+                    "99.0" : 25272.0,
+                    "99.9" : 25272.0,
+                    "99.99" : 25272.0,
+                    "99.999" : 25272.0,
+                    "99.9999" : 25272.0,
+                    "100.0" : 25272.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        24921.0,
+                        25272.0,
+                        24570.0
+                    ]
+                ]
+            },
+            "reachedTargets" : {
+                "score" : 0.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    0.0,
+                    0.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 0.0,
+                    "50.0" : 0.0,
+                    "90.0" : 0.0,
+                    "95.0" : 0.0,
+                    "99.0" : 0.0,
+                    "99.9" : 0.0,
+                    "99.99" : 0.0,
+                    "99.999" : 0.0,
+                    "99.9999" : 0.0,
+                    "100.0" : 0.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        0.0,
+                        0.0,
+                        0.0
+                    ]
+                ]
+            },
+            "searches" : {
+                "score" : 213.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    213.0,
+                    213.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 70.0,
+                    "50.0" : 71.0,
+                    "90.0" : 72.0,
+                    "95.0" : 72.0,
+                    "99.0" : 72.0,
+                    "99.9" : 72.0,
+                    "99.99" : 72.0,
+                    "99.999" : 72.0,
+                    "99.9999" : 72.0,
+                    "100.0" : 72.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        71.0,
+                        72.0,
+                        70.0
+                    ]
+                ]
+            }
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedTargetedSearch",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.31749866744406247,
+            "scoreError" : 0.025063222293611537,
+            "scoreConfidence" : [
+                0.29243544515045095,
+                0.342561889737674
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.3163125376344086,
+                "50.0" : 0.3171795109350238,
+                "90.0" : 0.3190039537627551,
+                "95.0" : 0.3190039537627551,
+                "99.0" : 0.3190039537627551,
+                "99.9" : 0.3190039537627551,
+                "99.99" : 0.3190039537627551,
+                "99.999" : 0.3190039537627551,
+                "99.9999" : 0.3190039537627551,
+                "100.0" : 0.3190039537627551
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.3171795109350238,
+                    0.3190039537627551,
+                    0.3163125376344086
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+            "enqueuedStates" : {
+                "score" : 151248.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    151248.0,
+                    151248.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 50176.0,
+                    "50.0" : 50480.0,
+                    "90.0" : 50592.0,
+                    "95.0" : 50592.0,
+                    "99.0" : 50592.0,
+                    "99.9" : 50592.0,
+                    "99.99" : 50592.0,
+                    "99.999" : 50592.0,
+                    "99.9999" : 50592.0,
+                    "100.0" : 50592.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        50480.0,
+                        50176.0,
+                        50592.0
+                    ]
+                ]
+            },
+            "expandedStates" : {
+                "score" : 37812.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    37812.0,
+                    37812.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 12544.0,
+                    "50.0" : 12620.0,
+                    "90.0" : 12648.0,
+                    "95.0" : 12648.0,
+                    "99.0" : 12648.0,
+                    "99.9" : 12648.0,
+                    "99.99" : 12648.0,
+                    "99.999" : 12648.0,
+                    "99.9999" : 12648.0,
+                    "100.0" : 12648.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        12620.0,
+                        12544.0,
+                        12648.0
+                    ]
+                ]
+            },
+            "exploredStates" : {
+                "score" : 47265.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    47265.0,
+                    47265.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 15680.0,
+                    "50.0" : 15775.0,
+                    "90.0" : 15810.0,
+                    "95.0" : 15810.0,
+                    "99.0" : 15810.0,
+                    "99.9" : 15810.0,
+                    "99.99" : 15810.0,
+                    "99.999" : 15810.0,
+                    "99.9999" : 15810.0,
+                    "100.0" : 15810.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        15775.0,
+                        15680.0,
+                        15810.0
+                    ]
+                ]
+            },
+            "generatedTransformations" : {
+                "score" : 160701.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    160701.0,
+                    160701.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 53312.0,
+                    "50.0" : 53635.0,
+                    "90.0" : 53754.0,
+                    "95.0" : 53754.0,
+                    "99.0" : 53754.0,
+                    "99.9" : 53754.0,
+                    "99.99" : 53754.0,
+                    "99.999" : 53754.0,
+                    "99.9999" : 53754.0,
+                    "100.0" : 53754.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        53635.0,
+                        53312.0,
+                        53754.0
+                    ]
+                ]
+            },
+            "reachedTargets" : {
+                "score" : 9453.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    9453.0,
+                    9453.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 3136.0,
+                    "50.0" : 3155.0,
+                    "90.0" : 3162.0,
+                    "95.0" : 3162.0,
+                    "99.0" : 3162.0,
+                    "99.9" : 3162.0,
+                    "99.99" : 3162.0,
+                    "99.999" : 3162.0,
+                    "99.9999" : 3162.0,
+                    "100.0" : 3162.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        3155.0,
+                        3136.0,
+                        3162.0
+                    ]
+                ]
+            },
+            "searches" : {
+                "score" : 9453.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    9453.0,
+                    9453.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 3136.0,
+                    "50.0" : 3155.0,
+                    "90.0" : 3162.0,
+                    "95.0" : 3162.0,
+                    "99.0" : 3162.0,
+                    "99.9" : 3162.0,
+                    "99.99" : 3162.0,
+                    "99.999" : 3162.0,
+                    "99.9999" : 3162.0,
+                    "100.0" : 3162.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        3155.0,
+                        3136.0,
+                        3162.0
+                    ]
+                ]
+            }
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceFixedWorkSearch",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 18.339018963636363,
+            "scoreError" : 1.1496263778797984,
+            "scoreConfidence" : [
+                17.189392585756565,
+                19.48864534151616
+            ],
+            "scorePercentiles" : {
+                "0.0" : 18.284761072727274,
+                "50.0" : 18.324160545454546,
+                "90.0" : 18.40813527272727,
+                "95.0" : 18.40813527272727,
+                "99.0" : 18.40813527272727,
+                "99.9" : 18.40813527272727,
+                "99.99" : 18.40813527272727,
+                "99.999" : 18.40813527272727,
+                "99.9999" : 18.40813527272727,
+                "100.0" : 18.40813527272727
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    18.40813527272727,
+                    18.284761072727274,
+                    18.324160545454546
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+            "enqueuedStates" : {
+                "score" : 55275.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    55275.0,
+                    55275.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 18425.0,
+                    "50.0" : 18425.0,
+                    "90.0" : 18425.0,
+                    "95.0" : 18425.0,
+                    "99.0" : 18425.0,
+                    "99.9" : 18425.0,
+                    "99.99" : 18425.0,
+                    "99.999" : 18425.0,
+                    "99.9999" : 18425.0,
+                    "100.0" : 18425.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        18425.0,
+                        18425.0,
+                        18425.0
+                    ]
+                ]
+            },
+            "expandedStates" : {
+                "score" : 11550.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    11550.0,
+                    11550.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 3850.0,
+                    "50.0" : 3850.0,
+                    "90.0" : 3850.0,
+                    "95.0" : 3850.0,
+                    "99.0" : 3850.0,
+                    "99.9" : 3850.0,
+                    "99.99" : 3850.0,
+                    "99.999" : 3850.0,
+                    "99.9999" : 3850.0,
+                    "100.0" : 3850.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        3850.0,
+                        3850.0,
+                        3850.0
+                    ]
+                ]
+            },
+            "exploredStates" : {
+                "score" : 21120.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    21120.0,
+                    21120.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 7040.0,
+                    "50.0" : 7040.0,
+                    "90.0" : 7040.0,
+                    "95.0" : 7040.0,
+                    "99.0" : 7040.0,
+                    "99.9" : 7040.0,
+                    "99.99" : 7040.0,
+                    "99.999" : 7040.0,
+                    "99.9999" : 7040.0,
+                    "100.0" : 7040.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        7040.0,
+                        7040.0,
+                        7040.0
+                    ]
+                ]
+            },
+            "generatedTransformations" : {
+                "score" : 57915.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    57915.0,
+                    57915.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 19305.0,
+                    "50.0" : 19305.0,
+                    "90.0" : 19305.0,
+                    "95.0" : 19305.0,
+                    "99.0" : 19305.0,
+                    "99.9" : 19305.0,
+                    "99.99" : 19305.0,
+                    "99.999" : 19305.0,
+                    "99.9999" : 19305.0,
+                    "100.0" : 19305.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        19305.0,
+                        19305.0,
+                        19305.0
+                    ]
+                ]
+            },
+            "reachedTargets" : {
+                "score" : 0.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    0.0,
+                    0.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 0.0,
+                    "50.0" : 0.0,
+                    "90.0" : 0.0,
+                    "95.0" : 0.0,
+                    "99.0" : 0.0,
+                    "99.9" : 0.0,
+                    "99.99" : 0.0,
+                    "99.999" : 0.0,
+                    "99.9999" : 0.0,
+                    "100.0" : 0.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        0.0,
+                        0.0,
+                        0.0
+                    ]
+                ]
+            },
+            "searches" : {
+                "score" : 165.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    165.0,
+                    165.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 55.0,
+                    "50.0" : 55.0,
+                    "90.0" : 55.0,
+                    "95.0" : 55.0,
+                    "99.0" : 55.0,
+                    "99.9" : 55.0,
+                    "99.99" : 55.0,
+                    "99.999" : 55.0,
+                    "99.9999" : 55.0,
+                    "100.0" : 55.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        55.0,
+                        55.0,
+                        55.0
+                    ]
+                ]
+            }
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceTargetedSearch",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.42014872653814983,
+            "scoreError" : 0.027835146780397738,
+            "scoreConfidence" : [
+                0.3923135797577521,
+                0.44798387331854755
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.41886849393051484,
+                "50.0" : 0.4197406869492237,
+                "90.0" : 0.4218369987347111,
+                "95.0" : 0.4218369987347111,
+                "99.0" : 0.4218369987347111,
+                "99.9" : 0.4218369987347111,
+                "99.99" : 0.4218369987347111,
+                "99.999" : 0.4218369987347111,
+                "99.9999" : 0.4218369987347111,
+                "100.0" : 0.4218369987347111
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.4197406869492237,
+                    0.41886849393051484,
+                    0.4218369987347111
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+            "enqueuedStates" : {
+                "score" : 114288.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    114288.0,
+                    114288.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 37936.0,
+                    "50.0" : 38128.0,
+                    "90.0" : 38224.0,
+                    "95.0" : 38224.0,
+                    "99.0" : 38224.0,
+                    "99.9" : 38224.0,
+                    "99.99" : 38224.0,
+                    "99.999" : 38224.0,
+                    "99.9999" : 38224.0,
+                    "100.0" : 38224.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        38128.0,
+                        38224.0,
+                        37936.0
+                    ]
+                ]
+            },
+            "expandedStates" : {
+                "score" : 28572.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    28572.0,
+                    28572.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 9484.0,
+                    "50.0" : 9532.0,
+                    "90.0" : 9556.0,
+                    "95.0" : 9556.0,
+                    "99.0" : 9556.0,
+                    "99.9" : 9556.0,
+                    "99.99" : 9556.0,
+                    "99.999" : 9556.0,
+                    "99.9999" : 9556.0,
+                    "100.0" : 9556.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        9532.0,
+                        9556.0,
+                        9484.0
+                    ]
+                ]
+            },
+            "exploredStates" : {
+                "score" : 35715.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    35715.0,
+                    35715.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 11855.0,
+                    "50.0" : 11915.0,
+                    "90.0" : 11945.0,
+                    "95.0" : 11945.0,
+                    "99.0" : 11945.0,
+                    "99.9" : 11945.0,
+                    "99.99" : 11945.0,
+                    "99.999" : 11945.0,
+                    "99.9999" : 11945.0,
+                    "100.0" : 11945.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        11915.0,
+                        11945.0,
+                        11855.0
+                    ]
+                ]
+            },
+            "generatedTransformations" : {
+                "score" : 121431.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    121431.0,
+                    121431.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 40307.0,
+                    "50.0" : 40511.0,
+                    "90.0" : 40613.0,
+                    "95.0" : 40613.0,
+                    "99.0" : 40613.0,
+                    "99.9" : 40613.0,
+                    "99.99" : 40613.0,
+                    "99.999" : 40613.0,
+                    "99.9999" : 40613.0,
+                    "100.0" : 40613.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        40511.0,
+                        40613.0,
+                        40307.0
+                    ]
+                ]
+            },
+            "reachedTargets" : {
+                "score" : 7143.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    7143.0,
+                    7143.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 2371.0,
+                    "50.0" : 2383.0,
+                    "90.0" : 2389.0,
+                    "95.0" : 2389.0,
+                    "99.0" : 2389.0,
+                    "99.9" : 2389.0,
+                    "99.99" : 2389.0,
+                    "99.999" : 2389.0,
+                    "99.9999" : 2389.0,
+                    "100.0" : 2389.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        2383.0,
+                        2389.0,
+                        2371.0
+                    ]
+                ]
+            },
+            "searches" : {
+                "score" : 7143.0,
+                "scoreError" : "NaN",
+                "scoreConfidence" : [
+                    7143.0,
+                    7143.0
+                ],
+                "scorePercentiles" : {
+                    "0.0" : 2371.0,
+                    "50.0" : 2383.0,
+                    "90.0" : 2389.0,
+                    "95.0" : 2389.0,
+                    "99.0" : 2389.0,
+                    "99.9" : 2389.0,
+                    "99.99" : 2389.0,
+                    "99.999" : 2389.0,
+                    "99.9999" : 2389.0,
+                    "100.0" : 2389.0
+                },
+                "scoreUnit" : "#",
+                "rawData" : [
+                    [
+                        2383.0,
+                        2389.0,
+                        2371.0
+                    ]
+                ]
+            }
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.directAstRewriteSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.13245057487165654,
+            "scoreError" : 0.001996728865285028,
+            "scoreConfidence" : [
+                0.1304538460063715,
+                0.13444730373694158
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.13237601852832187,
+                "50.0" : 0.13239948021178027,
+                "90.0" : 0.13257622587486745,
+                "95.0" : 0.13257622587486745,
+                "99.0" : 0.13257622587486745,
+                "99.9" : 0.13257622587486745,
+                "99.99" : 0.13257622587486745,
+                "99.999" : 0.13257622587486745,
+                "99.9999" : 0.13257622587486745,
+                "100.0" : 0.13257622587486745
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.13257622587486745,
+                    0.13237601852832187,
+                    0.13239948021178027
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.directSyntheticSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 2.206057510971951E-5,
+            "scoreError" : 1.6494207463998535E-6,
+            "scoreConfidence" : [
+                2.0411154363319658E-5,
+                2.3709995856119362E-5
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.1980014222653403E-5,
+                "50.0" : 2.2043353527237306E-5,
+                "90.0" : 2.215835757926782E-5,
+                "95.0" : 2.215835757926782E-5,
+                "99.0" : 2.215835757926782E-5,
+                "99.9" : 2.215835757926782E-5,
+                "99.99" : 2.215835757926782E-5,
+                "99.999" : 2.215835757926782E-5,
+                "99.9999" : 2.215835757926782E-5,
+                "100.0" : 2.215835757926782E-5
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.2043353527237306E-5,
+                    2.1980014222653403E-5,
+                    2.215835757926782E-5
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedAstRewriteSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.13277100392756808,
+            "scoreError" : 0.005719939168878265,
+            "scoreConfidence" : [
+                0.12705106475868982,
+                0.13849094309644633
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.13247062283141306,
+                "50.0" : 0.13274618322940163,
+                "90.0" : 0.13309620572188954,
+                "95.0" : 0.13309620572188954,
+                "99.0" : 0.13309620572188954,
+                "99.9" : 0.13309620572188954,
+                "99.99" : 0.13309620572188954,
+                "99.999" : 0.13309620572188954,
+                "99.9999" : 0.13309620572188954,
+                "100.0" : 0.13309620572188954
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.13309620572188954,
+                    0.13247062283141306,
+                    0.13274618322940163
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedChoiceTwoAlternatives",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 7.418796527131075E-4,
+            "scoreError" : 9.358900277359034E-6,
+            "scoreConfidence" : [
+                7.325207524357484E-4,
+                7.512385529904666E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 7.413994348347574E-4,
+                "50.0" : 7.418194204930222E-4,
+                "90.0" : 7.424201028115431E-4,
+                "95.0" : 7.424201028115431E-4,
+                "99.0" : 7.424201028115431E-4,
+                "99.9" : 7.424201028115431E-4,
+                "99.99" : 7.424201028115431E-4,
+                "99.999" : 7.424201028115431E-4,
+                "99.9999" : 7.424201028115431E-4,
+                "100.0" : 7.424201028115431E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    7.413994348347574E-4,
+                    7.424201028115431E-4,
+                    7.418194204930222E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedFirstApplicableSecondAlternative",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 4.5858462570735415E-4,
+            "scoreError" : 5.1334928418126415E-6,
+            "scoreConfidence" : [
+                4.534511328655415E-4,
+                4.637181185491668E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.582608016538733E-4,
+                "50.0" : 4.5872350560989685E-4,
+                "90.0" : 4.5876956985829216E-4,
+                "95.0" : 4.5876956985829216E-4,
+                "99.0" : 4.5876956985829216E-4,
+                "99.9" : 4.5876956985829216E-4,
+                "99.99" : 4.5876956985829216E-4,
+                "99.999" : 4.5876956985829216E-4,
+                "99.9999" : 4.5876956985829216E-4,
+                "100.0" : 4.5876956985829216E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    4.582608016538733E-4,
+                    4.5872350560989685E-4,
+                    4.5876956985829216E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedNestedControlFlow",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.003596019711629653,
+            "scoreError" : 4.0574738695392434E-4,
+            "scoreConfidence" : [
+                0.0031902723246757286,
+                0.004001767098583577
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0035799571437775614,
+                "50.0" : 0.003586697895261559,
+                "90.0" : 0.003621404095849838,
+                "95.0" : 0.003621404095849838,
+                "99.0" : 0.003621404095849838,
+                "99.9" : 0.003621404095849838,
+                "99.99" : 0.003621404095849838,
+                "99.999" : 0.003621404095849838,
+                "99.9999" : 0.003621404095849838,
+                "100.0" : 0.003621404095849838
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.0035799571437775614,
+                    0.003586697895261559,
+                    0.003621404095849838
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPrioritizeTwoCandidates",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 8.056913374619917E-4,
+            "scoreError" : 3.1762063911871745E-5,
+            "scoreConfidence" : [
+                7.7392927355012E-4,
+                8.374534013738634E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 8.044198451854509E-4,
+                "50.0" : 8.049785612813651E-4,
+                "90.0" : 8.076756059191591E-4,
+                "95.0" : 8.076756059191591E-4,
+                "99.0" : 8.076756059191591E-4,
+                "99.9" : 8.076756059191591E-4,
+                "99.99" : 8.076756059191591E-4,
+                "99.999" : 8.076756059191591E-4,
+                "99.9999" : 8.076756059191591E-4,
+                "100.0" : 8.076756059191591E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    8.049785612813651E-4,
+                    8.076756059191591E-4,
+                    8.044198451854509E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPruneTwoCandidatesToOne",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 8.139107739181103E-4,
+            "scoreError" : 1.8839859845199827E-4,
+            "scoreConfidence" : [
+                6.255121754661121E-4,
+                0.0010023093723701085
+            ],
+            "scorePercentiles" : {
+                "0.0" : 8.07056785124347E-4,
+                "50.0" : 8.088873742246838E-4,
+                "90.0" : 8.257881624052999E-4,
+                "95.0" : 8.257881624052999E-4,
+                "99.0" : 8.257881624052999E-4,
+                "99.9" : 8.257881624052999E-4,
+                "99.99" : 8.257881624052999E-4,
+                "99.999" : 8.257881624052999E-4,
+                "99.9999" : 8.257881624052999E-4,
+                "100.0" : 8.257881624052999E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    8.088873742246838E-4,
+                    8.257881624052999E-4,
+                    8.07056785124347E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRepeatThreeIterations",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.0023690382050022447,
+            "scoreError" : 9.018527933707617E-5,
+            "scoreConfidence" : [
+                0.0022788529256651687,
+                0.002459223484339321
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0023633673667594556,
+                "50.0" : 0.0023713097108878215,
+                "90.0" : 0.002372437537359457,
+                "95.0" : 0.002372437537359457,
+                "99.0" : 0.002372437537359457,
+                "99.9" : 0.002372437537359457,
+                "99.99" : 0.002372437537359457,
+                "99.999" : 0.002372437537359457,
+                "99.9999" : 0.002372437537359457,
+                "100.0" : 0.002372437537359457
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.0023713097108878215,
+                    0.0023633673667594556,
+                    0.002372437537359457
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRequireFilter",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 8.733961305515163E-4,
+            "scoreError" : 2.2289298155800307E-4,
+            "scoreConfidence" : [
+                6.505031489935132E-4,
+                0.0010962891121095194
+            ],
+            "scorePercentiles" : {
+                "0.0" : 8.629021628467992E-4,
+                "50.0" : 8.704776267106029E-4,
+                "90.0" : 8.868086020971469E-4,
+                "95.0" : 8.868086020971469E-4,
+                "99.0" : 8.868086020971469E-4,
+                "99.9" : 8.868086020971469E-4,
+                "99.99" : 8.868086020971469E-4,
+                "99.999" : 8.868086020971469E-4,
+                "99.9999" : 8.868086020971469E-4,
+                "100.0" : 8.868086020971469E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    8.629021628467992E-4,
+                    8.868086020971469E-4,
+                    8.704776267106029E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSequenceTwoSteps",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.0010737648785218634,
+            "scoreError" : 1.7070251954433706E-4,
+            "scoreConfidence" : [
+                9.030623589775264E-4,
+                0.0012444673980662004
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.0010633539904016875,
+                "50.0" : 0.0010764684414738756,
+                "90.0" : 0.0010814722036900273,
+                "95.0" : 0.0010814722036900273,
+                "99.0" : 0.0010814722036900273,
+                "99.9" : 0.0010814722036900273,
+                "99.99" : 0.0010814722036900273,
+                "99.999" : 0.0010814722036900273,
+                "99.9999" : 0.0010814722036900273,
+                "100.0" : 0.0010814722036900273
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.0010633539904016875,
+                    0.0010764684414738756,
+                    0.0010814722036900273
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSingleSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 3.4336015472460034E-4,
+            "scoreError" : 2.1262840156366817E-5,
+            "scoreConfidence" : [
+                3.220973145682335E-4,
+                3.6462299488096715E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3.426068144385554E-4,
+                "50.0" : 3.4277104998270977E-4,
+                "90.0" : 3.4470259975253584E-4,
+                "95.0" : 3.4470259975253584E-4,
+                "99.0" : 3.4470259975253584E-4,
+                "99.9" : 3.4470259975253584E-4,
+                "99.99" : 3.4470259975253584E-4,
+                "99.999" : 3.4470259975253584E-4,
+                "99.9999" : 3.4470259975253584E-4,
+                "100.0" : 3.4470259975253584E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.4277104998270977E-4,
+                    3.426068144385554E-4,
+                    3.4470259975253584E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.preparedAstRewriteSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.08578959499060462,
+            "scoreError" : 0.007069172172272298,
+            "scoreConfidence" : [
+                0.07872042281833233,
+                0.09285876716287692
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.08551160242818058,
+                "50.0" : 0.08562497166338498,
+                "90.0" : 0.0862322108802483,
+                "95.0" : 0.0862322108802483,
+                "99.0" : 0.0862322108802483,
+                "99.9" : 0.0862322108802483,
+                "99.99" : 0.0862322108802483,
+                "99.999" : 0.0862322108802483,
+                "99.9999" : 0.0862322108802483,
+                "100.0" : 0.0862322108802483
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.08562497166338498,
+                    0.0862322108802483,
+                    0.08551160242818058
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedAstRewriteSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.13484758380213663,
+            "scoreError" : 0.006123853831848076,
+            "scoreConfidence" : [
+                0.12872372997028855,
+                0.1409714376339847
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.1344681888948642,
+                "50.0" : 0.13496859087842397,
+                "90.0" : 0.1351059716331217,
+                "95.0" : 0.1351059716331217,
+                "99.0" : 0.1351059716331217,
+                "99.9" : 0.1351059716331217,
+                "99.99" : 0.1351059716331217,
+                "99.999" : 0.1351059716331217,
+                "99.9999" : 0.1351059716331217,
+                "100.0" : 0.1351059716331217
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.1344681888948642,
+                    0.13496859087842397,
+                    0.1351059716331217
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedSingleSource",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "-Dfile.encoding=UTF-8",
+            "-Djava.io.tmpdir=/home/runner/work/Regelsuche/Regelsuche/app/build/tmp/jmh",
+            "-Duser.country",
+            "-Duser.language=en",
+            "-Duser.variant"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 6,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 4.6073904680165315E-4,
+            "scoreError" : 1.80740117123648E-5,
+            "scoreConfidence" : [
+                4.4266503508928837E-4,
+                4.7881305851401793E-4
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.5965405015871934E-4,
+                "50.0" : 4.6096758909312146E-4,
+                "90.0" : 4.6159550115311854E-4,
+                "95.0" : 4.6159550115311854E-4,
+                "99.0" : 4.6159550115311854E-4,
+                "99.9" : 4.6159550115311854E-4,
+                "99.99" : 4.6159550115311854E-4,
+                "99.999" : 4.6159550115311854E-4,
+                "99.9999" : 4.6159550115311854E-4,
+                "100.0" : 4.6159550115311854E-4
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    4.6096758909312146E-4,
+                    4.6159550115311854E-4,
+                    4.5965405015871934E-4
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    }
+]
+
+

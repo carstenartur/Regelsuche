@@ -63,11 +63,19 @@ public final class TargetFreeRepresentationDiscoveryRun {
         return TargetFreeSearchExecution.run(sourceExpression, heuristic, requireRepositoryRevision(repositoryRevision));
     }
 
+    /** Emits the same native events that the immutable run retains, including bounded progress. */
+    public static TargetFreeSearchExecution.RunResult runTargetFree(String sourceExpression,
+            de.regelsuche.search.SearchHeuristic heuristic, String repositoryRevision,
+            java.util.function.Consumer<de.regelsuche.search.telemetry.SearchEvent> observer) {
+        return TargetFreeSearchExecution.run(sourceExpression, heuristic, requireRepositoryRevision(repositoryRevision),
+            java.util.Objects.requireNonNull(observer, "observer"));
+    }
+
     /** Persists an actual native execution for the existing run and dossier consumers. */
     public static TargetFreeSearchExecution.RunResult writeTargetFree(Path runDirectory, String sourceExpression,
             de.regelsuche.search.SearchHeuristic heuristic, String repositoryRevision) throws IOException {
         var result = runTargetFree(sourceExpression, heuristic, repositoryRevision);
-        TargetFreeSearchArtifactStore.retainRun(runDirectory, result.workspace(), result.artifact().toCanonicalJson().getBytes(StandardCharsets.UTF_8));
+        result.retain(runDirectory);
         return result;
     }
 

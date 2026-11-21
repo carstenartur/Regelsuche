@@ -52,13 +52,16 @@
         output.replaceChildren();
     }
 
+    const runtimeShape = form.elements.runtimeShape;
+    const activeType = () => profile.value ? runtimeShape.value : type.value;
+
     function captureSource() {
-        return {expression: input.value, type: type.value, profile: profile.value};
+        return {expression: input.value, type: activeType(), profile: profile.value};
     }
 
     function isCurrent(source) {
         return source === snapshot && input.value === source.expression
-            && type.value === source.type && profile.value === source.profile;
+            && activeType() === source.type && profile.value === source.profile;
     }
 
     async function inspect(expression, type) {
@@ -112,6 +115,7 @@
             }
             case 'DIV': return math('mfrac', ...children);
             case 'POW': return math('msup', node.children[0].kind === 'POW' ? grouped(children[0]) : children[0], children[1]);
+            case 'SYSTEM': return math('mtable', ...children.map(row => math('mtr', math('mtd', row))));
             case 'EQUATION': return math('mrow', children[0], math('mo', '='), children[1]);
             case 'SUB':
                 if (!node.children[0].sourceRange) return grouped(math('mrow', math('mo', '−'), children[1]));
@@ -240,11 +244,8 @@
 
     input.addEventListener('input', invalidate);
     type.addEventListener('change', invalidate);
-    profile.addEventListener('change', () => {
-        tools.hidden = Boolean(profile.value);
-        invalidate();
-    });
-    tools.hidden = Boolean(profile.value);
+    profile.addEventListener('change', invalidate);
+    runtimeShape.addEventListener('change', invalidate);
     form.addEventListener('submit', event => {
         if (!activeEdit) return;
         event.preventDefault();
@@ -282,7 +283,6 @@
 
     document.getElementById('previewFormula').addEventListener('click', async () => {
         invalidate();
-        if (profile.value) return;
         const source = snapshot = captureSource();
         showStatus('Formel wird gelesen …');
         try {

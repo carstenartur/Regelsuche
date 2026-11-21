@@ -1,6 +1,9 @@
 package de.regelsuche.solver.portfolio;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static de.regelsuche.solver.ir.ScopedProofDag.Rule.*;
+import static de.regelsuche.solver.ir.ScopedProofDag.Node.*;
+import static de.regelsuche.solver.portfolio.ScopedLeanContractTest.app;
 import de.regelsuche.solver.ir.*;
 import de.regelsuche.solver.ir.SolverIr.*;
 import java.io.IOException;
@@ -58,6 +61,55 @@ class CheckedLeanRealTest {
             Files.writeString(source, genuine);
         }
     }
+    @Test void replaysScopedEliminationDefinitionsAndStrictNaturalInduction() throws Exception {
+        var rebuild = new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")), root());
+        for (var dag : List.of(eliminations(), strongNat(false))) {
+            var attempt = backend().using(dag).executeWithEvidence(dag.obligation());
+            var execution = attempt.execution().result();
+            assertEquals(ResultStatus.CONFIRMED, execution.status(), diagnostics(attempt.directory()));
+            var receipt = rebuild.rebuild(dag.obligation(), execution.certificateHash(), attempt.directory());
+            assertEquals(dag.canonical(), Files.readString(receipt.directory().resolve(LeanDagPlan.FILE)));
+            Path retained = attempt.directory().resolve(LeanDagPlan.FILE);
+            Files.writeString(retained, dag.canonical() + "\n");
+            try { assertThrows(IOException.class, () -> rebuild.rebuild(dag.obligation(),execution.certificateHash(),attempt.directory())); }
+            finally { Files.writeString(retained, dag.canonical()); }
+        }
+        var discovered = strongNat(false);
+        assertTrue(ScopedProofSearch.discover(discovered.obligation(),2048).proposals().stream()
+            .anyMatch(p -> p.dag().equals(discovered)));
+        var wrong = strongNat(true);
+        var invalid = backend().using(wrong).executeWithEvidence(wrong.obligation()).execution().result();
+        assertEquals(ResultStatus.UNKNOWN, invalid.status());
+        assertTrue(invalid.certificateHash().isEmpty());
+        assertEquals(ResultStatus.UNSUPPORTED, backend().using(wrong).execute(eliminations().obligation()).result().status());
+    }
+
+    static ScopedProofDag eliminations() {
+        var p = new Symbol("p"); var q = new Symbol("q");
+        var zero = app("nat", new Literal("0"));
+        var witness = new Binder(BinderKind.EXISTS, Sort.NATURAL, app("eq",new Bound(0),zero));
+        var request = ScopedLeanContractTest.theorem(List.of(new SymbolDeclaration("p",Sort.PROPOSITION),
+                new SymbolDeclaration("q",Sort.PROPOSITION)),
+            List.of(Predicate.holds("a",app("or",p,p)), Predicate.holds("b",p), Predicate.holds("c",app("eq",p,q))),
+            app("and",q,app("and",p,witness)));
+        return ScopedProofDag.create(request, List.of(
+            premise(0), local(0), of(CASES,0,1,1), of(HAVE,2,1), premise(2), of(REWRITE,4,3),
+            premise(1), of(BY_CONTRADICTION,1,6), of(ZERO), of(NORMALIZE), indexed(UNFOLD,0,9),
+            of(WITNESS,1,10), of(LET,8,11), of(PAIR,7,12), of(PAIR,5,13)));
+    }
+
+    static ScopedProofDag strongNat(boolean invalidDecrease) {
+        var p = new Symbol("p"); var n = new Bound(0); var outer = new Bound(1);
+        var pn = app("at",p,n);
+        var smaller = new Binder(BinderKind.FORALL, Sort.NATURAL, app("implies",app("lt",n,outer),pn));
+        var progress = new Binder(BinderKind.FORALL, Sort.NATURAL, app("implies",smaller,pn));
+        var request = ScopedLeanContractTest.theorem(List.of(new SymbolDeclaration("p",Sort.NAT_PREDICATE)),
+            List.of(Predicate.holds("progress",progress)), new Binder(BinderKind.FORALL,Sort.NATURAL,pn));
+        return ScopedProofDag.create(request, List.of(premise(0), local(1), of(SPECIALIZE,0,1),
+            invalidDecrease ? of(NORMALIZE) : local(0), of(DECREASE,1,3), of(INTRO,4), of(INTRO,5),
+            of(APPLY,2,6), of(STRONG_INDUCTION,7)));
+    }
+
     @Test void boundedTacticFailureIsNotARefutation() {
         var a=backend().executeWithEvidence(CheckedLeanProofTest.obligation("x+1","x"));
         assertEquals(ResultStatus.UNKNOWN,a.execution().result().status(),a.directory().toString());

@@ -28,6 +28,20 @@ class MavenGitFreeFullLifecycleContractTest {
     }
 
     @Test
+    void gitFreeRunRetainsItsOwnRawReportsEvenAfterFailure() throws IOException {
+        String workflow = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/gradle.yml"));
+        String step = workflow.substring(workflow.indexOf(STEP), workflow.indexOf(NEXT));
+        assertTrue(step.contains("id: source_archive"));
+        assertTrue(step.contains("echo \"root=$source_root\" >> \"$GITHUB_OUTPUT\""));
+        assertTrue(step.contains("always() && !cancelled() && steps.source_archive.outputs.root != ''"));
+        assertTrue(step.contains("name: git-free-maven-verification"));
+        for (String reports : java.util.List.of("surefire-reports", "failsafe-reports", "reports")) {
+            assertTrue(step.contains("${{ steps.source_archive.outputs.root }}/**/target/" + reports + "/**"));
+        }
+        assertTrue(step.contains("if-no-files-found: error"));
+    }
+
+    @Test
     void selectedModuleSubsetCannotPretendToBeFullLifecycle() {
         String valid = fixture();
         verifyFullGitFreeLifecycle(valid);

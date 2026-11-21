@@ -498,6 +498,9 @@
                 });
             });
             renderDossier(host, active.workspace, state.artifact, selected, select, active.edge || '');
+            const occurrence = api.occurrenceSelection(selected);
+            if (occurrence) window.RegelsucheOccurrenceReview.render(host.querySelector('#candidateDossierDetail'),
+                active, state.artifact, occurrence, select);
             if (native ? selected.candidate.generationSequences.length : selected.bridge) {
                 renderLiterature(host.querySelector('#candidateDossierDetail'), active.workspace.runId, candidateId);
             }

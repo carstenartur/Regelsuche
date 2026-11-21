@@ -40,7 +40,7 @@ class OpenApiRouteRegistryTest {
     void loadsEveryCanonicalOperationAndContext() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
-        assertEquals(87, registry.routes().size());
+        assertEquals(95, registry.routes().size());
         assertEquals(27, registry.contexts().size());
         assertTrue(registry.contexts().containsAll(Set.of(
             "/api/search",

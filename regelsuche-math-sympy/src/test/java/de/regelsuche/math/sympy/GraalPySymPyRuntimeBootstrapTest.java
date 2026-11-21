@@ -7,9 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** Packaging/bootstrap correctness, not a cold-start performance threshold. */
+@Tag("sympy-runtime")
 class GraalPySymPyRuntimeBootstrapTest {
     // Match the cold completion allowance of GraalPySymPyRuntimeTest. Importing
     // the pinned environment is part of the first invocation, not a warm call.

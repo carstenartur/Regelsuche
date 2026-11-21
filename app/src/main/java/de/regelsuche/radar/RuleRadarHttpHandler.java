@@ -48,6 +48,10 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
         this.jsonRequestBody = new StreamingJsonRequestBody(maxRequestBytes);
     }
 
+    public AstRuleRadarService service() {
+        return radar;
+    }
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
