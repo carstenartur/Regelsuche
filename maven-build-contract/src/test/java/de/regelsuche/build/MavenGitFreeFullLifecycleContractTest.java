@@ -13,10 +13,13 @@ import org.junit.jupiter.api.Test;
  * in for the complete product build.
  */
 class MavenGitFreeFullLifecycleContractTest {
+    private static final String PREPARE =
+        "      - name: Prepare the exact Git-free source archive";
     private static final String STEP =
         "      - name: Reproduce full Maven lifecycle from a Git-free source archive";
     private static final String NEXT =
         "      - name: Retain Maven product verification evidence";
+    private static final String ARCHIVE_ROOT = "${{ steps.source_archive.outputs.root }}";
     private static final String FULL_COMMAND =
         "mvn --batch-mode --no-transfer-progress -Pfull verify";
 
@@ -31,14 +34,35 @@ class MavenGitFreeFullLifecycleContractTest {
     void gitFreeRunRetainsItsOwnRawReportsEvenAfterFailure() throws IOException {
         String workflow = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/gradle.yml"));
         String step = workflow.substring(workflow.indexOf(STEP), workflow.indexOf(NEXT));
-        assertTrue(step.contains("id: source_archive"));
-        assertTrue(step.contains("echo \"root=$source_root\" >> \"$GITHUB_OUTPUT\""));
+        String preparation = workflow.substring(workflow.indexOf(PREPARE), workflow.indexOf(STEP));
+        assertTrue(preparation.contains("id: source_archive"));
+        assertTrue(preparation.contains("echo \"root=$source_root\" >> \"$GITHUB_OUTPUT\""));
         assertTrue(step.contains("always() && !cancelled() && steps.source_archive.outputs.root != ''"));
         assertTrue(step.contains("name: git-free-maven-verification"));
         for (String reports : java.util.List.of("surefire-reports", "failsafe-reports", "reports")) {
-            assertTrue(step.contains("${{ steps.source_archive.outputs.root }}/**/target/" + reports + "/**"));
+            assertTrue(step.contains(ARCHIVE_ROOT + "/**/target/" + reports + "/**"));
         }
         assertTrue(step.contains("if-no-files-found: error"));
+    }
+
+    @Test
+    void archiveCommitWitnessAndSuccessfulPreflightAreRetainedAlongsideTheFullReactor() throws IOException {
+        String workflow = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/gradle.yml"));
+        String step = workflow.substring(workflow.indexOf(STEP), workflow.indexOf(NEXT));
+        String preparation = workflow.substring(workflow.indexOf(PREPARE), workflow.indexOf(STEP));
+        assertTrue(preparation.contains("-Dregelsuche.qualityAcceptance.registerArchive=true")
+            && preparation.contains("$source_root/build/authority-evidence/quality-source-tree.json"),
+            "register the source receipt in the directory prepared by the archive step");
+        int sourceRoot = step.indexOf("cd \"${REGELSUCHE_SOURCE_ARCHIVE_ROOT:?}\"");
+        int verification = step.indexOf("-Dregelsuche.qualityAcceptance.verifyArchive=true");
+        int receipt = step.indexOf("build/authority-evidence/quality-source-verification.xml");
+        int reactor = step.indexOf(FULL_COMMAND);
+        assertTrue(sourceRoot >= 0 && verification > sourceRoot && receipt > verification && reactor > receipt,
+            "verify the archive bytes and retain the receipt before running the full reactor inside it");
+        assertTrue(step.contains("-Dregelsuche.qualityAcceptance.revision=$REGELSUCHE_AUTHORITY_GITHUB_SHA"));
+        for (String file : java.util.List.of("quality-source-tree.json", "quality-source-verification.xml")) {
+            assertTrue(step.contains(ARCHIVE_ROOT + "/build/authority-evidence/" + file));
+        }
     }
 
     @Test
@@ -58,6 +82,9 @@ class MavenGitFreeFullLifecycleContractTest {
     @Test
     void missingProvenanceOrReportRechecksAreRejected() {
         String valid = fixture();
+        assertThrows(AssertionError.class, () -> verifyFullGitFreeLifecycle(valid.replace(
+            "REGELSUCHE_SOURCE_ARCHIVE_ROOT: " + ARCHIVE_ROOT,
+            "REGELSUCHE_SOURCE_ARCHIVE_ROOT: ${{ github.workspace }}")));
         assertThrows(AssertionError.class,
             () -> verifyFullGitFreeLifecycle(valid.replace(
                 "export REGELSUCHE_PREPARATION_REVISION=",
@@ -75,9 +102,13 @@ class MavenGitFreeFullLifecycleContractTest {
     }
 
     private static String fixture() {
-        return STEP + "\n"
+        return PREPARE + "\n"
             + "        run: |\n"
             + "          git archive --format=tar HEAD | tar -xf - -C \"$source_root\"\n"
+            + STEP + "\n"
+            + "        env:\n"
+            + "          REGELSUCHE_SOURCE_ARCHIVE_ROOT: " + ARCHIVE_ROOT + "\n"
+            + "        run: |\n"
             + "          export REGELSUCHE_PREPARATION_REVISION=\"source\"\n"
             + "          " + FULL_COMMAND + "\n"
             + "          -pl maven-build-contract \\\n"
@@ -88,12 +119,16 @@ class MavenGitFreeFullLifecycleContractTest {
     }
 
     private static void verifyFullGitFreeLifecycle(String workflow) {
+        int setup = workflow.indexOf(PREPARE);
         int start = workflow.indexOf(STEP);
         int end = start < 0 ? -1 : workflow.indexOf(NEXT, start + STEP.length());
-        assertTrue(start >= 0 && end > start, "missing full source-archive step");
+        assertTrue(setup >= 0 && start > setup && end > start, "missing full source-archive step");
+        String preparation = workflow.substring(setup, start);
         String block = workflow.substring(start, end);
-        assertTrue(block.contains("git archive --format=tar HEAD | tar -xf - -C \"$source_root\""),
+        assertTrue(preparation.contains("git archive --format=tar HEAD | tar -xf - -C \"$source_root\""),
             "source archive must come from Git rather than copying .git");
+        assertTrue(block.contains("REGELSUCHE_SOURCE_ARCHIVE_ROOT: " + ARCHIVE_ROOT),
+            "the full source lifecycle must use the same directory prepared by the archive step");
         assertTrue(block.contains("export REGELSUCHE_PREPARATION_REVISION="),
             "git-free tests need the authentic checkout revision");
         assertTrue(block.lines().map(String::trim).anyMatch(FULL_COMMAND::equals),
