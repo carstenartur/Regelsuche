@@ -194,43 +194,26 @@ def reportSlowTests = tasks.register('reportSlowTests') {
 def supplyChainReportDirectory = qualityRepositoryRoot.dir('build/reports/quality/supply-chain')
 def supplyChainBom = supplyChainReportDirectory.file('bom.json')
 
-def testSupplyChainEvidenceVerifier = tasks.register('testSupplyChainEvidenceVerifier', Exec) {
+// The resolver still owns Gradle's transitional graph. Maven and Gradle consume
+// its immutable CycloneDX bytes through the same Java inventory projection.
+def verifySupplyChainInventory = tasks.register('verifySupplyChainInventory', JavaExec) {
     group = 'verification'
-    description = 'Characterizes the supply-chain evidence verifier with positive and fail-closed synthetic cases.'
-    dependsOn 'prepareVerificationEnvironment'
-    workingDir qualityRepositoryRoot
-    inputs.file qualityRepositoryRoot.file('config/quality/supply-chain-policy.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py')
-    inputs.file qualityRepositoryRoot.file('scripts/test-supply-chain-evidence.py')
-    outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            '-B',
-            'scripts/test-supply-chain-evidence.py'
+    description = 'Projects the resolved CycloneDX graph through the Java inventory verifier.'
+    dependsOn 'cyclonedxBom', ':regelsuche-quality:test'
+    classpath = coverageQualityProject.files(coverageRuntimeClasspath)
+    mainClass = 'de.regelsuche.quality.supplychain.SupplyChainInventory'
+    javaLauncher = coverageQualityProject.extensions.getByType(JavaToolchainService).launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
     }
-}
-
-def verifySupplyChainInventory = tasks.register('verifySupplyChainInventory', Exec) {
-    group = 'verification'
-    description = 'Verifies and normalizes the aggregate CycloneDX dependency inventory.'
-    dependsOn 'prepareVerificationEnvironment', 'cyclonedxBom', testSupplyChainEvidenceVerifier
-    mustRunAfter 'cyclonedxBom'
     workingDir qualityRepositoryRoot
     inputs.file qualityRepositoryRoot.file('config/quality/supply-chain-policy.json')
-    inputs.file qualityRepositoryRoot.file('scripts/verify-supply-chain-evidence.py')
     inputs.file supplyChainBom
     outputs.file supplyChainReportDirectory.file('dependency-inventory.json')
     outputs.file supplyChainReportDirectory.file('supply-chain-evidence.json')
     outputs.file supplyChainReportDirectory.file('supply-chain-evidence.md')
     outputs.upToDateWhen { false }
-    doFirst {
-        commandLine qualityVerificationPython.get().absolutePath,
-            '-B',
-            'scripts/verify-supply-chain-evidence.py',
-            '--repository-root', qualityRepositoryRoot.asFile.absolutePath,
-            '--bom', supplyChainBom.asFile.absolutePath,
-            '--output', supplyChainReportDirectory.asFile.absolutePath
-    }
+    args qualityRepositoryRoot.asFile.absolutePath, supplyChainBom.asFile.absolutePath,
+        supplyChainReportDirectory.asFile.absolutePath
 }
 
 tasks.matching { candidate -> candidate.name == 'check' }.configureEach {

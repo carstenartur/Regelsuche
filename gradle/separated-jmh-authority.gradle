@@ -3,9 +3,9 @@
  *
  * The ordinary ciCheck graph keeps every benchmark dependency by default. CI
  * may set -PseparateJmhAuthority=true only when a separately required job runs
- * the jmhAuthority task from a fresh checkout. In that mode this script detaches
+ * the complete native Maven producer from a fresh checkout. In that mode this script detaches
  * the exact benchmark execution/validator graphs from ciCheck; their complete
- * unchanged graph is executed by jmhAuthority on an otherwise idle runner.
+ * requirements execute in Maven on an otherwise idle runner.
  */
 
 def separateJmhAuthority = providers.gradleProperty(
@@ -46,21 +46,6 @@ if (separateJmhAuthority) {
         }.configureEach {
             enabled = false
             setDependsOn([])
-        }
-    }
-}
-
-tasks.register('jmhAuthority') {
-    group = 'verification'
-    description = 'Runs every JMH execution and its unchanged fail-closed validators on one isolated runner.'
-    dependsOn 'verifyJmhRegression',
-        'verifyJmhBenchmark',
-        'verifyJmhAllocationBenchmark',
-        ':regelsuche-math-sympy:verifySymPyFactorizationBenchmark'
-    doFirst {
-        if (separateJmhAuthority) {
-            throw new GradleException(
-                'jmhAuthority must run without -PseparateJmhAuthority=true')
         }
     }
 }

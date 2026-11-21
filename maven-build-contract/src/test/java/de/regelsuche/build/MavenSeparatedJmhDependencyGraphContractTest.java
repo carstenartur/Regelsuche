@@ -29,16 +29,15 @@ class MavenSeparatedJmhDependencyGraphContractTest {
         "root, app and SymPy benchmark terminals must drop duplicate prerequisites");
     assertEquals(3, occurrences(script, "enabled = false"));
 
-    assertTrue(script.contains("tasks.register('jmhAuthority')"));
-    assertTrue(script.contains(
-        "dependsOn 'verifyJmhRegression',\n"
-            + "        'verifyJmhBenchmark',\n"
-            + "        'verifyJmhAllocationBenchmark',\n"
-            + "        ':regelsuche-math-sympy:"
-            + "verifySymPyFactorizationBenchmark'"),
-        "the isolated authority must retain the complete original graph");
-    assertTrue(script.contains(
-        "jmhAuthority must run without -PseparateJmhAuthority=true"));
+    assertFalse(script.contains("tasks.register('jmhAuthority')"));
+    String workflow = Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml"));
+    String job = workflow.substring(workflow.indexOf("  jmh-verification:\n"), workflow.indexOf("  sympy-runtime-verification:\n"));
+    assertTrue(job.contains("--fail-at-end -Pjmh-qualification"));
+    assertTrue(job.contains("-pl regelsuche-jmh,regelsuche-sympy-jmh -am -DskipTests verify"));
+    assertTrue(job.contains("JmhWarmupMigrationTest,JmhRegressionV3VerifierTest"));
+    assertFalse(job.contains("./gradlew"));
+    assertFalse(job.contains("apt-get"));
+    assertFalse(job.contains("setup-gradle"));
 
     assertFalse(script.contains("warmup"));
     assertFalse(script.contains("iteration"));

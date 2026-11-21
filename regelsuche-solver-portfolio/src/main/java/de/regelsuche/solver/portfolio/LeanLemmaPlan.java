@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /** Frozen proposals for one-step lemma application, acquired from a caller-trusted checked proof. */
-public final class LeanLemmaPlan {
+public final class LeanLemmaPlan implements LeanProofPlan {
     static final String FILE = "lemma-plan.txt";
     private static final String SCHEMA = "regelsuche.lean-lemma-plan/v1";
     private static final int MAX_CANDIDATES = 32;
@@ -50,7 +50,8 @@ public final class LeanLemmaPlan {
     public List<String> declarations() { return declarations; }
     public String hash() { return SolverIr.sha256(material()); }
 
-    String material() {
+    @Override public String fileName() { return FILE; }
+    @Override public String material() {
         return SCHEMA + "\n" + trainingCertificate + "\n" + String.join("\n", declarations) + "\n";
     }
 
@@ -69,7 +70,12 @@ public final class LeanLemmaPlan {
     }
 
     /** No fallback tactic. Confirmation of a transfer requires an acquired lemma to apply. */
-    String proof() {
+    @Override public void verifyAudit(LeanSolverBackend.AuditDocument audit) throws IOException {
+        if (audit.imports().stream().noneMatch(d -> declarations.contains(d.name())))
+            throw new IOException("the proof term contains none of the proposed declarations");
+    }
+
+    @Override public String proof() {
         var source = new StringBuilder("by\n  -- frozen lemma plan " + hash() + "\n  intros\n  solve\n");
         for (String name : declarations) {
             String quoted = "«" + name.replace(".", "».«") + "»";

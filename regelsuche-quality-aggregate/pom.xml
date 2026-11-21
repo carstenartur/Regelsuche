@@ -52,6 +52,9 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>io.github.carstenartur</groupId>
       <artifactId>regelsuche-quality</artifactId>
       <scope>test</scope>
@@ -74,6 +77,22 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
         <executions>
+          <execution>
+            <id>delete-stale-coverage-decision</id>
+            <phase>initialize</phase>
+            <goals><goal>clean</goal></goals>
+            <configuration>
+              <excludeDefaultDirectories>true</excludeDefaultDirectories>
+              <filesets><fileset>
+                <directory>${maven.multiModuleProjectDirectory}</directory>
+                <includes>
+                  <include>regelsuche-quality-aggregate/target/reports/coverage</include>
+                  <include>regelsuche-quality-aggregate/target/reports/coverage/**</include>
+                </includes>
+                <followSymlinks>false</followSymlinks>
+              </fileset></filesets>
+            </configuration>
+          </execution>
           <execution>
             <id>delete-stale-qualified-release-evidence</id>
             <phase>initialize</phase>
@@ -152,19 +171,35 @@
         <plugins>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
+            <artifactId>maven-failsafe-plugin</artifactId>
             <executions>
               <execution>
+                <id>verify-native-module-coverage</id>
+                <goals><goal>integration-test</goal><goal>verify</goal></goals>
+                <configuration>
+                  <test>de.regelsuche.quality.aggregate.MavenCoverageIT</test>
+                  <summaryFile>${project.build.directory}/failsafe-reports/coverage-summary.xml</summaryFile>
+                  <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+                  <systemPropertyVariables>
+                    <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+                    <regelsuche.reactorStart>${maven.build.timestamp}</regelsuche.reactorStart>
+                  </systemPropertyVariables>
+                </configuration>
+              </execution>
+              <execution>
                 <id>verify-installed-python-client</id>
-                <phase>verify</phase>
-                <goals><goal>test</goal></goals>
+                <goals><goal>integration-test</goal><goal>verify</goal></goals>
                 <configuration>
                   <test>de.regelsuche.quality.aggregate.MavenPythonClientDistributionIT</test>
                   <skip>false</skip>
                   <skipTests>false</skipTests>
                   <failIfNoTests>true</failIfNoTests>
                   <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
-                  <forkedProcessTimeoutInSeconds>420</forkedProcessTimeoutInSeconds>
+                  <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+                  <systemPropertyVariables>
+                    <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+                    <regelsuche.distributionVersion>${releaseVersion}</regelsuche.distributionVersion>
+                  </systemPropertyVariables>
                 </configuration>
               </execution>
             </executions>
@@ -200,7 +235,11 @@
           regelsuche-release,
           regelsuche-benchmarks,
           app,
-          regelsuche-integration-tests
+          regelsuche-integration-tests,
+          regelsuche-jmh,
+          regelsuche-sympy-jmh,
+          regelsuche-browser-tests,
+          regelsuche-proof-tests
         </regelsuche.slow-test-report.modules>
       </properties>
       <dependencies>

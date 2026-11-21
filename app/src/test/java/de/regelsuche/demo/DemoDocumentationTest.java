@@ -43,10 +43,10 @@ class DemoDocumentationTest {
         String readme = readReadme();
         // Quickstart section must use the single-image flow and announce
         // it as the primary/standard demo mode.
-        assertTrue(readme.contains("docker build -t regelsuche ."),
-            "README must document `docker build -t regelsuche .`");
-        assertTrue(readme.contains("docker run --rm -p 8080:8080 regelsuche"),
-            "README must document `docker run --rm -p 8080:8080 regelsuche`");
+        assertTrue(readme.contains("docker build --build-arg \"REGELSUCHE_PREPARATION_REVISION=$(git rev-parse HEAD)\" -t regelsuche ."),
+            "README must document the checkout-revision-bound single-image build");
+        assertTrue(readme.contains("docker run --rm -p 127.0.0.1:8080:8080 regelsuche"),
+            "README must bind the local demonstration port to loopback only");
         assertTrue(
             readme.contains("Killer-Demo Standard")
                 || readme.contains("Standardmodus der Killer-Demo")

@@ -17,6 +17,21 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Native bedingte Skalarsättigung
+
+- **Hypothese.** Native AC-Multimengen und bestätigte Nichtnullbedingungen können in einem endlichen rationalen Fragment Darstellungen erschließen, die eine geordnete Pfadsuche aus derselben Quelle verfehlt.
+- **Umsetzungsstand.** Ein gemeinsamer E-Graph hält n-stellige Operatoren und monotone Klassenfakten, begrenzt die Sucharbeit je Regel und extrahiert zwei Ziele mit unabhängig geprüften Beweis-DAGs. Die Annahmenprüfung trennt die exakte, symbolgebundene Prämissenerkennung von der Faktenvereinigung. Die Quelle und die Ergebnisse lassen sich mit der Produkt-CLI erneut prüfen. Das Fünf-Fälle-Panel zählt die strukturelle Arbeit beider Zeitpläne von der Quellvorprüfung bis zur geprüften Extraktion. Zeit- und Allokationsdiagnostik sowie die anschließende Belegwiederholung bleiben separat.
+- **Befund.** Beide historischen #620-Faktoren erreichten alle drei Verfahren. Beim Kontrollausdruck mit entgegengesetzten Faktorrollen fand BestFirst innerhalb des deklarierten Budgets keine Faktorisierung, während die native Sättigung und SymPy 1.14.0 sie erreichten. Ohne Nichtnullbeleg gab kein Arm die Kürzung frei. Kontrollen prüfen alle elf zugelassenen Prämissenformen, veränderte Aussagen und Symbolbereiche sowie die reihenfolgeunabhängige Erkennung widersprüchlicher Fakten.
+- **Folgerung.** Die zusätzliche Erreichbarkeit betrifft den geprüften Join. Matching-Fuel, Zustandszahl, DAG-Schritte und SymPy-Operationszahl erlauben keine gemeinsame Effizienzaussage.
+
+[Protokoll und Befunde](native-scalar-saturation.md)
+
+- [`NativeScalarSaturation.java`](../../regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java#L13) <!-- strategy-code: regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java | public final class NativeScalarSaturation { -->
+- [`NativeScalarComparison.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java#L25) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java | final class NativeScalarComparison { -->
+- [`NativeScalarDiagnostics.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarDiagnostics.java#L37) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarDiagnostics.java | final class NativeScalarDiagnostics { -->
+- [`ScalarGuardFactsTest.java`](../../regelsuche-egraph/src/test/java/de/regelsuche/egraph/proof/ScalarGuardFactsTest.java#L11) <!-- strategy-code: regelsuche-egraph/src/test/java/de/regelsuche/egraph/proof/ScalarGuardFactsTest.java | class ScalarGuardFactsTest { -->
+
+
 ## Geprüfte Rechenpläne in der Workbench
 
 - **Hypothese.** Ausgeführte Beispiele können einen endlichen Nachweis und tatsächliche Rechenarbeit sichtbar machen, wenn die Oberfläche Eingaben, Prüfergebnisse und Operationszahlen getrennt ausweist.
@@ -425,3 +440,14 @@ Aus diesen Einzelfällen lässt sich kein allgemeiner Suchvorteil ableiten.
 - [`ResidualPlanController.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanController.java#L25) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanController.java | public final class ResidualPlanController { -->
 - [`ResidualPlanCompiler.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanCompiler.java#L19) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ResidualPlanCompiler.java | public final class ResidualPlanCompiler { -->
 - [`ResidualPlanComparisonTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/ResidualPlanComparisonTest.java#L16) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/ResidualPlanComparisonTest.java | class ResidualPlanComparisonTest { -->
+
+## Gebundene logische Beweisgraphen im DiscoveryDomain
+
+- **Hypothese.** Ein begrenzter Graph aus logischen Regeln kann aus expliziten Prämissen neue Aussagen bilden und jeden Vorschlag unverändert an zwei getrennte Kernelprojekte übergeben.
+- **Umsetzungsstand.** Die Quellgrammatik bildet unter anderem Implikationsketten, universelle Spezialisierungen, Zeugen, Fallunterscheidungen und natürliche Induktion. Rekursive Aufrufe der starken Nat-Induktion benötigen einen eigenen Beweis für das strikt kleinere Argument. Der Empfänger rekonstruiert den Graphen gegen die exakte Aussage. [Einstieg und Grenzen](../proof-bridge.md#bounded-logical-discovery-and-exact-dag-replay)
+- **Befund.** Der JVM-Test bildet aus drei Prämissen eine zweistufige Implikationskette auch bei geändertem Eingabeziel. Er findet ein konkretes Gegenmodell zu einer unberechtigten Folgerung. Fehlende Prüfwerkzeuge ergeben kein Zertifikat. Im echten Werkzeuglauf sind zusätzliche Kontrollen für die unabhängige Rekonstruktion und für einen falschen Abstieg vorgesehen.
+- **Folgerung.** Der logische Graph macht gebundene Voraussetzungen und Beweisarbeit prüfbar. Ein positiver mathematischer Befund verlangt beide Kernelquittungen im verwendeten Quellstand.
+
+- [`ScopedProofDag.java`](../../regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofDag.java#L10) <!-- strategy-code: regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofDag.java | public final class ScopedProofDag { -->
+- [`ScopedProofSearch.java`](../../regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofSearch.java#L12) <!-- strategy-code: regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/ScopedProofSearch.java | public final class ScopedProofSearch { -->
+- [`ScopedLogicDiscoveryDomainTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java#L15) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/ScopedLogicDiscoveryDomainTest.java | class ScopedLogicDiscoveryDomainTest { -->

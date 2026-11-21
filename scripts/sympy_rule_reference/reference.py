@@ -77,10 +77,42 @@ def run_panel():
             "cases": [evaluate_case(case) for case in cases]}
 
 
+def native_scalar_reference(rows):
+    """Execute the declared external operation on source-only input, with total-domain admission."""
+    if sympy.__version__ != "1.14.0" or mpmath.__version__ != "1.3.0":
+        raise ValueError("Pinned SymPy 1.14.0 and mpmath 1.3.0 required")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 32:
+        raise ValueError("Expected bounded comparison panel")
+    results = []
+    operations = {"factor_terms": sympy.factor_terms, "cancel": sympy.cancel}
+    for row in rows:
+        if set(row) != {"id", "source", "assumptions", "operation"} or len(row["source"]) > 256:
+            raise ValueError("Unknown or oversized external input")
+        expr, _ = read_source(row["source"], row["assumptions"])
+        operation = operations[row["operation"]]
+        denominators = [term.base for term in sympy.preorder_traversal(expr)
+                        if isinstance(term, sympy.Pow) and term.exp.is_negative is True]
+        result = {"id": row["id"], "operation": row["operation"],
+                  "sourceOps": int(sympy.count_ops(expr)), "source": row["source"],
+                  "assumptions": row["assumptions"], "proof": "NO_DETACHED_DERIVATION"}
+        if any(sympy.ask(sympy.Q.nonzero(term)) is not True for term in denominators):
+            result["status"] = "NONZERO_NOT_ESTABLISHED"
+        else:
+            value = operation(expr)
+            result.update(status="RETURNED", output=sympy.sstr(value).replace("**", "^"),
+                          outputOps=int(sympy.count_ops(value)))
+        results.append(result)
+    return {"sympy": sympy.__version__, "mpmath": mpmath.__version__, "cases": results}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verify", action="store_true", help="compare with the retained result")
+    parser.add_argument("--native-scalar-request", action="store_true", help="read source-only scalar cases from stdin")
     args = parser.parse_args()
+    if args.native_scalar_request:
+        sys.stdout.buffer.write(encode(native_scalar_reference(json.loads(sys.stdin.buffer.read(65537)))))
+        return
     result = encode(run_panel())
     if args.verify and result != EXPECTED.read_bytes():
         raise SystemExit("Named SymPy outputs differ from the retained panel")

@@ -89,6 +89,7 @@ public class WebWorkbenchServer {
     private final de.regelsuche.radar.RuleRadarHttpHandler ruleRadarHandler;
     private final Path representationRunDirectory;
     private final LiteratureWorkbenchActions literatureActions;
+    private final NativeSearchOperations nativeSearchOperations;
 
     private final TransformationQueryService transformationQuery;
     private final RuleInventoryQueryService inventoryQuery;
@@ -232,6 +233,7 @@ public class WebWorkbenchServer {
         );
         this.representationRunDirectory =
             defaultRepresentationRunDirectory();
+        this.nativeSearchOperations = new NativeSearchOperations(representationRunDirectory, RetainedRunActions::nativeRevision);
         this.literatureActions = new LiteratureWorkbenchActions(representationRunDirectory, host, this.securityConfig);
     }
 
@@ -507,6 +509,7 @@ public class WebWorkbenchServer {
         if (server != null) {
             server.stop(0);
         }
+        nativeSearchOperations.close();
         ruleRadarHandler.close();
     }
 
@@ -519,7 +522,11 @@ public class WebWorkbenchServer {
     ) throws IOException {
         try {
             String suffix = representationRunSuffix(exchange);
-            if (suffix.contains("/literature/")) {
+            if (suffix.equals("operations") || suffix.startsWith("operations/")) {
+                RetainedRunActions.handleOperation(exchange, nativeSearchOperations, suffix, securityConfig.maxRequestBytes());
+            } else if (suffix.contains("/candidate-evidence")) {
+                CandidateEvidenceRoute.handle(exchange, representationRunDirectory, suffix, ruleRadarHandler.service(), securityConfig.maxRequestBytes());
+            } else if (suffix.contains("/literature/")) {
                 literatureActions.handle(exchange, suffix);
             } else if (suffix.contains("/")) {
                 RetainedRunActions.handle(exchange, representationRunDirectory,
@@ -3309,6 +3316,8 @@ public class WebWorkbenchServer {
             || path.equals("/run-workspace-state.js")
             || path.equals("/candidate-dossier-state.js")
             || path.equals("/candidate-dossier.js")
+            || path.equals("/candidate-occurrence-review.js")
+            || path.equals("/native-search-workspace.js")
             || path.equals("/run-workspace.js")
             || path.equals("/run-workspace.css")
             || path.equals("/rule-radar.js")

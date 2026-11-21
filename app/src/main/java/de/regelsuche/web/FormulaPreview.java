@@ -21,19 +21,26 @@ final class FormulaPreview {
         if (source.length() > MAX_SOURCE_LENGTH)
             throw new IllegalArgumentException("Die Formelvorschau unterstützt bis zu " + MAX_SOURCE_LENGTH + " Zeichen.");
         InputType inputType = InputType.valueOf(type);
-        if (inputType == InputType.SYSTEM) throw new IllegalArgumentException("TERM oder EQUATION erforderlich.");
         var parser = new ExpressionParser();
         var result = new JsonWriter().beginObject();
-        if (inputType == InputType.EQUATION) {
-            var parsed = parser.parseExactEquation(source);
-            var equation = parsed.equation();
-            result.property("kind", "EQUATION").property("value", "=");
-            writeChildren(result, List.of(equation.left(), equation.right()), parsed::sourceRangeFor);
+        if (inputType == InputType.SYSTEM) {
+            var equations = parser.parseExactSystem(source);
+            if (equations.isEmpty()) throw new IllegalArgumentException("Das Gleichungssystem benötigt mindestens eine Gleichung.");
+            result.property("kind", "SYSTEM").property("value", ";").array("children",
+                rows -> equations.forEach(row -> rows.objectValue(item -> writeEquation(item, row))));
+        } else if (inputType == InputType.EQUATION) {
+            writeEquation(result, parser.parseExactEquation(source));
         } else {
             var parsed = parser.parseExactTerm(source);
             write(result, parsed.expression(), parsed::sourceRangeFor);
         }
         return result.endObject().toString();
+    }
+
+    private static void writeEquation(JsonWriter result, de.regelsuche.parse.ExactParsedEquation parsed) {
+        var equation = parsed.equation();
+        result.property("kind", "EQUATION").property("value", "=");
+        writeChildren(result, List.of(equation.left(), equation.right()), parsed::sourceRangeFor);
     }
 
     private static void write(JsonWriter writer, Expr expression, Function<Expr, Optional<SourceRange>> ranges) {

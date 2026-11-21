@@ -1,0 +1,61 @@
+{
+  "hello-rule-java25": {
+    "main": "example.HelloRule",
+    "modules": [
+      "regelsuche-core",
+      "regelsuche-egraph",
+      "regelsuche-plugin-api",
+      "regelsuche-search"
+    ],
+    "tests": [
+      "example.HelloRuleTest#loadsAndReplaysExactIdentity",
+      "example.HelloRuleTest#refusesDifferentRightOperand"
+    ],
+    "stdout": "rule=hello-add-zero\nbefore=x + 0\nafter=x\nreplay=VERIFIED\nnegative=REJECTED\nproof=AUTHOR_SUPPLIED_IDENTITY\n"
+  },
+  "extension-runtime-java25": {
+    "main": "example.Main",
+    "modules": [
+      "regelsuche-core",
+      "regelsuche-extension-api",
+      "regelsuche-extension-runtime"
+    ],
+    "tests": [
+      "example.ExtensionRuntimeConsumerTest#classpathPluginContributesTypedExtensionWithStableReloadIdentity"
+    ],
+    "stdoutPrefix": "extension=hello\norigin=greeting-plugin\ngreeting=Hello Ada\n",
+    "repeatHash": [
+      "catalog",
+      "catalogHash",
+      "CANONICAL_CATALOGUE_AND_STABLE_REPEAT"
+    ]
+  },
+  "geometric-sequence-domain-java25": {
+    "main": "example.GeometricSequenceExample",
+    "modules": [
+      "regelsuche-core",
+      "regelsuche-discovery",
+      "regelsuche-discovery-sdk",
+      "regelsuche-egraph",
+      "regelsuche-search",
+      "regelsuche-validation"
+    ],
+    "tests": [
+      "example.GeometricSequenceDomainTest#confirmsTheHeldOutMultiplierAndRetainsEarlierCounterexamples",
+      "example.GeometricSequenceDomainTest#exposesBudgetExhaustionInsteadOfReturningAPartialSuccess",
+      "example.GeometricSequenceDomainTest#providerIsDiscoveredWithoutApplicationInternals",
+      "example.GeometricSequenceDomainTest#refutesAnIncompatibleHoldout",
+      "example.GeometricSequenceTypedInputTest#codecPreservesLegacyPayloadAndTheDocumentedDefault",
+      "example.GeometricSequenceTypedInputTest#rejectsTrailingEmptyFields",
+      "example.GeometricSequenceTypedInputTest#rejectsUnknownMalformedDuplicateAndTruncatedFields",
+      "example.GeometricSequenceTypedInputTest#typedAndSerializedInputsHaveIdenticalEvidence",
+      "example.GeometricSequenceTypedInputTest#typedInputRetainsRefutationAndBudgetSemantics"
+    ],
+    "stdoutPrefix": "provider=example-geometric-sequence-provider\noutcome=CONFIRMED\ncandidate=Plan[multiplier=2, input=Input[observed=[2, 4, 8, 16], holdout=[32, 64], maxMultiplier=6]]\ncounterexamples=[multiplier 1 predicts 2 but observed 4]\n",
+    "repeatHash": [
+      "evidenceHash",
+      "evidenceHash",
+      "CANONICAL_DISCOVERY_EVIDENCE_AND_STABLE_REPEAT"
+    ]
+  }
+}
