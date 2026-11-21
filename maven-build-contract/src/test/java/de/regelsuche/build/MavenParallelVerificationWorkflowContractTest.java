@@ -178,7 +178,7 @@ class MavenParallelVerificationWorkflowContractTest {
         "needs: [gradle-verification, jmh-verification, "
             + "sympy-runtime-verification, maven-product-verification, "
             + "external-polynomial-comparison, typed-external-polynomial-comparison, "
-            + "checked-proofs, native-scalar-reproduction]"));
+            + "checked-proofs, native-scalar-reproduction, maven-polynomial-qualification]"));
     assertTrue(compactConvergence.contains(
         "needs.gradle-verification.result != 'success' || "
             + "needs.jmh-verification.result != 'success' || "
@@ -188,7 +188,8 @@ class MavenParallelVerificationWorkflowContractTest {
             + "needs.external-polynomial-comparison.result != 'success' || "
             + "needs.typed-external-polynomial-comparison.result != 'success' || "
             + "needs.checked-proofs.result != 'success' || "
-            + "needs.native-scalar-reproduction.result != 'success'))"),
+            + "needs.native-scalar-reproduction.result != 'success' || "
+            + "needs.maven-polynomial-qualification.result != 'success'))"),
         "the stable required check must reject any incomplete authority");
     assertTrue(convergence.contains("run: exit 1"),
         "an incomplete authority set must fail rather than become skipped-success");
@@ -226,8 +227,15 @@ class MavenParallelVerificationWorkflowContractTest {
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
     assertFalse(convergence.contains("scripts/generate-ci-pages.py"));
-    assertEquals(1, occurrences(convergence, "mvn "),
-        "convergence must run only the focused Maven coverage verification");
+    JsonNode collection = YAML.readTree(workflow).required("jobs").required("verification").required("steps")
+        .valueStream().filter(step -> "Collect complete checkout-owned quality acceptance evidence".equals(step.path("name").asText()))
+        .findFirst().orElseThrow();
+    assertEquals("mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am "
+        + "-Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false "
+        + "-Dregelsuche.qualityAcceptance.collect=true verify", collection.required("run").asText().strip());
+    assertFalse(collection.has("if"));
+    assertFalse(collection.has("continue-on-error"));
+    assertEquals(2, occurrences(convergence, "mvn "), "coverage and collection must be the only converged Maven invocations");
 
     assertTrue(publication.contains("needs: verification"),
         "publication must wait for all converged authorities");
@@ -244,6 +252,86 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void fullMavenEvidenceIsRetainedBeforeAnotherCheckoutLifecycleCanReplaceIt() throws IOException {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
+        .findFirst().orElseThrow();
+    var registration = steps.stream()
+        .filter(step -> step.path("run").asText().contains("-Dregelsuche.qualityAcceptance.registerArchive=true"))
+        .findFirst().orElseThrow();
+    assertTrue(steps.indexOf(registration) < steps.indexOf(product),
+        "register the archive before the full lifecycle produces reports in the original checkout");
+    var registrationCommand = registration.path("run").asText();
+    assertTrue(registrationCommand.contains("-DdisableXmlReport=true")
+        && registrationCommand.contains("-Dsurefire.useFile=false")
+        && registrationCommand.contains("-Djacoco.skip=true"),
+        "an early failure must not publish registration-only output as the full reactor result");
+
+    var retention = steps.stream()
+        .filter(step -> "maven-full-reactor-verification".equals(step.path("with").path("name").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("missing full-reactor report artifact"));
+    int produced = steps.indexOf(product);
+    int retained = steps.indexOf(retention);
+    assertTrue(produced < retained, "the artifact must come from the full product lifecycle");
+    assertFalse(steps.subList(produced + 1, retained).stream()
+        .anyMatch(step -> step.path("run").asText().contains("mvn ")),
+        "an intervening Maven lifecycle can clean the first run's reports");
+    assertTrue(retention.path("uses").asText().startsWith("actions/upload-artifact@"));
+    assertTrue(retention.path("if").asText().contains("always()"), "retain reports from failed runs as well");
+    var paths = retention.required("with").required("path").asText().lines().map(String::strip).toList();
+    assertTrue(paths.containsAll(List.of("**/target/surefire-reports/**", "**/target/failsafe-reports/**",
+        "**/target/jacoco.exec", "**/target/site/jacoco/**")), "retain the original test and JaCoCo evidence");
+  }
+
+  @Test
+  void mavenPagesReplayTheFullReactorFilesInsteadOfLaterReports() throws IOException {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var snapshot = steps.stream().filter(step -> "full_maven_reports".equals(step.path("id").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("missing full-reactor report snapshot"));
+    var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
+        .findFirst().orElseThrow();
+    int produced = steps.indexOf(product);
+    int captured = steps.indexOf(snapshot);
+    assertTrue(produced < captured, "capture the reports after the full product run");
+    assertFalse(steps.subList(produced + 1, captured).stream()
+        .anyMatch(step -> step.path("run").asText().contains("mvn ")),
+        "capture the reports before any Maven reinitialization");
+    assertTrue(snapshot.path("run").asText().contains("**/target/surefire-reports/TEST-*.xml"));
+    assertTrue(snapshot.path("run").asText().contains("**/target/failsafe-reports/TEST-*.xml"));
+    var replay = steps.stream()
+        .filter(step -> step.path("run").asText().contains("-Dregelsuche.tests.mavenPages=true"))
+        .findFirst().orElseThrow();
+    assertEquals("${{ steps.full_maven_reports.outputs.root }}",
+        replay.required("env").required("REGELSUCHE_MAVEN_REPORT_ROOT").asText());
+    assertTrue(replay.path("run").asText().contains("-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}"));
+  }
+
+  @Test
+  void nativePolynomialPilotUsesTheSameSourceAndRetainsIndependentReplay() throws IOException {
+    var jobs = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml"))).required("jobs");
+    var pilot = jobs.required("maven-polynomial-qualification");
+    var steps = pilot.required("steps");
+    var checkout = steps.required(0).required("with");
+    var legacyCheckout = jobs.required("external-polynomial-comparison").required("steps").required(0).required("with");
+    assertEquals(legacyCheckout.required("ref"), checkout.required("ref"));
+    assertEquals(0, checkout.required("fetch-depth").intValue(), "proof of freeze ancestry needs the actual Git history");
+    var producer = steps.valueStream().filter(step -> step.has("run")).findFirst().orElseThrow();
+    assertEquals("mvn --batch-mode --no-transfer-progress -Ppolynomial-comparison -pl regelsuche-release -am "
+        + "-Dtest=ExternalPolynomialComparisonWorkerTest,PolynomialSourceProofTest,PolynomialRuntimeClasspathTest,PolynomialComparisonArchiveTest "
+        + "-Dsurefire.failIfNoSpecifiedTests=false verify", producer.required("run").asText().strip());
+    assertFalse(producer.has("if"));
+    assertFalse(producer.has("continue-on-error"));
+    var retention = steps.required(steps.size() - 1);
+    assertTrue(retention.required("if").asText().contains("always()"));
+    assertEquals("error", retention.required("with").required("if-no-files-found").asText());
+    assertTrue(retention.required("with").required("path").asText().contains("target/reports/polynomial-comparison/**"));
   }
 
   @Test
