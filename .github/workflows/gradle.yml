@@ -188,18 +188,7 @@ jobs:
           mvn --batch-mode --no-transfer-progress \
             -f playwright-bootstrap/pom.xml \
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
-      - name: Verify the complete Maven product and Docker contract
-        run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
-      - name: Verify Maven Web Workbench Docker image through JUnit/Testcontainers
-        timeout-minutes: 40
-        run: >-
-          mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image
-          -pl regelsuche-integration-tests -am verify
-      - name: Replay retained Maven Surefire and Failsafe pages without Gradle inputs
-        run: >-
-          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
-          -Dregelsuche.tests.mavenPages=true verify
-      - name: Reproduce full Maven lifecycle from a Git-free source archive
+      - name: Prepare the exact Git-free source archive
         id: source_archive
         run: |
           set -euo pipefail
@@ -208,10 +197,51 @@ jobs:
           git archive --format=tar HEAD | tar -xf - -C "$source_root"
           mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am \
             -Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false \
+            -DdisableXmlReport=true -Dsurefire.useFile=false -Djacoco.skip=true \
             -Dregelsuche.qualityAcceptance.registerArchive=true \
             "-Dregelsuche.qualityAcceptance.registration=$source_root/build/authority-evidence/quality-source-tree.json" test
+      - name: Verify the complete Maven product and Docker contract
+        id: full_maven_product
+        run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
+      - name: Retain the original full Maven reactor reports
+        if: ${{ always() && !cancelled() && steps.full_maven_product.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: maven-full-reactor-verification
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+            **/target/jacoco.exec
+            **/target/site/jacoco/**
+          if-no-files-found: error
+      - name: Snapshot the original Maven XML for page replay
+        id: full_maven_reports
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          report_root="$(mktemp -d "${RUNNER_TEMP}/regelsuche-maven-reports.XXXXXXXX")"
+          reports=(**/target/surefire-reports/TEST-*.xml **/target/failsafe-reports/TEST-*.xml)
+          cp --parents -- "${reports[@]}" "$report_root"
+          echo "root=$report_root" >> "$GITHUB_OUTPUT"
+      - name: Verify Maven Web Workbench Docker image through JUnit/Testcontainers
+        timeout-minutes: 40
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image
+          -pl regelsuche-integration-tests -am verify
+      - name: Replay retained Maven Surefire and Failsafe pages without Gradle inputs
+        env:
+          REGELSUCHE_MAVEN_REPORT_ROOT: ${{ steps.full_maven_reports.outputs.root }}
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
+          -Dregelsuche.tests.mavenPages=true
+          "-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}" verify
+      - name: Reproduce full Maven lifecycle from a Git-free source archive
+        env:
+          REGELSUCHE_SOURCE_ARCHIVE_ROOT: ${{ steps.source_archive.outputs.root }}
+        run: |
+          set -euo pipefail
           (
-            cd "$source_root"
+            cd "${REGELSUCHE_SOURCE_ARCHIVE_ROOT:?}"
             # This is intentionally the unfiltered full Maven reactor, not
             # a selected -pl subset. The archive has no .git metadata.
             # Supply exact checkout provenance explicitly before any module

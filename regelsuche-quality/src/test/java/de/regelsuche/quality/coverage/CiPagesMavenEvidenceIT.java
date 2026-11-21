@@ -6,8 +6,8 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Explicit read-only Maven reactor report replay. The existing Surefire and
- * Failsafe reports must come from an earlier successful build in this checkout;
- * this test neither executes source tests nor treats report counts as gate proof.
+ * Failsafe reports must come from an earlier successful build of this checkout.
+ * CI passes the root of its retained report snapshot.
  */
 @EnabledIfSystemProperty(named = "regelsuche.tests.mavenPages", matches = "true")
 class CiPagesMavenEvidenceIT {
@@ -15,7 +15,9 @@ class CiPagesMavenEvidenceIT {
     void renderRetainedMavenReports() throws Exception {
         Path root = Path.of(System.getProperty("regelsuche.repositoryRoot"))
             .toAbsolutePath().normalize();
-        CiPagesMain.publishTests(root, root.resolve("public/maven-tests"),
+        Path reportRoot = Path.of(System.getProperty("regelsuche.tests.mavenReportRoot", root.toString()))
+            .toAbsolutePath().normalize();
+        CiPagesMain.publishTests(reportRoot, root.resolve("public/maven-tests"),
             CiPagesMain.TestInput.MAVEN);
     }
 }
