@@ -22,7 +22,7 @@ public final class FrozenGraalPyJsonAdmissionControl {
         if (!sha(bridge).equals("d67e266e11c92fdd3e5e2c85c30a89a7b5292f56e291bc86a9d036ac7aab23c4"))
             throw new IllegalArgumentException("different factor bridge");
         var input = Files.readString(Path.of(args[2])).strip();
-        if (!input.startsWith("{\"protocol\":") || !input.chars().allMatch(ch -> ch < 128))
+        if (!isStructuredAsciiProtocolInput(input))
             throw new IllegalArgumentException("expected structured ASCII protocol input");
         try (Context context = Context.newBuilder("python").allowIO(org.graalvm.polyglot.io.IOAccess.ALL)
                 .allowNativeAccess(true).allowCreateThread(true).allowHostAccess(HostAccess.NONE).allowPolyglotAccess(PolyglotAccess.NONE)
@@ -89,5 +89,9 @@ public final class FrozenGraalPyJsonAdmissionControl {
             System.out.println("checked-prefixes=" + (full.size() + 1));
             System.out.println("first-refused=" + refused);
         }
+    }
+
+    private static boolean isStructuredAsciiProtocolInput(String input) {
+        return input.startsWith("{\"protocol\":") && input.chars().allMatch(ch -> ch < 128);
     }
 }
