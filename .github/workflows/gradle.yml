@@ -294,6 +294,51 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
 
+  maven-student-sdk-archive-qualification:
+    name: Fresh Maven Student SDK archive qualification
+    if: github.event_name != 'create'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { ref: "${{ github.event.pull_request.head.sha || github.sha }}", persist-credentials: false }
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+      - name: Stage fresh Maven SDK artifacts, package and qualify the native archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/student-sdk-archive/evidence"
+          mkdir -p "$evidence"
+          work=$(mktemp -d "$RUNNER_TEMP/student-sdk-archive/work.XXXXXXXX")
+          repository="$work/staged"
+          git rev-parse HEAD 'HEAD^{tree}' > "$evidence/source.txt"
+          git show -s --format=%ct HEAD > "$evidence/source-epoch.txt"
+          source_path=maven-build-contract/src/test/java/de/regelsuche/build
+          sha256sum "$source_path/StudentSdkArchive.java" "$source_path/StudentSdkPinnedConsumer.java" \
+            "$source_path/MavenStudentSdkArchiveTest.java" > "$evidence/native-assembler.sha256"
+          version=$(sed -n 's/^version=//p' release.properties)
+          archive="$work/regelsuche-sdk-${version}.zip"
+          mvn --batch-mode --no-transfer-progress -Psdk-release \
+            -pl regelsuche-discovery-sdk,regelsuche-optimization-sdk,regelsuche-plugin-api,regelsuche-extension-api,regelsuche-extension-runtime,regelsuche-bom -am \
+            "-Dproject.build.outputTimestamp=$(cat "$evidence/source-epoch.txt")" \
+            "-Dmaven.repo.local=$repository" -DskipTests clean install 2>&1 | tee "$evidence/stage.log"
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+            -Dtest=MavenStudentSdkArchiveTest#packageConfiguredRepository -Dregelsuche.studentSdk.package=true \
+            "-Dregelsuche.studentSdk.repository=$repository" "-Dregelsuche.studentSdk.version=$version" \
+            "-Dregelsuche.studentSdk.output=$archive" test 2>&1 | tee "$evidence/native-package.log"
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+            -Dtest=MavenStudentSdkArchiveTest#qualifyConfiguredArchive -Dregelsuche.studentSdk.qualify=true \
+            "-Dregelsuche.studentSdk.repository=$repository" "-Dregelsuche.studentSdk.version=$version" \
+            "-Dregelsuche.studentSdk.output=$archive" "-Dregelsuche.studentSdk.evidence=$evidence" test
+      - name: Retain native SDK archive qualification evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: maven-student-sdk-archive-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/student-sdk-archive/evidence
+          if-no-files-found: error
+
   external-polynomial-comparison:
     name: External polynomial comparison
     if: github.event_name != 'create'
@@ -432,7 +477,7 @@ jobs:
 
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs, native-scalar-reproduction, maven-polynomial-qualification]
+    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs, native-scalar-reproduction, maven-polynomial-qualification, maven-student-sdk-archive-qualification]
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
@@ -440,7 +485,7 @@ jobs:
     steps:
       - name: Reject incomplete verification authority
         if: >-
-          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success' || needs.native-scalar-reproduction.result != 'success' || needs.maven-polynomial-qualification.result != 'success')) }}
+          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success' || needs.native-scalar-reproduction.result != 'success' || needs.maven-polynomial-qualification.result != 'success' || needs.maven-student-sdk-archive-qualification.result != 'success')) }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
@@ -491,7 +536,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} TypedPolynomial=${{ needs.typed-external-polynomial-comparison.result }} MavenPolynomial=${{ needs.maven-polynomial-qualification.result }} Coverage=success"
+        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} TypedPolynomial=${{ needs.typed-external-polynomial-comparison.result }} MavenPolynomial=${{ needs.maven-polynomial-qualification.result }} MavenStudentSdkArchive=${{ needs.maven-student-sdk-archive-qualification.result }} Coverage=success"
 
   publish-pages:
     name: Publish generated reports
