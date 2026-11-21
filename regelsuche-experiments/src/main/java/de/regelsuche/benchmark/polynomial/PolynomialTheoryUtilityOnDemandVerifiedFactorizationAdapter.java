@@ -11,6 +11,8 @@ import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.polynomial.ExactNestedFactorizationTransformationPipeline;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.polynomial.PolynomialWorkAuthority;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.VerifiedPolynomialTransitionCacheStore.VerifiedTransition;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /** Executes the frozen native profile through the shared exact pipeline. */
 public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
@@ -128,7 +131,8 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         for (List<Integer> path : paths) {
             var beforeRaw = authority.ledger();
             int firstAttempt = attempts.size();
-            Occurrence occurrence = executeOccurrence(parsed, path, authority);
+            Occurrence occurrence = executeOccurrence(parsed, path, authority,
+                () -> NativeUnivariateFactorizationEngine.rationals(NativeUnivariateFactorizationPolicy.boundedDefaults()));
             observations.add(occurrence);
             var nested = occurrence.pipeline();
             PolynomialTheoryUtilityTransitionOutcome transition = null;
@@ -186,7 +190,7 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         return executeCase(input, formation, true);
     }
 
-    private static ExactParsedTerm parse(String source, PolynomialTheoryUtilityWorkAuthority authority) {
+    static ExactParsedTerm parse(String source, PolynomialTheoryUtilityWorkAuthority authority) {
         try {
             authority.consume("projection.study-source-parse-code-units", source.length());
             return new ExpressionParser().parseExactTerm(source);
@@ -195,8 +199,8 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         }
     }
 
-    private static Occurrence executeOccurrence(ExactParsedTerm parsed, List<Integer> path,
-            PolynomialTheoryUtilityWorkAuthority authority) {
+    static Occurrence executeOccurrence(ExactParsedTerm parsed, List<Integer> path,
+            PolynomialTheoryUtilityWorkAuthority authority, Supplier<FactorizationEngine<ExactRational>> engine) {
         var before = authority.work();
         ExactNestedFactorizationTransformationPipeline.Result nested = null;
         try {
@@ -209,7 +213,7 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
             var position = new TreePosition(path, ExpressionFormatter.formatMeasured(selected,
                 units -> authority.consume("projection.study-position-format-code-units", units)));
             nested = new ExactNestedFactorizationTransformationPipeline(authority).transform(parsed, position,
-                NativeUnivariateFactorizationEngine.rationals(NativeUnivariateFactorizationPolicy.boundedDefaults()), 0);
+                engine.get(), 0);
             if (nested.transformed()) {
                 var expansion = VerifiedTransition.from(nested.transformation().orElseThrow()).primitiveExpansion();
                 if (expansion.size() != PRIMITIVE_EXPANSION_LENGTH) {
@@ -302,7 +306,7 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
         return TerminalStatus.NO_TRANSITION;
     }
 
-    private static List<List<Integer>> paths(PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
+    static List<List<Integer>> paths(PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
         return switch (formation.occurrenceLayout()) {
             case "ROOT" -> List.of(List.of());
             case "NESTED_RIGHT" -> List.of(List.of(1));

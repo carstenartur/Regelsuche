@@ -1,0 +1,50 @@
+{
+  "schema": "regelsuche.historical-jdk-regex-admission-receipt/v1",
+  "sourceRevision": "4e99115591f748161441598b8e9375fb9620796c",
+  "sourceTree": "036871db8cd494e131c87b5cad08b20392101e2f",
+  "bundle": {
+    "file": "earlier-source.bundle",
+    "sha256": "2144666d206be075e0293fa59822492238125d1e63373106c7d0aef0f388eb9d",
+    "bytes": 72233,
+    "ref": "refs/heads/recovery/748-integrated-d49594a",
+    "prerequisite": "d49594a351b7651c7c44cf8c24c4821dafbfa6f0"
+  },
+  "runtimeManifest": "scripts/frozen_sympy_jvm_runtime.json",
+  "publicInputSha256": "85148c685548affdba51ffff6459e111dec63468487bc066559c48ba898b4aa1",
+  "meterSha256": {
+    "scripts/FrozenGraalPyJsonAdmission.java": "5f438e9dee9ae56292a4dd5ec5489b8bca19890f3dc954894b0a42f4bf4895c1",
+    "scripts/FrozenGraalPyJsonAdmissionControl.java": "c9bf50d1701c1ebadbd563cba24319155611c31960f25a31c9b8dfa2a67688d4",
+    "scripts/FrozenGraalPyRegexAdmission.java": "c7a7821169d39407640bd1f1ba371d010cf5ea06e92f60937bbb925e9f939918",
+    "scripts/frozen-jvm/FrozenJdkStringTransformer.java": "78694a545202a05d1c5bcf537919c45d639d936cee964723305bbd0740ca3701",
+    "scripts/frozen-jvm/FrozenStringPrimitives.java": "cc9c4234ef1fb75c294982dfd001763d208550c6b0eeaf6c1e2eb5af06b683ad",
+    "scripts/frozen-jvm/FrozenStringPrimitivesControl.java": "c95ac8c4939056ee7a779f06b7552045817362f4b1f89c5c46a0ab7dc3dd45e9",
+    "scripts/frozen_graalpy_json_admission.py": "90683590b93c6ab0df1daa17129ba788512cb647a4a943a38394015ff7ce8b72",
+    "scripts/frozen_sympy_jvm_runtime.json": "cff6b42bab75e927a9b8aa7bc550b13778947b2edb86e8bfd9798943551c2775",
+    "scripts/verify-frozen-graalpy-json-admission.py": "b9277b12e1d95787f206e258630357b304fe22620e9f73d8f8d33179e1a8e5af"
+  },
+  "scope": "Historical declared-event diagnostics only. The earlier bulk boundary passed opaque helpers, so neither trace constitutes complete mechanical or frozen-v2 work.",
+  "traces": [
+    {
+      "mode": "bulk",
+      "file": "earlier-bulk.log",
+      "sha256": "ddc1f343b9936b3d696827e8cd7945dc71d13b0f5e16a168f18cb8a0ed12856a",
+      "declaredEvents": 223,
+      "checkedPrefixLimits": 224,
+      "firstRefusedLabelAtThatRevision": "gap.regex.method-name-conversion",
+      "sourceByteReadEvents": 44,
+      "targetByteWriteEvents": 44,
+      "methodNameFieldReadEvents": 1
+    },
+    {
+      "mode": "bulk-survey",
+      "file": "earlier-bulk-survey.log",
+      "sha256": "710f5d1ca196b2af71e329cec5c0a6df5f43b911211ed8d855ee89fe2a6d3d7c",
+      "declaredEvents": 373,
+      "checkedPrefixLimits": 374,
+      "firstRefusedLabelAtThatRevision": "gap.regex.options-materialize",
+      "sourceByteReadEvents": 96,
+      "targetByteWriteEvents": 96,
+      "methodNameFieldReadEvents": 1
+    }
+  ]
+}
