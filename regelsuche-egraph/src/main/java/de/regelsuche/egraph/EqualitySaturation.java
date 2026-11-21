@@ -52,6 +52,12 @@ public final class EqualitySaturation {
     public List<RewriteRule> rules() { return rules; }
     public Config config() { return config; }
 
+    /** Executes only independently admitted scalar rules on one native AC graph under a fixed premise context. */
+    public NativeScalarSaturation.Result saturateExactScalars(Expr input,
+            de.regelsuche.egraph.proof.ScalarExtractionProof.Context context, NativeScalarSaturation.Budget budget) {
+        return NativeScalarSaturation.run(input, rules, context, budget);
+    }
+
     /** Exact extraction for additive, non-negative per-node costs. */
     public Result saturate(EGraph graph, EClassId root, ToIntFunction<ENode> costOfNode) {
         Objects.requireNonNull(graph, "graph");

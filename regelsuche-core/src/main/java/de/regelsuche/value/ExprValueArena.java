@@ -39,7 +39,7 @@ public final class ExprValueArena implements AutoCloseable {
         }
     }
 
-    private enum Kind { VARIABLE, SCOPED, NUMBER, FUNCTION, ADD, MUL, SUB, DIV, POW }
+    public enum Kind { VARIABLE, SCOPED, NUMBER, FUNCTION, ADD, MUL, SUB, DIV, POW }
 
     // Arrays are privately created and never mutated. A hash match is only a bucket lookup.
     private record Key(Kind kind, Object atom, int[] edges) {
@@ -264,6 +264,25 @@ public final class ExprValueArena implements AutoCloseable {
     }
 
     public synchronized int digestComputations() { requireOpen(); return digests.size(); }
+
+    public record Operand(ValueId value, int multiplicity) { }
+    public record NodeView(Kind kind, String atom, List<Operand> operands) {
+        public NodeView { operands = List.copyOf(operands); }
+    }
+
+    /** Owner-local semantic children, retaining multiplicities without expanding or hashing a value. */
+    public synchronized NodeView describe(ValueId id) {
+        requireOpen();
+        if (Objects.requireNonNull(id).owner != owner) throw new IllegalArgumentException("foreign value ID");
+        Key node = entries.get(id.index);
+        var children = new ArrayList<Operand>();
+        int stride = node.unordered() ? 2 : 1;
+        for (int i = 0; i < node.edges().length; i += stride) {
+            ValueId child = index.get(entries.get(node.edges()[i]));
+            children.add(new Operand(child, node.unordered() ? node.edges()[i + 1] : 1));
+        }
+        return new NodeView(node.kind(), atomText(node), children);
+    }
 
     /** Canonical reachable DAG with allocation-independent local numbering. */
     public synchronized ExprValueSnapshot.Snapshot snapshot(ValueId root) {

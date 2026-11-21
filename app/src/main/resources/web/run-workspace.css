@@ -43,3 +43,20 @@ body.retained-run #demoHero, body.retained-run .tab-panel:not(#tab-runs):not(#ta
     #tab-runs #nativeReplaySelection th, #tab-runs #nativeReplaySelection td { display: block; width: auto; }
     #tab-runs #nativeReplaySelection tr { margin-top: .5rem; }
 }
+
+body.retained-run .tabs [disabled] { display: none; }
+#nativeSearchForm .field, #nativeSearchHistory, #nativeSearchHistory select { min-width: 0; max-width: 100%; }
+#nativeSearchForm input[type=checkbox] { width: auto; }
+#nativeSearchStatus, #nativeSearchProgress, #nativeSearchMinima, #candidateOccurrenceReview { overflow-wrap: anywhere; }
+#candidateOccurrenceReview form { display: grid; gap: .75rem; }
+#candidateOccurrenceReview form label { display: grid; gap: .3rem; }
+#candidateOccurrenceReview input, #candidateOccurrenceReview textarea { min-width: 0; max-width: 100%; }
+
+#workbenchToolGroups { margin: .4rem 0; }
+#workbenchToolGroups select { max-width: 100%; }
+#workbenchToolGroups summary { cursor: pointer; }
+@media (min-width: 900px) {
+    header:has(#workbenchToolGroups) { position: relative; }
+    #workbenchToolGroups { position: absolute; top: .8rem; right: 1.5rem; z-index: 2; }
+    #workbenchToolGroups[open] { max-width: 24rem; padding: .6rem; background: #263445; border: 1px solid #708090; }
+}

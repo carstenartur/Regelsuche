@@ -1,0 +1,2914 @@
+[
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 7.207271883597245,
+            "scoreError" : 1.5868955725419693,
+            "scoreConfidence" : [
+                5.620376311055275,
+                8.794167456139213
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.916776142857143,
+                "50.0" : 6.968977827586207,
+                "90.0" : 9.86651528325359,
+                "95.0" : 10.71310752631579,
+                "99.0" : 10.71310752631579,
+                "99.9" : 10.71310752631579,
+                "99.99" : 10.71310752631579,
+                "99.999" : 10.71310752631579,
+                "99.9999" : 10.71310752631579,
+                "100.0" : 10.71310752631579
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    10.71310752631579,
+                    8.18508576,
+                    7.10968175862069,
+                    6.859023633333333,
+                    6.968977827586207
+                ],
+                [
+                    8.29043196,
+                    7.114491206896552,
+                    6.171432303030303,
+                    5.42563847368421,
+                    4.916776142857143
+                ],
+                [
+                    9.302120454545454,
+                    6.462358,
+                    7.705177038461539,
+                    6.876109933333334,
+                    6.008666235294117
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-content-mixed-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 9.386658362766319,
+            "scoreError" : 2.1450291735720057,
+            "scoreConfidence" : [
+                7.241629189194313,
+                11.531687536338325
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6.37942525,
+                "50.0" : 9.23189990909091,
+                "90.0" : 12.817806956862746,
+                "95.0" : 14.294044333333334,
+                "99.0" : 14.294044333333334,
+                "99.9" : 14.294044333333334,
+                "99.99" : 14.294044333333334,
+                "99.999" : 14.294044333333334,
+                "99.9999" : 14.294044333333334,
+                "100.0" : 14.294044333333334
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    10.567009,
+                    9.311470863636364,
+                    8.485148416666666,
+                    9.23189990909091,
+                    9.373080090909092
+                ],
+                [
+                    11.350365666666667,
+                    9.824008047619047,
+                    8.17168244,
+                    7.355745857142857,
+                    8.1056274
+                ],
+                [
+                    14.294044333333334,
+                    11.833648705882354,
+                    9.025725608695652,
+                    7.490993851851852,
+                    6.37942525
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-large-coefficient-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 9.082577696422268,
+            "scoreError" : 2.023157293680084,
+            "scoreConfidence" : [
+                7.059420402742184,
+                11.105734990102352
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6.946243413793104,
+                "50.0" : 8.94254647826087,
+                "90.0" : 12.091583388235295,
+                "95.0" : 12.12466205882353,
+                "99.0" : 12.12466205882353,
+                "99.9" : 12.12466205882353,
+                "99.99" : 12.12466205882353,
+                "99.999" : 12.12466205882353,
+                "99.9999" : 12.12466205882353,
+                "100.0" : 12.12466205882353
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    10.03205955,
+                    8.98735252173913,
+                    7.600360740740741,
+                    7.057262034482759,
+                    8.94254647826087
+                ],
+                [
+                    11.814253294117647,
+                    10.4128194,
+                    7.546203518518518,
+                    7.113179034482759,
+                    7.026594172413793
+                ],
+                [
+                    12.06953094117647,
+                    12.12466205882353,
+                    9.725988809523809,
+                    8.83960947826087,
+                    6.946243413793104
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-eisenstein-irreducible-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 5.184340558255226,
+            "scoreError" : 1.8313803032671072,
+            "scoreConfidence" : [
+                3.3529602549881186,
+                7.0157208615223325
+            ],
+            "scorePercentiles" : {
+                "0.0" : 3.2569494677419355,
+                "50.0" : 4.858517333333333,
+                "90.0" : 8.520604145454545,
+                "95.0" : 9.122460363636364,
+                "99.0" : 9.122460363636364,
+                "99.9" : 9.122460363636364,
+                "99.99" : 9.122460363636364,
+                "99.999" : 9.122460363636364,
+                "99.9999" : 9.122460363636364,
+                "100.0" : 9.122460363636364
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    9.122460363636364,
+                    5.428894108108108,
+                    4.858517333333333,
+                    4.102856428571428,
+                    3.736922814814815
+                ],
+                [
+                    7.228433214285714,
+                    5.2868283157894735,
+                    4.799940595238096,
+                    4.977687634146341,
+                    4.345758106382979
+                ],
+                [
+                    8.119366666666666,
+                    5.158479102564103,
+                    3.947231705882353,
+                    3.3947825166666665,
+                    3.2569494677419355
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-repeated-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 8.807931970350236,
+            "scoreError" : 1.6374849578626176,
+            "scoreConfidence" : [
+                7.170447012487618,
+                10.445416928212854
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.931949823529412,
+                "50.0" : 8.654442041666666,
+                "90.0" : 11.207985602339182,
+                "95.0" : 11.46373461111111,
+                "99.0" : 11.46373461111111,
+                "99.9" : 11.46373461111111,
+                "99.99" : 11.46373461111111,
+                "99.999" : 11.46373461111111,
+                "99.9999" : 11.46373461111111,
+                "100.0" : 11.46373461111111
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    11.46373461111111,
+                    9.307964818181818,
+                    8.066025,
+                    9.951652047619048,
+                    10.0575262
+                ],
+                [
+                    10.08760305,
+                    8.654442041666666,
+                    7.769080269230769,
+                    7.301604178571429,
+                    8.998803782608695
+                ],
+                [
+                    11.037486263157895,
+                    8.631850666666667,
+                    7.385390321428571,
+                    7.4738664814814815,
+                    5.931949823529412
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-sparse-cyclotomic-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 5.818463658306911,
+            "scoreError" : 1.130850383803243,
+            "scoreConfidence" : [
+                4.687613274503668,
+                6.949314042110154
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.456199044444444,
+                "50.0" : 5.476742236842106,
+                "90.0" : 7.578921629059829,
+                "95.0" : 7.798655961538461,
+                "99.0" : 7.798655961538461,
+                "99.9" : 7.798655961538461,
+                "99.99" : 7.798655961538461,
+                "99.999" : 7.798655961538461,
+                "99.9999" : 7.798655961538461,
+                "100.0" : 7.798655961538461
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    7.432432074074074,
+                    6.548933032258065,
+                    5.476742236842106,
+                    5.183760153846154,
+                    4.5200539555555554
+                ],
+                [
+                    6.237571606060606,
+                    5.2130760512820515,
+                    4.499330266666667,
+                    5.2985995263157895,
+                    6.256596696969697
+                ],
+                [
+                    7.798655961538461,
+                    6.8258602,
+                    6.38870621875,
+                    5.14043785,
+                    4.456199044444444
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 7.356275780225213,
+            "scoreError" : 1.497036041826033,
+            "scoreConfidence" : [
+                5.85923973839918,
+                8.853311822051246
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.321923447368421,
+                "50.0" : 7.127668965517241,
+                "90.0" : 9.47573570995671,
+                "95.0" : 10.020144047619048,
+                "99.0" : 10.020144047619048,
+                "99.9" : 10.020144047619048,
+                "99.99" : 10.020144047619048,
+                "99.999" : 10.020144047619048,
+                "99.9999" : 10.020144047619048,
+                "100.0" : 10.020144047619048
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    10.020144047619048,
+                    7.785694769230769,
+                    8.31290592,
+                    7.127668965517241,
+                    5.321923447368421
+                ],
+                [
+                    9.112796818181819,
+                    8.409736666666667,
+                    6.9321787666666665,
+                    8.005063961538461,
+                    5.726391514285714
+                ],
+                [
+                    8.618153791666666,
+                    7.061482655172414,
+                    6.30516309375,
+                    5.782412371428571,
+                    5.822419914285715
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-eisenstein-irreducible-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 6.219320580382107,
+            "scoreError" : 2.1718615093721114,
+            "scoreConfidence" : [
+                4.047459071009996,
+                8.391182089754219
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.03976094,
+                "50.0" : 5.5824595,
+                "90.0" : 9.940482739705883,
+                "95.0" : 11.998781411764705,
+                "99.0" : 11.998781411764705,
+                "99.9" : 11.998781411764705,
+                "99.99" : 11.998781411764705,
+                "99.999" : 11.998781411764705,
+                "99.9999" : 11.998781411764705,
+                "100.0" : 11.998781411764705
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    6.532986741935484,
+                    7.254517035714286,
+                    5.118406625,
+                    5.003486475,
+                    5.4921466486486485
+                ],
+                [
+                    11.998781411764705,
+                    8.568283625,
+                    7.774019481481481,
+                    5.5824595,
+                    5.168427
+                ],
+                [
+                    5.663758055555555,
+                    5.9062035,
+                    4.817195904761904,
+                    4.369375760869565,
+                    4.03976094
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-repeated-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 9.703070899160204,
+            "scoreError" : 2.3838171851955283,
+            "scoreConfidence" : [
+                7.319253713964676,
+                12.086888084355733
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6.678029766666667,
+                "50.0" : 9.54536219047619,
+                "90.0" : 13.223879007058825,
+                "95.0" : 14.2498514,
+                "99.0" : 14.2498514,
+                "99.9" : 14.2498514,
+                "99.99" : 14.2498514,
+                "99.999" : 14.2498514,
+                "99.9999" : 14.2498514,
+                "100.0" : 14.2498514
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    14.2498514,
+                    12.248169470588236,
+                    10.44303355,
+                    10.30849195,
+                    9.266778782608696
+                ],
+                [
+                    12.539897411764706,
+                    11.206411555555556,
+                    10.2811939,
+                    7.497755,
+                    6.678029766666667
+                ],
+                [
+                    9.54536219047619,
+                    8.19594896,
+                    7.227004464285714,
+                    6.934849172413793,
+                    8.923285913043479
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 6.386156136994294,
+            "scoreError" : 1.7935765119319518,
+            "scoreConfidence" : [
+                4.592579625062342,
+                8.179732648926246
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.515122022222222,
+                "50.0" : 6.2006967575757574,
+                "90.0" : 9.126124511111112,
+                "95.0" : 11.166000166666667,
+                "99.0" : 11.166000166666667,
+                "99.9" : 11.166000166666667,
+                "99.99" : 11.166000166666667,
+                "99.999" : 11.166000166666667,
+                "99.9999" : 11.166000166666667,
+                "100.0" : 11.166000166666667
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    7.4958511851851855,
+                    6.248853212121212,
+                    5.731420285714286,
+                    5.0761286,
+                    4.515122022222222
+                ],
+                [
+                    7.2069963928571426,
+                    6.8514451,
+                    5.00859695,
+                    5.000017390243903,
+                    4.84058869047619
+                ],
+                [
+                    11.166000166666667,
+                    7.766207407407407,
+                    6.900047866666666,
+                    6.2006967575757574,
+                    5.784370027777777
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-content-mixed-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 8.423630002741403,
+            "scoreError" : 2.0495176341806904,
+            "scoreConfidence" : [
+                6.374112368560713,
+                10.473147636922093
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.387603236842105,
+                "50.0" : 7.667473172413793,
+                "90.0" : 11.7303591627451,
+                "95.0" : 12.181856823529412,
+                "99.0" : 12.181856823529412,
+                "99.9" : 12.181856823529412,
+                "99.99" : 12.181856823529412,
+                "99.999" : 12.181856823529412,
+                "99.9999" : 12.181856823529412,
+                "100.0" : 12.181856823529412
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    9.3918215,
+                    7.234346321428571,
+                    6.622902419354839,
+                    6.8200289666666665,
+                    5.387603236842105
+                ],
+                [
+                    10.15426245,
+                    8.416143333333334,
+                    7.577000518518519,
+                    7.45534,
+                    6.887746533333333
+                ],
+                [
+                    12.181856823529412,
+                    11.429360722222222,
+                    10.168601,
+                    8.959963043478261,
+                    7.667473172413793
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-large-coefficient-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 8.819195173357693,
+            "scoreError" : 1.640790549999078,
+            "scoreConfidence" : [
+                7.178404623358615,
+                10.459985723356771
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6.948814482758621,
+                "50.0" : 8.581339833333333,
+                "90.0" : 11.377687455,
+                "95.0" : 12.5184661875,
+                "99.0" : 12.5184661875,
+                "99.9" : 12.5184661875,
+                "99.99" : 12.5184661875,
+                "99.999" : 12.5184661875,
+                "99.9999" : 12.5184661875,
+                "100.0" : 12.5184661875
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    10.6171683,
+                    9.55695240909091,
+                    7.888727038461538,
+                    6.948814482758621,
+                    7.758103923076923
+                ],
+                [
+                    9.872761523809524,
+                    9.83231442857143,
+                    9.591626142857143,
+                    7.916197538461539,
+                    7.085354517241379
+                ],
+                [
+                    12.5184661875,
+                    7.761250461538461,
+                    9.03898695652174,
+                    8.581339833333333,
+                    7.319863857142857
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-eisenstein-irreducible-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 5.012519054925714,
+            "scoreError" : 1.7033811320894565,
+            "scoreConfidence" : [
+                3.3091379228362574,
+                6.715900187015171
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.70898248,
+                "50.0" : 4.507112488888889,
+                "90.0" : 7.843040024,
+                "95.0" : 8.29868356,
+                "99.0" : 8.29868356,
+                "99.9" : 8.29868356,
+                "99.99" : 8.29868356,
+                "99.999" : 8.29868356,
+                "99.9999" : 8.29868356,
+                "100.0" : 8.29868356
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    8.29868356,
+                    7.505191333333333,
+                    5.100278625,
+                    4.507112488888889,
+                    3.8475173773584905
+                ],
+                [
+                    4.733632395348837,
+                    5.331925605263158,
+                    4.289490382978723,
+                    4.0969934285714285,
+                    3.696578218181818
+                ],
+                [
+                    7.539277666666667,
+                    5.332556078947368,
+                    4.398043673913043,
+                    3.8015225094339624,
+                    2.70898248
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-repeated-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 9.317984559225428,
+            "scoreError" : 2.4266810150917473,
+            "scoreConfidence" : [
+                6.891303544133681,
+                11.744665574317175
+            ],
+            "scorePercentiles" : {
+                "0.0" : 5.783551742857143,
+                "50.0" : 8.879084173913043,
+                "90.0" : 12.935946966666666,
+                "95.0" : 13.372336666666667,
+                "99.0" : 13.372336666666667,
+                "99.9" : 13.372336666666667,
+                "99.99" : 13.372336666666667,
+                "99.999" : 13.372336666666667,
+                "99.9999" : 13.372336666666667,
+                "100.0" : 13.372336666666667
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    12.294749,
+                    11.902604529411764,
+                    9.33292959090909,
+                    7.336499035714286,
+                    8.73547056521739
+                ],
+                [
+                    8.879084173913043,
+                    7.480744555555556,
+                    7.632767703703704,
+                    7.089840931034483,
+                    5.783551742857143
+                ],
+                [
+                    13.372336666666667,
+                    12.6450205,
+                    9.715483238095239,
+                    9.122617363636364,
+                    8.446068791666667
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-sparse-cyclotomic-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 6.011618233964348,
+            "scoreError" : 1.7105815601024783,
+            "scoreConfidence" : [
+                4.301036673861869,
+                7.722199794066826
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.41477602173913,
+                "50.0" : 5.630474583333333,
+                "90.0" : 9.33500852505176,
+                "95.0" : 9.784338095238095,
+                "99.0" : 9.784338095238095,
+                "99.9" : 9.784338095238095,
+                "99.99" : 9.784338095238095,
+                "99.999" : 9.784338095238095,
+                "99.9999" : 9.784338095238095,
+                "100.0" : 9.784338095238095
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    9.03545547826087,
+                    6.974478862068966,
+                    6.7315816,
+                    6.0735245454545455,
+                    5.430898578947368
+                ],
+                [
+                    9.784338095238095,
+                    6.44554503125,
+                    4.929427195121951,
+                    4.721772162790698,
+                    4.41477602173913
+                ],
+                [
+                    5.8015586,
+                    5.630474583333333,
+                    4.692900674418604,
+                    4.669477604651163,
+                    4.8380644761904765
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 8.065535540965566,
+            "scoreError" : 1.7949271592670684,
+            "scoreConfidence" : [
+                6.270608381698498,
+                9.860462700232635
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.926903585365854,
+                "50.0" : 7.989641192307692,
+                "90.0" : 10.913943336842104,
+                "95.0" : 11.013473578947368,
+                "99.0" : 11.013473578947368,
+                "99.9" : 11.013473578947368,
+                "99.99" : 11.013473578947368,
+                "99.999" : 11.013473578947368,
+                "99.9999" : 11.013473578947368,
+                "100.0" : 11.013473578947368
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    9.936556571428572,
+                    8.729041416666666,
+                    7.989641192307692,
+                    6.92434624137931,
+                    6.212237424242424
+                ],
+                [
+                    11.013473578947368,
+                    8.448949166666667,
+                    7.527403666666666,
+                    7.534214962962963,
+                    6.789508966666666
+                ],
+                [
+                    10.847589842105263,
+                    9.092596739130435,
+                    7.990449346153846,
+                    7.020120413793103,
+                    4.926903585365854
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-eisenstein-irreducible-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 5.345240399485121,
+            "scoreError" : 1.1366861902555359,
+            "scoreConfidence" : [
+                4.208554209229585,
+                6.481926589740657
+            ],
+            "scorePercentiles" : {
+                "0.0" : 4.1354997346938775,
+                "50.0" : 5.14544215,
+                "90.0" : 7.358363777718833,
+                "95.0" : 7.938929961538461,
+                "99.0" : 7.938929961538461,
+                "99.9" : 7.938929961538461,
+                "99.99" : 7.938929961538461,
+                "99.999" : 7.938929961538461,
+                "99.9999" : 7.938929961538461,
+                "100.0" : 7.938929961538461
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    7.938929961538461,
+                    5.1873318974358975,
+                    4.510479466666666,
+                    4.900171024390244,
+                    5.139839075
+                ],
+                [
+                    5.5450684594594595,
+                    4.791629047619048,
+                    4.206198770833334,
+                    4.232478479166667,
+                    4.1354997346938775
+                ],
+                [
+                    6.30486275,
+                    6.9713196551724135,
+                    5.775491257142857,
+                    5.14544215,
+                    5.393864263157894
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-repeated-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 8.941875937714961,
+            "scoreError" : 1.7991815135194003,
+            "scoreConfidence" : [
+                7.142694424195561,
+                10.741057451234362
+            ],
+            "scorePercentiles" : {
+                "0.0" : 6.3898669375,
+                "50.0" : 9.019722565217391,
+                "90.0" : 11.730196019607844,
+                "95.0" : 11.968825882352942,
+                "99.0" : 11.968825882352942,
+                "99.9" : 11.968825882352942,
+                "99.99" : 11.968825882352942,
+                "99.999" : 11.968825882352942,
+                "99.9999" : 11.968825882352942,
+                "100.0" : 11.968825882352942
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    11.571109444444444,
+                    10.937672315789474,
+                    9.019722565217391,
+                    8.47021,
+                    6.951596241379311
+                ],
+                [
+                    11.968825882352942,
+                    9.742032,
+                    8.873918173913044,
+                    6.3898669375,
+                    7.07846775862069
+                ],
+                [
+                    9.47440959090909,
+                    7.724795076923077,
+                    7.318815,
+                    9.064528173913043,
+                    9.542169904761904
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 1.2259626053095751,
+            "scoreError" : 0.3530135858579342,
+            "scoreConfidence" : [
+                0.8729490194516409,
+                1.5789761911675093
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.7632277528517111,
+                "50.0" : 1.1450064457142857,
+                "90.0" : 1.730517736612022,
+                "95.0" : 1.8548813333333334,
+                "99.0" : 1.8548813333333334,
+                "99.9" : 1.8548813333333334,
+                "99.99" : 1.8548813333333334,
+                "99.999" : 1.8548813333333334,
+                "99.9999" : 1.8548813333333334,
+                "100.0" : 1.8548813333333334
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.6476086721311476,
+                    1.4791432867647059,
+                    1.1450064457142857,
+                    0.8430638571428571,
+                    0.7632277528517111
+                ],
+                [
+                    1.3639921283783785,
+                    1.130468279329609,
+                    1.066054744680851,
+                    0.848092279661017,
+                    0.9413410985915492
+                ],
+                [
+                    1.6159386904761905,
+                    1.8548813333333334,
+                    1.341200072847682,
+                    1.3666315102040816,
+                    0.9827889275362319
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-content-mixed-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 2.2857177475723227,
+            "scoreError" : 0.6273805032708402,
+            "scoreConfidence" : [
+                1.6583372443014825,
+                2.913098250843163
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.252867043478261,
+                "50.0" : 2.087351948453608,
+                "90.0" : 3.258584622580645,
+                "95.0" : 3.287814677419355,
+                "99.0" : 3.287814677419355,
+                "99.9" : 3.287814677419355,
+                "99.99" : 3.287814677419355,
+                "99.999" : 3.287814677419355,
+                "99.9999" : 3.287814677419355,
+                "100.0" : 3.287814677419355
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.3473811627906978,
+                    2.447868325301205,
+                    2.47668012345679,
+                    1.8668378240740742,
+                    1.6908088655462186
+                ],
+                [
+                    2.8030463333333335,
+                    3.287814677419355,
+                    2.00163600990099,
+                    2.037298595959596,
+                    1.252867043478261
+                ],
+                [
+                    2.950841764705882,
+                    3.2390979193548386,
+                    2.087351948453608,
+                    2.06157193877551,
+                    1.7346636810344827
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-large-coefficient-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 2.4181876818591848,
+            "scoreError" : 0.7323503274437538,
+            "scoreConfidence" : [
+                1.685837354415431,
+                3.1505380093029385
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.5647425390625,
+                "50.0" : 2.1557562127659575,
+                "90.0" : 3.478285756824264,
+                "95.0" : 3.5637193157894735,
+                "99.0" : 3.5637193157894735,
+                "99.9" : 3.5637193157894735,
+                "99.99" : 3.5637193157894735,
+                "99.999" : 3.5637193157894735,
+                "99.9999" : 3.5637193157894735,
+                "100.0" : 3.5637193157894735
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.3139527540983607,
+                    3.4213300508474576,
+                    2.416419638554217,
+                    2.1557562127659575,
+                    1.9462012912621358
+                ],
+                [
+                    3.3932059,
+                    3.5637193157894735,
+                    1.942473048076923,
+                    2.02917359,
+                    2.1881240212765958
+                ],
+                [
+                    2.743258864864865,
+                    1.9807077307692307,
+                    1.766269350877193,
+                    1.8474809196428572,
+                    1.5647425390625
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-eisenstein-irreducible-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 1.3174103187151944,
+            "scoreError" : 0.48878685225485047,
+            "scoreConfidence" : [
+                0.828623466460344,
+                1.8061971709700448
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.783380328125,
+                "50.0" : 1.2294249079754602,
+                "90.0" : 2.01096290394019,
+                "95.0" : 2.054776081632653,
+                "99.0" : 2.054776081632653,
+                "99.9" : 2.054776081632653,
+                "99.99" : 2.054776081632653,
+                "99.999" : 2.054776081632653,
+                "99.9999" : 2.054776081632653,
+                "100.0" : 2.054776081632653
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.848220190909091,
+                    1.9817541188118812,
+                    1.0337196855670103,
+                    0.8624877939914163,
+                    0.783380328125
+                ],
+                [
+                    1.7475929826086956,
+                    1.25532390625,
+                    0.9563428066037736,
+                    0.8992535848214286,
+                    0.9262425576036867
+                ],
+                [
+                    1.8881316320754717,
+                    2.054776081632653,
+                    1.303184076923077,
+                    1.2294249079754602,
+                    0.9913201268292683
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-repeated-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 2.2399636272001495,
+            "scoreError" : 0.6124349670801352,
+            "scoreConfidence" : [
+                1.6275286601200143,
+                2.8523985942802845
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.5167483106060606,
+                "50.0" : 2.120575084210526,
+                "90.0" : 3.139876785043988,
+                "95.0" : 3.251242758064516,
+                "99.0" : 3.251242758064516,
+                "99.9" : 3.251242758064516,
+                "99.99" : 3.251242758064516,
+                "99.999" : 3.251242758064516,
+                "99.9999" : 3.251242758064516,
+                "100.0" : 3.251242758064516
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.9208788550724636,
+                    2.2577680549450547,
+                    2.00509034,
+                    1.6654304958677686,
+                    1.5167483106060606
+                ],
+                [
+                    3.065632803030303,
+                    3.251242758064516,
+                    2.625613831168831,
+                    2.2895120454545457,
+                    1.8397702201834862
+                ],
+                [
+                    2.8275366388888887,
+                    2.120575084210526,
+                    1.983828274509804,
+                    1.609039488,
+                    1.620787208
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-sparse-cyclotomic-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 2.8681907126872104,
+            "scoreError" : 0.9927350886615951,
+            "scoreConfidence" : [
+                1.8754556240256153,
+                3.8609258013488055
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.532292251908397,
+                "50.0" : 2.6615236842105263,
+                "90.0" : 4.298044192120075,
+                "95.0" : 4.918280634146342,
+                "99.0" : 4.918280634146342,
+                "99.9" : 4.918280634146342,
+                "99.99" : 4.918280634146342,
+                "99.999" : 4.918280634146342,
+                "99.9999" : 4.918280634146342,
+                "100.0" : 4.918280634146342
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.7371489074074073,
+                    3.8845532307692308,
+                    2.5354408860759494,
+                    2.388371380952381,
+                    1.9807530196078431
+                ],
+                [
+                    4.918280634146342,
+                    3.665905290909091,
+                    2.798106375,
+                    2.6615236842105263,
+                    1.9657540196078431
+                ],
+                [
+                    2.9519303970588235,
+                    3.610350625,
+                    2.5194738024691357,
+                    1.8729761851851852,
+                    1.532292251908397
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 1.3801803171955562,
+            "scoreError" : 0.43762599340489905,
+            "scoreConfidence" : [
+                0.9425543237906572,
+                1.8178063106004552
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.807325068,
+                "50.0" : 1.383470751724138,
+                "90.0" : 2.0130797871092954,
+                "95.0" : 2.2810752359550563,
+                "99.0" : 2.2810752359550563,
+                "99.9" : 2.2810752359550563,
+                "99.99" : 2.2810752359550563,
+                "99.999" : 2.2810752359550563,
+                "99.9999" : 2.2810752359550563,
+                "100.0" : 2.2810752359550563
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.5835255625,
+                    1.6209387903225807,
+                    1.383470751724138,
+                    1.0186065329949239,
+                    0.8213508770491803
+                ],
+                [
+                    1.6839672916666666,
+                    1.33042775,
+                    1.1863569176470588,
+                    0.9145231278538812,
+                    0.807325068
+                ],
+                [
+                    1.8344161545454545,
+                    2.2810752359550563,
+                    1.5851905196850393,
+                    1.4995976492537313,
+                    1.1519325287356321
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-eisenstein-irreducible-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 1.4995372342105289,
+            "scoreError" : 0.46446202786225893,
+            "scoreConfidence" : [
+                1.03507520634827,
+                1.9639992620727877
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.8859212433628318,
+                "50.0" : 1.3390458333333333,
+                "90.0" : 2.1044038674648045,
+                "95.0" : 2.1560352150537634,
+                "99.0" : 2.1560352150537634,
+                "99.9" : 2.1560352150537634,
+                "99.99" : 2.1560352150537634,
+                "99.999" : 2.1560352150537634,
+                "99.9999" : 2.1560352150537634,
+                "100.0" : 2.1560352150537634
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.8288239363636363,
+                    2.069982969072165,
+                    1.2966762838709678,
+                    1.3097906387096774,
+                    0.9601160382775119
+                ],
+                [
+                    1.9825313823529411,
+                    2.03790314,
+                    1.3390458333333333,
+                    1.3713455616438357,
+                    0.8859212433628318
+                ],
+                [
+                    1.7828548684210526,
+                    2.1560352150537634,
+                    1.2139608727272728,
+                    1.254318204968944,
+                    1.003752325
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-repeated-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 0.2625271488926634,
+            "scoreError" : 0.10906781925680721,
+            "scoreConfidence" : [
+                0.15345932963585618,
+                0.3715949681494706
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.13728329698216735,
+                "50.0" : 0.23335405594405595,
+                "90.0" : 0.44611540689408186,
+                "95.0" : 0.4573170433789954,
+                "99.0" : 0.4573170433789954,
+                "99.9" : 0.4573170433789954,
+                "99.99" : 0.4573170433789954,
+                "99.999" : 0.4573170433789954,
+                "99.9999" : 0.4573170433789954,
+                "100.0" : 0.4573170433789954
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.4573170433789954,
+                    0.30548036953242835,
+                    0.23335405594405595,
+                    0.14125806039325842,
+                    0.13728329698216735
+                ],
+                [
+                    0.4386476492374728,
+                    0.18661398695246972,
+                    0.23973722634730538,
+                    0.226043960496614,
+                    0.2047442525562372
+                ],
+                [
+                    0.4250860127388535,
+                    0.2795430055865922,
+                    0.23572555123674913,
+                    0.22908999543899658,
+                    0.1979827665677547
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 1.5484558043976464,
+            "scoreError" : 0.4689253559352742,
+            "scoreConfidence" : [
+                1.0795304484623722,
+                2.0173811603329206
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.9521069241706162,
+                "50.0" : 1.5658302890625,
+                "90.0" : 2.236286199218559,
+                "95.0" : 2.2391673222222224,
+                "99.0" : 2.2391673222222224,
+                "99.9" : 2.2391673222222224,
+                "99.99" : 2.2391673222222224,
+                "99.999" : 2.2391673222222224,
+                "99.9999" : 2.2391673222222224,
+                "100.0" : 2.2391673222222224
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.026189575757576,
+                    2.2391673222222224,
+                    1.7134093247863247,
+                    1.280924923566879,
+                    1.0016257178217822
+                ],
+                [
+                    1.750353095652174,
+                    1.279604433121019,
+                    1.1782720350877194,
+                    1.024906918367347,
+                    0.9521069241706162
+                ],
+                [
+                    2.00533188,
+                    2.2343654505494506,
+                    1.5658302890625,
+                    1.5961898333333333,
+                    1.3785593424657534
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-content-mixed-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 2.632419545655319,
+            "scoreError" : 0.7951700677633214,
+            "scoreConfidence" : [
+                1.8372494778919979,
+                3.4275896134186405
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.5229797045454545,
+                "50.0" : 2.390960130952381,
+                "90.0" : 3.870643389542484,
+                "95.0" : 3.9708695294117646,
+                "99.0" : 3.9708695294117646,
+                "99.9" : 3.9708695294117646,
+                "99.99" : 3.9708695294117646,
+                "99.999" : 3.9708695294117646,
+                "99.9999" : 3.9708695294117646,
+                "100.0" : 3.9708695294117646
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.2867772258064516,
+                    3.9708695294117646,
+                    2.350029046511628,
+                    2.390960130952381,
+                    2.04484957
+                ],
+                [
+                    2.7991999444444446,
+                    2.3051765057471263,
+                    2.2770492045454547,
+                    1.7232512222222223,
+                    1.5229797045454545
+                ],
+                [
+                    3.6329654642857143,
+                    3.803825962962963,
+                    2.712319283783784,
+                    2.620151961038961,
+                    2.0458884285714287
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-large-coefficient-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 3.07142153622014,
+            "scoreError" : 0.6599083360370414,
+            "scoreConfidence" : [
+                2.4115132001830983,
+                3.7313298722571813
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.182245956521739,
+                "50.0" : 3.035438895522388,
+                "90.0" : 3.9927693133437994,
+                "95.0" : 4.137643244897959,
+                "99.0" : 4.137643244897959,
+                "99.9" : 4.137643244897959,
+                "99.99" : 4.137643244897959,
+                "99.999" : 4.137643244897959,
+                "99.9999" : 4.137643244897959,
+                "100.0" : 4.137643244897959
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.836693283018868,
+                    3.896186692307692,
+                    3.2674367258064514,
+                    2.5458666708860758,
+                    2.3329162325581394
+                ],
+                [
+                    3.035438895522388,
+                    3.547780448275862,
+                    3.132800609375,
+                    2.182245956521739,
+                    2.459872207317073
+                ],
+                [
+                    3.5285013559322036,
+                    4.137643244897959,
+                    2.9453153970588235,
+                    2.727294175675676,
+                    2.495331148148148
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-eisenstein-irreducible-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 1.4809211543763503,
+            "scoreError" : 0.4517321838813202,
+            "scoreConfidence" : [
+                1.02918897049503,
+                1.9326533382576705
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.8693708008658009,
+                "50.0" : 1.4008701875,
+                "90.0" : 2.0143442208526974,
+                "95.0" : 2.0602307551020407,
+                "99.0" : 2.0602307551020407,
+                "99.9" : 2.0602307551020407,
+                "99.99" : 2.0602307551020407,
+                "99.999" : 2.0602307551020407,
+                "99.9999" : 2.0602307551020407,
+                "100.0" : 2.0602307551020407
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.8779193981481481,
+                    1.9634746666666667,
+                    1.4008701875,
+                    1.2318300552147239,
+                    1.0365117164948454
+                ],
+                [
+                    1.8762289813084112,
+                    1.983753198019802,
+                    1.4044037902097901,
+                    1.237730648148148,
+                    0.8850650704845815
+                ],
+                [
+                    1.909967141509434,
+                    2.0602307551020407,
+                    1.2745975886075949,
+                    1.2018633173652695,
+                    0.8693708008658009
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-repeated-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 2.749174953136539,
+            "scoreError" : 0.6264259299684584,
+            "scoreConfidence" : [
+                2.1227490231680806,
+                3.3756008831049975
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.8372860733944953,
+                "50.0" : 2.7209580405405407,
+                "90.0" : 3.7766181152661065,
+                "95.0" : 3.9861216274509803,
+                "99.0" : 3.9861216274509803,
+                "99.9" : 3.9861216274509803,
+                "99.99" : 3.9861216274509803,
+                "99.999" : 3.9861216274509803,
+                "99.9999" : 3.9861216274509803,
+                "100.0" : 3.9861216274509803
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.0571158333333335,
+                    2.446028768292683,
+                    2.950642115942029,
+                    2.7209580405405407,
+                    2.5016354
+                ],
+                [
+                    3.6369491071428572,
+                    3.9861216274509803,
+                    3.0500788059701494,
+                    2.7299972533333334,
+                    2.2305402777777776
+                ],
+                [
+                    3.2152603968253968,
+                    2.5484019620253164,
+                    2.341965965116279,
+                    1.9846426699029127,
+                    1.8372860733944953
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "z-sparse-cyclotomic-degree6"
+        },
+        "primaryMetric" : {
+            "score" : 3.2315214484234986,
+            "scoreError" : 0.8418954168041867,
+            "scoreConfidence" : [
+                2.389626031619312,
+                4.073416865227685
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2.2739667191011237,
+                "50.0" : 2.8321816944444445,
+                "90.0" : 4.462917250048309,
+                "95.0" : 4.489581755555555,
+                "99.0" : 4.489581755555555,
+                "99.9" : 4.489581755555555,
+                "99.99" : 4.489581755555555,
+                "99.999" : 4.489581755555555,
+                "99.9999" : 4.489581755555555,
+                "100.0" : 4.489581755555555
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3.8097006226415093,
+                    4.4451409130434785,
+                    2.8658556285714285,
+                    2.7869038055555557,
+                    2.43442021686747
+                ],
+                [
+                    3.7484282407407408,
+                    4.2636232765957445,
+                    2.8321816944444445,
+                    2.618619961038961,
+                    2.2739667191011237
+                ],
+                [
+                    3.9117078461538464,
+                    4.489581755555555,
+                    2.8111956849315067,
+                    2.791724527777778,
+                    2.3897708333333334
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-linear-pair-degree2"
+        },
+        "primaryMetric" : {
+            "score" : 1.9500632446138155,
+            "scoreError" : 0.4450313564429903,
+            "scoreConfidence" : [
+                1.5050318881708251,
+                2.395094601056806
+            ],
+            "scorePercentiles" : {
+                "0.0" : 1.454489768115942,
+                "50.0" : 1.7799710265486726,
+                "90.0" : 2.71182459769863,
+                "95.0" : 2.756654534246575,
+                "99.0" : 2.756654534246575,
+                "99.9" : 2.756654534246575,
+                "99.99" : 2.756654534246575,
+                "99.999" : 2.756654534246575,
+                "99.9999" : 2.756654534246575,
+                "100.0" : 2.756654534246575
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    2.1167423684210527,
+                    2.6819379733333335,
+                    1.750944243478261,
+                    1.7799710265486726,
+                    1.454489768115942
+                ],
+                [
+                    2.215179120879121,
+                    2.392005119047619,
+                    1.7182749059829059,
+                    1.7372733879310345,
+                    1.488778288888889
+                ],
+                [
+                    2.1444548617021275,
+                    2.756654534246575,
+                    1.7950986071428572,
+                    1.7254028017241378,
+                    1.493741661764706
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-eisenstein-irreducible-degree4"
+        },
+        "primaryMetric" : {
+            "score" : 1.2892019585623393,
+            "scoreError" : 0.41036171525427206,
+            "scoreConfidence" : [
+                0.8788402433080673,
+                1.6995636738166113
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.8341565933609959,
+                "50.0" : 1.2040673413173653,
+                "90.0" : 1.9044221862745099,
+                "95.0" : 1.969714049019608,
+                "99.0" : 1.969714049019608,
+                "99.9" : 1.969714049019608,
+                "99.99" : 1.969714049019608,
+                "99.999" : 1.969714049019608,
+                "99.9999" : 1.969714049019608,
+                "100.0" : 1.969714049019608
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1.7148010512820513,
+                    1.5231305454545454,
+                    0.9577745837320574,
+                    0.8582952051282051,
+                    0.8341565933609959
+                ],
+                [
+                    1.7013705847457627,
+                    1.0762098835978835,
+                    1.0799627724867724,
+                    1.2040673413173653,
+                    0.9754397427184466
+                ],
+                [
+                    1.8608942777777777,
+                    1.969714049019608,
+                    1.396627,
+                    1.2940452322580644,
+                    0.8915405155555556
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 3,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 3,
+        "warmupTime" : "200 ms",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 5,
+        "measurementTime" : "200 ms",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "caseId" : "q-repeated-degree5"
+        },
+        "primaryMetric" : {
+            "score" : 0.46930924741810826,
+            "scoreError" : 0.14434583706536658,
+            "scoreConfidence" : [
+                0.3249634103527417,
+                0.6136550844834748
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.30208405429864255,
+                "50.0" : 0.4324018725701944,
+                "90.0" : 0.6492518845203321,
+                "95.0" : 0.652215667752443,
+                "99.0" : 0.652215667752443,
+                "99.9" : 0.652215667752443,
+                "99.99" : 0.652215667752443,
+                "99.999" : 0.652215667752443,
+                "99.9999" : 0.652215667752443,
+                "100.0" : 0.652215667752443
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.6091732852852852,
+                    0.6472760290322581,
+                    0.42149928721174,
+                    0.3445623752151463,
+                    0.3230778473767886
+                ],
+                [
+                    0.652215667752443,
+                    0.6308038962264151,
+                    0.4524467178329571,
+                    0.35561135283687945,
+                    0.3465817837370242
+                ],
+                [
+                    0.6012283731343283,
+                    0.5829469360465116,
+                    0.4324018725701944,
+                    0.30208405429864255,
+                    0.33772923271500843
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.cpythonOneShotEndToEnd",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 2,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 214.0016438,
+            "scoreError" : 51.94059381572883,
+            "scoreConfidence" : [
+                162.06104998427116,
+                265.94223761572886
+            ],
+            "scorePercentiles" : {
+                "0.0" : 211.0606546,
+                "50.0" : 214.1999084,
+                "90.0" : 216.7443684,
+                "95.0" : 216.7443684,
+                "99.0" : 216.7443684,
+                "99.9" : 216.7443684,
+                "99.99" : 216.7443684,
+                "99.999" : 216.7443684,
+                "99.9999" : 216.7443684,
+                "100.0" : 216.7443684
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    216.7443684,
+                    214.1999084,
+                    211.0606546
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 2,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 10.097900236352194,
+            "scoreError" : 6.455846735586608,
+            "scoreConfidence" : [
+                3.642053500765586,
+                16.5537469719388
+            ],
+            "scorePercentiles" : {
+                "0.0" : 9.733200388349514,
+                "50.0" : 10.120665737373738,
+                "90.0" : 10.439834583333333,
+                "95.0" : 10.439834583333333,
+                "99.0" : 10.439834583333333,
+                "99.9" : 10.439834583333333,
+                "99.99" : 10.439834583333333,
+                "99.999" : 10.439834583333333,
+                "99.9999" : 10.439834583333333,
+                "100.0" : 10.439834583333333
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    10.439834583333333,
+                    9.733200388349514,
+                    10.120665737373738
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyEndToEndCold",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 2,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 3220.9622830000003,
+            "scoreError" : 7524.341272032795,
+            "scoreConfidence" : [
+                -4303.378989032795,
+                10745.303555032795
+            ],
+            "scorePercentiles" : {
+                "0.0" : 2781.009312,
+                "50.0" : 3283.036004,
+                "90.0" : 3598.841533,
+                "95.0" : 3598.841533,
+                "99.0" : 3598.841533,
+                "99.9" : 3598.841533,
+                "99.99" : 3598.841533,
+                "99.999" : 3598.841533,
+                "99.9999" : 3598.841533,
+                "100.0" : 3598.841533
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    3598.841533,
+                    3283.036004,
+                    2781.009312
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 2,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 11.022494721637043,
+            "scoreError" : 15.968785784605753,
+            "scoreConfidence" : [
+                -4.94629106296871,
+                26.991280506242795
+            ],
+            "scorePercentiles" : {
+                "0.0" : 10.25676206122449,
+                "50.0" : 10.834050698924731,
+                "90.0" : 11.976671404761905,
+                "95.0" : 11.976671404761905,
+                "99.0" : 11.976671404761905,
+                "99.9" : 11.976671404761905,
+                "99.99" : 11.976671404761905,
+                "99.999" : 11.976671404761905,
+                "99.9999" : 11.976671404761905,
+                "100.0" : 11.976671404761905
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    11.976671404761905,
+                    10.834050698924731,
+                    10.25676206122449
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.nativeBackendWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 2,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.08334665456018159,
+            "scoreError" : 0.0053431923581384955,
+            "scoreConfidence" : [
+                0.07800346220204309,
+                0.08868984691832009
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.08301031313801975,
+                "50.0" : 0.08348427048906694,
+                "90.0" : 0.08354538005345807,
+                "95.0" : 0.08354538005345807,
+                "99.0" : 0.08354538005345807,
+                "99.9" : 0.08354538005345807,
+                "99.99" : 0.08354538005345807,
+                "99.999" : 0.08354538005345807,
+                "99.9999" : 0.08354538005345807,
+                "100.0" : 0.08354538005345807
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.08301031313801975,
+                    0.08354538005345807,
+                    0.08348427048906694
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.36",
+        "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.nativeEndToEndWarm",
+        "mode" : "avgt",
+        "threads" : 1,
+        "forks" : 1,
+        "jvm" : "/usr/lib/jvm/temurin-25-jdk-amd64/bin/java",
+        "jvmArgs" : [
+            "--enable-native-access=ALL-UNNAMED",
+            "-Xms512m",
+            "-Xmx2g",
+            "-Dregelsuche.sympy.python=/home/runner/work/Regelsuche/Regelsuche/build/verification-venv/bin/python"
+        ],
+        "jdkVersion" : "25.0.5",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "25.0.5+8-LTS",
+        "warmupIterations" : 2,
+        "warmupTime" : "1 s",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 3,
+        "measurementTime" : "1 s",
+        "measurementBatchSize" : 1,
+        "primaryMetric" : {
+            "score" : 0.10765849112606851,
+            "scoreError" : 0.29043573523827126,
+            "scoreConfidence" : [
+                -0.18277724411220275,
+                0.3980942263643398
+            ],
+            "scorePercentiles" : {
+                "0.0" : 0.09774618694420013,
+                "50.0" : 0.09920761098988296,
+                "90.0" : 0.12602167544412246,
+                "95.0" : 0.12602167544412246,
+                "99.0" : 0.12602167544412246,
+                "99.9" : 0.12602167544412246,
+                "99.99" : 0.12602167544412246,
+                "99.999" : 0.12602167544412246,
+                "99.9999" : 0.12602167544412246,
+                "100.0" : 0.12602167544412246
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    0.12602167544412246,
+                    0.09774618694420013,
+                    0.09920761098988296
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    }
+]
+
+

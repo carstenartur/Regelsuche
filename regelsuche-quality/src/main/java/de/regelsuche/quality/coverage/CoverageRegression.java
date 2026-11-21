@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.xml.XMLConstants;
 import javax.xml.stream.XMLInputFactory;
@@ -24,6 +25,13 @@ import javax.xml.stream.XMLStreamReader;
 /** Evaluates the checkout policy against canonical JaCoCo XML measurements. */
 final class CoverageRegression {
     private static final Path REPORT = Path.of("build/reports/jacoco/test/jacocoTestReport.xml");
+    private static final Path MAVEN_REPORT = Path.of("target/site/jacoco/jacoco.xml");
+    // These modules are outside the versioned product-coverage scope. Any other
+    // discovered report must be declared in the policy, including future modules.
+    private static final Set<String> MAVEN_SUPPORT_MODULES = Set.of(
+        "maven-build-contract", "playwright-bootstrap", "regelsuche-bom", "regelsuche-browser-tests",
+        "regelsuche-integration-tests", "regelsuche-proof-tests", "regelsuche-jmh", "regelsuche-sympy-jmh",
+        "regelsuche-math-jas", "regelsuche-quality", "regelsuche-quality-aggregate");
     static final String POLICY_SCHEMA = "regelsuche.quality.coverage-policy/v1";
     static final String REPORT_SCHEMA = "regelsuche.quality.coverage-report/v1";
     static final JsonMapper COVERAGE_JSON = JsonMapper.builder()
@@ -106,12 +114,18 @@ final class CoverageRegression {
     }
 
     static List<Path> reportPaths(Path repository) throws IOException {
+        return reportPaths(repository, false);
+    }
+
+    static List<Path> reportPaths(Path repository, boolean maven) throws IOException {
+        Path reportFile = maven ? MAVEN_REPORT : REPORT;
         List<Path> reports;
         try (var paths = Files.list(repository)) {
-            reports = new ArrayList<>(paths.sorted().map(path -> path.resolve(REPORT))
-                .filter(Files::exists).toList());
+            reports = new ArrayList<>(paths.sorted()
+                .filter(path -> !maven || !MAVEN_SUPPORT_MODULES.contains(path.getFileName().toString()))
+                .map(path -> path.resolve(reportFile)).filter(Files::exists).toList());
         }
-        Path rootReport = repository.resolve(REPORT);
+        Path rootReport = repository.resolve(reportFile);
         if (Files.exists(rootReport)) {
             reports.add(rootReport);
         }
