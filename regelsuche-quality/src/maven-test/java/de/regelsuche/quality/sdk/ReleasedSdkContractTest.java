@@ -2,8 +2,14 @@ package de.regelsuche.quality.sdk;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -39,10 +45,11 @@ class ReleasedSdkContractTest {
     @Test void completeInternalChecksumInventoryBindsEveryExtractedFile() throws Exception {
         Path source = Files.writeString(tmp.resolve("source"), "released");
         String digest = ReleasedSdkArchive.digest(source);
+        byte[] manifest = (digest + "  file.jar\r\n").getBytes(StandardCharsets.UTF_8);
         Path archive = tmp.resolve("sdk.zip");
         try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
             zip.putNextEntry(new ZipEntry("sdk/SHA256SUMS.txt"));
-            zip.write((digest + "  file.jar\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.write(manifest);
             zip.putNextEntry(new ZipEntry("sdk/file.jar"));
             zip.write(Files.readAllBytes(source));
         }
@@ -51,9 +58,41 @@ class ReleasedSdkContractTest {
         assertFalse(Files.exists(tmp.resolve("wrong-count")));
         ReleasedSdkArchive.extract(archive, tmp.resolve("valid"), outer, 1, "sdk");
         assertEquals(-1L, Files.mismatch(source, tmp.resolve("valid/sdk/file.jar")));
+        assertArrayEquals(manifest, Files.readAllBytes(tmp.resolve("valid/sdk/SHA256SUMS.txt")));
         Path symlink = tmp.resolve("link");
         Files.createSymbolicLink(symlink, archive.getFileName());
         assertThrows(Exception.class, () -> ReleasedSdkArchive.extract(symlink, tmp.resolve("linked"), outer, 1, "sdk"));
+    }
+
+    @Test void rejectsAnOversizeUnterminatedManifestWithoutReadingPastTheFirstExcessByte() {
+        class UnterminatedManifest extends InputStream {
+            private int delivered;
+
+            @Override public int read(byte[] bytes, int offset, int length) {
+                if (length == 0) return 0;
+                int count = Math.min(length, (4 << 20) + 1 - delivered);
+                if (count == 0) fail("read past the first byte beyond the 4 MiB manifest limit");
+                Arrays.fill(bytes, offset, offset + count, (byte) 'x');
+                delivered += count;
+                return count;
+            }
+
+            @Override public int read() {
+                byte[] bytes = new byte[1];
+                read(bytes, 0, 1);
+                return bytes[0];
+            }
+        }
+        var stream = new UnterminatedManifest();
+        assertThrows(IOException.class, () -> ReleasedSdkArchive.readChecksums(stream));
+        assertEquals((4 << 20) + 1, stream.delivered);
+    }
+
+    @Test void malformedUtf8DoesNotGetReplacedInChecksumPaths() {
+        byte[] bytes = ("a".repeat(64) + "  \u00e9.jar\n").getBytes(StandardCharsets.UTF_8);
+        bytes[67] = 'x';
+        assertThrows(CharacterCodingException.class,
+            () -> ReleasedSdkArchive.readChecksums(new ByteArrayInputStream(bytes)));
     }
 
     @Test void rejectsFileUsedAsDirectoryBeforeWritingValidatedEntries() throws Exception {
