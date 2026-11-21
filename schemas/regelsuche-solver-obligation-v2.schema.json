@@ -18,7 +18,7 @@
         "required": ["name", "sort"],
         "properties": {
           "name": { "$ref": "#/$defs/identifier" },
-          "sort": { "enum": ["REAL", "INTEGER", "BOOLEAN", "NATURAL", "REAL_SET", "REAL_SEQUENCE", "REAL_FUNCTION", "PROPOSITION"] }
+          "sort": { "enum": ["REAL", "INTEGER", "BOOLEAN", "NATURAL", "REAL_SET", "REAL_SEQUENCE", "REAL_FUNCTION", "NAT_PREDICATE", "PROPOSITION"] }
         },
         "additionalProperties": false
       }
@@ -89,7 +89,7 @@
           "properties": {
             "kind": { "const": "BINDER" },
             "binder": { "enum": ["FORALL", "EXISTS", "SET_OF", "SEQUENCE", "FUNCTION"] },
-            "domain": { "enum": ["REAL", "INTEGER", "BOOLEAN", "NATURAL", "REAL_SET", "REAL_SEQUENCE", "REAL_FUNCTION", "PROPOSITION"] },
+            "domain": { "enum": ["REAL", "INTEGER", "BOOLEAN", "NATURAL", "REAL_SET", "REAL_SEQUENCE", "REAL_FUNCTION", "NAT_PREDICATE", "PROPOSITION"] },
             "body": { "$ref": "#/$defs/expression" }
           },
           "additionalProperties": false

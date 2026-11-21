@@ -328,3 +328,22 @@ positive control trains on summability of the sum of two summable sequences
 and targets a doubled sequence with one premise. Removing that premise is the
 negative control. This public transfer control makes no speed or blinded
 generalization claim.
+
+#### Quantified witness and induction plans
+
+`ExistentialIntroduction.Statement.toScopedObligation()` exports an existing
+witness goal, all its outer parameters and its structured premises for a fresh
+formal check. The existing polynomial or assumption leaf remains available for
+independent replay. The scoped export of an alpha-renamed witness is identical.
+
+`NaturalInduction.discover(context)` enumerates at most 128 declared natural
+predicates from the context. For a predicate `P : Nat → Prop` it matches
+two distinct premise leaves, `P 0` and `∀ n, P n → P (n+1)`. The endpoint
+of the context is never read during formation. Each returned plan carries the
+two exact premise IDs and its reconstructed conclusion `∀ n, P n`. The
+renderer chooses the matching plan only for that recipient statement. Lean
+checks the generated application of `Nat.rec` to its explicit motive and the
+two named hypotheses. The independent statement reconstruction and imported
+dependency/axiom audit also run here. This inference covers the primitive
+natural-number rule with supplied base and step. Synthesizing those premises
+or proving arbitrary well-founded recursive calls requires additional rules.

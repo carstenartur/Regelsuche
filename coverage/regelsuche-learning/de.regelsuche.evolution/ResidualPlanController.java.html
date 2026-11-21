@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ResidualPlanController.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ResidualPlanController.java</span></div><h1>ResidualPlanController.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.StructuralConstructionPrograms.Limit;
+import de.regelsuche.evolution.StructuralConstructionPrograms.PreparedResidual;
+import de.regelsuche.evolution.StructuralConstructionPrograms.Work;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.Composition;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.Effect;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.search.program.RewriteProgram;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.function.Consumer;
+
+/** Bounded pair selector. Every admitted pair still goes through the native exact composition checker. */
+public final class ResidualPlanController {
+<span class="fc" id="L26">    public enum Mode { COMPLETE_REFERENCE, DISCOVERY }</span>
+<span class="fc" id="L27">    public record State(String key, String status, boolean done, long work, long remainingWork,</span>
+                        int preparedGrowthCharacters, int unresolvedObligations) { }
+    public record Step(String action, List&lt;String&gt; effects, List&lt;String&gt; proofRoots) {
+<span class="fc" id="L30">        public Step { effects = List.copyOf(effects); proofRoots = List.copyOf(proofRoots); }</span>
+    }
+    public static Session open(String source, Mode mode, int mask, long budget) {
+<span class="fc" id="L33">        return new Session(Objects.requireNonNull(source).strip().replaceAll(&quot;\\s+&quot;, &quot; &quot;), mode, mask, budget);</span>
+    }
+
+    /** A suspended run of this controller, sharing its native checker and selectors. */
+    public static final class Session {
+<span class="fc" id="L38">        private record Issued(List&lt;String&gt; effects, long acquisitionWork, int pairCount) { }</span>
+<span class="fc" id="L39">        private final Map&lt;String,Issued&gt; issued = new TreeMap&lt;&gt;();</span>
+        private final String source;
+        private final String sourceHash;
+        private final int mask;
+        private final long budget;
+        private final Work work;
+        private final ResidualPlanController controller;
+        private ResidualPlanController.PairCursor cursor;
+        private ResidualPlanController.Pair pending;
+<span class="fc" id="L48">        private String status = &quot;ACTIVE&quot;;</span>
+
+<span class="fc" id="L50">        private Session(String source, Mode mode, int mask, long budget) {</span>
+<span class="fc" id="L51">            Objects.requireNonNull(mode);</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">            if (mask &lt; 0 || mask &gt; 7) throw new IllegalArgumentException(&quot;selector mask must be in [0,7]&quot;);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            this.mask = mode == Mode.COMPLETE_REFERENCE ? 0 : mask;</span>
+<span class="fc" id="L54">            this.budget = budget;</span>
+<span class="fc" id="L55">            this.source = source;</span>
+<span class="fc" id="L56">            this.work = new Work(budget);</span>
+<span class="fc" id="L57">            this.controller = new ResidualPlanController(source, work);</span>
+<span class="fc" id="L58">            this.sourceHash = SolverIr.sha256(&quot;residual-search/v1\n&quot; + source);</span>
+            try {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                if (controller.prepare()) cursor = controller.cursor();</span>
+<span class="fc" id="L61">                else status = &quot;UNSUPPORTED&quot;;</span>
+<span class="fc" id="L62">            } catch (Limit exhausted) {</span>
+<span class="fc" id="L63">                status = &quot;BUDGET_EXHAUSTED&quot;;</span>
+<span class="nc" id="L64">            } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L65">                status = &quot;UNSUPPORTED&quot;;</span>
+<span class="fc" id="L66">            }</span>
+<span class="fc" id="L67">        }</span>
+
+        public State state() {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            boolean done = !status.equals(&quot;ACTIVE&quot;);</span>
+<span class="fc" id="L71">            long remaining = budget - work.units();</span>
+            // Cache contents are deterministic from the source, mask and enumeration prefix.
+            // Completed prefixes also determine which proof roots can be compiled and their required work.
+<span class="fc bfc" id="L74" title="All 4 branches covered.">            String continuation = done ? status : cursor.offset() + &quot;|&quot; + (pending == null ? &quot;select&quot; : pending.key());</span>
+<span class="fc" id="L75">            String future = sourceHash + &quot;|&quot; + mask + &quot;|&quot; + remaining + &quot;|&quot; + continuation + &quot;|&quot; + issued;</span>
+<span class="fc" id="L76">            return new State(SolverIr.sha256(future), status, done, work.units(), remaining,</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                controller.preparedGrowth(), pending == null ? 0 : 4);</span>
+        }
+
+        public Step advance() {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (!status.equals(&quot;ACTIVE&quot;)) throw new IllegalStateException(&quot;residual controller is terminal&quot;);</span>
+            try {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                Step step = pending == null ? select() : discharge();</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">                if (pending == null &amp;&amp; !cursor.hasNext()) status = &quot;COMPLETE&quot;;</span>
+<span class="fc" id="L85">                return step;</span>
+<span class="nc" id="L86">            } catch (Limit exhausted) {</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">                var effects = pending == null ? List.&lt;String&gt;of() : effectIds(pending);</span>
+<span class="nc" id="L88">                pending = null;</span>
+<span class="nc" id="L89">                status = &quot;BUDGET_EXHAUSTED&quot;;</span>
+<span class="nc" id="L90">                return new Step(status, effects, List.of());</span>
+            }
+        }
+
+        private Step select() {
+<span class="fc" id="L95">            var pair = cursor.next();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (!controller.admit(pair, mask)) return new Step(&quot;SELECTOR_REJECTED&quot;, effectIds(pair), List.of());</span>
+<span class="fc" id="L97">            pending = pair;</span>
+<span class="fc" id="L98">            return new Step(&quot;OBLIGATIONS_OPEN&quot;, effectIds(pair), List.of());</span>
+        }
+
+        private Step discharge() {
+<span class="fc" id="L102">            var results = controller.check(pending);</span>
+<span class="fc" id="L103">            var ids = effectIds(pending);</span>
+<span class="fc" id="L104">            pending = null;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (var candidate : results) {</span>
+<span class="fc" id="L106">                issued.putIfAbsent(candidate.root(), new Issued(ids, work.units(), cursor.offset()));</span>
+<span class="fc" id="L107">            }</span>
+<span class="fc" id="L108">            var roots = results.stream().map(ResidualPlanController.Candidate::root).toList();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            return new Step(roots.isEmpty() ? &quot;EXACT_REJECTED&quot; : &quot;EXACT_ACCEPTED&quot;, ids, roots);</span>
+        }
+
+        /** The first accepted prefix is charged alongside the independent compile-time proof replay. */
+        public RewriteProgram.BudgetedSource compileAccepted(String proofRoot, long verifierBudget) {
+<span class="fc" id="L114">            var prefix = issued.get(proofRoot);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (prefix == null) throw new IllegalArgumentException(&quot;proof root has not been issued by this search&quot;);</span>
+<span class="fc" id="L116">            String acquisition = SolverIr.sha256(sourceHash + &quot;|&quot; + mask + &quot;|&quot; + prefix.pairCount() + &quot;|&quot; + prefix.acquisitionWork());</span>
+<span class="fc" id="L117">            return ResidualPlanCompiler.compileSearch(source, prefix.effects(), proofRoot, verifierBudget, prefix.acquisitionWork(), acquisition);</span>
+        }
+
+        private static List&lt;String&gt; effectIds(ResidualPlanController.Pair pair) {
+<span class="fc" id="L121">            return List.of(pair.left().id(), pair.right().id());</span>
+        }
+    }
+
+<span class="fc" id="L125">    enum Arm { LEARNED, FIXED, RANDOM, EXHAUSTIVE, HAND, ALL_AT_ONCE }</span>
+<span class="fc" id="L126">    record Pair(Effect left, Effect right) { String key() { return left.id() + &quot;|&quot; + right.id(); } }</span>
+<span class="fc" id="L127">    record Signature(Monomial powers, BigInteger absNumerator, BigInteger denominator, int sign) { }</span>
+<span class="fc" id="L128">    record Decision(String pair, String status) { }</span>
+<span class="fc" id="L129">    record Candidate(String root, String expression, List&lt;String&gt; effects, List&lt;String&gt; primitiveRules,</span>
+                     List&lt;String&gt; applications, List&lt;String&gt; assumptions, String residual) { }
+<span class="fc" id="L131">    record Report(String arm, String status, String preparedSource, long work, long prepareWork, List&lt;Decision&gt; decisions,</span>
+                  List&lt;Effect&gt; localEffects, List&lt;Candidate&gt; candidates, String candidateFreeze) { }
+
+    private final String source;
+    private final Work work;
+    private final ExactPolynomialAnalysis exact;
+<span class="fc" id="L137">    private final Map&lt;String,Signature&gt; features = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L138">    private final List&lt;Decision&gt; decisions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L139">    private final Map&lt;String,Candidate&gt; retained = new TreeMap&lt;&gt;();</span>
+    private PreparedResidual material;
+    private long prepareWork;
+
+<span class="fc" id="L143">    ResidualPlanController(String source) { this(source, new Work()); }</span>
+
+<span class="fc" id="L145">    ResidualPlanController(String source, Work work) {</span>
+<span class="fc" id="L146">        this.source = source;</span>
+<span class="fc" id="L147">        this.work = work;</span>
+<span class="fc" id="L148">        this.exact = ExactPolynomialAnalysis.withProductWork(work::add);</span>
+<span class="fc" id="L149">    }</span>
+
+    boolean prepare() {
+<span class="fc" id="L152">        work.add(source.length() + 1L);</span>
+<span class="fc" id="L153">        material = StructuralConstructionPrograms.prepareResidual(source, work, true);</span>
+<span class="fc" id="L154">        prepareWork = work.units();</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        return material != null &amp;&amp; material.parts().size() == 4;</span>
+    }
+
+<span class="fc bfc" id="L158" title="All 2 branches covered.">    int preparedGrowth() { return material == null ? 0 : material.expression().length() - source.length(); }</span>
+
+
+    Report run(Arm arm, int learnedMask, int ordinal) {
+<span class="fc" id="L162">        String status = &quot;COMPLETE&quot;;</span>
+        try {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (!prepare()) status = &quot;UNSUPPORTED&quot;;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            else if (arm == Arm.ALL_AT_ONCE) batch();</span>
+<span class="fc" id="L166">            else runPairs(arm, learnedMask, ordinal);</span>
+<span class="nc" id="L167">        } catch (Limit stopped) {</span>
+<span class="nc" id="L168">            status = &quot;BUDGET_EXHAUSTED&quot;;</span>
+<span class="fc" id="L169">        }</span>
+<span class="fc" id="L170">        var candidates = List.copyOf(retained.values());</span>
+<span class="fc" id="L171">        String freeze = SolverIr.sha256(&quot;residual-candidates/v1\n&quot; + candidates.stream().map(Candidate::root).toList());</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        return new Report(arm.name(), status, material == null ? &quot;&quot; : material.expression(), work.units(), prepareWork, List.copyOf(decisions),</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            material == null ? List.of() : material.effects(), candidates, freeze);</span>
+    }
+
+    private void batch() {
+<span class="fc" id="L177">        var result = material.composer().compose(material.expression(), material.parts(), material.effects(), 2, 8);</span>
+<span class="fc" id="L178">        decisions.add(new Decision(&quot;native-composition-enumeration&quot;, &quot;NATIVE_BATCH&quot;));</span>
+<span class="fc" id="L179">        result.forEach(this::retain);</span>
+<span class="fc" id="L180">    }</span>
+
+    private void runPairs(Arm arm, int learnedMask, int ordinal) {
+<span class="fc bfc" id="L183" title="All 4 branches covered.">        int mask = switch (arm) {</span>
+<span class="fc" id="L184">            case LEARNED -&gt; learnedMask;</span>
+<span class="fc" id="L185">            case FIXED, RANDOM -&gt; 1;</span>
+<span class="fc" id="L186">            case HAND -&gt; 7;</span>
+<span class="fc" id="L187">            default -&gt; 0;</span>
+        };
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (arm == Arm.RANDOM) {</span>
+<span class="fc" id="L190">            var available = new ArrayList&lt;Pair&gt;();</span>
+<span class="fc" id="L191">            pairs(pair -&gt; {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (admit(pair, mask)) available.add(pair);</span>
+<span class="fc" id="L193">                else decisions.add(new Decision(pair.key(), &quot;SELECTOR_REJECTED&quot;));</span>
+<span class="fc" id="L194">            });</span>
+<span class="fc" id="L195">            work.add(available.size());</span>
+<span class="fc" id="L196">            Collections.shuffle(available, new Random(874235L + ordinal));</span>
+<span class="fc" id="L197">            available.forEach(this::check);</span>
+<span class="fc" id="L198">        } else {</span>
+<span class="fc" id="L199">            pairs(pair -&gt; {</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                if (admit(pair, mask)) check(pair);</span>
+<span class="fc" id="L201">                else decisions.add(new Decision(pair.key(), &quot;SELECTOR_REJECTED&quot;));</span>
+<span class="fc" id="L202">            });</span>
+        }
+<span class="fc" id="L204">    }</span>
+
+    private void pairs(Consumer&lt;Pair&gt; receiver) {
+<span class="fc" id="L207">        var cursor = cursor();</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        while (cursor.hasNext()) receiver.accept(cursor.next());</span>
+<span class="fc" id="L209">    }</span>
+
+<span class="fc" id="L211">    PairCursor cursor() { return new PairCursor(material.effects(), work); }</span>
+
+    static final class PairCursor {
+        private final List&lt;Effect&gt; effects;
+        private final Work work;
+        private int first;
+<span class="fc" id="L217">        private int second = 1;</span>
+        private int offset;
+
+<span class="fc" id="L220">        PairCursor(List&lt;Effect&gt; effects, Work work) {</span>
+<span class="fc" id="L221">            this.effects = effects.stream().sorted(Comparator.comparing(Effect::id)).toList();</span>
+<span class="fc" id="L222">            this.work = work;</span>
+<span class="fc" id="L223">        }</span>
+<span class="fc" id="L224">        int offset() { return offset; }</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        boolean hasNext() { return second &lt; effects.size(); }</span>
+        Pair next() {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            if (!hasNext()) throw new java.util.NoSuchElementException(&quot;source pairs exhausted&quot;);</span>
+<span class="fc" id="L228">            work.add(1);</span>
+<span class="fc" id="L229">            var pair = new Pair(effects.get(first), effects.get(second));</span>
+<span class="fc" id="L230">            offset++;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (++second == effects.size()) second = ++first + 1;</span>
+<span class="fc" id="L232">            return pair;</span>
+        }
+    }
+
+    boolean admit(Pair p, int mask) {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if ((mask &amp; 1) != 0) {</span>
+<span class="fc" id="L238">            work.add(1);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (!Collections.disjoint(p.left().componentIds(), p.right().componentIds())) return false;</span>
+        }
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if ((mask &amp; 6) == 0) return true;</span>
+<span class="fc" id="L242">        var a = signature(p.left());</span>
+<span class="fc" id="L243">        var b = signature(p.right());</span>
+<span class="pc bpc" id="L244" title="2 of 4 branches missed.">        if (a == null || b == null) return false;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if ((mask &amp; 2) != 0) {</span>
+<span class="fc" id="L246">            work.add(1);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (a.sign() != -b.sign()) return false;</span>
+        }
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if ((mask &amp; 4) != 0) {</span>
+<span class="fc" id="L250">            work.add(1);</span>
+<span class="pc bpc" id="L251" title="1 of 4 branches missed.">            return a.powers().equals(b.powers()) &amp;&amp; a.absNumerator().equals(b.absNumerator())</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                &amp;&amp; a.denominator().equals(b.denominator());</span>
+        }
+<span class="fc" id="L254">        return true;</span>
+    }
+
+    private Signature signature(Effect e) {
+<span class="fc" id="L258">        work.add(1);</span>
+<span class="fc" id="L259">        return features.computeIfAbsent(e.id(), ignored -&gt; {</span>
+<span class="fc" id="L260">            var terms = exact.normalForm(e.residualNormalForm()).terms();</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            if (terms.size() != 1) return null;</span>
+<span class="fc" id="L262">            var entry = terms.entrySet().iterator().next();</span>
+<span class="fc" id="L263">            var value = entry.getValue();</span>
+<span class="fc" id="L264">            return new Signature(entry.getKey(), value.numerator().abs(), value.denominator(), value.numerator().signum());</span>
+        });
+    }
+
+    List&lt;Candidate&gt; check(Pair p) {
+        try {
+<span class="fc" id="L270">            var result = material.composer().compose(material.expression(), material.parts(), List.of(p.left(),p.right()), 2, 1);</span>
+<span class="fc" id="L271">            var candidates = result.stream().map(this::retain).toList();</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            decisions.add(new Decision(p.key(), result.isEmpty() ? &quot;EXACT_REJECTED&quot; : &quot;EXACT_ACCEPTED&quot;));</span>
+<span class="fc" id="L273">            return candidates;</span>
+<span class="nc" id="L274">        } catch (Limit stopped) {</span>
+<span class="nc" id="L275">            decisions.add(new Decision(p.key(), &quot;BUDGET_EXHAUSTED&quot;));</span>
+<span class="nc" id="L276">            throw stopped;</span>
+        }
+    }
+
+    private Candidate retain(Composition c) {
+<span class="fc" id="L281">        exact.requireEquivalent(source, c.candidateExpression());</span>
+<span class="fc" id="L282">        var candidate = checkedCandidate(source, material.expression(), c);</span>
+<span class="fc" id="L283">        retained.putIfAbsent(candidate.root(), candidate);</span>
+<span class="fc" id="L284">        return candidate;</span>
+    }
+
+    static Candidate checkedCandidate(String source, String prepared, Composition c) {
+<span class="fc" id="L288">        List&lt;String&gt; ids = c.effects().stream().map(Effect::id).sorted().toList();</span>
+<span class="fc" id="L289">        List&lt;String&gt; premises = c.effects().stream().flatMap(e -&gt; e.assumptions().stream()).distinct().sorted().toList();</span>
+<span class="fc" id="L290">        String root = SolverIr.sha256(&quot;residual-composition/v1\n&quot; + source + &quot;\n&quot; + prepared + &quot;\n&quot; + c.candidateExpression()</span>
+<span class="fc" id="L291">            + &quot;\n&quot; + ids + &quot;\n&quot; + c.primitiveRuleIds() + &quot;\n&quot; + c.applicationKeys() + &quot;\n&quot; + premises + &quot;\n&quot; + c.combinedResidualNormalForm());</span>
+<span class="fc" id="L292">        return new Candidate(root, c.candidateExpression(), ids, c.primitiveRuleIds(), c.applicationKeys(), premises,</span>
+<span class="fc" id="L293">            c.combinedResidualNormalForm());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

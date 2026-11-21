@@ -23,8 +23,8 @@ final class LeanStatementReconstruction {
     }
 
     private static String sort(Sort s) {
-<span class="pc bpc" id="L26" title="5 of 7 branches missed.">        return switch (s) {</span>
-<span class="pc" id="L27">            case REAL -&gt; &quot;ℝ&quot;; case NATURAL -&gt; &quot;ℕ&quot;; case REAL_SET -&gt; &quot;Set ℝ&quot;;</span>
+<span class="pc bpc" id="L26" title="5 of 8 branches missed.">        return switch (s) {</span>
+<span class="pc" id="L27">            case NAT_PREDICATE -&gt; &quot;ℕ → Prop&quot;; case REAL -&gt; &quot;ℝ&quot;; case NATURAL -&gt; &quot;ℕ&quot;; case REAL_SET -&gt; &quot;Set ℝ&quot;;</span>
 <span class="nc" id="L28">            case PROPOSITION -&gt; &quot;Prop&quot;; case REAL_SEQUENCE -&gt; &quot;ℕ → ℝ&quot;; case REAL_FUNCTION -&gt; &quot;ℝ → ℝ&quot;;</span>
 <span class="nc" id="L29">            default -&gt; throw new IllegalArgumentException(&quot;unsupported reconstructed sort &quot; + s);</span>
         };
@@ -51,8 +51,8 @@ final class LeanStatementReconstruction {
 <span class="fc" id="L51">            case Binder b -&gt; {</span>
 <span class="fc" id="L52">                String variable = &quot;(local_&quot; + level + &quot; : &quot; + sort(b.domain()) + &quot;)&quot;;</span>
 <span class="fc" id="L53">                String body = term(b.body(), level + 1);</span>
-<span class="pc bpc" id="L54" title="2 of 4 branches missed.">                yield switch (b.kind()) {</span>
-<span class="nc" id="L55">                    case FORALL -&gt; &quot;(∀ &quot; + variable + &quot;, &quot; + body + &quot;)&quot;;</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">                yield switch (b.kind()) {</span>
+<span class="fc" id="L55">                    case FORALL -&gt; &quot;(∀ &quot; + variable + &quot;, &quot; + body + &quot;)&quot;;</span>
 <span class="nc" id="L56">                    case EXISTS -&gt; &quot;(Exists (fun &quot; + variable + &quot; =&gt; &quot; + body + &quot;))&quot;;</span>
 <span class="fc" id="L57">                    case SET_OF -&gt; &quot;((fun &quot; + variable + &quot; =&gt; &quot; + body + &quot;) : Set ℝ)&quot;;</span>
 <span class="fc" id="L58">                    case SEQUENCE, FUNCTION -&gt; &quot;(fun &quot; + variable + &quot; =&gt; &quot; + body + &quot;)&quot;;</span>
@@ -89,10 +89,10 @@ final class LeanStatementReconstruction {
     }
 
     private static String unary(Call c, String a) {
-<span class="pc bpc" id="L92" title="9 of 11 branches missed.">        return switch (c.function()) {</span>
+<span class="pc bpc" id="L92" title="8 of 11 branches missed.">        return switch (c.function()) {</span>
 <span class="fc" id="L93">            case &quot;nat&quot; -&gt; &quot;(&quot; + ((Literal)c.arguments().getFirst()).value() + &quot; : ℕ)&quot;;</span>
 <span class="fc" id="L94">            case &quot;of_nat&quot; -&gt; &quot;(&quot; + a + &quot; : ℝ)&quot;;</span>
-<span class="nc" id="L95">            case &quot;succ&quot; -&gt; apply(&quot;Nat.succ&quot;, a); case &quot;not&quot; -&gt; apply(&quot;Not&quot;, a);</span>
+<span class="pc" id="L95">            case &quot;succ&quot; -&gt; apply(&quot;Nat.succ&quot;, a); case &quot;not&quot; -&gt; apply(&quot;Not&quot;, a);</span>
 <span class="nc" id="L96">            case &quot;summable&quot; -&gt; apply(&quot;Summable&quot;, a); case &quot;tsum&quot; -&gt; apply(&quot;tsum&quot;, a);</span>
 <span class="nc" id="L97">            case &quot;exp&quot; -&gt; apply(&quot;Real.exp&quot;, a); case &quot;log&quot;, &quot;ln&quot; -&gt; apply(&quot;Real.log&quot;, a);</span>
 <span class="nc" id="L98">            case &quot;sqrt&quot; -&gt; apply(&quot;Real.sqrt&quot;, a); case &quot;abs&quot; -&gt; apply(&quot;abs&quot;, a);</span>
@@ -101,11 +101,11 @@ final class LeanStatementReconstruction {
     }
 
     private static String multiple(Call c, List&lt;String&gt; args, String a, String b) {
-<span class="pc bpc" id="L104" title="10 of 17 branches missed.">        return switch (c.function()) {</span>
+<span class="pc bpc" id="L104" title="9 of 17 branches missed.">        return switch (c.function()) {</span>
 <span class="pc" id="L105">            case &quot;eq&quot; -&gt; apply(&quot;Eq&quot;, a, b); case &quot;ne&quot; -&gt; apply(&quot;Ne&quot;, a, b);</span>
 <span class="pc" id="L106">            case &quot;lt&quot; -&gt; apply(&quot;LT.lt&quot;, a, b); case &quot;le&quot; -&gt; apply(&quot;LE.le&quot;, a, b);</span>
 <span class="pc" id="L107">            case &quot;and&quot; -&gt; apply(&quot;And&quot;, a, b); case &quot;or&quot; -&gt; apply(&quot;Or&quot;, a, b);</span>
-<span class="nc" id="L108">            case &quot;implies&quot; -&gt; &quot;(&quot; + a + &quot; → &quot; + b + &quot;)&quot;;</span>
+<span class="fc" id="L108">            case &quot;implies&quot; -&gt; &quot;(&quot; + a + &quot; → &quot; + b + &quot;)&quot;;</span>
 <span class="pc" id="L109">            case &quot;at&quot; -&gt; apply(a, b); case &quot;has_sum&quot; -&gt; apply(&quot;HasSum&quot;, a, b);</span>
 <span class="fc" id="L110">            case &quot;tends_to&quot; -&gt; apply(&quot;Filter.Tendsto&quot;, a, &quot;Filter.atTop&quot;, apply(&quot;nhds&quot;, b));</span>
 <span class="fc" id="L111">            case &quot;limit_at&quot; -&gt; apply(&quot;Filter.Tendsto&quot;, a, apply(&quot;nhds&quot;, b), apply(&quot;nhds&quot;, args.get(2)));</span>

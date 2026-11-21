@@ -63,7 +63,7 @@ import java.util.TreeMap;
             new Goal(
 <span class="fc" id="L64">                Relation.valueOf(text(goal, &quot;relation&quot;)),</span>
 <span class="fc" id="L65">                readExpression(required(goal, &quot;left&quot;)),</span>
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                required(goal, &quot;right&quot;).isNull() ? null : readExpression(required(goal, &quot;right&quot;))),</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                required(goal, &quot;right&quot;).isNull() ? null : readExpression(required(goal, &quot;right&quot;))),</span>
 <span class="fc" id="L67">            RequestedEvidence.valueOf(text(root, &quot;requestedEvidence&quot;)),</span>
             new SourceProvenance(
 <span class="fc" id="L69">                text(provenance, &quot;sourceType&quot;),</span>
@@ -102,32 +102,32 @@ import java.util.TreeMap;
     }
 
     private Expression readExpression(JsonNode node) {
-<span class="pc bpc" id="L105" title="4 of 7 branches missed.">        return switch (text(node, &quot;kind&quot;)) {</span>
+<span class="pc bpc" id="L105" title="1 of 7 branches missed.">        return switch (text(node, &quot;kind&quot;)) {</span>
             case &quot;BOUND&quot; -&gt; {
-<span class="nc" id="L107">                JsonNode index = required(node, &quot;index&quot;);</span>
-<span class="nc bnc" id="L108" title="All 4 branches missed.">                if (!index.isIntegralNumber() || !index.canConvertToInt()) throw new IllegalArgumentException(&quot;invalid bound index&quot;);</span>
-<span class="nc" id="L109">                yield new SolverIr.Bound(index.intValue());</span>
+<span class="fc" id="L107">                JsonNode index = required(node, &quot;index&quot;);</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">                if (!index.isIntegralNumber() || !index.canConvertToInt()) throw new IllegalArgumentException(&quot;invalid bound index&quot;);</span>
+<span class="fc" id="L109">                yield new SolverIr.Bound(index.intValue());</span>
             }
-<span class="nc" id="L111">            case &quot;BINDER&quot; -&gt; new SolverIr.Binder(SolverIr.BinderKind.valueOf(text(node, &quot;binder&quot;)),</span>
-<span class="nc" id="L112">                Sort.valueOf(text(node, &quot;domain&quot;)), readExpression(required(node, &quot;body&quot;)));</span>
+<span class="fc" id="L111">            case &quot;BINDER&quot; -&gt; new SolverIr.Binder(SolverIr.BinderKind.valueOf(text(node, &quot;binder&quot;)),</span>
+<span class="fc" id="L112">                Sort.valueOf(text(node, &quot;domain&quot;)), readExpression(required(node, &quot;body&quot;)));</span>
 <span class="fc" id="L113">            case &quot;LITERAL&quot; -&gt; new Literal(text(node, &quot;value&quot;));</span>
 <span class="fc" id="L114">            case &quot;SYMBOL&quot; -&gt; new Symbol(text(node, &quot;name&quot;));</span>
 <span class="fc" id="L115">            case &quot;BINARY&quot; -&gt; new Binary(</span>
 <span class="fc" id="L116">                BinaryOperator.valueOf(text(node, &quot;operator&quot;)),</span>
 <span class="fc" id="L117">                readExpression(required(node, &quot;left&quot;)),</span>
 <span class="fc" id="L118">                readExpression(required(node, &quot;right&quot;)));</span>
-<span class="nc" id="L119">            case &quot;CALL&quot; -&gt; new Call(</span>
-<span class="nc" id="L120">                text(node, &quot;function&quot;),</span>
-<span class="nc" id="L121">                expressions(array(node, &quot;arguments&quot;)));</span>
+<span class="fc" id="L119">            case &quot;CALL&quot; -&gt; new Call(</span>
+<span class="fc" id="L120">                text(node, &quot;function&quot;),</span>
+<span class="fc" id="L121">                expressions(array(node, &quot;arguments&quot;)));</span>
 <span class="nc" id="L122">            default -&gt; throw new IllegalArgumentException(</span>
 <span class="nc" id="L123">                &quot;unsupported solver expression kind: &quot; + node.path(&quot;kind&quot;).asText());</span>
         };
     }
 
     private List&lt;Expression&gt; expressions(JsonNode values) {
-<span class="nc" id="L128">        List&lt;Expression&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="nc" id="L129">        values.forEach(value -&gt; result.add(readExpression(value)));</span>
-<span class="nc" id="L130">        return List.copyOf(result);</span>
+<span class="fc" id="L128">        List&lt;Expression&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L129">        values.forEach(value -&gt; result.add(readExpression(value)));</span>
+<span class="fc" id="L130">        return List.copyOf(result);</span>
     }
 
     private static List&lt;String&gt; strings(JsonNode values) {

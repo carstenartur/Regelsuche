@@ -120,87 +120,110 @@ final class StructuralConstructionPrograms {
     private static List&lt;String&gt; residualBalance(Expr expression, String source, Work work, boolean expanded) {
 <span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if (!(expression instanceof BinaryExpr root)</span>
 <span class="fc bfc" id="L122" title="All 4 branches covered.">                || (expanded ? root.operator() != BinaryOperator.ADD : root.operator() != BinaryOperator.MUL)) return List.of();</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        var exact = expanded ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);</span>
-<span class="fc" id="L124">        var polynomial = exact.normalForm(source);</span>
-<span class="fc" id="L125">        int count = polynomial.termCount();</span>
-<span class="fc bfc" id="L126" title="All 6 branches covered.">        if (count &lt; 4 || count &gt; 6 || count % 2 != 0) return List.of();</span>
-<span class="fc" id="L127">        String prepared = exposeAll(polynomial.toCanonicalString(), work, expanded);</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">        var composer = expanded ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);</span>
-<span class="fc" id="L129">        var parts = composer.additiveComponents(prepared);</span>
-<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (parts.size() != count || !allSquares(parts, work)) return List.of();</span>
-<span class="fc" id="L131">        var effects = pairedEffects(parts, composer, work);</span>
-<span class="fc" id="L132">        var results = composer.compose(prepared, parts, effects, count / 2, 8);</span>
-<span class="fc" id="L133">        work.add(results.size());</span>
-<span class="fc" id="L134">        return results.stream().map(ExactPolynomialResidualComposer.Composition::candidateExpression).toList();</span>
+<span class="fc" id="L123">        var prepared = prepareResidual(source, work, expanded);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (prepared == null) return List.of();</span>
+<span class="fc" id="L125">        var results = prepared.composer().compose(prepared.expression(), prepared.parts(), prepared.effects(), prepared.parts().size() / 2, 8);</span>
+<span class="fc" id="L126">        work.add(results.size());</span>
+<span class="fc" id="L127">        return results.stream().map(ExactPolynomialResidualComposer.Composition::candidateExpression).toList();</span>
     }
+
+<span class="fc" id="L130">    record PreparedResidual(String expression, List&lt;ExactPolynomialResidualComposer.SourceComponent&gt; parts,</span>
+                            List&lt;ExactPolynomialResidualComposer.Effect&gt; effects, ExactPolynomialResidualComposer composer) { }
+
+    static PreparedResidual prepareResidual(String source, Work work, boolean productWork) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        var exact = productWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);</span>
+<span class="fc" id="L135">        var polynomial = exact.normalForm(source);</span>
+<span class="fc" id="L136">        int count = polynomial.termCount();</span>
+<span class="fc bfc" id="L137" title="All 6 branches covered.">        if (count &lt; 4 || count &gt; 6 || count % 2 != 0) return null;</span>
+<span class="fc" id="L138">        String prepared = exposeAll(polynomial.toCanonicalString(), work, productWork);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        var composer = productWork ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);</span>
+<span class="fc" id="L140">        var parts = composer.additiveComponents(prepared);</span>
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        if (parts.size() != count || !allSquares(parts, work)) return null;</span>
+<span class="fc" id="L142">        return new PreparedResidual(prepared, parts, pairedEffects(parts, composer, work), composer);</span>
+    }
+
     private static String exposeAll(String source, Work work, boolean includeProductWork) {
-<span class="fc" id="L137">        String current = source;</span>
-<span class="fc" id="L138">        var exposure = new ExactMonomialSquareExposureOperator(1);</span>
-<span class="fc bfc" id="L139" title="All 2 branches covered.">        var exact = includeProductWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);</span>
-<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        for (int step = 0; step &lt; 12; step++) {</span>
-<span class="fc" id="L141">            var candidates = apply(exposure, current, work);</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (candidates.isEmpty()) return current;</span>
-<span class="fc" id="L143">            String next = candidates.getFirst(); exact.requireEquivalent(current, next); current = next;</span>
+<span class="fc" id="L146">        String current = source;</span>
+<span class="fc" id="L147">        var exposure = new ExactMonomialSquareExposureOperator(1);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        var exact = includeProductWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        for (int step = 0; step &lt; 12; step++) {</span>
+<span class="fc" id="L150">            var candidates = apply(exposure, current, work);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (candidates.isEmpty()) return current;</span>
+<span class="fc" id="L152">            String next = candidates.getFirst(); exact.requireEquivalent(current, next); current = next;</span>
         }
-<span class="nc" id="L145">        throw new IllegalArgumentException(&quot;square preparation did not converge within its bound&quot;);</span>
+<span class="nc" id="L154">        throw new IllegalArgumentException(&quot;square preparation did not converge within its bound&quot;);</span>
     }
     private static boolean allSquares(List&lt;ExactPolynomialResidualComposer.SourceComponent&gt; parts, Work work) {
-<span class="fc" id="L148">        var parser = new ExpressionParser();</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (var part : parts) {</span>
-<span class="fc" id="L150">            work.add(part.expression().length());</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (!StructuralTaskObjective.isSquare(parser.parseExactTerm(part.expression()).expression())) return false;</span>
-<span class="fc" id="L152">        }</span>
-<span class="fc" id="L153">        return true;</span>
+<span class="fc" id="L157">        var parser = new ExpressionParser();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (var part : parts) {</span>
+<span class="fc" id="L159">            work.add(part.expression().length());</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (!StructuralTaskObjective.isSquare(parser.parseExactTerm(part.expression()).expression())) return false;</span>
+<span class="fc" id="L161">        }</span>
+<span class="fc" id="L162">        return true;</span>
     }
     private static List&lt;ExactPolynomialResidualComposer.Effect&gt; pairedEffects(
             List&lt;ExactPolynomialResidualComposer.SourceComponent&gt; parts, ExactPolynomialResidualComposer composer, Work work) {
-<span class="fc" id="L157">        var effects = new ArrayList&lt;ExactPolynomialResidualComposer.Effect&gt;();</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (int left = 0; left &lt; parts.size(); left++) {</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (int right = left + 1; right &lt; parts.size(); right++) {</span>
-<span class="fc" id="L160">                var pair = List.of(parts.get(left), parts.get(right));</span>
-<span class="fc" id="L161">                effects.add(effect(pair, false, left + &quot;-&quot; + right, composer, work));</span>
-<span class="fc" id="L162">                effects.add(effect(pair, true, left + &quot;-&quot; + right, composer, work));</span>
+<span class="fc" id="L166">        var effects = new ArrayList&lt;ExactPolynomialResidualComposer.Effect&gt;();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int left = 0; left &lt; parts.size(); left++) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (int right = left + 1; right &lt; parts.size(); right++) {</span>
+<span class="fc" id="L169">                var pair = List.of(parts.get(left), parts.get(right));</span>
+<span class="fc" id="L170">                effects.add(effect(pair, false, left + &quot;-&quot; + right, composer, work));</span>
+<span class="fc" id="L171">                effects.add(effect(pair, true, left + &quot;-&quot; + right, composer, work));</span>
             }
         }
-<span class="fc" id="L165">        return List.copyOf(effects);</span>
+<span class="fc" id="L174">        return List.copyOf(effects);</span>
     }
     private static ExactPolynomialResidualComposer.Effect effect(
             List&lt;ExactPolynomialResidualComposer.SourceComponent&gt; pair, boolean reflect, String id,
             ExactPolynomialResidualComposer composer, Work work) {
-<span class="fc" id="L170">        String right = pair.get(1).expression();</span>
-<span class="fc" id="L171">        var rules = new ArrayList&lt;String&gt;(); var applications = new ArrayList&lt;String&gt;();</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (reflect) {</span>
-<span class="fc" id="L173">            var symmetry = only(new SquareBaseSignSymmetryOperator().generateCandidates(right));</span>
-<span class="fc" id="L174">            work.add(right.length() + symmetry.transformedExpression().length());</span>
-<span class="fc" id="L175">            right = symmetry.transformedExpression(); rules.addAll(symmetry.primitiveRuleIds()); applications.add(symmetry.applicationKey());</span>
+<span class="fc" id="L179">        String right = pair.get(1).expression();</span>
+<span class="fc" id="L180">        var rules = new ArrayList&lt;String&gt;(); var applications = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (reflect) {</span>
+<span class="fc" id="L182">            var symmetry = only(new SquareBaseSignSymmetryOperator().generateCandidates(right));</span>
+<span class="fc" id="L183">            work.add(right.length() + symmetry.transformedExpression().length());</span>
+<span class="fc" id="L184">            right = symmetry.transformedExpression(); rules.addAll(symmetry.primitiveRuleIds()); applications.add(symmetry.applicationKey());</span>
         }
-<span class="fc" id="L177">        String input = &quot;(&quot; + pair.get(0).expression() + &quot;)+(&quot; + right + &quot;)&quot;;</span>
-<span class="fc" id="L178">        var completion = only(new SumOfSquaresCompletionOperator().generateCandidates(input));</span>
-<span class="fc" id="L179">        work.add(input.length() + completion.transformedExpression().length());</span>
-<span class="fc" id="L180">        rules.addAll(completion.primitiveRuleIds()); applications.add(completion.applicationKey());</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        return composer.effect((reflect ? &quot;reflected-&quot; : &quot;plus-&quot;) + id, pair, completion.transformedExpression(),</span>
-<span class="fc" id="L182">            completedSquare(completion.transformedExpression(), work), List.of(), rules, applications);</span>
+<span class="fc" id="L186">        String input = &quot;(&quot; + pair.get(0).expression() + &quot;)+(&quot; + right + &quot;)&quot;;</span>
+<span class="fc" id="L187">        var completion = only(new SumOfSquaresCompletionOperator().generateCandidates(input));</span>
+<span class="fc" id="L188">        work.add(input.length() + completion.transformedExpression().length());</span>
+<span class="fc" id="L189">        rules.addAll(completion.primitiveRuleIds()); applications.add(completion.applicationKey());</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        return composer.effect((reflect ? &quot;reflected-&quot; : &quot;plus-&quot;) + id, pair, completion.transformedExpression(),</span>
+<span class="fc" id="L191">            completedSquare(completion.transformedExpression(), work), List.of(), rules, applications);</span>
     }
     private static String completedSquare(String source, Work work) {
-<span class="fc" id="L185">        var pending = new ArrayDeque&lt;Expr&gt;(); pending.push(new ExpressionParser().parseExactTerm(source).expression());</span>
-<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L187">            Expr node = pending.pop(); work.add(1);</span>
-<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (!(node instanceof BinaryExpr binary)) continue;</span>
-<span class="pc bpc" id="L189" title="1 of 4 branches missed.">            if (StructuralTaskObjective.isSquare(binary) &amp;&amp; binary.left() instanceof BinaryExpr base</span>
-<span class="pc bpc" id="L190" title="1 of 4 branches missed.">                    &amp;&amp; (base.operator() == BinaryOperator.ADD || base.operator() == BinaryOperator.SUB))</span>
-<span class="fc" id="L191">                return ExpressionFormatter.format(binary);</span>
-<span class="fc" id="L192">            pending.push(binary.right()); pending.push(binary.left());</span>
-<span class="fc" id="L193">        }</span>
-<span class="nc" id="L194">        throw new IllegalArgumentException(&quot;completion did not retain a structured square&quot;);</span>
+<span class="fc" id="L194">        var pending = new ArrayDeque&lt;Expr&gt;(); pending.push(new ExpressionParser().parseExactTerm(source).expression());</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L196">            Expr node = pending.pop(); work.add(1);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!(node instanceof BinaryExpr binary)) continue;</span>
+<span class="pc bpc" id="L198" title="1 of 4 branches missed.">            if (StructuralTaskObjective.isSquare(binary) &amp;&amp; binary.left() instanceof BinaryExpr base</span>
+<span class="pc bpc" id="L199" title="1 of 4 branches missed.">                    &amp;&amp; (base.operator() == BinaryOperator.ADD || base.operator() == BinaryOperator.SUB))</span>
+<span class="fc" id="L200">                return ExpressionFormatter.format(binary);</span>
+<span class="fc" id="L201">            pending.push(binary.right()); pending.push(binary.left());</span>
+<span class="fc" id="L202">        }</span>
+<span class="nc" id="L203">        throw new IllegalArgumentException(&quot;completion did not retain a structured square&quot;);</span>
     }
     private static Transformation only(List&lt;Transformation&gt; results) {
-<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (results.size() != 1) throw new IllegalArgumentException(&quot;one bound completion required&quot;);</span>
-<span class="fc" id="L198">        return results.getFirst();</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (results.size() != 1) throw new IllegalArgumentException(&quot;one bound completion required&quot;);</span>
+<span class="fc" id="L207">        return results.getFirst();</span>
     }
-    private static final class Work {
+    static final class Work {
+        private final long limit;
+        private final boolean strict;
         private long units;
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        private void add(long count) { units = Math.addExact(units, count); if (units &gt; LIMIT) throw new Limit(); }</span>
+<span class="fc" id="L213">        Work() { limit = LIMIT; strict = false; }</span>
+<span class="fc" id="L214">        Work(long limit) {</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">            if (limit &lt; 0 || limit &gt; LIMIT) throw new IllegalArgumentException(&quot;work limit outside the finite grammar&quot;);</span>
+<span class="fc" id="L216">            this.limit = limit;</span>
+<span class="fc" id="L217">            this.strict = true;</span>
+<span class="fc" id="L218">        }</span>
+<span class="fc" id="L219">        long units() { return units; }</span>
+        void add(long count) {
+<span class="fc" id="L221">            long next = Math.addExact(units, count);</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">            if (strict &amp;&amp; next &gt; limit) throw new Limit();</span>
+<span class="fc" id="L223">            units = next;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if (units &gt; limit) throw new Limit();</span>
+<span class="fc" id="L225">        }</span>
     }
-    private static final class Limit extends RuntimeException { }
+<span class="fc" id="L227">    static final class Limit extends RuntimeException { }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

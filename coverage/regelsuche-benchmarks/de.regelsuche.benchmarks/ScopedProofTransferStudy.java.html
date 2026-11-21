@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedProofTransferStudy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ScopedProofTransferStudy.java</span></div><h1>ScopedProofTransferStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.benchmarks.ScopedProofPartitions.Case;
+import de.regelsuche.benchmarks.ScopedProofPartitions.Split;
+import de.regelsuche.benchmarks.ScopedProofTrials.Arm;
+import de.regelsuche.benchmarks.ScopedProofTrials.Row;
+import de.regelsuche.solver.ir.ExistentialIntroduction.Statement;
+import de.regelsuche.solver.ir.SolverIr;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Separate TRAIN freeze and independently invocable evaluation commands for the public protocol. */
+public final class ScopedProofTransferStudy {
+<span class="fc" id="L24">    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);</span>
+    private static final String PROTOCOL = &quot;abf2aba070a70f1ac48ab066d134195c9182af9c&quot;;
+<span class="fc" id="L26">    record Observation(String id, String binder, JsonNode source, JsonNode recipient, List&lt;Row&gt; arms) { }</span>
+<span class="fc" id="L27">    record Plan(String schema, String protocolCommit, String trainingHash, Map&lt;String,List&lt;String&gt;&gt; witnessPriorities,</span>
+                boolean inductionBaseFirst, int trainingProposals, int trainingCheckerCalls) { }
+<span class="fc" id="L29">    record Totals(int cases, int reached, int proposals, int checkerCalls, int planUses, int chargedTrainingProposals,</span>
+                  int chargedTrainingCheckerCalls) { }
+
+    private ScopedProofTransferStudy() { }
+
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L35" title="All 4 branches missed.">        if (args.length == 2 &amp;&amp; args[0].equals(&quot;train&quot;)) {</span>
+<span class="nc" id="L36">            train(Path.of(args[1]));</span>
+<span class="nc" id="L37">            System.out.println(SolverIr.sha256(Files.readString(Path.of(args[1], &quot;plan.json&quot;))));</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        } else if (args.length == 3) {</span>
+<span class="nc" id="L39">            evaluate(args[0].toUpperCase(Locale.ROOT), Path.of(args[1]), args[2]);</span>
+        } else {
+<span class="nc" id="L41">            throw new IllegalArgumentException(&quot;train DIRECTORY | validation|final DIRECTORY TRUSTED_PLAN_HASH&quot;);</span>
+        }
+<span class="nc" id="L43">    }</span>
+
+    static void train(Path dir) throws Exception {
+<span class="fc" id="L46">        var training = ScopedProofPartitions.generate(Split.TRAIN);</span>
+<span class="fc" id="L47">        var observations = new ArrayList&lt;Observation&gt;();</span>
+<span class="fc" id="L48">        var scores = new TreeMap&lt;String, Map&lt;String,Integer&gt;&gt;();</span>
+<span class="fc" id="L49">        int baseFirstWins = 0, sortedWins = 0, proposals = 0, checkerCalls = 0;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (var c : training) {</span>
+<span class="fc" id="L51">            var row = ScopedProofTrials.run(c, observations.size(), Arm.EXHAUSTIVE, ScopedProofTrials.GRAMMAR, false);</span>
+<span class="fc" id="L52">            observations.add(observation(c, List.of(row)));</span>
+<span class="fc" id="L53">            proposals += row.trials().size();</span>
+<span class="fc" id="L54">            checkerCalls += row.checkerCalls();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (c.witness()) {</span>
+<span class="fc" id="L56">                String shape = ScopedProofTrials.shape(new Statement(c.source(), c.binder())).key();</span>
+<span class="fc" id="L57">                var byRule = scores.computeIfAbsent(shape, ignored -&gt; new TreeMap&lt;&gt;());</span>
+<span class="fc bfc" id="L58" title="All 4 branches covered.">                for (var trial : row.trials()) if (trial.accepted()) byRule.merge(trial.proposal(), 1, Integer::sum);</span>
+<span class="fc" id="L59">            } else {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                if (row.trials().getFirst().accepted()) sortedWins++;</span>
+<span class="fc" id="L61">                String selected = ScopedProofTrials.firstBase(c.source());</span>
+<span class="pc bpc" id="L62" title="1 of 6 branches missed.">                if (row.trials().stream().anyMatch(t -&gt; t.accepted() &amp;&amp; t.proposal().equals(selected))) baseFirstWins++;</span>
+            }
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        var priorities = new TreeMap&lt;String,List&lt;String&gt;&gt;();</span>
+<span class="fc" id="L66">        scores.forEach((shape, hits) -&gt; priorities.put(shape, ScopedProofTrials.GRAMMAR.stream()</span>
+<span class="fc" id="L67">            .sorted(Comparator.&lt;String&gt;comparingInt(rule -&gt; hits.getOrDefault(rule, 0)).reversed()).toList()));</span>
+<span class="fc" id="L68">        String evidence = encode(Map.of(&quot;split&quot;, &quot;TRAIN&quot;, &quot;cases&quot;, observations, &quot;hits&quot;, scores,</span>
+<span class="fc" id="L69">            &quot;baseFirstHits&quot;, baseFirstWins, &quot;sortedFirstHits&quot;, sortedWins, &quot;protocolCommit&quot;, PROTOCOL));</span>
+<span class="fc" id="L70">        persist(dir, &quot;train.json&quot;, evidence);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        persist(dir, &quot;plan.json&quot;, encode(new Plan(&quot;scoped-proof-plan-priorities/v1&quot;, PROTOCOL, SolverIr.sha256(evidence),</span>
+            priorities, baseFirstWins &gt; sortedWins, proposals, checkerCalls)));
+<span class="fc" id="L73">    }</span>
+
+    static void evaluate(String name, Path dir, String expectedHash) throws Exception {
+<span class="fc" id="L76">        var split = Split.valueOf(name);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (split == Split.TRAIN) throw new IllegalArgumentException(&quot;use the training command for TRAIN&quot;);</span>
+<span class="fc" id="L78">        String frozen = Files.readString(dir.resolve(&quot;plan.json&quot;));</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (!SolverIr.sha256(frozen).equals(expectedHash)) throw new IllegalArgumentException(&quot;frozen plan hash differs&quot;);</span>
+<span class="fc" id="L80">        Plan plan = JSON.readValue(frozen, Plan.class);</span>
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (!plan.protocolCommit().equals(PROTOCOL) || !plan.trainingHash().equals(SolverIr.sha256(Files.readString(dir.resolve(&quot;train.json&quot;)))))</span>
+<span class="fc" id="L82">            throw new IllegalArgumentException(&quot;training evidence or protocol differs&quot;);</span>
+<span class="fc" id="L83">        var observations = new ArrayList&lt;Observation&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (Case c : ScopedProofPartitions.generate(split)) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            String shape = c.witness() ? ScopedProofTrials.shape(new Statement(c.source(), c.binder())).key() : &quot;&quot;;</span>
+<span class="fc" id="L86">            var order = plan.witnessPriorities().getOrDefault(shape, ScopedProofTrials.GRAMMAR);</span>
+<span class="fc" id="L87">            var arms = new ArrayList&lt;Row&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            for (Arm arm : Arm.values()) arms.add(ScopedProofTrials.run(c, observations.size(), arm, order, plan.inductionBaseFirst()));</span>
+<span class="fc" id="L89">            observations.add(observation(c, arms));</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        var totals = new TreeMap&lt;String,Totals&gt;();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (Arm arm : Arm.values()) totals.put(arm.name(), totals(observations, arm, plan));</span>
+<span class="fc" id="L93">        persist(dir, name.toLowerCase(Locale.ROOT) + &quot;.json&quot;, encode(Map.of(&quot;split&quot;, name, &quot;cases&quot;, observations,</span>
+            &quot;frozenPlanHash&quot;, expectedHash, &quot;protocolCommit&quot;, PROTOCOL, &quot;work&quot;, totals)));
+<span class="fc" id="L95">    }</span>
+
+    private static Totals totals(List&lt;Observation&gt; observations, Arm arm, Plan plan) {
+<span class="fc" id="L98">        var rows = observations.stream().flatMap(o -&gt; o.arms().stream()).filter(r -&gt; r.arm().equals(arm.name())).toList();</span>
+<span class="fc" id="L99">        return new Totals(rows.size(), (int) rows.stream().filter(r -&gt; r.status().equals(&quot;FOUND&quot;)).count(),</span>
+<span class="fc" id="L100">            rows.stream().mapToInt(r -&gt; r.trials().size()).sum(), rows.stream().mapToInt(Row::checkerCalls).sum(),</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            (int) rows.stream().filter(Row::selectedPlanApplied).count(), arm == Arm.LEARNED ? plan.trainingProposals() : 0,</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            arm == Arm.LEARNED ? plan.trainingCheckerCalls() : 0);</span>
+    }
+
+    private static Observation observation(Case c, List&lt;Row&gt; rows) throws Exception {
+<span class="fc" id="L106">        return new Observation(c.id(), c.binder(), JSON.readTree(c.source().toCanonicalJson()),</span>
+<span class="fc" id="L107">            JSON.readTree(c.receiver().toCanonicalJson()), List.copyOf(rows));</span>
+    }
+
+    private static String encode(Object object) throws Exception {
+<span class="fc" id="L111">        return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(object) + &quot;\n&quot;;</span>
+    }
+
+    private static void persist(Path dir, String name, String text) throws Exception {
+<span class="fc" id="L115">        Files.createDirectories(dir);</span>
+<span class="fc" id="L116">        Path output = dir.resolve(name);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (Files.exists(output)) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (!Files.readString(output).equals(text)) throw new IllegalStateException(&quot;existing study evidence differs: &quot; + name);</span>
+<span class="nc" id="L119">            return;</span>
+        }
+<span class="fc" id="L121">        Path staged = Files.createTempFile(dir, name, &quot;.tmp&quot;);</span>
+        try {
+<span class="fc" id="L123">            Files.writeString(staged, text);</span>
+<span class="fc" id="L124">            Files.move(staged, output, StandardCopyOption.ATOMIC_MOVE);</span>
+        } finally {
+<span class="fc" id="L126">            Files.deleteIfExists(staged);</span>
+        }
+<span class="fc" id="L128">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

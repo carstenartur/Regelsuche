@@ -62,18 +62,27 @@ public final class ExistentialIntroduction {
 <span class="fc" id="L62">                substitute(body.goal().right(), binder, replacement));</span>
         }
 
+        /** Export the exact quantified conclusion for a fresh check by the scoped formal backend. */
+        public Obligation toScopedObligation() {
+<span class="fc" id="L67">            Goal bound = substitutedGoal(new SolverIr.Bound(0));</span>
+<span class="fc" id="L68">            var equation = new SolverIr.Call(&quot;eq&quot;, List.of(bound.left(), bound.right()));</span>
+<span class="fc" id="L69">            var exists = new SolverIr.Binder(SolverIr.BinderKind.EXISTS, Sort.REAL, equation);</span>
+<span class="fc" id="L70">            return Obligation.create(body.obligationId(), parameters(), List.of(Theory.REAL_ARITHMETIC, Theory.SCOPED_ANALYSIS),</span>
+<span class="fc" id="L71">                body.assumptions(), Goal.holds(exists), RequestedEvidence.FORMAL_PROOF, body.provenance());</span>
+        }
+
         /** Instantiate only the body, once, with a total term from the outer context. */
         public Obligation instantiate(Expression witness) {
-<span class="fc" id="L67">            RingTerm.check(witness);</span>
-<span class="fc" id="L68">            var outer = parameters();</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!outer.stream().map(SymbolDeclaration::name).toList().containsAll(witness.referencedSymbols())) {</span>
-<span class="fc" id="L70">                throw new IllegalArgumentException(&quot;witness refers outside the outer context&quot;);</span>
+<span class="fc" id="L76">            RingTerm.check(witness);</span>
+<span class="fc" id="L77">            var outer = parameters();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (!outer.stream().map(SymbolDeclaration::name).toList().containsAll(witness.referencedSymbols())) {</span>
+<span class="fc" id="L79">                throw new IllegalArgumentException(&quot;witness refers outside the outer context&quot;);</span>
             }
-<span class="fc" id="L72">            Goal goal = substitutedGoal(witness);</span>
-<span class="fc" id="L73">            RingTerm.check(goal.left());</span>
-<span class="fc" id="L74">            RingTerm.check(goal.right());</span>
-<span class="fc" id="L75">            return Obligation.create(body.obligationId(), outer, body.theories(), body.assumptions(), goal,</span>
-<span class="fc" id="L76">                body.requestedEvidence(), body.provenance());</span>
+<span class="fc" id="L81">            Goal goal = substitutedGoal(witness);</span>
+<span class="fc" id="L82">            RingTerm.check(goal.left());</span>
+<span class="fc" id="L83">            RingTerm.check(goal.right());</span>
+<span class="fc" id="L84">            return Obligation.create(body.obligationId(), outer, body.theories(), body.assumptions(), goal,</span>
+<span class="fc" id="L85">                body.requestedEvidence(), body.provenance());</span>
         }
     }
 
@@ -82,53 +91,53 @@ public final class ExistentialIntroduction {
     }
 
     public record NormalForm(Obligation instance) implements Leaf {
-<span class="fc" id="L85">        public NormalForm { Objects.requireNonNull(instance, &quot;instance&quot;); }</span>
+<span class="fc" id="L94">        public NormalForm { Objects.requireNonNull(instance, &quot;instance&quot;); }</span>
     }
 
     public record Hypothesis(Obligation instance, String premiseId) implements Leaf {
-<span class="fc" id="L89">        public Hypothesis {</span>
-<span class="fc" id="L90">            Objects.requireNonNull(instance, &quot;instance&quot;);</span>
-<span class="fc" id="L91">            Objects.requireNonNull(premiseId, &quot;premiseId&quot;);</span>
-<span class="fc" id="L92">        }</span>
+<span class="fc" id="L98">        public Hypothesis {</span>
+<span class="fc" id="L99">            Objects.requireNonNull(instance, &quot;instance&quot;);</span>
+<span class="fc" id="L100">            Objects.requireNonNull(premiseId, &quot;premiseId&quot;);</span>
+<span class="fc" id="L101">        }</span>
     }
 
     /** The introduction root points to its one independently replayable premise node. */
     public record Proof(Statement conclusion, Expression witness, Leaf premise) {
-<span class="fc" id="L97">        public Proof {</span>
-<span class="fc" id="L98">            Objects.requireNonNull(conclusion, &quot;conclusion&quot;);</span>
-<span class="fc" id="L99">            Objects.requireNonNull(witness, &quot;witness&quot;);</span>
-<span class="fc" id="L100">            Objects.requireNonNull(premise, &quot;premise&quot;);</span>
-<span class="fc" id="L101">        }</span>
+<span class="fc" id="L106">        public Proof {</span>
+<span class="fc" id="L107">            Objects.requireNonNull(conclusion, &quot;conclusion&quot;);</span>
+<span class="fc" id="L108">            Objects.requireNonNull(witness, &quot;witness&quot;);</span>
+<span class="fc" id="L109">            Objects.requireNonNull(premise, &quot;premise&quot;);</span>
+<span class="fc" id="L110">        }</span>
     }
 
     /** Check the proof against the receiver's statement and reconstruct the premise from that statement. */
     public static boolean replay(Statement expected, Proof proof) {
-<span class="pc bpc" id="L106" title="2 of 6 branches missed.">        if (expected == null || proof == null || !expected.sameStatement(proof.conclusion())) return false;</span>
+<span class="pc bpc" id="L115" title="2 of 6 branches missed.">        if (expected == null || proof == null || !expected.sameStatement(proof.conclusion())) return false;</span>
         Obligation instance;
         try {
-<span class="fc" id="L109">            instance = expected.instantiate(proof.witness());</span>
-<span class="fc" id="L110">        } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L111">            return false;</span>
-<span class="fc" id="L112">        }</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (!instance.equals(proof.premise().instance())) return false;</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        return switch (proof.premise()) {</span>
-<span class="fc" id="L115">            case Hypothesis h -&gt; instance.assumptions().stream().anyMatch(p -&gt; matches(h, p, instance.goal()));</span>
-<span class="fc" id="L116">            case NormalForm ignored -&gt; new PolynomialNormalFormSolverBackend().execute(instance)</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">                .result().status() == ResultStatus.CONFIRMED;</span>
+<span class="fc" id="L118">            instance = expected.instantiate(proof.witness());</span>
+<span class="fc" id="L119">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L120">            return false;</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (!instance.equals(proof.premise().instance())) return false;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        return switch (proof.premise()) {</span>
+<span class="fc" id="L124">            case Hypothesis h -&gt; instance.assumptions().stream().anyMatch(p -&gt; matches(h, p, instance.goal()));</span>
+<span class="fc" id="L125">            case NormalForm ignored -&gt; new PolynomialNormalFormSolverBackend().execute(instance)</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                .result().status() == ResultStatus.CONFIRMED;</span>
         };
     }
 
     private static boolean matches(Hypothesis leaf, Predicate premise, Goal goal) {
-<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        return premise.id().equals(leaf.premiseId()) &amp;&amp; premise.relation() == goal.relation()</span>
-<span class="fc bfc" id="L123" title="All 4 branches covered.">            &amp;&amp; premise.left().equals(goal.left()) &amp;&amp; premise.right().equals(goal.right());</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        return premise.id().equals(leaf.premiseId()) &amp;&amp; premise.relation() == goal.relation()</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">            &amp;&amp; premise.left().equals(goal.left()) &amp;&amp; premise.right().equals(goal.right());</span>
     }
 
     private static Expression substitute(Expression term, String binder, Expression witness) {
-<span class="fc bfc" id="L127" title="All 3 branches covered.">        return switch (term) {</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">            case Symbol symbol -&gt; symbol.name().equals(binder) ? witness : symbol;</span>
-<span class="fc" id="L129">            case Binary binary -&gt; new Binary(binary.operator(), substitute(binary.left(), binder, witness),</span>
-<span class="fc" id="L130">                substitute(binary.right(), binder, witness));</span>
-<span class="fc" id="L131">            default -&gt; term; // Already checked as a literal, symbol or ring operation.</span>
+<span class="fc bfc" id="L136" title="All 3 branches covered.">        return switch (term) {</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            case Symbol symbol -&gt; symbol.name().equals(binder) ? witness : symbol;</span>
+<span class="fc" id="L138">            case Binary binary -&gt; new Binary(binary.operator(), substitute(binary.left(), binder, witness),</span>
+<span class="fc" id="L139">                substitute(binary.right(), binder, witness));</span>
+<span class="fc" id="L140">            default -&gt; term; // Already checked as a literal, symbol or ring operation.</span>
         };
     }
 
@@ -139,23 +148,23 @@ public final class ExistentialIntroduction {
         private int nodes;
 
         private static void check(Expression term) {
-<span class="fc" id="L142">            new RingTerm().monomialBound(term);</span>
-<span class="fc" id="L143">        }</span>
+<span class="fc" id="L151">            new RingTerm().monomialBound(term);</span>
+<span class="fc" id="L152">        }</span>
 
         private int monomialBound(Expression term) {
-<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (++nodes &gt; MAX_NODES) throw new IllegalArgumentException(&quot;ring term exceeds node bound&quot;);</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (term instanceof Symbol) return 1;</span>
-<span class="fc bfc" id="L148" title="All 4 branches covered.">            if (term instanceof Literal literal &amp;&amp; literal.value().length() &lt;= 64) return 1;</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (!(term instanceof Binary binary)) throw new IllegalArgumentException(&quot;unsupported ring term&quot;);</span>
-<span class="fc" id="L150">            int left = monomialBound(binary.left());</span>
-<span class="fc" id="L151">            int right = monomialBound(binary.right());</span>
-<span class="fc bfc" id="L152" title="All 3 branches covered.">            int bound = switch (binary.operator()) {</span>
-<span class="fc" id="L153">                case ADD, SUBTRACT -&gt; left + right;</span>
-<span class="fc" id="L154">                case MULTIPLY -&gt; left * right;</span>
-<span class="fc" id="L155">                default -&gt; throw new IllegalArgumentException(&quot;unsupported ring operator&quot;);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (++nodes &gt; MAX_NODES) throw new IllegalArgumentException(&quot;ring term exceeds node bound&quot;);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (term instanceof Symbol) return 1;</span>
+<span class="fc bfc" id="L157" title="All 4 branches covered.">            if (term instanceof Literal literal &amp;&amp; literal.value().length() &lt;= 64) return 1;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (!(term instanceof Binary binary)) throw new IllegalArgumentException(&quot;unsupported ring term&quot;);</span>
+<span class="fc" id="L159">            int left = monomialBound(binary.left());</span>
+<span class="fc" id="L160">            int right = monomialBound(binary.right());</span>
+<span class="fc bfc" id="L161" title="All 3 branches covered.">            int bound = switch (binary.operator()) {</span>
+<span class="fc" id="L162">                case ADD, SUBTRACT -&gt; left + right;</span>
+<span class="fc" id="L163">                case MULTIPLY -&gt; left * right;</span>
+<span class="fc" id="L164">                default -&gt; throw new IllegalArgumentException(&quot;unsupported ring operator&quot;);</span>
             };
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (bound &gt; MAX_MONOMIALS) throw new IllegalArgumentException(&quot;ring term exceeds expansion bound&quot;);</span>
-<span class="fc" id="L158">            return bound;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (bound &gt; MAX_MONOMIALS) throw new IllegalArgumentException(&quot;ring term exceeds expansion bound&quot;);</span>
+<span class="fc" id="L167">            return bound;</span>
         }
     }
 }

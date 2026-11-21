@@ -16,105 +16,117 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 /** Finite goal-directed introduction for the existing single-binder ring fragment. */
 public final class ExistentialWitnessSearch {
     private static final int MAX_TRIALS = 4096;
     private static final int MAX_SEEDS = 32;
-<span class="fc" id="L24">    private static final List&lt;BinaryOperator&gt; OPERATIONS = List.of(</span>
+<span class="fc" id="L25">    private static final List&lt;BinaryOperator&gt; OPERATIONS = List.of(</span>
         BinaryOperator.ADD, BinaryOperator.SUBTRACT, BinaryOperator.MULTIPLY);
 
-<span class="fc" id="L27">    public enum Status { FOUND, BUDGET_EXHAUSTED, GRAMMAR_EXHAUSTED }</span>
-<span class="fc" id="L28">    public record Result(Status status, int examined, Optional&lt;Proof&gt; proof) {}</span>
+<span class="fc" id="L28">    public enum Status { FOUND, BUDGET_EXHAUSTED, GRAMMAR_EXHAUSTED }</span>
+<span class="fc" id="L29">    public record Result(Status status, int examined, Optional&lt;Proof&gt; proof) {}</span>
 
     private final Statement target;
     private final int budget;
-<span class="fc" id="L32">    private final Set&lt;Expression&gt; seen = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L33">    private final Set&lt;Expression&gt; seen = new HashSet&lt;&gt;();</span>
     private int examined;
+    private final BiConsumer&lt;Expression, Optional&lt;Proof&gt;&gt; observer;
 
-<span class="fc" id="L35">    private ExistentialWitnessSearch(Statement target, int budget) {</span>
-<span class="fc" id="L36">        this.target = Objects.requireNonNull(target);</span>
-<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (budget &lt; 0 || budget &gt; MAX_TRIALS) throw new IllegalArgumentException(&quot;require 0–4096 candidate trials&quot;);</span>
-<span class="fc" id="L38">        this.budget = budget;</span>
-<span class="fc" id="L39">    }</span>
+<span class="fc" id="L37">    private ExistentialWitnessSearch(Statement target, int budget, BiConsumer&lt;Expression, Optional&lt;Proof&gt;&gt; observer) {</span>
+<span class="fc" id="L38">        this.observer = observer;</span>
+<span class="fc" id="L39">        this.target = Objects.requireNonNull(target);</span>
+<span class="pc bpc" id="L40" title="1 of 4 branches missed.">        if (budget &lt; 0 || budget &gt; MAX_TRIALS) throw new IllegalArgumentException(&quot;require 0–4096 candidate trials&quot;);</span>
+<span class="fc" id="L41">        this.budget = budget;</span>
+<span class="fc" id="L42">    }</span>
 
     /** Search seed terms, then one ordered ring operation on pairs of seeds, stopping on the first replayed proof. */
     public static Result search(Statement target, int maximumTrials) {
-<span class="fc" id="L43">        return new ExistentialWitnessSearch(target, maximumTrials).run();</span>
+<span class="fc" id="L46">        return search(target, maximumTrials, null);</span>
+    }
+
+    /** Observe each charged trial, including rejected terms, without altering the candidate order. */
+    public static Result search(Statement target, int maximumTrials, BiConsumer&lt;Expression, Optional&lt;Proof&gt;&gt; observer) {
+<span class="fc" id="L51">        return new ExistentialWitnessSearch(target, maximumTrials, observer).run();</span>
     }
 
     private Result run() {
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (budget == 0) return new Result(Status.BUDGET_EXHAUSTED, 0, Optional.empty());</span>
-<span class="fc" id="L48">        var seeds = seeds();</span>
-<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (var seed : seeds) {</span>
-<span class="fc" id="L50">            var stop = trial(seed);</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (stop != null) return stop;</span>
-<span class="fc" id="L52">        }</span>
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (var left : seeds) {</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">            for (var right : seeds) {</span>
-<span class="fc bfc" id="L55" title="All 2 branches covered.">                for (var operator : OPERATIONS) {</span>
-<span class="fc" id="L56">                    var stop = trial(new Binary(operator, left, right));</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">                    if (stop != null) return stop;</span>
-<span class="fc" id="L58">                }</span>
-<span class="fc" id="L59">            }</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (budget == 0) return new Result(Status.BUDGET_EXHAUSTED, 0, Optional.empty());</span>
+<span class="fc" id="L56">        var seeds = seeds();</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (var seed : seeds) {</span>
+<span class="fc" id="L58">            var stop = trial(seed);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (stop != null) return stop;</span>
 <span class="fc" id="L60">        }</span>
-<span class="fc" id="L61">        return new Result(Status.GRAMMAR_EXHAUSTED, examined, Optional.empty());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (var left : seeds) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (var right : seeds) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                for (var operator : OPERATIONS) {</span>
+<span class="fc" id="L64">                    var stop = trial(new Binary(operator, left, right));</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    if (stop != null) return stop;</span>
+<span class="fc" id="L66">                }</span>
+<span class="fc" id="L67">            }</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">        return new Result(Status.GRAMMAR_EXHAUSTED, examined, Optional.empty());</span>
     }
 
     private List&lt;Expression&gt; seeds() {
-<span class="fc" id="L65">        var terms = new LinkedHashSet&lt;Expression&gt;();</span>
-<span class="fc" id="L66">        terms.add(new Literal(&quot;0&quot;));</span>
-<span class="fc" id="L67">        terms.add(new Literal(&quot;1&quot;));</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (var declaration : target.body().declarations()) {</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!declaration.name().equals(target.binder())) terms.add(new Symbol(declaration.name()));</span>
-<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (terms.size() == MAX_SEEDS) return List.copyOf(terms);</span>
-<span class="fc" id="L71">        }</span>
-<span class="fc" id="L72">        collect(target.body().goal().left(), terms);</span>
-<span class="fc" id="L73">        collect(target.body().goal().right(), terms);</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (var premise : target.body().assumptions()) {</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (terms.size() == MAX_SEEDS) break;</span>
-<span class="fc" id="L76">            collect(premise.left(), terms);</span>
-<span class="fc" id="L77">            collect(premise.right(), terms);</span>
-<span class="fc" id="L78">        }</span>
-<span class="fc" id="L79">        return List.copyOf(terms);</span>
+<span class="fc" id="L73">        var terms = new LinkedHashSet&lt;Expression&gt;();</span>
+<span class="fc" id="L74">        terms.add(new Literal(&quot;0&quot;));</span>
+<span class="fc" id="L75">        terms.add(new Literal(&quot;1&quot;));</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (var declaration : target.body().declarations()) {</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (!declaration.name().equals(target.binder())) terms.add(new Symbol(declaration.name()));</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (terms.size() == MAX_SEEDS) return List.copyOf(terms);</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        collect(target.body().goal().left(), terms);</span>
+<span class="fc" id="L81">        collect(target.body().goal().right(), terms);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (var premise : target.body().assumptions()) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (terms.size() == MAX_SEEDS) break;</span>
+<span class="fc" id="L84">            collect(premise.left(), terms);</span>
+<span class="fc" id="L85">            collect(premise.right(), terms);</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        return List.copyOf(terms);</span>
     }
 
     private void collect(Expression term, Set&lt;Expression&gt; terms) {
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (terms.size() == MAX_SEEDS) return;</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (!term.referencedSymbols().contains(target.binder())) terms.add(term);</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (term instanceof Binary binary) {</span>
-<span class="fc" id="L86">            collect(binary.left(), terms);</span>
-<span class="fc" id="L87">            collect(binary.right(), terms);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (terms.size() == MAX_SEEDS) return;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (!term.referencedSymbols().contains(target.binder())) terms.add(term);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (term instanceof Binary binary) {</span>
+<span class="fc" id="L94">            collect(binary.left(), terms);</span>
+<span class="fc" id="L95">            collect(binary.right(), terms);</span>
         }
-<span class="fc" id="L89">    }</span>
+<span class="fc" id="L97">    }</span>
 
     /** A null result continues enumeration. An invalid expanded instance still consumes a trial. */
     private Result trial(Expression witness) {
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!seen.add(witness)) return null;</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (examined == budget) return new Result(Status.BUDGET_EXHAUSTED, examined, Optional.empty());</span>
-<span class="fc" id="L95">        examined++;</span>
-        Obligation instance;
-        try {
-<span class="fc" id="L98">            instance = target.instantiate(witness);</span>
-<span class="nc" id="L99">        } catch (IllegalArgumentException outsideRingBounds) {</span>
-<span class="nc" id="L100">            return null;</span>
-<span class="fc" id="L101">        }</span>
-<span class="fc" id="L102">        var proof = proofCandidate(witness, instance);</span>
-<span class="fc bfc" id="L103" title="All 4 branches covered.">        if (proof != null &amp;&amp; ExistentialIntroduction.replay(target, proof)) {</span>
-<span class="fc" id="L104">            return new Result(Status.FOUND, examined, Optional.of(proof));</span>
-        }
-<span class="fc" id="L106">        return null;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!seen.add(witness)) return null;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (examined == budget) return new Result(Status.BUDGET_EXHAUSTED, examined, Optional.empty());</span>
+<span class="fc" id="L103">        examined++;</span>
+<span class="fc" id="L104">        Optional&lt;Proof&gt; proof = checkWitness(target, witness);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (observer != null) observer.accept(witness, proof);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        return proof.isPresent() ? new Result(Status.FOUND, examined, proof) : null;</span>
     }
 
-    private Proof proofCandidate(Expression witness, Obligation instance) {
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (instance.assumptions().isEmpty()) return new Proof(target, witness, new NormalForm(instance));</span>
-        // The existing normal-form leaf accepts assumption-free instances only.
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (var premise : instance.assumptions()) {</span>
-<span class="pc bpc" id="L113" title="1 of 4 branches missed.">            if (premise.left().equals(instance.goal().left()) &amp;&amp; premise.right().equals(instance.goal().right())) {</span>
-<span class="fc" id="L114">                return new Proof(target, witness, new Hypothesis(instance, premise.id()));</span>
-            }
+    /** Instantiate and exactly replay a suggested witness through the same leaf checker as enumeration. */
+    public static Optional&lt;Proof&gt; checkWitness(Statement target, Expression witness) {
+        Obligation instance;
+        try {
+<span class="fc" id="L113">            instance = target.instantiate(witness);</span>
+<span class="nc" id="L114">        } catch (IllegalArgumentException outsideRingBounds) {</span>
+<span class="nc" id="L115">            return Optional.empty();</span>
 <span class="fc" id="L116">        }</span>
-<span class="fc" id="L117">        return null;</span>
+<span class="fc" id="L117">        var proof = proofCandidate(target, witness, instance);</span>
+<span class="fc bfc" id="L118" title="All 4 branches covered.">        return proof != null &amp;&amp; ExistentialIntroduction.replay(target, proof) ? Optional.of(proof) : Optional.empty();</span>
+    }
+
+    private static Proof proofCandidate(Statement target, Expression witness, Obligation instance) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (instance.assumptions().isEmpty()) return new Proof(target, witness, new NormalForm(instance));</span>
+        // The existing normal-form leaf accepts assumption-free instances only.
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (var premise : instance.assumptions()) {</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            if (premise.left().equals(instance.goal().left()) &amp;&amp; premise.right().equals(instance.goal().right())) {</span>
+<span class="fc" id="L126">                return new Proof(target, witness, new Hypothesis(instance, premise.id()));</span>
+            }
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        return null;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

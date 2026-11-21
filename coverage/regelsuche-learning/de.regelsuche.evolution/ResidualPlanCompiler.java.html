@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ResidualPlanCompiler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ResidualPlanCompiler.java</span></div><h1>ResidualPlanCompiler.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.evolution.StructuralConstructionPrograms.PreparedResidual;
+import de.regelsuche.evolution.StructuralConstructionPrograms.Work;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer.Effect;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.program.BudgetedTransformationSource;
+import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.solver.ir.SolverIr;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/** Compiles only completely re-derived, source-local, four-component residual compositions. */
+public final class ResidualPlanCompiler {
+    static final String CHECKER = &quot;residual-composition/v1&quot;;
+<span class="fc" id="L21">    static final String REVISION = SolverIr.sha256(CHECKER + &quot;|source-effects|exact-cover|sum-zero|exact-equality|four-prepared-components&quot;);</span>
+<span class="fc" id="L22">    private static final List&lt;String&gt; HOLES = List.of(&quot;left-pair&quot;, &quot;left-sign&quot;, &quot;right-pair&quot;, &quot;right-sign&quot;);</span>
+<span class="fc" id="L23">    private static final List&lt;SchematicProofPlan.ObligationKind&gt; CHECKS = List.of(</span>
+        SchematicProofPlan.ObligationKind.DISJOINT_OCCURRENCES, SchematicProofPlan.ObligationKind.COMPLETE_SOURCE_COVER,
+        SchematicProofPlan.ObligationKind.RESIDUAL_SUM_IS_ZERO, SchematicProofPlan.ObligationKind.EQUIVALENT);
+
+    private ResidualPlanCompiler() { }
+
+    public record Bound(String source, SchematicProofPlan plan, SchematicProofPlanResolution resolution,
+                        List&lt;String&gt; effects, String expression, List&lt;String&gt; primitiveRules, List&lt;String&gt; applicationKeys,
+                        List&lt;String&gt; assumptions, String proofRoot, long checkWork) {
+<span class="fc" id="L32">        public Bound {</span>
+<span class="fc" id="L33">            effects = List.copyOf(effects);</span>
+<span class="fc" id="L34">            primitiveRules = List.copyOf(primitiveRules);</span>
+<span class="fc" id="L35">            applicationKeys = List.copyOf(applicationKeys);</span>
+<span class="fc" id="L36">            assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L37">        }</span>
+    }
+
+    public static Bound bind(String source, List&lt;String&gt; selected, long workLimit) {
+<span class="fc" id="L41">        source = source.strip().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (source.isEmpty()) throw new IllegalArgumentException(&quot;source must contain an expression&quot;);</span>
+<span class="fc" id="L43">        var ids = List.copyOf(selected);</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (ids.size() != 2 || ids.getFirst().equals(ids.getLast())) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(&quot;two distinct source effect IDs required&quot;);</span>
+        }
+<span class="fc" id="L47">        var work = new Work(workLimit);</span>
+        try {
+<span class="fc" id="L49">            work.add(source.length() + 1L);</span>
+<span class="fc" id="L50">            var prepared = StructuralConstructionPrograms.prepareResidual(source, work, true);</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">            if (prepared == null || prepared.parts().size() != 4) throw new IllegalArgumentException(&quot;four source components required&quot;);</span>
+<span class="fc" id="L52">            var effects = prepared.effects().stream().filter(e -&gt; ids.contains(e.id())).toList();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (effects.size() != 2) throw new IllegalArgumentException(&quot;unknown source effect&quot;);</span>
+<span class="fc" id="L54">            return discharge(source, prepared, effects, work);</span>
+<span class="fc" id="L55">        } catch (StructuralConstructionPrograms.Limit exhausted) {</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(&quot;residual plan check exhausted its work limit&quot;, exhausted);</span>
+        }
+    }
+
+    private static Bound discharge(String source, PreparedResidual prepared, List&lt;Effect&gt; effects, Work work) {
+<span class="fc" id="L61">        var results = prepared.composer().compose(prepared.expression(), prepared.parts(), effects, 2, 1);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (results.size() != 1) throw new IllegalArgumentException(&quot;source effects do not cover and cancel&quot;);</span>
+<span class="fc" id="L63">        var composition = results.getFirst();</span>
+<span class="fc" id="L64">        ExactPolynomialAnalysis.withProductWork(work::add).requireEquivalent(source, composition.candidateExpression());</span>
+<span class="fc" id="L65">        var c = ResidualPlanController.checkedCandidate(source, prepared.expression(), composition);</span>
+<span class="fc" id="L66">        var plan = plan(source, prepared.expression());</span>
+<span class="fc" id="L67">        var bindings = bindings(prepared, composition.effects(), c.root(), work);</span>
+<span class="fc" id="L68">        var outcomes = plan.obligations().stream().map(o -&gt; new SchematicProofPlanResolution.ObligationOutcome(</span>
+<span class="fc" id="L69">            o.id(), SchematicProofPlanResolution.OutcomeStatus.CONFIRMED, CHECKER, REVISION,</span>
+<span class="fc" id="L70">            SolverIr.sha256(c.root() + &quot;|&quot; + o.id()), &quot;SOURCE_REPLAY_CONFIRMED&quot;)).toList();</span>
+<span class="fc" id="L71">        var resolution = SchematicProofPlanResolution.create(plan, bindings, outcomes);</span>
+<span class="fc" id="L72">        return new Bound(source, plan, resolution, c.effects(), c.expression(), c.primitiveRules(), c.applications(),</span>
+<span class="fc" id="L73">            c.assumptions(), c.root(), work.units());</span>
+    }
+
+    private static SchematicProofPlan plan(String source, String prepared) {
+<span class="fc" id="L77">        var holes = HOLES.stream().map(id -&gt; {</span>
+<span class="fc" id="L78">            boolean sign = id.endsWith(&quot;sign&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            var kind = sign ? SchematicProofPlan.HoleKind.SIGN : SchematicProofPlan.HoleKind.DISJOINT_TERM_PAIR;</span>
+<span class="fc" id="L80">            return new SchematicProofPlan.Hole(id, kind, kind.requiredSort(), &quot;source-additive-components&quot;, &quot;residual/v1&quot;,</span>
+                new SchematicProofPlan.HoleBudget(12, 128, 2, 4));
+<span class="fc" id="L82">        }).toList();</span>
+<span class="fc" id="L83">        var obligations = CHECKS.stream().map(k -&gt; new SchematicProofPlan.Obligation(</span>
+<span class="fc" id="L84">            k.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-'), k, &quot;compose&quot;, HOLES, List.of(), CHECKER, REVISION,</span>
+<span class="fc" id="L85">            SchematicProofPlan.InitialObligationStatus.OPEN)).toList();</span>
+<span class="fc" id="L86">        var ids = obligations.stream().map(SchematicProofPlan.Obligation::id).toList();</span>
+<span class="fc" id="L87">        var steps = List.of(new SchematicProofPlan.Step(&quot;form&quot;, SchematicProofPlan.StepAction.FORM_CANDIDATES, HOLES, List.of()),</span>
+            new SchematicProofPlan.Step(&quot;compose&quot;, SchematicProofPlan.StepAction.COMPOSE, HOLES, ids),
+<span class="fc" id="L89">            new SchematicProofPlan.Step(&quot;discharge&quot;, SchematicProofPlan.StepAction.DISCHARGE_OBLIGATIONS, List.of(), ids),</span>
+<span class="fc" id="L90">            new SchematicProofPlan.Step(&quot;emit&quot;, SchematicProofPlan.StepAction.EMIT_CANDIDATE, List.of(), ids));</span>
+<span class="fc" id="L91">        return SchematicProofPlan.create(&quot;signed-residual-pairs&quot;, SchematicProofPlan.InformationBoundary.TARGET_FREE_FORMATION,</span>
+<span class="fc" id="L92">            SolverIr.sha256(source.length() + &quot;:&quot; + source + prepared), steps, holes, obligations,</span>
+            new SchematicProofPlan.Limits(4, 4, 4, 16_384));
+    }
+
+    private static List&lt;SchematicProofPlanResolution.HoleBinding&gt; bindings(PreparedResidual prepared, List&lt;Effect&gt; effects,
+                                                                         String root, Work work) {
+<span class="fc" id="L98">        work.add(prepared.expression().length());</span>
+<span class="fc" id="L99">        var ordered = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L100">        occurrencePaths(new ExpressionParser().parseExactTerm(prepared.expression()).expression(), &quot;&quot;, ordered, work);</span>
+<span class="fc" id="L101">        var indexed = new HashMap&lt;String,String&gt;();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (int i = 0; i &lt; ordered.size(); i++) indexed.put(prepared.parts().get(i).id(), ordered.get(i));</span>
+<span class="fc" id="L103">        var bindings = new ArrayList&lt;SchematicProofPlanResolution.HoleBinding&gt;();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int i = 0; i &lt; effects.size(); i++) {</span>
+<span class="fc" id="L105">            var e = effects.get(i);</span>
+<span class="fc" id="L106">            var pair = e.components().stream().map(c -&gt; indexed.get(c.id())).sorted().toList();</span>
+<span class="fc" id="L107">            bindings.add(new SchematicProofPlanResolution.HoleBinding(HOLES.get(i*2), SchematicProofPlan.HoleSort.OCCURRENCE_PAIR,</span>
+<span class="fc" id="L108">                String.join(&quot;|&quot;, pair), root));</span>
+<span class="fc" id="L109">            bindings.add(new SchematicProofPlanResolution.HoleBinding(HOLES.get(i*2+1), SchematicProofPlan.HoleSort.SIGN,</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                e.id().startsWith(&quot;reflected-&quot;) ? &quot;-1&quot; : &quot;1&quot;, root));</span>
+        }
+<span class="fc" id="L112">        return bindings;</span>
+    }
+
+    private static void occurrencePaths(Expr expression, String path, List&lt;String&gt; out, Work work) {
+<span class="fc" id="L116">        work.add(1);</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.ADD) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            String prefix = path.isEmpty() ? &quot;&quot; : path + &quot;.&quot;;</span>
+<span class="fc" id="L119">            occurrencePaths(binary.left(), prefix + &quot;0&quot;, out, work);</span>
+<span class="fc" id="L120">            occurrencePaths(binary.right(), prefix + &quot;1&quot;, out, work);</span>
+<span class="fc" id="L121">        } else out.add(path);</span>
+<span class="fc" id="L122">    }</span>
+
+    public static RewriteProgram.BudgetedSource compile(Bound offered, long verifierBudget) {
+<span class="fc" id="L125">        var verified = bind(offered.source(), offered.effects(), verifierBudget);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!verified.equals(offered)) throw new IllegalArgumentException(&quot;offer differs from native replay of bound plan&quot;);</span>
+<span class="fc" id="L127">        return program(verified, 0, REVISION);</span>
+    }
+
+    static RewriteProgram.BudgetedSource compileSearch(String source, List&lt;String&gt; effects, String root,
+                                                        long verifierBudget, long acquisitionWork, String acquisition) {
+<span class="fc" id="L132">        var verified = bind(source, effects, verifierBudget);</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (!verified.proofRoot().equals(root)) throw new IllegalArgumentException(&quot;bound proof differs from search output&quot;);</span>
+<span class="fc" id="L134">        return program(verified, acquisitionWork, acquisition);</span>
+    }
+
+    private static RewriteProgram.BudgetedSource program(Bound verified, long acquisitionWork, String acquisition) {
+<span class="fc" id="L138">        var source = new CheckedSource(verified, Math.addExact(verified.checkWork(), acquisitionWork), acquisition);</span>
+<span class="fc" id="L139">        return new RewriteProgram.BudgetedSource(RewriteProgram.NodeMetadata.named(&quot;bound-residual-plan&quot;), source);</span>
+    }
+
+<span class="fc" id="L142">    private record CheckedSource(Bound bound, long totalWork, String acquisition) implements BudgetedTransformationSource {</span>
+        @Override public SourceIdentity identity() {
+<span class="fc" id="L144">            return new SourceIdentity(CHECKER, REVISION, SolverIr.sha256(bound.proofRoot() + &quot;|&quot; + bound.resolution().contentHash() + &quot;|&quot; + acquisition));</span>
+        }
+        @Override public Result transform(String expression, long available) {
+<span class="fc" id="L147">            var id = identity();</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (!expression.equals(bound.source())) return Result.noMatch(id, expression, available, 1, &quot;SOURCE_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (available &lt; totalWork) return Result.budgetInconclusive(id, expression, available, totalWork, 2, &quot;REPLAY_WORK_REQUIRED&quot;);</span>
+<span class="fc" id="L150">            var edge = ExactTheoryTransition.create(expression, bound.expression(), CHECKER, id.authorityHash(),</span>
+<span class="fc" id="L151">                bound.assumptions(), totalWork, bound.proofRoot());</span>
+<span class="fc" id="L152">            return Result.candidates(id, expression, available, List.of(edge), 3, &quot;BOUND_RESIDUAL_PLAN&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

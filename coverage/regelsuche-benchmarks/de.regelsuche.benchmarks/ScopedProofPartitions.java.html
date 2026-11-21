@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedProofPartitions.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ScopedProofPartitions.java</span></div><h1>ScopedProofPartitions.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.solver.ir.CoreExpressionIrAdapter;
+import de.regelsuche.solver.ir.ExistentialIntroduction.Statement;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/** Disjoint source generators committed in the scoped-proof-transfer-v1 protocol. */
+final class ScopedProofPartitions {
+<span class="fc" id="L13">    private static final CoreExpressionIrAdapter TERMS = new CoreExpressionIrAdapter();</span>
+<span class="fc" id="L14">    enum Split { TRAIN, VALIDATION, FINAL }</span>
+<span class="fc" id="L15">    record Case(String id, Obligation source, String binder, Obligation receiver) {</span>
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        boolean witness() { return !binder.isEmpty(); }</span>
+    }
+
+    static List&lt;Case&gt; generate(Split split) {
+<span class="fc" id="L20">        var cases = new ArrayList&lt;Case&gt;();</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (int family = 0; family &lt; 2; family++) {</span>
+<span class="fc" id="L22">            String prefix = split.name().toLowerCase(Locale.ROOT) + family;</span>
+<span class="fc" id="L23">            String a = prefix + &quot;a&quot;, b = prefix + &quot;b&quot;, w = prefix + &quot;w&quot;;</span>
+<span class="fc" id="L24">            var operands = operands(split, family, a, b);</span>
+<span class="fc" id="L25">            String A = &quot;(&quot; + operands.get(0) + &quot;)&quot;, B = &quot;(&quot; + operands.get(1) + &quot;)&quot;;</span>
+<span class="fc" id="L26">            var forms = List.of(List.of(w + &quot;+&quot; + A, B), List.of(w + &quot;-&quot; + A, B), List.of(A + &quot;-&quot; + w, B),</span>
+<span class="fc" id="L27">                List.of(w + &quot;+&quot; + w, w + &quot;+&quot; + w + &quot;+1&quot;));</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (int i = 0; i &lt; forms.size(); i++) {</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">                var sides = (cases.size() &amp; 1) == 0 ? forms.get(i) : forms.get(i).reversed();</span>
+<span class="fc" id="L30">                String id = prefix + &quot;-w&quot; + i;</span>
+<span class="fc" id="L31">                var goal = new Goal(Relation.EQUALS, TERMS.parse(sides.get(0)), TERMS.parse(sides.get(1)));</span>
+<span class="fc" id="L32">                var declarations = List.of(real(a), real(b), real(w));</span>
+<span class="fc" id="L33">                var source = Obligation.create(id, declarations, List.of(Theory.REAL_ARITHMETIC), List.of(), goal,</span>
+<span class="fc" id="L34">                    RequestedEvidence.SYMBOLIC_CERTIFICATE, provenance(id));</span>
+<span class="fc" id="L35">                cases.add(new Case(id, source, w, new Statement(source, w).toScopedObligation()));</span>
+            }
+        }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 0; i &lt; 3; i++) cases.add(induction(split, i));</span>
+<span class="fc" id="L39">        return List.copyOf(cases);</span>
+    }
+
+    private static List&lt;String&gt; operands(Split split, int family, String a, String b) {
+<span class="fc bfc" id="L43" title="All 3 branches covered.">        return switch (split) {</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            case TRAIN -&gt; family == 0 ? List.of(a, b) : List.of(a + &quot;+2&quot;, b + &quot;-3&quot;);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            case VALIDATION -&gt; family == 0 ? List.of(a + &quot;*&quot; + b, b + &quot;+5&quot;) : List.of(a + &quot;-&quot; + b, &quot;(&quot; + a + &quot;+&quot; + b + &quot;)*7&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            case FINAL -&gt; family == 0 ? List.of(&quot;(&quot; + a + &quot;+&quot; + b + &quot;)*(&quot; + a + &quot;-&quot; + b + &quot;)&quot;, a + &quot;*&quot; + a + &quot;+&quot; + b + &quot;*&quot; + b + &quot;+11&quot;)</span>
+<span class="fc" id="L47">                : List.of(a + &quot;*&quot; + a + &quot;-&quot; + b, &quot;(&quot; + a + &quot;+&quot; + b + &quot;)*13-&quot; + b);</span>
+        };
+    }
+
+    private static Case induction(Split split, int family) {
+<span class="fc" id="L52">        String id = split.name().toLowerCase(Locale.ROOT) + &quot;ind&quot; + family;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        String p = id + (family == 1 ? &quot;z&quot; : &quot;a&quot;), q = id + &quot;m&quot;, r = id + &quot;n&quot;;</span>
+<span class="fc" id="L54">        var declarations = new ArrayList&lt;SymbolDeclaration&gt;();</span>
+<span class="fc" id="L55">        var premises = new ArrayList&lt;Predicate&gt;();</span>
+<span class="fc" id="L56">        declarations.add(new SymbolDeclaration(p, Sort.NAT_PREDICATE));</span>
+<span class="fc" id="L57">        premises.add(transition(&quot;own-step&quot;, p, p));</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (family &lt; 2) premises.add(Predicate.holds(&quot;base&quot;, at(p, app(&quot;nat&quot;, new Literal(&quot;0&quot;)))));</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">        if (split != Split.TRAIN || family == 1) declarations.add(new SymbolDeclaration(q, Sort.NAT_PREDICATE));</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (split != Split.TRAIN) premises.add(transition(&quot;unmatched&quot;, q, q));</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (split == Split.FINAL) {</span>
+<span class="fc" id="L62">            declarations.add(new SymbolDeclaration(r, Sort.NAT_PREDICATE));</span>
+<span class="fc" id="L63">            premises.add(transition(&quot;crossed&quot;, q, r));</span>
+        }
+        // Only the observer receives the designated recipient statement.
+<span class="fc" id="L66">        var source = Obligation.create(id, declarations, List.of(Theory.SCOPED_ANALYSIS), premises,</span>
+<span class="fc" id="L67">            new Goal(Relation.EQUALS, new Literal(&quot;0&quot;), new Literal(&quot;0&quot;)), RequestedEvidence.FORMAL_PROOF, provenance(id));</span>
+<span class="fc" id="L68">        var receiver = Obligation.create(id, declarations, source.theories(), premises,</span>
+<span class="fc" id="L69">            Goal.holds(all(at(p, new Bound(0)))), source.requestedEvidence(), source.provenance());</span>
+<span class="fc" id="L70">        return new Case(id, source, &quot;&quot;, receiver);</span>
+    }
+
+    private static Predicate transition(String id, String from, String to) {
+<span class="fc" id="L74">        var n = new Bound(0);</span>
+<span class="fc" id="L75">        return Predicate.holds(id, all(app(&quot;implies&quot;, at(from,n), at(to,app(&quot;succ&quot;,n)))));</span>
+    }
+
+<span class="fc" id="L78">    static Call app(String name, Expression... args) { return new Call(name, List.of(args)); }</span>
+<span class="fc" id="L79">    private static Expression at(String p, Expression n) { return app(&quot;at&quot;, new Symbol(p), n); }</span>
+<span class="fc" id="L80">    private static Binder all(Expression p) { return new Binder(BinderKind.FORALL, Sort.NATURAL, p); }</span>
+<span class="fc" id="L81">    private static SymbolDeclaration real(String name) { return new SymbolDeclaration(name, Sort.REAL); }</span>
+    private static SourceProvenance provenance(String id) {
+<span class="fc" id="L83">        return new SourceProvenance(&quot;scoped-proof-transfer-v1&quot;, id, SolverIr.sha256(&quot;scoped-proof-transfer-v1/&quot; + id));</span>
+    }
+    private ScopedProofPartitions() { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

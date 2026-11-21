@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ResidualPlanComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ResidualPlanComparison.java</span></div><h1>ResidualPlanComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.evolution.ResidualPlanController.Arm;
+import de.regelsuche.evolution.ResidualPlanController.Candidate;
+import de.regelsuche.evolution.ResidualPlanController.Report;
+import de.regelsuche.solver.ir.SolverIr;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+
+/** Source-only acquisition and evaluation. Historical formulas are supplied only to the separate observer. */
+public final class ResidualPlanComparison {
+<span class="fc" id="L20">    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);</span>
+    private static final String PROTOCOL = &quot;a672a8c78ee28734bb779f9870c9a6e321078f13&quot;;
+<span class="fc" id="L22">    private static final List&lt;String&gt; TRAIN = List.of(&quot;x^2+x^4+x^6+x^8&quot;, &quot;4*y^2+9*y^4+16*y^6+36*y^8&quot;, &quot;a^2+b^2+c^2+d^2&quot;);</span>
+<span class="fc" id="L23">    record Score(int mask, boolean recall, long admittedFailures) { }</span>
+<span class="fc" id="L24">    record Plan(String schema, String protocol, String trainingHash, int mask, boolean trainingComplete, long acquisitionWork) { }</span>
+    private ResidualPlanComparison() { }
+
+    public static void main(String[] args) throws Exception {
+<span class="nc" id="L28">        var dir = Path.of(args[1]);</span>
+<span class="nc bnc" id="L29" title="All 4 branches missed.">        if (args.length == 2 &amp;&amp; args[0].equals(&quot;train&quot;)) {</span>
+<span class="nc" id="L30">            train(dir);</span>
+<span class="nc" id="L31">            System.out.println(SolverIr.sha256(Files.readString(dir.resolve(&quot;plan.json&quot;))));</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        } else if (args.length == 3) evaluate(args[0], dir, args[2]);</span>
+<span class="nc" id="L33">        else throw new IllegalArgumentException(&quot;train DIRECTORY | validation|final DIRECTORY TRUSTED_PLAN_HASH&quot;);</span>
+<span class="nc" id="L34">    }</span>
+
+    static void train(Path dir) throws Exception {
+<span class="fc" id="L37">        var scores = new ArrayList&lt;Score&gt;();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int mask = 0; mask &lt; 8; mask++) scores.add(new Score(mask, true, 0));</span>
+<span class="fc" id="L39">        var observations = new ArrayList&lt;ObjectNode&gt;();</span>
+<span class="fc" id="L40">        long work = 0;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (String source : TRAIN) {</span>
+<span class="fc" id="L42">            var gold = new ResidualPlanController(source).run(Arm.ALL_AT_ONCE, 0, observations.size());</span>
+<span class="fc" id="L43">            var wanted = gold.candidates().stream().map(Candidate::root).sorted().toList();</span>
+<span class="fc" id="L44">            boolean oracleComplete = gold.status().equals(&quot;COMPLETE&quot;);</span>
+<span class="fc" id="L45">            var item = caseHeader(source, gold);</span>
+<span class="fc" id="L46">            var attempts = item.putArray(&quot;arms&quot;);</span>
+<span class="fc" id="L47">            attempts.add(report(gold));</span>
+<span class="fc" id="L48">            work = Math.addExact(work, gold.work());</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (int mask = 0; mask &lt; 8; mask++) {</span>
+<span class="fc" id="L50">                var result = new ResidualPlanController(source).run(Arm.LEARNED, mask, observations.size());</span>
+<span class="fc" id="L51">                attempts.add(report(result).put(&quot;mask&quot;, mask));</span>
+<span class="fc" id="L52">                work = Math.addExact(work, result.work());</span>
+<span class="fc" id="L53">                var seen = result.candidates().stream().map(Candidate::root).sorted().toList();</span>
+<span class="fc" id="L54">                var before = scores.get(mask);</span>
+<span class="pc bpc" id="L55" title="4 of 8 branches missed.">                boolean retains = before.recall() &amp;&amp; oracleComplete &amp;&amp; result.status().equals(&quot;COMPLETE&quot;) &amp;&amp; wanted.equals(seen);</span>
+<span class="fc" id="L56">                long rejected = result.decisions().stream().filter(d -&gt; d.status().equals(&quot;EXACT_REJECTED&quot;)).count();</span>
+<span class="fc" id="L57">                scores.set(mask, new Score(mask, retains, before.admittedFailures() + rejected));</span>
+            }
+<span class="fc" id="L59">            observations.add(item);</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        var winner = scores.stream().filter(Score::recall).min(Comparator.comparingLong(Score::admittedFailures)</span>
+<span class="pc" id="L62">            .thenComparingInt(s -&gt; Integer.bitCount(s.mask())).thenComparingInt(Score::mask));</span>
+<span class="fc" id="L63">        String data = encode(Map.of(&quot;protocol&quot;, PROTOCOL, &quot;split&quot;, &quot;TRAIN&quot;, &quot;cases&quot;, observations, &quot;maskScores&quot;, scores));</span>
+<span class="fc" id="L64">        save(dir, &quot;train.json&quot;, data);</span>
+<span class="fc" id="L65">        save(dir, &quot;plan.json&quot;, encode(new Plan(&quot;residual-controller-mask/v1&quot;, PROTOCOL, SolverIr.sha256(data),</span>
+<span class="fc" id="L66">            winner.map(Score::mask).orElse(0), winner.isPresent(), work)));</span>
+<span class="fc" id="L67">    }</span>
+
+    static void evaluate(String split, Path dir, String hash) throws Exception {
+<span class="fc" id="L70">        String frozen = Files.readString(dir.resolve(&quot;plan.json&quot;));</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!SolverIr.sha256(frozen).equals(hash)) throw new IllegalArgumentException(&quot;residual plan hash differs&quot;);</span>
+<span class="fc" id="L72">        var plan = JSON.readValue(frozen, Plan.class);</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        if (!plan.protocol().equals(PROTOCOL) || !plan.trainingHash().equals(SolverIr.sha256(Files.readString(dir.resolve(&quot;train.json&quot;)))))</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(&quot;residual training evidence or protocol differs&quot;);</span>
+<span class="pc bpc" id="L75" title="1 of 3 branches missed.">        var sources = switch (split) {</span>
+<span class="fc" id="L76">            case &quot;validation&quot; -&gt; List.of(&quot;u^2+u^6+u^10+u^14&quot;, &quot;r^2+s^2+t^2+v^2&quot;);</span>
+<span class="fc" id="L77">            case &quot;final&quot; -&gt; List.of(&quot;(a^2+b^2)*(c^2+d^2)&quot;, &quot;(4*p^2+9*q^2)*(25*r^2+49*s^2)&quot;, &quot;j^2+k^2+l^2+m^2&quot;);</span>
+<span class="nc" id="L78">            default -&gt; throw new IllegalArgumentException(&quot;unexpected residual split&quot;);</span>
+        };
+<span class="fc" id="L80">        var observations = new ArrayList&lt;ObjectNode&gt;();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (String source : sources) {</span>
+<span class="fc" id="L82">            ObjectNode item = null;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (Arm arm : Arm.values()) {</span>
+<span class="fc" id="L84">                var result = new ResidualPlanController(source).run(arm, plan.mask(), observations.size());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                if (item == null) item = caseHeader(source, result);</span>
+<span class="fc" id="L86">                item.withArray(&quot;arms&quot;).add(report(result));</span>
+            }
+<span class="fc" id="L88">            observations.add(item);</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">        save(dir, split + &quot;.json&quot;, encode(Map.of(&quot;plan&quot;, hash, &quot;split&quot;, split, &quot;cases&quot;, observations,</span>
+<span class="fc" id="L91">            &quot;chargeTrainingOnceToLearned&quot;,plan.acquisitionWork())));</span>
+<span class="fc" id="L92">    }</span>
+
+    private static ObjectNode caseHeader(String source, Report run) {
+<span class="fc" id="L95">        ObjectNode item = JSON.createObjectNode().put(&quot;source&quot;, source).put(&quot;prepared&quot;, run.preparedSource());</span>
+<span class="fc" id="L96">        item.set(&quot;localEffects&quot;, JSON.valueToTree(run.localEffects()));</span>
+<span class="fc" id="L97">        return item;</span>
+    }
+    private static ObjectNode report(Report report) {
+<span class="fc" id="L100">        ObjectNode node = JSON.valueToTree(report);</span>
+<span class="fc" id="L101">        node.remove(List.of(&quot;localEffects&quot;, &quot;preparedSource&quot;));</span>
+<span class="fc" id="L102">        return node;</span>
+    }
+    private static String encode(Object value) throws Exception {
+<span class="fc" id="L105">        return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(value) + &quot;\n&quot;;</span>
+    }
+    static void save(Path dir, String name, String text) throws Exception {
+<span class="fc" id="L108">        Files.createDirectories(dir);</span>
+<span class="fc" id="L109">        Path file = dir.resolve(name);</span>
+<span class="pc bpc" id="L110" title="3 of 4 branches missed.">        if (Files.exists(file) &amp;&amp; Files.readString(file).equals(text)) return;</span>
+<span class="fc" id="L111">        Files.writeString(file, text, StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L112">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

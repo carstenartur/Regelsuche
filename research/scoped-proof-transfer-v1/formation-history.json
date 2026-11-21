@@ -1,0 +1,70 @@
+{
+  "format": "git-bundle",
+  "file": "formation-history.bundle",
+  "bytes": 133078,
+  "sha256": "cdf4c9859663f9ba0d0e9e9c61162a565ebe1bb571de1dbfd4539f04605a7312",
+  "prerequisite": "e115dca89bba32bad516d66f408e26f99fbb6149",
+  "head": "12c07101ee6caed1c418ef8328afca05541f5ed8",
+  "orderedStudyBoundaries": [
+    {
+      "revision": "abf2aba070a70f1ac48ab066d134195c9182af9c",
+      "parent": "371287f395dcac10fc85c6b55393f21e1ec96a5e",
+      "tree": "ea69cc6b445a66bf2802ae6f399d7dcec3332542",
+      "subject": "Freeze the finite scoped proof transfer protocol before evaluation"
+    },
+    {
+      "revision": "e4059fa7b618dc91e87bf0264bef1dc47a970997",
+      "parent": "1708d0e44de4a458ba1e4766b03e7cadd1850bf7",
+      "tree": "ec1bb015a78e52a51e78586d2d7a9f07717f9c46",
+      "subject": "Freeze scoped proof training receipts and six-arm evaluation before holdouts"
+    },
+    {
+      "revision": "958a89300071fc1e121560e99cd24aa1c82bacfd",
+      "parent": "e4059fa7b618dc91e87bf0264bef1dc47a970997",
+      "tree": "f1727d551736b04e55f2b1396623cd2aabd4cc2e",
+      "subject": "Retain all six scoped holdout arms and replay their exact proofs"
+    },
+    {
+      "revision": "a672a8c78ee28734bb779f9870c9a6e321078f13",
+      "parent": "958a89300071fc1e121560e99cd24aa1c82bacfd",
+      "tree": "92e24368a4bea528e88831d67c90204fd7d96fb3",
+      "subject": "Preregister the source-only residual controller and all comparison arms"
+    },
+    {
+      "revision": "39ee189d6d439db9c156b935497cc4f20aaf0a68",
+      "parent": "a672a8c78ee28734bb779f9870c9a6e321078f13",
+      "tree": "149189e08a88824787a17f778e78f2703359d8aa",
+      "subject": "Freeze learned residual selectors and native training evidence before holdouts"
+    },
+    {
+      "revision": "4f94fd4d5b933ab014b4445520d329cd9db4540b",
+      "parent": "39ee189d6d439db9c156b935497cc4f20aaf0a68",
+      "tree": "18d509adb44fad6990ab5a9968dda285c7cf4f58",
+      "subject": "Freeze checked residual candidates independently of historical correspondence"
+    },
+    {
+      "revision": "b2d7e172e04da7022f46d2e3944fad46a8c5370d",
+      "parent": "4f94fd4d5b933ab014b4445520d329cd9db4540b",
+      "tree": "33edea900d2d16148d131c5f6fa278e9955845b2",
+      "subject": "Replay frozen residual outcomes and compare both historical forms after freeze"
+    },
+    {
+      "revision": "0a5d5d813c24a78db2e6096179c48755aaaded7e",
+      "parent": "b2d7e172e04da7022f46d2e3944fad46a8c5370d",
+      "tree": "8fe5695442b641cdad69a4dc11e3ec8fbcd7ae81",
+      "subject": "Compile fully bound residual occurrence plans after independent primitive replay"
+    },
+    {
+      "revision": "12c07101ee6caed1c418ef8328afca05541f5ed8",
+      "parent": "0a5d5d813c24a78db2e6096179c48755aaaded7e",
+      "tree": "fef409317cf11f5cd15149871ec32fbe283c2925",
+      "subject": "Charge lazy residual search continuations and exact replay to compiled moves"
+    }
+  ],
+  "verification": [
+    "git bundle verify docs/research/scoped-proof-transfer-v1/formation-history.bundle",
+    "git fetch docs/research/scoped-proof-transfer-v1/formation-history.bundle HEAD:refs/heads/reproduced-proof-history",
+    "git log --reverse --oneline e115dca89bba32bad516d66f408e26f99fbb6149..reproduced-proof-history"
+  ],
+  "scope": "These original commit and tree objects preserve the ordering of local protocols, acquisition, candidate freezes and post-freeze observations. They do not attest independent blindness or wall-clock timestamps."
+}

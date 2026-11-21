@@ -2,6 +2,7 @@
 
 import static de.regelsuche.solver.ir.SolverIr.Sort.*;
 
+import de.regelsuche.solver.ir.NaturalInduction;
 import de.regelsuche.solver.ir.SolverIr.*;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -30,234 +31,249 @@ final class ScopedLeanRenderer {
           | solve_by_elim
           | exact?
         &quot;&quot;&quot;;
-<span class="fc" id="L33">    private record Term(String source, Sort sort) { }</span>
+<span class="fc" id="L34">    private record Term(String source, Sort sort) { }</span>
     private final Obligation obligation;
-<span class="fc" id="L35">    private final List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L36">    private final Map&lt;String, Sort&gt; free = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L37">    private final List&lt;Sort&gt; scope = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L36">    private final List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L37">    private final Map&lt;String, Sort&gt; free = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L38">    private final List&lt;Sort&gt; scope = new ArrayList&lt;&gt;();</span>
     // Keys are typed, fully rendered real terms, whose bound names encode lexical levels.
-<span class="fc" id="L39">    private record Guard(String source, boolean positive, boolean nonnegative, boolean nonzero) { }</span>
-<span class="fc" id="L40">    private final List&lt;Guard&gt; guards = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L40">    private record Guard(String source, boolean positive, boolean nonnegative, boolean nonzero) { }</span>
+<span class="fc" id="L41">    private final List&lt;Guard&gt; guards = new ArrayList&lt;&gt;();</span>
 
-<span class="fc" id="L42">    ScopedLeanRenderer(Obligation obligation) { this.obligation = obligation; }</span>
+<span class="fc" id="L43">    ScopedLeanRenderer(Obligation obligation) { this.obligation = obligation; }</span>
 
     LeanSourceRenderer.Material render() {
-<span class="fc" id="L45">        var mapping = new HashMap&lt;String,String&gt;();</span>
+<span class="fc" id="L46">        var mapping = new HashMap&lt;String,String&gt;();</span>
         try {
-<span class="pc bpc" id="L47" title="2 of 4 branches missed.">            if (obligation.declarations().size() &gt; 128 || obligation.assumptions().size() &gt; 128)</span>
-<span class="nc" id="L48">                throw new IllegalArgumentException(&quot;OBLIGATION_SIZE_LIMIT&quot;);</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (obligation.theories().contains(Theory.INTEGER_ARITHMETIC))</span>
-<span class="nc" id="L50">                throw new IllegalArgumentException(&quot;UNSUPPORTED_THEORY:INTEGER_ARITHMETIC&quot;);</span>
-<span class="fc" id="L51">            StringBuilder type = new StringBuilder();</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (var d : obligation.declarations()) {</span>
-<span class="fc" id="L53">                free.put(d.name(), d.sort());</span>
-<span class="fc" id="L54">                type.append(&quot; (rs_&quot;).append(d.name()).append(&quot; : &quot;).append(sortName(d.sort())).append(&quot;)&quot;);</span>
-<span class="fc" id="L55">            }</span>
-<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (!type.isEmpty()) type.insert(0, &quot;∀&quot;).append(&quot;, &quot;);</span>
-<span class="fc" id="L57">            collectGlobalGuards();</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (var p : obligation.assumptions()) {</span>
-<span class="fc" id="L59">                String premise = relation(p.relation(), p.left(), p.right(), null);</span>
-<span class="fc" id="L60">                mapping.put(&quot;assumption.&quot; + p.id(), premise);</span>
-<span class="fc" id="L61">                type.append(premise).append(&quot; → &quot;);</span>
-<span class="fc" id="L62">            }</span>
-<span class="fc" id="L63">            var goal = obligation.goal();</span>
-<span class="fc" id="L64">            type.append(relation(goal.relation(), goal.left(), goal.right(), mapping));</span>
-<span class="fc" id="L65">            mapping.put(&quot;goal.closedType&quot;, type.toString());</span>
-<span class="fc" id="L66">            return new LeanSourceRenderer.Material(type.toString(), TACTICS, mapping, issues);</span>
-<span class="fc" id="L67">        } catch (IllegalArgumentException unsupported) {</span>
-<span class="fc" id="L68">            issues.add(unsupported.getMessage());</span>
-<span class="fc" id="L69">            return new LeanSourceRenderer.Material(&quot;&quot;, &quot;&quot;, Map.of(), issues);</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">            if (obligation.declarations().size() &gt; 128 || obligation.assumptions().size() &gt; 128)</span>
+<span class="nc" id="L49">                throw new IllegalArgumentException(&quot;OBLIGATION_SIZE_LIMIT&quot;);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (obligation.theories().contains(Theory.INTEGER_ARITHMETIC))</span>
+<span class="nc" id="L51">                throw new IllegalArgumentException(&quot;UNSUPPORTED_THEORY:INTEGER_ARITHMETIC&quot;);</span>
+<span class="fc" id="L52">            StringBuilder type = new StringBuilder();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (var d : obligation.declarations()) {</span>
+<span class="fc" id="L54">                free.put(d.name(), d.sort());</span>
+<span class="fc" id="L55">                type.append(&quot; (rs_&quot;).append(d.name()).append(&quot; : &quot;).append(sortName(d.sort())).append(&quot;)&quot;);</span>
+<span class="fc" id="L56">            }</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (!type.isEmpty()) type.insert(0, &quot;∀&quot;).append(&quot;, &quot;);</span>
+<span class="fc" id="L58">            collectGlobalGuards();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (var p : obligation.assumptions()) {</span>
+<span class="fc" id="L60">                String premise = relation(p.relation(), p.left(), p.right(), null);</span>
+<span class="fc" id="L61">                mapping.put(&quot;assumption.&quot; + p.id(), premise);</span>
+<span class="fc" id="L62">                type.append(premise).append(&quot; → &quot;);</span>
+<span class="fc" id="L63">            }</span>
+<span class="fc" id="L64">            var goal = obligation.goal();</span>
+<span class="fc" id="L65">            type.append(relation(goal.relation(), goal.left(), goal.right(), mapping));</span>
+<span class="fc" id="L66">            mapping.put(&quot;goal.closedType&quot;, type.toString());</span>
+<span class="fc" id="L67">            return new LeanSourceRenderer.Material(type.toString(), proof(), mapping, issues);</span>
+<span class="fc" id="L68">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L69">            issues.add(unsupported.getMessage());</span>
+<span class="fc" id="L70">            return new LeanSourceRenderer.Material(&quot;&quot;, &quot;&quot;, Map.of(), issues);</span>
         }
     }
 
+    private String proof() {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var plan : NaturalInduction.discover(obligation)) {</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (!plan.conclusion().equals(obligation)) continue;</span>
+<span class="fc" id="L77">            var introductions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L78">            obligation.declarations().forEach(d -&gt; introductions.add(&quot;rs_&quot; + d.name()));</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (int i = 0; i &lt; obligation.assumptions().size(); i++) introductions.add(&quot;h&quot; + i);</span>
+<span class="fc" id="L80">            int base = obligation.assumptions().indexOf(plan.base());</span>
+<span class="fc" id="L81">            int step = obligation.assumptions().indexOf(plan.step());</span>
+<span class="fc" id="L82">            return &quot;by\n  intro &quot; + String.join(&quot; &quot;, introductions)</span>
+<span class="fc" id="L83">                + &quot;\n  exact Nat.rec (motive := rs_&quot; + plan.predicate() + &quot;) h&quot; + base + &quot; h&quot; + step + &quot;\n&quot;;</span>
+        }
+<span class="fc" id="L85">        return TACTICS;</span>
+    }
+
     private String relation(Relation relation, Expression l, Expression r, Map&lt;String,String&gt; mapping) {
-<span class="fc" id="L74">        Term left = term(l, 0);</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (relation == Relation.HOLDS) {</span>
-<span class="fc" id="L76">            expect(left, PROPOSITION);</span>
-<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (mapping != null) mapping.put(&quot;goal.proposition&quot;, left.source);</span>
-<span class="fc" id="L78">            return left.source;</span>
+<span class="fc" id="L89">        Term left = term(l, 0);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (relation == Relation.HOLDS) {</span>
+<span class="fc" id="L91">            expect(left, PROPOSITION);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (mapping != null) mapping.put(&quot;goal.proposition&quot;, left.source);</span>
+<span class="fc" id="L93">            return left.source;</span>
         }
-<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (relation == Relation.IS_INTEGER) throw new IllegalArgumentException(&quot;UNSUPPORTED_RELATION:IS_INTEGER&quot;);</span>
-<span class="nc" id="L81">        Term right = term(r, 0);</span>
-<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (mapping != null) {</span>
-<span class="nc" id="L83">            mapping.put(&quot;goal.left&quot;, left.source);</span>
-<span class="nc" id="L84">            mapping.put(&quot;goal.right&quot;, right.source);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (relation == Relation.IS_INTEGER) throw new IllegalArgumentException(&quot;UNSUPPORTED_RELATION:IS_INTEGER&quot;);</span>
+<span class="nc" id="L96">        Term right = term(r, 0);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (mapping != null) {</span>
+<span class="nc" id="L98">            mapping.put(&quot;goal.left&quot;, left.source);</span>
+<span class="nc" id="L99">            mapping.put(&quot;goal.right&quot;, right.source);</span>
         }
-<span class="nc bnc" id="L86" title="All 7 branches missed.">        return compare(switch (relation) {</span>
-<span class="nc" id="L87">            case EQUALS -&gt; &quot;=&quot;; case NOT_EQUALS -&gt; &quot;≠&quot;; case LESS_THAN -&gt; &quot;&lt;&quot;; case LESS_OR_EQUAL -&gt; &quot;≤&quot;;</span>
-<span class="nc" id="L88">            case GREATER_THAN -&gt; &quot;&gt;&quot;; case GREATER_OR_EQUAL -&gt; &quot;≥&quot;; default -&gt; throw new IllegalStateException();</span>
+<span class="nc bnc" id="L101" title="All 7 branches missed.">        return compare(switch (relation) {</span>
+<span class="nc" id="L102">            case EQUALS -&gt; &quot;=&quot;; case NOT_EQUALS -&gt; &quot;≠&quot;; case LESS_THAN -&gt; &quot;&lt;&quot;; case LESS_OR_EQUAL -&gt; &quot;≤&quot;;</span>
+<span class="nc" id="L103">            case GREATER_THAN -&gt; &quot;&gt;&quot;; case GREATER_OR_EQUAL -&gt; &quot;≥&quot;; default -&gt; throw new IllegalStateException();</span>
         }, left, right).source;
     }
 
     static String sortName(Sort sort) {
-<span class="pc bpc" id="L93" title="4 of 7 branches missed.">        return switch (sort) {</span>
-<span class="pc" id="L94">            case REAL -&gt; &quot;Real&quot;; case NATURAL -&gt; &quot;Nat&quot;; case PROPOSITION -&gt; &quot;Prop&quot;; case REAL_SET -&gt; &quot;Set Real&quot;;</span>
-<span class="pc" id="L95">            case REAL_SEQUENCE -&gt; &quot;Nat → Real&quot;; case REAL_FUNCTION -&gt; &quot;Real → Real&quot;;</span>
-<span class="nc" id="L96">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_SORT:&quot; + sort);</span>
+<span class="pc bpc" id="L108" title="4 of 8 branches missed.">        return switch (sort) {</span>
+<span class="pc" id="L109">            case NAT_PREDICATE -&gt; &quot;Nat → Prop&quot;; case REAL -&gt; &quot;Real&quot;; case NATURAL -&gt; &quot;Nat&quot;; case PROPOSITION -&gt; &quot;Prop&quot;; case REAL_SET -&gt; &quot;Set Real&quot;;</span>
+<span class="pc" id="L110">            case REAL_SEQUENCE -&gt; &quot;Nat → Real&quot;; case REAL_FUNCTION -&gt; &quot;Real → Real&quot;;</span>
+<span class="nc" id="L111">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_SORT:&quot; + sort);</span>
         };
     }
 
     private Term term(Expression e, int depth) {
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
-<span class="fc bfc" id="L102" title="All 6 branches covered.">        return switch (e) {</span>
-<span class="fc" id="L103">            case Literal l -&gt; new Term(LeanSourceRenderer.literal(l, issues), REAL);</span>
-<span class="fc" id="L104">            case Symbol s -&gt; new Term(&quot;rs_&quot; + s.name(), free.get(s.name()));</span>
-<span class="fc" id="L105">            case Bound b -&gt; {</span>
-<span class="fc" id="L106">                int level = scope.size() - 1 - b.index();</span>
-<span class="fc" id="L107">                yield new Term(&quot;b&quot; + level, scope.get(level));</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
+<span class="fc bfc" id="L117" title="All 6 branches covered.">        return switch (e) {</span>
+<span class="fc" id="L118">            case Literal l -&gt; new Term(LeanSourceRenderer.literal(l, issues), REAL);</span>
+<span class="fc" id="L119">            case Symbol s -&gt; new Term(&quot;rs_&quot; + s.name(), free.get(s.name()));</span>
+<span class="fc" id="L120">            case Bound b -&gt; {</span>
+<span class="fc" id="L121">                int level = scope.size() - 1 - b.index();</span>
+<span class="fc" id="L122">                yield new Term(&quot;b&quot; + level, scope.get(level));</span>
             }
-<span class="fc" id="L109">            case Binder b -&gt; binder(b, depth);</span>
-<span class="fc" id="L110">            case Binary b -&gt; {</span>
-<span class="fc" id="L111">                var left = expect(term(b.left(), depth + 1), REAL);</span>
-<span class="fc" id="L112">                var right = expect(term(b.right(), depth + 1), REAL);</span>
-<span class="fc" id="L113">                yield binary(b, left, right);</span>
+<span class="fc" id="L124">            case Binder b -&gt; binder(b, depth);</span>
+<span class="fc" id="L125">            case Binary b -&gt; {</span>
+<span class="fc" id="L126">                var left = expect(term(b.left(), depth + 1), REAL);</span>
+<span class="fc" id="L127">                var right = expect(term(b.right(), depth + 1), REAL);</span>
+<span class="fc" id="L128">                yield binary(b, left, right);</span>
             }
-<span class="fc" id="L115">            case Call c -&gt; application(c, depth);</span>
+<span class="fc" id="L130">            case Call c -&gt; application(c, depth);</span>
         };
     }
 
     private Term binder(Binder binder, int depth) {
-<span class="fc" id="L120">        String name = &quot;b&quot; + scope.size();</span>
-<span class="fc" id="L121">        String param = name + &quot; : &quot; + sortName(binder.domain());</span>
-<span class="fc" id="L122">        scope.add(binder.domain());</span>
-<span class="fc" id="L123">        Term body = term(binder.body(), depth + 1);</span>
-<span class="fc" id="L124">        scope.removeLast();</span>
-<span class="fc bfc" id="L125" title="All 3 branches covered.">        return switch (binder.kind()) {</span>
+<span class="fc" id="L135">        String name = &quot;b&quot; + scope.size();</span>
+<span class="fc" id="L136">        String param = name + &quot; : &quot; + sortName(binder.domain());</span>
+<span class="fc" id="L137">        scope.add(binder.domain());</span>
+<span class="fc" id="L138">        Term body = term(binder.body(), depth + 1);</span>
+<span class="fc" id="L139">        scope.removeLast();</span>
+<span class="fc bfc" id="L140" title="All 3 branches covered.">        return switch (binder.kind()) {</span>
             case FORALL, EXISTS -&gt; {
-<span class="fc bfc" id="L127" title="All 2 branches covered.">                String quantifier = binder.kind() == BinderKind.FORALL ? &quot;∀&quot; : &quot;∃&quot;;</span>
-<span class="fc" id="L128">                yield new Term(&quot;(&quot; + quantifier + &quot; (&quot; + param + &quot;), &quot; + expect(body, PROPOSITION) + &quot;)&quot;, PROPOSITION);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                String quantifier = binder.kind() == BinderKind.FORALL ? &quot;∀&quot; : &quot;∃&quot;;</span>
+<span class="fc" id="L143">                yield new Term(&quot;(&quot; + quantifier + &quot; (&quot; + param + &quot;), &quot; + expect(body, PROPOSITION) + &quot;)&quot;, PROPOSITION);</span>
             }
             case SET_OF -&gt; {
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                require(binder.domain() == REAL, &quot;SET_OF_DOMAIN&quot;);</span>
-<span class="fc" id="L132">                yield new Term(&quot;(setOf (fun (&quot; + param + &quot;) =&gt; &quot; + expect(body, PROPOSITION) + &quot;))&quot;, REAL_SET);</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                require(binder.domain() == REAL, &quot;SET_OF_DOMAIN&quot;);</span>
+<span class="fc" id="L147">                yield new Term(&quot;(setOf (fun (&quot; + param + &quot;) =&gt; &quot; + expect(body, PROPOSITION) + &quot;))&quot;, REAL_SET);</span>
             }
             case SEQUENCE, FUNCTION -&gt; {
-<span class="fc bfc" id="L135" title="All 2 branches covered.">                boolean sequence = binder.kind() == BinderKind.SEQUENCE;</span>
-<span class="pc bpc" id="L136" title="1 of 4 branches missed.">                require(binder.domain() == (sequence ? NATURAL : REAL), &quot;FUNCTION_DOMAIN&quot;);</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">                yield new Term(&quot;(fun (&quot; + param + &quot;) =&gt; &quot; + expect(body, REAL) + &quot;)&quot;, sequence ? REAL_SEQUENCE : REAL_FUNCTION);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                boolean sequence = binder.kind() == BinderKind.SEQUENCE;</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">                require(binder.domain() == (sequence ? NATURAL : REAL), &quot;FUNCTION_DOMAIN&quot;);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                yield new Term(&quot;(fun (&quot; + param + &quot;) =&gt; &quot; + expect(body, REAL) + &quot;)&quot;, sequence ? REAL_SEQUENCE : REAL_FUNCTION);</span>
             }
         };
     }
 
     private Term application(Call c, int depth) {
-<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        if (c.function().equals(&quot;implies&quot;) &amp;&amp; c.arguments().size() == 2) {</span>
-<span class="fc" id="L144">            var antecedent = term(c.arguments().getFirst(), depth + 1);</span>
-<span class="fc" id="L145">            expect(antecedent, PROPOSITION);</span>
-<span class="fc" id="L146">            int before = guards.size();</span>
-<span class="fc" id="L147">            collectGuards(c.arguments().getFirst(), depth + 1);</span>
-<span class="fc" id="L148">            var consequent = term(c.arguments().get(1), depth + 1);</span>
-<span class="fc" id="L149">            guards.subList(before, guards.size()).clear();</span>
-<span class="fc" id="L150">            return infix(&quot;→&quot;, antecedent, PROPOSITION, consequent, PROPOSITION, PROPOSITION);</span>
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        if (c.function().equals(&quot;implies&quot;) &amp;&amp; c.arguments().size() == 2) {</span>
+<span class="fc" id="L159">            var antecedent = term(c.arguments().getFirst(), depth + 1);</span>
+<span class="fc" id="L160">            expect(antecedent, PROPOSITION);</span>
+<span class="fc" id="L161">            int before = guards.size();</span>
+<span class="fc" id="L162">            collectGuards(c.arguments().getFirst(), depth + 1);</span>
+<span class="fc" id="L163">            var consequent = term(c.arguments().get(1), depth + 1);</span>
+<span class="fc" id="L164">            guards.subList(before, guards.size()).clear();</span>
+<span class="fc" id="L165">            return infix(&quot;→&quot;, antecedent, PROPOSITION, consequent, PROPOSITION, PROPOSITION);</span>
         }
-<span class="fc" id="L152">        var args = c.arguments().stream().map(e -&gt; term(e, depth + 1)).toList();</span>
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (args.size() == 1) return unary(c, args.getFirst());</span>
-<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        if (args.size() == 3 &amp;&amp; c.function().equals(&quot;limit_at&quot;))</span>
-<span class="fc" id="L155">            return new Term(&quot;(Filter.Tendsto &quot; + expect(args.get(0), REAL_FUNCTION) + &quot; (nhds &quot; + expect(args.get(1), REAL)</span>
-<span class="fc" id="L156">                + &quot;) (nhds &quot; + expect(args.get(2), REAL) + &quot;))&quot;, PROPOSITION);</span>
-<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        require(args.size() == 2, &quot;UNSUPPORTED_ARITY:&quot; + c.function());</span>
-<span class="fc" id="L158">        return binaryCall(c, args.get(0), args.get(1));</span>
+<span class="fc" id="L167">        var args = c.arguments().stream().map(e -&gt; term(e, depth + 1)).toList();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (args.size() == 1) return unary(c, args.getFirst());</span>
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">        if (args.size() == 3 &amp;&amp; c.function().equals(&quot;limit_at&quot;))</span>
+<span class="fc" id="L170">            return new Term(&quot;(Filter.Tendsto &quot; + expect(args.get(0), REAL_FUNCTION) + &quot; (nhds &quot; + expect(args.get(1), REAL)</span>
+<span class="fc" id="L171">                + &quot;) (nhds &quot; + expect(args.get(2), REAL) + &quot;))&quot;, PROPOSITION);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        require(args.size() == 2, &quot;UNSUPPORTED_ARITY:&quot; + c.function());</span>
+<span class="fc" id="L173">        return binaryCall(c, args.get(0), args.get(1));</span>
     }
 
     private Term unary(Call c, Term a) {
-<span class="pc bpc" id="L162" title="3 of 7 branches missed.">        return switch (c.function()) {</span>
-<span class="fc" id="L163">            case &quot;summable&quot; -&gt; new Term(&quot;(Summable &quot; + expect(a, REAL_SEQUENCE) + &quot;)&quot;, PROPOSITION);</span>
-<span class="nc" id="L164">            case &quot;tsum&quot; -&gt; new Term(&quot;(tsum &quot; + expect(a, REAL_SEQUENCE) + &quot;)&quot;, REAL);</span>
-<span class="nc" id="L165">            case &quot;not&quot; -&gt; new Term(&quot;(¬ &quot; + expect(a, PROPOSITION) + &quot;)&quot;, PROPOSITION);</span>
-<span class="fc" id="L166">            case &quot;of_nat&quot; -&gt; new Term(&quot;((&quot; + expect(a, NATURAL) + &quot;) : Real)&quot;, REAL);</span>
-<span class="nc" id="L167">            case &quot;succ&quot; -&gt; new Term(&quot;(Nat.succ &quot; + expect(a, NATURAL) + &quot;)&quot;, NATURAL);</span>
+<span class="pc bpc" id="L177" title="2 of 7 branches missed.">        return switch (c.function()) {</span>
+<span class="fc" id="L178">            case &quot;summable&quot; -&gt; new Term(&quot;(Summable &quot; + expect(a, REAL_SEQUENCE) + &quot;)&quot;, PROPOSITION);</span>
+<span class="nc" id="L179">            case &quot;tsum&quot; -&gt; new Term(&quot;(tsum &quot; + expect(a, REAL_SEQUENCE) + &quot;)&quot;, REAL);</span>
+<span class="nc" id="L180">            case &quot;not&quot; -&gt; new Term(&quot;(¬ &quot; + expect(a, PROPOSITION) + &quot;)&quot;, PROPOSITION);</span>
+<span class="fc" id="L181">            case &quot;of_nat&quot; -&gt; new Term(&quot;((&quot; + expect(a, NATURAL) + &quot;) : Real)&quot;, REAL);</span>
+<span class="fc" id="L182">            case &quot;succ&quot; -&gt; new Term(&quot;(Nat.succ &quot; + expect(a, NATURAL) + &quot;)&quot;, NATURAL);</span>
             case &quot;nat&quot; -&gt; {
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (!(c.arguments().getFirst() instanceof Literal l)) throw new IllegalArgumentException(&quot;NAT_LITERAL_REQUIRED&quot;);</span>
-<span class="fc" id="L170">                BigDecimal n = new BigDecimal(l.value());</span>
-<span class="pc bpc" id="L171" title="2 of 4 branches missed.">                require(n.scale() &lt;= 0 &amp;&amp; n.signum() &gt;= 0, &quot;NAT_LITERAL_REQUIRED&quot;);</span>
-<span class="fc" id="L172">                yield new Term(&quot;(&quot; + l.value() + &quot; : Nat)&quot;, NATURAL);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                if (!(c.arguments().getFirst() instanceof Literal l)) throw new IllegalArgumentException(&quot;NAT_LITERAL_REQUIRED&quot;);</span>
+<span class="fc" id="L185">                BigDecimal n = new BigDecimal(l.value());</span>
+<span class="pc bpc" id="L186" title="2 of 4 branches missed.">                require(n.scale() &lt;= 0 &amp;&amp; n.signum() &gt;= 0, &quot;NAT_LITERAL_REQUIRED&quot;);</span>
+<span class="fc" id="L187">                yield new Term(&quot;(&quot; + l.value() + &quot; : Nat)&quot;, NATURAL);</span>
             }
             default -&gt; {
-<span class="fc" id="L175">                Expression argument = c.arguments().getFirst();</span>
-<span class="fc" id="L176">                String source = expect(a, REAL);</span>
-<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                boolean positive = LeanSourceRenderer.positive(argument, obligation)</span>
-<span class="pc bpc" id="L178" title="1 of 6 branches missed.">                    || guards.stream().anyMatch(g -&gt; g.source.equals(source) &amp;&amp; g.positive);</span>
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                boolean nonnegative = LeanSourceRenderer.nonnegative(argument, obligation)</span>
-<span class="pc bpc" id="L180" title="1 of 6 branches missed.">                    || guards.stream().anyMatch(g -&gt; g.source.equals(source) &amp;&amp; g.nonnegative);</span>
-<span class="fc" id="L181">                yield new Term(LeanSourceRenderer.realCall(c.function(), argument, source, issues, positive, nonnegative), REAL);</span>
+<span class="fc" id="L190">                Expression argument = c.arguments().getFirst();</span>
+<span class="fc" id="L191">                String source = expect(a, REAL);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                boolean positive = LeanSourceRenderer.positive(argument, obligation)</span>
+<span class="pc bpc" id="L193" title="1 of 6 branches missed.">                    || guards.stream().anyMatch(g -&gt; g.source.equals(source) &amp;&amp; g.positive);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                boolean nonnegative = LeanSourceRenderer.nonnegative(argument, obligation)</span>
+<span class="pc bpc" id="L195" title="1 of 6 branches missed.">                    || guards.stream().anyMatch(g -&gt; g.source.equals(source) &amp;&amp; g.nonnegative);</span>
+<span class="fc" id="L196">                yield new Term(LeanSourceRenderer.realCall(c.function(), argument, source, issues, positive, nonnegative), REAL);</span>
             }
         };
     }
 
     private Term binaryCall(Call c, Term l, Term r) {
-<span class="pc bpc" id="L187" title="7 of 15 branches missed.">        return switch (c.function()) {</span>
-<span class="pc" id="L188">            case &quot;eq&quot; -&gt; compare(&quot;=&quot;, l, r); case &quot;ne&quot; -&gt; compare(&quot;≠&quot;, l, r);</span>
-<span class="fc" id="L189">            case &quot;le&quot; -&gt; compare(&quot;≤&quot;, l, r); case &quot;lt&quot; -&gt; compare(&quot;&lt;&quot;, l, r);</span>
-<span class="fc" id="L190">            case &quot;and&quot; -&gt; infix(&quot;∧&quot;, l, PROPOSITION, r, PROPOSITION, PROPOSITION);</span>
-<span class="fc" id="L191">            case &quot;or&quot; -&gt; infix(&quot;∨&quot;, l, PROPOSITION, r, PROPOSITION, PROPOSITION);</span>
-<span class="fc" id="L192">            case &quot;mem&quot; -&gt; infix(&quot;∈&quot;, l, REAL, r, REAL_SET, PROPOSITION);</span>
-<span class="nc" id="L193">            case &quot;subset&quot; -&gt; infix(&quot;⊆&quot;, l, REAL_SET, r, REAL_SET, PROPOSITION);</span>
-<span class="nc" id="L194">            case &quot;union&quot; -&gt; infix(&quot;∪&quot;, l, REAL_SET, r, REAL_SET, REAL_SET);</span>
-<span class="nc" id="L195">            case &quot;inter&quot; -&gt; infix(&quot;∩&quot;, l, REAL_SET, r, REAL_SET, REAL_SET);</span>
+<span class="pc bpc" id="L202" title="7 of 15 branches missed.">        return switch (c.function()) {</span>
+<span class="pc" id="L203">            case &quot;eq&quot; -&gt; compare(&quot;=&quot;, l, r); case &quot;ne&quot; -&gt; compare(&quot;≠&quot;, l, r);</span>
+<span class="fc" id="L204">            case &quot;le&quot; -&gt; compare(&quot;≤&quot;, l, r); case &quot;lt&quot; -&gt; compare(&quot;&lt;&quot;, l, r);</span>
+<span class="fc" id="L205">            case &quot;and&quot; -&gt; infix(&quot;∧&quot;, l, PROPOSITION, r, PROPOSITION, PROPOSITION);</span>
+<span class="fc" id="L206">            case &quot;or&quot; -&gt; infix(&quot;∨&quot;, l, PROPOSITION, r, PROPOSITION, PROPOSITION);</span>
+<span class="fc" id="L207">            case &quot;mem&quot; -&gt; infix(&quot;∈&quot;, l, REAL, r, REAL_SET, PROPOSITION);</span>
+<span class="nc" id="L208">            case &quot;subset&quot; -&gt; infix(&quot;⊆&quot;, l, REAL_SET, r, REAL_SET, PROPOSITION);</span>
+<span class="nc" id="L209">            case &quot;union&quot; -&gt; infix(&quot;∪&quot;, l, REAL_SET, r, REAL_SET, REAL_SET);</span>
+<span class="nc" id="L210">            case &quot;inter&quot; -&gt; infix(&quot;∩&quot;, l, REAL_SET, r, REAL_SET, REAL_SET);</span>
             case &quot;at&quot; -&gt; {
-<span class="pc bpc" id="L197" title="3 of 4 branches missed.">                require(l.sort == REAL_SEQUENCE || l.sort == REAL_FUNCTION, &quot;FUNCTION_REQUIRED&quot;);</span>
-<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                yield new Term(&quot;(&quot; + l.source + &quot; &quot; + expect(r, l.sort == REAL_SEQUENCE ? NATURAL : REAL) + &quot;)&quot;, REAL);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (l.sort == NAT_PREDICATE) yield new Term(&quot;(&quot; + l.source + &quot; &quot; + expect(r, NATURAL) + &quot;)&quot;, PROPOSITION);</span>
+<span class="pc bpc" id="L213" title="3 of 4 branches missed.">                require(l.sort == REAL_SEQUENCE || l.sort == REAL_FUNCTION, &quot;FUNCTION_REQUIRED&quot;);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                yield new Term(&quot;(&quot; + l.source + &quot; &quot; + expect(r, l.sort == REAL_SEQUENCE ? NATURAL : REAL) + &quot;)&quot;, REAL);</span>
             }
-<span class="nc" id="L200">            case &quot;has_sum&quot; -&gt; new Term(&quot;(HasSum &quot; + expect(l, REAL_SEQUENCE) + &quot; &quot; + expect(r, REAL) + &quot;)&quot;, PROPOSITION);</span>
-<span class="fc" id="L201">            case &quot;tends_to&quot; -&gt; new Term(&quot;(Filter.Tendsto &quot; + expect(l, REAL_SEQUENCE) + &quot; Filter.atTop (nhds &quot;</span>
-<span class="nc" id="L202">                + expect(r, REAL) + &quot;))&quot;, PROPOSITION);</span>
-<span class="nc" id="L203">            case &quot;pow&quot; -&gt; binary(new Binary(BinaryOperator.POWER, c.arguments().get(0), c.arguments().get(1)),</span>
-<span class="nc" id="L204">                expect(l, REAL), expect(r, REAL));</span>
-<span class="nc" id="L205">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_CALL:&quot; + c.function());</span>
+<span class="nc" id="L216">            case &quot;has_sum&quot; -&gt; new Term(&quot;(HasSum &quot; + expect(l, REAL_SEQUENCE) + &quot; &quot; + expect(r, REAL) + &quot;)&quot;, PROPOSITION);</span>
+<span class="fc" id="L217">            case &quot;tends_to&quot; -&gt; new Term(&quot;(Filter.Tendsto &quot; + expect(l, REAL_SEQUENCE) + &quot; Filter.atTop (nhds &quot;</span>
+<span class="nc" id="L218">                + expect(r, REAL) + &quot;))&quot;, PROPOSITION);</span>
+<span class="nc" id="L219">            case &quot;pow&quot; -&gt; binary(new Binary(BinaryOperator.POWER, c.arguments().get(0), c.arguments().get(1)),</span>
+<span class="nc" id="L220">                expect(l, REAL), expect(r, REAL));</span>
+<span class="nc" id="L221">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_CALL:&quot; + c.function());</span>
         };
     }
 
     private Term binary(Binary b, String left, String right) {
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        boolean positive = LeanSourceRenderer.positive(b.left(), obligation)</span>
-<span class="pc bpc" id="L211" title="5 of 6 branches missed.">            || guards.stream().anyMatch(g -&gt; g.source.equals(left) &amp;&amp; g.positive);</span>
-<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        boolean nonzero = LeanSourceRenderer.nonzero(b.right(), obligation)</span>
-<span class="pc bpc" id="L213" title="5 of 6 branches missed.">            || guards.stream().anyMatch(g -&gt; g.source.equals(right) &amp;&amp; g.nonzero);</span>
-<span class="fc" id="L214">        return new Term(LeanSourceRenderer.binary(b, issues, left, right, positive, nonzero), REAL);</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        boolean positive = LeanSourceRenderer.positive(b.left(), obligation)</span>
+<span class="pc bpc" id="L227" title="5 of 6 branches missed.">            || guards.stream().anyMatch(g -&gt; g.source.equals(left) &amp;&amp; g.positive);</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        boolean nonzero = LeanSourceRenderer.nonzero(b.right(), obligation)</span>
+<span class="pc bpc" id="L229" title="5 of 6 branches missed.">            || guards.stream().anyMatch(g -&gt; g.source.equals(right) &amp;&amp; g.nonzero);</span>
+<span class="fc" id="L230">        return new Term(LeanSourceRenderer.binary(b, issues, left, right, positive, nonzero), REAL);</span>
     }
 
     private void collectGlobalGuards() {
         // Premise identifiers order the wire representation, not the domain conditions.
         // Type-check guard operands now. Recheck all their partial-operation domains below
         // when rendering every full premise with the complete set of global facts.
-<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (var p : obligation.assumptions()) {</span>
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (p.relation() == Relation.HOLDS) collectGuards(p.left(), 0);</span>
-<span class="fc" id="L223">        }</span>
-<span class="fc" id="L224">        issues.clear();</span>
-<span class="fc" id="L225">    }</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (var p : obligation.assumptions()) {</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (p.relation() == Relation.HOLDS) collectGuards(p.left(), 0);</span>
+<span class="fc" id="L239">        }</span>
+<span class="fc" id="L240">        issues.clear();</span>
+<span class="fc" id="L241">    }</span>
 
     private void collectGuards(Expression condition, int depth) {
-<span class="pc bpc" id="L228" title="1 of 4 branches missed.">        if (!(condition instanceof Call c) || c.arguments().size() != 2) return;</span>
-<span class="fc" id="L229">        var left = c.arguments().get(0);</span>
-<span class="fc" id="L230">        var right = c.arguments().get(1);</span>
-<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (c.function().equals(&quot;and&quot;)) {</span>
-<span class="nc" id="L232">            collectGuards(left, depth + 1);</span>
-<span class="nc" id="L233">            collectGuards(right, depth + 1);</span>
-<span class="nc" id="L234">            return;</span>
+<span class="fc bfc" id="L244" title="All 4 branches covered.">        if (!(condition instanceof Call c) || c.arguments().size() != 2) return;</span>
+<span class="fc" id="L245">        var left = c.arguments().get(0);</span>
+<span class="fc" id="L246">        var right = c.arguments().get(1);</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (c.function().equals(&quot;and&quot;)) {</span>
+<span class="nc" id="L248">            collectGuards(left, depth + 1);</span>
+<span class="nc" id="L249">            collectGuards(right, depth + 1);</span>
+<span class="nc" id="L250">            return;</span>
         }
-<span class="fc" id="L236">        boolean less = c.function().equals(&quot;lt&quot;), le = c.function().equals(&quot;le&quot;), ne = c.function().equals(&quot;ne&quot;);</span>
-<span class="pc bpc" id="L237" title="1 of 6 branches missed.">        if (!(less || le || ne)) return;</span>
-<span class="fc" id="L238">        boolean zeroLeft = LeanSourceRenderer.zero(left);</span>
-<span class="pc bpc" id="L239" title="3 of 4 branches missed.">        if (!zeroLeft &amp;&amp; !LeanSourceRenderer.zero(right)) return;</span>
-<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        Term guarded = term(zeroLeft ? right : left, depth + 1);</span>
-<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (guarded.sort == REAL)</span>
-<span class="pc bpc" id="L242" title="4 of 14 branches missed.">            guards.add(new Guard(guarded.source, zeroLeft &amp;&amp; less, zeroLeft &amp;&amp; (less || le), less || ne));</span>
-<span class="fc" id="L243">    }</span>
+<span class="fc" id="L252">        boolean less = c.function().equals(&quot;lt&quot;), le = c.function().equals(&quot;le&quot;), ne = c.function().equals(&quot;ne&quot;);</span>
+<span class="pc bpc" id="L253" title="1 of 6 branches missed.">        if (!(less || le || ne)) return;</span>
+<span class="fc" id="L254">        boolean zeroLeft = LeanSourceRenderer.zero(left);</span>
+<span class="pc bpc" id="L255" title="3 of 4 branches missed.">        if (!zeroLeft &amp;&amp; !LeanSourceRenderer.zero(right)) return;</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        Term guarded = term(zeroLeft ? right : left, depth + 1);</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (guarded.sort == REAL)</span>
+<span class="pc bpc" id="L258" title="4 of 14 branches missed.">            guards.add(new Guard(guarded.source, zeroLeft &amp;&amp; less, zeroLeft &amp;&amp; (less || le), less || ne));</span>
+<span class="fc" id="L259">    }</span>
 
     private static Term compare(String op, Term l, Term r) {
-<span class="pc bpc" id="L246" title="4 of 8 branches missed.">        require(op.equals(&quot;=&quot;) || op.equals(&quot;≠&quot;) || l.sort == REAL || l.sort == NATURAL, &quot;NUMERIC_ORDER_REQUIRED&quot;);</span>
-<span class="fc" id="L247">        return infix(op, l, l.sort, r, l.sort, PROPOSITION);</span>
+<span class="pc bpc" id="L262" title="4 of 8 branches missed.">        require(op.equals(&quot;=&quot;) || op.equals(&quot;≠&quot;) || l.sort == REAL || l.sort == NATURAL, &quot;NUMERIC_ORDER_REQUIRED&quot;);</span>
+<span class="fc" id="L263">        return infix(op, l, l.sort, r, l.sort, PROPOSITION);</span>
     }
 
     private static Term infix(String op, Term l, Sort left, Term r, Sort right, Sort result) {
-<span class="fc" id="L251">        return new Term(&quot;(&quot; + expect(l, left) + &quot; &quot; + op + &quot; &quot; + expect(r, right) + &quot;)&quot;, result);</span>
+<span class="fc" id="L267">        return new Term(&quot;(&quot; + expect(l, left) + &quot; &quot; + op + &quot; &quot; + expect(r, right) + &quot;)&quot;, result);</span>
     }
 
     private static String expect(Term term, Sort sort) {
-<span class="fc bfc" id="L255" title="All 2 branches covered.">        require(term.sort == sort, &quot;SORT_MISMATCH:&quot; + term.sort + &quot;:&quot; + sort);</span>
-<span class="fc" id="L256">        return term.source;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        require(term.sort == sort, &quot;SORT_MISMATCH:&quot; + term.sort + &quot;:&quot; + sort);</span>
+<span class="fc" id="L272">        return term.source;</span>
     }
 
     private static void require(boolean ok, String reason) {
-<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (!ok) throw new IllegalArgumentException(reason);</span>
-<span class="fc" id="L261">    }</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (!ok) throw new IllegalArgumentException(reason);</span>
+<span class="fc" id="L277">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

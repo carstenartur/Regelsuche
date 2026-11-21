@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ResidualCorrespondence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ResidualCorrespondence.java</span></div><h1>ResidualCorrespondence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.solver.ir.SolverIr;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/** Observer receives the trusted frozen candidate bundle before exposing historical references. */
+public final class ResidualCorrespondence {
+<span class="fc" id="L17">    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);</span>
+<span class="fc" id="L18">    private static final List&lt;String&gt; REFERENCES = List.of(&quot;(a*c-b*d)^2+(a*d+b*c)^2&quot;, &quot;(a*c+b*d)^2+(b*c-a*d)^2&quot;);</span>
+    private ResidualCorrespondence() { }
+
+<span class="nc" id="L21">    public static void main(String[] args) throws Exception { observe(Path.of(args[0]), args[1]); }</span>
+
+    static void observe(Path dir, String expectedHash) throws Exception {
+<span class="fc" id="L24">        String frozen = Files.readString(dir.resolve(&quot;final.json&quot;));</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (!SolverIr.sha256(frozen).equals(expectedHash)) throw new IllegalArgumentException(&quot;candidate bundle hash differs&quot;);</span>
+<span class="fc" id="L26">        var c = JSON.readTree(frozen).required(&quot;cases&quot;).get(0);</span>
+<span class="fc" id="L27">        String source = c.required(&quot;source&quot;).textValue();</span>
+<span class="fc" id="L28">        var canonical = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L29">        var exact = new ExactPolynomialAnalysis();</span>
+<span class="fc" id="L30">        var rows = new ArrayList&lt;Map&lt;String,Object&gt;&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (var arm : c.required(&quot;arms&quot;)) {</span>
+<span class="fc" id="L32">            var candidates = arm.required(&quot;candidates&quot;);</span>
+<span class="fc" id="L33">            var roots = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L34">            candidates.forEach(n -&gt; roots.add(n.required(&quot;root&quot;).textValue()));</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (!arm.required(&quot;candidateFreeze&quot;).textValue().equals(SolverIr.sha256(&quot;residual-candidates/v1\n&quot; + roots)))</span>
+<span class="nc" id="L36">                throw new IllegalArgumentException(&quot;candidate freeze differs&quot;);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (var reference : REFERENCES) {</span>
+<span class="fc" id="L38">                exact.requireEquivalent(source, reference);</span>
+<span class="fc" id="L39">                var matches = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                for (JsonNode candidate : candidates) {</span>
+<span class="fc" id="L41">                    String expression = candidate.required(&quot;expression&quot;).textValue();</span>
+<span class="fc" id="L42">                    exact.requireEquivalent(source, expression);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">                    if (!candidate.required(&quot;primitiveRules&quot;).isEmpty()</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">                            &amp;&amp; canonical.canonicalize(reference).equals(canonical.canonicalize(expression))) matches.add(candidate.required(&quot;root&quot;).textValue());</span>
+<span class="fc" id="L45">                }</span>
+<span class="fc" id="L46">                rows.add(Map.of(&quot;arm&quot;, arm.required(&quot;arm&quot;).textValue(), &quot;reference&quot;, reference, &quot;roots&quot;, matches));</span>
+<span class="fc" id="L47">            }</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        ResidualPlanComparison.save(dir, &quot;correspondence.json&quot;, JSON.writerWithDefaultPrettyPrinter()</span>
+<span class="fc" id="L50">            .writeValueAsString(Map.of(&quot;finalFreeze&quot;, expectedHash, &quot;source&quot;, source, &quot;matches&quot;, rows)) + &quot;\n&quot;);</span>
+<span class="fc" id="L51">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedProofTrials.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ScopedProofTrials.java</span></div><h1>ScopedProofTrials.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ScopedProofPartitions.Case;
+import de.regelsuche.solver.ir.*;
+import de.regelsuche.solver.ir.ExistentialIntroduction.Proof;
+import de.regelsuche.solver.ir.ExistentialIntroduction.Statement;
+import de.regelsuche.solver.ir.SolverIr.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+
+/** Shared receiver-side replay for every arm of the scoped synthetic protocol. */
+final class ScopedProofTrials {
+<span class="fc" id="L18">    static final List&lt;String&gt; GRAMMAR = List.of(&quot;ZERO&quot;, &quot;B&quot;, &quot;ADD&quot;, &quot;SUBTRACT_B_A&quot;, &quot;SUBTRACT_A_B&quot;, &quot;MULTIPLY&quot;);</span>
+<span class="fc" id="L19">    enum Arm { LEARNED, FIXED, RANDOM, EXHAUSTIVE, HAND, ORDINARY }</span>
+<span class="fc" id="L20">    record Trial(String proposal, String term, String baseId, String stepId, String instanceHash,</span>
+                 String proofRoot, boolean accepted, int checkerCalls) { }
+<span class="fc" id="L22">    record Row(String arm, String status, boolean selectedPlanApplied, List&lt;Trial&gt; trials, int checkerCalls) { }</span>
+<span class="fc" id="L23">    record Shape(String key, Expression a, Expression b) { }</span>
+<span class="fc" id="L24">    private static final CoreExpressionIrAdapter TERMS = new CoreExpressionIrAdapter();</span>
+
+    static Shape shape(Statement s) {
+<span class="fc" id="L27">        var goal = s.body().goal();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        for (var side : List.of(goal.left(), goal.right())) {</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            Expression opposite = side == goal.left() ? goal.right() : goal.left();</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">            if (opposite.referencedSymbols().contains(s.binder()) || !(side instanceof Binary binary)) continue;</span>
+<span class="fc" id="L31">            var binder = new Symbol(s.binder());</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">            if (binary.left().equals(binder) &amp;&amp; !binary.right().referencedSymbols().contains(s.binder()))</span>
+<span class="fc" id="L33">                return new Shape(binary.operator().name() + &quot;_LEFT&quot;, binary.right(), opposite);</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">            if (binary.right().equals(binder) &amp;&amp; !binary.left().referencedSymbols().contains(s.binder()))</span>
+<span class="fc" id="L35">                return new Shape(binary.operator().name() + &quot;_RIGHT&quot;, binary.left(), opposite);</span>
+<span class="nc" id="L36">        }</span>
+<span class="fc" id="L37">        return new Shape(&quot;UNMATCHED&quot;, null, null);</span>
+    }
+
+    static Row run(Case c, int ordinal, Arm arm, List&lt;String&gt; learnedOrder, boolean baseFirst) {
+<span class="fc" id="L41">        var trials = new ArrayList&lt;Trial&gt;();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (c.witness()) {</span>
+<span class="fc" id="L43">            var source = new Statement(c.source(), c.binder());</span>
+<span class="fc" id="L44">            var recipient = new Statement(new SolverIrJsonCodec().readObligation(c.source().toCanonicalJson()), c.binder());</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (!recipient.toScopedObligation().equals(c.receiver())) throw new IllegalArgumentException(&quot;recipient differs&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (arm == Arm.ORDINARY) {</span>
+<span class="fc" id="L47">                ExistentialWitnessSearch.search(source, 6, (term, proof) -&gt;</span>
+<span class="fc" id="L48">                    trials.add(witnessTrial(recipient, &quot;ORDINARY&quot;, term, proof)));</span>
+            } else {
+<span class="fc" id="L50">                var shape = shape(source);</span>
+<span class="fc" id="L51">                var order = witnessOrder(arm, shape, learnedOrder, ordinal);</span>
+<span class="fc" id="L52">                var seen = new HashSet&lt;Expression&gt;();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                for (String proposal : order) {</span>
+<span class="fc" id="L54">                    var term = term(proposal, shape);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    if (!seen.add(term)) continue;</span>
+<span class="fc" id="L56">                    var proof = ExistentialWitnessSearch.checkWitness(source, term);</span>
+<span class="fc" id="L57">                    var trial = witnessTrial(recipient, proposal, term, proof);</span>
+<span class="fc" id="L58">                    trials.add(trial);</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">                    if (trial.accepted() &amp;&amp; arm != Arm.EXHAUSTIVE) break;</span>
+<span class="fc" id="L60">                }</span>
+            }
+<span class="fc" id="L62">        } else {</span>
+<span class="fc" id="L63">            inductionTrials(c, ordinal, arm, baseFirst, trials);</span>
+        }
+<span class="fc" id="L65">        boolean found = trials.stream().anyMatch(Trial::accepted);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        String status = found ? &quot;FOUND&quot; : trials.size() == 6 ? &quot;BUDGET_EXHAUSTED&quot; : &quot;GRAMMAR_EXHAUSTED&quot;;</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">        return new Row(arm.name(), status, arm == Arm.LEARNED &amp;&amp; found, List.copyOf(trials),</span>
+<span class="fc" id="L68">            trials.stream().mapToInt(Trial::checkerCalls).sum());</span>
+    }
+
+    private static List&lt;String&gt; witnessOrder(Arm arm, Shape shape, List&lt;String&gt; learned, int ordinal) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (shape.a() == null) return List.of(&quot;ZERO&quot;);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        var order = new ArrayList&lt;&gt;(arm == Arm.LEARNED ? learned : GRAMMAR);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (arm == Arm.RANDOM) Collections.shuffle(order, new Random(8741066L + ordinal));</span>
+<span class="pc bpc" id="L75" title="1 of 6 branches missed.">        if (arm == Arm.HAND) return switch (shape.key()) {</span>
+<span class="fc" id="L76">            case &quot;ADD_LEFT&quot;, &quot;ADD_RIGHT&quot; -&gt; List.of(&quot;SUBTRACT_B_A&quot;);</span>
+<span class="fc" id="L77">            case &quot;SUBTRACT_LEFT&quot; -&gt; List.of(&quot;ADD&quot;);</span>
+<span class="fc" id="L78">            case &quot;SUBTRACT_RIGHT&quot; -&gt; List.of(&quot;SUBTRACT_A_B&quot;);</span>
+<span class="nc" id="L79">            default -&gt; List.of(&quot;ZERO&quot;);</span>
+        };
+<span class="fc" id="L81">        return order;</span>
+    }
+
+    private static Expression term(String rule, Shape s) {
+<span class="pc bpc" id="L85" title="1 of 7 branches missed.">        return switch (rule) {</span>
+<span class="fc" id="L86">            case &quot;ZERO&quot; -&gt; new Literal(&quot;0&quot;);</span>
+<span class="fc" id="L87">            case &quot;B&quot; -&gt; s.b();</span>
+<span class="fc" id="L88">            case &quot;ADD&quot; -&gt; new Binary(BinaryOperator.ADD, s.b(), s.a());</span>
+<span class="fc" id="L89">            case &quot;SUBTRACT_B_A&quot; -&gt; new Binary(BinaryOperator.SUBTRACT, s.b(), s.a());</span>
+<span class="fc" id="L90">            case &quot;SUBTRACT_A_B&quot; -&gt; new Binary(BinaryOperator.SUBTRACT, s.a(), s.b());</span>
+<span class="fc" id="L91">            case &quot;MULTIPLY&quot; -&gt; new Binary(BinaryOperator.MULTIPLY, s.b(), s.a());</span>
+<span class="nc" id="L92">            default -&gt; throw new IllegalArgumentException(&quot;unknown proposal&quot;);</span>
+        };
+    }
+
+    private static Trial witnessTrial(Statement recipient, String rule, Expression witness, Optional&lt;Proof&gt; proof) {
+<span class="fc" id="L97">        String term = TERMS.render(witness);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (proof.isEmpty()) return new Trial(rule, term, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, false, 1);</span>
+<span class="fc" id="L99">        var candidate = proof.get();</span>
+<span class="fc" id="L100">        String instance = candidate.premise().instance().contentHash();</span>
+<span class="fc" id="L101">        String root = SolverIr.sha256(&quot;witness/v1\n&quot; + candidate.conclusion().toScopedObligation().contentHash()</span>
+<span class="fc" id="L102">            + &quot;\n&quot; + witness.canonicalMaterial() + &quot;\nnormal-form=&quot; + instance);</span>
+<span class="fc" id="L103">        boolean accepted = ExistentialIntroduction.replay(recipient, candidate);</span>
+<span class="fc" id="L104">        return new Trial(rule, term, &quot;&quot;, &quot;&quot;, instance, root, accepted, 2);</span>
+    }
+
+    private static void inductionTrials(Case c, int ordinal, Arm arm, boolean baseFirst, List&lt;Trial&gt; trials) {
+<span class="fc" id="L108">        var declarations = new ArrayList&lt;&gt;(c.source().declarations());</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (arm == Arm.RANDOM) Collections.shuffle(declarations, new Random(8741066L + ordinal));</span>
+<span class="pc bpc" id="L110" title="1 of 6 branches missed.">        if (arm == Arm.HAND || arm == Arm.LEARNED &amp;&amp; baseFirst) {</span>
+<span class="fc" id="L111">            String first = firstBase(c.source());</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            declarations.sort(Comparator.comparing(d -&gt; !d.name().equals(first)));</span>
+        }
+<span class="fc" id="L114">        var recipient = new SolverIrJsonCodec().readObligation(c.receiver().toCanonicalJson());</span>
+        // The ordinary native search enumerates all candidates, even if an early one will match.
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        var ordinary = arm == Arm.ORDINARY ? NaturalInduction.discover(c.source()) : List.&lt;NaturalInduction.Plan&gt;of();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (var d : declarations) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            var proposal = arm == Arm.ORDINARY ? ordinary.stream().filter(p -&gt; p.predicate().equals(d.name())).findFirst()</span>
+<span class="fc" id="L119">                : NaturalInduction.propose(c.source(), d);</span>
+<span class="fc" id="L120">            var trial = inductionTrial(recipient, d, proposal);</span>
+<span class="fc" id="L121">            trials.add(trial);</span>
+<span class="fc bfc" id="L122" title="All 6 branches covered.">            if (trial.accepted() &amp;&amp; arm != Arm.EXHAUSTIVE &amp;&amp; arm != Arm.ORDINARY) break;</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">    }</span>
+
+    static String firstBase(Obligation o) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (var premise : o.assumptions()) {</span>
+<span class="pc bpc" id="L128" title="2 of 6 branches missed.">            if (premise.relation() == Relation.HOLDS &amp;&amp; premise.left() instanceof Call c &amp;&amp; c.function().equals(&quot;at&quot;)</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">                    &amp;&amp; c.arguments().size() == 2 &amp;&amp; c.arguments().get(0) instanceof Symbol p</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                    &amp;&amp; c.arguments().get(1).equals(ScopedProofPartitions.app(&quot;nat&quot;, new Literal(&quot;0&quot;)))) return p.name();</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">        return &quot;&quot;;</span>
+    }
+
+    private static Trial inductionTrial(Obligation receiver, SymbolDeclaration d, Optional&lt;NaturalInduction.Plan&gt; plan) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (plan.isEmpty()) return new Trial(d.name(), &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, false, 1);</span>
+<span class="fc" id="L137">        var candidate = plan.get();</span>
+<span class="fc" id="L138">        String conclusion = candidate.conclusion().contentHash();</span>
+<span class="fc" id="L139">        String root = SolverIr.sha256(&quot;induction/v1\n&quot; + conclusion + &quot;\n&quot; + d.name() + &quot;\n&quot;</span>
+<span class="fc" id="L140">            + candidate.base().id() + &quot;\n&quot; + candidate.step().id());</span>
+<span class="fc" id="L141">        return new Trial(d.name(), &quot;&quot;, candidate.base().id(), candidate.step().id(), conclusion, root,</span>
+<span class="fc" id="L142">            NaturalInduction.matches(receiver, candidate), 2);</span>
+    }
+    private ScopedProofTrials() { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
