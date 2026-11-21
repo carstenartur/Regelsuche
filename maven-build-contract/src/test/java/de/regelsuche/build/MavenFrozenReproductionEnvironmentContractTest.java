@@ -78,8 +78,31 @@ class MavenFrozenReproductionEnvironmentContractTest {
         var result = evaluate(repositoryRoot());
         assertTrue(result.violations().isEmpty(), result.violations().toString());
         assertEquals(Set.of("Dockerfile", "Dockerfile.autopilot", "Dockerfile.comparative-benchmarks",
-            "Dockerfile.external-proofs", "Dockerfile.external-python", "Dockerfile.proof", "Dockerfile.release-readiness", "Dockerfile.visual-regression"),
+            "Dockerfile.external-proofs", "Dockerfile.external-polynomial", "Dockerfile.external-python", "Dockerfile.proof", "Dockerfile.release-readiness", "Dockerfile.visual-regression"),
             result.routineDockerfiles());
+    }
+
+    @Test
+    void nativeMavenStudyMustPassAlongsideBothExistingPolynomialGates() throws IOException {
+        var jobs = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
+        var verification = jobs.required("verification");
+        var reject = verification.required("steps").get(0);
+        assertEquals("exit 1", reject.required("run").asText());
+        for (String id : List.of("external-polynomial-comparison", "typed-external-polynomial-comparison",
+                "maven-polynomial-qualification", "maven-native-polynomial-study")) {
+            assertTrue(verification.required("needs").valueStream().anyMatch(need -> id.equals(need.asText())), id);
+            assertTrue(reject.required("if").asText().contains("needs." + id + ".result != 'success'"), id);
+        }
+        var study = jobs.required("maven-native-polynomial-study");
+        assertEquals("github.event_name != 'create'", study.required("if").asText());
+        var run = study.required("steps").get(2).required("run").asText().strip();
+        assertEquals("mvn --batch-mode --no-transfer-progress -Pnative-polynomial-comparison -pl regelsuche-release -am "
+            + "-Dregelsuche.skipPolynomialClasspath=false verify", run);
+        var artifact = study.required("steps").get(3).required("with");
+        assertEquals("error", artifact.required("if-no-files-found").asText());
+        assertEquals(Set.of("regelsuche-release/target/reports/native-polynomial-comparison/**",
+            "regelsuche-release/target/failsafe-reports/**", "regelsuche-learning/target/surefire-reports/**",
+            "regelsuche-search/target/surefire-reports/**"), Set.copyOf(artifact.required("path").asText().lines().toList()));
     }
 
     @ParameterizedTest
