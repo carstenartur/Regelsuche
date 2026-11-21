@@ -172,6 +172,25 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after witness/induction integration (2026-11-21)
+
+[Main CI 44852121730](https://github.com/carstenartur/Regelsuche/actions/runs/44852121730)
+completed successfully on immutable `main` revision `a5e2efc099162723ca2f3f8ca7064a98fddb52cb` (tree `38e161b03b68bbd36261d5908b4afa14bd6a5f88`):
+all seven mandatory verification authorities, the aggregate `ciCheck`, and report publication
+passed. The original retained [quality evidence](https://github.com/carstenartur/Regelsuche/actions/runs/44852121730)
+(artifact 14691325547; ZIP SHA-256 `6321089fa1b2d4a1c1af2e7dc5c430adb1aa488cf4915e424931a2a0c77e3a01`)
+has 290 unique indexed files; all reported byte lengths and SHA-256 checksums were independently
+matched. The original `check.json` passed and the native `complexity.json` measures
+832860 context units, up 3290 from the previously accepted 829570, within the **unchanged**
+15000 limit. The verified source and CI linkage is retained in
+[provenance](../ai-knowledge/baseline-history/2026-11-21-main-a5e2efc0/provenance.json)
+and [metrics snapshot](../ai-knowledge/baseline-history/2026-11-21-main-a5e2efc0/metrics-snapshot.json).
+
+This accepts **only this green predecessor main**, not any current feature branch.
+No threshold, exception, policy, code selector, unpublished material, or protected test input is
+changed. Feature PRs still require fresh complete exact-head CI and their own functional acceptance.
+
+
 
 ### Accepted main after scoped proof and continuation integrations (2026-11-20)
 
