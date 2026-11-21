@@ -62,6 +62,15 @@ public final class ExistentialIntroduction {
                 substitute(body.goal().right(), binder, replacement));
         }
 
+        /** Export the exact quantified conclusion for a fresh check by the scoped formal backend. */
+        public Obligation toScopedObligation() {
+            Goal bound = substitutedGoal(new SolverIr.Bound(0));
+            var equation = new SolverIr.Call("eq", List.of(bound.left(), bound.right()));
+            var exists = new SolverIr.Binder(SolverIr.BinderKind.EXISTS, Sort.REAL, equation);
+            return Obligation.create(body.obligationId(), parameters(), List.of(Theory.REAL_ARITHMETIC, Theory.SCOPED_ANALYSIS),
+                body.assumptions(), Goal.holds(exists), RequestedEvidence.FORMAL_PROOF, body.provenance());
+        }
+
         /** Instantiate only the body, once, with a total term from the outer context. */
         public Obligation instantiate(Expression witness) {
             RingTerm.check(witness);

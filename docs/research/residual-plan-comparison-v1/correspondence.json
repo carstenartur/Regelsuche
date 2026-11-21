@@ -1,0 +1,53 @@
+{
+  "finalFreeze" : "sha256:ef9ee49caf2fb2ad784d237e5787fa977bb27a8ed4d61b7f520292c39efe65d3",
+  "matches" : [ {
+    "arm" : "LEARNED",
+    "reference" : "(a*c-b*d)^2+(a*d+b*c)^2",
+    "roots" : [ "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce" ]
+  }, {
+    "arm" : "LEARNED",
+    "reference" : "(a*c+b*d)^2+(b*c-a*d)^2",
+    "roots" : [ "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035" ]
+  }, {
+    "arm" : "FIXED",
+    "reference" : "(a*c-b*d)^2+(a*d+b*c)^2",
+    "roots" : [ "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce" ]
+  }, {
+    "arm" : "FIXED",
+    "reference" : "(a*c+b*d)^2+(b*c-a*d)^2",
+    "roots" : [ "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035" ]
+  }, {
+    "arm" : "RANDOM",
+    "reference" : "(a*c-b*d)^2+(a*d+b*c)^2",
+    "roots" : [ "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce" ]
+  }, {
+    "arm" : "RANDOM",
+    "reference" : "(a*c+b*d)^2+(b*c-a*d)^2",
+    "roots" : [ "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035" ]
+  }, {
+    "arm" : "EXHAUSTIVE",
+    "reference" : "(a*c-b*d)^2+(a*d+b*c)^2",
+    "roots" : [ "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce" ]
+  }, {
+    "arm" : "EXHAUSTIVE",
+    "reference" : "(a*c+b*d)^2+(b*c-a*d)^2",
+    "roots" : [ "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035" ]
+  }, {
+    "arm" : "HAND",
+    "reference" : "(a*c-b*d)^2+(a*d+b*c)^2",
+    "roots" : [ "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce" ]
+  }, {
+    "arm" : "HAND",
+    "reference" : "(a*c+b*d)^2+(b*c-a*d)^2",
+    "roots" : [ "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035" ]
+  }, {
+    "arm" : "ALL_AT_ONCE",
+    "reference" : "(a*c-b*d)^2+(a*d+b*c)^2",
+    "roots" : [ "sha256:d26309aeaa69bff8dd019d5ba98938118f9b22a80045f92d3c6360490f98d8ce" ]
+  }, {
+    "arm" : "ALL_AT_ONCE",
+    "reference" : "(a*c+b*d)^2+(b*c-a*d)^2",
+    "roots" : [ "sha256:2364155f5de74e84534c2450a29dbc967877941b077392a17e992574b6ae1035" ]
+  } ],
+  "source" : "(a^2+b^2)*(c^2+d^2)"
+}

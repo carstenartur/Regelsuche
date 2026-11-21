@@ -1,0 +1,4518 @@
+{
+  "cases" : [ {
+    "id" : "final0-w0",
+    "binder" : "final0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final0-w0",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "final0w"
+          },
+          "right" : {
+            "kind" : "BINARY",
+            "operator" : "MULTIPLY",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            },
+            "right" : {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            }
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              }
+            },
+            "right" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "11"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w0",
+        "revisionHash" : "sha256:afeaa08fcfd052df322111f124ea31a59a482ad349b484f742353f208fe0f714"
+      },
+      "contentHash" : "sha256:c7adc3ab5c7f2cd31e1ca5fb44d9f2e8142913f85edd0c26864ce5ef315b543f"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final0-w0",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BINARY",
+                "operator" : "MULTIPLY",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "ADD",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                },
+                "right" : {
+                  "kind" : "BINARY",
+                  "operator" : "SUBTRACT",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                }
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  }
+                },
+                "right" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "11"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w0",
+        "revisionHash" : "sha256:afeaa08fcfd052df322111f124ea31a59a482ad349b484f742353f208fe0f714"
+      },
+      "contentHash" : "sha256:35e0d19e5fd80b65e63ff10e43b53e66e7a99bb8195e757f560d0b75c94bec65"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e5df04bfc9c6f88f6746c613c6b6fb8373d8a1e43b794586e15514c7e055aebc",
+        "proofRoot" : "sha256:a5fccc3f8f51a65693588822b3dee7802e987e8f59e0a18ef3c5a91cf74b3bcb",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e5df04bfc9c6f88f6746c613c6b6fb8373d8a1e43b794586e15514c7e055aebc",
+        "proofRoot" : "sha256:a5fccc3f8f51a65693588822b3dee7802e987e8f59e0a18ef3c5a91cf74b3bcb",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 5
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e5df04bfc9c6f88f6746c613c6b6fb8373d8a1e43b794586e15514c7e055aebc",
+        "proofRoot" : "sha256:a5fccc3f8f51a65693588822b3dee7802e987e8f59e0a18ef3c5a91cf74b3bcb",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e5df04bfc9c6f88f6746c613c6b6fb8373d8a1e43b794586e15514c7e055aebc",
+        "proofRoot" : "sha256:a5fccc3f8f51a65693588822b3dee7802e987e8f59e0a18ef3c5a91cf74b3bcb",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "(final0a * final0a + final0b * final0b + 11) * (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e5df04bfc9c6f88f6746c613c6b6fb8373d8a1e43b794586e15514c7e055aebc",
+        "proofRoot" : "sha256:a5fccc3f8f51a65693588822b3dee7802e987e8f59e0a18ef3c5a91cf74b3bcb",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "(final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a + final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final0-w1",
+    "binder" : "final0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final0-w1",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              }
+            },
+            "right" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "11"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "final0w"
+          },
+          "right" : {
+            "kind" : "BINARY",
+            "operator" : "MULTIPLY",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            },
+            "right" : {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            }
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w1",
+        "revisionHash" : "sha256:feaee452a42b5ac0e9f93daf6b2fd6200663d7979babdb0c8af1a783949d5334"
+      },
+      "contentHash" : "sha256:3702d49769f60918cf7c8033c59ecb01c5fa4d39e220019027771e6bfc69d995"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final0-w1",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  }
+                },
+                "right" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "11"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BINARY",
+                "operator" : "MULTIPLY",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "ADD",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                },
+                "right" : {
+                  "kind" : "BINARY",
+                  "operator" : "SUBTRACT",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                }
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w1",
+        "revisionHash" : "sha256:feaee452a42b5ac0e9f93daf6b2fd6200663d7979babdb0c8af1a783949d5334"
+      },
+      "contentHash" : "sha256:31ecd41ceda72e0e0f6734a00e846e543dff8f160edb068e64b0712bfcaa52d0"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:b0e16f64180e4d203a29ca16a7d872f56d1394772f1cb05dab44115e317a451e",
+        "proofRoot" : "sha256:207ece42d0ada0e7148d9b06384f5dabf2e370c4a364a16dcf020417d33ba82b",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:b0e16f64180e4d203a29ca16a7d872f56d1394772f1cb05dab44115e317a451e",
+        "proofRoot" : "sha256:207ece42d0ada0e7148d9b06384f5dabf2e370c4a364a16dcf020417d33ba82b",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:b0e16f64180e4d203a29ca16a7d872f56d1394772f1cb05dab44115e317a451e",
+        "proofRoot" : "sha256:207ece42d0ada0e7148d9b06384f5dabf2e370c4a364a16dcf020417d33ba82b",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 5
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:b0e16f64180e4d203a29ca16a7d872f56d1394772f1cb05dab44115e317a451e",
+        "proofRoot" : "sha256:207ece42d0ada0e7148d9b06384f5dabf2e370c4a364a16dcf020417d33ba82b",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "(final0a * final0a + final0b * final0b + 11) * (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:b0e16f64180e4d203a29ca16a7d872f56d1394772f1cb05dab44115e317a451e",
+        "proofRoot" : "sha256:207ece42d0ada0e7148d9b06384f5dabf2e370c4a364a16dcf020417d33ba82b",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a * final0a + final0b * final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final0-w2",
+    "binder" : "final0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final0-w2",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "MULTIPLY",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            },
+            "right" : {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            }
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final0w"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0a"
+              }
+            },
+            "right" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final0b"
+              }
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "11"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w2",
+        "revisionHash" : "sha256:fff81c2c09107bb01d5ff857383f3d672487ebaa823ced71577e264a8f45552d"
+      },
+      "contentHash" : "sha256:3df8fde50483eb1374fbcf5d7c3fcbd2e1c864feef5a598ec48daa6c7f413b48"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final0-w2",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "MULTIPLY",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "ADD",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                },
+                "right" : {
+                  "kind" : "BINARY",
+                  "operator" : "SUBTRACT",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                }
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0a"
+                  }
+                },
+                "right" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final0b"
+                  }
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "11"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w2",
+        "revisionHash" : "sha256:fff81c2c09107bb01d5ff857383f3d672487ebaa823ced71577e264a8f45552d"
+      },
+      "contentHash" : "sha256:c428918287eabd6f0e49de8d2dd3c26eb7fe6fd4ff4ca1590a05259efe0c7f24"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e344e017bb72c2dcdc645f337d896cfad58d5d3946daa7660c6643f806986871",
+        "proofRoot" : "sha256:aedc75cae02d2cb6ccbe9152b03b60732c6e7b3f59d200d42d35019a66c16b39",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e344e017bb72c2dcdc645f337d896cfad58d5d3946daa7660c6643f806986871",
+        "proofRoot" : "sha256:aedc75cae02d2cb6ccbe9152b03b60732c6e7b3f59d200d42d35019a66c16b39",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 6
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e344e017bb72c2dcdc645f337d896cfad58d5d3946daa7660c6643f806986871",
+        "proofRoot" : "sha256:aedc75cae02d2cb6ccbe9152b03b60732c6e7b3f59d200d42d35019a66c16b39",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "final0a * final0a + final0b * final0b + 11",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "final0a * final0a + final0b * final0b + 11 + (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "final0a * final0a + final0b * final0b + 11 - (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e344e017bb72c2dcdc645f337d896cfad58d5d3946daa7660c6643f806986871",
+        "proofRoot" : "sha256:aedc75cae02d2cb6ccbe9152b03b60732c6e7b3f59d200d42d35019a66c16b39",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "(final0a * final0a + final0b * final0b + 11) * (final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "(final0a + final0b) * (final0a - final0b) - (final0a * final0a + final0b * final0b + 11)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:e344e017bb72c2dcdc645f337d896cfad58d5d3946daa7660c6643f806986871",
+        "proofRoot" : "sha256:aedc75cae02d2cb6ccbe9152b03b60732c6e7b3f59d200d42d35019a66c16b39",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "(final0a + final0b) * (final0a - final0b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a + final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final0-w3",
+    "binder" : "final0w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final0-w3",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "final0w"
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "final0w"
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "1"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "final0w"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final0w"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w3",
+        "revisionHash" : "sha256:a0a15d97668b009a1bb2cf342fa8cc48afbc2b21106b9b81f53d53a3cdf8a0bd"
+      },
+      "contentHash" : "sha256:6169c0a44010a7478b7ea838502d7ec326de9a362a2dc0152f8ec4ca6f35d28f"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final0-w3",
+      "declarations" : [ {
+        "name" : "final0a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final0b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                },
+                "right" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "1"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final0-w3",
+        "revisionHash" : "sha256:a0a15d97668b009a1bb2cf342fa8cc48afbc2b21106b9b81f53d53a3cdf8a0bd"
+      },
+      "contentHash" : "sha256:0ec39e38b025166ad73f3ec161a4f0d16c0e290d1b9c447335d6a3d1b9c55e82"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "FIXED",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "RANDOM",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "HAND",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final0b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "0 + 0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "0 - 0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final1-w0",
+    "binder" : "final1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final1-w0",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "final1w"
+          },
+          "right" : {
+            "kind" : "BINARY",
+            "operator" : "SUBTRACT",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              }
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "final1b"
+            }
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "MULTIPLY",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1b"
+              }
+            },
+            "right" : {
+              "kind" : "LITERAL",
+              "value" : "13"
+            }
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final1b"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w0",
+        "revisionHash" : "sha256:f77c4f7d2ed0fbc14ca60201d94c1d6e6127999e1ebdfda9afe0fbaedbb9a613"
+      },
+      "contentHash" : "sha256:df785437fa9b0b1aaa02674143a4e3fa19e0ca979e6f956da2104252ce9fc947"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final1-w0",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BINARY",
+                "operator" : "SUBTRACT",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  }
+                },
+                "right" : {
+                  "kind" : "SYMBOL",
+                  "name" : "final1b"
+                }
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "MULTIPLY",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "ADD",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1b"
+                  }
+                },
+                "right" : {
+                  "kind" : "LITERAL",
+                  "value" : "13"
+                }
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1b"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w0",
+        "revisionHash" : "sha256:f77c4f7d2ed0fbc14ca60201d94c1d6e6127999e1ebdfda9afe0fbaedbb9a613"
+      },
+      "contentHash" : "sha256:8d44ba9c2c9f93e174994c5c6257f3139c8609c5cc1a24395f9d0616b5d4326c"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:44c1851e60750fcca0acd6c80e0ebe48f17be430617405888bf90f6be48b4035",
+        "proofRoot" : "sha256:7beaab3abc7cb5e6569a52a7a8e57c1c2af7c027430f07c5b9da3f1425c6819e",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:44c1851e60750fcca0acd6c80e0ebe48f17be430617405888bf90f6be48b4035",
+        "proofRoot" : "sha256:7beaab3abc7cb5e6569a52a7a8e57c1c2af7c027430f07c5b9da3f1425c6819e",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 5
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:44c1851e60750fcca0acd6c80e0ebe48f17be430617405888bf90f6be48b4035",
+        "proofRoot" : "sha256:7beaab3abc7cb5e6569a52a7a8e57c1c2af7c027430f07c5b9da3f1425c6819e",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:44c1851e60750fcca0acd6c80e0ebe48f17be430617405888bf90f6be48b4035",
+        "proofRoot" : "sha256:7beaab3abc7cb5e6569a52a7a8e57c1c2af7c027430f07c5b9da3f1425c6819e",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "((final1a + final1b) * 13 - final1b) * (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:44c1851e60750fcca0acd6c80e0ebe48f17be430617405888bf90f6be48b4035",
+        "proofRoot" : "sha256:7beaab3abc7cb5e6569a52a7a8e57c1c2af7c027430f07c5b9da3f1425c6819e",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a * final1a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final1-w1",
+    "binder" : "final1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final1-w1",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "MULTIPLY",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1b"
+              }
+            },
+            "right" : {
+              "kind" : "LITERAL",
+              "value" : "13"
+            }
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final1b"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "final1w"
+          },
+          "right" : {
+            "kind" : "BINARY",
+            "operator" : "SUBTRACT",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              }
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "final1b"
+            }
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w1",
+        "revisionHash" : "sha256:cea8132a7ce476d7565e23d04000d326d1a58757e7bd5be513110a61773d105c"
+      },
+      "contentHash" : "sha256:9f1cb9c42fc631c02b37b839b4a7dd70a80b9d7449c853d300a847c549f22a43"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final1-w1",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "MULTIPLY",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "ADD",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1b"
+                  }
+                },
+                "right" : {
+                  "kind" : "LITERAL",
+                  "value" : "13"
+                }
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1b"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BINARY",
+                "operator" : "SUBTRACT",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  }
+                },
+                "right" : {
+                  "kind" : "SYMBOL",
+                  "name" : "final1b"
+                }
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w1",
+        "revisionHash" : "sha256:cea8132a7ce476d7565e23d04000d326d1a58757e7bd5be513110a61773d105c"
+      },
+      "contentHash" : "sha256:01b9726044e358b549ad2280d2cc74c98adb4a31f7818ce329275169d1d5c720"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:3286e349e2479ddfa7525a7db3842ff3424f6c37f508c1b33f696fbd8a5ee45a",
+        "proofRoot" : "sha256:a3a6bd85653cc40469716fe109932c620a6933bda97c78ed21130945be6e7d43",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:3286e349e2479ddfa7525a7db3842ff3424f6c37f508c1b33f696fbd8a5ee45a",
+        "proofRoot" : "sha256:a3a6bd85653cc40469716fe109932c620a6933bda97c78ed21130945be6e7d43",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "((final1a + final1b) * 13 - final1b) * (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:3286e349e2479ddfa7525a7db3842ff3424f6c37f508c1b33f696fbd8a5ee45a",
+        "proofRoot" : "sha256:a3a6bd85653cc40469716fe109932c620a6933bda97c78ed21130945be6e7d43",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:3286e349e2479ddfa7525a7db3842ff3424f6c37f508c1b33f696fbd8a5ee45a",
+        "proofRoot" : "sha256:a3a6bd85653cc40469716fe109932c620a6933bda97c78ed21130945be6e7d43",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "((final1a + final1b) * 13 - final1b) * (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:3286e349e2479ddfa7525a7db3842ff3424f6c37f508c1b33f696fbd8a5ee45a",
+        "proofRoot" : "sha256:a3a6bd85653cc40469716fe109932c620a6933bda97c78ed21130945be6e7d43",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "(final1a + final1b) * 13",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final1-w2",
+    "binder" : "final1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final1-w2",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "SUBTRACT",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "MULTIPLY",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              }
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "final1b"
+            }
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final1w"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "SUBTRACT",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "MULTIPLY",
+            "left" : {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "SYMBOL",
+                "name" : "final1a"
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1b"
+              }
+            },
+            "right" : {
+              "kind" : "LITERAL",
+              "value" : "13"
+            }
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final1b"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w2",
+        "revisionHash" : "sha256:25e5f4585deb47d37acc59f3d4d29f1651005a1986dcdda8923131c4b732b712"
+      },
+      "contentHash" : "sha256:80b70369da8f84d6bb0737cfc2340bee9b7c4ab4aabfecf887dfbfc7b9f9522c"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final1-w2",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "SUBTRACT",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "MULTIPLY",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  }
+                },
+                "right" : {
+                  "kind" : "SYMBOL",
+                  "name" : "final1b"
+                }
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "SUBTRACT",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "MULTIPLY",
+                "left" : {
+                  "kind" : "BINARY",
+                  "operator" : "ADD",
+                  "left" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1a"
+                  },
+                  "right" : {
+                    "kind" : "SYMBOL",
+                    "name" : "final1b"
+                  }
+                },
+                "right" : {
+                  "kind" : "LITERAL",
+                  "value" : "13"
+                }
+              },
+              "right" : {
+                "kind" : "SYMBOL",
+                "name" : "final1b"
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w2",
+        "revisionHash" : "sha256:25e5f4585deb47d37acc59f3d4d29f1651005a1986dcdda8923131c4b732b712"
+      },
+      "contentHash" : "sha256:2a422b908a9684c1855a9190eeb3f3ffda4e8f71abe5d868e3588e28468432ec"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:0843545859c4f6ce66d5eee0e13f0944f9ac854346c855c5448aecc712c460e1",
+        "proofRoot" : "sha256:ee9e0ca769770031b7d045957f7c3759b4fa89355590071477572ad704f0ef10",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:0843545859c4f6ce66d5eee0e13f0944f9ac854346c855c5448aecc712c460e1",
+        "proofRoot" : "sha256:ee9e0ca769770031b7d045957f7c3759b4fa89355590071477572ad704f0ef10",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 6
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:0843545859c4f6ce66d5eee0e13f0944f9ac854346c855c5448aecc712c460e1",
+        "proofRoot" : "sha256:ee9e0ca769770031b7d045957f7c3759b4fa89355590071477572ad704f0ef10",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "B",
+        "term" : "(final1a + final1b) * 13 - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ADD",
+        "term" : "(final1a + final1b) * 13 - final1b + final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_B_A",
+        "term" : "(final1a + final1b) * 13 - final1b - (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:0843545859c4f6ce66d5eee0e13f0944f9ac854346c855c5448aecc712c460e1",
+        "proofRoot" : "sha256:ee9e0ca769770031b7d045957f7c3759b4fa89355590071477572ad704f0ef10",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "MULTIPLY",
+        "term" : "((final1a + final1b) * 13 - final1b) * (final1a * final1a - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 7
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "SUBTRACT_A_B",
+        "term" : "final1a * final1a - final1b - ((final1a + final1b) * 13 - final1b)",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "sha256:0843545859c4f6ce66d5eee0e13f0944f9ac854346c855c5448aecc712c460e1",
+        "proofRoot" : "sha256:ee9e0ca769770031b7d045957f7c3759b4fa89355590071477572ad704f0ef10",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a * final1a - final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a * final1a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "final1-w3",
+    "binder" : "final1w",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v1",
+      "obligationId" : "final1-w3",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1w",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "BINARY",
+            "operator" : "ADD",
+            "left" : {
+              "kind" : "SYMBOL",
+              "name" : "final1w"
+            },
+            "right" : {
+              "kind" : "SYMBOL",
+              "name" : "final1w"
+            }
+          },
+          "right" : {
+            "kind" : "LITERAL",
+            "value" : "1"
+          }
+        },
+        "right" : {
+          "kind" : "BINARY",
+          "operator" : "ADD",
+          "left" : {
+            "kind" : "SYMBOL",
+            "name" : "final1w"
+          },
+          "right" : {
+            "kind" : "SYMBOL",
+            "name" : "final1w"
+          }
+        }
+      },
+      "requestedEvidence" : "SYMBOLIC_CERTIFICATE",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w3",
+        "revisionHash" : "sha256:d8ed65b860ec76377b25e9f63f0785c6c4dede833bb7dec9c6b64a250dcfb358"
+      },
+      "contentHash" : "sha256:b638f447e20816f2f2d1140c05f05f85704d92eec82628d369d5b0630f90e5f1"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "final1-w3",
+      "declarations" : [ {
+        "name" : "final1a",
+        "sort" : "REAL"
+      }, {
+        "name" : "final1b",
+        "sort" : "REAL"
+      } ],
+      "theories" : [ "REAL_ARITHMETIC", "SCOPED_ANALYSIS" ],
+      "assumptions" : [ ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "EXISTS",
+          "domain" : "REAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "eq",
+            "arguments" : [ {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BINARY",
+                "operator" : "ADD",
+                "left" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                },
+                "right" : {
+                  "kind" : "BOUND",
+                  "index" : 0
+                }
+              },
+              "right" : {
+                "kind" : "LITERAL",
+                "value" : "1"
+              }
+            }, {
+              "kind" : "BINARY",
+              "operator" : "ADD",
+              "left" : {
+                "kind" : "BOUND",
+                "index" : 0
+              },
+              "right" : {
+                "kind" : "BOUND",
+                "index" : 0
+              }
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "final1-w3",
+        "revisionHash" : "sha256:d8ed65b860ec76377b25e9f63f0785c6c4dede833bb7dec9c6b64a250dcfb358"
+      },
+      "contentHash" : "sha256:c95318157341b49b3e530cc32fada6e2114353a56aa6e548eaae45c8028bc1b5"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "FIXED",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "RANDOM",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "HAND",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ZERO",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 1
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "BUDGET_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "ORDINARY",
+        "term" : "0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "1",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1a",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "final1b",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "0 + 0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "ORDINARY",
+        "term" : "0 - 0",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 6
+    } ]
+  }, {
+    "id" : "finalind0",
+    "binder" : "",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "finalind0",
+      "declarations" : [ {
+        "name" : "finalind0a",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind0m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind0n",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "finalind0a"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "crossed",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0n"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "unmatched",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0m"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        },
+        "right" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        }
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "finalind0",
+        "revisionHash" : "sha256:a887143b5ec97cebb89361cf9f66962f39418f2b371895e6124df6c3279a4708"
+      },
+      "contentHash" : "sha256:c21c8c3a87264ae571bfb8444df05b742c0bd7697bbf1b35008564ab5292ff72"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "finalind0",
+      "declarations" : [ {
+        "name" : "finalind0a",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind0m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind0n",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "finalind0a"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "crossed",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0n"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "unmatched",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind0m"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "at",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "finalind0a"
+            }, {
+              "kind" : "BOUND",
+              "index" : 0
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "finalind0",
+        "revisionHash" : "sha256:a887143b5ec97cebb89361cf9f66962f39418f2b371895e6124df6c3279a4708"
+      },
+      "contentHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "finalind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c",
+        "proofRoot" : "sha256:6507636c4ce7812f6b014c4c292f08ee3e089f7d59063df027914372d92400a3",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c",
+        "proofRoot" : "sha256:6507636c4ce7812f6b014c4c292f08ee3e089f7d59063df027914372d92400a3",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind0m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind0n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c",
+        "proofRoot" : "sha256:6507636c4ce7812f6b014c4c292f08ee3e089f7d59063df027914372d92400a3",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c",
+        "proofRoot" : "sha256:6507636c4ce7812f6b014c4c292f08ee3e089f7d59063df027914372d92400a3",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "finalind0m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind0n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c",
+        "proofRoot" : "sha256:6507636c4ce7812f6b014c4c292f08ee3e089f7d59063df027914372d92400a3",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind0a",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:2f865df1f09cbefa41dce817771feef823ffa871e38212731c8dc42d2611257c",
+        "proofRoot" : "sha256:6507636c4ce7812f6b014c4c292f08ee3e089f7d59063df027914372d92400a3",
+        "accepted" : true,
+        "checkerCalls" : 2
+      }, {
+        "proposal" : "finalind0m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind0n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 4
+    } ]
+  }, {
+    "id" : "finalind1",
+    "binder" : "",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "finalind1",
+      "declarations" : [ {
+        "name" : "finalind1m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind1n",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind1z",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "finalind1z"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "crossed",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1n"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1z"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1z"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "unmatched",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1m"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        },
+        "right" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        }
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "finalind1",
+        "revisionHash" : "sha256:fe3196dc3c1ec0bbc86b82ea7def9ef1e207da7a228493e9970a897b5d2cfbed"
+      },
+      "contentHash" : "sha256:1d0621702dd8ac99e4437bbccce02cecd8dee73372947039ff90d97e0dd76648"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "finalind1",
+      "declarations" : [ {
+        "name" : "finalind1m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind1n",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind1z",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "base",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "CALL",
+          "function" : "at",
+          "arguments" : [ {
+            "kind" : "SYMBOL",
+            "name" : "finalind1z"
+          }, {
+            "kind" : "CALL",
+            "function" : "nat",
+            "arguments" : [ {
+              "kind" : "LITERAL",
+              "value" : "0"
+            } ]
+          } ]
+        },
+        "right" : null
+      }, {
+        "id" : "crossed",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1n"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1z"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1z"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "unmatched",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind1m"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "at",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "finalind1z"
+            }, {
+              "kind" : "BOUND",
+              "index" : 0
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "finalind1",
+        "revisionHash" : "sha256:fe3196dc3c1ec0bbc86b82ea7def9ef1e207da7a228493e9970a897b5d2cfbed"
+      },
+      "contentHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : true,
+      "trials" : [ {
+        "proposal" : "finalind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1",
+        "proofRoot" : "sha256:8965ea5d309aeecdbe938dd34cc69b4b6e0331aad384d2e49c6425c9d7458dae",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "FIXED",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind1m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind1n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1",
+        "proofRoot" : "sha256:8965ea5d309aeecdbe938dd34cc69b4b6e0331aad384d2e49c6425c9d7458dae",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "RANDOM",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1",
+        "proofRoot" : "sha256:8965ea5d309aeecdbe938dd34cc69b4b6e0331aad384d2e49c6425c9d7458dae",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind1m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind1n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1",
+        "proofRoot" : "sha256:8965ea5d309aeecdbe938dd34cc69b4b6e0331aad384d2e49c6425c9d7458dae",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    }, {
+      "arm" : "HAND",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1",
+        "proofRoot" : "sha256:8965ea5d309aeecdbe938dd34cc69b4b6e0331aad384d2e49c6425c9d7458dae",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 2
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "FOUND",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind1m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind1n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind1z",
+        "term" : "",
+        "baseId" : "base",
+        "stepId" : "own-step",
+        "instanceHash" : "sha256:54bb456597af219714554560a324db8bd9e0e599262404efc249b685c05e0bc1",
+        "proofRoot" : "sha256:8965ea5d309aeecdbe938dd34cc69b4b6e0331aad384d2e49c6425c9d7458dae",
+        "accepted" : true,
+        "checkerCalls" : 2
+      } ],
+      "checkerCalls" : 4
+    } ]
+  }, {
+    "id" : "finalind2",
+    "binder" : "",
+    "source" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "finalind2",
+      "declarations" : [ {
+        "name" : "finalind2a",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind2m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind2n",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "crossed",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2n"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "unmatched",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2m"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "EQUALS",
+        "left" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        },
+        "right" : {
+          "kind" : "LITERAL",
+          "value" : "0"
+        }
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "finalind2",
+        "revisionHash" : "sha256:f09d0534ba0f672e705b31658b5b92f60d3dac741248aac1c149c30b3a2d03c5"
+      },
+      "contentHash" : "sha256:f4f98a4cc4235da538e19fcaddc0f7633955776193ac1c4e2057c585e1ddc7fe"
+    },
+    "recipient" : {
+      "schema" : "regelsuche.solver-obligation/v2",
+      "obligationId" : "finalind2",
+      "declarations" : [ {
+        "name" : "finalind2a",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind2m",
+        "sort" : "NAT_PREDICATE"
+      }, {
+        "name" : "finalind2n",
+        "sort" : "NAT_PREDICATE"
+      } ],
+      "theories" : [ "SCOPED_ANALYSIS" ],
+      "assumptions" : [ {
+        "id" : "crossed",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2n"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "own-step",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2a"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2a"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      }, {
+        "id" : "unmatched",
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "implies",
+            "arguments" : [ {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2m"
+              }, {
+                "kind" : "BOUND",
+                "index" : 0
+              } ]
+            }, {
+              "kind" : "CALL",
+              "function" : "at",
+              "arguments" : [ {
+                "kind" : "SYMBOL",
+                "name" : "finalind2m"
+              }, {
+                "kind" : "CALL",
+                "function" : "succ",
+                "arguments" : [ {
+                  "kind" : "BOUND",
+                  "index" : 0
+                } ]
+              } ]
+            } ]
+          }
+        },
+        "right" : null
+      } ],
+      "goal" : {
+        "relation" : "HOLDS",
+        "left" : {
+          "kind" : "BINDER",
+          "binder" : "FORALL",
+          "domain" : "NATURAL",
+          "body" : {
+            "kind" : "CALL",
+            "function" : "at",
+            "arguments" : [ {
+              "kind" : "SYMBOL",
+              "name" : "finalind2a"
+            }, {
+              "kind" : "BOUND",
+              "index" : 0
+            } ]
+          }
+        },
+        "right" : null
+      },
+      "requestedEvidence" : "FORMAL_PROOF",
+      "provenance" : {
+        "sourceType" : "scoped-proof-transfer-v1",
+        "sourceId" : "finalind2",
+        "revisionHash" : "sha256:f09d0534ba0f672e705b31658b5b92f60d3dac741248aac1c149c30b3a2d03c5"
+      },
+      "contentHash" : "sha256:827907fea410e2940423f782c03febde685cdcc362553a472fb8557694154144"
+    },
+    "arms" : [ {
+      "arm" : "LEARNED",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "FIXED",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "RANDOM",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "EXHAUSTIVE",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "HAND",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 3
+    }, {
+      "arm" : "ORDINARY",
+      "status" : "GRAMMAR_EXHAUSTED",
+      "selectedPlanApplied" : false,
+      "trials" : [ {
+        "proposal" : "finalind2a",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2m",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      }, {
+        "proposal" : "finalind2n",
+        "term" : "",
+        "baseId" : "",
+        "stepId" : "",
+        "instanceHash" : "",
+        "proofRoot" : "",
+        "accepted" : false,
+        "checkerCalls" : 1
+      } ],
+      "checkerCalls" : 3
+    } ]
+  } ],
+  "frozenPlanHash" : "sha256:d3adcb985e3a61f07f8a33c410893d76c7e9750bb41e8857da638b2ee6e053f7",
+  "protocolCommit" : "abf2aba070a70f1ac48ab066d134195c9182af9c",
+  "split" : "FINAL",
+  "work" : {
+    "EXHAUSTIVE" : {
+      "cases" : 11,
+      "reached" : 8,
+      "proposals" : 47,
+      "checkerCalls" : 55,
+      "planUses" : 0,
+      "chargedTrainingProposals" : 0,
+      "chargedTrainingCheckerCalls" : 0
+    },
+    "FIXED" : {
+      "cases" : 11,
+      "reached" : 8,
+      "proposals" : 33,
+      "checkerCalls" : 41,
+      "planUses" : 0,
+      "chargedTrainingProposals" : 0,
+      "chargedTrainingCheckerCalls" : 0
+    },
+    "HAND" : {
+      "cases" : 11,
+      "reached" : 8,
+      "proposals" : 13,
+      "checkerCalls" : 21,
+      "planUses" : 0,
+      "chargedTrainingProposals" : 0,
+      "chargedTrainingCheckerCalls" : 0
+    },
+    "LEARNED" : {
+      "cases" : 11,
+      "reached" : 8,
+      "proposals" : 13,
+      "checkerCalls" : 21,
+      "planUses" : 8,
+      "chargedTrainingProposals" : 42,
+      "chargedTrainingCheckerCalls" : 50
+    },
+    "ORDINARY" : {
+      "cases" : 11,
+      "reached" : 2,
+      "proposals" : 57,
+      "checkerCalls" : 59,
+      "planUses" : 0,
+      "chargedTrainingProposals" : 0,
+      "chargedTrainingCheckerCalls" : 0
+    },
+    "RANDOM" : {
+      "cases" : 11,
+      "reached" : 8,
+      "proposals" : 22,
+      "checkerCalls" : 30,
+      "planUses" : 0,
+      "chargedTrainingProposals" : 0,
+      "chargedTrainingCheckerCalls" : 0
+    }
+  }
+}

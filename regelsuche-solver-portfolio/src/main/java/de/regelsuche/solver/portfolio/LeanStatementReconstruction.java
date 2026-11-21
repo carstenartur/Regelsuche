@@ -24,7 +24,7 @@ final class LeanStatementReconstruction {
 
     private static String sort(Sort s) {
         return switch (s) {
-            case REAL -> "ℝ"; case NATURAL -> "ℕ"; case REAL_SET -> "Set ℝ";
+            case NAT_PREDICATE -> "ℕ → Prop"; case REAL -> "ℝ"; case NATURAL -> "ℕ"; case REAL_SET -> "Set ℝ";
             case PROPOSITION -> "Prop"; case REAL_SEQUENCE -> "ℕ → ℝ"; case REAL_FUNCTION -> "ℝ → ℝ";
             default -> throw new IllegalArgumentException("unsupported reconstructed sort " + s);
         };

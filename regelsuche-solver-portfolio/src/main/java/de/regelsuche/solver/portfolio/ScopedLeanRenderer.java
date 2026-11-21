@@ -2,6 +2,7 @@ package de.regelsuche.solver.portfolio;
 
 import static de.regelsuche.solver.ir.SolverIr.Sort.*;
 
+import de.regelsuche.solver.ir.NaturalInduction;
 import de.regelsuche.solver.ir.SolverIr.*;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -63,11 +64,25 @@ final class ScopedLeanRenderer {
             var goal = obligation.goal();
             type.append(relation(goal.relation(), goal.left(), goal.right(), mapping));
             mapping.put("goal.closedType", type.toString());
-            return new LeanSourceRenderer.Material(type.toString(), TACTICS, mapping, issues);
+            return new LeanSourceRenderer.Material(type.toString(), proof(), mapping, issues);
         } catch (IllegalArgumentException unsupported) {
             issues.add(unsupported.getMessage());
             return new LeanSourceRenderer.Material("", "", Map.of(), issues);
         }
+    }
+
+    private String proof() {
+        for (var plan : NaturalInduction.discover(obligation)) {
+            if (!plan.conclusion().equals(obligation)) continue;
+            var introductions = new ArrayList<String>();
+            obligation.declarations().forEach(d -> introductions.add("rs_" + d.name()));
+            for (int i = 0; i < obligation.assumptions().size(); i++) introductions.add("h" + i);
+            int base = obligation.assumptions().indexOf(plan.base());
+            int step = obligation.assumptions().indexOf(plan.step());
+            return "by\n  intro " + String.join(" ", introductions)
+                + "\n  exact Nat.rec (motive := rs_" + plan.predicate() + ") h" + base + " h" + step + "\n";
+        }
+        return TACTICS;
     }
 
     private String relation(Relation relation, Expression l, Expression r, Map<String,String> mapping) {
@@ -91,7 +106,7 @@ final class ScopedLeanRenderer {
 
     static String sortName(Sort sort) {
         return switch (sort) {
-            case REAL -> "Real"; case NATURAL -> "Nat"; case PROPOSITION -> "Prop"; case REAL_SET -> "Set Real";
+            case NAT_PREDICATE -> "Nat → Prop"; case REAL -> "Real"; case NATURAL -> "Nat"; case PROPOSITION -> "Prop"; case REAL_SET -> "Set Real";
             case REAL_SEQUENCE -> "Nat → Real"; case REAL_FUNCTION -> "Real → Real";
             default -> throw new IllegalArgumentException("UNSUPPORTED_SORT:" + sort);
         };
@@ -194,6 +209,7 @@ final class ScopedLeanRenderer {
             case "union" -> infix("∪", l, REAL_SET, r, REAL_SET, REAL_SET);
             case "inter" -> infix("∩", l, REAL_SET, r, REAL_SET, REAL_SET);
             case "at" -> {
+                if (l.sort == NAT_PREDICATE) yield new Term("(" + l.source + " " + expect(r, NATURAL) + ")", PROPOSITION);
                 require(l.sort == REAL_SEQUENCE || l.sort == REAL_FUNCTION, "FUNCTION_REQUIRED");
                 yield new Term("(" + l.source + " " + expect(r, l.sort == REAL_SEQUENCE ? NATURAL : REAL) + ")", REAL);
             }

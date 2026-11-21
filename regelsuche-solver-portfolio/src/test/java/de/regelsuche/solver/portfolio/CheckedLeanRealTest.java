@@ -155,6 +155,36 @@ class CheckedLeanRealTest {
         }
     }
 
+    @Test void existingWitnessAndNaturalInductionPlansReachAFreshKernelAndSecondChecker() throws Exception {
+        var body = new SolverObligationFactory().equality("witness", "w", "x+1", List.of(),
+            RequestedEvidence.SYMBOLIC_CERTIFICATE, new SourceProvenance("test", "witness", SolverIr.sha256("witness")));
+        var statement = new ExistentialIntroduction.Statement(body, "w");
+        var proof = ExistentialWitnessSearch.search(statement, 256).proof().orElseThrow();
+        assertTrue(ExistentialIntroduction.replay(statement, proof));
+        var witness = statement.toScopedObligation();
+
+        var p = new Symbol("property");
+        var n = new Bound(0);
+        var pn = ScopedLeanContractTest.app("at", p, n);
+        var base = Predicate.holds("initial", ScopedLeanContractTest.app("at", p, ScopedLeanContractTest.app("nat", new Literal("0"))));
+        var next = ScopedLeanContractTest.app("at", p, ScopedLeanContractTest.app("succ", n));
+        var step = Predicate.holds("transition", new Binder(BinderKind.FORALL, Sort.NATURAL, ScopedLeanContractTest.app("implies", pn, next)));
+        var declarations = List.of(new SymbolDeclaration("property", Sort.NAT_PREDICATE));
+        var endpoint = new Binder(BinderKind.FORALL, Sort.NATURAL, pn);
+        var target = ScopedLeanContractTest.theorem(declarations, List.of(base, step), endpoint);
+        var plan = NaturalInduction.discover(target).getFirst();
+        assertTrue(NaturalInduction.matches(target, plan));
+        var rebuild = new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")), root());
+        for (var request : List.of(witness, plan.conclusion())) {
+            var checked = backend().executeWithEvidence(request);
+            assertEquals(ResultStatus.CONFIRMED, checked.execution().result().status(), diagnostics(checked.directory()));
+            rebuild.rebuild(request, checked.execution().result().certificateHash(), checked.directory());
+        }
+        var withoutBase = backend().executeWithEvidence(ScopedLeanContractTest.theorem(declarations, List.of(step), endpoint));
+        assertEquals(ResultStatus.UNKNOWN, withoutBase.execution().result().status(), diagnostics(withoutBase.directory()));
+        assertTrue(withoutBase.execution().result().certificateHash().isEmpty());
+    }
+
     private static String diagnostics(Path directory) throws Exception {
         StringBuilder out = new StringBuilder(directory.toString());
         for (String file : List.of("proof.stdout", "proof.stderr", "FAILED.txt")) {
