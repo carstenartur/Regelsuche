@@ -145,6 +145,15 @@ class MavenParallelVerificationWorkflowContractTest {
         "regelsuche-math-sympy/target/site/jacoco/**"));
     assertTrue(sympy.contains("if-no-files-found: error"),
         "missing runtime evidence must fail the isolated authority");
+    String sympyProducer = Files.readString(root.resolve(
+        "regelsuche-math-sympy/src/maven-test/java/de/regelsuche/math/sympy/SympyRuntimeContainerIT.java"));
+    assertTrue(sympyProducer.contains("retainCoverageInputs(root, target);"),
+        "isolated worker must retain its own tested classes, sources and execution data");
+    assertTrue(sympyProducer.contains("target.resolve(\"site/jacoco/inputs\")"),
+        "the independent artifact must retain renderable JaCoCo inputs");
+    assertTrue(sympyProducer.contains("target.resolve(\"jacoco.exec\")"));
+    assertTrue(sympyProducer.contains("inputs.resolve(\"execution-data/jacoco.exec\")"));
+
 
     assertTrue(maven.contains("actions/checkout@"),
         "the Maven authority must start from a separate fresh checkout");
@@ -243,6 +252,65 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void fullMavenEvidenceIsRetainedBeforeAnotherCheckoutLifecycleCanReplaceIt() throws IOException {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
+        .findFirst().orElseThrow();
+    var registration = steps.stream()
+        .filter(step -> step.path("run").asText().contains("-Dregelsuche.qualityAcceptance.registerArchive=true"))
+        .findFirst().orElseThrow();
+    assertTrue(steps.indexOf(registration) < steps.indexOf(product),
+        "register the archive before the full lifecycle produces reports in the original checkout");
+    var registrationCommand = registration.path("run").asText();
+    assertTrue(registrationCommand.contains("-DdisableXmlReport=true")
+        && registrationCommand.contains("-Dsurefire.useFile=false")
+        && registrationCommand.contains("-Djacoco.skip=true"),
+        "an early failure must not publish registration-only output as the full reactor result");
+
+    var retention = steps.stream()
+        .filter(step -> "maven-full-reactor-verification".equals(step.path("with").path("name").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("missing full-reactor report artifact"));
+    int produced = steps.indexOf(product);
+    int retained = steps.indexOf(retention);
+    assertTrue(produced < retained, "the artifact must come from the full product lifecycle");
+    assertFalse(steps.subList(produced + 1, retained).stream()
+        .anyMatch(step -> step.path("run").asText().contains("mvn ")),
+        "an intervening Maven lifecycle can clean the first run's reports");
+    assertTrue(retention.path("uses").asText().startsWith("actions/upload-artifact@"));
+    assertTrue(retention.path("if").asText().contains("always()"), "retain reports from failed runs as well");
+    var paths = retention.required("with").required("path").asText().lines().map(String::strip).toList();
+    assertTrue(paths.containsAll(List.of("**/target/surefire-reports/**", "**/target/failsafe-reports/**",
+        "**/target/jacoco.exec", "**/target/site/jacoco/**")), "retain the original test and JaCoCo evidence");
+  }
+
+  @Test
+  void mavenPagesReplayTheFullReactorFilesInsteadOfLaterReports() throws IOException {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var snapshot = steps.stream().filter(step -> "full_maven_reports".equals(step.path("id").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("missing full-reactor report snapshot"));
+    var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
+        .findFirst().orElseThrow();
+    int produced = steps.indexOf(product);
+    int captured = steps.indexOf(snapshot);
+    assertTrue(produced < captured, "capture the reports after the full product run");
+    assertFalse(steps.subList(produced + 1, captured).stream()
+        .anyMatch(step -> step.path("run").asText().contains("mvn ")),
+        "capture the reports before any Maven reinitialization");
+    assertTrue(snapshot.path("run").asText().contains("**/target/surefire-reports/TEST-*.xml"));
+    assertTrue(snapshot.path("run").asText().contains("**/target/failsafe-reports/TEST-*.xml"));
+    var replay = steps.stream()
+        .filter(step -> step.path("run").asText().contains("-Dregelsuche.tests.mavenPages=true"))
+        .findFirst().orElseThrow();
+    assertEquals("${{ steps.full_maven_reports.outputs.root }}",
+        replay.required("env").required("REGELSUCHE_MAVEN_REPORT_ROOT").asText());
+    assertTrue(replay.path("run").asText().contains("-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}"));
   }
 
   @Test
