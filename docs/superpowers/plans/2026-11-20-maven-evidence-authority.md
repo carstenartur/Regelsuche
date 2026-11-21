@@ -28,3 +28,9 @@ Missing benchmarks, altered policy bytes, INCONCLUSIVE, stale raw output and wor
 1. Prove the original three ancestor identities and the registered schema protocol through actual Git commit, tree and blob bytes. Preserve a bounded historical object set from accepted e115 and carry the contemporary commit chain into archives. An unrelated branch or missing historical object fails qualification.
 2. Resolve the learning worker classpath from the active Maven reactor. Run the original experiment matrix, real Java worker and independent SymPy evaluator with the pinned JDK/CPython image, then replay every retained row. Compare against the separately executed hosted predecessor before promoting the Maven lane.
 3. Repeat for the typed, native and learned-schema experiments with their additional clean-source, snapshot and worker-accounting requirements. Their original lanes remain required until their separate controls, raw rows and failed-outcome evidence agree.
+
+## Maven report retention
+
+CI registers the Git-free archive before the full product lifecycle and uploads the original Surefire, Failsafe and JaCoCo reports immediately afterward. Maven pages replay a separate snapshot of the same XML. The Git-free artifact retains its own full reactor reports and the separate archive verification receipt. Its final focused recheck regenerates only the `maven-build-contract` module's reports.
+
+On the previous workflow, the new ordering control failed because registration ran after the full product lifecycle. A replay fixture using the updated snapshot step rendered seven original test results after the live reports changed to 23 test results.
