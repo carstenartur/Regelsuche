@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QualityAcceptanceCollection.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">QualityAcceptanceCollection.java</span></div><h1>QualityAcceptanceCollection.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+/** Collects the original reports and their first-read bytes, including failed native outcomes. */
+public final class QualityAcceptanceCollection {
+<span class="fc" id="L30">    static final ObjectMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L31">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
+    private static final String QUALITY = &quot;build/reports/quality/&quot;;
+    private static final String HISTORY = QUALITY + &quot;jmh-history/&quot;;
+    private static final String VISUAL = &quot;app/src/e2eTest/resources/screenshots/&quot;;
+    private static final String INVENTORY = QUALITY + &quot;supply-chain/&quot;;
+    private static final String SCAN = INVENTORY + &quot;vulnerability/&quot;;
+    private static final String SCAN_POLICY = &quot;config/quality/supply-chain-vulnerability-policy.json&quot;;
+    private final OwnedReleaseEvidenceFiles source;
+    private final JsonNode plan;
+    private final ObjectNode sections;
+<span class="fc" id="L41">    private final ArrayNode problems = JSON.createArrayNode();</span>
+<span class="fc" id="L42">    private final Map&lt;String, byte[]&gt; files = new TreeMap&lt;&gt;();</span>
+
+<span class="fc" id="L44">    private QualityAcceptanceCollection(OwnedReleaseEvidenceFiles source) throws IOException {</span>
+<span class="fc" id="L45">        this.source = source;</span>
+<span class="fc" id="L46">        try (var stream = QualityAcceptanceCollection.class.getResourceAsStream(&quot;/quality-collection/retention-map.json&quot;)) {</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (stream == null) throw new IOException(&quot;missing quality retention map&quot;);</span>
+<span class="fc" id="L48">            plan = JSON.readTree(stream);</span>
+        }
+<span class="fc" id="L50">        sections = plan.required(&quot;sections&quot;).deepCopy();</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (var entry : sections.properties()) {</span>
+<span class="fc" id="L52">            ObjectNode section = (ObjectNode) entry.getValue();</span>
+<span class="fc" id="L53">            section.putArray(&quot;outcomes&quot;);</span>
+<span class="fc" id="L54">            section.putArray(&quot;currentValueBindings&quot;);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">    }</span>
+
+    public static ObjectNode collect(Path root, Path output, ObjectNode checkout) throws IOException {
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        require(checkout.required(&quot;revision&quot;).asText().matches(&quot;[0-9a-f]{40}&quot;) &amp;&amp; checkout.required(&quot;tree&quot;).asText().matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            &amp;&amp; checkout.required(&quot;trackedChangesPresent&quot;).isBoolean(), &quot;invalid checkout identity&quot;);</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        require(output.startsWith(&quot;build/reports/quality&quot;) &amp;&amp; output.getNameCount() &gt; 3</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            &amp;&amp; output.equals(output.normalize()), &quot;output must be a fresh child of build/reports/quality&quot;);</span>
+<span class="fc" id="L63">        try (var reader = new OwnedReleaseEvidenceFiles(root)) {</span>
+<span class="fc" id="L64">            var collection = new QualityAcceptanceCollection(reader);</span>
+<span class="fc" id="L65">            collection.read();</span>
+<span class="fc" id="L66">            return collection.publish(root, output, checkout);</span>
+        }
+    }
+
+    private void read() {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var entry : sections.properties()) {</span>
+<span class="fc" id="L72">            String section = entry.getKey();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (var file : entry.getValue().required(&quot;policyFiles&quot;)) {</span>
+<span class="fc" id="L74">                String path = file.textValue();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (!path.endsWith(&quot;.json&quot;)) retain(section, path, null);</span>
+                else {
+<span class="fc" id="L77">                    var policy = plan.required(&quot;policies&quot;).required(path);</span>
+<span class="fc" id="L78">                    document(section, path, policy.get(0).textValue(), null, null, null, policy.get(1));</span>
+                }
+<span class="fc" id="L80">            }</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (var file : entry.getValue().required(&quot;supportFiles&quot;)) retain(section, file.textValue(), null);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (var group : plan.required(&quot;reports&quot;).properties()) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (var report : group.getValue()) document(group.getKey(), report.get(0).textValue(),</span>
+<span class="fc" id="L85">                report.get(1).textValue(), report.get(2).textValue(), report.get(3), null, null);</span>
+<span class="fc" id="L86">        }</span>
+<span class="fc" id="L87">        special(&quot;history&quot;, this::history);</span>
+<span class="fc" id="L88">        special(&quot;visual&quot;, this::visual);</span>
+<span class="fc" id="L89">        special(&quot;http&quot;, this::http);</span>
+<span class="fc" id="L90">        special(&quot;vulnerability&quot;, this::vulnerability);</span>
+<span class="fc" id="L91">    }</span>
+
+    private interface Checked { void execute() throws Exception; }
+    private void special(String section, Checked operation) {
+<span class="fc" id="L95">        try { operation.execute(); }</span>
+<span class="fc" id="L96">        catch (Exception failure) { problem(section, section + &quot; bindings&quot;, failure); }</span>
+<span class="fc" id="L97">    }</span>
+
+    private void problem(String section, String path, Exception failure) {
+<span class="fc" id="L100">        problems.addObject().put(&quot;section&quot;, section).put(&quot;path&quot;, path)</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            .put(&quot;reason&quot;, failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage());</span>
+<span class="fc" id="L102">    }</span>
+
+    private byte[] retain(String section, String path, JsonNode hash) {
+        try {
+<span class="fc" id="L106">            Path relative = Path.of(path);</span>
+<span class="fc" id="L107">            path = relative.toString();</span>
+<span class="fc" id="L108">            byte[] bytes = files.get(path);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (bytes == null) bytes = source.readBytes(relative);</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">            require(hash == null || sha256(bytes).equals(hash.textValue()), &quot;byte hash binding differs&quot;);</span>
+<span class="fc" id="L111">            files.put(path, bytes);</span>
+<span class="fc" id="L112">            return bytes;</span>
+<span class="fc" id="L113">        } catch (IOException | IllegalArgumentException failure) {</span>
+<span class="fc" id="L114">            problem(section, path, failure);</span>
+<span class="fc" id="L115">            return null;</span>
+        }
+    }
+
+    private JsonNode document(String section, String path, String schema, String outcome, JsonNode fields,
+                              JsonNode hash, JsonNode shape) {
+<span class="fc" id="L121">        byte[] bytes = retain(section, path, hash);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (bytes == null) return null;</span>
+        try {
+<span class="fc" id="L124">            var value = JSON.readTree(bytes);</span>
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            require(value != null &amp;&amp; value.isContainerNode(), &quot;report must be a JSON object or array&quot;);</span>
+<span class="fc bfc" id="L126" title="All 4 branches covered.">            require(schema == null || schema.equals(value.path(&quot;schema&quot;).textValue()), &quot;report schema differs: expected &quot; + schema);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (shape != null) validateShape(value, shape, path);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (outcome != null) {</span>
+<span class="fc" id="L129">                String result = value.required(outcome).textValue();</span>
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">                require(result != null &amp;&amp; !result.isEmpty(), &quot;missing native outcome: &quot; + outcome);</span>
+<span class="fc" id="L131">                section(section).withArray(&quot;outcomes&quot;).addObject().put(&quot;sourcePath&quot;, path).put(&quot;field&quot;, outcome).put(&quot;value&quot;, result);</span>
+            }
+<span class="fc bfc" id="L133" title="All 4 branches covered.">            if (fields != null &amp;&amp; !fields.isEmpty()) {</span>
+<span class="fc" id="L134">                var projection = JSON.createObjectNode();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                for (var key : fields) projection.set(key.textValue(), value.required(key.textValue()));</span>
+<span class="fc" id="L136">                bind(section, path, bytes, projection);</span>
+            }
+<span class="fc" id="L138">            return value;</span>
+<span class="fc" id="L139">        } catch (IOException | IllegalArgumentException failure) {</span>
+<span class="fc" id="L140">            problem(section, path, failure);</span>
+<span class="fc" id="L141">            return null;</span>
+        }
+    }
+
+    private static void validateShape(JsonNode value, JsonNode shape, String label) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (shape.isObject()) {</span>
+<span class="fc" id="L147">            require(value.isObject(), label + &quot; expects an object&quot;);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (var entry : shape.properties()) validateShape(value.required(entry.getKey()), entry.getValue(), label + &quot;.&quot; + entry.getKey());</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        } else if (shape.isArray()) {</span>
+<span class="fc" id="L150">            boolean map = shape.get(0).asText().equals(&quot;object&quot;);</span>
+<span class="pc bpc" id="L151" title="2 of 10 branches missed.">            require((map ? value.isObject() : value.isArray()) &amp;&amp; (shape.get(2).asBoolean() || !value.isEmpty()),</span>
+                label + &quot; has an invalid inventory&quot;);
+<span class="pc bpc" id="L153" title="1 of 6 branches missed.">            if (map) for (var key : value.propertyStream().map(Map.Entry::getKey).toList()) require(!key.isBlank(), label + &quot; has a blank key&quot;);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (var member : value) validateShape(member, shape.get(1), label);</span>
+<span class="fc" id="L155">        } else {</span>
+<span class="pc bpc" id="L156" title="1 of 7 branches missed.">            boolean valid = switch (shape.textValue()) {</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">                case &quot;string&quot; -&gt; value.isTextual() &amp;&amp; !value.textValue().isBlank();</span>
+<span class="fc" id="L158">                case &quot;array&quot; -&gt; value.isArray();</span>
+<span class="fc" id="L159">                case &quot;boolean&quot; -&gt; value.isBoolean();</span>
+<span class="fc" id="L160">                case &quot;integer&quot; -&gt; value.isIntegralNumber();</span>
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">                case &quot;nullableInteger&quot; -&gt; value.isNull() || value.isIntegralNumber();</span>
+<span class="pc bpc" id="L162" title="2 of 6 branches missed.">                case &quot;number&quot; -&gt; value.isNumber() &amp;&amp; (value.isIntegralNumber() || Double.isFinite(value.doubleValue()));</span>
+<span class="nc" id="L163">                default -&gt; throw new IllegalArgumentException(&quot;unknown retention type &quot; + shape);</span>
+            };
+<span class="fc" id="L165">            require(valid, label + &quot; has the wrong JSON type&quot;);</span>
+        }
+<span class="fc" id="L167">    }</span>
+
+    private void bind(String section, String path, byte[] bytes, ObjectNode values) {
+<span class="fc" id="L170">        section(section).withArray(&quot;currentValueBindings&quot;).addObject().put(&quot;sourcePath&quot;, path)</span>
+<span class="fc" id="L171">            .put(&quot;sha256&quot;, sha256(bytes)).set(&quot;fields&quot;, values);</span>
+<span class="fc" id="L172">    }</span>
+<span class="fc" id="L173">    private ObjectNode section(String section) { return (ObjectNode) sections.required(section); }</span>
+<span class="fc" id="L174">    private JsonNode document(String section, String path) { return document(section, path, null, null, null, null, null); }</span>
+
+    private void bound(String section, String prefix, JsonNode ref) {
+<span class="fc" id="L177">        retain(section, prefix + text(ref, &quot;path&quot;), ref.required(&quot;sha256&quot;));</span>
+<span class="fc" id="L178">    }</span>
+    private static String text(JsonNode node, String key) {
+<span class="fc" id="L180">        var value = node.required(key);</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        require(value.isTextual() &amp;&amp; !value.textValue().isEmpty(), &quot;missing text &quot; + key);</span>
+<span class="fc" id="L182">        return value.textValue();</span>
+    }
+    private static List&lt;String&gt; column(JsonNode rows, String field) {
+<span class="fc" id="L185">        require(rows.isArray(), &quot;expected row inventory&quot;);</span>
+<span class="fc" id="L186">        return rows.valueStream().map(row -&gt; text(row, field)).toList();</span>
+    }
+    private static void sameInventory(Set&lt;String&gt; expected, List&lt;String&gt; actual, String label) {
+<span class="pc bpc" id="L189" title="2 of 6 branches missed.">        require(!expected.isEmpty() &amp;&amp; actual.size() == expected.size() &amp;&amp; Set.copyOf(actual).equals(expected), label);</span>
+<span class="fc" id="L190">    }</span>
+    private static void require(boolean value, String reason) {
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (!value) throw new IllegalArgumentException(reason);</span>
+<span class="fc" id="L193">    }</span>
+    private static boolean hasExactCount(JsonNode value, int count) {
+<span class="pc bpc" id="L195" title="2 of 6 branches missed.">        return value.isIntegralNumber() &amp;&amp; value.canConvertToInt() &amp;&amp; value.intValue() == count;</span>
+    }
+<span class="fc" id="L197">    private static String sha256(byte[] data) { return &quot;sha256:&quot; + HexFormat.of().formatHex(digest(&quot;SHA-256&quot;).digest(data)); }</span>
+    private static MessageDigest digest(String algorithm) {
+<span class="fc" id="L199">        try { return MessageDigest.getInstance(algorithm); }</span>
+<span class="nc" id="L200">        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+
+    private void history() {
+<span class="fc" id="L204">        var policy = document(&quot;history&quot;, &quot;config/quality/jmh-history-policy.json&quot;);</span>
+<span class="fc bfc" id="L205" title="All 4 branches covered.">        if (policy != null) for (var reference : policy.required(&quot;snapshots&quot;)) bound(&quot;history&quot;, &quot;&quot;, reference);</span>
+<span class="fc" id="L206">        var history = document(&quot;history&quot;, HISTORY + &quot;history.json&quot;);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (history == null) return;</span>
+<span class="fc" id="L208">        var contract = document(&quot;history&quot;, &quot;config/quality/jmh-regression-policy-v2.json&quot;);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (contract == null) throw new IllegalArgumentException(&quot;benchmark policy unavailable&quot;);</span>
+<span class="fc" id="L210">        var expected = Set.copyOf(column(contract.required(&quot;benchmarks&quot;), &quot;benchmark&quot;));</span>
+<span class="fc" id="L211">        var rows = history.required(&quot;benchmarks&quot;);</span>
+<span class="fc" id="L212">        sameInventory(expected, column(rows, &quot;benchmark&quot;), &quot;history benchmark inventory differs&quot;);</span>
+<span class="fc" id="L213">        var charts = column(rows, &quot;chart&quot;);</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        require(hasExactCount(history.required(&quot;benchmarkCount&quot;), expected.size())</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            &amp;&amp; charts.size() == Set.copyOf(charts).size(), &quot;history chart inventory differs&quot;);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (String chart : charts) {</span>
+<span class="fc" id="L217">            Path child = Path.of(chart);</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">            require(Path.of(&quot;charts&quot;).equals(child.getParent()) &amp;&amp; chart.endsWith(&quot;.svg&quot;), &quot;invalid history chart child&quot;);</span>
+<span class="fc" id="L219">            retain(&quot;history&quot;, HISTORY + chart, null);</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">    }</span>
+
+    private void visual() {
+<span class="fc" id="L224">        var policy = document(&quot;visual&quot;, VISUAL + &quot;visual-regression-policy.json&quot;);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (policy == null) return;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (var entry : policy.required(&quot;baselines&quot;).properties()) {</span>
+<span class="fc" id="L227">            String name = entry.getKey();</span>
+<span class="pc bpc" id="L228" title="2 of 4 branches missed.">            require(Path.of(name).getFileName().toString().equals(name) &amp;&amp; name.endsWith(&quot;.png&quot;), &quot;invalid visual child&quot;);</span>
+<span class="fc" id="L229">            String baseline = VISUAL + &quot;baseline/&quot; + name;</span>
+<span class="fc" id="L230">            byte[] data = retain(&quot;visual&quot;, baseline, null);</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (data != null) {</span>
+<span class="fc" id="L232">                var hash = digest(&quot;SHA-1&quot;);</span>
+<span class="fc" id="L233">                hash.update((&quot;blob &quot; + data.length + &quot;\0&quot;).getBytes(StandardCharsets.US_ASCII));</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                if (!HexFormat.of().formatHex(hash.digest(data)).equals(text(entry.getValue(), &quot;gitBlobSha&quot;))</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                        || !hasExactCount(entry.getValue().required(&quot;byteLength&quot;), data.length))</span>
+<span class="fc" id="L236">                    problem(&quot;visual&quot;, baseline, new IllegalArgumentException(&quot;baseline policy binding differs&quot;));</span>
+            }
+<span class="fc" id="L238">            String stem = &quot;build/reports/visual-regression/&quot; + name.substring(0, name.length() - 4);</span>
+<span class="fc" id="L239">            String path = stem + &quot;.comparison.json&quot;;</span>
+<span class="fc" id="L240">            var receipt = document(&quot;visual&quot;, path, &quot;regelsuche.visual-comparison/v1&quot;, &quot;status&quot;,</span>
+<span class="fc" id="L241">                fields(&quot;changedPixels&quot;,&quot;totalPixels&quot;,&quot;diffRatio&quot;,&quot;channelTolerance&quot;,&quot;maxDiffRatio&quot;,&quot;baselineSha256&quot;,&quot;actualSha256&quot;), null, null);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            retain(&quot;visual&quot;, stem + &quot;.actual.png&quot;, receipt == null ? null : receipt.required(&quot;actualSha256&quot;));</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (receipt == null) continue;</span>
+<span class="fc" id="L244">            retain(&quot;visual&quot;, baseline, receipt.required(&quot;baselineSha256&quot;));</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            for (String field : List.of(&quot;channelTolerance&quot;, &quot;maxDiffRatio&quot;)) {</span>
+<span class="fc" id="L246">                var expected = policy.required(&quot;comparison&quot;).required(field);</span>
+<span class="fc" id="L247">                var actual = receipt.required(field);</span>
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">                if (!actual.isNumber() || actual.decimalValue().compareTo(expected.decimalValue()) != 0)</span>
+<span class="nc" id="L249">                    problem(&quot;visual&quot;, path, new IllegalArgumentException(&quot;comparison policy binding differs&quot;));</span>
+<span class="fc" id="L250">            }</span>
+<span class="fc" id="L251">            require(receipt.required(&quot;changedPixels&quot;).isNumber(), &quot;changedPixels must be numeric&quot;);</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (receipt.required(&quot;changedPixels&quot;).doubleValue() &gt; 0) retain(&quot;visual&quot;, stem + &quot;.diff.png&quot;, null);</span>
+<span class="fc" id="L253">        }</span>
+<span class="fc" id="L254">    }</span>
+<span class="fc" id="L255">    private static ArrayNode fields(String... fields) { return JSON.valueToTree(List.of(fields)); }</span>
+
+    private void http() throws Exception {
+<span class="fc" id="L258">        String name = &quot;de.regelsuche.web.WebWorkbenchServerRequestLimitTest&quot;;</span>
+<span class="fc" id="L259">        String path = &quot;app/build/test-results/test/TEST-&quot; + name + &quot;.xml&quot;;</span>
+<span class="fc" id="L260">        byte[] bytes = retain(&quot;http&quot;, path, null);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (bytes == null) return;</span>
+<span class="fc" id="L262">        var factory = DocumentBuilderFactory.newInstance();</span>
+<span class="fc" id="L263">        factory.setFeature(&quot;http://apache.org/xml/features/disallow-doctype-decl&quot;, true);</span>
+<span class="fc" id="L264">        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, &quot;&quot;);</span>
+<span class="fc" id="L265">        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, &quot;&quot;);</span>
+<span class="fc" id="L266">        var suite = factory.newDocumentBuilder().parse(new ByteArrayInputStream(bytes)).getDocumentElement();</span>
+<span class="pc bpc" id="L267" title="2 of 4 branches missed.">        require(&quot;testsuite&quot;.equals(suite.getTagName()) &amp;&amp; name.equals(suite.getAttribute(&quot;name&quot;)), &quot;HTTP request-limit suite identity differs&quot;);</span>
+<span class="fc" id="L268">        var values = JSON.createObjectNode();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (String field : List.of(&quot;tests&quot;, &quot;failures&quot;, &quot;errors&quot;, &quot;skipped&quot;)) {</span>
+<span class="fc" id="L270">            int count = Integer.parseInt(suite.getAttribute(field));</span>
+<span class="pc bpc" id="L271" title="2 of 6 branches missed.">            require(count &gt;= 0 &amp;&amp; (!field.equals(&quot;tests&quot;) || count &gt; 0), &quot;invalid HTTP test counts&quot;);</span>
+<span class="fc" id="L272">            values.put(field, count);</span>
+<span class="fc" id="L273">        }</span>
+<span class="fc" id="L274">        bind(&quot;http&quot;, path, bytes, values);</span>
+<span class="fc" id="L275">    }</span>
+
+    private JsonNode scanDocument(String path, String schema, JsonNode hash, String shape) {
+<span class="fc" id="L278">        return document(&quot;vulnerability&quot;, path, schema, null, null, hash, plan.required(&quot;structures&quot;).required(shape));</span>
+    }
+
+    private void vulnerability() {
+<span class="fc" id="L282">        String section = &quot;vulnerability&quot;;</span>
+<span class="fc" id="L283">        var latest = scanDocument(SCAN + &quot;latest.json&quot;, null, null, &quot;LATEST_SCAN&quot;);</span>
+<span class="fc" id="L284">        var policy = document(section, SCAN_POLICY);</span>
+<span class="pc bpc" id="L285" title="1 of 4 branches missed.">        if (latest == null || policy == null) return;</span>
+<span class="fc" id="L286">        Path directory = Path.of(text(latest, &quot;run&quot;));</span>
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">        require(Path.of(SCAN + &quot;runs&quot;).equals(directory.getParent()) &amp;&amp; directory.normalize().equals(directory),</span>
+            &quot;latest scanner run is not a direct retained run child&quot;);
+<span class="fc" id="L289">        String run = directory + &quot;/&quot;;</span>
+<span class="fc" id="L290">        String evidencePath = run + &quot;vulnerability-evidence.json&quot;;</span>
+<span class="fc" id="L291">        var evidence = document(section, evidencePath, &quot;regelsuche.supply-chain-vulnerability-evidence/v1&quot;, &quot;decision&quot;,</span>
+<span class="fc" id="L292">            fields(&quot;evaluatedAt&quot;, &quot;databaseAsOf&quot;, &quot;databaseHash&quot;, &quot;scannerHash&quot;, &quot;findings&quot;, &quot;errors&quot;, &quot;execution&quot;),</span>
+<span class="fc" id="L293">            latest.required(&quot;evidenceHash&quot;), null);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (evidence == null) return;</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (!evidence.required(&quot;decision&quot;).equals(latest.required(&quot;decision&quot;)))</span>
+<span class="nc" id="L296">            problem(section, SCAN + &quot;latest.json&quot;, new IllegalArgumentException(&quot;latest decision binding differs&quot;));</span>
+<span class="fc" id="L297">        scannerAuthorities(policy, evidence, run);</span>
+<span class="fc" id="L298">        scannerInputs(evidence, run);</span>
+<span class="fc" id="L299">        scannerExecution(evidence, run);</span>
+<span class="fc" id="L300">        retain(section, run + &quot;osv-scanner.toml&quot;, null);</span>
+<span class="fc" id="L301">    }</span>
+
+    private void scannerAuthorities(JsonNode policy, JsonNode evidence, String run) {
+<span class="fc" id="L304">        String section = &quot;vulnerability&quot;;</span>
+<span class="fc" id="L305">        String dbPath = text(policy.required(&quot;databaseManifest&quot;), &quot;path&quot;);</span>
+<span class="fc" id="L306">        String scannerPath = text(policy.required(&quot;scannerManifest&quot;), &quot;path&quot;);</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        for (var member : List.of(List.of(&quot;bom.json&quot;, &quot;rawBomHash&quot;, INVENTORY + &quot;bom.json&quot;),</span>
+<span class="fc" id="L308">                List.of(&quot;dependency-inventory.json&quot;, &quot;inventoryHash&quot;, INVENTORY + &quot;dependency-inventory.json&quot;),</span>
+<span class="fc" id="L309">                List.of(&quot;inventory-evidence-v1.json&quot;, &quot;inventoryEvidenceHash&quot;, INVENTORY + &quot;supply-chain-evidence.json&quot;),</span>
+<span class="fc" id="L310">                List.of(&quot;vulnerability-policy.json&quot;, &quot;policyHash&quot;, SCAN_POLICY),</span>
+<span class="fc" id="L311">                List.of(&quot;database-manifest.json&quot;, &quot;databaseManifestHash&quot;, dbPath),</span>
+<span class="fc" id="L312">                List.of(&quot;scanner-manifest.json&quot;, &quot;scannerManifestHash&quot;, scannerPath))) {</span>
+<span class="fc" id="L313">            var hash = evidence.required(member.get(1));</span>
+<span class="fc" id="L314">            retain(section, run + member.get(0), hash);</span>
+<span class="fc" id="L315">            retain(section, member.get(2), hash);</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">        var db = scanDocument(dbPath, &quot;regelsuche.supply-chain-advisory-snapshot/v1&quot;,</span>
+<span class="fc" id="L318">            policy.required(&quot;databaseManifest&quot;).required(&quot;sha256&quot;), &quot;DATABASE_MANIFEST&quot;);</span>
+<span class="fc" id="L319">        var scanner = scanDocument(scannerPath, &quot;regelsuche.supply-chain-scanner/v1&quot;,</span>
+<span class="fc" id="L320">            policy.required(&quot;scannerManifest&quot;).required(&quot;sha256&quot;), &quot;SCANNER_MANIFEST&quot;);</span>
+<span class="fc bfc" id="L321" title="All 4 branches covered.">        if (db != null &amp;&amp; scanner != null) {</span>
+<span class="fc" id="L322">            var refs = new ArrayList&lt;JsonNode&gt;();</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            for (String field : List.of(&quot;archive&quot;, &quot;metadata&quot;, &quot;upstreamRetention&quot;)) refs.add(db.required(field));</span>
+<span class="fc" id="L324">            db.required(&quot;licenses&quot;).forEach(refs::add);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            for (String field : List.of(&quot;license&quot;, &quot;release&quot;, &quot;tag&quot;, &quot;checksums&quot;, &quot;provenance&quot;)) refs.add(scanner.required(field));</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            for (var ref : refs) { bound(section, &quot;&quot;, ref); bound(section, run + &quot;authority/&quot;, ref); }</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            for (String path : List.of(SCAN_POLICY, text(policy, &quot;inventoryPolicy&quot;), dbPath, scannerPath)) {</span>
+<span class="fc" id="L328">                byte[] bytes = retain(section, path, null);</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                if (bytes != null) retain(section, run + &quot;authority/&quot; + path, JSON.getNodeFactory().textNode(sha256(bytes)));</span>
+<span class="fc" id="L330">            }</span>
+<span class="fc" id="L331">            retain(section, run + &quot;cache/osv-scalibr/Maven/all.zip&quot;, db.required(&quot;archive&quot;).required(&quot;sha256&quot;));</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (!evidence.required(&quot;databaseHash&quot;).equals(db.required(&quot;archive&quot;).required(&quot;sha256&quot;))</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                    || !evidence.required(&quot;databaseAsOf&quot;).equals(db.required(&quot;createdAt&quot;))</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                    || !evidence.required(&quot;scannerHash&quot;).equals(scanner.required(&quot;sha256&quot;)))</span>
+<span class="nc" id="L335">                problem(section, run + &quot;vulnerability-evidence.json&quot;, new IllegalArgumentException(&quot;scanner/database identity binding differs&quot;));</span>
+        }
+<span class="fc" id="L337">    }</span>
+
+    private void scannerInputs(JsonNode evidence, String run) {
+<span class="fc" id="L340">        String section = &quot;vulnerability&quot;;</span>
+<span class="fc" id="L341">        var inputs = scanDocument(run + &quot;scanner-inputs.json&quot;, null, evidence.required(&quot;scannerInputsHash&quot;), &quot;SCANNER_INPUTS&quot;);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (inputs != null) {</span>
+<span class="fc" id="L343">            var inventory = document(section, INVENTORY + &quot;dependency-inventory.json&quot;);</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            require(inventory != null, &quot;missing resolved inventory&quot;);</span>
+<span class="fc" id="L345">            var components = inputs.required(&quot;components&quot;);</span>
+<span class="fc" id="L346">            sameInventory(Set.copyOf(column(inventory.required(&quot;components&quot;), &quot;purl&quot;)), column(components, &quot;purl&quot;),</span>
+                &quot;scanner inputs differ from the complete resolved PURL inventory&quot;);
+<span class="fc" id="L348">            var paths = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            for (var component : components) {</span>
+<span class="fc" id="L350">                String path = text(component, &quot;source&quot;);</span>
+<span class="fc" id="L351">                Path child = Path.of(path);</span>
+<span class="pc bpc" id="L352" title="3 of 6 branches missed.">                require(Path.of(&quot;inputs&quot;).equals(child.getParent()) &amp;&amp; child.equals(child.normalize()) &amp;&amp; paths.add(path),</span>
+                    &quot;scanner input must be a unique direct input child&quot;);
+<span class="fc" id="L354">                retain(section, run + path, component.required(&quot;sha256&quot;));</span>
+<span class="fc" id="L355">            }</span>
+        }
+<span class="fc" id="L357">    }</span>
+
+    private void scannerExecution(JsonNode evidence, String run) {
+<span class="fc" id="L360">        String section = &quot;vulnerability&quot;;</span>
+<span class="fc" id="L361">        var execution = scanDocument(run + &quot;scanner-execution.json&quot;, null, null, &quot;SCANNER_EXECUTION&quot;);</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (execution != null) {</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">            if (!execution.equals(evidence.required(&quot;execution&quot;)))</span>
+<span class="nc" id="L364">                problem(section, run + &quot;scanner-execution.json&quot;, new IllegalArgumentException(&quot;execution receipt binding differs&quot;));</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            for (String field : List.of(&quot;stdout&quot;, &quot;stderr&quot;)) {</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">                String name = field.equals(&quot;stdout&quot;) ? &quot;scanner.stdout.json&quot; : &quot;scanner.stderr.log&quot;;</span>
+<span class="fc" id="L367">                require(name.equals(text(execution, field + &quot;Path&quot;)), &quot;scanner stream path differs&quot;);</span>
+<span class="fc" id="L368">                retain(section, run + name, execution.required(field + &quot;Hash&quot;));</span>
+<span class="fc" id="L369">            }</span>
+        }
+<span class="fc" id="L371">    }</span>
+
+    private ObjectNode publish(Path root, Path output, ObjectNode checkout) throws IOException {
+<span class="fc" id="L374">        var result = JSON.createObjectNode().put(&quot;schema&quot;, &quot;regelsuche.quality.acceptance-evidence-index/v1&quot;);</span>
+<span class="fc" id="L375">        result.set(&quot;checkout&quot;, checkout);</span>
+<span class="fc" id="L376">        result.set(&quot;claimBoundary&quot;, plan.required(&quot;claimBoundary&quot;));</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        result.put(&quot;completeness&quot;, problems.isEmpty() ? &quot;COMPLETE&quot; : &quot;INCOMPLETE&quot;);</span>
+<span class="fc" id="L378">        result.set(&quot;sections&quot;, sections);</span>
+<span class="fc" id="L379">        result.set(&quot;problems&quot;, problems);</span>
+<span class="fc" id="L380">        var entries = result.putArray(&quot;files&quot;);</span>
+<span class="fc" id="L381">        Path parent = root;</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        for (Path part : output.getParent()) {</span>
+<span class="fc" id="L383">            parent = parent.resolve(part);</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            require(!Files.isSymbolicLink(parent), &quot;symbolic output parent is forbidden&quot;);</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">            if (!Files.isDirectory(parent)) Files.createDirectory(parent);</span>
+<span class="fc" id="L386">        }</span>
+<span class="fc" id="L387">        Path dest = Files.createDirectory(root.resolve(output));</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        for (var file : files.entrySet()) {</span>
+<span class="fc" id="L389">            String path = file.getKey();</span>
+<span class="fc" id="L390">            String retained = &quot;files/&quot; + path;</span>
+<span class="fc" id="L391">            entries.addObject().put(&quot;sourcePath&quot;, path).put(&quot;path&quot;, retained).put(&quot;bytes&quot;, file.getValue().length)</span>
+<span class="fc" id="L392">                .put(&quot;sha256&quot;, sha256(file.getValue()));</span>
+<span class="fc" id="L393">            Path to = dest.resolve(retained);</span>
+<span class="fc" id="L394">            Files.createDirectories(to.getParent());</span>
+<span class="fc" id="L395">            Files.write(to, file.getValue(), java.nio.file.StandardOpenOption.CREATE_NEW);</span>
+<span class="fc" id="L396">        }</span>
+<span class="fc" id="L397">        var lines = new ArrayList&lt;&gt;(List.of(&quot;# Quality acceptance evidence&quot;, &quot;&quot;, &quot;Completeness: **&quot; + result.required(&quot;completeness&quot;).asText()</span>
+<span class="fc" id="L398">            + &quot;**&quot;, &quot;&quot;, &quot;Collection revision: `&quot; + text(checkout, &quot;revision&quot;) + &quot;`; tree: `&quot; + text(checkout, &quot;tree&quot;) + &quot;`.&quot;, &quot;&quot;,</span>
+<span class="fc" id="L399">            plan.required(&quot;claimBoundary&quot;).asText(), &quot;&quot;, &quot;[Policy, baseline, exception and measurement map](files/docs/quality-acceptance-evidence.md)&quot;,</span>
+            &quot;&quot;, &quot;| Section | Evidence availability | Reported outcomes |&quot;, &quot;| --- | --- | --- |&quot;));
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        for (var entry : sections.properties()) {</span>
+<span class="fc" id="L402">            String id = entry.getKey();</span>
+<span class="fc" id="L403">            boolean missing = problems.valueStream().anyMatch(p -&gt; id.equals(p.required(&quot;section&quot;).textValue()));</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            String availability = missing ? &quot;UNAVAILABLE&quot; : &quot;RETAINED&quot;;</span>
+<span class="fc" id="L405">            section(id).put(&quot;availability&quot;, availability);</span>
+<span class="fc" id="L406">            String outcomes = section(id).required(&quot;outcomes&quot;).valueStream().map(row -&gt;</span>
+<span class="fc" id="L407">                &quot;[&quot; + text(row, &quot;value&quot;) + &quot;](files/&quot; + text(row, &quot;sourcePath&quot;) + &quot;)&quot;).collect(Collectors.joining(&quot;, &quot;));</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">            lines.add(&quot;| &quot; + id + &quot; | &quot; + availability + &quot; | &quot; + (outcomes.isEmpty()</span>
+<span class="fc" id="L409">                ? &quot;No native outcome field; see current value bindings in index.json&quot; : outcomes) + &quot; |&quot;);</span>
+<span class="fc" id="L410">        }</span>
+<span class="fc" id="L411">        lines.addAll(List.of(&quot;&quot;, &quot;Exact policies, baselines, exception identities and measurements are retained under `files/`.&quot;,</span>
+            &quot;`index.json` binds every retained file by SHA-256 and projects native current value fields.&quot;, &quot;&quot;));
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        for (var problem : problems) lines.add(&quot;- &quot; + text(problem, &quot;section&quot;) + &quot;: `&quot; + text(problem, &quot;path&quot;) + &quot;` — &quot; + text(problem, &quot;reason&quot;));</span>
+<span class="fc" id="L414">        Files.writeString(dest.resolve(&quot;index.md&quot;), String.join(&quot;\n&quot;, lines) + &quot;\n&quot;);</span>
+<span class="fc" id="L415">        Files.writeString(dest.resolve(&quot;index.json&quot;), result.toPrettyString() + &quot;\n&quot;);</span>
+<span class="fc" id="L416">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

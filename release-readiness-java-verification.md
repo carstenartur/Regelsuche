@@ -49,9 +49,9 @@ snapshot against concurrent mutation.
 
 The original Gradle producer paths and retained 48-file fixture are unchanged.
 Independent review accepted Maven-production parity before the Python release
-decision, its controls and its two identity/binding helpers were removed. The
-shared Python `release_readiness_files.py` remains owned by the separate
-quality-acceptance collector. Historical receipts retain their original bytes and
+decision, its controls and its two identity/binding helpers were removed. Both
+the release verifier and quality-acceptance collector now read their input through
+the Java descriptor-owned file reader. Historical receipts retain their original bytes and
 describe their original source revisions, including the then-existing Python files.
 
 The finite parity controls run the actual App producer, qualified runner, existing

@@ -93,12 +93,12 @@ final class OwnedReleaseEvidenceFiles implements AutoCloseable {
 <span class="fc" id="L93">                int next = Calls.open(descriptor, relative.getName(i).toString(), DIRECTORY_FLAGS);</span>
 <span class="fc" id="L94">                int previous = descriptor;</span>
 <span class="fc" id="L95">                descriptor = next;</span>
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                if (owned) Calls.close(previous);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (owned) Calls.close(previous);</span>
 <span class="fc" id="L97">                owned = true;</span>
             }
 <span class="fc" id="L99">            return new Parent(descriptor, owned);</span>
 <span class="fc" id="L100">        } catch (Throwable failure) {</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (owned) try { Calls.close(descriptor); } catch (IOException closeFailure) { failure.addSuppressed(closeFailure); }</span>
+<span class="pc bfc" id="L101" title="All 2 branches covered.">            if (owned) try { Calls.close(descriptor); } catch (IOException closeFailure) { failure.addSuppressed(closeFailure); }</span>
 <span class="fc" id="L102">            throw failure;</span>
         }
     }
