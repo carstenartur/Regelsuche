@@ -115,6 +115,24 @@ class MavenProductReactorContractTest {
   }
 
   @Test
+  void screenshotRevisionFixturesRunOnGitCapableMavenHostNotPinnedBrowserContainer()
+      throws Exception {
+    Path root = repositoryRoot();
+    String browserPom = Files.readString(root.resolve("regelsuche-browser-tests/pom.xml"));
+    String browserRunner = Files.readString(root.resolve(
+        "regelsuche-browser-tests/src/test/java/de/regelsuche/browser/BrowserSuiteContainerIT.java"));
+
+    assertTrue(browserPom.contains("<skipTests>false</skipTests>"));
+    assertTrue(browserPom.contains(
+        "<test>de.regelsuche.e2e.DocumentationScreenshotsTest</test>"));
+    assertTrue(browserPom.contains("<failIfNoTests>true</failIfNoTests>"));
+    assertTrue(browserRunner.contains("--select-package=de.regelsuche.e2e"));
+    assertTrue(browserRunner.contains("--exclude-classname=.*"));
+    assertTrue(browserRunner.contains("DocumentationScreenshotsTest"));
+    assertTrue(browserRunner.contains("--fail-if-no-tests"));
+  }
+
+  @Test
   void applicationDistributionIsCheckoutOwnedAndVersionOverrideable() throws Exception {
     Path root = repositoryRoot();
     Document parent = parse(root.resolve("pom.xml"));
