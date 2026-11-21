@@ -118,6 +118,25 @@ class SafeRuntimeReproductionTest(unittest.TestCase):
                     root / "checkout-a", root / "checkout-b", root / "container"
                 )
 
+    def test_qualification_byte_mismatch_reports_first_field_without_values(self):
+        module = load_reproducer()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("checkout-a", "checkout-b", "container"):
+                output_tree(root / name)
+            write_canonical(
+                root / "container/qualification.json",
+                {"schema": "regelsuche.safe-runtime-product-qualification/v1", "cases": 15},
+            )
+            with self.assertRaisesRegex(
+                module.ReproductionError,
+                r"canonical output bytes differ for container/qualification\\.json"
+                r" \\(first differing JSON field: \\$\\.cases\\)",
+            ):
+                module.compare_canonical_outputs(
+                    root / "checkout-a", root / "checkout-b", root / "container"
+                )
+
     def test_runtime_implementation_identity_bytes_must_match(self):
         module = load_reproducer()
         with tempfile.TemporaryDirectory() as directory:
