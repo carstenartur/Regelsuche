@@ -1,0 +1,52 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_ONLY",
+  "sourceCommit": "16a345b3d8b2cb71c50e3ad9025ea30fb8dbc4e3",
+  "sourceTree": "2ba7db35d10d57c45298a99df50e70860ea01d15",
+  "originalMainCI": {
+    "runId": 44919811586,
+    "runURL": "https://github.com/carstenartur/Regelsuche/actions/runs/44919811586",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "successfulMandatoryJobs": 8,
+    "aggregateCiCheck": "success",
+    "reportPublication": "success",
+    "originalGradleJobId": 136893275367
+  },
+  "originalQualityEvidence": {
+    "artifactId": 14717875294,
+    "artifactName": "quality-acceptance-evidence",
+    "downloadedZipSha256": "b4af876f86fb796a25d3be469370d0829a6e0468685f02ce4a22dd3aa67c8aef",
+    "zipIndexSha256": "4cc69fe343c1df955f61a8515af7cebe383c9889076d3d2a66c738eda30a8754",
+    "indexCheckoutRevision": "16a345b3d8b2cb71c50e3ad9025ea30fb8dbc4e3",
+    "indexCheckoutTree": "2ba7db35d10d57c45298a99df50e70860ea01d15",
+    "indexTrackedChangesPresent": false,
+    "indexedFilesVerified": 290,
+    "indexedFileFailures": 0,
+    "originalCheckJson": {
+      "bytes": 10186,
+      "sha256": "6164e65b227c540342e45ce7173fd221344445b518af8a42ab93f4f1fcc364f1",
+      "passed": true,
+      "trendPassed": true,
+      "trendViolationCount": 0,
+      "claimFailureCount": 0
+    },
+    "originalComplexityJson": {
+      "bytes": 20798,
+      "sha256": "cf9941064afd543df5463ae2ec4c474a2d3ccd2c735c73adf5f327ef03ac81a9"
+    }
+  },
+  "comparator": {
+    "previousAcceptedMain": "a5e2efc099162723ca2f3f8ca7064a98fddb52cb",
+    "previousReferenceEstimatedTokens": 832860,
+    "measuredAcceptedMainEstimatedTokens": 847010,
+    "delta": 14150,
+    "unchangedMaxIncrease": 15000,
+    "measuredConceptRadius": 117,
+    "previousConceptRadius": 115,
+    "unchangedMaxConceptRadiusIncrease": 3,
+    "sourceExtractorVersion": "0.1.10"
+  },
+  "boundary": "Only the already successful main source was admitted as the new reference, not any failing feature head. Verified the original GitHub run and its committed source tree, source-archive digest, 290 indexed paths/sizes/SHA-256s, and native check and complexity report hashes. The feature must independently pass all original CI gates against this reference. No threshold, release, external study, external audit or proof authority is granted."
+}
