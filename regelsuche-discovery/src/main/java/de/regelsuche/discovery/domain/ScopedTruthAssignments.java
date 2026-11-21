@@ -31,7 +31,8 @@ final class ScopedTruthAssignments implements CounterexampleGenerator<ScopedProo
         var request = candidate.obligation();
         if (attemptBudget < 1) return CounterexampleResult.inconclusive(0,"No constant interpretation budget",Map.of());
         if (request.goal().relation()!=Relation.HOLDS || !supports.test(request))
-            return CounterexampleResult.unsupported("Constant interpretations require a supported scoped proposition");
+            return new CounterexampleResult(DiscoveryDomain.CounterexampleStatus.UNSUPPORTED, 0, "",
+                Map.of("reason", "Constant interpretations require a supported scoped proposition"));
         var variables = request.declarations().stream().filter(d -> d.sort()==Sort.PROPOSITION || d.sort()==Sort.NAT_PREDICATE).toList();
         int limit = Math.min(attemptBudget, 1 << Math.min(8, variables.size()));
         int classified = 0;
