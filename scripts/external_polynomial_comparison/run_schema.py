@@ -25,6 +25,7 @@ from .audit_typed import _load, _require, _typed_polynomial
 from .polynomial import LIMITS, operation_cost, parse, polynomial
 from .run import canonical, judge, summarize, untimed, verify_row
 from .run_typed import MeasuredSession, natural
+from .registered_source import portable_schema_provenance
 
 PROTOCOL_HASH = '7e9b51c8f4c66655489350ef4be982411b6ab5ae0585ddb8b725b1ef15d7113c'
 # API publication reconstructs commits on the published history. Commit IDs bind
@@ -84,6 +85,14 @@ def source_provenance(repository: Path) -> dict:
                       or path.parts[0] in ('gradle', 'config')),
                  'untracked implementation/configuration is not bound to HEAD: ' + name)
     return {'sourceRevision': git('rev-parse', 'HEAD'), 'sourceTreeHash': 'git:' + git('rev-parse', 'HEAD^{tree}')}
+
+
+def schema_source_provenance(repository: Path) -> dict:
+    """Keep portable Schema admission separate from the shared Git-only helper."""
+    portable = portable_schema_provenance(repository, FREEZE_COMMIT, PROTOCOL_HASH)
+    if portable is not None:
+        return portable
+    return {**check_freeze(repository), **source_provenance(repository)}
 
 
 def _file_inventory(directory: Path) -> dict:
@@ -676,8 +685,7 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path):
     controller = time.process_time_ns()
     preparation = time.perf_counter_ns()
     protocol = load_protocol(protocol_path)
-    freeze = check_freeze(Path.cwd())
-    provenance = source_provenance(Path.cwd())
+    provenance = schema_source_provenance(Path.cwd())
     revision = provenance['sourceRevision']
     classpath = classpath_path.read_text(encoding='utf-8').strip()
     _require(bool(classpath), 'empty Java classpath')
@@ -688,7 +696,7 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path):
     commands = {'java': [java['executable'], '-Xmx512m', '-cp',
                 os.pathsep.join(str((output / entry).resolve()) for entry in runtime['classpathEntries']), JAVA_WORKER],
                 'sympy': [sys.executable, '-u', '-m', 'external_polynomial_comparison.native_worker']}
-    metadata = {'revision': revision, 'protocolHash': PROTOCOL_HASH, **freeze,
+    metadata = {'revision': revision, 'protocolHash': PROTOCOL_HASH,
         'sourceLocalFreezeCommit': SOURCE_LOCAL_FREEZE_COMMIT,
         **provenance, 'runtimeBytesHash': runtime['runtimeBytesHash'], 'java': java, 'commands': commands,
         'outputDirectoryAtExecution': str(output.resolve()),
@@ -707,7 +715,7 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path):
             sequences.append(run_sequence(protocol, profile, length, repetition, command, output))
             (output / 'sequences.json').write_bytes(canonical(sequences))
         require_sequences(protocol, sequences)
-        _require(source_provenance(Path.cwd()) == provenance, 'source changed during execution')
+        _require(schema_source_provenance(Path.cwd()) == provenance, 'source changed during execution')
         verify_runtime(output, runtime)
     finally:
         metadata['executionControllerCpuNanos'] = time.process_time_ns() - controller
