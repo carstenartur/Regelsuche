@@ -1,7 +1,10 @@
 package de.regelsuche.quality.sdk;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -25,6 +28,7 @@ final class ReleasedSdkArchive {
     static final int CHECKSUM_COUNT = 4034;
     static final long MAX_DOWNLOAD = 64L << 20;
     private static final long MAX_EXPANDED = 256L << 20;
+    private static final int MAX_MANIFEST_BYTES = 4 << 20;
     private static final Pattern CHECKSUM = Pattern.compile("([0-9a-f]{64})  (.+)");
 
     private ReleasedSdkArchive() {}
@@ -100,16 +104,10 @@ final class ReleasedSdkArchive {
                 }
             }
             var manifest = files.get("SHA256SUMS.txt");
-            require(manifest != null && manifest.getSize() <= 4L << 20, "missing or excessive SDK checksum manifest");
-            Map<String, String> checksums = new HashMap<>();
-            try (var stream = zip.getInputStream(manifest);
-                    var lines = new java.io.BufferedReader(new java.io.InputStreamReader(stream, StandardCharsets.UTF_8.newDecoder()))) {
-                for (String line; (line = lines.readLine()) != null;) {
-                    var match = CHECKSUM.matcher(line);
-                    require(match.matches(), "malformed SDK checksum");
-                    relative(match.group(2));
-                    require(checksums.putIfAbsent(match.group(2), match.group(1)) == null, "duplicate SDK checksum");
-                }
+            require(manifest != null && manifest.getSize() <= MAX_MANIFEST_BYTES, "missing or excessive SDK checksum manifest");
+            Map<String, String> checksums;
+            try (var stream = zip.getInputStream(manifest)) {
+                checksums = readChecksums(stream);
             }
             Set<String> expectedFiles = new HashSet<>(files.keySet());
             expectedFiles.remove("SHA256SUMS.txt");
@@ -140,5 +138,21 @@ final class ReleasedSdkArchive {
             return Map.of("sha256", sha, "verifiedInternalChecksums", checksums.size(),
                 "archiveBytes", Files.size(archive), "prefix", prefix);
         }
+    }
+
+    static Map<String, String> readChecksums(InputStream stream) throws IOException {
+        // Read the inflated bytes under the same limit, with one byte to detect overflow.
+        byte[] bytes = stream.readNBytes(MAX_MANIFEST_BYTES + 1);
+        require(bytes.length <= MAX_MANIFEST_BYTES, "expanded SDK checksum manifest exceeds 4 MiB");
+        Map<String, String> checksums = new HashMap<>();
+        try (var lines = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(bytes), StandardCharsets.UTF_8.newDecoder()))) {
+            for (String line; (line = lines.readLine()) != null;) {
+                var match = CHECKSUM.matcher(line);
+                require(match.matches(), "malformed SDK checksum");
+                relative(match.group(2));
+                require(checksums.putIfAbsent(match.group(2), match.group(1)) == null, "duplicate SDK checksum");
+            }
+        }
+        return checksums;
     }
 }
