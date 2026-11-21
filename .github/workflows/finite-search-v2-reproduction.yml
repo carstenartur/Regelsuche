@@ -1,0 +1,111 @@
+name: Finite search v2 public reproduction
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/finite-search-v2-reproduction.yml'
+      - 'docs/research/finite-search-knowledge-v2/**'
+      - 'docs/superpowers/plans/2026-11-21-finite-search-v2-reproduction.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PRODUCER: 6dce1fae5bf84cbb588129993830c41be45a8bda
+      PRODUCER_TREE: 3098d9e6b330aa4ef700fa47a7562dc9ce9fa31c
+      TOOLS: docs/research/finite-search-knowledge-v2
+      JDK_IMAGE: eclipse-temurin:25.0.5_8-jdk-noble@sha256:3c35c595580ae3342eb34e5832e8e516ded8e767efa4a5fe61b8644d44847b8e
+      MAVEN_SHA512: 831a8591fe20c8243b1dbe7d71e3244f31d1665b0804b2e825e38cbbe5ce0cafb8338851f90780735568773e0a6cd07bbec107cda0b896b008b861075358b6f6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with:
+          distribution: temurin
+          java-version: '25.0.5+8'
+          verify-signature: true
+      - name: Check the matrix verifier and prepare pinned Maven
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/finite-search-v2"
+          mkdir -p "$work"/{source,dependencies,evidence,tools}
+          echo "WORK=$work" >> "$GITHUB_ENV"
+          git rev-parse HEAD > "$work/evidence/workflow-source.txt"
+          python3 -B -m unittest discover -s "$TOOLS" -p test_reproduction.py -v
+          curl --fail --silent --show-error --location --retry 3 \
+            https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.tar.gz \
+            -o "$work/tools/maven.tar.gz"
+          echo "$MAVEN_SHA512  $work/tools/maven.tar.gz" | sha512sum --check
+          tar -xzf "$work/tools/maven.tar.gz" -C "$work/tools"
+      - name: Fetch the original source independently for each build
+        shell: bash
+        run: |
+          set -euo pipefail
+          for environment in host-1 host-2 container; do
+            source="$WORK/source/$environment"
+            evidence="$WORK/evidence/$environment"
+            mkdir -p "$evidence" "$WORK/dependencies/$environment"
+            git init --quiet "$source"
+            git -C "$source" fetch --depth=1 --no-tags https://github.com/carstenartur/Regelsuche.git "$PRODUCER"
+            git -C "$source" checkout --quiet --detach FETCH_HEAD
+            test ! -e "$source/.git/objects/info/alternates"
+            checkout_status=$(git -C "$source" status --porcelain)
+            test -z "$checkout_status"
+            git -C "$source" rev-parse HEAD 'HEAD^{tree}' > "$evidence/source.txt"
+            diff -u <(printf '%s\n' "$PRODUCER" "$PRODUCER_TREE") "$evidence/source.txt"
+          done
+      - name: Build and measure the two fresh host checkouts sequentially
+        shell: bash
+        run: |
+          set -euo pipefail
+          launcher="$GITHUB_WORKSPACE/$TOOLS/run-reproduction.sh"
+          for environment in host-1 host-2; do
+            evidence="$WORK/evidence/$environment"
+            cd "$WORK/source/$environment"
+            bash "$launcher" build "$WORK/tools/apache-maven-3.9.16/bin/mvn" "$WORK/dependencies/$environment" \
+              > "$evidence/build.log" 2>&1
+            bash "$launcher" measure "$evidence" > "$evidence/run.log" 2>&1
+            checkout_status=$(git status --porcelain)
+            test -z "$checkout_status"
+          done
+      - name: Build in the pinned image and measure with the network disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "$JDK_IMAGE"
+          image=$(docker image inspect "$JDK_IMAGE" --format '{{.Id}}')
+          printf '%s\n' "$image" > "$WORK/evidence/image.id"
+          docker image inspect "$JDK_IMAGE" --format '{{json .RepoDigests}}' > "$WORK/evidence/image-digests.json"
+          evidence="$WORK/evidence/container"
+          launcher="$GITHUB_WORKSPACE/$TOOLS/run-reproduction.sh"
+          args=(--rm --platform linux/amd64 --user "$(id -u):$(id -g)" --workdir /src
+                --env HOME=/tmp --env MAVEN_OPTS=-Duser.home=/tmp
+                --mount "type=bind,src=$launcher,dst=/launcher.sh,readonly")
+          docker run "${args[@]}" --mount "type=bind,src=$WORK/source/container,dst=/src" \
+            --mount "type=bind,src=$WORK/dependencies/container,dst=/deps" \
+            --mount "type=bind,src=$WORK/tools/apache-maven-3.9.16,dst=/maven,readonly" \
+            "$image" bash /launcher.sh build /maven/bin/mvn /deps > "$evidence/build.log" 2>&1
+          docker run "${args[@]}" --network none \
+            --mount "type=bind,src=$WORK/source/container,dst=/src,readonly" \
+            --mount "type=bind,src=$WORK/dependencies/container,dst=/deps,readonly" \
+            --mount "type=bind,src=$evidence,dst=/out" \
+            "$image" bash /launcher.sh measure /out > "$evidence/run.log" 2>&1
+          checkout_status=$(git -C "$WORK/source/container" status --porcelain)
+          test -z "$checkout_status"
+      - name: Verify all source, work and result bindings
+        run: python3 -B "$TOOLS/verify_reproduction.py" "$WORK/source/host-1" "$WORK/evidence"
+      - name: Retain complete public outputs and run diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: finite-search-v2-reproduction-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/finite-search-v2/evidence
+          if-no-files-found: error

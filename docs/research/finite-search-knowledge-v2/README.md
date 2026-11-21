@@ -33,3 +33,9 @@ java -Xmx512m -cp "$module/classes:$(cat "$module/finite-search-classpath.txt")"
   de.regelsuche.benchmark.FiniteSearchKnowledgeComparison \
   "$output/comparison.json" "$output/runtime.json"
 ```
+
+## Reproduktion des veröffentlichten v2-Produzenten
+
+Der [Reproduktionsplan](../../superpowers/plans/2026-11-21-finite-search-v2-reproduction.md) bindet den unveränderten Produzenten `6dce1fae5bf84cbb588129993830c41be45a8bda`. Der [Workflow](../../../.github/workflows/finite-search-v2-reproduction.yml) baut drei frische Checkouts mit getrennten Maven-Repositories. Zwei laufen auf demselben Host, der dritte in einem digest-gepinnten JDK-Image. Der Java-Messlauf im Container hat keinen Netzwerkzugriff.
+
+Das Artefakt enthält je Umgebung den vollständigen Vergleich mit allen 160 Zeilen und den erzeugten Quelltabellen sowie die einzelnen Zeit- und Allokationsbeobachtungen. Die Prüfung verlangt bytegleiche kanonische Vergleiche und bindet die Laufzeitdateien separat. Die öffentliche Matrix und die v1-Befunde bleiben an ihre ursprünglichen Quellen gebunden. Ein reproduzierter v2-Befund erfordert den abgeschlossenen Lauf und die Prüfung seines Artefakts.
