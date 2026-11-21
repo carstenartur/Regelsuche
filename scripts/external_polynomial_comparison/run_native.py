@@ -9,14 +9,20 @@ import platform
 import sys
 import time
 from .polynomial import Unsupported, polynomial
+from .registered_source import portable_source_provenance
 from .run import canonical, judge, require_matrix, summarize, verify_row
-from .run_schema import (AccountedSession, audit_response, snapshot_runtime, source_provenance,
+from .run_schema import (AccountedSession, audit_response, snapshot_runtime, source_provenance as checkout_provenance,
                          verify_runtime, _file_inventory, _java_provenance, CPU_SCOPE)
 from .run_typed import natural
 
 PROTOCOL_HASH = 'c35902e09c4c6e0b49e7b1c5257bf5f696ca867ae8c6a1880a071f29ad758f3e'
 JAVA_WORKER = 'de.regelsuche.evolution.NativePolynomialComparisonWorker'
 SETTINGS = ('workBudget', 'maxTheoryWork', 'primitiveDepth', 'searchDepth', 'maxStates', 'complexityDebt')
+
+
+def source_provenance(repository):
+    registered = portable_source_provenance(repository)
+    return checkout_provenance(repository) if registered is None else registered
 
 
 def load_protocol(path):
@@ -262,6 +268,8 @@ def execute(protocol_path, classpath_path, output):
         (output / name).write_bytes(canonical(value))
     inventory = _file_inventory(output)
     (output / 'manifest.json').write_bytes(canonical(inventory))
+    if source_provenance(Path.cwd()) != provenance:
+        raise ValueError('source changed during native execution')
     return verify(output)
 
 
