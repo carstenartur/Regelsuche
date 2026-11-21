@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Restrict the external scalar reference to the immutable, offline comparative image.
+set -euo pipefail
+if [[ $# -ne 2 || "$2" != "--native-scalar-request" ]]; then
+    echo "Only the source-bound native scalar reference protocol is permitted" >&2
+    exit 2
+fi
+expected=$(realpath "$(dirname "$0")/sympy_rule_reference/reference.py")
+if [[ "$(realpath "$1")" != "$expected" ]]; then
+    echo "Foreign reference source does not belong to this checkout" >&2
+    exit 2
+fi
+image_id=${REGELSUCHE_SCALAR_IMAGE_ID:-}
+if [[ ! "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "An immutable local OCI image ID is required" >&2
+    exit 2
+fi
+# The Python executable and source exist only in the already-built comparative
+# image. No host Python, pip, network, mutable tag, or separate package install.
+exec docker run --rm -i --network none --read-only --tmpfs /tmp:rw,nosuid,size=32m \
+    --entrypoint /opt/regelsuche-sympy/bin/python \
+    --env PYTHONDONTWRITEBYTECODE=1 \
+    "$image_id" /opt/regelsuche-sympy-reference/reference.py --native-scalar-request

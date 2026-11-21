@@ -3,20 +3,18 @@
 The acceptance check uses the **published SDK 0.5.2 ZIP** to qualify the three
 external Java examples and the data-only factorization rule package.
 
-From a checkout with JDK 25 and Maven **3.9.9 or newer from the 3.x line**:
+From a checkout with JDK 25 and Maven 3.9.9 or newer in the 3.x line:
 
 ```bash
-bash gradle/run-released-sdk-maven-consumers.sh
+mvn -Preleased-sdk-consumers -pl regelsuche-quality verify
 ```
 
-The thin checkout-owned adapter runs the unit contracts, then the verifier.
-It can also be invoked outside the repository directory; it finds its own root.
-The verifier uses the existing `mvn` executable. `--maven /absolute/path/to/mvn`
-selects another installed Maven. It records the precise Maven and Java versions
-and rejects Maven outside the supported range or Java other than 25. It neither
-downloads a new build tool nor changes the existing product build gates.
-Python performs build/file orchestration only; the mathematical implementations
-and consumer tests remain Java.
+The full Maven profile includes the same JUnit qualification. Maven records the
+actual toolchain versions, builds each external example, inspects its
+Surefire reports and runtime dependency graph, and executes its CLI. The
+hash-bound ZIP may also be supplied via `REGELSUCHE_RELEASED_SDK_ZIP`.
+A Git-free source archive supplies its exact checkout identity via
+`REGELSUCHE_PREPARATION_REVISION`.
 
 ## Inputs and isolation
 
@@ -101,9 +99,12 @@ Java command and its result. Raw Maven output, Surefire and CLI logs are
 retained. `PASSED` requires all three Maven consumers and the data-only parser
 check. Failure exits nonzero and retains `FAILED` evidence.
 
-The existing Maven product job invokes the adapter, keeping assertions and
-qualification orchestration out of the workflow itself. It runs **before** the unchanged
-`mvn -Pfull,sdk-release verify`. Its existing always-run artifact upload includes
-the dedicated evidence directory. No new workflow or relaxed gate is introduced.
+The product job runs this Failsafe verification in both full Maven reactors, from
+the checkout and from its Git-free source archive. Each run retains its own
+reports and command logs. The focused profile runs the same qualification.
 
-The three Maven consumer checks passed in the original [#1190 Maven CI run](https://github.com/carstenartur/Regelsuche/actions/runs/43513021000/job/132187770580).
+The hosted [reference run on main](https://github.com/carstenartur/Regelsuche/actions/runs/44804422507)
+used the original producer. An independent Maven lifecycle against the same
+release reproduced all 12 test identities and all source, dependency and JAR
+hashes for the three consumers. Both data-only parser outputs were identical.
+The greeting catalogue passed its within-build identity check on both producers.

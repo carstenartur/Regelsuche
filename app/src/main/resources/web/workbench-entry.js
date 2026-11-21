@@ -83,6 +83,46 @@
         }
     });
     byId('showAllTools').addEventListener('click', revealTools);
+    const groups = byId('workbenchToolGroups'), choice = byId('workbenchToolChoice');
+    const areas = [
+        ['Erkunden', ['workbench', 'paths', 'graph', 'replay', 'ruleIde', 'didaktik']],
+        ['Entdecken', ['candidates', 'identities', 'memory', 'dashboard']],
+        ['Prüfen', ['proofJobs']],
+        ['Reproduzieren', ['runs', 'compare', 'exports']],
+        ['Konfigurieren', ['inventory', 'benchmark', 'help']]
+    ];
+    const contextual = [
+        ['Erkunden', 'Gespeicherte Graphkante', 'SEARCH_GRAPH'], ['Erkunden', 'Gespeicherter Schritt', 'PATH_REPLAY'],
+        ['Entdecken', 'Regel am gespeicherten Vorkommen', 'RULE_RADAR'], ['Prüfen', 'Gebundene Gleichheitsprüfung', 'PROOF_OBLIGATIONS']
+    ];
+    function updateToolChoices() {
+        choice.replaceChildren(new Option('Werkzeug wählen', ''));
+        for (const [label, ids] of areas) {
+            const group = document.createElement('optgroup');
+            group.label = label;
+            ids.map(id => tabs.find(tab => tab.dataset.tab === id)).filter(tab => tab && !tab.disabled)
+                .forEach(tab => group.append(new Option(tab.textContent, tab.dataset.tab)));
+            contextual.filter(([area]) => area === label).forEach(([, name, role]) => {
+                if (document.querySelector('[data-review-role="' + role + '"]')) group.append(new Option(name, 'review/' + role));
+            });
+            if (group.children.length) choice.append(group);
+        }
+    }
+    groups.addEventListener('toggle', () => { if (groups.open) updateToolChoices(); });
+    choice.addEventListener('focus', updateToolChoices);
+    choice.addEventListener('change', () => {
+        const target = choice.value;
+        if (!target) return;
+        groups.open = false;
+        if (target.startsWith('review/')) {
+            const role = target.slice(7);
+            document.querySelector('[data-review-role="' + role + '"]')?.click();
+        } else if (activateTab(target)) {
+            const panel = byId('tab-' + target);
+            panel.tabIndex = -1;
+            panel.focus();
+        }
+    });
     const restoreTab = () => {
         clearTimeout(pendingRestore);
         // Run after all DOM-ready/hash listeners, including lazy-loader binding

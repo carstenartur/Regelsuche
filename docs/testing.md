@@ -28,11 +28,44 @@ Jedes Java-Modul besitzt JUnit-5-Tests für seine fachliche Verantwortung. Diese
 Tests sollen schnell, deterministisch und frei von nicht benötigter
 Infrastruktur sein.
 
+Die portablen SymPy-Tests laufen mit
+`mvn -pl regelsuche-math-sympy -am verify`. Das Vollprofil führt die gesamte
+ursprüngliche Suite einschließlich GraalPy-Kaltstart, Timeout-Erholung und
+CPython-Kontrolllauf in einem per Digest fixierten Linux-Container aus.
+
+```bash
+mvn -Pfull -pl regelsuche-math-sympy -am verify
+```
+
+Jede Testklasse erhält eine frische JVM mit JaCoCo-Instrumentierung. Maven
+erhält je Klasse das JUnit-XML und beide Ausgabeströme unter
+`regelsuche-math-sympy/target/reports/sympy-runtime/`. Die JaCoCo-Daten des
+Workers fließen in den regulären Modulbericht unter `target/site/jacoco/` ein.
+Im direkten Vergleich von CI-Lauf 44812027827 führten beide Produzenten alle
+24 Testmethoden in neun Klassen ohne Skip aus. Die sechs JaCoCo-Zählerarten
+waren identisch, einschließlich 638 erfasster Linien und 228 erfasster Zweige.
+Der eigenständige CI-Job verwendet seither ausschließlich den Maven-Worker.
+
 ### Browser-E2E
 
 `:app:e2eTest` startet eine reale lokale Workbench auf einem zufälligen Port und
 steuert Chromium mit Playwright. Die Tests prüfen sichtbare Nutzerflüsse,
 Zustände, Downloads und semantische Darstellung.
+
+Das Maven-Vollprofil startet dieselben Browser- und Screenshot-Tests in dem
+per Digest fixierten Playwright-Image aus der visuellen Richtlinie. Für einen
+gezielten Lauf mit Docker, JDK 25 und Maven gilt
+
+```bash
+mvn -Pfull -pl regelsuche-browser-tests -am verify
+```
+
+Der Worker startet die echte Workbench, aktiviert den visuellen JUnit-Vertrag
+und verwendet die vier versionierten PNG-Baselines. Der Host erhält JUnit-XML,
+Screenshots, Standardausgabe und das vollständige Evidence-Archiv unter
+`regelsuche-browser-tests/target/reports/browser/`. Eine fehlende Docker-Runtime,
+fehlende Vergleichsbilder, abgebrochene Tests und Pixelabweichungen über der
+versionierten Toleranz lassen den Lauf fehlschlagen.
 
 ### Container-E2E
 
@@ -45,6 +78,22 @@ zufälligen Host-Ports und ohne GitHub-Service-Container geprüft.
 Solver-Tests verwenden echte ausführbare Backends, wenn der jeweilige Vertrag
 dies verlangt. Technische Nichtverfügbarkeit bleibt von mathematischer
 Refutation oder Bestätigung getrennt.
+
+Für die reale Lean- und SMT-Prüfung startet das Maven-Vollprofil einen
+Linux-amd64-Worker mit Lean 4.19.0, Z3 4.8.12 und cvc5 1.0.3. Darin laden
+zwei unabhängige Lake-Projekte denselben fixierten Mathlib-Commit. Die
+16 bisherigen Proof-Testklassen laufen gegen die gepackte Java-Anwendung.
+Die Solver beantworten zusätzlich je eine erfüllbare und unerfüllbare
+SMT-LIB-Eingabe. Die eigenständige Qualifikation läuft mit
+
+```bash
+mvn -Pchecked-proofs -pl regelsuche-proof-tests -am verify
+```
+
+`regelsuche-proof-tests/target/reports/checked-proof/` enthält die beiden
+Lake-Manifeste, die JUnit-Nachweise, Solver-Eingaben und -Antworten sowie
+Archive der Proof-Versuche beider Module. Das CI führt die gepinnte
+Docker-Qualifikation neben der bisherigen Solver-Qualifikation aus.
 
 ### Evidence- und Vertragsverifier
 
@@ -114,9 +163,9 @@ unabhängige, frische Checkouts beginnen gleichzeitig:
 
 1. die checkout-lokale Gradle-Korrektheitsautorität ohne doppelte JMH- und
    geladene SymPy-Laufzeitarbeit;
-2. die unveränderte vollständige JMH-Autorität auf einem eigenen Runner;
-3. die unveränderte vollständige SymPy-Laufzeit- und JaCoCo-Autorität auf einem
-   eigenen Runner;
+2. den isolierten Maven-JMH-Lauf für 29 Latenzmessungen, sechs Allokationsmessungen und 42 Faktorisierungsfälle;
+3. die vollständige SymPy-Laufzeit- und JaCoCo-Prüfung im gepinnten Maven-Worker
+   auf einem eigenen Runner;
 4. der vollständige Maven-Produkt- und Docker-Vertrag.
 
 Der Showcase-Train-Freeze-Lauf über das `create`-Ereignis verwendet dagegen
@@ -137,6 +186,17 @@ repositoryweiten Coverage-Verifier an. Kein Benchmark, Test, Threshold oder
 negativer Ausgang wird durch die Parallelisierung entfernt. Zwischen den
 Produzenten werden keine Build-Ausgaben wiederverwendet; nur abgeschlossene
 Evidence-Artefakte gelangen in die Konvergenz.
+
+### Native Coverage im Maven-Vollprofil
+
+Der letzte Reaktorbaustein wertet die JaCoCo-XML-Dateien der 23 Produktmodule
+gegen `config/quality/coverage-policy.json` aus. Maven entfernt die lokalen
+Ausführungsdaten vor jedem Modulbuild. Ein fehlendes Modul, ein veralteter
+Bericht, ein zusätzlicher erfasster Produktbaustein oder eine unterschrittene
+Linien- oder Zweiggrenze lässt die Verifikation fehlschlagen. Der native
+Bericht liegt unter `regelsuche-quality-aggregate/target/reports/coverage/`.
+Die aus Gradle und isolierter SymPy-Ausführung zusammengeführten Vergleichsdaten
+bleiben zur laufenden Qualifikation gesondert verfügbar.
 
 ### Git-freier Maven-Vollprofil-Nachbau
 

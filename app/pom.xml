@@ -46,6 +46,30 @@
     <finalName>regelsuche-${releaseVersion}</finalName>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>compile-source-revision-writer</id><phase>generate-resources</phase><goals><goal>compile</goal></goals>
+            <configuration>
+              <compileSourceRoots><compileSourceRoot>${project.basedir}/src/buildProvenance/java</compileSourceRoot></compileSourceRoots>
+              <outputDirectory>${project.build.directory}/revision-writer</outputDirectory><proc>none</proc>
+            </configuration>
+          </execution>
+          <execution>
+            <id>embed-source-revision</id><phase>generate-resources</phase><goals><goal>compile</goal></goals>
+            <configuration>
+              <compileSourceRoots><compileSourceRoot>${project.basedir}/src/buildProvenance/marker</compileSourceRoot></compileSourceRoots>
+              <proc>only</proc><useIncrementalCompilation>false</useIncrementalCompilation>
+              <compilerArgs>
+                <arg>-processorpath</arg><arg>${project.build.directory}/revision-writer</arg>
+                <arg>-processor</arg><arg>de.regelsuche.buildprovenance.SourceRevisionProcessor</arg>
+                <arg>-AregelsucheSourceRoot=${project.parent.basedir}</arg>
+              </compilerArgs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-clean-plugin</artifactId>
         <executions>

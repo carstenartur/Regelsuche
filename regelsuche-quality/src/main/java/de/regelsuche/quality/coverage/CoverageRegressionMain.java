@@ -20,9 +20,11 @@ import java.util.Map;
 /** CLI used by the local Gradle gate and by split CI after coverage converges. */
 public final class CoverageRegressionMain {
     private static final String USAGE = "Usage: CoverageRegressionMain [--root PATH] [--policy PATH] "
-        + "[--json-output PATH] [--markdown-output PATH] [--isolated-report PATH]";
+        + "[--json-output PATH] [--markdown-output PATH] [--isolated-report PATH] [--layout gradle|maven]";
     private static final String JSON_OUTPUT = "build/reports/quality/coverage-report.json";
     private static final String MARKDOWN_OUTPUT = "build/reports/quality/coverage-report.md";
+    private static final String MAVEN_JSON = "regelsuche-quality-aggregate/target/reports/coverage/coverage-report.json";
+    private static final String MAVEN_MARKDOWN = "regelsuche-quality-aggregate/target/reports/coverage/coverage-report.md";
     private static final DefaultIndenter INDENT = new DefaultIndenter("  ", "\n");
     private static final ObjectWriter JSON = JsonMapper.builder()
         .enable(JsonWriteFeature.ESCAPE_NON_ASCII)
@@ -41,7 +43,7 @@ public final class CoverageRegressionMain {
         }
     }
 
-    static int run(String[] args, PrintStream out, PrintStream err) {
+    public static int run(String[] args, PrintStream out, PrintStream err) {
         if (args.length == 1 && ("--help".equals(args[0]) || "-h".equals(args[0]))) {
             out.println(USAGE);
             return 0;
@@ -63,7 +65,7 @@ public final class CoverageRegressionMain {
                 out.println("crossAuthorityCoverageSymPyReport=sha256:" + digest);
             }
             Path policy = root.resolve(options.policy()).normalize();
-            List<Path> reports = CoverageRegression.reportPaths(root);
+            List<Path> reports = CoverageRegression.reportPaths(root, options.maven());
             inputs = new ArrayList<>(reports);
             inputs.add(policy);
             if (!policy.startsWith(root)) {
@@ -78,7 +80,7 @@ public final class CoverageRegressionMain {
             requireSafeOutput(root, markdown, inputs);
             CoverageRegression.Result result = CoverageRegression.evaluate(root, policy, reports);
             if (!result.violations().isEmpty()) {
-                clearCanonicalReports(root, inputs, List.of(json, markdown), err);
+                clearCanonicalReports(root, inputs, List.of(json, markdown), options.maven(), err);
             }
             publish(json, JSON.writeValueAsString(result.data()) + "\n", markdown, result.markdown());
             out.println("coverageStatus=" + result.status());
@@ -92,14 +94,14 @@ public final class CoverageRegressionMain {
         } catch (IOException | IllegalArgumentException error) {
             err.println("coverage gate failed: " + error.getMessage());
             if (inputs != null) {
-                clearCanonicalReports(root, inputs, List.of(), err);
+                clearCanonicalReports(root, inputs, List.of(), options.maven(), err);
             }
             return 1;
         }
     }
 
     private static void requireSafeOutput(Path root, Path output, List<Path> inputs) throws IOException {
-        if (output.equals(root.resolve(JSON_OUTPUT)) || output.equals(root.resolve(MARKDOWN_OUTPUT))) {
+        if (List.of(JSON_OUTPUT, MARKDOWN_OUTPUT, MAVEN_JSON, MAVEN_MARKDOWN).stream().map(root::resolve).anyMatch(output::equals)) {
             for (Path parent = output; !parent.equals(root); parent = parent.getParent()) {
                 if (Files.isSymbolicLink(parent)) {
                     throw new IOException("canonical coverage output uses a symbolic link: " + parent);
@@ -118,8 +120,8 @@ public final class CoverageRegressionMain {
             && Files.isSameFile(first, second);
     }
 
-    private static void clearCanonicalReports(Path root, List<Path> inputs, List<Path> retained, PrintStream err) {
-        for (Path output : List.of(root.resolve(JSON_OUTPUT), root.resolve(MARKDOWN_OUTPUT))) {
+    private static void clearCanonicalReports(Path root, List<Path> inputs, List<Path> retained, boolean maven, PrintStream err) {
+        for (Path output : List.of(root.resolve(maven ? MAVEN_JSON : JSON_OUTPUT), root.resolve(maven ? MAVEN_MARKDOWN : MARKDOWN_OUTPUT))) {
             if (retained.contains(output)) {
                 continue;
             }
@@ -165,14 +167,16 @@ public final class CoverageRegressionMain {
         }
     }
 
-    private record Options(Path root, Path policy, Path jsonOutput, Path markdownOutput, Path isolatedReport) {
+    private record Options(Path root, Path policy, Path jsonOutput, Path markdownOutput, Path isolatedReport, boolean maven) {
         private static final Map<String, String> DEFAULTS = Map.of(
             "--root", ".", "--policy", "config/quality/coverage-policy.json",
-            "--json-output", JSON_OUTPUT, "--markdown-output", MARKDOWN_OUTPUT);
+            "--json-output", JSON_OUTPUT, "--markdown-output", MARKDOWN_OUTPUT, "--layout", "gradle");
 
         private static Options parse(String[] args) {
             Map<String, String> values = new HashMap<>(DEFAULTS);
             values.put("--isolated-report", null);
+            values.put("--json-output", null);
+            values.put("--markdown-output", null);
             for (int index = 0; index < args.length; index += 2) {
                 String option = args[index];
                 if (!values.containsKey(option) || index + 1 == args.length || args[index + 1].startsWith("--")) {
@@ -180,9 +184,17 @@ public final class CoverageRegressionMain {
                 }
                 values.put(option, args[index + 1]);
             }
+            String layout = values.get("--layout");
+            if (!List.of("gradle", "maven").contains(layout)) throw new IllegalArgumentException("unknown report layout " + layout);
+            if ("maven".equals(layout) && values.get("--isolated-report") != null) {
+                throw new IllegalArgumentException("split Gradle input cannot supply native Maven coverage");
+            }
+            boolean maven = "maven".equals(layout);
+            values.putIfAbsent("--json-output", maven ? MAVEN_JSON : JSON_OUTPUT);
+            values.putIfAbsent("--markdown-output", maven ? MAVEN_MARKDOWN : MARKDOWN_OUTPUT);
             return new Options(Path.of(values.get("--root")), Path.of(values.get("--policy")),
                 Path.of(values.get("--json-output")), Path.of(values.get("--markdown-output")),
-                values.get("--isolated-report") == null ? null : Path.of(values.get("--isolated-report")));
+                values.get("--isolated-report") == null ? null : Path.of(values.get("--isolated-report")), maven);
         }
     }
 }

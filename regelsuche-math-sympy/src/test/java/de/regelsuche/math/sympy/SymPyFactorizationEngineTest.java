@@ -19,6 +19,7 @@ import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 class SymPyFactorizationEngineTest {
@@ -29,6 +30,7 @@ class SymPyFactorizationEngineTest {
             128,
             4_096);
 
+    @Tag("sympy-runtime")
     @Test
     void embeddedIntegerEngineReusesItsContextAndKeepsEvidenceStable() {
         FactorizationRequest<BigInteger> request = integerQuarticRequest();
@@ -60,6 +62,7 @@ class SymPyFactorizationEngineTest {
         }
     }
 
+    @Tag("sympy-runtime")
     @Test
     void aFailedCallDoesNotExposeThePreviousSuccessfulMetrics() {
         FactorizationRequest<BigInteger> successful =
@@ -88,6 +91,7 @@ class SymPyFactorizationEngineTest {
         }
     }
 
+    @Tag("sympy-runtime")
     @Test
     void embeddedRationalEnginePreservesExactFractions() {
         PolynomialRing<ExactRational> ring = new PolynomialRing<>(
@@ -190,6 +194,7 @@ class SymPyFactorizationEngineTest {
         assertTrue(report.candidates().isEmpty());
     }
 
+    @Tag("sympy-runtime")
     @Test
     void oneShotCpythonControlUsesTheSameVerifierBoundary() {
         assumeTrue(

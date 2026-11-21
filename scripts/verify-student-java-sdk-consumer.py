@@ -20,6 +20,7 @@ SDK_MODULES = (
     "regelsuche-egraph",
     "regelsuche-search",
     "regelsuche-validation",
+    "regelsuche-solver-ir",
     "regelsuche-discovery",
     "regelsuche-discovery-sdk",
     "regelsuche-math-algorithms",
@@ -28,6 +29,7 @@ SDK_MODULES = (
     "regelsuche-extension-runtime",
 )
 SOURCE_DOC_MODULES = (
+    "regelsuche-solver-ir",
     "regelsuche-optimization-sdk",
     "regelsuche-discovery-sdk",
     "regelsuche-extension-api",
@@ -35,6 +37,7 @@ SOURCE_DOC_MODULES = (
 )
 FORBIDDEN_RUNTIME_MARKERS = (
     "regelsuche-app",
+    "regelsuche-solver-portfolio",
     "regelsuche-persistence",
     "regelsuche-persistence-hibernate",
     "spring-boot",

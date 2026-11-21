@@ -26,6 +26,30 @@ class CoverageRegressionTest {
     @TempDir Path root;
 
     @Test
+    void mavenUsesCurrentModuleXmlAndRejectsMissingUnknownAndRegressedModules() throws Exception {
+        policy("{\"alpha\":{\"lineMinimumPercent\":75,\"branchMinimumPercent\":50}}", 75, 50);
+        report("alpha", counters(1, 9, 1, 9));
+        var nativeOutput = root.resolve("regelsuche-quality-aggregate/target/reports/coverage/coverage-report.json");
+        var nativeReport = Path.of("target/site/jacoco/jacoco.xml");
+        var module = root.resolve("alpha").resolve(nativeReport);
+        assertEquals(1, run("--layout", "maven").code());
+        write(module, Files.readString(root.resolve("alpha").resolve(REPORT)));
+        assertEquals(0, run("--layout", "maven").code());
+        var passing = JSON.readTree(nativeOutput.toFile());
+        assertEquals(0, run().code());
+        assertEquals(passing, JSON.readTree(root.resolve(OUTPUT).toFile()));
+        write(root.resolve("unexpected-module").resolve(nativeReport), Files.readString(module));
+        assertEquals(1, run("--layout", "maven").code());
+        assertTrue(Files.readString(nativeOutput).contains("undeclared covered modules"));
+        Files.delete(root.resolve("unexpected-module").resolve(nativeReport));
+        write(module, "<report>" + counters(9, 1, 9, 1) + "</report>");
+        assertEquals(1, run("--layout", "maven").code());
+        assertEquals("FAILED", JSON.readTree(nativeOutput.toFile()).path("status").asText());
+        assertEquals("PASSED", JSON.readTree(root.resolve(OUTPUT).toFile()).path("status").asText());
+        assertEquals(2, run("--layout", "typo").code());
+    }
+
+    @Test
     void countsOnlyReportCountersAndWeightsAggregateByTotal() throws Exception {
         policy("""
             {"zeta":{"lineMinimumPercent":75.0,"branchMinimumPercent":100},

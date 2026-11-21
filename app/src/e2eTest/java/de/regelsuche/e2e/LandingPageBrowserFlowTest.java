@@ -341,6 +341,26 @@ class LandingPageBrowserFlowTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"DIRECT_V1", "SAFE_PREPARATION_V4"})
+    void visuallyEditedSystemUsesGlobalOccurrenceOffsetsAndTheSelectedRuntimeProfile(String profile) {
+        page.locator("#runtimeProfile").selectOption(profile);
+        page.locator("[name=runtimeShape]").selectOption("SYSTEM");
+        var input = page.locator("#searchForm [name=expression]");
+        input.fill("x+y=2; x-y=0");
+        page.locator("#formulaTools summary").click();
+        page.locator("#previewFormula").click();
+        page.locator("math [data-formula-part='7:8']").click();
+        page.getByLabel("Teilausdruck ersetzen").fill("2*x");
+        page.getByLabel("Teilausdruck ersetzen").press("Enter");
+        assertThat(input).hasValue("x+y=2; (2*x)-y=0");
+        var response = page.waitForResponse(r -> r.url().endsWith("/api/search") && r.request().method().equals("POST"),
+            () -> page.locator("#searchForm button[type='submit']").click());
+        assertTrue(response.ok(), response::text);
+        assertTrue(response.text().contains("(2*x)-y=0"));
+        assertTrue(response.text().contains(profile));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"source", "type", "profile", "draft"})
     void pendingVisualEditCannotOverwriteANewerContext(String change) {
         var input = page.locator("#searchForm input[name='expression']");
@@ -373,7 +393,7 @@ class LandingPageBrowserFlowTest {
             }
             case "profile" -> {
                 profile.selectOption("DIRECT_V1");
-                assertFalse(page.locator("#formulaTools").isVisible());
+                assertTrue(page.locator("#formulaTools").isVisible());
                 profile.selectOption("");
             }
             case "draft" -> replacement.fill("new_draft");

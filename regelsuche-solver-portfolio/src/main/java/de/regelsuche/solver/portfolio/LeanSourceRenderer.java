@@ -182,11 +182,11 @@ public final class LeanSourceRenderer {
         return source(obligation, nonce, null);
     }
 
-    String source(Obligation obligation, String nonce, LeanLemmaPlan plan) {
+    String source(Obligation obligation, String nonce, LeanProofPlan plan) {
         Material material = render(obligation);
         if (!material.supported()) throw new IllegalArgumentException(String.join(",", material.issues()));
         boolean scoped = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema());
-        if (!scoped && plan != null) throw new IllegalArgumentException("a lemma plan requires a v2 obligation");
+        if (plan != null && !plan.accepts(obligation)) throw new IllegalArgumentException("proof plan does not match the scoped obligation");
         return "import Mathlib\nimport Lean.Util.CollectAxioms\n"
             + (scoped ? "import Lean.Util.FoldConsts\n" : "")
             + "set_option autoImplicit false\nset_option Elab.async false\nset_option maxHeartbeats 1000000\n"
