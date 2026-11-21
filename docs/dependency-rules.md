@@ -132,7 +132,9 @@ Details stehen unter
   der exakten, technischen-losen Algorithmen aus `:regelsuche-math-algorithms`, kennt
   aber keine Web- oder App-Orchestrierung.
 - `:regelsuche-discovery` enthält portable Domänen-, Pfad- und Handoff-Typen;
-  konkrete Web- und Persistenzadapter bleiben außen.
+  konkrete Web- und Persistenzadapter bleiben außen. Der formale Proof-Port
+  liegt im inneren Solver IR; ein produktiver Lean-/Rebuild-Adapter gehört
+  nach `:regelsuche-solver-portfolio`, nie als direkte Discovery-Runtime-Abhängigkeit.
 - `:regelsuche-discovery-sdk` darf ausschließlich die portable Discovery-
   Schicht und deren innere Abhängigkeiten als äußere Java-Fassade exportieren.
   Als einzige weitere direkte Kante darf es `:regelsuche-extension-api` für

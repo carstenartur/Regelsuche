@@ -6,8 +6,7 @@ import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.ResultStatus;
 import de.regelsuche.solver.ir.SolverIrJsonCodec;
-import de.regelsuche.solver.portfolio.LeanEvidenceRebuilder;
-import de.regelsuche.solver.portfolio.LeanSolverBackend;
+import de.regelsuche.solver.ir.ScopedProofExecutor;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -35,9 +34,9 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain<ScopedL
         private final ScopedProofDag dag;
         private final String kernel, rebuild;
         private final Path kernelDirectory, rebuildDirectory;
-        private Certificate(ScopedProofDag dag, String kernel, Path source, LeanEvidenceRebuilder.Receipt receipt) {
-            this.dag = dag; this.kernel = kernel; rebuild = receipt.receiptHash();
-            kernelDirectory = source; rebuildDirectory = receipt.directory();
+        private Certificate(ScopedProofDag dag, ScopedProofExecutor.VerifiedReplay receipt) {
+            this.dag = dag; this.kernel = receipt.kernelHash(); rebuild = receipt.rebuildHash();
+            kernelDirectory = receipt.kernelDirectory(); rebuildDirectory = receipt.rebuildDirectory();
         }
         public ScopedProofDag dag() { return dag; }
         public String kernelHash() { return kernel; }
@@ -47,13 +46,11 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain<ScopedL
         String canonical() { return dag.canonical() + kernel + "\n" + rebuild; }
     }
 
-    private final LeanSolverBackend kernel;
-    private final LeanEvidenceRebuilder independent;
+    private final ScopedProofExecutor verifier;
     private final int formationBudget;
 
-    public ScopedLogicDiscoveryDomain(LeanSolverBackend kernel, LeanEvidenceRebuilder independent, int formationBudget) {
-        this.kernel = Objects.requireNonNull(kernel);
-        this.independent = Objects.requireNonNull(independent);
+    public ScopedLogicDiscoveryDomain(ScopedProofExecutor verifier, int formationBudget) {
+        this.verifier = Objects.requireNonNull(verifier);
         if (formationBudget < 0 || formationBudget > 65536) throw new IllegalArgumentException("invalid formation budget");
         this.formationBudget = formationBudget;
     }
@@ -142,18 +139,22 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain<ScopedL
     }
 
     private Evaluation<Certificate> receive(ScopedProofDag dag) {
-        var original = kernel.using(dag).executeWithEvidence(dag.obligation());
-        var result = original.execution().result();
-        var evidence = Map.of("proposal",dag.hash(),"kernelStatus",result.status().name());
-        if (result.status()==ResultStatus.UNSUPPORTED) return Evaluation.unsupported(result.message(),evidence);
-        if (result.status()!=ResultStatus.CONFIRMED) return Evaluation.inconclusive(result.message(),evidence);
         try {
-            var receipt = independent.rebuild(dag.obligation(),result.certificateHash(),original.directory());
-            var certificate = new Certificate(dag,result.certificateHash(),original.directory(),receipt);
-            return Evaluation.confirmed(certificate,"Scoped theorem checked in both pinned projects",evidence);
-        } catch (Exception refused) {
-            return Evaluation.inconclusive("Independent proof reconstruction failed: "+refused,
-                Map.of("proposal",dag.hash(),"originalKernel",result.certificateHash()));
+            var checked = verifier.verify(dag);
+            if (!dag.hash().equals(checked.proposalHash())) {
+                return Evaluation.inconclusive("Checked proof receipt is bound to another proposal",
+                    Map.of("proposal", dag.hash(), "receiptProposal", checked.proposalHash()));
+            }
+            var evidence = Map.of("proposal", dag.hash(), "kernelStatus", checked.status().name());
+            if (checked.status() == ResultStatus.UNSUPPORTED)
+                return Evaluation.unsupported(checked.message(), evidence);
+            if (checked.status() != ResultStatus.CONFIRMED)
+                return Evaluation.inconclusive(checked.message(), evidence);
+            var certificate = new Certificate(dag, checked);
+            return Evaluation.confirmed(certificate, "Scoped theorem checked in both pinned projects", evidence);
+        } catch (RuntimeException refusal) {
+            return Evaluation.inconclusive("Checked proof receiver failed: " + refusal,
+                Map.of("proposal", dag.hash()));
         }
     }
     @Override public CertificateRenderer<Certificate> certificateRenderer() {

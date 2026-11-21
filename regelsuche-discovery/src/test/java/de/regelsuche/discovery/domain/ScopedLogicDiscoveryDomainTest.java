@@ -6,6 +6,7 @@ import de.regelsuche.solver.ir.SolverIr.*;
 import de.regelsuche.solver.ir.ScopedProofSearch;
 import de.regelsuche.solver.portfolio.LeanSolverBackend;
 import de.regelsuche.solver.portfolio.LeanEvidenceRebuilder;
+import de.regelsuche.solver.portfolio.CheckedLeanScopedProofExecutor;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,8 +33,9 @@ class ScopedLogicDiscoveryDomainTest {
     }
 
     @Test void normalDiscoveryEntryKeepsAProposedGraphSeparateFromCheckedEvidence(@TempDir Path dir) {
-        var domain = new ScopedLogicDiscoveryDomain(new LeanSolverBackend(dir.resolve("missing"),dir),
-            new LeanEvidenceRebuilder(dir.resolve("separate"),dir),1024);
+        var domain = new ScopedLogicDiscoveryDomain(new CheckedLeanScopedProofExecutor(
+            new LeanSolverBackend(dir.resolve("missing"),dir),
+            new LeanEvidenceRebuilder(dir.resolve("separate"),dir)),1024);
         var query = context(R);
         var seed = DiscoveryDomain.DiscoverySeed.create("scope",domain.domainId(),query.toCanonicalJson(),"source-only");
         var state = domain.generator().generate(seed).getFirst();
@@ -54,8 +56,9 @@ class ScopedLogicDiscoveryDomainTest {
     @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="REGELSUCHE_REAL_LEAN",matches="true")
     void sourceOnlyDiscoveryRunnerReturnsARealIndependentlyRebuiltProof() {
         var root=Path.of("target","checked-proof").toAbsolutePath();
-        var domain=new ScopedLogicDiscoveryDomain(new LeanSolverBackend(Path.of(System.getenv("REGELSUCHE_LEAN_PROJECT")),root),
-            new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")),root),1024);
+        var domain=new ScopedLogicDiscoveryDomain(new CheckedLeanScopedProofExecutor(
+            new LeanSolverBackend(Path.of(System.getenv("REGELSUCHE_LEAN_PROJECT")),root),
+            new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")),root)),1024);
         var seed=DiscoveryDomain.DiscoverySeed.create("scope",domain.domainId(),context(P).toCanonicalJson(),"public-propositions");
         var result=new DomainDiscoveryRunner().run("real-kernel-domain",domain,seed,new DiscoveryDomain.DiscoveryBudget(2,16,16,16,4,8));
         assertEquals(DomainDiscoveryEvidence.Outcome.CONFIRMED,result.evidence().outcome(),result.evidence().toString());

@@ -26,7 +26,7 @@ Diese Seite erklärt die beabsichtigte Verantwortung und darf keine abweichende 
 | `:regelsuche-solver-ir` | solver-neutrale Obligationen, Übersetzungen, Ergebnisse und Executions | Core, Search, Validation, Math Algorithms |
 | `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
 | `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten, schematische Beweispläne und Rewrite-Program-Lernen | Core, Search, Validation, Math Algorithms, Solver IR |
-| `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation, Math Algorithms |
+| `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff sowie solverneutrale Beweisdomänen | Core, Search, Validation, Solver IR, Math Algorithms |
 | `:regelsuche-optimization-sdk` | externe Fassade für typisierte numerische Rechenpläne und unabhängige Java-Semantikprüfung | Search, Math Algorithms |
 | `:regelsuche-discovery-sdk` | kleine externe Java-25-Fassade, Domain-Builder und ServiceLoader-SPI | Discovery |
 | `:regelsuche-experiments` | Experiment-, Corpus-, Budget- und Evidence-DAG-Verträge | Search, Validation, Discovery, Math Algorithms |
@@ -139,7 +139,9 @@ Verifier-Grenze.
 
 - `:regelsuche-learning` enthält portable Candidate- und Programmlernlogik;
 - `:regelsuche-discovery` enthält domänenneutrale Discovery- und Handoff-
-  Verträge;
+  Verträge. Seine beweisführenden Domänen sehen nur den Solver-IR-Port;
+  die echte Lean-Ausführung und unabhängige Rekonstruktion verbleiben im
+  äußeren Solver-Portfolio-Adapter;
 - `:regelsuche-discovery-sdk` bietet darüber eine schmale externe Fassade,
   einen boilerplatearmen Domain-Builder und die Provider-SPI, ohne Web- oder
   Persistenzabhängigkeiten einzuführen;
