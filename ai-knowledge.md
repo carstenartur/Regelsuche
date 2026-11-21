@@ -173,6 +173,26 @@ not change which tasks, assertions or artifact contracts are executed.
 ## Context-debt trend baseline
 
 
+### Accepted main after scoped proof and continuation integrations (2026-11-20)
+
+The clean accepted reference is `c268eedc94032b65293d09b4e3d9d6af256b1074`,
+tree `8dc43f34aa9af5b06299468f9424933184de0086`.
+[Main CI 44824761437](https://github.com/carstenartur/Regelsuche/actions/runs/44824761437)
+passed all seven verification authorities, aggregate `ciCheck` and report
+publication. Its original artifact binds 290 indexed evidence files.
+
+A fresh detached checkout passed all 14 root `aiKnowledgeCheck` tasks in 43s,
+including eight coverage controls and 17 hotspot checks. The original 825210-unit
+baseline measured 829570 units and a concept radius of 115, with no violations
+under the unchanged 15000-unit and 3-radius limits. The proposed reference copies
+the complete generated [snapshot](../ai-knowledge/baseline-history/2026-11-20-main-c268eedc/metrics-snapshot.json).
+[Provenance](../ai-knowledge/baseline-history/2026-11-20-main-c268eedc/provenance.json)
+retains all 38 raw reports, the actual execution log and the original CI index.
+The native check/complexity files are byte-identical to the accepted CI files.
+The [independent review](../ai-knowledge/baseline-history/2026-11-20-main-c268eedc/independent-review.json)
+rechecked the original ZIP, every indexed file, source/tool Git objects and the
+unchanged controls. Pending feature measurements supply no baseline values.
+
 ### Accepted main with the mathematical certificates and domain workspaces (2026-11-20)
 
 The reference is clean main `e115dca89bba32bad516d66f408e26f99fbb6149`, tree
