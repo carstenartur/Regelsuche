@@ -38,26 +38,26 @@ final class ReleaseMetadataTransition {
     }
 
     private static void transition(Path root, String version, LocalDate date) throws Exception {
-        String current = MavenReleaseMetadataAlignmentTest.oneVersion(Files.readString(root.resolve("release.properties")));
+        String current = MavenReleaseMetadataAlignmentTest.oneVersion(readWriterInput(root.resolve("release.properties")));
         var poms = MavenReleaseMetadataAlignmentTest.verify(root, current);
         var updates = new LinkedHashMap<Path, String>();
         for (var path : poms.stream().sorted().toList()) {
-            String text = Files.readString(path);
+            String text = readWriterInput(path);
             var pattern = Pattern.compile("(<artifactId>regelsuche-parent</artifactId>\\s*<version>)" + Pattern.quote(current) + "(</version>)");
             updates.put(root.relativize(path), pattern.matcher(text).replaceFirst("$1" + version + "$2"));
         }
-        updates.put(Path.of("release.properties"), Files.readString(root.resolve("release.properties"))
+        updates.put(Path.of("release.properties"), readWriterInput(root.resolve("release.properties"))
             .replaceAll("(?m)^[ \\t]*version[ \\t]*=.*$", "version=" + version));
-        String cff = Files.readString(root.resolve("CITATION.cff")).replaceAll("(?m)^version: .*$", "version: \"" + version + "\"");
+        String cff = readWriterInput(root.resolve("CITATION.cff")).replaceAll("(?m)^version: .*$", "version: \"" + version + "\"");
         if (date == null) cff = cff.replaceAll("(?m)^date-released: .*\\n?", "");
         else if (Pattern.compile("(?m)^date-released: .*$").matcher(cff).find())
             cff = cff.replaceAll("(?m)^date-released: .*$", "date-released: \"" + date + "\"");
         else cff = cff + (cff.endsWith("\n") ? "" : "\n") + "date-released: \"" + date + "\"\n";
         updates.put(Path.of("CITATION.cff"), cff);
-        updates.put(Path.of("CITATION.md"), citation(Files.readString(root.resolve("CITATION.md")), version, date));
+        updates.put(Path.of("CITATION.md"), citation(readWriterInput(root.resolve("CITATION.md")), version, date));
         updates.put(Path.of(".zenodo.json"), json(root.resolve(".zenodo.json"), "publication_date", version, date));
         updates.put(Path.of("codemeta.json"), json(root.resolve("codemeta.json"), "datePublished", version, date));
-        updates.put(Path.of(OPENAPI), Files.readString(root.resolve(OPENAPI))
+        updates.put(Path.of(OPENAPI), readWriterInput(root.resolve(OPENAPI))
             .replaceFirst("(?m)^(\\s*\"version\"\\s*:\\s*\")[^\"]*(\".*)$", "$1" + version + "$2"));
 
         Path stage = Files.createTempDirectory("regelsuche-release-transition-");
@@ -76,6 +76,11 @@ final class ReleaseMetadataTransition {
         }
     }
 
+    /** Match the legacy writer's universal newlines while planning a transition. */
+    private static String readWriterInput(Path path) throws IOException {
+        return Files.readString(path).replace("\r\n", "\n").replace('\r', '\n');
+    }
+
     private static String citation(String input, String version, LocalDate date) {
         String text = input.replaceAll("(Carsten Hammer\\. \\*\\*Regelsuche\\*\\*\\. Version )[0-9A-Za-z.-]+(\\. \\d{4}\\.)", "$1" + version + "$2")
             .replaceAll("(  version\\s+= \\{)[^}]+(\\},)", "$1" + version + "$2");
@@ -91,7 +96,7 @@ final class ReleaseMetadataTransition {
     }
 
     private static String json(Path path, String dateKey, String version, LocalDate date) throws IOException {
-        ObjectNode document = (ObjectNode) JSON.readTree(path.toFile());
+        ObjectNode document = (ObjectNode) JSON.readTree(readWriterInput(path));
         document.put("version", version);
         if (date == null) document.remove(dateKey);
         else document.put(dateKey, date.toString());

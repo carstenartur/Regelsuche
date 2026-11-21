@@ -850,12 +850,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release-state.outputs.release_version }}
           NEXT_VERSION: ${{ steps.release-state.outputs.next_version }}
-        run: >-
-          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am
-          -Dtest=MavenReleaseMetadataTransitionTest#executeRequestedTransition
-          -Dsurefire.failIfNoSpecifiedTests=false -Dregelsuche.releaseMetadata.operation=follow-up
-          -Dregelsuche.releaseMetadata.predecessor="$RELEASE_VERSION"
-          -Dregelsuche.releaseMetadata.version="$NEXT_VERSION" test
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+            -Dtest=MavenReleaseMetadataTransitionTest#executeRequestedTransition \
+            -Dsurefire.failIfNoSpecifiedTests=false -Dregelsuche.releaseMetadata.operation=follow-up \
+            -Dregelsuche.releaseMetadata.predecessor="$RELEASE_VERSION" \
+            -Dregelsuche.releaseMetadata.version="$NEXT_VERSION" test
+          git diff --check
 
       - name: Open next development metadata PR
         if: steps.next-development.outputs.required == 'true'

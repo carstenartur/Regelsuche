@@ -78,7 +78,7 @@ class MavenReleaseFollowUpTest {
                 "path: .release-follow-up", "working-directory: .release-follow-up", "ref: main",
                 "steps.release-state.outputs.managed_release == 'true'", "steps.release-state.outputs.dry_run != 'true'",
                 "-Dregelsuche.releaseMetadata.operation=follow-up", "-Dregelsuche.releaseMetadata.predecessor=\"$RELEASE_VERSION\"",
-                "steps.next-development.outputs.required == 'true'")) {
+                "git diff --check", "steps.next-development.outputs.required == 'true'")) {
             assertTrue(workflow.contains(mutation), mutation);
             int separator = mutation.indexOf(": ");
             String replacement = separator >= 0 ? mutation.substring(0, separator + 2) + "wrong-location" : "changed";
@@ -107,10 +107,15 @@ class MavenReleaseFollowUpTest {
         assertEquals(Set.of("CITATION.cff", "CITATION.md", ".zenodo.json", "codemeta.json", "release.properties",
             "app/src/main/resources/web/openapi/openapi.json", "pom.xml", "*/pom.xml"),
             Set.copyOf(publish.at("/with/add-paths").asText().lines().toList()));
+        var command = prepare.path("run").asText().strip().lines().toList();
+        assertEquals("set -euo pipefail", command.getFirst());
+        assertEquals("git diff --check", command.getLast());
+        String invocation = String.join(" ", command.subList(1, command.size() - 1).stream()
+            .map(line -> line.strip().replaceFirst("\\\\$", "").stripTrailing()).toList());
         assertEquals("mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am "
             + "-Dtest=MavenReleaseMetadataTransitionTest#executeRequestedTransition -Dsurefire.failIfNoSpecifiedTests=false "
             + "-Dregelsuche.releaseMetadata.operation=follow-up -Dregelsuche.releaseMetadata.predecessor=\"$RELEASE_VERSION\" "
-            + "-Dregelsuche.releaseMetadata.version=\"$NEXT_VERSION\" test", prepare.path("run").asText().strip());
+            + "-Dregelsuche.releaseMetadata.version=\"$NEXT_VERSION\" test", invocation);
     }
 
     private static org.eclipse.jgit.revwalk.RevCommit commit(Git git, String message) throws Exception {

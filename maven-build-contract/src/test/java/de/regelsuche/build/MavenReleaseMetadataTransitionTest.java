@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class MavenReleaseMetadataTransitionTest {
     private static final String OPENAPI = "app/src/main/resources/web/openapi/openapi.json";
@@ -28,6 +31,31 @@ class MavenReleaseMetadataTransitionTest {
         assertFalse(Files.readString(root.resolve("CITATION.md")).contains("date         ="));
         assertEquals("{\n  \"title\": \"Étude\",\n  \"version\": \"9.9.0-SNAPSHOT\"\n}\n", Files.readString(root.resolve(".zenodo.json")));
         assertEquals(before, Files.readString(root.resolve("unregistered/pom.xml")));
+    }
+
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void releaseAndSnapshotNormalizeCrLfInAllManagedInputs(boolean snapshot, @TempDir Path root) throws Exception {
+        Path lf = Files.createDirectory(root.resolve("lf"));
+        Path crlf = Files.createDirectory(root.resolve("crlf"));
+        fixture(lf);
+        fixture(crlf);
+        var day = LocalDate.parse("2026-11-18");
+        if (snapshot) {
+            ReleaseMetadataTransition.write(lf, "9.8.7", day);
+            ReleaseMetadataTransition.write(crlf, "9.8.7", day);
+        }
+        String current = snapshot ? "9.8.7" : "9.8.7-SNAPSHOT";
+        var managed = new ArrayList<>(List.of("release.properties", "CITATION.cff", "CITATION.md", OPENAPI,
+            ".zenodo.json", "codemeta.json"));
+        MavenReleaseMetadataAlignmentTest.verify(crlf, current).forEach(p -> managed.add(crlf.relativize(p).toString()));
+        for (String name : managed) {
+            Path path = crlf.resolve(name);
+            Files.writeString(path, Files.readString(path).replace("\n", "\r\n"));
+        }
+        String version = snapshot ? "9.9.0-SNAPSHOT" : "9.8.7";
+        ReleaseMetadataTransition.write(lf, version, snapshot ? null : day);
+        ReleaseMetadataTransition.write(crlf, version, snapshot ? null : day);
+        for (String name : managed) assertArrayEquals(Files.readAllBytes(lf.resolve(name)), Files.readAllBytes(crlf.resolve(name)), name);
     }
 
     @Test void badPublicationInputLeavesAllEarlierSourcesUntouched(@TempDir Path root) throws Exception {
