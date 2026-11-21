@@ -226,7 +226,15 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
                 tree = ET.parse(root / module / 'pom.xml')
                 dependencies = [dependency.find('m:artifactId', namespace).text
                                 for dependency in tree.findall('./m:dependencies/m:dependency', namespace)
-                                if dependency.find('m:groupId', namespace).text == 'io.github.carstenartur']
+                                if dependency.find('m:groupId', namespace).text == 'io.github.carstenartur'
+                                # The consumer's runtime closure must not include Maven test-only
+                                # or provided dependencies. Gradle's comparison likewise reads
+                                # only api/implementation, not testImplementation.
+                                and (dependency.find('m:scope', namespace) is None
+                                     or dependency.find('m:scope', namespace).text
+                                     in ('compile', 'runtime'))
+                                and (dependency.find('m:optional', namespace) is None
+                                     or dependency.find('m:optional', namespace).text != 'true')]
             for dependency in dependencies:
                 result.update(closure(dependency, build))
             return result
