@@ -80,6 +80,14 @@ class ScopedLogicDiscoveryDomainTest {
         assertTrue(result.witness().contains("p=TRUE"));
         assertTrue(result.witness().contains("q=FALSE"));
     }
+    @Test
+    void modelSearchFailsClosedWhenTheFormalReceiverRejectsItsTheory() {
+        var candidate = ScopedProofSearch.discover(context(R), 1024).proposals().getFirst().dag();
+        var rejected = new ScopedTruthAssignments(ignored -> false).search(candidate, 8);
+        assertEquals(DiscoveryDomain.CounterexampleStatus.UNSUPPORTED, rejected.status());
+        assertTrue(rejected.witness().isBlank());
+    }
+
     @Test void generalCasesDoubleNegationAndWitnessesAreActuallyFormedFromSourceFacts() {
         var template=context(R);
         var n=new Symbol("n"); var f=new Symbol("f");
