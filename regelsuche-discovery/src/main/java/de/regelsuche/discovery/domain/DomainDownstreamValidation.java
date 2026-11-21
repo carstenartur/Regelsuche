@@ -162,6 +162,9 @@ public final class DomainDownstreamValidation {
     public static Receipt validate(DomainExportWorkspace workspace, Budget budget) {
         Objects.requireNonNull(workspace, "workspace"); Objects.requireNonNull(budget, "budget");
         var execution = new Execution(workspace, budget);
+        if (workspace.scopedLogicDomain()) {
+            return execution.receipt("UNSUPPORTED", workspace.replayUnavailableReason());
+        }
         if (budget.maxReplayAttempts() == 0 || !workspace.replaySupported()
                 || workspace.evidence().seed().payload().length() > budget.maxPayloadCharacters()) {
             return execution.receipt("INCONCLUSIVE", "SOURCE_EXCEEDS_DOWNSTREAM_REPLAY_ADMISSION");
