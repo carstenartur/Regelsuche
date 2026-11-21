@@ -15,6 +15,31 @@ starter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(starter)
 
 
+def runtime_closure(root, module, build):
+    import re
+    import xml.etree.ElementTree as ET
+    namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+    result = {module}
+    if build == 'gradle':
+        dependencies = re.findall(r"(?:api|implementation|runtimeOnly) project\(':([^']+)'\)",
+                                  (root / module / 'build.gradle').read_text())
+    else:
+        tree = ET.parse(root / module / 'pom.xml')
+        dependencies = []
+        for dependency in tree.findall('./m:dependencies/m:dependency', namespace):
+            if dependency.find('m:groupId', namespace).text != 'io.github.carstenartur':
+                continue
+            scope = dependency.findtext('m:scope', default='compile', namespaces=namespace).strip()
+            optional = dependency.findtext('m:optional', default='false', namespaces=namespace).strip()
+            if scope not in ('compile', 'runtime', 'test', 'provided', 'system', 'import') or optional not in ('true', 'false'):
+                raise ValueError(f'Unresolved consumer dependency scope or optional flag in {module}')
+            if scope in ('compile', 'runtime') and optional == 'false':
+                dependencies.append(dependency.find('m:artifactId', namespace).text)
+    for dependency in dependencies:
+        result.update(runtime_closure(root, dependency, build))
+    return result
+
+
 class StudentDiscoveryStarterTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -213,31 +238,10 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
 
     def test_maintained_consumers_and_generated_starter_have_exact_sdk_closure(self):
         import re
-        import xml.etree.ElementTree as ET
         root = SCRIPT.parent.parent
-        namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
 
         def closure(module, build):
-            result = {module}
-            if build == 'gradle':
-                dependencies = re.findall(r"(?:api|implementation) project\(':([^']+)'\)",
-                                          (root / module / 'build.gradle').read_text())
-            else:
-                tree = ET.parse(root / module / 'pom.xml')
-                dependencies = [dependency.find('m:artifactId', namespace).text
-                                for dependency in tree.findall('./m:dependencies/m:dependency', namespace)
-                                if dependency.find('m:groupId', namespace).text == 'io.github.carstenartur'
-                                # The consumer's runtime closure must not include Maven test-only
-                                # or provided dependencies. Gradle's comparison likewise reads
-                                # only api/implementation, not testImplementation.
-                                and (dependency.find('m:scope', namespace) is None
-                                     or dependency.find('m:scope', namespace).text
-                                     in ('compile', 'runtime'))
-                                and (dependency.find('m:optional', namespace) is None
-                                     or dependency.find('m:optional', namespace).text != 'true')]
-            for dependency in dependencies:
-                result.update(closure(dependency, build))
-            return result
+            return runtime_closure(root, module, build)
 
         expected = closure('regelsuche-discovery-sdk', 'gradle')
         self.assertEqual(expected, closure('regelsuche-discovery-sdk', 'maven'))
@@ -264,6 +268,45 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
         block = re.search(r'def expectedRegelsucheRuntimeModules = \[(.*?)\] as Set', adapted, re.S)
         self.assertEqual(expected, set(re.findall(r"'(regelsuche-[^']+)'", block[1])))
 
+    def test_runtime_closure_honors_consumer_scopes_and_keeps_transitive_runtime_edges(self):
+        cases = (
+            ('api', '', '', True),
+            ('implementation', 'compile', '', True),
+            ('runtimeOnly', 'runtime', '', True),
+            ('testImplementation', 'test', '', False),
+            ('testRuntimeOnly', 'test', '', False),
+            ('compileOnly', 'provided', '', False),
+            ('compileOnly', 'compile', 'true', False),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for module in ('consumer', 'required', 'transitive'):
+                (root / module).mkdir()
+                (root / module / 'build.gradle').write_text('')
+                (root / module / 'pom.xml').write_text(
+                    '<project xmlns="http://maven.apache.org/POM/4.0.0"/>')
+
+            def pom(dependency, scope='', optional=''):
+                return ('<project xmlns="http://maven.apache.org/POM/4.0.0"><dependencies><dependency>'
+                        '<groupId>io.github.carstenartur</groupId><artifactId>' + dependency + '</artifactId>'
+                        + (f'<scope>{scope}</scope>' if scope else '')
+                        + (f'<optional>{optional}</optional>' if optional else '')
+                        + '</dependency></dependencies></project>')
+
+            (root / 'required' / 'build.gradle').write_text("runtimeOnly project(':transitive')")
+            (root / 'required' / 'pom.xml').write_text(pom('transitive', 'runtime'))
+            for configuration, scope, optional, included in cases:
+                (root / 'consumer' / 'build.gradle').write_text(f"{configuration} project(':required')")
+                (root / 'consumer' / 'pom.xml').write_text(pom('required', scope, optional))
+                expected = {'consumer', 'required', 'transitive'} if included else {'consumer'}
+                for build in ('gradle', 'maven'):
+                    with self.subTest(build=build, configuration=configuration, scope=scope, optional=optional):
+                        self.assertEqual(expected, runtime_closure(root, 'consumer', build))
+            for scope, optional in (('${unresolved.scope}', ''), ('compile', '${unresolved.optional}')):
+                (root / 'consumer' / 'pom.xml').write_text(pom('required', scope, optional))
+                with self.subTest(scope=scope, optional=optional), self.assertRaises(ValueError):
+                    runtime_closure(root, 'consumer', 'maven')
+
     def test_pinned_consumer_adaptation_is_exact_reproducible_and_preserves_upstream(self):
         import hashlib
         import student_sdk_source
@@ -275,15 +318,15 @@ class DiscoveryRuntimeContractTest(unittest.TestCase):
         original = before['build.gradle']
         expected = original.replace(b"    'regelsuche-discovery-sdk'\n] as Set",
                                     b"    'regelsuche-discovery-sdk',\n    'regelsuche-extension-api',\n"
-                                    b"    'regelsuche-math-algorithms'\n] as Set")
+                                    b"    'regelsuche-math-algorithms',\n    'regelsuche-solver-ir'\n] as Set")
         expected = expected.replace(b"'de.regelsuche'", b"'io.github.carstenartur'")
         expected = expected.replace(b'de.regelsuche:regelsuche-', b'io.github.carstenartur:regelsuche-')
         self.assertEqual(expected, files['build.gradle'])
         self.assertEqual(original, files['upstream-build.gradle'])
         receipt = json.loads(files['SDK-ADAPTATION.json'])
         self.assertEqual('io.github.carstenartur', receipt['sdkGroupId'])
-        self.assertEqual('discovery-model-proof-runtime-contract/v3', receipt['adaptationId'])
-        self.assertEqual(['regelsuche-extension-api', 'regelsuche-math-algorithms'],
+        self.assertEqual('discovery-scoped-proof-runtime-contract/v4', receipt['adaptationId'])
+        self.assertEqual(['regelsuche-extension-api', 'regelsuche-math-algorithms', 'regelsuche-solver-ir'],
                          receipt['addedRuntimeModules'])
         self.assertEqual(hashlib.sha256(original).hexdigest(), receipt['upstreamBuildSha256'])
         self.assertEqual(hashlib.sha256(expected).hexdigest(), receipt['adaptedBuildSha256'])
