@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedTruthAssignments.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">ScopedTruthAssignments.java</span></div><h1>ScopedTruthAssignments.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
+import de.regelsuche.solver.ir.ScopedProofDag;
+import de.regelsuche.solver.ir.SolverIr.*;
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Countermodels over constant interpretations for propositions and Nat predicates. Unknown values stay open. */
+final class ScopedTruthAssignments implements CounterexampleGenerator&lt;ScopedProofDag&gt; {
+    private final Predicate&lt;Obligation&gt; supports;
+
+<span class="fc" id="L17">    ScopedTruthAssignments(Predicate&lt;Obligation&gt; supports) {</span>
+<span class="fc" id="L18">        this.supports = Objects.requireNonNull(supports, &quot;supports&quot;);</span>
+<span class="fc" id="L19">    }</span>
+
+<span class="fc" id="L21">    private enum Truth {</span>
+<span class="fc" id="L22">        TRUE, FALSE, UNKNOWN;</span>
+<span class="pc bpc" id="L23" title="1 of 3 branches missed.">        Truth negate() { return switch(this) { case TRUE -&gt; FALSE; case FALSE -&gt; TRUE; case UNKNOWN -&gt; UNKNOWN; }; }</span>
+<span class="pc bpc" id="L24" title="2 of 8 branches missed.">        Truth and(Truth b) { return this==FALSE || b==FALSE ? FALSE : this==TRUE &amp;&amp; b==TRUE ? TRUE : UNKNOWN; }</span>
+<span class="fc" id="L25">        Truth or(Truth b) { return negate().and(b.negate()).negate(); }</span>
+    }
+
+<span class="fc" id="L28">    @Override public String id() { return &quot;scoped-constant-models/v1&quot;; }</span>
+
+    @Override public CounterexampleResult search(ScopedProofDag candidate, int attemptBudget) {
+<span class="fc" id="L31">        var request = candidate.obligation();</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (attemptBudget &lt; 1) return CounterexampleResult.inconclusive(0,&quot;No constant interpretation budget&quot;,Map.of());</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        if (request.goal().relation()!=Relation.HOLDS || !supports.test(request))</span>
+<span class="fc" id="L34">            return new CounterexampleResult(DiscoveryDomain.CounterexampleStatus.UNSUPPORTED, 0, &quot;&quot;,</span>
+<span class="fc" id="L35">                Map.of(&quot;reason&quot;, &quot;Constant interpretations require a supported scoped proposition&quot;));</span>
+<span class="pc bpc" id="L36" title="3 of 4 branches missed.">        var variables = request.declarations().stream().filter(d -&gt; d.sort()==Sort.PROPOSITION || d.sort()==Sort.NAT_PREDICATE).toList();</span>
+<span class="fc" id="L37">        int limit = Math.min(attemptBudget, 1 &lt;&lt; Math.min(8, variables.size()));</span>
+<span class="fc" id="L38">        int classified = 0;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (int ordinal=0;ordinal&lt;limit;ordinal++) {</span>
+<span class="fc" id="L40">            var assignment = interpretation(variables,ordinal);</span>
+<span class="fc" id="L41">            Truth counterexample = check(request,assignment);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (counterexample==Truth.TRUE) return CounterexampleResult.found(ordinal+1, assignment.toString(),Map.of(&quot;family&quot;,id()));</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if (counterexample==Truth.FALSE) classified++;</span>
+        }
+<span class="fc" id="L45">        var metrics = Map.of(&quot;family&quot;,id(),&quot;classified&quot;,Integer.toString(classified),&quot;partial&quot;,Integer.toString(limit-classified));</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        return classified==0 ? CounterexampleResult.inconclusive(limit,&quot;No interpretation could decide the counterexample condition&quot;,metrics)</span>
+<span class="fc" id="L47">            : CounterexampleResult.noneFound(limit,metrics);</span>
+    }
+
+    private static Map&lt;String,Truth&gt; interpretation(List&lt;SymbolDeclaration&gt; variables,int ordinal) {
+<span class="fc" id="L51">        var assignment = new TreeMap&lt;String,Truth&gt;();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int i=0;i&lt;variables.size();i++) assignment.put(variables.get(i).name(),</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">            i&lt;8 &amp;&amp; ((ordinal&gt;&gt;i)&amp;1)==1 ? Truth.TRUE : Truth.FALSE);</span>
+<span class="fc" id="L54">        return assignment;</span>
+    }
+    private static Truth check(Obligation q, Map&lt;String,Truth&gt; model) {
+<span class="fc" id="L57">        Truth result = truth(q.goal().left(),model).negate();</span>
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">        for (var h:q.assumptions()) result = result.and(h.relation()==Relation.HOLDS ? truth(h.left(),model) : Truth.UNKNOWN);</span>
+<span class="fc" id="L59">        return result;</span>
+    }
+    private static Truth truth(Expression e, Map&lt;String,Truth&gt; model) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (e instanceof Symbol s) return model.getOrDefault(s.name(),Truth.UNKNOWN);</span>
+        // Unknown bound terms range over their full inhabited Lean sorts. A definite result is uniform.
+<span class="pc bpc" id="L64" title="5 of 6 branches missed.">        if (e instanceof Binder b &amp;&amp; (b.kind()==BinderKind.FORALL || b.kind()==BinderKind.EXISTS)) return truth(b.body(),model);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (!(e instanceof Call c)) return Truth.UNKNOWN;</span>
+<span class="fc" id="L66">        var args = c.arguments();</span>
+<span class="pc bpc" id="L67" title="7 of 8 branches missed.">        return switch(c.function()) {</span>
+<span class="nc" id="L68">            case &quot;not&quot; -&gt; truth(args.getFirst(),model).negate();</span>
+<span class="nc" id="L69">            case &quot;and&quot; -&gt; truth(args.getFirst(),model).and(truth(args.getLast(),model));</span>
+<span class="nc" id="L70">            case &quot;or&quot; -&gt; truth(args.getFirst(),model).or(truth(args.getLast(),model));</span>
+<span class="fc" id="L71">            case &quot;implies&quot; -&gt; truth(args.getFirst(),model).negate().or(truth(args.getLast(),model));</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            case &quot;at&quot; -&gt; args.getFirst() instanceof Symbol p ? model.getOrDefault(p.name(),Truth.UNKNOWN) : Truth.UNKNOWN;</span>
+<span class="nc" id="L73">            case &quot;eq&quot; -&gt; equality(args.getFirst(),args.getLast(),model);</span>
+<span class="nc" id="L74">            case &quot;ne&quot; -&gt; equality(args.getFirst(),args.getLast(),model).negate();</span>
+<span class="nc" id="L75">            default -&gt; Truth.UNKNOWN;</span>
+        };
+    }
+    private static Truth equality(Expression left,Expression right,Map&lt;String,Truth&gt; model) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (left.equals(right)) return Truth.TRUE;</span>
+<span class="nc" id="L80">        var a=truth(left,model); var b=truth(right,model);</span>
+<span class="nc bnc" id="L81" title="All 4 branches missed.">        if (a==Truth.UNKNOWN || b==Truth.UNKNOWN) return Truth.UNKNOWN;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        return a==b ? Truth.TRUE : Truth.FALSE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

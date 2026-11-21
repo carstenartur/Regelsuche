@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScalarGuardFacts.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">ScalarGuardFacts.java</span></div><h1>ScalarGuardFacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.*;
+import java.util.List;
+
+/** Refinement lattice of possible signs and integral sorts over exact rational values; the empty set records contradiction. */
+<span class="fc" id="L8">public record ScalarGuardFacts(int signs, int integral, boolean defined) {</span>
+<span class="fc" id="L9">    public enum Predicate { NONZERO, POSITIVE, NONNEGATIVE, INTEGER, NATURAL, EXACT_RATIONAL, INVERTIBLE }</span>
+<span class="fc" id="L10">    public enum Truth { TRUE, FALSE, UNKNOWN, CONFLICT }</span>
+    public static final int NEG = 1, ZERO = 2, POS = 4, ALL = 7;
+    private static final int INTEGER = 1, FRACTION = 2;
+<span class="fc" id="L13">    public static final ScalarGuardFacts UNKNOWN = new ScalarGuardFacts(ALL, INTEGER | FRACTION, false);</span>
+<span class="fc" id="L14">    private ScalarGuardFacts(int signs, int integral) { this(signs, integral, true); }</span>
+
+<span class="fc bfc" id="L16" title="All 4 branches covered.">    public ScalarGuardFacts merge(ScalarGuardFacts other) { return new ScalarGuardFacts(signs &amp; other.signs, integral &amp; other.integral, defined || other.defined); }</span>
+<span class="pc bpc" id="L17" title="1 of 4 branches missed.">    public boolean conflict() { return signs == 0 || integral == 0; }</span>
+<span class="fc" id="L18">    public Truth nonzero() { return signQuery(NEG | POS); }</span>
+<span class="fc" id="L19">    public Truth positive() { return signQuery(POS); }</span>
+<span class="nc" id="L20">    public Truth nonnegative() { return signQuery(ZERO | POS); }</span>
+<span class="nc" id="L21">    public Truth invertible() { return nonzero(); }</span>
+<span class="pc bpc" id="L22" title="4 of 8 branches missed.">    public Truth integer() { return conflict() ? Truth.CONFLICT : !defined ? Truth.UNKNOWN : integral == INTEGER ? Truth.TRUE : integral == FRACTION ? Truth.FALSE : Truth.UNKNOWN; }</span>
+    public Truth evaluate(Predicate predicate) {
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        if (conflict()) return Truth.CONFLICT;</span>
+<span class="pc bpc" id="L25" title="4 of 6 branches missed.">        return switch (predicate) {</span>
+<span class="fc" id="L26">            case NONZERO, INVERTIBLE -&gt; nonzero();</span>
+<span class="nc" id="L27">            case POSITIVE -&gt; positive();</span>
+<span class="nc" id="L28">            case NONNEGATIVE -&gt; nonnegative();</span>
+<span class="nc" id="L29">            case INTEGER -&gt; integer();</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            case EXACT_RATIONAL -&gt; defined ? Truth.TRUE : Truth.UNKNOWN;</span>
+<span class="nc bnc" id="L31" title="All 4 branches missed.">            case NATURAL -&gt; integer() == Truth.FALSE || nonnegative() == Truth.FALSE ? Truth.FALSE</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">                : integer() == Truth.TRUE &amp;&amp; nonnegative() == Truth.TRUE ? Truth.TRUE : Truth.UNKNOWN;</span>
+        };
+    }
+    private Truth signQuery(int admitted) {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (conflict()) return Truth.CONFLICT;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (!defined) return Truth.UNKNOWN;</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if ((signs &amp; admitted) == 0) return Truth.FALSE;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        return (signs &amp; ~admitted) == 0 ? Truth.TRUE : Truth.UNKNOWN;</span>
+    }
+
+    public static ScalarGuardFacts of(Expr value,List&lt;Assumption&gt; assumptions) {
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">        return switch(value) {</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            case NumberExpr n -&gt; new ScalarGuardFacts(1 &lt;&lt; (n.value().signum()+1), n.value().isInteger() ? INTEGER : FRACTION);</span>
+<span class="fc" id="L45">            case VariableExpr v -&gt; variable(v.name(),assumptions);</span>
+<span class="fc" id="L46">            case BinaryExpr b -&gt; combine(b.operator(), of(b.left(),assumptions), of(b.right(),assumptions));</span>
+<span class="nc" id="L47">            case FunctionExpr ignored -&gt; UNKNOWN;</span>
+        };
+    }
+
+    public static ScalarGuardFacts variable(String symbol, List&lt;Assumption&gt; assumptions) {
+<span class="fc" id="L52">        var facts = new ScalarGuardFacts(ALL, INTEGER | FRACTION);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (var premise : assumptions) {</span>
+<span class="fc" id="L54">            var refinement = premiseFacts(symbol, premise);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (refinement.defined) facts = facts.merge(refinement);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return facts;</span>
+    }
+
+    private static ScalarGuardFacts premiseFacts(String symbol, Assumption premise) {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!premise.symbols().equals(List.of(symbol))) return UNKNOWN;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (premise.equals(Assumption.positive(symbol))) return new ScalarGuardFacts(POS, INTEGER | FRACTION);</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (premise.equals(Assumption.nonZero(symbol)) || premise.equals(Assumption.invertible(symbol)))</span>
+<span class="fc" id="L64">            return new ScalarGuardFacts(NEG | POS, INTEGER | FRACTION);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (premise.equals(Assumption.nonNegative(symbol))) return new ScalarGuardFacts(ZERO | POS, INTEGER | FRACTION);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (premise.equals(Assumption.natural(symbol)) || premise.equals(Assumption.domainMembership(symbol, &quot;N&quot;)))</span>
+<span class="fc" id="L67">            return new ScalarGuardFacts(ZERO | POS, INTEGER);</span>
+<span class="fc bfc" id="L68" title="All 4 branches covered.">        if (premise.equals(Assumption.integer(symbol)) || premise.equals(Assumption.domainMembership(symbol, &quot;Z&quot;)))</span>
+<span class="fc" id="L69">            return new ScalarGuardFacts(ALL, INTEGER);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        return premise.kind() == Assumption.Kind.CUSTOM_PREDICATE ? customFacts(symbol, premise.expression()) : UNKNOWN;</span>
+    }
+
+    private static ScalarGuardFacts customFacts(String symbol, String expression) {
+<span class="fc" id="L74">        String statement = expression.replace(&quot; &quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">        if (statement.equals(symbol + &quot;=0&quot;) || statement.equals(symbol + &quot;==0&quot;)) return new ScalarGuardFacts(ZERO, INTEGER);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (statement.equals(symbol + &quot;&lt;0&quot;)) return new ScalarGuardFacts(NEG, INTEGER | FRACTION);</span>
+<span class="fc" id="L77">        return UNKNOWN;</span>
+    }
+
+    public static ScalarGuardFacts combine(BinaryOperator op, ScalarGuardFacts left, ScalarGuardFacts right) {
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (left.conflict() || right.conflict()) return new ScalarGuardFacts(0,0);</span>
+<span class="pc bpc" id="L82" title="1 of 10 branches missed.">        if (!left.defined || !right.defined || op == BinaryOperator.POW || op == BinaryOperator.DIV &amp;&amp; (right.signs &amp; ZERO) != 0) return UNKNOWN;</span>
+<span class="fc" id="L83">        int result = 0;</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        for (int x = -1; x &lt;= 1; x++) for (int y = -1; y &lt;= 1; y++) {</span>
+<span class="fc bfc" id="L85" title="All 4 branches covered.">            if ((left.signs &amp; 1 &lt;&lt; x+1) == 0 || (right.signs &amp; 1 &lt;&lt; y+1) == 0) continue;</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            int second = op == BinaryOperator.SUB ? -y : y;</span>
+<span class="fc bfc" id="L87" title="All 4 branches covered.">            if (op == BinaryOperator.MUL || op == BinaryOperator.DIV) result |= 1 &lt;&lt; (x*y+1);</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">            else result |= x == -second &amp;&amp; x != 0 ? ALL : 1 &lt;&lt; (Integer.signum(x+second)+1);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 6 branches missed.">        int sort = op != BinaryOperator.DIV &amp;&amp; left.integral == INTEGER &amp;&amp; right.integral == INTEGER ? INTEGER : 3;</span>
+<span class="fc" id="L91">        return new ScalarGuardFacts(result, sort);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

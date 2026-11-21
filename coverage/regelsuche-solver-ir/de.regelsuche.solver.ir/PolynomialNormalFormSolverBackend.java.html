@@ -162,22 +162,22 @@ import java.util.TreeMap;
 <span class="pc bpc" id="L162" title="1 of 4 branches missed.">        if (!isPolynomial(binary.left()) || !isPolynomial(binary.right())) {</span>
 <span class="fc" id="L163">            return false;</span>
         }
-<span class="pc bpc" id="L165" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc bfc" id="L165" title="All 3 branches covered.">        return switch (binary.operator()) {</span>
 <span class="fc" id="L166">            case ADD, SUBTRACT, MULTIPLY -&gt; true;</span>
 <span class="fc" id="L167">            case DIVIDE -&gt; false;</span>
-<span class="nc" id="L168">            case POWER -&gt; nonNegativeIntegerExponent(binary.right());</span>
+<span class="fc" id="L168">            case POWER -&gt; nonNegativeIntegerExponent(binary.right());</span>
         };
     }
 
     private static boolean nonNegativeIntegerExponent(Expression expression) {
-<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
 <span class="nc" id="L174">            return false;</span>
         }
         try {
-<span class="nc" id="L177">            BigDecimal value = new BigDecimal(literal.value()).stripTrailingZeros();</span>
-<span class="nc bnc" id="L178" title="All 2 branches missed.">            return value.scale() &lt;= 0</span>
-<span class="nc bnc" id="L179" title="All 2 branches missed.">                &amp;&amp; value.signum() &gt;= 0</span>
-<span class="nc bnc" id="L180" title="All 2 branches missed.">                &amp;&amp; value.compareTo(BigDecimal.valueOf(20)) &lt;= 0;</span>
+<span class="fc" id="L177">            BigDecimal value = new BigDecimal(literal.value()).stripTrailingZeros();</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            return value.scale() &lt;= 0</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                &amp;&amp; value.signum() &gt;= 0</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                &amp;&amp; value.compareTo(BigDecimal.valueOf(20)) &lt;= 0;</span>
 <span class="nc" id="L181">        } catch (NumberFormatException exception) {</span>
 <span class="nc" id="L182">            return false;</span>
         }

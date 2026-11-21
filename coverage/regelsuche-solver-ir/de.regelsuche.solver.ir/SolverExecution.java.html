@@ -62,18 +62,18 @@ public record SolverExecution(
     }
 
     public String toCanonicalJson() {
-<span class="nc" id="L65">        return new JsonWriter().beginObject()</span>
-<span class="nc" id="L66">            .property(&quot;schema&quot;, schema)</span>
-<span class="nc" id="L67">            .property(&quot;obligationHash&quot;, obligationHash)</span>
-<span class="nc" id="L68">            .property(&quot;translationHash&quot;, translation.contentHash())</span>
-<span class="nc" id="L69">            .property(&quot;resultHash&quot;, result.contentHash())</span>
-<span class="nc" id="L70">            .property(&quot;backendId&quot;, result.backendId())</span>
-<span class="nc" id="L71">            .property(&quot;backendVersion&quot;, result.backendVersion())</span>
-<span class="nc" id="L72">            .property(&quot;translationStatus&quot;, translation.status().name())</span>
-<span class="nc" id="L73">            .property(&quot;resultStatus&quot;, result.status().name())</span>
-<span class="nc" id="L74">            .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="nc" id="L75">            .endObject()</span>
-<span class="nc" id="L76">            .toString();</span>
+<span class="fc" id="L65">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L66">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L67">            .property(&quot;obligationHash&quot;, obligationHash)</span>
+<span class="fc" id="L68">            .property(&quot;translationHash&quot;, translation.contentHash())</span>
+<span class="fc" id="L69">            .property(&quot;resultHash&quot;, result.contentHash())</span>
+<span class="fc" id="L70">            .property(&quot;backendId&quot;, result.backendId())</span>
+<span class="fc" id="L71">            .property(&quot;backendVersion&quot;, result.backendVersion())</span>
+<span class="fc" id="L72">            .property(&quot;translationStatus&quot;, translation.status().name())</span>
+<span class="fc" id="L73">            .property(&quot;resultStatus&quot;, result.status().name())</span>
+<span class="fc" id="L74">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L75">            .endObject()</span>
+<span class="fc" id="L76">            .toString();</span>
     }
 
     private static String hash(

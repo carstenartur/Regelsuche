@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedProofDag.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">ScopedProofDag.java</span></div><h1>ScopedProofDag.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.List;
+import java.util.Objects;
+
+/** Bounded proof proposals over a v2 obligation. Mathematical typing belongs to the checked backend. */
+public final class ScopedProofDag {
+<span class="fc" id="L11">    public enum Rule {</span>
+<span class="fc" id="L12">        DECLARATION(0), PREMISE(0), LOCAL(0), ZERO(0), SUCC(1),</span>
+<span class="fc" id="L13">        INTRO(1), APPLY(2), SPECIALIZE(2), HAVE(2), LET(2), UNFOLD(1),</span>
+<span class="fc" id="L14">        PAIR(2), WITNESS(2), CASES(3), BY_CONTRADICTION(2), REWRITE(2),</span>
+<span class="fc" id="L15">        INDUCTION(2), STRONG_INDUCTION(1), DECREASE(2), NORMALIZE(0), SOLVE_LEAF(0);</span>
+        private final int arity;
+<span class="fc" id="L17">        Rule(int arity) { this.arity = arity; }</span>
+    }
+<span class="fc" id="L19">    public enum Local { VARIABLE, DEFINITION, SMALLER_CASES }</span>
+    public record Node(Rule rule, int operand, List&lt;Integer&gt; children) {
+<span class="fc" id="L21">        public Node {</span>
+<span class="fc" id="L22">            Objects.requireNonNull(rule);</span>
+<span class="fc" id="L23">            children = List.copyOf(children);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            if (children.size() != rule.arity) throw new IllegalArgumentException(&quot;wrong proof-rule arity&quot;);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            boolean indexed = switch (rule) {</span>
+<span class="fc" id="L26">                case DECLARATION, PREMISE, LOCAL, UNFOLD, INDUCTION -&gt; true;</span>
+<span class="fc" id="L27">                default -&gt; false;</span>
+            };
+<span class="pc bpc" id="L29" title="2 of 6 branches missed.">            if (indexed ? operand &lt; 0 : operand != -1) throw new IllegalArgumentException(&quot;invalid proof-rule operand&quot;);</span>
+<span class="fc" id="L30">        }</span>
+<span class="fc" id="L31">        public static Node of(Rule rule, int... children) { return indexed(rule, -1, children); }</span>
+        public static Node indexed(Rule rule, int operand, int... children) {
+<span class="fc" id="L33">            return new Node(rule, operand, java.util.Arrays.stream(children).boxed().toList());</span>
+        }
+<span class="fc" id="L35">        public static Node local(int index) { return indexed(Rule.LOCAL, index); }</span>
+<span class="nc" id="L36">        public static Node premise(int index) { return indexed(Rule.PREMISE, index); }</span>
+    }
+
+    public interface Fold&lt;T&gt; { T apply(Node node, List&lt;Local&gt; scope, List&lt;T&gt; children); }
+
+    public static final String SCHEMA = &quot;regelsuche.scoped-proof-dag/v1&quot;;
+    private final Obligation obligation;
+    private final List&lt;Node&gt; nodes;
+
+<span class="fc" id="L45">    private ScopedProofDag(Obligation obligation, List&lt;Node&gt; nodes) {</span>
+<span class="pc bpc" id="L46" title="3 of 6 branches missed.">        if (!SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()) || nodes.isEmpty() || nodes.size() &gt; 128)</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;scoped DAG requires a bounded v2 obligation&quot;);</span>
+<span class="fc" id="L48">        this.obligation = obligation;</span>
+<span class="fc" id="L49">        this.nodes = List.copyOf(nodes);</span>
+<span class="fc" id="L50">        fold((node, scope, children) -&gt; Boolean.TRUE);</span>
+<span class="fc" id="L51">    }</span>
+<span class="fc" id="L52">    public static ScopedProofDag create(Obligation obligation, List&lt;Node&gt; nodes) { return new ScopedProofDag(obligation, nodes); }</span>
+<span class="nc" id="L53">    public Obligation obligation() { return obligation; }</span>
+<span class="nc" id="L54">    public List&lt;Node&gt; nodes() { return nodes; }</span>
+<span class="nc" id="L55">    public String hash() { return SolverIr.sha256(canonical()); }</span>
+
+    public &lt;T&gt; T fold(Fold&lt;T&gt; operator) {
+<span class="fc" id="L58">        var observed = new BitSet(nodes.size());</span>
+<span class="fc" id="L59">        T result = visit(nodes.size()-1, List.of(), operator, new int[]{0}, observed);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (observed.cardinality() != nodes.size()) throw new IllegalArgumentException(&quot;unreachable proof nodes&quot;);</span>
+<span class="fc" id="L61">        return result;</span>
+    }
+    private &lt;T&gt; T visit(int i, List&lt;Local&gt; scope, Fold&lt;T&gt; fold, int[] work, BitSet observed) {
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        if (++work[0] &gt; 512 || scope.size() &gt; 64) throw new IllegalArgumentException(&quot;proof expansion budget exhausted&quot;);</span>
+<span class="fc" id="L65">        observed.set(i);</span>
+<span class="fc" id="L66">        Node node = nodes.get(i);</span>
+<span class="fc" id="L67">        checkOperand(node, scope);</span>
+<span class="fc" id="L68">        var values = new ArrayList&lt;T&gt;();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int n = 0; n &lt; node.children().size(); n++) {</span>
+<span class="fc" id="L70">            int child = node.children().get(n);</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">            if (child &lt; 0 || child &gt;= i) throw new IllegalArgumentException(&quot;non-topological proof edge&quot;);</span>
+<span class="fc" id="L72">            values.add(visit(child, childScope(scope, node.rule(), n), fold, work, observed));</span>
+        }
+<span class="fc" id="L74">        return fold.apply(node, scope, List.copyOf(values));</span>
+    }
+
+    private void checkOperand(Node node, List&lt;Local&gt; scope) {
+<span class="fc" id="L78">        int index = node.operand();</span>
+<span class="pc bpc" id="L79" title="4 of 7 branches missed.">        boolean valid = switch (node.rule()) {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            case DECLARATION -&gt; index &lt; obligation.declarations().size();</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            case PREMISE -&gt; index &lt; obligation.assumptions().size();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            case INDUCTION -&gt; index &lt; obligation.declarations().size()</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                &amp;&amp; obligation.declarations().get(index).sort() == SolverIr.Sort.NAT_PREDICATE;</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">            case LOCAL -&gt; index &lt; scope.size() &amp;&amp; scope.get(index) != Local.SMALLER_CASES;</span>
+<span class="nc bnc" id="L85" title="All 4 branches missed.">            case UNFOLD -&gt; index &lt; scope.size() &amp;&amp; scope.get(index) == Local.DEFINITION;</span>
+<span class="fc" id="L86">            case DECREASE -&gt; scope.contains(Local.SMALLER_CASES);</span>
+<span class="fc" id="L87">            default -&gt; true;</span>
+        };
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (!valid) throw new IllegalArgumentException(&quot;unavailable or incorrectly scoped proof operand&quot;);</span>
+<span class="fc" id="L90">    }</span>
+
+    private static List&lt;Local&gt; childScope(List&lt;Local&gt; scope, Rule rule, int child) {
+<span class="pc bpc" id="L93" title="2 of 5 branches missed.">        return switch (rule) {</span>
+<span class="fc" id="L94">            case INTRO, BY_CONTRADICTION -&gt; extend(scope, Local.VARIABLE);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            case HAVE, CASES -&gt; child == 0 ? scope : extend(scope, Local.VARIABLE);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            case LET -&gt; child == 0 ? scope : extend(scope, Local.DEFINITION);</span>
+<span class="fc" id="L97">            case STRONG_INDUCTION -&gt; extend(extend(scope, Local.VARIABLE), Local.SMALLER_CASES);</span>
+<span class="fc" id="L98">            default -&gt; scope;</span>
+        };
+    }
+    private static List&lt;Local&gt; extend(List&lt;Local&gt; scope, Local local) {
+<span class="fc" id="L102">        var next = new ArrayList&lt;Local&gt;();</span>
+<span class="fc" id="L103">        next.add(local); next.addAll(scope);</span>
+<span class="fc" id="L104">        return List.copyOf(next);</span>
+    }
+
+    public String canonical() {
+<span class="fc" id="L108">        var result = new StringBuilder(SCHEMA).append('\n').append(obligation.contentHash()).append('\n');</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (var node : nodes) {</span>
+<span class="fc" id="L110">            result.append(node.rule()).append(' ').append(node.operand());</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            for (int edge : node.children()) result.append(' ').append(edge);</span>
+<span class="fc" id="L112">            result.append('\n');</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        return result.toString();</span>
+    }
+
+    public static ScopedProofDag read(Obligation obligation, String text) {
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (text.length() &gt; 16_384) throw new IllegalArgumentException(&quot;proof document exceeds limit&quot;);</span>
+<span class="fc" id="L119">        var lines = text.lines().toList();</span>
+<span class="pc bpc" id="L120" title="3 of 6 branches missed.">        if (lines.size() &lt; 3 || lines.size() &gt; 130 || !lines.get(0).equals(SCHEMA)</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                || !lines.get(1).equals(obligation.contentHash())) throw new IllegalArgumentException(&quot;proof obligation differs&quot;);</span>
+<span class="fc" id="L122">        var nodes = new ArrayList&lt;Node&gt;();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (String line : lines.subList(2,lines.size())) {</span>
+<span class="fc" id="L124">            var fields = line.split(&quot; &quot;, -1);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (fields.length &lt; 2) throw new IllegalArgumentException(&quot;malformed proof node&quot;);</span>
+<span class="fc" id="L126">            var rule = Rule.valueOf(fields[0]);</span>
+<span class="fc" id="L127">            var numbers = java.util.Arrays.stream(fields,1,fields.length).map(Integer::valueOf).toList();</span>
+<span class="fc" id="L128">            nodes.add(new Node(rule,numbers.getFirst(),numbers.subList(1,numbers.size())));</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        var dag = create(obligation, nodes);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (!dag.canonical().equals(text)) throw new IllegalArgumentException(&quot;noncanonical proof document&quot;);</span>
+<span class="fc" id="L132">        return dag;</span>
+    }
+<span class="pc bpc" id="L134" title="3 of 6 branches missed.">    @Override public boolean equals(Object o) { return o instanceof ScopedProofDag d &amp;&amp; obligation.equals(d.obligation) &amp;&amp; nodes.equals(d.nodes); }</span>
+<span class="nc" id="L135">    @Override public int hashCode() { return Objects.hash(obligation, nodes); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedLogicDiscoveryDomain.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">ScopedLogicDiscoveryDomain.java</span></div><h1>ScopedLogicDiscoveryDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.solver.ir.ScopedProofDag;
+import de.regelsuche.solver.ir.ScopedProofSearch;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIrJsonCodec;
+import de.regelsuche.solver.ir.ScopedProofExecutor;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+
+/** Source-only proposals, independently evaluated finite countermodels and separate, rebuilt kernel proofs. */
+public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain&lt;ScopedLogicDiscoveryDomain.State,ScopedProofDag,ScopedLogicDiscoveryDomain.Certificate&gt; {
+    public record State(Obligation context, ScopedProofDag proposal, int cumulativeWork, boolean exhausted) {
+<span class="fc" id="L20">        public State {</span>
+<span class="fc" id="L21">            Objects.requireNonNull(context);</span>
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">            if (!SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(context.schema()) || cumulativeWork &lt; 0)</span>
+<span class="nc" id="L23">                throw new IllegalArgumentException(&quot;invalid scoped state&quot;);</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (proposal != null) {</span>
+<span class="fc" id="L25">                var receiving = Obligation.create(context.obligationId(), context.declarations(), context.theories(), context.assumptions(),</span>
+<span class="fc" id="L26">                    proposal.obligation().goal(),context.requestedEvidence(),context.provenance());</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">                if (!receiving.equals(proposal.obligation())) throw new IllegalArgumentException(&quot;proposal changed source context&quot;);</span>
+            }
+<span class="fc" id="L29">        }</span>
+    }
+
+    /** Issued only after both the original kernel execution and the independent reconstruction succeed. */
+    public static final class Certificate {
+        private final ScopedProofDag dag;
+        private final String kernel, rebuild;
+        private final Path kernelDirectory, rebuildDirectory;
+<span class="nc" id="L37">        private Certificate(ScopedProofDag dag, ScopedProofExecutor.VerifiedReplay receipt) {</span>
+<span class="nc" id="L38">            this.dag = dag; this.kernel = receipt.kernelHash(); rebuild = receipt.rebuildHash();</span>
+<span class="nc" id="L39">            kernelDirectory = receipt.kernelDirectory(); rebuildDirectory = receipt.rebuildDirectory();</span>
+<span class="nc" id="L40">        }</span>
+<span class="nc" id="L41">        public ScopedProofDag dag() { return dag; }</span>
+<span class="nc" id="L42">        public String kernelHash() { return kernel; }</span>
+<span class="nc" id="L43">        public String rebuildHash() { return rebuild; }</span>
+<span class="nc" id="L44">        public Path kernelDirectory() { return kernelDirectory; }</span>
+<span class="nc" id="L45">        public Path rebuildDirectory() { return rebuildDirectory; }</span>
+<span class="nc" id="L46">        String canonical() { return dag.canonical() + kernel + &quot;\n&quot; + rebuild; }</span>
+    }
+
+    private final ScopedProofExecutor verifier;
+    private final int formationBudget;
+
+<span class="fc" id="L52">    public ScopedLogicDiscoveryDomain(ScopedProofExecutor verifier, int formationBudget) {</span>
+<span class="fc" id="L53">        this.verifier = Objects.requireNonNull(verifier);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (formationBudget &lt; 0 || formationBudget &gt; 65536) throw new IllegalArgumentException(&quot;invalid formation budget&quot;);</span>
+<span class="fc" id="L55">        this.formationBudget = formationBudget;</span>
+<span class="fc" id="L56">    }</span>
+<span class="fc" id="L57">    @Override public String domainId() { return &quot;scoped-logic&quot;; }</span>
+<span class="fc" id="L58">    @Override public String revision() { return &quot;v1&quot;; }</span>
+<span class="fc" id="L59">    @Override public String stateType() { return &quot;scoped-proof-state/v1&quot;; }</span>
+<span class="fc" id="L60">    @Override public String candidateType() { return ScopedProofDag.SCHEMA; }</span>
+<span class="fc" id="L61">    @Override public String certificateType() { return &quot;scoped-kernel-rebuild/v1&quot;; }</span>
+
+    @Override public StateGenerator&lt;State&gt; generator() {
+<span class="fc" id="L64">        return new StateGenerator&lt;&gt;() {</span>
+<span class="fc" id="L65">            public String id() { return &quot;scoped-context/v1&quot;; }</span>
+            public List&lt;State&gt; generate(DiscoverySeed seed) {
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">                if (!seed.domainId().equals(domainId()) || seed.payload().length()&gt;1_000_000) throw new IllegalArgumentException(&quot;invalid scoped seed&quot;);</span>
+<span class="fc" id="L68">                var context = new SolverIrJsonCodec().readObligation(seed.payload());</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">                if (context.declarations().size()&gt;32 || context.assumptions().size()&gt;32)</span>
+<span class="nc" id="L70">                    throw new IllegalArgumentException(&quot;bounded logical domain permits at most 32 declarations and assumptions&quot;);</span>
+<span class="fc" id="L71">                return List.of(new State(context,null,0,false));</span>
+            }
+        };
+    }
+    private static &lt;T&gt; CanonicalCodec&lt;T&gt; codec(String id, Function&lt;T,String&gt; encode) {
+<span class="fc" id="L76">        return new CanonicalCodec&lt;&gt;() {</span>
+<span class="fc" id="L77">            public String id() { return id; }</span>
+<span class="fc" id="L78">            public String canonicalForm(T input) { return encode.apply(input); }</span>
+        };
+    }
+    @Override public CanonicalCodec&lt;State&gt; stateCodec() {
+<span class="fc" id="L82">        return codec(stateType(), s -&gt; s.context().toCanonicalJson()+&quot;\n&quot;+s.cumulativeWork()+&quot;\n&quot;+s.exhausted()+&quot;\n&quot;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            +(s.proposal()==null?&quot;&quot;:s.proposal().canonical()));</span>
+    }
+    @Override public CanonicalCodec&lt;ScopedProofDag&gt; candidateCodec() {
+<span class="fc" id="L86">        return codec(candidateType(),p -&gt; p.obligation().toCanonicalJson()+&quot;\n&quot;+p.canonical());</span>
+    }
+<span class="fc" id="L88">    @Override public CanonicalCodec&lt;Certificate&gt; certificateCodec() { return codec(certificateType(),Certificate::canonical); }</span>
+    @Override public List&lt;Invariant&lt;State&gt;&gt; invariants() {
+<span class="fc" id="L90">        return List.of(new Invariant&lt;&gt;() {</span>
+<span class="fc" id="L91">            public String id() { return &quot;scoped-work-bound/v1&quot;; }</span>
+            public InvariantResult check(State state) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                return state.cumulativeWork() &lt;= formationBudget ? InvariantResult.pass() : InvariantResult.fail(&quot;formation budget exceeded&quot;);</span>
+            }
+        });
+    }
+    @Override public List&lt;TransitionOperator&lt;State&gt;&gt; operators() {
+<span class="fc" id="L98">        return List.of(new TransitionOperator&lt;&gt;() {</span>
+<span class="fc" id="L99">            public String id() { return &quot;form-scoped-consequences/v1&quot;; }</span>
+            public List&lt;Successor&lt;State&gt;&gt; apply(State s) {
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">                if (s.proposal()!=null || s.exhausted()) return List.of();</span>
+<span class="fc" id="L102">                var report = ScopedProofSearch.discover(s.context(),formationBudget);</span>
+<span class="fc" id="L103">                var outputs = new java.util.ArrayList&lt;Successor&lt;State&gt;&gt;();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                for (var p : report.proposals()) {</span>
+<span class="fc" id="L105">                    var next = new State(s.context(),p.dag(),p.formationWork(),false);</span>
+<span class="fc" id="L106">                    outputs.add(new Successor&lt;&gt;(&quot;propose-scoped-dag&quot;,next,p.formationWork(),false,List.of(),</span>
+<span class="fc" id="L107">                        Map.of(&quot;attemptedWork&quot;,Integer.toString(report.work()),&quot;formationExhausted&quot;,Boolean.toString(report.exhausted()))));</span>
+<span class="fc" id="L108">                }</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                if (report.exhausted()) outputs.add(new Successor&lt;&gt;(&quot;formation-budget-exhausted&quot;,</span>
+<span class="nc" id="L110">                    new State(s.context(),null,report.work(),true),report.work(),false,List.of(),Map.of()));</span>
+<span class="fc" id="L111">                return List.copyOf(outputs);</span>
+            }
+        });
+    }
+    @Override public Objective&lt;State&gt; objective() {
+<span class="fc" id="L116">        return new Objective&lt;&gt;() {</span>
+<span class="fc" id="L117">            public String id() { return &quot;replayable-proof/v1&quot;; }</span>
+            public ObjectiveAssessment assess(State s) {
+<span class="fc bfc" id="L119" title="All 4 branches covered.">                return new ObjectiveAssessment(s.proposal()==null?0:1,s.proposal()!=null,</span>
+<span class="fc" id="L120">                    Map.of(&quot;formationWork&quot;,Integer.toString(s.cumulativeWork()),&quot;formationExhausted&quot;,Boolean.toString(s.exhausted())));</span>
+            }
+        };
+    }
+    @Override public CandidateExtractor&lt;State,ScopedProofDag&gt; candidateExtractor() {
+<span class="fc" id="L125">        return new CandidateExtractor&lt;&gt;() {</span>
+<span class="fc" id="L126">            public String id() { return &quot;scoped-plan/v1&quot;; }</span>
+            public ScopedProofDag extract(CandidateContext&lt;State&gt; c) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (!c.initialState().context().equals(c.currentState().context())) throw new IllegalArgumentException(&quot;different proof context&quot;);</span>
+<span class="fc" id="L129">                return Objects.requireNonNull(c.currentState().proposal(),&quot;no proof proposal&quot;);</span>
+            }
+        };
+    }
+<span class="fc" id="L133">    @Override public CounterexampleGenerator&lt;ScopedProofDag&gt; counterexampleGenerator() { return new ScopedTruthAssignments(verifier::supports); }</span>
+    @Override public CandidateEvaluator&lt;ScopedProofDag,Certificate&gt; evaluator() {
+<span class="fc" id="L135">        return new CandidateEvaluator&lt;&gt;() {</span>
+<span class="fc" id="L136">            public String id() { return &quot;independent-lean-rebuild/v1&quot;; }</span>
+<span class="fc" id="L137">            public Evaluation&lt;Certificate&gt; evaluate(ScopedProofDag dag) { return receive(dag); }</span>
+        };
+    }
+
+    private Evaluation&lt;Certificate&gt; receive(ScopedProofDag dag) {
+        try {
+<span class="fc" id="L143">            var checked = verifier.verify(dag);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (!dag.hash().equals(checked.proposalHash())) {</span>
+<span class="nc" id="L145">                return Evaluation.inconclusive(&quot;Checked proof receipt is bound to another proposal&quot;,</span>
+<span class="nc" id="L146">                    Map.of(&quot;proposal&quot;, dag.hash(), &quot;receiptProposal&quot;, checked.proposalHash()));</span>
+            }
+<span class="fc" id="L148">            var evidence = Map.of(&quot;proposal&quot;, dag.hash(), &quot;kernelStatus&quot;, checked.status().name());</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (checked.status() == ResultStatus.UNSUPPORTED)</span>
+<span class="nc" id="L150">                return Evaluation.unsupported(checked.message(), evidence);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (checked.status() != ResultStatus.CONFIRMED)</span>
+<span class="fc" id="L152">                return Evaluation.inconclusive(checked.message(), evidence);</span>
+<span class="nc" id="L153">            var certificate = new Certificate(dag, checked);</span>
+<span class="nc" id="L154">            return Evaluation.confirmed(certificate, &quot;Scoped theorem checked in both pinned projects&quot;, evidence);</span>
+<span class="nc" id="L155">        } catch (RuntimeException refusal) {</span>
+<span class="nc" id="L156">            return Evaluation.inconclusive(&quot;Checked proof receiver failed: &quot; + refusal,</span>
+<span class="nc" id="L157">                Map.of(&quot;proposal&quot;, dag.hash()));</span>
+        }
+    }
+    @Override public CertificateRenderer&lt;Certificate&gt; certificateRenderer() {
+<span class="fc" id="L161">        return new CertificateRenderer&lt;&gt;() {</span>
+<span class="fc" id="L162">            public String id() { return &quot;scoped-proof-receipt/v1&quot;; }</span>
+<span class="nc" id="L163">            public CertificateRendering render(Certificate c) { return new CertificateRendering(certificateType(),&quot;text&quot;,c.canonical()); }</span>
+        };
+    }
+    @Override public EvidenceAdapter&lt;State,ScopedProofDag,Certificate&gt; evidenceAdapter() {
+<span class="fc" id="L167">        return new EvidenceAdapter&lt;&gt;() {</span>
+<span class="fc" id="L168">            public String id() { return &quot;scoped-proof-evidence/v1&quot;; }</span>
+            public DomainPayload adapt(Optional&lt;State&gt; initial,Optional&lt;ScopedProofDag&gt; candidate,Optional&lt;Certificate&gt; certificate) {
+<span class="fc" id="L170">                return new DomainPayload(domainId(),Map.of(&quot;source&quot;,initial.map(s-&gt;s.context().contentHash()).orElse(&quot;&quot;),</span>
+<span class="fc" id="L171">                    &quot;proposal&quot;,candidate.map(ScopedProofDag::hash).orElse(&quot;&quot;),&quot;kernel&quot;,certificate.map(Certificate::kernelHash).orElse(&quot;&quot;),</span>
+<span class="fc" id="L172">                    &quot;independentRebuild&quot;,certificate.map(Certificate::rebuildHash).orElse(&quot;&quot;)));</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

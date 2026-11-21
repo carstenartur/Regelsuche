@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScalarPolynomialProofWitness.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">ScalarPolynomialProofWitness.java</span></div><h1>ScalarPolynomialProofWitness.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.egraph.proof.ScalarCertificateCodec;
+import de.regelsuche.egraph.proof.ScalarExtractionProof;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.Optional;
+
+/** Reconstructs the exact selected obligation and reruns the bounded native backend on the receiving side. */
+<span class="fc" id="L13">public final class ScalarPolynomialProofWitness implements ScalarExtractionProof.BackendVerifier {</span>
+    public static final String ID = &quot;polynomial-normal-form/1&quot;;
+    public Optional&lt;ScalarExtractionProof.BackendWitness&gt; execute(ScalarExtractionProof.Context context,Expr left,Expr right) {
+<span class="fc" id="L16">        String source=ExpressionFormatter.format(left), target=ExpressionFormatter.format(right);</span>
+<span class="pc bpc" id="L17" title="1 of 4 branches missed.">        if (!admitted(source) || !admitted(target)) return Optional.empty();</span>
+        try {
+<span class="fc" id="L19">            var obligation = new SolverObligationFactory().equality(&quot;native-scalar-equality&quot;,source,target,</span>
+<span class="fc" id="L20">                context.assumptions().stream().map(Assumption::expression).toList(),SolverIr.RequestedEvidence.SYMBOLIC_CERTIFICATE,</span>
+<span class="fc" id="L21">                new SolverIr.SourceProvenance(&quot;native-scalar-egraph&quot;,ScalarCertificateCodec.SCHEMA,ScalarCertificateCodec.contextHash(context)));</span>
+<span class="fc" id="L22">            var execution = new PolynomialNormalFormSolverBackend().execute(obligation);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (execution.result().status() != SolverIr.ResultStatus.CONFIRMED) return Optional.empty();</span>
+<span class="fc" id="L24">            return Optional.of(new ScalarExtractionProof.BackendWitness(ID,obligation.toCanonicalJson(),execution.toCanonicalJson(),execution.result().toCanonicalJson()));</span>
+<span class="nc" id="L25">        } catch (IllegalArgumentException unsupported) { return Optional.empty(); }</span>
+    }
+    private static boolean admitted(String expression) {
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (expression.length()&gt;256) return false;</span>
+<span class="fc" id="L29">        return new ExactParsedUnivariatePolynomialView().analyze(new ExpressionParser().parseExactTerm(expression)).supported();</span>
+    }
+    @Override public boolean verify(ScalarExtractionProof.Context context,Expr source,Expr target,ScalarExtractionProof.BackendWitness witness) {
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">        return ID.equals(witness.backend()) &amp;&amp; execute(context,source,target).filter(witness::equals).isPresent();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

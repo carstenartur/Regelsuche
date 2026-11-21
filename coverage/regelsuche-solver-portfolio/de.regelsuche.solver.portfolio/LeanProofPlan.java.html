@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LeanProofPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">LeanProofPlan.java</span></div><h1>LeanProofPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.ScopedProofDag;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+
+/** The two closed, reconstructible proposal languages accepted by the real Lean boundary. */
+sealed interface LeanProofPlan permits LeanLemmaPlan, LeanDagPlan {
+    String fileName();
+    String material();
+    String proof();
+<span class="nc" id="L16">    default String hash() { return SolverIr.sha256(material()); }</span>
+<span class="fc" id="L17">    default boolean accepts(Obligation obligation) { return SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()); }</span>
+<span class="nc" id="L18">    default void verifyAudit(LeanSolverBackend.AuditDocument audit) throws IOException { }</span>
+
+    static LeanProofPlan read(Obligation request, Path directory) throws IOException {
+<span class="fc" id="L21">        var lemma = LeanLemmaPlan.retained(directory);</span>
+<span class="fc" id="L22">        Path file = directory.resolve(LeanDagPlan.FILE);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (Files.notExists(file, LinkOption.NOFOLLOW_LINKS)) return lemma;</span>
+<span class="nc bnc" id="L24" title="All 6 branches missed.">        if (lemma != null || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) &gt; 16_384)</span>
+<span class="nc" id="L25">            throw new IOException(&quot;ambiguous or invalid retained proof DAG&quot;);</span>
+<span class="nc" id="L26">        try { return new LeanDagPlan(ScopedProofDag.read(request, Files.readString(file))); }</span>
+<span class="nc" id="L27">        catch (IllegalArgumentException invalid) { throw new IOException(&quot;malformed retained proof DAG&quot;, invalid); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

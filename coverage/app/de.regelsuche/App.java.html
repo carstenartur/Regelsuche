@@ -27,126 +27,131 @@ import java.util.Optional;
         }
 
 <span class="fc" id="L29">        String firstArg = args[0].trim();</span>
-<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (&quot;showcase-train-preflight&quot;.equals(firstArg)) {</span>
-<span class="nc" id="L31">            ProofCarryingShowcaseTrainPreflightCommand.main(</span>
-<span class="nc" id="L32">                Arrays.copyOfRange(args, 1, args.length));</span>
-<span class="nc" id="L33">            return;</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (&quot;scalar-saturation&quot;.equals(firstArg)) {</span>
+<span class="nc" id="L31">            de.regelsuche.solver.ir.NativeScalarCommand.main(Arrays.copyOfRange(args,1,args.length));</span>
+<span class="nc" id="L32">            return;</span>
         }
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (&quot;showcase-train-freeze&quot;.equals(firstArg)) {</span>
-<span class="nc" id="L36">            ProofCarryingShowcaseTrainAndFreezeCommand.main(</span>
-<span class="nc" id="L37">                Arrays.copyOfRange(args, 1, args.length));</span>
-<span class="nc" id="L38">            return;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (&quot;showcase-train-preflight&quot;.equals(firstArg)) {</span>
+<span class="nc" id="L35">            ProofCarryingShowcaseTrainPreflightCommand.main(</span>
+<span class="nc" id="L36">                Arrays.copyOfRange(args, 1, args.length));</span>
+<span class="nc" id="L37">            return;</span>
         }
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (CliRouter.isSubcommand(firstArg)) {</span>
-<span class="nc" id="L41">            int exit = new CliRouter().run(args);</span>
-<span class="nc bnc" id="L42" title="All 2 branches missed.">            if (exit != 0) {</span>
-<span class="nc" id="L43">                System.exit(exit);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (&quot;showcase-train-freeze&quot;.equals(firstArg)) {</span>
+<span class="nc" id="L40">            ProofCarryingShowcaseTrainAndFreezeCommand.main(</span>
+<span class="nc" id="L41">                Arrays.copyOfRange(args, 1, args.length));</span>
+<span class="nc" id="L42">            return;</span>
+        }
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (CliRouter.isSubcommand(firstArg)) {</span>
+<span class="nc" id="L45">            int exit = new CliRouter().run(args);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            if (exit != 0) {</span>
+<span class="nc" id="L47">                System.exit(exit);</span>
             }
-<span class="nc" id="L45">            return;</span>
+<span class="nc" id="L49">            return;</span>
         }
 
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (args.length &lt; 2) {</span>
-<span class="nc" id="L49">            printUsage();</span>
-<span class="nc" id="L50">            return;</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (args.length &lt; 2) {</span>
+<span class="nc" id="L53">            printUsage();</span>
+<span class="nc" id="L54">            return;</span>
         }
 
         InputType type;
         try {
-<span class="fc" id="L55">            type = InputType.valueOf(firstArg.toUpperCase(Locale.ROOT));</span>
-<span class="fc" id="L56">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L57">            printUsage();</span>
-<span class="fc" id="L58">            return;</span>
-<span class="fc" id="L59">        }</span>
-<span class="fc" id="L60">        String expression = String.join(</span>
+<span class="fc" id="L59">            type = InputType.valueOf(firstArg.toUpperCase(Locale.ROOT));</span>
+<span class="fc" id="L60">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L61">            printUsage();</span>
+<span class="fc" id="L62">            return;</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        String expression = String.join(</span>
             &quot; &quot;,
-<span class="fc" id="L62">            Arrays.copyOfRange(args, 1, args.length));</span>
+<span class="fc" id="L66">            Arrays.copyOfRange(args, 1, args.length));</span>
 
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (type == InputType.SYSTEM) {</span>
-<span class="fc" id="L65">            analyzeEquationSystem(expression);</span>
-<span class="fc" id="L66">            return;</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (type == InputType.SYSTEM) {</span>
+<span class="fc" id="L69">            analyzeEquationSystem(expression);</span>
+<span class="fc" id="L70">            return;</span>
         }
 
-<span class="nc" id="L69">        try (ExpressionGraphStore store = createStore()) {</span>
-<span class="nc" id="L70">            TransformationSearchService service =</span>
+<span class="nc" id="L73">        try (ExpressionGraphStore store = createStore()) {</span>
+<span class="nc" id="L74">            TransformationSearchService service =</span>
                 new TransformationSearchService(
                     new SymPyTransformationEngine(),
                     store,
                     new SearchHeuristic(5, 500, 2),
                     new ConsoleNotifier());
 
-<span class="nc" id="L77">            service.submit(new InputRequest(type, expression)).join();</span>
-<span class="nc" id="L78">            Optional&lt;SimplificationSuccess&gt; best = service.getBestSolution();</span>
-<span class="nc" id="L79">            GraphSnapshot snapshot = service.getGraphSnapshot();</span>
+<span class="nc" id="L81">            service.submit(new InputRequest(type, expression)).join();</span>
+<span class="nc" id="L82">            Optional&lt;SimplificationSuccess&gt; best = service.getBestSolution();</span>
+<span class="nc" id="L83">            GraphSnapshot snapshot = service.getGraphSnapshot();</span>
 
-<span class="nc" id="L81">            best.ifPresentOrElse(</span>
-<span class="nc" id="L82">                success -&gt; System.out.println(</span>
+<span class="nc" id="L85">            best.ifPresentOrElse(</span>
+<span class="nc" id="L86">                success -&gt; System.out.println(</span>
                     &quot;Best simplification: &quot;
-<span class="nc" id="L84">                        + success.simplifiedExpression()),</span>
-<span class="nc" id="L85">                () -&gt; System.out.println(&quot;No simplification found yet&quot;));</span>
-<span class="nc" id="L86">            System.out.println(</span>
-<span class="nc" id="L87">                &quot;Graph nodes: &quot; + snapshot.nodes().size()</span>
-<span class="nc" id="L88">                    + &quot;, edges: &quot; + snapshot.edges().size());</span>
-<span class="nc" id="L89">            service.shutdown();</span>
+<span class="nc" id="L88">                        + success.simplifiedExpression()),</span>
+<span class="nc" id="L89">                () -&gt; System.out.println(&quot;No simplification found yet&quot;));</span>
+<span class="nc" id="L90">            System.out.println(</span>
+<span class="nc" id="L91">                &quot;Graph nodes: &quot; + snapshot.nodes().size()</span>
+<span class="nc" id="L92">                    + &quot;, edges: &quot; + snapshot.edges().size());</span>
+<span class="nc" id="L93">            service.shutdown();</span>
         }
-<span class="nc" id="L91">    }</span>
+<span class="nc" id="L95">    }</span>
 
     private static void analyzeEquationSystem(String expression) {
         try {
-<span class="fc" id="L95">            EquationSystemRepresentationService.Analysis analysis =</span>
-<span class="fc" id="L96">                new EquationSystemRepresentationService().analyze(expression);</span>
-<span class="fc" id="L97">            System.out.println(analysis.renderSummary());</span>
-<span class="nc" id="L98">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L99">            System.out.println(</span>
-<span class="nc" id="L100">                &quot;Invalid equation system: &quot; + exception.getMessage());</span>
-<span class="fc" id="L101">        }</span>
-<span class="fc" id="L102">    }</span>
+<span class="fc" id="L99">            EquationSystemRepresentationService.Analysis analysis =</span>
+<span class="fc" id="L100">                new EquationSystemRepresentationService().analyze(expression);</span>
+<span class="fc" id="L101">            System.out.println(analysis.renderSummary());</span>
+<span class="nc" id="L102">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L103">            System.out.println(</span>
+<span class="nc" id="L104">                &quot;Invalid equation system: &quot; + exception.getMessage());</span>
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">    }</span>
 
     private static ExpressionGraphStore createStore() {
-<span class="nc" id="L105">        String uri = System.getenv(&quot;NEO4J_URI&quot;);</span>
-<span class="nc" id="L106">        String user = System.getenv(&quot;NEO4J_USER&quot;);</span>
-<span class="nc" id="L107">        String password = System.getenv(&quot;NEO4J_PASSWORD&quot;);</span>
-<span class="nc bnc" id="L108" title="All 8 branches missed.">        if (uri != null &amp;&amp; !uri.isBlank()</span>
+<span class="nc" id="L109">        String uri = System.getenv(&quot;NEO4J_URI&quot;);</span>
+<span class="nc" id="L110">        String user = System.getenv(&quot;NEO4J_USER&quot;);</span>
+<span class="nc" id="L111">        String password = System.getenv(&quot;NEO4J_PASSWORD&quot;);</span>
+<span class="nc bnc" id="L112" title="All 8 branches missed.">        if (uri != null &amp;&amp; !uri.isBlank()</span>
                 &amp;&amp; user != null &amp;&amp; password != null) {
-<span class="nc" id="L110">            return new Neo4jExpressionGraphStore(uri, user, password);</span>
+<span class="nc" id="L114">            return new Neo4jExpressionGraphStore(uri, user, password);</span>
         }
-<span class="nc" id="L112">        return new InMemoryExpressionGraphStore();</span>
+<span class="nc" id="L116">        return new InMemoryExpressionGraphStore();</span>
     }
 
     private static void printUsage() {
-<span class="fc" id="L116">        System.out.println(&quot;Usage:&quot;);</span>
-<span class="fc" id="L117">        System.out.println(&quot;  &lt;term|equation&gt; &lt;expression&gt;&quot;);</span>
-<span class="fc" id="L118">        System.out.println(</span>
+<span class="fc" id="L120">        System.out.println(&quot;Usage:&quot;);</span>
+<span class="fc" id="L121">        System.out.println(&quot;  &lt;term|equation&gt; &lt;expression&gt;&quot;);</span>
+<span class="fc" id="L122">        System.out.println(</span>
             &quot;  system &lt;equation-1; equation-2; ...&gt;&quot;);
-<span class="fc" id="L120">        System.out.println(</span>
+<span class="fc" id="L124">        System.out.println(</span>
             &quot;  discover [--min N] [--max N] &quot;
                 + &quot;[--export json,markdown,mermaid,latex,inventory] &quot;
                 + &quot;[--dir PATH]&quot;);
-<span class="fc" id="L124">        System.out.println(&quot;  transform &lt;expression&gt;&quot;);</span>
-<span class="fc" id="L125">        System.out.println(&quot;  representations analyze &lt;request.json&gt; | replay &lt;artifact.json&gt;&quot;);</span>
-<span class="fc" id="L126">        System.out.println(</span>
+<span class="fc" id="L128">        System.out.println(&quot;  transform &lt;expression&gt;&quot;);</span>
+<span class="fc" id="L129">        System.out.println(&quot;  representations analyze &lt;request.json&gt; | replay &lt;artifact.json&gt;&quot;);</span>
+<span class="fc" id="L130">        System.out.println(</span>
             &quot;  showcase-train-preflight &lt;showcase-plan.json&gt; &quot;
                 + &quot;&lt;output-directory&gt;&quot;);
-<span class="fc" id="L129">        System.out.println(</span>
+<span class="fc" id="L133">        System.out.println(</span>
             &quot;  showcase-train-freeze &lt;showcase-plan.json&gt; &quot;
                 + &quot;&lt;repository-commit&gt; &lt;output-directory&gt;&quot;);
-<span class="fc" id="L132">        System.out.println(</span>
+<span class="fc" id="L136">        System.out.println(</span>
             &quot;  plugins list|reload|watch|status &quot;
                 + &quot;[--dir PATH] [--rules PATH]&quot;);
-<span class="fc" id="L135">        System.out.println(&quot;  rules list [--dir PATH] [--profile ID]&quot;);</span>
-<span class="fc" id="L136">        System.out.println(&quot;  rules validate &lt;file.regelsuche&gt;&quot;);</span>
-<span class="fc" id="L137">        System.out.println(&quot;  rules conflicts [--dir PATH]&quot;);</span>
-<span class="fc" id="L138">        System.out.println(</span>
+<span class="fc" id="L139">        System.out.println(&quot;  rules list [--dir PATH] [--profile ID]&quot;);</span>
+<span class="fc" id="L140">        System.out.println(&quot;  rules validate &lt;file.regelsuche&gt;&quot;);</span>
+<span class="fc" id="L141">        System.out.println(&quot;  rules conflicts [--dir PATH]&quot;);</span>
+<span class="fc" id="L142">        System.out.println(</span>
             &quot;  rules profiles [--dir PATH] [--profile ID]&quot;);
-<span class="fc" id="L140">        System.out.println(&quot;  rules debug &lt;expression&gt; [--dir PATH]&quot;);</span>
-<span class="fc" id="L141">        System.out.println(</span>
+<span class="fc" id="L144">        System.out.println(&quot;  rules debug &lt;expression&gt; [--dir PATH]&quot;);</span>
+<span class="fc" id="L145">        System.out.println(</span>
             &quot;  rules import &lt;file-or-dir&gt; [--into PATH]&quot;);
-<span class="fc" id="L143">        System.out.println(</span>
-            &quot;  rules export [--profile ID] [--dir PATH] [--out PATH]&quot;);
-<span class="fc" id="L145">        System.out.println(&quot;  inventory list&quot;);</span>
-<span class="fc" id="L146">        System.out.println(&quot;  inventory export --format json [--dir PATH]&quot;);</span>
 <span class="fc" id="L147">        System.out.println(</span>
+            &quot;  rules export [--profile ID] [--dir PATH] [--out PATH]&quot;);
+<span class="fc" id="L149">        System.out.println(&quot;  inventory list&quot;);</span>
+<span class="fc" id="L150">        System.out.println(&quot;  inventory export --format json [--dir PATH]&quot;);</span>
+<span class="fc" id="L151">        System.out.println(</span>
             &quot;  path show &lt;pathId&gt; --format markdown|latex|mermaid|json&quot;);
-<span class="fc" id="L149">        System.out.println(&quot;Valid input types: term, equation, system&quot;);</span>
-<span class="fc" id="L150">    }</span>
+<span class="fc" id="L153">        System.out.println(&quot;  scalar-saturation run|verify|check &lt;arguments&gt;&quot;);</span>
+<span class="fc" id="L154">        System.out.println(&quot;Valid input types: term, equation, system&quot;);</span>
+<span class="fc" id="L155">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

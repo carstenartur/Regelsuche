@@ -1,158 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DomainReceiptStore.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainReceiptStore.java</span></div><h1>DomainReceiptStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
 
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
 /** Bounded, immutable storage shared by source-bound assessment and model receipts. */
 final class DomainReceiptStore {
-    public static final int MAX_RECEIPT_BYTES = 1_048_576;
+    public static final int MAX_RECEIPT_BYTES = SourceBoundReceiptFiles.MAX_RECEIPT_BYTES;
     public static final int MAX_RECEIPTS_PER_EXPORT = 16;
     private final Path sourceDirectory;
-    private final Path directory;
+    private final SourceBoundReceiptFiles files;
 
     interface Check { void verify(DomainExportWorkspace source, String hash, byte[] bytes); }
     private final Check check;
 
-<span class="fc" id="L21">    DomainReceiptStore(Path sourceDirectory, String suffix, Check check) {</span>
-<span class="fc" id="L22">        this.check = Objects.requireNonNull(check);</span>
-<span class="fc" id="L23">        Path source = Objects.requireNonNull(sourceDirectory, &quot;sourceDirectory&quot;).toAbsolutePath().normalize();</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (source.getFileName() == null) throw new IllegalArgumentException(&quot;a named source repository is required&quot;);</span>
-<span class="fc" id="L25">        this.sourceDirectory = source;</span>
-<span class="fc" id="L26">        directory = source.resolveSibling(source.getFileName() + suffix);</span>
-<span class="fc" id="L27">    }</span>
+<span class="fc" id="L19">    DomainReceiptStore(Path sourceDirectory, String suffix, Check check) {</span>
+<span class="fc" id="L20">        this.check = Objects.requireNonNull(check);</span>
+<span class="fc" id="L21">        Path source = Objects.requireNonNull(sourceDirectory, &quot;sourceDirectory&quot;).toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (source.getFileName() == null) throw new IllegalArgumentException(&quot;a named source repository is required&quot;);</span>
+<span class="fc" id="L23">        this.sourceDirectory = source;</span>
+<span class="fc" id="L24">        files = new SourceBoundReceiptFiles(source.resolveSibling(source.getFileName() + suffix), MAX_RECEIPTS_PER_EXPORT);</span>
+<span class="fc" id="L25">    }</span>
 
     /** Called only with checker-issued canonical receipts. */
     void retain(DomainExportWorkspace workspace, String hash, String canonicalJson) {
-<span class="fc" id="L31">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
-<span class="fc" id="L32">        Objects.requireNonNull(canonicalJson, &quot;canonicalJson&quot;);</span>
-<span class="fc" id="L33">        byte[] bytes = canonicalJson.getBytes(StandardCharsets.UTF_8);</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_RECEIPT_BYTES) throw new IllegalArgumentException(&quot;downstream receipt exceeds 1 MiB&quot;);</span>
-<span class="fc" id="L35">        var value = DomainExportWorkspace.read(bytes);</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (!DomainDownstreamValidation.sourceBinding(workspace).equals(value.path(&quot;source&quot;))) {</span>
-<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;downstream receipt belongs to another source&quot;);</span>
+<span class="fc" id="L29">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
+<span class="fc" id="L30">        Objects.requireNonNull(canonicalJson, &quot;canonicalJson&quot;);</span>
+<span class="fc" id="L31">        byte[] bytes = canonicalJson.getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (bytes.length &gt; MAX_RECEIPT_BYTES) throw new IllegalArgumentException(&quot;downstream receipt exceeds 1 MiB&quot;);</span>
+<span class="fc" id="L33">        var value = DomainExportWorkspace.read(bytes);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!DomainDownstreamValidation.sourceBinding(workspace).equals(value.path(&quot;source&quot;))) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;downstream receipt belongs to another source&quot;);</span>
         }
-<span class="fc" id="L39">        Path target = target(workspace.runId(), hash);</span>
-<span class="fc" id="L40">        synchronized (DomainReceiptStore.class) {</span>
-            try {
-<span class="fc" id="L42">                var retained = new DomainExportWorkspaceRepository(sourceDirectory).find(workspace.runId()).orElseThrow(() -&gt;</span>
-<span class="fc" id="L43">                    new IllegalStateException(&quot;downstream source export is not retained&quot;));</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                if (!workspace.toCanonicalJson().equals(retained.toCanonicalJson())) {</span>
-<span class="nc" id="L45">                    throw new IllegalArgumentException(&quot;downstream source workspace differs from retained bytes&quot;);</span>
-                }
-<span class="fc" id="L47">                createDirectories(target.getParent());</span>
-<span class="fc" id="L48">                Path locks = directory.resolve(&quot;.locks&quot;);</span>
-<span class="fc" id="L49">                createDirectories(locks);</span>
-<span class="fc" id="L50">                Path lockPath = locks.resolve(workspace.runId().substring(7) + &quot;.lock&quot;);</span>
-<span class="fc" id="L51">                rejectLinks(lockPath);</span>
-                // The JVM monitor prevents overlapping FileLocks in this process; the file lock covers other writers.
-<span class="fc" id="L53">                try (var channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE,</span>
-<span class="fc" id="L54">                        LinkOption.NOFOLLOW_LINKS); var lock = channel.lock()) {</span>
-<span class="pc bpc" id="L55" title="2 of 4 branches missed.">                    if (!lock.isValid() || channel.size() != 0) throw new IllegalStateException(&quot;invalid downstream writer lock&quot;);</span>
-<span class="fc" id="L56">                    retainBytes(target, bytes);</span>
-                }
-<span class="fc" id="L58">            } catch (IOException | IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
-<span class="fc" id="L59">                throw new IllegalStateException(&quot;unable to retain downstream receipt&quot;, exception);</span>
-<span class="fc" id="L60">            }</span>
-<span class="fc" id="L61">        }</span>
-<span class="fc" id="L62">    }</span>
+        try {
+<span class="fc" id="L38">            var retained = new DomainExportWorkspaceRepository(sourceDirectory).find(workspace.runId()).orElseThrow(() -&gt;</span>
+<span class="fc" id="L39">                new IllegalStateException(&quot;downstream source export is not retained&quot;));</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            if (!workspace.toCanonicalJson().equals(retained.toCanonicalJson())) throw new IllegalArgumentException(&quot;downstream source workspace differs&quot;);</span>
+<span class="fc" id="L41">            files.retain(workspace.runId(), hash, bytes);</span>
+<span class="fc" id="L42">        } catch (IOException | IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
+<span class="fc" id="L43">            throw new IllegalStateException(&quot;unable to retain downstream receipt&quot;, exception);</span>
+<span class="fc" id="L44">        }</span>
+<span class="fc" id="L45">    }</span>
 
     /** Successful historical proofs are reproduced before returning their exact original bytes. */
     public Optional&lt;byte[]&gt; find(String runId, String receiptHash) {
         // Reject caller-controlled path material before entering the retained-artifact error boundary.
-<span class="fc" id="L67">        Path target = target(runId, receiptHash);</span>
+<span class="fc" id="L50">        DomainCanonical.requireSha256(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L51">        DomainCanonical.requireSha256(receiptHash, &quot;receiptHash&quot;);</span>
         try {
-<span class="fc" id="L69">            checkDirectories(target.getParent());</span>
-<span class="fc" id="L70">            var workspace = new DomainExportWorkspaceRepository(sourceDirectory).find(runId);</span>
-<span class="pc bpc" id="L71" title="1 of 4 branches missed.">            if (workspace.isEmpty() || !Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return Optional.empty();</span>
-<span class="fc" id="L72">            byte[] bytes = readBytes(target);</span>
-<span class="fc" id="L73">            check.verify(workspace.orElseThrow(), receiptHash, bytes);</span>
-<span class="fc" id="L74">            return Optional.of(bytes);</span>
-<span class="fc" id="L75">        } catch (IOException | IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
-<span class="fc" id="L76">            throw new IllegalStateException(&quot;invalid retained downstream receipt&quot;, exception);</span>
+<span class="fc" id="L53">            var source = new DomainExportWorkspaceRepository(sourceDirectory).find(runId);</span>
+<span class="fc" id="L54">            var bytes = files.find(runId, receiptHash);</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">            if (source.isEmpty() || bytes.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L56">            check.verify(source.get(), receiptHash, bytes.get());</span>
+<span class="fc" id="L57">            return bytes;</span>
+<span class="fc" id="L58">        } catch (IOException | IllegalArgumentException | DomainDiscoveryExportVerifier.ExportVerificationException exception) {</span>
+<span class="fc" id="L59">            throw new IllegalStateException(&quot;invalid retained downstream receipt&quot;, exception);</span>
         }
     }
 
-    private Path target(String runId, String receiptHash) {
-<span class="fc" id="L81">        DomainCanonical.requireSha256(runId, &quot;runId&quot;);</span>
-<span class="fc" id="L82">        DomainCanonical.requireSha256(receiptHash, &quot;receiptHash&quot;);</span>
-<span class="fc" id="L83">        Path parent = directory.resolve(runId.substring(7));</span>
-<span class="fc" id="L84">        return parent.resolve(receiptHash.substring(7) + &quot;.json&quot;);</span>
-    }
-
-    private static void retainBytes(Path target, byte[] bytes) throws IOException {
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {</span>
-<span class="fc" id="L89">            requireSame(readBytes(target), bytes);</span>
-<span class="fc" id="L90">            return;</span>
-        }
-<span class="fc" id="L92">        requireCapacity(target.getParent());</span>
-<span class="fc" id="L93">        Path pending = Files.createTempFile(target.getParent(), &quot;.pending-&quot;, &quot;.tmp&quot;);</span>
-        try {
-<span class="fc" id="L95">            Files.write(pending, bytes, StandardOpenOption.TRUNCATE_EXISTING);</span>
-<span class="fc" id="L96">            try { Files.createLink(target, pending); }</span>
-<span class="pc" id="L97">            catch (FileAlreadyExistsException exception) { requireSame(readBytes(target), bytes); }</span>
-<span class="fc" id="L98">        } finally { Files.deleteIfExists(pending); }</span>
-<span class="fc" id="L99">    }</span>
-
-    private static void requireSame(byte[] retained, byte[] supplied) {
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (!Arrays.equals(retained, supplied)) throw new IllegalStateException(&quot;immutable downstream receipt conflict&quot;);</span>
-<span class="fc" id="L103">    }</span>
-
-    private static void createDirectories(Path path) throws IOException {
-<span class="fc" id="L106">        checkDirectories(path);</span>
-<span class="fc" id="L107">        Files.createDirectories(path);</span>
-<span class="fc" id="L108">        checkDirectories(path);</span>
-<span class="fc" id="L109">    }</span>
-
-    private static void checkDirectories(Path path) {
-<span class="fc" id="L112">        Path current = path.getRoot();</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (Path part : path) {</span>
-<span class="fc" id="L114">            current = current.resolve(part);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)</span>
-<span class="pc bpc" id="L116" title="1 of 4 branches missed.">                    || (Files.exists(current, LinkOption.NOFOLLOW_LINKS) &amp;&amp; !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS))) {</span>
-<span class="fc" id="L117">                throw new IllegalArgumentException(&quot;invalid downstream repository directory&quot;);</span>
-            }
-<span class="fc" id="L119">        }</span>
-<span class="fc" id="L120">    }</span>
-
-    private static byte[] readBytes(Path target) throws IOException {
-<span class="fc" id="L123">        rejectLinks(target);</span>
-<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS) || Files.size(target) &gt; MAX_RECEIPT_BYTES) {</span>
-<span class="fc" id="L125">            throw new IllegalArgumentException(&quot;invalid retained downstream file&quot;);</span>
-        }
-<span class="fc" id="L127">        try (var input = Files.newInputStream(target, LinkOption.NOFOLLOW_LINKS)) {</span>
-<span class="fc" id="L128">            byte[] bytes = input.readNBytes(MAX_RECEIPT_BYTES + 1);</span>
-<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (bytes.length &gt; MAX_RECEIPT_BYTES) throw new IllegalArgumentException(&quot;downstream file exceeds 1 MiB&quot;);</span>
-<span class="fc" id="L130">            return bytes;</span>
-        }
-    }
-
-    private static void requireCapacity(Path parent) throws IOException {
-<span class="fc" id="L135">        try (var stream = Files.list(parent)) {</span>
-<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            var entries = stream.filter(path -&gt; !path.getFileName().toString().startsWith(&quot;.pending-&quot;))</span>
-<span class="fc" id="L137">                .limit(MAX_RECEIPTS_PER_EXPORT + 1L).toList();</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (Path path : entries) {</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                if (!path.getFileName().toString().matches(&quot;[0-9a-f]{64}\\.json&quot;)</span>
-<span class="pc bpc" id="L140" title="2 of 4 branches missed.">                        || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(path)) {</span>
-<span class="nc" id="L141">                    throw new IllegalStateException(&quot;invalid downstream repository entry&quot;);</span>
-                }
-<span class="fc" id="L143">            }</span>
-<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (entries.size() &gt;= MAX_RECEIPTS_PER_EXPORT) {</span>
-<span class="fc" id="L145">                throw new IllegalStateException(&quot;downstream receipt limit reached for this export&quot;);</span>
-            }
-        }
-<span class="fc" id="L148">    }</span>
-
-    private static void rejectLinks(Path path) {
-<span class="fc" id="L151">        Path current = path.getRoot();</span>
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (Path part : path) {</span>
-<span class="fc" id="L153">            current = current.resolve(part);</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)) throw new IllegalArgumentException(&quot;symbolic downstream repository path&quot;);</span>
-<span class="fc" id="L155">        }</span>
-<span class="fc" id="L156">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

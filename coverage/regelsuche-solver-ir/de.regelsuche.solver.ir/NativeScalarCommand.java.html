@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativeScalarCommand.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">NativeScalarCommand.java</span></div><h1>NativeScalarCommand.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.egraph.NativeScalarSaturation;
+import de.regelsuche.egraph.proof.ScalarCertificateCodec;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.*;
+
+/** Exact source and assumptions are supplied by the receiving caller for both capture and reproducibility. */
+public final class NativeScalarCommand {
+    private NativeScalarCommand() { }
+    public static void main(String[] args) {
+<span class="nc bnc" id="L16" title="All 4 branches missed.">        if (args.length&gt;0 &amp;&amp; args[0].equals(&quot;check&quot;)) {</span>
+<span class="nc bnc" id="L17" title="All 2 branches missed.">            if (args.length&lt;6) throw new IllegalArgumentException(&quot;scalar-saturation check &lt;file&gt; &lt;digest&gt; &lt;revision&gt; &lt;source&gt; &lt;target&gt; [nonzero variable ...]&quot;);</span>
+<span class="nc" id="L18">            try { NativeScalarEvidence.checkCertificate(Path.of(args[1]),args[2],args[4],args[5],premises(args,6),args[3]); }</span>
+<span class="nc" id="L19">            catch (IOException failure) { throw new UncheckedIOException(failure); }</span>
+<span class="nc" id="L20">            return;</span>
+        }
+<span class="nc bnc" id="L22" title="All 2 branches missed.">        if (args.length&lt;5) throw new IllegalArgumentException(&quot;scalar-saturation run|verify &lt;directory&gt; &lt;revision&gt; &lt;schedule&gt; &lt;expression&gt; [expected-report-hash for verify] [nonzero variable ...]&quot;);</span>
+<span class="nc" id="L23">        var budget=new NativeScalarSaturation.Budget(12,1024,16000,NativeScalarSaturation.Schedule.valueOf(args[3]));</span>
+<span class="nc" id="L24">        boolean verify=args[0].equals(&quot;verify&quot;);</span>
+<span class="nc bnc" id="L25" title="All 8 branches missed.">        if (!verify &amp;&amp; !args[0].equals(&quot;run&quot;) || verify &amp;&amp; args.length&lt;6) throw new IllegalArgumentException(&quot;invalid scalar command&quot;);</span>
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        List&lt;Assumption&gt; assumptions=premises(args,verify?6:5);</span>
+        try {
+<span class="nc bnc" id="L28" title="All 2 branches missed.">            if (verify) NativeScalarEvidence.verify(Path.of(args[1]),args[5],args[4],assumptions,args[2],budget);</span>
+            else {
+<span class="nc" id="L30">                var archive=NativeScalarEvidence.run(args[4],assumptions,args[2],budget);</span>
+<span class="nc" id="L31">                archive.write(Path.of(args[1]));</span>
+<span class="nc" id="L32">                System.out.println(ScalarCertificateCodec.hash(archive.report().getBytes(StandardCharsets.UTF_8)));</span>
+            }
+<span class="nc" id="L34">        } catch (IOException failure) { throw new UncheckedIOException(failure); }</span>
+<span class="nc" id="L35">    }</span>
+    private static List&lt;Assumption&gt; premises(String[] args,int from) {
+<span class="nc" id="L37">        return Arrays.stream(args).skip(from).map(symbol -&gt; {</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            if (!symbol.matches(&quot;[a-zA-Z][a-zA-Z0-9_]*&quot;)) throw new IllegalArgumentException(&quot;expected a nonzero scalar variable&quot;);</span>
+<span class="nc" id="L39">            return Assumption.nonZero(symbol);</span>
+<span class="nc" id="L40">        }).toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

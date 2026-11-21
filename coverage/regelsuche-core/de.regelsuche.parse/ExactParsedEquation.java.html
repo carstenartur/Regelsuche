@@ -10,23 +10,25 @@ public final class ExactParsedEquation {
     private final Equation equation;
     private final ExactParsedTerm left;
     private final ExactParsedTerm right;
+    private final int leftStart;
     private final int rightStart;
 
-<span class="fc" id="L15">    ExactParsedEquation(ExactParsedTerm left, ExactParsedTerm right, int rightStart) {</span>
-<span class="fc" id="L16">        this.equation = new Equation(left.expression(), right.expression());</span>
-<span class="fc" id="L17">        this.left = left;</span>
-<span class="fc" id="L18">        this.right = right;</span>
-<span class="fc" id="L19">        this.rightStart = rightStart;</span>
-<span class="fc" id="L20">    }</span>
+<span class="fc" id="L16">    ExactParsedEquation(ExactParsedTerm left, ExactParsedTerm right, int leftStart, int rightStart) {</span>
+<span class="fc" id="L17">        this.equation = new Equation(left.expression(), right.expression());</span>
+<span class="fc" id="L18">        this.left = left;</span>
+<span class="fc" id="L19">        this.right = right;</span>
+<span class="fc" id="L20">        this.leftStart = leftStart;</span>
+<span class="fc" id="L21">        this.rightStart = rightStart;</span>
+<span class="fc" id="L22">    }</span>
 
     public Equation equation() {
-<span class="fc" id="L23">        return equation;</span>
+<span class="fc" id="L25">        return equation;</span>
     }
 
     /** Resolves the exact node's half-open UTF-16 range in the original equation. */
     public Optional&lt;SourceRange&gt; sourceRangeFor(Expr node) {
-<span class="fc" id="L28">        return left.sourceRangeFor(node).or(() -&gt; right.sourceRangeFor(node)</span>
-<span class="fc" id="L29">            .map(range -&gt; new SourceRange(rightStart + range.startInclusive(), rightStart + range.endExclusive())));</span>
+<span class="pc" id="L30">        return left.sourceRangeFor(node).map(range -&gt; new SourceRange(leftStart + range.startInclusive(), leftStart + range.endExclusive())).or(() -&gt; right.sourceRangeFor(node)</span>
+<span class="fc" id="L31">            .map(range -&gt; new SourceRange(rightStart + range.startInclusive(), rightStart + range.endExclusive())));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

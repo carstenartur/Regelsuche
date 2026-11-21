@@ -182,11 +182,11 @@ import java.util.Map;
 <span class="fc" id="L182">        return source(obligation, nonce, null);</span>
     }
 
-    String source(Obligation obligation, String nonce, LeanLemmaPlan plan) {
+    String source(Obligation obligation, String nonce, LeanProofPlan plan) {
 <span class="fc" id="L186">        Material material = render(obligation);</span>
 <span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (!material.supported()) throw new IllegalArgumentException(String.join(&quot;,&quot;, material.issues()));</span>
 <span class="fc" id="L188">        boolean scoped = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema());</span>
-<span class="pc bpc" id="L189" title="1 of 4 branches missed.">        if (!scoped &amp;&amp; plan != null) throw new IllegalArgumentException(&quot;a lemma plan requires a v2 obligation&quot;);</span>
+<span class="pc bpc" id="L189" title="1 of 4 branches missed.">        if (plan != null &amp;&amp; !plan.accepts(obligation)) throw new IllegalArgumentException(&quot;proof plan does not match the scoped obligation&quot;);</span>
 <span class="fc" id="L190">        return &quot;import Mathlib\nimport Lean.Util.CollectAxioms\n&quot;</span>
 <span class="fc bfc" id="L191" title="All 2 branches covered.">            + (scoped ? &quot;import Lean.Util.FoldConsts\n&quot; : &quot;&quot;)</span>
             + &quot;set_option autoImplicit false\nset_option Elab.async false\nset_option maxHeartbeats 1000000\n&quot;

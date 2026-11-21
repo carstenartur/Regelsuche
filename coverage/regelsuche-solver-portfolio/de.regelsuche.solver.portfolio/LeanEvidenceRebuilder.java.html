@@ -35,7 +35,7 @@ public final class LeanEvidenceRebuilder {
 <span class="fc" id="L35">        require(obligation.equals(read(retained, &quot;obligation.json&quot;)), &quot;retained obligation differs&quot;);</span>
 <span class="fc" id="L36">        String originalAuditText = read(retained, &quot;audit.json&quot;);</span>
 <span class="fc" id="L37">        var originalAudit = LeanSolverBackend.checkedAuditDocument(originalAuditText, expected.contentHash(), null);</span>
-<span class="fc" id="L38">        var plan = LeanLemmaPlan.retained(retained);</span>
+<span class="fc" id="L38">        var plan = LeanProofPlan.read(expected, retained);</span>
 <span class="pc bpc" id="L39" title="1 of 4 branches missed.">        require(plan == null || originalAudit.scoped(), &quot;lemma plan requires a scoped audit&quot;);</span>
 <span class="fc" id="L40">        String source = new LeanSourceRenderer().source(expected, originalAudit.nonce(), plan);</span>
 <span class="fc" id="L41">        require(source.equals(read(retained, &quot;proof.lean&quot;)), &quot;retained source differs from the generated theorem&quot;);</span>
@@ -71,7 +71,7 @@ public final class LeanEvidenceRebuilder {
 <span class="fc bfc" id="L71" title="All 2 branches covered.">        String independent = originalAudit.scoped() ? LeanStatementReconstruction.theorem(expected) : &quot;&quot;;</span>
 <span class="fc" id="L72">        String rebuildSource = source + independent;</span>
 <span class="fc" id="L73">        Files.writeString(output.resolve(&quot;proof.lean&quot;), rebuildSource);</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (plan != null) Files.writeString(output.resolve(LeanLemmaPlan.FILE), plan.material());</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (plan != null) Files.writeString(output.resolve(plan.fileName()), plan.material());</span>
 <span class="fc" id="L75">        Files.writeString(output.resolve(TOOLCHAIN), toolchainPin);</span>
 <span class="fc" id="L76">        Files.writeString(output.resolve(MANIFEST), dependencyPin);</span>
 

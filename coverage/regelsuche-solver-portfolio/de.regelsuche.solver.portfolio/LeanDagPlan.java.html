@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LeanDagPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">LeanDagPlan.java</span></div><h1>LeanDagPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.ScopedProofDag;
+import de.regelsuche.solver.ir.ScopedProofDag.Local;
+import de.regelsuche.solver.ir.ScopedProofDag.Node;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import java.util.ArrayList;
+import java.util.List;
+
+/** Elaborates only fixed constructors and checked local slots. No incoming Lean source is used. */
+<span class="nc" id="L11">record LeanDagPlan(ScopedProofDag dag) implements LeanProofPlan {</span>
+    static final String FILE = &quot;scoped-proof-dag.txt&quot;;
+<span class="nc" id="L13">    @Override public String fileName() { return FILE; }</span>
+<span class="nc" id="L14">    @Override public String material() { return dag.canonical(); }</span>
+<span class="nc" id="L15">    @Override public boolean accepts(Obligation obligation) { return dag.obligation().equals(obligation); }</span>
+    @Override public String proof() {
+<span class="nc" id="L17">        var parameters = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L18">        dag.obligation().declarations().forEach(d -&gt; parameters.add(&quot;rs_&quot; + d.name()));</span>
+<span class="nc bnc" id="L19" title="All 2 branches missed.">        for (int i = 0; i &lt; dag.obligation().assumptions().size(); i++) parameters.add(&quot;h&quot; + i);</span>
+<span class="nc bnc" id="L20" title="All 2 branches missed.">        String lambda = parameters.isEmpty() ? &quot;&quot; : &quot;fun &quot; + String.join(&quot; &quot;, parameters) + &quot; =&gt; &quot;;</span>
+<span class="nc" id="L21">        return &quot;\n  -- scoped proof DAG &quot; + hash() + &quot;\n  &quot; + lambda + dag.fold(this::term) + &quot;\n&quot;;</span>
+    }
+    private String term(Node node, List&lt;Local&gt; scope, List&lt;String&gt; children) {
+<span class="nc" id="L24">        String next = &quot;l&quot; + scope.size();</span>
+<span class="nc bnc" id="L25" title="All 19 branches missed.">        return switch (node.rule()) {</span>
+<span class="nc" id="L26">            case DECLARATION -&gt; declaration(node);</span>
+<span class="nc" id="L27">            case PREMISE -&gt; &quot;h&quot; + node.operand();</span>
+<span class="nc" id="L28">            case LOCAL -&gt; local(scope, node.operand());</span>
+<span class="nc" id="L29">            case ZERO -&gt; &quot;(0 : Nat)&quot;;</span>
+<span class="nc" id="L30">            case SUCC -&gt; &quot;(Nat.succ &quot; + children.getFirst() + &quot;)&quot;;</span>
+<span class="nc" id="L31">            case INTRO -&gt; &quot;(fun &quot; + next + &quot; =&gt; &quot; + children.getFirst() + &quot;)&quot;;</span>
+<span class="nc" id="L32">            case APPLY, SPECIALIZE -&gt; &quot;(&quot; + children.getFirst() + &quot; &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L33">            case LET, HAVE -&gt; &quot;(let &quot; + next + &quot; := &quot; + children.getFirst() + &quot;; &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L34">            case UNFOLD -&gt; &quot;(by dsimp only [&quot; + local(scope,node.operand()) + &quot;] at * &lt;;&gt; exact &quot; + children.getFirst() + &quot;)&quot;;</span>
+<span class="nc" id="L35">            case REWRITE -&gt; &quot;(&quot; + children.getFirst() + &quot; ▸ &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L36">            case PAIR -&gt; &quot;(And.intro &quot; + children.getFirst() + &quot; &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L37">            case WITNESS -&gt; &quot;(Exists.intro &quot; + children.getFirst() + &quot; &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L38">            case CASES -&gt; &quot;(Or.elim &quot; + children.getFirst() + &quot; (fun &quot; + next + &quot; =&gt; &quot; + children.get(1)</span>
+<span class="nc" id="L39">                + &quot;) (fun &quot; + next + &quot; =&gt; &quot; + children.get(2) + &quot;))&quot;;</span>
+<span class="nc" id="L40">            case BY_CONTRADICTION -&gt; &quot;(Classical.byContradiction (fun &quot; + next + &quot; =&gt; &quot; + children.getFirst() + &quot; &quot; + children.getLast() + &quot;))&quot;;</span>
+<span class="nc" id="L41">            case INDUCTION -&gt; &quot;(Nat.rec (motive := &quot; + declaration(node) + &quot;) &quot; + children.getFirst() + &quot; &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L42">            case STRONG_INDUCTION -&gt; &quot;(fun n =&gt; Nat.strongRecOn n (fun &quot; + next + &quot; l&quot; + (scope.size()+1) + &quot; =&gt; &quot; + children.getFirst() + &quot;))&quot;;</span>
+<span class="nc" id="L43">            case DECREASE -&gt; &quot;(&quot; + local(scope,scope.indexOf(Local.SMALLER_CASES)) + &quot; &quot; + children.getFirst() + &quot; &quot; + children.getLast() + &quot;)&quot;;</span>
+<span class="nc" id="L44">            case NORMALIZE -&gt; &quot;(by rfl)&quot;;</span>
+<span class="nc" id="L45">            case SOLVE_LEAF -&gt; solveLeaf(scope);</span>
+        };
+    }
+    private static String solveLeaf(List&lt;Local&gt; scope) {
+<span class="nc" id="L49">        var script = new StringBuilder(&quot;(by &quot;);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        for (int i=0;i&lt;scope.size();i++) {</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">            if (scope.get(i)==Local.SMALLER_CASES) script.append(&quot;clear &quot;).append(local(scope,i)).append(&quot;; &quot;);</span>
+        }
+<span class="nc" id="L53">        return script.append(&quot;first | assumption | ring | norm_num | omega)&quot;).toString();</span>
+    }
+<span class="nc" id="L55">    private String declaration(Node node) { return &quot;rs_&quot; + dag.obligation().declarations().get(node.operand()).name(); }</span>
+<span class="nc" id="L56">    private static String local(List&lt;Local&gt; scope, int index) { return &quot;l&quot; + (scope.size() - 1 - index); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

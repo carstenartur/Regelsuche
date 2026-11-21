@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativeScalarComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">NativeScalarComparison.java</span></div><h1>NativeScalarComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.egraph.NativeScalarSaturation;
+import de.regelsuche.egraph.proof.ScalarCertificateCodec;
+import de.regelsuche.egraph.proof.ScalarExtractionProof;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.*;
+import de.regelsuche.solver.ir.NativeScalarEvidence;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.value.ExprValueArena;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/** Public #620 source controls. Targets are consumed only after the three source-only executions return. */
+final class NativeScalarComparison {
+<span class="nc" id="L26">    private static final JsonMapper JSON=new JsonMapper();</span>
+    private static final String PANEL=&quot;native-scalar-panel-v1.json&quot;;
+    private NativeScalarComparison() {}
+
+    static void write(Path script,String revision,Path output) throws IOException {
+        byte[] panel;
+<span class="nc" id="L32">        try (var input=NativeScalarComparison.class.getResourceAsStream(PANEL)) {</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">            if (input==null) throw new IOException(&quot;missing native scalar comparison panel&quot;);</span>
+<span class="nc" id="L34">            panel=input.readAllBytes();</span>
+        }
+<span class="nc" id="L36">        var cases=JSON.readTree(panel);</span>
+<span class="nc" id="L37">        var requests=JSON.createArrayNode();</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        for(var row:cases) {</span>
+<span class="nc" id="L39">            var request=requests.addObject();</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            for (String key:List.of(&quot;id&quot;,&quot;source&quot;,&quot;operation&quot;,&quot;assumptions&quot;)) request.set(key,row.required(key));</span>
+<span class="nc" id="L41">        }</span>
+<span class="nc" id="L42">        String external=foreign(script,requests.toString());</span>
+<span class="nc" id="L43">        var foreign=JSON.readTree(external);</span>
+<span class="nc bnc" id="L44" title="All 4 branches missed.">        if (!&quot;1.14.0&quot;.equals(foreign.required(&quot;sympy&quot;).asText()) || !foreign.required(&quot;mpmath&quot;).asText().equals(&quot;1.3.0&quot;)</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">                || foreign.required(&quot;cases&quot;).size()!=cases.size()) throw new IOException(&quot;foreign software or panel mismatch&quot;);</span>
+<span class="nc" id="L46">        var report=JSON.createObjectNode().put(&quot;schema&quot;,&quot;regelsuche.native-conditional-ac-comparison/v1&quot;)</span>
+<span class="nc" id="L47">            .put(&quot;sourceRevision&quot;,revision).put(&quot;panelHash&quot;,ScalarCertificateCodec.hash(panel))</span>
+<span class="nc" id="L48">            .put(&quot;externalReferenceHash&quot;,ScalarCertificateCodec.hash(Files.readAllBytes(script)))</span>
+<span class="nc" id="L49">            .put(&quot;externalReportHash&quot;,ScalarCertificateCodec.hash(external.getBytes(StandardCharsets.UTF_8)))</span>
+<span class="nc" id="L50">            .put(&quot;historicalCorpusSha256&quot;,&quot;53bff974a9ecb101b85e01f202d095fb2a99f5f33127ed7ec0e4ade2685ac422&quot;)</span>
+<span class="nc" id="L51">            .put(&quot;scope&quot;,&quot;Known public syntax targets evaluated after source-only runs; structural reachability modulo exact scalar AC.&quot;)</span>
+<span class="nc" id="L52">            .put(&quot;workComparison&quot;,&quot;E-graph matcher fuel, ordered path states and SymPy count_ops measure distinct operations; no cross-engine work ratio.&quot;)</span>
+<span class="nc" id="L53">            .put(&quot;externalProof&quot;,&quot;SymPy returns an expression and no detached proof. Native changed outputs require receiver-checked proof DAGs.&quot;);</span>
+<span class="nc" id="L54">        var outcomes=report.putArray(&quot;cases&quot;);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (int index=0;index&lt;cases.size();index++) {</span>
+<span class="nc" id="L56">            var row=cases.get(index); var ext=foreign.required(&quot;cases&quot;).get(index);</span>
+<span class="nc" id="L57">            String id=row.required(&quot;id&quot;).asText(), source=row.required(&quot;source&quot;).asText(), target=row.required(&quot;target&quot;).asText();</span>
+<span class="nc bnc" id="L58" title="All 4 branches missed.">            if (!id.equals(ext.required(&quot;id&quot;).asText()) || !source.equals(ext.required(&quot;source&quot;).asText())</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">                    || !row.get(&quot;assumptions&quot;).equals(ext.required(&quot;assumptions&quot;)) || !row.get(&quot;operation&quot;).equals(ext.required(&quot;operation&quot;)))</span>
+<span class="nc" id="L60">                throw new IOException(&quot;foreign source binding mismatch&quot;);</span>
+<span class="nc" id="L61">            var premises=JSON.readerForListOf(String.class).&lt;List&lt;String&gt;&gt;readValue(row.required(&quot;assumptions&quot;));</span>
+<span class="nc" id="L62">            var context=premises.stream().map(p-&gt;Assumption.nonZero(p.substring(0,p.length()-5))).toList();</span>
+<span class="nc" id="L63">            var result=outcomes.addObject().put(&quot;id&quot;,id).put(&quot;corpus&quot;,row.required(&quot;corpus&quot;).asText()).put(&quot;source&quot;,source).put(&quot;postRunTarget&quot;,target);</span>
+<span class="nc" id="L64">            result.set(&quot;assumptions&quot;,row.required(&quot;assumptions&quot;));</span>
+<span class="nc" id="L65">            result.set(&quot;external&quot;,ext);</span>
+<span class="nc bnc" id="L66" title="All 4 branches missed.">            result.put(&quot;externalReached&quot;,ext.has(&quot;output&quot;) &amp;&amp; same(ext.get(&quot;output&quot;).asText(),target));</span>
+<span class="nc" id="L67">            var schedules=result.putArray(&quot;native&quot;);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            for(var scheduler:NativeScalarSaturation.Schedule.values()) {</span>
+<span class="nc" id="L69">                var budget=new NativeScalarSaturation.Budget(8,256,4000,scheduler);</span>
+<span class="nc" id="L70">                var artifact=NativeScalarEvidence.run(source,context,revision,budget);</span>
+<span class="nc" id="L71">                var dir=output.resolve(id).resolve(scheduler.name());</span>
+<span class="nc" id="L72">                artifact.write(dir);</span>
+<span class="nc" id="L73">                var digest=ScalarCertificateCodec.hash(artifact.report().getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L74">                NativeScalarEvidence.verify(dir,digest,source,context,revision,budget);</span>
+<span class="nc" id="L75">                var actual=JSON.readTree(artifact.report()); var chosen=actual.required(&quot;extractions&quot;).get(0);</span>
+<span class="nc" id="L76">                schedules.addObject().put(&quot;schedule&quot;,scheduler.name()).put(&quot;report&quot;,digest).put(&quot;status&quot;,chosen.required(&quot;status&quot;).asText())</span>
+<span class="nc" id="L77">                    .put(&quot;reached&quot;,same(chosen.required(&quot;authorized&quot;).asText(),target)).put(&quot;nodes&quot;,actual.required(&quot;graphNodes&quot;).asInt())</span>
+<span class="nc" id="L78">                    .put(&quot;proofSteps&quot;,chosen.required(&quot;proofSteps&quot;).asInt()).put(&quot;rawExpressionNodes&quot;,chosen.required(&quot;expressionNodes&quot;).asInt());</span>
+            }
+<span class="nc" id="L80">            path(result.putObject(&quot;orderedPath&quot;),source,target,premises,context,revision);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            boolean expectedReach=!id.equals(&quot;unknown-cancellation&quot;);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (result.required(&quot;externalReached&quot;).asBoolean()!=expectedReach</span>
+<span class="nc bnc" id="L83" title="All 6 branches missed.">                    || result.required(&quot;orderedPath&quot;).required(&quot;reached&quot;).asBoolean()!=(expectedReach &amp;&amp; !id.equals(&quot;opposite-factor-roles&quot;)))</span>
+<span class="nc" id="L84">                throw new IOException(&quot;external or ordered-path control differed: &quot; + id);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            for (var observed:schedules) {</span>
+<span class="nc bnc" id="L86" title="All 4 branches missed.">                if (!observed.required(&quot;status&quot;).asText().equals(&quot;CHECKED_EQUALITY&quot;) || observed.required(&quot;reached&quot;).asBoolean()!=expectedReach)</span>
+<span class="nc" id="L87">                    throw new IOException(&quot;native scalar control differed: &quot; + id);</span>
+<span class="nc" id="L88">            }</span>
+        }
+<span class="nc" id="L90">        Files.createDirectories(output);</span>
+<span class="nc" id="L91">        AtomicJsonFile.writeUtf8(output.resolve(&quot;sympy.json&quot;),external);</span>
+<span class="nc" id="L92">        AtomicJsonFile.writeUtf8(output.resolve(&quot;comparison.json&quot;),report.toString()+&quot;\n&quot;);</span>
+<span class="nc" id="L93">    }</span>
+
+    private static void path(com.fasterxml.jackson.databind.node.ObjectNode record,String source,String target,List&lt;String&gt; premises,
+                             List&lt;Assumption&gt; assumptions,String revision) {
+<span class="nc" id="L97">        var rules=AstRewriteTransformationEngine.allBuiltInRules();</span>
+<span class="nc" id="L98">        var context=ScalarExtractionProof.Context.create(rules,assumptions,revision);</span>
+<span class="nc" id="L99">        var engine=new AstRewriteTransformationEngine(rules.stream().filter(r-&gt;context.enables(r.id())).toList(),16,32);</span>
+<span class="nc" id="L100">        var budget=new SearchHeuristic(4,32,1,2,32,16);</span>
+<span class="nc" id="L101">        var search=new BestFirstSearchStrategy().searchWithDiagnostics(new SearchProblem(source,engine,new ExpressionScorer(),new ExpressionCanonicalizer(),budget));</span>
+<span class="nc bnc" id="L102" title="All 4 branches missed.">        boolean reached=search.states().stream().anyMatch(s -&gt; premises.containsAll(s.assumptions()) &amp;&amp; same(s.expression(),target));</span>
+<span class="nc" id="L103">        record.put(&quot;reached&quot;,reached).put(&quot;visited&quot;,search.states().size()).put(&quot;maxDepth&quot;,budget.maxDepth())</span>
+<span class="nc" id="L104">            .put(&quot;maxVisited&quot;,budget.maxVisitedExpressions()).put(&quot;proof&quot;,&quot;RETAINED_DIRECTED_PRIMITIVE_PATH&quot;);</span>
+<span class="nc" id="L105">    }</span>
+    private static boolean same(String a,String b) {
+<span class="nc" id="L107">        var parser=new ExpressionParser();</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        try(var arena=new ExprValueArena(4096)) { return arena.intern(parser.parseTerm(a))==arena.intern(parser.parseTerm(b)); }</span>
+    }
+    private static String foreign(Path script,String request) throws IOException {
+<span class="nc" id="L111">        Path response=Files.createTempFile(&quot;native-scalar-sympy-&quot;, &quot;.json&quot;);</span>
+        try {
+<span class="nc" id="L113">            var pb=new ProcessBuilder(System.getenv().getOrDefault(&quot;REGELSUCHE_SYMPY_PYTHON&quot;,&quot;python3&quot;),script.toAbsolutePath().toString(),&quot;--native-scalar-request&quot;);</span>
+<span class="nc" id="L114">            var process=pb.redirectOutput(response.toFile()).redirectError(ProcessBuilder.Redirect.INHERIT).start();</span>
+            try {
+<span class="nc" id="L116">                try(var stream=process.getOutputStream()){stream.write(request.getBytes(StandardCharsets.UTF_8));}</span>
+<span class="nc bnc" id="L117" title="All 6 branches missed.">                if (!process.waitFor(30,TimeUnit.SECONDS) || process.exitValue()!=0 || Files.size(response)&gt;65536)</span>
+<span class="nc" id="L118">                    throw new IOException(&quot;external SymPy comparison failed&quot;);</span>
+<span class="nc" id="L119">            } catch (InterruptedException e) {Thread.currentThread().interrupt();throw new IOException(&quot;external comparison interrupted&quot;,e);}</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            finally { if(process.isAlive())process.destroyForcibly(); }</span>
+<span class="nc" id="L121">            return Files.readString(response);</span>
+<span class="nc" id="L122">        } finally {Files.deleteIfExists(response);}</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

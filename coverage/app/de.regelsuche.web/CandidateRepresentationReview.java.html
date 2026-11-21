@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CandidateRepresentationReview.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">CandidateRepresentationReview.java</span></div><h1>CandidateRepresentationReview.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.representation.*;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.value.ExprValueArena;
+import de.regelsuche.value.ExprValueFactory;
+import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+/** Bounded observations of the source and selected end candidate, independently of the currently inspected path step. */
+<span class="nc" id="L17">final class CandidateRepresentationReview {</span>
+<span class="fc" id="L18">    private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();</span>
+
+    static ObjectNode compare(String source, String candidate, RepresentationDiscoveryInformationBoundary boundary,
+            KnownStructureCatalog catalog, int maxGrowth, int limit) {
+<span class="fc" id="L22">        var engine = new AstRewriteTransformationEngine(boundary.candidateFormationRules(), maxGrowth, limit + 1);</span>
+<span class="fc" id="L23">        var beforeRules = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L24">        var afterRules = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L25">        var result = JSON.createObjectNode().put(&quot;catalogHash&quot;, catalog.contentHash())</span>
+<span class="fc" id="L26">            .put(&quot;semanticIdentityVersion&quot;, ExprValueArena.DIGEST_VERSION)</span>
+<span class="fc" id="L27">            .put(&quot;formationInventoryHash&quot;, boundary.candidateFormationRuleInventoryHash())</span>
+<span class="fc" id="L28">            .put(&quot;successorLimit&quot;, limit).put(&quot;maxAstIncrease&quot;, maxGrowth);</span>
+<span class="fc" id="L29">        result.set(&quot;source&quot;, describe(source, engine, catalog, limit, beforeRules));</span>
+<span class="fc" id="L30">        result.set(&quot;candidate&quot;, describe(candidate, engine, catalog, limit, afterRules));</span>
+<span class="fc" id="L31">        result.set(&quot;observedGainedRules&quot;, JSON.valueToTree(difference(afterRules, beforeRules)));</span>
+<span class="fc" id="L32">        result.set(&quot;observedLostRules&quot;, JSON.valueToTree(difference(beforeRules, afterRules)));</span>
+<span class="fc" id="L33">        return result;</span>
+    }
+
+    private static ObjectNode describe(String expression, AstRewriteTransformationEngine engine, KnownStructureCatalog catalog, int limit,
+            SortedSet&lt;String&gt; unconditional) {
+<span class="fc" id="L38">        var syntax = new ExpressionParser().parseExactTerm(expression).expression();</span>
+<span class="fc" id="L39">        var out = JSON.createObjectNode().put(&quot;expression&quot;, expression).put(&quot;syntaxHash&quot;, SolverIr.sha256(expression));</span>
+<span class="fc" id="L40">        try (var arena = new ExprValueArena(ExprValueFactory.DEFAULT_MAXIMUM_ENTRIES)) {</span>
+<span class="fc" id="L41">            out.put(&quot;semanticValueDigest&quot;, arena.digest(arena.intern(syntax)));</span>
+        }
+<span class="fc" id="L43">        out.set(&quot;description&quot;, JSON.valueToTree(new SemanticDescriptionMeasurer().measure(syntax)));</span>
+<span class="fc" id="L44">        var scan = new KnownStructureMatcher(catalog).scan(syntax);</span>
+<span class="fc" id="L45">        var recognition = out.putObject(&quot;recognition&quot;).put(&quot;complete&quot;, scan.complete());</span>
+<span class="fc" id="L46">        recognition.set(&quot;matches&quot;, JSON.valueToTree(scan.matches()));</span>
+<span class="fc" id="L47">        recognition.set(&quot;diagnostics&quot;, JSON.valueToTree(scan.diagnostics()));</span>
+<span class="fc" id="L48">        var successors = engine.transform(expression);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        out.put(&quot;successorsTruncated&quot;, successors.size() &gt; limit);</span>
+<span class="fc" id="L50">        var frontier = out.putArray(&quot;oneStepSuccessors&quot;);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (var step : successors.stream().limit(limit).toList()) {</span>
+<span class="fc" id="L52">            var observed = frontier.addObject().put(&quot;rule&quot;, step.rule()).put(&quot;applicationKey&quot;, step.applicationKey())</span>
+<span class="fc" id="L53">                .put(&quot;target&quot;, step.transformedExpression()).put(&quot;pack&quot;, step.packId()).put(&quot;license&quot;, step.license());</span>
+<span class="fc" id="L54">            observed.set(&quot;requiredAssumptions&quot;, JSON.valueToTree(step.assumptions()));</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (step.assumptions().isEmpty()) unconditional.add(step.rule());</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return out;</span>
+    }
+
+    private static List&lt;String&gt; difference(SortedSet&lt;String&gt; selected, SortedSet&lt;String&gt; control) {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        return selected.stream().filter(rule -&gt; !control.contains(rule)).toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

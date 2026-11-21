@@ -39,7 +39,7 @@ public final class ExprValueArena implements AutoCloseable {
 <span class="fc" id="L39">        }</span>
     }
 
-<span class="fc" id="L42">    private enum Kind { VARIABLE, SCOPED, NUMBER, FUNCTION, ADD, MUL, SUB, DIV, POW }</span>
+<span class="fc" id="L42">    public enum Kind { VARIABLE, SCOPED, NUMBER, FUNCTION, ADD, MUL, SUB, DIV, POW }</span>
 
     // Arrays are privately created and never mutated. A hash match is only a bucket lookup.
 <span class="fc" id="L45">    private record Key(Kind kind, Object atom, int[] edges) {</span>
@@ -265,140 +265,159 @@ public final class ExprValueArena implements AutoCloseable {
 
 <span class="fc" id="L266">    public synchronized int digestComputations() { requireOpen(); return digests.size(); }</span>
 
+<span class="nc" id="L268">    public record Operand(ValueId value, int multiplicity) { }</span>
+    public record NodeView(Kind kind, String atom, List&lt;Operand&gt; operands) {
+<span class="nc" id="L270">        public NodeView { operands = List.copyOf(operands); }</span>
+    }
+
+    /** Owner-local semantic children, retaining multiplicities without expanding or hashing a value. */
+    public synchronized NodeView describe(ValueId id) {
+<span class="nc" id="L275">        requireOpen();</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (Objects.requireNonNull(id).owner != owner) throw new IllegalArgumentException(&quot;foreign value ID&quot;);</span>
+<span class="nc" id="L277">        Key node = entries.get(id.index);</span>
+<span class="nc" id="L278">        var children = new ArrayList&lt;Operand&gt;();</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        int stride = node.unordered() ? 2 : 1;</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        for (int i = 0; i &lt; node.edges().length; i += stride) {</span>
+<span class="nc" id="L281">            ValueId child = index.get(entries.get(node.edges()[i]));</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            children.add(new Operand(child, node.unordered() ? node.edges()[i + 1] : 1));</span>
+        }
+<span class="nc" id="L284">        return new NodeView(node.kind(), atomText(node), children);</span>
+    }
+
     /** Canonical reachable DAG with allocation-independent local numbering. */
     public synchronized ExprValueSnapshot.Snapshot snapshot(ValueId root) {
-<span class="fc" id="L270">        String expected = digest(root); // Validate ownership and populate the bounded Merkle cache.</span>
-<span class="fc" id="L271">        var numbering = new HashMap&lt;Integer, Integer&gt;();</span>
-<span class="fc" id="L272">        var nodes = new ArrayList&lt;ExprValueSnapshot.Node&gt;();</span>
-<span class="fc" id="L273">        var pending = new ArrayDeque&lt;Integer&gt;();</span>
-<span class="fc" id="L274">        pending.push(root.index);</span>
-<span class="fc bfc" id="L275" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L276">            int current = pending.peek();</span>
-<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (numbering.containsKey(current)) { pending.pop(); continue; }</span>
-<span class="fc" id="L278">            var key = entries.get(current);</span>
-<span class="fc" id="L279">            int[] edges = snapshotEdges(key);</span>
-<span class="fc" id="L280">            boolean waiting = false;</span>
-<span class="fc bfc" id="L281" title="All 6 branches covered.">            for (int i = edges.length - (key.unordered() ? 2 : 1); i &gt;= 0; i -= key.unordered() ? 2 : 1)</span>
-<span class="fc bfc" id="L282" title="All 2 branches covered.">                if (!numbering.containsKey(edges[i])) { pending.push(edges[i]); waiting = true; }</span>
-<span class="fc bfc" id="L283" title="All 2 branches covered.">            if (waiting) continue;</span>
-<span class="fc" id="L284">            var mapped = new ArrayList&lt;Integer&gt;(edges.length);</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">            for (int i = 0; i &lt; edges.length; i++)</span>
-<span class="fc bfc" id="L286" title="All 4 branches covered.">                mapped.add(key.unordered() &amp;&amp; i % 2 == 1 ? edges[i] : numbering.get(edges[i]));</span>
-<span class="fc" id="L287">            numbering.put(current, nodes.size());</span>
-<span class="fc" id="L288">            nodes.add(new ExprValueSnapshot.Node(key.kind().name(), atomText(key), mapped));</span>
-<span class="fc" id="L289">            pending.pop();</span>
-<span class="fc" id="L290">        }</span>
-<span class="fc" id="L291">        return new ExprValueSnapshot.Snapshot(ExprValueSnapshot.VERSION, numbering.get(root.index), expected, nodes);</span>
+<span class="fc" id="L289">        String expected = digest(root); // Validate ownership and populate the bounded Merkle cache.</span>
+<span class="fc" id="L290">        var numbering = new HashMap&lt;Integer, Integer&gt;();</span>
+<span class="fc" id="L291">        var nodes = new ArrayList&lt;ExprValueSnapshot.Node&gt;();</span>
+<span class="fc" id="L292">        var pending = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L293">        pending.push(root.index);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L295">            int current = pending.peek();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (numbering.containsKey(current)) { pending.pop(); continue; }</span>
+<span class="fc" id="L297">            var key = entries.get(current);</span>
+<span class="fc" id="L298">            int[] edges = snapshotEdges(key);</span>
+<span class="fc" id="L299">            boolean waiting = false;</span>
+<span class="fc bfc" id="L300" title="All 6 branches covered.">            for (int i = edges.length - (key.unordered() ? 2 : 1); i &gt;= 0; i -= key.unordered() ? 2 : 1)</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                if (!numbering.containsKey(edges[i])) { pending.push(edges[i]); waiting = true; }</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            if (waiting) continue;</span>
+<span class="fc" id="L303">            var mapped = new ArrayList&lt;Integer&gt;(edges.length);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            for (int i = 0; i &lt; edges.length; i++)</span>
+<span class="fc bfc" id="L305" title="All 4 branches covered.">                mapped.add(key.unordered() &amp;&amp; i % 2 == 1 ? edges[i] : numbering.get(edges[i]));</span>
+<span class="fc" id="L306">            numbering.put(current, nodes.size());</span>
+<span class="fc" id="L307">            nodes.add(new ExprValueSnapshot.Node(key.kind().name(), atomText(key), mapped));</span>
+<span class="fc" id="L308">            pending.pop();</span>
+<span class="fc" id="L309">        }</span>
+<span class="fc" id="L310">        return new ExprValueSnapshot.Snapshot(ExprValueSnapshot.VERSION, numbering.get(root.index), expected, nodes);</span>
     }
 
     private int[] snapshotEdges(Key key) {
-<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (!key.unordered()) return key.edges();</span>
-<span class="fc" id="L296">        var pairs = new ArrayList&lt;int[]&gt;();</span>
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        for (int i = 0; i &lt; key.edges().length; i += 2) pairs.add(new int[]{key.edges()[i], key.edges()[i + 1]});</span>
-<span class="fc" id="L298">        pairs.sort((a, b) -&gt; Arrays.compareUnsigned(digests.get(a[0]), digests.get(b[0])));</span>
-<span class="fc" id="L299">        int[] result = new int[key.edges().length];</span>
-<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (int i = 0; i &lt; pairs.size(); i++) { result[2 * i] = pairs.get(i)[0]; result[2 * i + 1] = pairs.get(i)[1]; }</span>
-<span class="fc" id="L301">        return result;</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (!key.unordered()) return key.edges();</span>
+<span class="fc" id="L315">        var pairs = new ArrayList&lt;int[]&gt;();</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (int i = 0; i &lt; key.edges().length; i += 2) pairs.add(new int[]{key.edges()[i], key.edges()[i + 1]});</span>
+<span class="fc" id="L317">        pairs.sort((a, b) -&gt; Arrays.compareUnsigned(digests.get(a[0]), digests.get(b[0])));</span>
+<span class="fc" id="L318">        int[] result = new int[key.edges().length];</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        for (int i = 0; i &lt; pairs.size(); i++) { result[2 * i] = pairs.get(i)[0]; result[2 * i + 1] = pairs.get(i)[1]; }</span>
+<span class="fc" id="L320">        return result;</span>
     }
 
     private static String atomText(Key key) {
-<span class="fc bfc" id="L305" title="All 2 branches covered.">        return key.atom() instanceof ExactRational n ? n.canonicalText() : (String) key.atom();</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        return key.atom() instanceof ExactRational n ? n.canonicalText() : (String) key.atom();</span>
     }
 
     /** Re-intern every node; require the digest supplied by the caller's source binding. Atomic on rejection. */
     public synchronized ValueId restore(ExprValueSnapshot.Snapshot snapshot, String expectedDigest, int maximumBytes) {
-<span class="fc" id="L310">        requireOpen();</span>
-<span class="pc bpc" id="L311" title="1 of 4 branches missed.">        if (!ExprValueSnapshot.VERSION.equals(snapshot.version()) || !snapshot.digest().equals(expectedDigest)</span>
-<span class="pc bpc" id="L312" title="1 of 4 branches missed.">                || snapshot.nodes().isEmpty() || snapshot.nodes().size() &gt; maximumEntries</span>
-<span class="pc bpc" id="L313" title="1 of 4 branches missed.">                || snapshot.root() != snapshot.nodes().size() - 1 || maximumBytes &lt; 1</span>
-<span class="fc bfc" id="L314" title="All 2 branches covered.">                || ExprValueSnapshot.encodedSize(snapshot) &gt; maximumBytes)</span>
-<span class="fc" id="L315">            throw new IllegalArgumentException(&quot;snapshot binding or limit&quot;);</span>
-<span class="fc" id="L316">        int start = entries.size(), digestStart = digests.size();</span>
+<span class="fc" id="L329">        requireOpen();</span>
+<span class="pc bpc" id="L330" title="1 of 4 branches missed.">        if (!ExprValueSnapshot.VERSION.equals(snapshot.version()) || !snapshot.digest().equals(expectedDigest)</span>
+<span class="pc bpc" id="L331" title="1 of 4 branches missed.">                || snapshot.nodes().isEmpty() || snapshot.nodes().size() &gt; maximumEntries</span>
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">                || snapshot.root() != snapshot.nodes().size() - 1 || maximumBytes &lt; 1</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">                || ExprValueSnapshot.encodedSize(snapshot) &gt; maximumBytes)</span>
+<span class="fc" id="L334">            throw new IllegalArgumentException(&quot;snapshot binding or limit&quot;);</span>
+<span class="fc" id="L335">        int start = entries.size(), digestStart = digests.size();</span>
         try {
-<span class="fc" id="L318">            var mapped = new ArrayList&lt;ValueId&gt;(snapshot.nodes().size());</span>
-<span class="fc" id="L319">            var distinct = new java.util.HashSet&lt;ValueId&gt;();</span>
-<span class="fc bfc" id="L320" title="All 2 branches covered.">            for (var node : snapshot.nodes()) {</span>
-<span class="fc" id="L321">                ValueId id = restoreNode(node, mapped);</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                if (!distinct.add(id)) throw new IllegalArgumentException(&quot;duplicate snapshot node&quot;);</span>
-<span class="fc" id="L323">                mapped.add(id);</span>
-<span class="fc" id="L324">            }</span>
-<span class="fc" id="L325">            var root = mapped.get(snapshot.root());</span>
-<span class="pc bpc" id="L326" title="1 of 4 branches missed.">            if (!digest(root).equals(expectedDigest) || snapshot(root).nodes().size() != mapped.size())</span>
-<span class="fc" id="L327">                throw new IllegalArgumentException(&quot;snapshot structure differs from binding&quot;);</span>
-<span class="fc" id="L328">            return root;</span>
-<span class="fc" id="L329">        } catch (RuntimeException rejected) {</span>
-<span class="fc bfc" id="L330" title="All 2 branches covered.">            while (entries.size() &gt; start) index.remove(entries.removeLast());</span>
-<span class="fc bfc" id="L331" title="All 2 branches covered.">            while (digests.size() &gt; digestStart) digests.removeLast();</span>
-<span class="fc" id="L332">            throw rejected;</span>
+<span class="fc" id="L337">            var mapped = new ArrayList&lt;ValueId&gt;(snapshot.nodes().size());</span>
+<span class="fc" id="L338">            var distinct = new java.util.HashSet&lt;ValueId&gt;();</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">            for (var node : snapshot.nodes()) {</span>
+<span class="fc" id="L340">                ValueId id = restoreNode(node, mapped);</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                if (!distinct.add(id)) throw new IllegalArgumentException(&quot;duplicate snapshot node&quot;);</span>
+<span class="fc" id="L342">                mapped.add(id);</span>
+<span class="fc" id="L343">            }</span>
+<span class="fc" id="L344">            var root = mapped.get(snapshot.root());</span>
+<span class="pc bpc" id="L345" title="1 of 4 branches missed.">            if (!digest(root).equals(expectedDigest) || snapshot(root).nodes().size() != mapped.size())</span>
+<span class="fc" id="L346">                throw new IllegalArgumentException(&quot;snapshot structure differs from binding&quot;);</span>
+<span class="fc" id="L347">            return root;</span>
+<span class="fc" id="L348">        } catch (RuntimeException rejected) {</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            while (entries.size() &gt; start) index.remove(entries.removeLast());</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            while (digests.size() &gt; digestStart) digests.removeLast();</span>
+<span class="fc" id="L351">            throw rejected;</span>
         }
     }
 
     private ValueId restoreNode(ExprValueSnapshot.Node node, List&lt;ValueId&gt; mapped) {
-<span class="fc" id="L337">        Kind kind = Kind.valueOf(node.kind());</span>
-<span class="pc bpc" id="L338" title="1 of 4 branches missed.">        boolean ac = kind == Kind.ADD || kind == Kind.MUL;</span>
-<span class="fc" id="L339">        int[] edges = new int[node.edges().size()];</span>
-<span class="fc bfc" id="L340" title="All 2 branches covered.">        for (int i = 0; i &lt; edges.length; i++) {</span>
-<span class="fc" id="L341">            int value = node.edges().get(i);</span>
-<span class="fc bfc" id="L342" title="All 4 branches covered.">            if (ac &amp;&amp; i % 2 == 1) {</span>
-<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                if (value &lt; 1) throw new IllegalArgumentException(&quot;nonpositive multiplicity&quot;);</span>
-<span class="fc" id="L344">                edges[i] = value;</span>
+<span class="fc" id="L356">        Kind kind = Kind.valueOf(node.kind());</span>
+<span class="pc bpc" id="L357" title="1 of 4 branches missed.">        boolean ac = kind == Kind.ADD || kind == Kind.MUL;</span>
+<span class="fc" id="L358">        int[] edges = new int[node.edges().size()];</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        for (int i = 0; i &lt; edges.length; i++) {</span>
+<span class="fc" id="L360">            int value = node.edges().get(i);</span>
+<span class="fc bfc" id="L361" title="All 4 branches covered.">            if (ac &amp;&amp; i % 2 == 1) {</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                if (value &lt; 1) throw new IllegalArgumentException(&quot;nonpositive multiplicity&quot;);</span>
+<span class="fc" id="L363">                edges[i] = value;</span>
             } else {
-<span class="pc bpc" id="L346" title="1 of 4 branches missed.">                if (value &lt; 0 || value &gt;= mapped.size()) throw new IllegalArgumentException(&quot;non-topological snapshot&quot;);</span>
-<span class="fc" id="L347">                edges[i] = mapped.get(value).index;</span>
+<span class="pc bpc" id="L365" title="1 of 4 branches missed.">                if (value &lt; 0 || value &gt;= mapped.size()) throw new IllegalArgumentException(&quot;non-topological snapshot&quot;);</span>
+<span class="fc" id="L366">                edges[i] = mapped.get(value).index;</span>
             }
         }
-<span class="fc" id="L350">        Object atom = validateSnapshotNode(kind, node.atom(), edges);</span>
-<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (ac) edges = canonicalAcEdges(kind, edges);</span>
-<span class="fc" id="L352">        var key = new Key(kind, atom, edges);</span>
-<span class="pc bpc" id="L353" title="1 of 4 branches missed.">        if (kind == Kind.SUB || kind == Kind.DIV) {</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            var operator = kind == Kind.SUB ? BinaryOperator.SUB : BinaryOperator.DIV;</span>
-<span class="fc bfc" id="L355" title="All 2 branches covered.">            if (!key.equals(binaryKey(operator, edges[0], edges[1])))</span>
-<span class="fc" id="L356">                throw new IllegalArgumentException(&quot;noncanonical numeric operator&quot;);</span>
+<span class="fc" id="L369">        Object atom = validateSnapshotNode(kind, node.atom(), edges);</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (ac) edges = canonicalAcEdges(kind, edges);</span>
+<span class="fc" id="L371">        var key = new Key(kind, atom, edges);</span>
+<span class="pc bpc" id="L372" title="1 of 4 branches missed.">        if (kind == Kind.SUB || kind == Kind.DIV) {</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            var operator = kind == Kind.SUB ? BinaryOperator.SUB : BinaryOperator.DIV;</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (!key.equals(binaryKey(operator, edges[0], edges[1])))</span>
+<span class="fc" id="L375">                throw new IllegalArgumentException(&quot;noncanonical numeric operator&quot;);</span>
         }
-<span class="fc" id="L358">        var existing = index.get(key);</span>
-<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (existing != null) return existing;</span>
-<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (entries.size() == maximumEntries) throw new IllegalArgumentException(&quot;snapshot arena capacity&quot;);</span>
-<span class="fc" id="L361">        var id = new ValueId(owner, entries.size());</span>
-<span class="fc" id="L362">        entries.add(key); index.put(key, id);</span>
-<span class="fc" id="L363">        return id;</span>
+<span class="fc" id="L377">        var existing = index.get(key);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (existing != null) return existing;</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (entries.size() == maximumEntries) throw new IllegalArgumentException(&quot;snapshot arena capacity&quot;);</span>
+<span class="fc" id="L380">        var id = new ValueId(owner, entries.size());</span>
+<span class="fc" id="L381">        entries.add(key); index.put(key, id);</span>
+<span class="fc" id="L382">        return id;</span>
     }
 
     private Object validateSnapshotNode(Kind kind, String atom, int[] edges) {
-<span class="fc bfc" id="L367" title="All 4 branches covered.">        switch (kind) {</span>
+<span class="fc bfc" id="L386" title="All 4 branches covered.">        switch (kind) {</span>
             case NUMBER -&gt; {
-<span class="fc" id="L369">                var number = ExactRational.fromCanonicalText(atom);</span>
-<span class="pc bpc" id="L370" title="2 of 4 branches missed.">                if (edges.length != 0 || !number.canonicalText().equals(atom)) throw new IllegalArgumentException(&quot;noncanonical number&quot;);</span>
-<span class="fc" id="L371">                return number;</span>
+<span class="fc" id="L388">                var number = ExactRational.fromCanonicalText(atom);</span>
+<span class="pc bpc" id="L389" title="2 of 4 branches missed.">                if (edges.length != 0 || !number.canonicalText().equals(atom)) throw new IllegalArgumentException(&quot;noncanonical number&quot;);</span>
+<span class="fc" id="L390">                return number;</span>
             }
             case VARIABLE, SCOPED -&gt; {
-<span class="fc" id="L374">                var variable = new VariableExpr(atom);</span>
-<span class="pc bpc" id="L375" title="3 of 6 branches missed.">                if (edges.length != 0 || variable.symbol().isPresent() != (kind == Kind.SCOPED))</span>
-<span class="nc" id="L376">                    throw new IllegalArgumentException(&quot;invalid variable node&quot;);</span>
-<span class="fc" id="L377">            }</span>
+<span class="fc" id="L393">                var variable = new VariableExpr(atom);</span>
+<span class="pc bpc" id="L394" title="3 of 6 branches missed.">                if (edges.length != 0 || variable.symbol().isPresent() != (kind == Kind.SCOPED))</span>
+<span class="nc" id="L395">                    throw new IllegalArgumentException(&quot;invalid variable node&quot;);</span>
+<span class="fc" id="L396">            }</span>
             case FUNCTION -&gt; {
-<span class="pc bpc" id="L379" title="2 of 4 branches missed.">                if (atom.isBlank() || !atom.trim().equals(atom)) throw new IllegalArgumentException(&quot;invalid function node&quot;);</span>
+<span class="pc bpc" id="L398" title="2 of 4 branches missed.">                if (atom.isBlank() || !atom.trim().equals(atom)) throw new IllegalArgumentException(&quot;invalid function node&quot;);</span>
             }
             default -&gt; {
-<span class="pc bpc" id="L382" title="5 of 12 branches missed.">                if (!atom.isEmpty() || ((kind == Kind.ADD || kind == Kind.MUL)</span>
+<span class="pc bpc" id="L401" title="5 of 12 branches missed.">                if (!atom.isEmpty() || ((kind == Kind.ADD || kind == Kind.MUL)</span>
                         ? edges.length &lt; 2 || edges.length % 2 != 0 : edges.length != 2))
-<span class="nc" id="L384">                    throw new IllegalArgumentException(&quot;invalid operator node&quot;);</span>
+<span class="nc" id="L403">                    throw new IllegalArgumentException(&quot;invalid operator node&quot;);</span>
             }
         }
-<span class="fc" id="L387">        return atom;</span>
+<span class="fc" id="L406">        return atom;</span>
     }
 
     private int[] canonicalAcEdges(Kind kind, int[] edges) {
-<span class="fc" id="L391">        var sorted = new TreeMap&lt;Integer, Integer&gt;();</span>
-<span class="fc" id="L392">        int total = 0;</span>
-<span class="fc bfc" id="L393" title="All 2 branches covered.">        for (int i = 0; i &lt; edges.length; i += 2) {</span>
-<span class="pc bpc" id="L394" title="2 of 4 branches missed.">            if (entries.get(edges[i]).kind() == kind || sorted.put(edges[i], edges[i + 1]) != null)</span>
-<span class="nc" id="L395">                throw new IllegalArgumentException(&quot;noncanonical AC node&quot;);</span>
-<span class="fc" id="L396">            total = Math.addExact(total, edges[i + 1]);</span>
+<span class="fc" id="L410">        var sorted = new TreeMap&lt;Integer, Integer&gt;();</span>
+<span class="fc" id="L411">        int total = 0;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        for (int i = 0; i &lt; edges.length; i += 2) {</span>
+<span class="pc bpc" id="L413" title="2 of 4 branches missed.">            if (entries.get(edges[i]).kind() == kind || sorted.put(edges[i], edges[i + 1]) != null)</span>
+<span class="nc" id="L414">                throw new IllegalArgumentException(&quot;noncanonical AC node&quot;);</span>
+<span class="fc" id="L415">            total = Math.addExact(total, edges[i + 1]);</span>
         }
-<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        if (total &lt; 2) throw new IllegalArgumentException(&quot;AC node arity&quot;);</span>
-<span class="fc" id="L399">        int at = 0;</span>
-<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (var term : sorted.entrySet()) { edges[at++] = term.getKey(); edges[at++] = term.getValue(); }</span>
-<span class="fc" id="L401">        return edges;</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (total &lt; 2) throw new IllegalArgumentException(&quot;AC node arity&quot;);</span>
+<span class="fc" id="L418">        int at = 0;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        for (var term : sorted.entrySet()) { edges[at++] = term.getKey(); edges[at++] = term.getValue(); }</span>
+<span class="fc" id="L420">        return edges;</span>
     }
 
     /**
@@ -407,72 +426,72 @@ public final class ExprValueArena implements AutoCloseable {
      * The digest is evidence for cross-process comparison, never an interning key.
      */
     public synchronized String digest(ValueId id) {
-<span class="fc" id="L410">        requireOpen();</span>
-<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (Objects.requireNonNull(id, &quot;id&quot;).owner != owner) throw new IllegalArgumentException(&quot;foreign value ID&quot;);</span>
-<span class="fc bfc" id="L412" title="All 2 branches covered.">        if (digests.size() &lt;= id.index) {</span>
+<span class="fc" id="L429">        requireOpen();</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        if (Objects.requireNonNull(id, &quot;id&quot;).owner != owner) throw new IllegalArgumentException(&quot;foreign value ID&quot;);</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">        if (digests.size() &lt;= id.index) {</span>
             MessageDigest hash;
             try {
-<span class="fc" id="L415">                hash = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
-<span class="nc" id="L416">            } catch (NoSuchAlgorithmException impossible) {</span>
-<span class="nc" id="L417">                throw new IllegalStateException(impossible);</span>
-<span class="fc" id="L418">            }</span>
+<span class="fc" id="L434">                hash = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L435">            } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L436">                throw new IllegalStateException(impossible);</span>
+<span class="fc" id="L437">            }</span>
             // Children are older than their parents. Each entry is hashed at most once.
-<span class="fc bfc" id="L420" title="All 2 branches covered.">            while (digests.size() &lt;= id.index) digests.add(hashNode(hash, entries.get(digests.size())));</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">            while (digests.size() &lt;= id.index) digests.add(hashNode(hash, entries.get(digests.size())));</span>
         }
-<span class="fc" id="L422">        return DIGEST_VERSION + &quot;:&quot; + HexFormat.of().formatHex(digests.get(id.index));</span>
+<span class="fc" id="L441">        return DIGEST_VERSION + &quot;:&quot; + HexFormat.of().formatHex(digests.get(id.index));</span>
     }
 
     private byte[] hashNode(MessageDigest hash, Key key) {
-<span class="fc" id="L426">        text(hash, DIGEST_VERSION);</span>
-<span class="fc" id="L427">        text(hash, key.kind().name());</span>
-<span class="fc bfc" id="L428" title="All 2 branches covered.">        text(hash, key.atom() instanceof ExactRational number ? number.canonicalText() : (String) key.atom());</span>
-<span class="fc" id="L429">        integer(hash, key.edges().length);</span>
-<span class="fc bfc" id="L430" title="All 2 branches covered.">        if (key.unordered()) {</span>
-<span class="fc" id="L431">            var terms = new ArrayList&lt;DigestCount&gt;();</span>
-<span class="fc bfc" id="L432" title="All 2 branches covered.">            for (int i = 0; i &lt; key.edges().length; i += 2)</span>
-<span class="fc" id="L433">                terms.add(new DigestCount(digests.get(key.edges()[i]), key.edges()[i + 1]));</span>
-<span class="fc" id="L434">            terms.sort((a, b) -&gt; {</span>
-<span class="fc" id="L435">                int order = Arrays.compareUnsigned(a.digest(), b.digest());</span>
-<span class="pc bpc" id="L436" title="1 of 2 branches missed.">                return order != 0 ? order : Integer.compare(a.count(), b.count());</span>
+<span class="fc" id="L445">        text(hash, DIGEST_VERSION);</span>
+<span class="fc" id="L446">        text(hash, key.kind().name());</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        text(hash, key.atom() instanceof ExactRational number ? number.canonicalText() : (String) key.atom());</span>
+<span class="fc" id="L448">        integer(hash, key.edges().length);</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (key.unordered()) {</span>
+<span class="fc" id="L450">            var terms = new ArrayList&lt;DigestCount&gt;();</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            for (int i = 0; i &lt; key.edges().length; i += 2)</span>
+<span class="fc" id="L452">                terms.add(new DigestCount(digests.get(key.edges()[i]), key.edges()[i + 1]));</span>
+<span class="fc" id="L453">            terms.sort((a, b) -&gt; {</span>
+<span class="fc" id="L454">                int order = Arrays.compareUnsigned(a.digest(), b.digest());</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                return order != 0 ? order : Integer.compare(a.count(), b.count());</span>
             });
-<span class="fc bfc" id="L438" title="All 2 branches covered.">            for (var term : terms) {</span>
-<span class="fc" id="L439">                hash.update(term.digest());</span>
-<span class="fc" id="L440">                integer(hash, term.count());</span>
-<span class="fc" id="L441">            }</span>
-<span class="fc" id="L442">        } else {</span>
-<span class="fc bfc" id="L443" title="All 2 branches covered.">            for (int child : key.edges()) hash.update(digests.get(child));</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            for (var term : terms) {</span>
+<span class="fc" id="L458">                hash.update(term.digest());</span>
+<span class="fc" id="L459">                integer(hash, term.count());</span>
+<span class="fc" id="L460">            }</span>
+<span class="fc" id="L461">        } else {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            for (int child : key.edges()) hash.update(digests.get(child));</span>
         }
-<span class="fc" id="L445">        return hash.digest();</span>
+<span class="fc" id="L464">        return hash.digest();</span>
     }
 
     // Preserve exact Java string identity, including unpaired UTF-16 code units.
     private static void text(MessageDigest hash, String value) {
-<span class="fc" id="L450">        integer(hash, value.length());</span>
-<span class="fc bfc" id="L451" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
-<span class="fc" id="L452">            char c = value.charAt(i);</span>
-<span class="fc" id="L453">            hash.update((byte) (c &gt;&gt;&gt; 8));</span>
-<span class="fc" id="L454">            hash.update((byte) c);</span>
+<span class="fc" id="L469">        integer(hash, value.length());</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L471">            char c = value.charAt(i);</span>
+<span class="fc" id="L472">            hash.update((byte) (c &gt;&gt;&gt; 8));</span>
+<span class="fc" id="L473">            hash.update((byte) c);</span>
         }
-<span class="fc" id="L456">    }</span>
+<span class="fc" id="L475">    }</span>
 
     private static void integer(MessageDigest hash, int value) {
-<span class="fc bfc" id="L459" title="All 2 branches covered.">        for (int shift = 24; shift &gt;= 0; shift -= 8) hash.update((byte) (value &gt;&gt;&gt; shift));</span>
-<span class="fc" id="L460">    }</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        for (int shift = 24; shift &gt;= 0; shift -= 8) hash.update((byte) (value &gt;&gt;&gt; shift));</span>
+<span class="fc" id="L479">    }</span>
 
     private void requireOpen() {
-<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (closed) throw new IllegalStateException(&quot;semantic value arena is closed&quot;);</span>
-<span class="fc" id="L464">    }</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        if (closed) throw new IllegalStateException(&quot;semantic value arena is closed&quot;);</span>
+<span class="fc" id="L483">    }</span>
 
     @Override public synchronized void close() {
-<span class="fc bfc" id="L467" title="All 2 branches covered.">        for (var projection : projections) {</span>
-<span class="fc" id="L468">            projection.source = null;</span>
-<span class="fc" id="L469">            projection.values.clear();</span>
-<span class="fc" id="L470">        }</span>
-<span class="fc" id="L471">        projections.clear();</span>
-<span class="fc" id="L472">        entries.clear();</span>
-<span class="fc" id="L473">        index.clear();</span>
-<span class="fc" id="L474">        digests.clear();</span>
-<span class="fc" id="L475">        closed = true;</span>
-<span class="fc" id="L476">    }</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        for (var projection : projections) {</span>
+<span class="fc" id="L487">            projection.source = null;</span>
+<span class="fc" id="L488">            projection.values.clear();</span>
+<span class="fc" id="L489">        }</span>
+<span class="fc" id="L490">        projections.clear();</span>
+<span class="fc" id="L491">        entries.clear();</span>
+<span class="fc" id="L492">        index.clear();</span>
+<span class="fc" id="L493">        digests.clear();</span>
+<span class="fc" id="L494">        closed = true;</span>
+<span class="fc" id="L495">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

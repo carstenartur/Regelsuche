@@ -123,7 +123,7 @@ import java.util.Set;
 <span class="fc" id="L123">            this.budget = budget;</span>
 <span class="fc" id="L124">            this.descriptor = domain.descriptor();</span>
 <span class="fc" id="L125">            this.frontier = new PriorityQueue&lt;&gt;(Comparator</span>
-<span class="pc" id="L126">                .&lt;Node&lt;S&gt;&gt;comparingInt(node -&gt; node.objective().score())</span>
+<span class="fc" id="L126">                .&lt;Node&lt;S&gt;&gt;comparingInt(node -&gt; node.objective().score())</span>
 <span class="fc" id="L127">                .reversed()</span>
 <span class="fc" id="L128">                .thenComparingInt(Node::depth)</span>
 <span class="fc" id="L129">                .thenComparing(Node::stateHash));</span>
@@ -248,12 +248,12 @@ import java.util.Set;
 <span class="fc" id="L248">            int remaining = Math.max(</span>
                 0,
 <span class="fc" id="L250">                budget.maxCounterexampleAttempts() - counterexampleAttemptsUsed);</span>
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (remaining == 0) {</span>
-<span class="nc" id="L252">                return new CounterexampleResult(</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (remaining == 0) {</span>
+<span class="fc" id="L252">                return new CounterexampleResult(</span>
                     CounterexampleStatus.INCONCLUSIVE,
                     0,
                     &quot;counterexample budget exhausted&quot;,
-<span class="nc" id="L256">                    Map.of(&quot;budget&quot;, &quot;0&quot;));</span>
+<span class="fc" id="L256">                    Map.of(&quot;budget&quot;, &quot;0&quot;));</span>
             }
 <span class="fc" id="L258">            CounterexampleResult result = Objects.requireNonNull(</span>
 <span class="fc" id="L259">                domain.counterexampleGenerator().search(candidate, remaining),</span>
@@ -702,9 +702,9 @@ import java.util.Set;
         }
 
         private static AttemptDisposition disposition(EvaluationStatus status) {
-<span class="pc bpc" id="L705" title="3 of 4 branches missed.">            return switch (status) {</span>
+<span class="pc bpc" id="L705" title="2 of 4 branches missed.">            return switch (status) {</span>
 <span class="fc" id="L706">                case REFUTED -&gt; AttemptDisposition.REFUTED_BY_EVALUATOR;</span>
-<span class="nc" id="L707">                case INCONCLUSIVE -&gt; AttemptDisposition.INCONCLUSIVE;</span>
+<span class="fc" id="L707">                case INCONCLUSIVE -&gt; AttemptDisposition.INCONCLUSIVE;</span>
 <span class="nc" id="L708">                case UNSUPPORTED -&gt; AttemptDisposition.UNSUPPORTED;</span>
 <span class="nc" id="L709">                case CONFIRMED -&gt; throw new IllegalArgumentException(</span>
                     &quot;confirmed evaluation must use confirmed factory&quot;);
@@ -714,10 +714,10 @@ import java.util.Set;
         private static EvaluationDisposition evaluationDisposition(
             EvaluationStatus status
         ) {
-<span class="pc bpc" id="L717" title="3 of 4 branches missed.">            return switch (status) {</span>
+<span class="pc bpc" id="L717" title="2 of 4 branches missed.">            return switch (status) {</span>
 <span class="nc" id="L718">                case CONFIRMED -&gt; EvaluationDisposition.CONFIRMED;</span>
 <span class="fc" id="L719">                case REFUTED -&gt; EvaluationDisposition.REFUTED;</span>
-<span class="nc" id="L720">                case INCONCLUSIVE -&gt; EvaluationDisposition.INCONCLUSIVE;</span>
+<span class="fc" id="L720">                case INCONCLUSIVE -&gt; EvaluationDisposition.INCONCLUSIVE;</span>
 <span class="nc" id="L721">                case UNSUPPORTED -&gt; EvaluationDisposition.UNSUPPORTED;</span>
             };
         }

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CandidateEvidenceRoute.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">CandidateEvidenceRoute.java</span></div><h1>CandidateEvidenceRoute.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sun.net.httpserver.HttpExchange;
+import de.regelsuche.discovery.domain.SourceBoundReceiptFiles;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryRunWorkspace;
+import de.regelsuche.radar.AstRuleRadarService;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+<span class="nc" id="L18">final class CandidateEvidenceRoute {</span>
+<span class="fc" id="L19">    private static final JsonMapper JSON = new JsonMapper();</span>
+
+    static void handle(HttpExchange exchange, Path runs, String suffix, AstRuleRadarService radar, int limit) throws IOException {
+        try {
+<span class="fc" id="L23">            boolean submit = exchange.getRequestMethod().equals(&quot;POST&quot;);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            var request = submit ? JSON.valueToTree(RetainedRunActions.readJson(exchange, Math.min(limit, 8192))) : null;</span>
+<span class="fc" id="L25">            String[] parts = suffix.split(&quot;/&quot;, -1);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (!parts[0].matches(&quot;[0-9a-f]{64}&quot;)) throw new IllegalArgumentException(&quot;invalid run digest&quot;);</span>
+<span class="nc" id="L27">            var run = RepresentationDiscoveryRunWorkspace.findRetained(runs, &quot;sha256:&quot; + parts[0]).orElseThrow();</span>
+<span class="nc" id="L28">            var files = new SourceBoundReceiptFiles(runs.resolveSibling(runs.getFileName() + &quot;-candidate-reviews&quot;), 512);</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">            var receipt = submit ? create(request, runs, run, radar, files) : reopen(runs, run, radar, files, parts[2]);</span>
+<span class="nc" id="L30">            String digest = receipt.required(&quot;contentHash&quot;).asText().substring(7);</span>
+<span class="nc" id="L31">            exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, run.runId());</span>
+<span class="nc" id="L32">            exchange.getResponseHeaders().set(&quot;ETag&quot;, &quot;\&quot;&quot; + digest + &quot;\&quot;&quot;);</span>
+<span class="nc" id="L33">            exchange.getResponseHeaders().set(&quot;Location&quot;, &quot;/api/discovery-runs/&quot; + parts[0] + &quot;/candidate-evidence/&quot; + digest);</span>
+<span class="nc" id="L34">            RetainedRunActions.send(exchange, 200, receipt.toString());</span>
+<span class="nc" id="L35">        } catch (NoSuchElementException missing) {</span>
+<span class="nc" id="L36">            RetainedRunActions.error(exchange, 404, &quot;REVIEW_SOURCE_ABSENT&quot;, &quot;retained source or occurrence not found&quot;);</span>
+<span class="fc" id="L37">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L38">            RetainedRunActions.error(exchange, 400, &quot;INVALID_REVIEW&quot;, invalid.getMessage());</span>
+<span class="nc" id="L39">        }</span>
+<span class="fc" id="L40">    }</span>
+
+    private static ObjectNode create(JsonNode body, Path runs, RepresentationDiscoveryRunWorkspace run,
+            AstRuleRadarService radar, SourceBoundReceiptFiles files) throws IOException {
+<span class="nc" id="L44">        var allowed = Set.of(&quot;candidateId&quot;, &quot;edge&quot;, &quot;guard&quot;, &quot;premises&quot;);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (!allowed.containsAll(body.propertyStream().map(entry -&gt; entry.getKey()).toList())) throw new IllegalArgumentException(&quot;unknown review input&quot;);</span>
+<span class="nc bnc" id="L46" title="All 4 branches missed.">        if (!body.path(&quot;candidateId&quot;).asText().matches(&quot;sha256:[0-9a-f]{64}&quot;) || !body.path(&quot;edge&quot;).isIntegralNumber()</span>
+<span class="nc bnc" id="L47" title="All 4 branches missed.">                || !body.path(&quot;edge&quot;).canConvertToInt() || body.path(&quot;edge&quot;).intValue() &lt; 1) throw new IllegalArgumentException(&quot;invalid occurrence selection&quot;);</span>
+<span class="nc" id="L48">        var guard = body.path(&quot;guard&quot;);</span>
+<span class="nc bnc" id="L49" title="All 6 branches missed.">        if (!guard.isMissingNode() &amp;&amp; (!guard.isTextual() || guard.asText().length() &gt; 128)) throw new IllegalArgumentException(&quot;invalid guard&quot;);</span>
+<span class="nc" id="L50">        var premises = premises(body.path(&quot;premises&quot;));</span>
+<span class="nc bnc" id="L51" title="All 4 branches missed.">        if (!premises.isEmpty() &amp;&amp; guard.asText(&quot;&quot;).isBlank()) throw new IllegalArgumentException(&quot;review premise without a guard&quot;);</span>
+<span class="nc" id="L52">        var receipt = RetainedCandidateEvidence.review(runs, run, body.required(&quot;candidateId&quot;).textValue(), body.required(&quot;edge&quot;).intValue(),</span>
+<span class="nc" id="L53">            radar, guard.asText(&quot;&quot;), premises);</span>
+<span class="nc" id="L54">        files.retain(run.runId(), receipt.required(&quot;contentHash&quot;).asText(), receipt.toString().getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L55">        return receipt;</span>
+    }
+
+    private static List&lt;String&gt; premises(JsonNode values) {
+<span class="nc bnc" id="L59" title="All 6 branches missed.">        if (!values.isMissingNode() &amp;&amp; (!values.isArray() || values.size() &gt; 8</span>
+<span class="nc bnc" id="L60" title="All 8 branches missed.">                || values.valueStream().anyMatch(p -&gt; !p.isTextual() || p.asText().isBlank() || p.asText().length() &gt; 128))) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;review requires at most eight short predicates&quot;);</span>
+        }
+<span class="nc" id="L63">        return values.valueStream().map(JsonNode::asText).toList();</span>
+    }
+
+    private static ObjectNode reopen(Path runs, RepresentationDiscoveryRunWorkspace run, AstRuleRadarService radar,
+            SourceBoundReceiptFiles files, String digest) throws IOException {
+<span class="nc" id="L68">        String hash = &quot;sha256:&quot; + digest;</span>
+<span class="nc" id="L69">        var bytes = files.find(run.runId(), hash).orElseThrow();</span>
+<span class="nc" id="L70">        var saved = JSON.readTree(bytes);</span>
+<span class="nc" id="L71">        var context = saved.path(&quot;supplementalGuardReview&quot;);</span>
+<span class="nc" id="L72">        var replayed = RetainedCandidateEvidence.review(runs, run, saved.required(&quot;candidateId&quot;).textValue(),</span>
+<span class="nc" id="L73">            saved.required(&quot;edgeSequence&quot;).intValue(), radar, context.path(&quot;requirement&quot;).asText(&quot;&quot;), premises(context.path(&quot;reviewPremises&quot;)));</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">        if (!hash.equals(replayed.required(&quot;contentHash&quot;).asText()) || !Arrays.equals(bytes, replayed.toString().getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L75">            throw new IllegalStateException(&quot;candidate receipt differs from its independently reproduced sources&quot;);</span>
+        }
+<span class="nc" id="L77">        return replayed;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

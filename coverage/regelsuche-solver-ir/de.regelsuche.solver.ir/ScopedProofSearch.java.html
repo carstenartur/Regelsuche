@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedProofSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">ScopedProofSearch.java</span></div><h1>ScopedProofSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import static de.regelsuche.solver.ir.ScopedProofDag.Node.*;
+import static de.regelsuche.solver.ir.ScopedProofDag.Rule.*;
+import de.regelsuche.solver.ir.ScopedProofDag.Node;
+import de.regelsuche.solver.ir.SolverIr.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+/** Source-only finite logical formation. Premises are inspected, the supplied endpoint is never queried. */
+public final class ScopedProofSearch {
+<span class="nc" id="L13">    public record Proposal(ScopedProofDag dag, int formationWork) { }</span>
+    public record Report(List&lt;Proposal&gt; proposals, int work, boolean exhausted) {
+<span class="nc" id="L15">        public Report { proposals = List.copyOf(proposals); }</span>
+    }
+<span class="nc" id="L17">    private record Fact(Expression formula, List&lt;Node&gt; proof) { }</span>
+    private final Obligation context;
+    private final int limit;
+    private int work;
+<span class="nc" id="L21">    private final LinkedHashMap&lt;Expression,Fact&gt; facts = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L22">    private final List&lt;Proposal&gt; proposals = new ArrayList&lt;&gt;();</span>
+
+<span class="nc" id="L24">    private ScopedProofSearch(Obligation context, int limit) { this.context = context; this.limit = limit; }</span>
+    public static Report discover(Obligation source, int budget) {
+<span class="nc bnc" id="L26" title="All 4 branches missed.">        if (!SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(source.schema()) || source.assumptions().size() &gt; 32</span>
+<span class="nc bnc" id="L27" title="All 6 branches missed.">                || source.declarations().size() &gt; 32 || budget &lt; 0 || budget &gt; 65_536)</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;outside scoped proof formation bounds&quot;);</span>
+<span class="nc" id="L29">        var search = new ScopedProofSearch(source,budget);</span>
+<span class="nc" id="L30">        try { search.run(); return new Report(search.proposals,search.work,false); }</span>
+<span class="nc" id="L31">        catch (Stop exhausted) { return new Report(search.proposals,search.work,true); }</span>
+    }
+    private void run() {
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        for (int i = 0; i &lt; context.assumptions().size(); i++) {</span>
+<span class="nc" id="L35">            charge(1);</span>
+<span class="nc" id="L36">            var premise = context.assumptions().get(i);</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">            if (premise.relation() == Relation.HOLDS) facts.putIfAbsent(premise.left(),new Fact(premise.left(),List.of(premise(i))));</span>
+        }
+<span class="nc" id="L39">        var initial = List.copyOf(facts.values());</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        for (var fact : initial) fromPremise(fact,initial);</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        for (int i = 0; i &lt; context.declarations().size(); i++) {</span>
+<span class="nc" id="L42">            var predicate = context.declarations().get(i);</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">            if (predicate.sort() != Sort.NAT_PREDICATE) continue;</span>
+<span class="nc" id="L44">            charge(1 + 2 * context.assumptions().size());</span>
+<span class="nc" id="L45">            var found = NaturalInduction.propose(context,predicate);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            if (found.isEmpty()) continue;</span>
+<span class="nc" id="L47">            var plan = found.get();</span>
+<span class="nc" id="L48">            int base = context.assumptions().indexOf(plan.base()), step = context.assumptions().indexOf(plan.step());</span>
+<span class="nc" id="L49">            retain(plan.conclusion().goal().left(),List.of(premise(base),premise(step),indexed(INDUCTION,i,0,1)));</span>
+        }
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        for (int round = 0; round &lt; 4; round++) {</span>
+<span class="nc" id="L52">            int before = facts.size();</span>
+<span class="nc" id="L53">            var previous = List.copyOf(facts.values());</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            for (var implication : previous) apply(implication);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (before == facts.size()) return;</span>
+        }
+<span class="nc" id="L57">    }</span>
+    private void fromPremise(Fact fact, List&lt;Fact&gt; initial) {
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        if (fact.formula() instanceof Binder b &amp;&amp; b.kind()==BinderKind.FORALL) specialize(fact,b);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (fact.formula() instanceof Call c) {</span>
+<span class="nc bnc" id="L61" title="All 4 branches missed.">            switch (c.function()) {</span>
+<span class="nc" id="L62">                case &quot;or&quot; -&gt; cases(fact,c,initial);</span>
+<span class="nc" id="L63">                case &quot;eq&quot; -&gt; rewrite(fact,c,initial);</span>
+<span class="nc" id="L64">                case &quot;not&quot; -&gt; contradiction(fact,c);</span>
+                default -&gt; { }
+            }
+        }
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        for (int i=0;i&lt;context.declarations().size();i++) {</span>
+<span class="nc" id="L69">            charge(1);</span>
+<span class="nc" id="L70">            var d=context.declarations().get(i);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            if (d.sort()==Sort.NAT_PREDICATE) strongInduction(fact,d);</span>
+<span class="nc bnc" id="L72" title="All 6 branches missed.">            if ((d.sort()==Sort.REAL || d.sort()==Sort.NATURAL) &amp;&amp; fact.formula().referencedSymbols().contains(d.name())) {</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">                var closed = replace(fact.formula(),0,(e,depth)-&gt;e.equals(new Symbol(d.name())) ? new Bound(depth) : e);</span>
+<span class="nc" id="L74">                retain(new Binder(BinderKind.EXISTS,d.sort(),closed),</span>
+<span class="nc" id="L75">                    List.of(indexed(DECLARATION,i),fact.proof().getFirst(),of(WITNESS,0,1)));</span>
+            }
+        }
+<span class="nc" id="L78">    }</span>
+    private void cases(Fact input, Call disjunction, List&lt;Fact&gt; initial) {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (disjunction.arguments().size()!=2) return;</span>
+<span class="nc" id="L81">        var l=disjunction.arguments().getFirst(); var r=disjunction.arguments().getLast();</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (l.equals(r)) {</span>
+<span class="nc" id="L83">            retain(l,List.of(input.proof().getFirst(),local(0),of(CASES,0,1,1)));</span>
+<span class="nc" id="L84">            return;</span>
+        }
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        for (var f:initial) {</span>
+<span class="nc" id="L87">            charge(1);</span>
+<span class="nc bnc" id="L88" title="All 4 branches missed.">            if (!(f.formula() instanceof Call arrow) || !arrow.function().equals(&quot;implies&quot;)</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                    || arrow.arguments().size()!=2 || !arrow.arguments().getFirst().equals(l)) continue;</span>
+<span class="nc" id="L90">            var result=arrow.arguments().getLast();</span>
+<span class="nc" id="L91">            charge(initial.size());</span>
+<span class="nc" id="L92">            var g=initial.stream().filter(t -&gt; t.formula().equals(call(&quot;implies&quot;,r,result))).findFirst();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            if (g.isPresent()) retain(result,List.of(input.proof().getFirst(),f.proof().getFirst(),local(0),of(APPLY,1,2),</span>
+<span class="nc" id="L94">                g.get().proof().getFirst(),of(APPLY,4,2),of(CASES,0,3,5)));</span>
+<span class="nc" id="L95">        }</span>
+<span class="nc" id="L96">    }</span>
+    private void rewrite(Fact equality,Call eq,List&lt;Fact&gt; initial) {
+<span class="nc bnc" id="L98" title="All 4 branches missed.">        if (eq.arguments().size()!=2 || !(eq.arguments().getFirst() instanceof Symbol left)) return;</span>
+<span class="nc" id="L99">        var right=eq.arguments().getLast();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for (var f : initial) {</span>
+<span class="nc" id="L101">            charge(1);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (!f.formula().referencedSymbols().contains(left.name())) continue;</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            var next=replace(f.formula(),0,(atom,depth)-&gt;atom.equals(left) ? right : atom);</span>
+<span class="nc" id="L104">            retain(next,List.of(equality.proof().getFirst(),f.proof().getFirst(),of(REWRITE,0,1)));</span>
+<span class="nc" id="L105">        }</span>
+<span class="nc" id="L106">    }</span>
+    private void contradiction(Fact input,Call negation) {
+<span class="nc bnc" id="L108" title="All 4 branches missed.">        if (negation.arguments().size()==1 &amp;&amp; negation.arguments().getFirst() instanceof Call inner</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                &amp;&amp; inner.function().equals(&quot;not&quot;) &amp;&amp; inner.arguments().size()==1)</span>
+<span class="nc" id="L110">            retain(inner.arguments().getFirst(),List.of(input.proof().getFirst(),local(0),of(BY_CONTRADICTION,0,1)));</span>
+<span class="nc" id="L111">    }</span>
+    private void strongInduction(Fact input,SymbolDeclaration d) {
+<span class="nc" id="L113">        var p=new Symbol(d.name()); var n=new Bound(0); var pn=call(&quot;at&quot;,p,n);</span>
+<span class="nc" id="L114">        var smaller=new Binder(BinderKind.FORALL,Sort.NATURAL,call(&quot;implies&quot;,call(&quot;lt&quot;,n,new Bound(1)),pn));</span>
+<span class="nc" id="L115">        var condition=new Binder(BinderKind.FORALL,Sort.NATURAL,call(&quot;implies&quot;,smaller,pn));</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (input.formula().equals(condition)) retain(new Binder(BinderKind.FORALL,Sort.NATURAL,pn),</span>
+<span class="nc" id="L117">            List.of(input.proof().getFirst(), local(1),of(SPECIALIZE,0,1),local(0),of(DECREASE,1,3),</span>
+<span class="nc" id="L118">                of(INTRO,4),of(INTRO,5),of(APPLY,2,6),of(STRONG_INDUCTION,7)));</span>
+<span class="nc" id="L119">    }</span>
+<span class="nc" id="L120">    private static Call call(String op, Expression... xs) { return new Call(op,List.of(xs)); }</span>
+
+    private void apply(Fact fact) {
+<span class="nc" id="L123">        charge(1);</span>
+<span class="nc bnc" id="L124" title="All 6 branches missed.">        if (!(fact.formula() instanceof Call c) || !c.function().equals(&quot;implies&quot;) || c.arguments().size() != 2) return;</span>
+<span class="nc" id="L125">        var antecedent = facts.get(c.arguments().getFirst());</span>
+<span class="nc" id="L126">        Expression result = c.arguments().getLast();</span>
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (antecedent == null || facts.containsKey(result)) return;</span>
+<span class="nc" id="L128">        var nodes = new ArrayList&lt;&gt;(fact.proof());</span>
+<span class="nc" id="L129">        int offset = nodes.size();</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (offset + antecedent.proof().size() &gt;= 128) return;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        for (var n : antecedent.proof()) {</span>
+<span class="nc" id="L132">            nodes.add(new Node(n.rule(),n.operand(),n.children().stream().map(i -&gt; i + offset).toList()));</span>
+<span class="nc" id="L133">        }</span>
+<span class="nc" id="L134">        nodes.add(of(APPLY,offset-1,nodes.size()-1));</span>
+<span class="nc" id="L135">        retain(result,nodes);</span>
+<span class="nc" id="L136">    }</span>
+    private void specialize(Fact fact, Binder binder) {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        for (int i = 0; i &lt; context.declarations().size(); i++) {</span>
+<span class="nc" id="L139">            charge(1);</span>
+<span class="nc" id="L140">            var declaration = context.declarations().get(i);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            if (declaration.sort() == binder.domain()) {</span>
+<span class="nc" id="L142">                Expression argument = new Symbol(declaration.name());</span>
+<span class="nc bnc" id="L143" title="All 4 branches missed.">                retain(replace(binder.body(),0,(e,depth) -&gt; e instanceof Bound b &amp;&amp; b.index()==depth ? argument : e),</span>
+<span class="nc" id="L144">                    List.of(fact.proof().getFirst(),indexed(DECLARATION,i),of(SPECIALIZE,0,1)));</span>
+            }
+        }
+<span class="nc" id="L147">    }</span>
+
+    /** Traverses existing lexical levels. Formation only opens with a closed symbol or wraps a closed formula. */
+    private Expression replace(Expression formula, int depth, java.util.function.BiFunction&lt;Expression,Integer,Expression&gt; atom) {
+<span class="nc" id="L151">        charge(1);</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        return switch (formula) {</span>
+<span class="nc" id="L153">            case Binder b -&gt; new Binder(b.kind(),b.domain(),replace(b.body(),depth+1,atom));</span>
+<span class="nc" id="L154">            case Call c -&gt; new Call(c.function(),c.arguments().stream().map(a -&gt; replace(a,depth,atom)).toList());</span>
+<span class="nc" id="L155">            case Binary b -&gt; new Binary(b.operator(),replace(b.left(),depth,atom),replace(b.right(),depth,atom));</span>
+<span class="nc" id="L156">            default -&gt; atom.apply(formula,depth);</span>
+        };
+    }
+    private void retain(Expression formula, List&lt;Node&gt; nodes) {
+<span class="nc" id="L160">        charge(nodes.size()+1);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (facts.containsKey(formula)) return;</span>
+<span class="nc" id="L162">        var request = Obligation.create(context.obligationId(),context.declarations(),context.theories(),context.assumptions(),</span>
+<span class="nc" id="L163">            Goal.holds(formula),context.requestedEvidence(),context.provenance());</span>
+<span class="nc" id="L164">        var dag = ScopedProofDag.create(request,nodes);</span>
+<span class="nc" id="L165">        facts.put(formula,new Fact(formula,dag.nodes()));</span>
+<span class="nc" id="L166">        proposals.add(new Proposal(dag,work));</span>
+<span class="nc" id="L167">    }</span>
+    private void charge(int amount) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (amount &gt; limit-work) throw new Stop();</span>
+<span class="nc" id="L170">        work+=amount;</span>
+<span class="nc" id="L171">    }</span>
+    private static final class Stop extends RuntimeException { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

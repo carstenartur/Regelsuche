@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativeSearchOperation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">NativeSearchOperation.java</span></div><h1>NativeSearchOperation.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import de.regelsuche.discovery.representation.SemanticDescriptionMeasurer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.UUID;
+
+/** Operational observations stay distinct from the native run's mathematical event and artifact hashes. */
+record NativeSearchOperation(String operationId, String source, String profile, SearchHeuristic budget,
+        String repositoryRevision, String status, String terminalReason, String workspaceRunId, Progress progress) {
+<span class="fc" id="L16">    private static final Set&lt;String&gt; LIVE = Set.of(&quot;RUNNING&quot;, &quot;PAUSING&quot;, &quot;PAUSED&quot;, &quot;CANCELLING&quot;);</span>
+<span class="fc" id="L17">    private static final Set&lt;String&gt; TERMINAL = Set.of(&quot;CANCELLED&quot;, &quot;INTERRUPTED&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;);</span>
+
+<span class="fc" id="L19">    NativeSearchOperation {</span>
+<span class="fc" id="L20">        UUID.fromString(operationId);</span>
+<span class="pc bpc" id="L21" title="4 of 8 branches missed.">        if (source == null || source.isBlank() || source.length() &gt; 256 || !Set.of(&quot;small&quot;, &quot;extended&quot;).contains(profile)</span>
+<span class="pc bpc" id="L22" title="3 of 6 branches missed.">                || !repositoryRevision.matches(&quot;[a-f0-9]{40}&quot;) || budget == null || progress == null) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(&quot;invalid native operation sources&quot;);</span>
+        }
+<span class="fc" id="L25">        boolean complete = &quot;COMPLETED&quot;.equals(status);</span>
+<span class="pc bpc" id="L26" title="2 of 10 branches missed.">        if (!LIVE.contains(status) &amp;&amp; !TERMINAL.contains(status) || complete != (workspaceRunId != null)</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">                || complete &amp;&amp; !workspaceRunId.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;invalid native operation state or workspace binding&quot;);</span>
+        }
+<span class="fc" id="L30">    }</span>
+
+<span class="fc" id="L32">    record Minimum(int value, String expression, String stateCanonicalHash) {</span>
+        static Minimum retain(Minimum current, int value, SearchEvent visited) {
+<span class="fc bfc" id="L34" title="All 4 branches covered.">            if (current != null &amp;&amp; current.value() &lt;= value) return current;</span>
+<span class="fc" id="L35">            return new Minimum(value, visited.expression(), visited.canonicalHash());</span>
+        }
+    }
+
+    record Progress(long events, int visited, int queued, int generated, Map&lt;String, Integer&gt; pruned,
+            Minimum fewestTokens, Minimum fewestAstNodes) {
+<span class="fc" id="L41">        Progress {</span>
+<span class="fc" id="L42">            pruned = Collections.unmodifiableMap(new TreeMap&lt;&gt;(pruned));</span>
+<span class="fc" id="L43">        }</span>
+
+        static Progress initial() {
+<span class="fc" id="L46">            return new Progress(0, 0, 0, 0, Map.of(), null, null);</span>
+        }
+
+        Progress observed(SearchEvent event) {
+<span class="fc" id="L50">            Map&lt;String, Integer&gt; counts = pruned;</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (!event.pruningReason().isBlank()) {</span>
+<span class="nc" id="L52">                counts = new TreeMap&lt;&gt;(pruned);</span>
+<span class="nc" id="L53">                counts.merge(event.pruningReason(), 1, Integer::sum);</span>
+            }
+<span class="fc" id="L55">            Minimum tokens = fewestTokens;</span>
+<span class="fc" id="L56">            Minimum ast = fewestAstNodes;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (event.type() == SearchEventType.STATE_VISITED) {</span>
+<span class="fc" id="L58">                var metrics = new SemanticDescriptionMeasurer().measure(event.expression());</span>
+<span class="fc" id="L59">                tokens = Minimum.retain(tokens, metrics.tokenCount(), event);</span>
+<span class="fc" id="L60">                ast = Minimum.retain(ast, metrics.astNodeCount(), event);</span>
+            }
+            // Only STATE_EXPANDED carries the number returned by this engine invocation.
+            // SEARCH_FINISHED reuses the event-local generatedCount field for explored states.
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            int returned = generated + (event.type() == SearchEventType.STATE_EXPANDED ? event.generatedCount() : 0);</span>
+<span class="fc" id="L65">            return new Progress(events + 1, event.visitedCount(), event.frontierSize(), returned, counts, tokens, ast);</span>
+        }
+    }
+
+<span class="fc" id="L69">    boolean terminal() { return TERMINAL.contains(status); }</span>
+
+    NativeSearchOperation transition(String state, String reason, String runId) {
+<span class="fc" id="L72">        return new NativeSearchOperation(operationId, source, profile, budget, repositoryRevision, state, reason, runId, progress);</span>
+    }
+
+    NativeSearchOperation observe(SearchEvent event) {
+<span class="fc" id="L76">        return new NativeSearchOperation(operationId, source, profile, budget, repositoryRevision, status,</span>
+<span class="fc" id="L77">            terminalReason, workspaceRunId, progress.observed(event));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /** Frozen proposals for one-step lemma application, acquired from a caller-trusted checked proof. */
-public final class LeanLemmaPlan {
+public final class LeanLemmaPlan implements LeanProofPlan {
     static final String FILE = &quot;lemma-plan.txt&quot;;
     private static final String SCHEMA = &quot;regelsuche.lean-lemma-plan/v1&quot;;
     private static final int MAX_CANDIDATES = 32;
@@ -50,38 +50,44 @@ public final class LeanLemmaPlan {
 <span class="fc" id="L50">    public List&lt;String&gt; declarations() { return declarations; }</span>
 <span class="fc" id="L51">    public String hash() { return SolverIr.sha256(material()); }</span>
 
-    String material() {
-<span class="fc" id="L54">        return SCHEMA + &quot;\n&quot; + trainingCertificate + &quot;\n&quot; + String.join(&quot;\n&quot;, declarations) + &quot;\n&quot;;</span>
+<span class="fc" id="L53">    @Override public String fileName() { return FILE; }</span>
+    @Override public String material() {
+<span class="fc" id="L55">        return SCHEMA + &quot;\n&quot; + trainingCertificate + &quot;\n&quot; + String.join(&quot;\n&quot;, declarations) + &quot;\n&quot;;</span>
     }
 
     static LeanLemmaPlan retained(Path directory) throws IOException {
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (Files.notExists(directory.resolve(FILE), LinkOption.NOFOLLOW_LINKS)) return null;</span>
-<span class="fc" id="L59">        String input = read(directory, FILE);</span>
-<span class="fc" id="L60">        var lines = input.lines().toList();</span>
-<span class="pc bpc" id="L61" title="3 of 6 branches missed.">        if (lines.size() &lt; 3 || lines.size() &gt; MAX_CANDIDATES + 2 || !lines.getFirst().equals(SCHEMA)</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || !lines.get(1).matches(&quot;sha256:[0-9a-f]{64}&quot;)) throw new IOException(&quot;invalid retained lemma plan&quot;);</span>
-<span class="fc" id="L63">        var names = lines.subList(2, lines.size());</span>
-<span class="pc bpc" id="L64" title="1 of 6 branches missed.">        if (names.stream().anyMatch(name -&gt; !usable(name)) || !names.equals(names.stream().distinct().sorted().toList()))</span>
-<span class="fc" id="L65">            throw new IOException(&quot;invalid retained lemma declarations&quot;);</span>
-<span class="fc" id="L66">        var plan = new LeanLemmaPlan(lines.get(1), names);</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (!plan.material().equals(input)) throw new IOException(&quot;non-canonical lemma plan&quot;);</span>
-<span class="fc" id="L68">        return plan;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (Files.notExists(directory.resolve(FILE), LinkOption.NOFOLLOW_LINKS)) return null;</span>
+<span class="fc" id="L60">        String input = read(directory, FILE);</span>
+<span class="fc" id="L61">        var lines = input.lines().toList();</span>
+<span class="pc bpc" id="L62" title="3 of 6 branches missed.">        if (lines.size() &lt; 3 || lines.size() &gt; MAX_CANDIDATES + 2 || !lines.getFirst().equals(SCHEMA)</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                || !lines.get(1).matches(&quot;sha256:[0-9a-f]{64}&quot;)) throw new IOException(&quot;invalid retained lemma plan&quot;);</span>
+<span class="fc" id="L64">        var names = lines.subList(2, lines.size());</span>
+<span class="pc bpc" id="L65" title="1 of 6 branches missed.">        if (names.stream().anyMatch(name -&gt; !usable(name)) || !names.equals(names.stream().distinct().sorted().toList()))</span>
+<span class="fc" id="L66">            throw new IOException(&quot;invalid retained lemma declarations&quot;);</span>
+<span class="fc" id="L67">        var plan = new LeanLemmaPlan(lines.get(1), names);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!plan.material().equals(input)) throw new IOException(&quot;non-canonical lemma plan&quot;);</span>
+<span class="fc" id="L69">        return plan;</span>
     }
 
     /** No fallback tactic. Confirmation of a transfer requires an acquired lemma to apply. */
-    String proof() {
-<span class="fc" id="L73">        var source = new StringBuilder(&quot;by\n  -- frozen lemma plan &quot; + hash() + &quot;\n  intros\n  solve\n&quot;);</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (String name : declarations) {</span>
-<span class="fc" id="L75">            String quoted = &quot;«&quot; + name.replace(&quot;.&quot;, &quot;».«&quot;) + &quot;»&quot;;</span>
-<span class="fc" id="L76">            source.append(&quot;  | apply &quot;).append(quoted).append(&quot; &lt;;&gt; assumption\n&quot;);</span>
-<span class="fc" id="L77">        }</span>
-<span class="fc" id="L78">        return source.toString();</span>
+    @Override public void verifyAudit(LeanSolverBackend.AuditDocument audit) throws IOException {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (audit.imports().stream().noneMatch(d -&gt; declarations.contains(d.name())))</span>
+<span class="nc" id="L75">            throw new IOException(&quot;the proof term contains none of the proposed declarations&quot;);</span>
+<span class="fc" id="L76">    }</span>
+
+    @Override public String proof() {
+<span class="fc" id="L79">        var source = new StringBuilder(&quot;by\n  -- frozen lemma plan &quot; + hash() + &quot;\n  intros\n  solve\n&quot;);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (String name : declarations) {</span>
+<span class="fc" id="L81">            String quoted = &quot;«&quot; + name.replace(&quot;.&quot;, &quot;».«&quot;) + &quot;»&quot;;</span>
+<span class="fc" id="L82">            source.append(&quot;  | apply &quot;).append(quoted).append(&quot; &lt;;&gt; assumption\n&quot;);</span>
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">        return source.toString();</span>
     }
 
     private static String read(Path dir, String file) throws IOException {
-<span class="fc" id="L82">        Path path = dir.resolve(file);</span>
-<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;missing training artifact &quot; + file);</span>
-<span class="fc" id="L84">        return Files.readString(path);</span>
+<span class="fc" id="L88">        Path path = dir.resolve(file);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException(&quot;missing training artifact &quot; + file);</span>
+<span class="fc" id="L90">        return Files.readString(path);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

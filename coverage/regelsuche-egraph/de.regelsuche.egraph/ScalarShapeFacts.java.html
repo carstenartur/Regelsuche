@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScalarShapeFacts.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">ScalarShapeFacts.java</span></div><h1>ScalarShapeFacts.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import de.regelsuche.scalar.ExactRational;
+import java.util.*;
+
+/** Bounded structural observations across retained representatives. An unknown degree or cost is represented by -1. */
+public record ScalarShapeFacts(List&lt;String&gt; exactConstants, Set&lt;String&gt; observedVariables, int polynomialDegreeUpper,
+                               boolean hasDenominator, int smallestSyntaxNodes) {
+<span class="fc" id="L9">    static final ScalarShapeFacts EMPTY = new ScalarShapeFacts(List.of(),Set.of(),-1,false,-1);</span>
+<span class="fc" id="L10">    public ScalarShapeFacts {</span>
+<span class="fc" id="L11">        exactConstants=List.copyOf(exactConstants);</span>
+<span class="fc" id="L12">        observedVariables=Collections.unmodifiableSet(new TreeSet&lt;&gt;(observedVariables));</span>
+<span class="fc" id="L13">    }</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">    boolean contradictory() { return exactConstants.size()&gt;1; }</span>
+    ScalarShapeFacts merge(ScalarShapeFacts other) {
+<span class="fc" id="L16">        var constants=new TreeSet&lt;&gt;(exactConstants);</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (!contradictory()) constants.addAll(other.exactConstants);</span>
+<span class="fc" id="L18">        var symbols=new TreeSet&lt;&gt;(observedVariables); symbols.addAll(other.observedVariables);</span>
+<span class="fc bfc" id="L19" title="All 4 branches covered.">        return new ScalarShapeFacts(constants.stream().limit(2).toList(),symbols,min(polynomialDegreeUpper,other.polynomialDegreeUpper),</span>
+<span class="fc" id="L20">            hasDenominator || other.hasDenominator,min(smallestSyntaxNodes,other.smallestSyntaxNodes));</span>
+    }
+<span class="fc bfc" id="L22" title="All 4 branches covered.">    private static int min(int a,int b) { return a&lt;0?b:b&lt;0?a:Math.min(a,b); }</span>
+
+    static ScalarShapeFacts make(ENode node,List&lt;ScalarShapeFacts&gt; children) {
+<span class="fc" id="L25">        String symbol=node.symbol();</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (symbol.startsWith(&quot;num:&quot;)) return new ScalarShapeFacts(List.of(symbol.substring(4)),Set.of(),0,false,1);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (symbol.startsWith(&quot;var:&quot;)) return new ScalarShapeFacts(List.of(),Set.of(symbol.substring(4)),1,false,1);</span>
+<span class="fc" id="L28">        var variables=new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (var facts:children) variables.addAll(facts.observedVariables);</span>
+<span class="fc bfc" id="L30" title="All 4 branches covered.">        boolean denominator=symbol.equals(&quot;op:DIV&quot;) || children.stream().anyMatch(ScalarShapeFacts::hasDenominator);</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">        int size=children.stream().anyMatch(c-&gt;c.smallestSyntaxNodes&lt;0) ? -1 :</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            (int)Math.min(Integer.MAX_VALUE, (symbol.startsWith(&quot;ac:&quot;)?children.size()-1L:1L)+children.stream().mapToLong(ScalarShapeFacts::smallestSyntaxNodes).sum());</span>
+<span class="fc" id="L33">        var constant=constant(symbol,children);</span>
+<span class="fc" id="L34">        int degree=-1;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (constant!=null) degree=0;</span>
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        else if (children.stream().noneMatch(c-&gt;c.polynomialDegreeUpper&lt;0)) {</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (symbol.equals(&quot;ac:MUL&quot;)) degree=(int)Math.min(Integer.MAX_VALUE,children.stream().mapToLong(ScalarShapeFacts::polynomialDegreeUpper).sum());</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">            else if (symbol.equals(&quot;ac:ADD&quot;) || symbol.equals(&quot;op:SUB&quot;)) degree=children.stream().mapToInt(ScalarShapeFacts::polynomialDegreeUpper).max().orElse(-1);</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">            else if (symbol.equals(&quot;op:DIV&quot;) &amp;&amp; singleNonzero(children.get(1))) degree=children.getFirst().polynomialDegreeUpper();</span>
+        }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        return new ScalarShapeFacts(constant==null?List.of():List.of(constant),variables,degree,denominator,size);</span>
+    }
+    private static boolean singleNonzero(ScalarShapeFacts value) {
+<span class="pc bpc" id="L44" title="3 of 4 branches missed.">        return value.exactConstants.size()==1 &amp;&amp; !value.exactConstants.getFirst().equals(&quot;0&quot;);</span>
+    }
+    private static String constant(String symbol,List&lt;ScalarShapeFacts&gt; children) {
+<span class="pc bpc" id="L47" title="2 of 8 branches missed.">        if (symbol.startsWith(&quot;fn:&quot;) || children.isEmpty() || children.stream().anyMatch(c -&gt; c.exactConstants.size()!=1</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                || c.exactConstants.getFirst().length()&gt;512)) return null;</span>
+<span class="nc" id="L49">        var n=ExactRational.fromCanonicalText(children.getFirst().exactConstants.getFirst());</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        for(int i=1;i&lt;children.size();i++) {</span>
+<span class="nc" id="L51">            var x=ExactRational.fromCanonicalText(children.get(i).exactConstants.getFirst());</span>
+<span class="nc bnc" id="L52" title="All 5 branches missed.">            n=switch(symbol) {</span>
+<span class="nc" id="L53">                case &quot;ac:ADD&quot; -&gt; n.add(x);</span>
+<span class="nc" id="L54">                case &quot;ac:MUL&quot; -&gt; n.multiply(x);</span>
+<span class="nc" id="L55">                case &quot;op:SUB&quot; -&gt; n.subtract(x);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                case &quot;op:DIV&quot; -&gt; x.isZero()?null:n.divide(x);</span>
+<span class="nc" id="L57">                default -&gt; null;</span>
+            };
+<span class="nc bnc" id="L59" title="All 6 branches missed.">            if(n==null || n.numerator().bitLength()&gt;2048 || n.denominator().bitLength()&gt;2048) return null;</span>
+        }
+<span class="nc" id="L61">        return n.canonicalText();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

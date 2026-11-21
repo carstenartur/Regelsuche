@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScalarExtractionProof.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph.proof</a> &gt; <span class="el_source">ScalarExtractionProof.java</span></div><h1>ScalarExtractionProof.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph.proof;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.*;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.*;
+import de.regelsuche.value.ExprValueArena;
+import java.util.*;
+
+/** Receiver-owned scalar laws and ground lemmas checked before reuse by the detached congruence proof checker. */
+public final class ScalarExtractionProof {
+    public static final String DOMAIN = &quot;exact-rational-field/ac-add-mul/v1&quot;;
+    public static final String ANALYSIS = &quot;exact-scalar-class-facts/v1&quot;;
+    public static final String BACKEND = &quot;receiver.checked-backend-equality/v1&quot;;
+    public static final String AC = &quot;intrinsic.ac-normalization/v1&quot;;
+<span class="fc" id="L16">    private static final Set&lt;String&gt; NATIVE = Set.of(&quot;ast_add_zero_left&quot;,&quot;ast_add_zero_right&quot;,&quot;ast_multiply_one_left&quot;,</span>
+        &quot;ast_multiply_one_right&quot;,&quot;ast_subtract_zero&quot;,&quot;ast_divide_one&quot;,&quot;ast_double_term&quot;,&quot;ast_factor_common_left&quot;,&quot;ast_factor_common_right&quot;,&quot;ast_cancel_division_factor&quot;);
+<span class="fc" id="L18">    private static final Map&lt;String,String&gt; TRUSTED = trusted();</span>
+    private ScalarExtractionProof() {}
+
+<span class="fc" id="L21">    public record Entry(String id, String contentHash, String disposition) { }</span>
+    public record Context(String domain, String analysis, String sourceRevision, List&lt;Entry&gt; inventory, List&lt;Assumption&gt; assumptions) {
+<span class="fc" id="L23">        public Context {</span>
+<span class="fc" id="L24">            inventory = List.copyOf(inventory); assumptions = List.copyOf(assumptions);</span>
+<span class="fc" id="L25">        }</span>
+
+        public static Context create(Collection&lt;? extends RewriteRule&gt; rules, List&lt;Assumption&gt; assumptions, String revision) {
+<span class="fc" id="L28">            var inventory = new TreeMap&lt;String,Entry&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            for (var rule : rules) {</span>
+<span class="fc" id="L30">                String hash = RuleInventoryFingerprint.ruleContentHash(rule);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">                String disposition = hash.equals(TRUSTED.get(rule.id())) ? &quot;NATIVE_SUPPORTED&quot; : &quot;EXCLUDED_NO_NATIVE_SCALAR_CHECKER&quot;;</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                if (inventory.put(rule.id(),new Entry(rule.id(),hash,disposition)) != null) throw new IllegalArgumentException(&quot;duplicate rule identity&quot;);</span>
+<span class="fc" id="L33">            }</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">            if (assumptions.size() &gt; 64 || !revision.matches(&quot;[0-9a-f]{40}&quot;)) throw new IllegalArgumentException(&quot;invalid scalar context&quot;);</span>
+<span class="fc" id="L35">            return new Context(DOMAIN, ANALYSIS, revision, List.copyOf(inventory.values()), assumptions);</span>
+        }
+
+        public boolean enables(String rule) {
+<span class="fc bfc" id="L39" title="All 4 branches covered.">            return inventory.stream().anyMatch(e -&gt; e.id().equals(rule) &amp;&amp; e.disposition().equals(&quot;NATIVE_SUPPORTED&quot;)</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                &amp;&amp; e.contentHash().equals(TRUSTED.get(rule)));</span>
+        }
+    }
+
+<span class="nc" id="L44">    public record BackendWitness(String backend, String obligationJson, String executionJson, String resultJson) { }</span>
+    @FunctionalInterface
+    public interface BackendVerifier { boolean verify(Context context, Expr before, Expr after, BackendWitness witness); }
+<span class="fc" id="L47">    public record Lemma(String ruleId, Expr before, Expr after, BackendWitness backend) {</span>
+<span class="fc" id="L48">        public Lemma(String ruleId, Expr before, Expr after) { this(ruleId,before,after,null); }</span>
+    }
+    public record Bundle(Context context, List&lt;Lemma&gt; lemmas, ExtractionCertificate dag) {
+<span class="fc" id="L51">        public Bundle { lemmas = List.copyOf(lemmas); }</span>
+    }
+
+    public static Optional&lt;Bundle&gt; build(Expr source, Expr target, Context context, List&lt;Lemma&gt; observations, ProofLimits limits) {
+<span class="fc" id="L55">        return build(source,target,context,observations,limits,null);</span>
+    }
+    public static Optional&lt;Bundle&gt; build(Expr source, Expr target, Context context, List&lt;Lemma&gt; observations,
+            ProofLimits limits, BackendVerifier verifier) {
+<span class="fc" id="L59">        List&lt;Lemma&gt; lemmas = List.copyOf(new LinkedHashSet&lt;&gt;(observations));</span>
+<span class="fc" id="L60">        var rules = verified(context, lemmas, limits, verifier);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (rules == null) return Optional.empty();</span>
+<span class="fc" id="L62">        var builder = new ExtractionProofBuilder(rules, limits, true);</span>
+<span class="fc" id="L63">        int input = builder.addExpression(source), output = builder.addExpression(target);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (var rule : rules) builder.recordInstance(builder.prepareInstance(rule.id(),Map.of()));</span>
+<span class="fc" id="L65">        return builder.build(input,output).certificate().map(dag -&gt; new Bundle(context, lemmas, dag))</span>
+<span class="fc" id="L66">            .filter(bundle -&gt; check(source, target, context, bundle, limits, verifier));</span>
+    }
+
+    public static boolean check(Expr source, Expr target, Context receiver, Bundle bundle, ProofLimits limits) {
+<span class="fc" id="L70">        return check(source,target,receiver,bundle,limits,null);</span>
+    }
+    public static boolean check(Expr source, Expr target, Context receiver, Bundle bundle, ProofLimits limits, BackendVerifier verifier) {
+        try {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (!receiver.equals(bundle.context())) return false;</span>
+<span class="fc" id="L75">            var rules = verified(receiver, bundle.lemmas(), limits, verifier);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            return rules != null &amp;&amp; ExtractionProofChecker.check(source,target,bundle.dag(),rules,limits,true)</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                .status() == ExtractionProofChecker.Status.ACCEPTED;</span>
+<span class="nc" id="L78">        } catch (IllegalArgumentException | ExtractionProofBuilder.LimitExceeded rejected) { return false; }</span>
+    }
+
+    private static List&lt;PatternRewriteRule&gt; verified(Context context, List&lt;Lemma&gt; lemmas, ProofLimits limits, BackendVerifier verifier) {
+<span class="pc bpc" id="L82" title="2 of 6 branches missed.">        if (!DOMAIN.equals(context.domain()) || !ANALYSIS.equals(context.analysis()) || !context.sourceRevision().matches(&quot;[0-9a-f]{40}&quot;)</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                || lemmas.size() &gt; Math.min(limits.maxProofSteps(),4096)) return null;</span>
+<span class="fc" id="L84">        var bounds = new ExtractionProofBuilder(List.of(), limits, true);</span>
+<span class="fc" id="L85">        var rules = new ArrayList&lt;PatternRewriteRule&gt;();</span>
+<span class="fc" id="L86">        try (var arena = new ExprValueArena(Math.max(1, limits.maxTerms()))) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (var step : lemmas) {</span>
+<span class="fc" id="L88">                bounds.addExpression(step.before()); bounds.addExpression(step.after());</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                if (step.ruleId().equals(BACKEND)) {</span>
+<span class="nc bnc" id="L90" title="All 6 branches missed.">                    if (verifier == null || step.backend() == null || !verifier.verify(context,step.before(),step.after(),step.backend())) return null;</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">                } else if (step.backend() != null || !valid(context, step, arena)) return null;</span>
+<span class="fc" id="L92">                rules.add(new PatternRewriteRule(&quot;scalar-ground/&quot; + rules.size() + &quot;/&quot; + step.ruleId(),</span>
+<span class="fc" id="L93">                    ground(step.before()), ground(step.after())));</span>
+<span class="fc" id="L94">            }</span>
+<span class="pc" id="L95">        }</span>
+<span class="fc" id="L96">        return rules;</span>
+    }
+
+    public static boolean admits(Context receiver, Lemma lemma) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        return verified(receiver, List.of(lemma), ProofLimits.defaults(),null) != null;</span>
+    }
+
+    private static boolean valid(Context context, Lemma lemma, ExprValueArena arena) {
+<span class="fc" id="L104">        Expr before = lemma.before(), after = lemma.after();</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">        if (lemma.ruleId().equals(AC)) return arena.intern(before) == arena.intern(after);</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        if (!context.enables(lemma.ruleId()) || !(before instanceof BinaryExpr binary)) return false;</span>
+<span class="fc" id="L107">        BinaryOperator op = binary.operator();</span>
+<span class="pc bpc" id="L108" title="5 of 8 branches missed.">        return switch (lemma.ruleId()) {</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            case &quot;ast_add_zero_left&quot;,&quot;ast_add_zero_right&quot; -&gt; op == BinaryOperator.ADD</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                &amp;&amp; remove(arena, before, new NumberExpr(0), after, op);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            case &quot;ast_multiply_one_left&quot;,&quot;ast_multiply_one_right&quot; -&gt; op == BinaryOperator.MUL</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                &amp;&amp; remove(arena, before, new NumberExpr(1), after, op);</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">            case &quot;ast_subtract_zero&quot; -&gt; op == BinaryOperator.SUB &amp;&amp; binary.right().equals(new NumberExpr(0))</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                &amp;&amp; arena.intern(binary.left()) == arena.intern(after);</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">            case &quot;ast_divide_one&quot; -&gt; op == BinaryOperator.DIV &amp;&amp; binary.right().equals(new NumberExpr(1))</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                &amp;&amp; arena.intern(binary.left()) == arena.intern(after);</span>
+<span class="nc bnc" id="L117" title="All 4 branches missed.">            case &quot;ast_double_term&quot; -&gt; op == BinaryOperator.ADD &amp;&amp; arena.intern(binary.left()) == arena.intern(binary.right())</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                &amp;&amp; arena.intern(after) == arena.intern(new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,binary.left()));</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">            case &quot;ast_factor_common_left&quot;,&quot;ast_factor_common_right&quot; -&gt; op == BinaryOperator.ADD &amp;&amp; factorization(arena,before,after);</span>
+            case &quot;ast_cancel_division_factor&quot; -&gt; op == BinaryOperator.DIV
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">                &amp;&amp; binary.left() instanceof BinaryExpr product &amp;&amp; product.operator() == BinaryOperator.MUL</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                &amp;&amp; ScalarGuardFacts.of(binary.right(),context.assumptions()).nonzero() == ScalarGuardFacts.Truth.TRUE</span>
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">                &amp;&amp; remove(arena, binary.left(), binary.right(), after, BinaryOperator.MUL);</span>
+<span class="nc" id="L124">            default -&gt; false;</span>
+        };
+    }
+
+    private static boolean factorization(ExprValueArena arena, Expr before, Expr after) {
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        if (!(after instanceof BinaryExpr product) || product.operator() != BinaryOperator.MUL) return false;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        for (boolean swap : List.of(false,true)) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            Expr factor = swap ? product.right() : product.left();</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            Expr other = swap ? product.left() : product.right();</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">            if (!(other instanceof BinaryExpr sum) || sum.operator() != BinaryOperator.ADD) continue;</span>
+<span class="fc" id="L134">            Expr expanded = new BinaryExpr(new BinaryExpr(factor,BinaryOperator.MUL,sum.left()),BinaryOperator.ADD,</span>
+<span class="fc" id="L135">                new BinaryExpr(factor,BinaryOperator.MUL,sum.right()));</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (arena.intern(expanded) == arena.intern(before)) return true;</span>
+<span class="nc" id="L137">        }</span>
+<span class="nc" id="L138">        return false;</span>
+    }
+
+    private static boolean remove(ExprValueArena arena, Expr before, Expr factor, Expr after, BinaryOperator op) {
+<span class="fc" id="L142">        var factors = new ArrayList&lt;Expr&gt;();</span>
+<span class="fc" id="L143">        flatten(before, op, factors);</span>
+<span class="fc" id="L144">        var id = arena.intern(factor);</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        for (int i=0;i&lt;factors.size();i++) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (arena.intern(factors.get(i)) != id) continue;</span>
+<span class="fc" id="L147">            factors.remove(i);</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">            return !factors.isEmpty() &amp;&amp; arena.intern(join(factors,op)) == arena.intern(after);</span>
+        }
+<span class="nc" id="L150">        return false;</span>
+    }
+
+    public static void flatten(Expr value, BinaryOperator operator, List&lt;Expr&gt; out) {
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        if (value instanceof BinaryExpr binary &amp;&amp; binary.operator() == operator) {</span>
+<span class="fc" id="L155">            flatten(binary.left(),operator,out); flatten(binary.right(),operator,out);</span>
+<span class="fc" id="L156">        } else out.add(value);</span>
+<span class="fc" id="L157">    }</span>
+    public static Expr join(List&lt;Expr&gt; terms, BinaryOperator op) {
+<span class="fc" id="L159">        Expr value = terms.getFirst();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (int i=1;i&lt;terms.size();i++) value = new BinaryExpr(value, op, terms.get(i));</span>
+<span class="fc" id="L161">        return value;</span>
+    }
+    private static PatternExpr ground(Expr expression) {
+<span class="fc bfc" id="L164" title="All 4 branches covered.">        return switch (expression) {</span>
+<span class="fc" id="L165">            case NumberExpr n -&gt; PatternExpr.num(n.value());</span>
+<span class="fc" id="L166">            case VariableExpr v -&gt; PatternExpr.variable(v.name());</span>
+<span class="fc" id="L167">            case BinaryExpr b -&gt; PatternExpr.op(b.operator(),ground(b.left()),ground(b.right()));</span>
+<span class="fc" id="L168">            case FunctionExpr f -&gt; PatternExpr.fn(f.name(),f.arguments().stream().map(ScalarExtractionProof::ground).toArray(PatternExpr[]::new));</span>
+        };
+    }
+    private static Map&lt;String,String&gt; trusted() {
+<span class="fc" id="L172">        var map = new TreeMap&lt;String,String&gt;();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (var rule : AstRewriteTransformationEngine.allBuiltInRules()) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (NATIVE.contains(rule.id())) map.put(rule.id(),RuleInventoryFingerprint.ruleContentHash(rule));</span>
+<span class="fc" id="L175">        }</span>
+<span class="fc" id="L176">        return Map.copyOf(map);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

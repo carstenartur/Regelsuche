@@ -96,85 +96,97 @@ public final class AstRuleRadarService implements AutoCloseable {
 <span class="fc" id="L96">        this.inventory = inventory;</span>
 <span class="fc" id="L97">        this.graphStore = graphStore;</span>
 <span class="fc" id="L98">        this.pluginRuntime = new PluginRuntime(</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            pluginRuntimeConfig == null ? PluginRuntimeConfig.defaults() : pluginRuntimeConfig);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            pluginRuntimeConfig == null ? PluginRuntimeConfig.defaults() : pluginRuntimeConfig);</span>
 <span class="fc" id="L100">    }</span>
 
+    /** Re-evaluate precisely one archived formation rule at precisely one position, without consulting current inventory. */
+    public Optional&lt;ApplicableMove&gt; inspectFormationOccurrence(String expression, List&lt;Integer&gt; path,
+            RewriteRule rule, List&lt;String&gt; assumptions) {
+<span class="fc" id="L105">        Expr root = parser.parseTerm(expression);</span>
+<span class="fc" id="L106">        Context defaults = Context.defaults();</span>
+<span class="fc" id="L107">        Context context = new Context(defaults.knowledgeProfile(), Set.of(), Set.of(), false, false,</span>
+<span class="fc" id="L108">            defaults.minMacroProofStatus(), &quot;RETAINED_FORMATION&quot;, &quot;&quot;, 1, 1, assumptions, true, &quot;&quot;, Map.of());</span>
+<span class="fc" id="L109">        var position = positionedNodes(root).stream().filter(node -&gt; node.path().equals(path)).findFirst().orElseThrow();</span>
+<span class="fc" id="L110">        var source = source(rule, RuleOrigin.KNOWLEDGE_PACK, rule.descriptor().packId(), rule.descriptor().sourceReference());</span>
+<span class="fc" id="L111">        return createOrdinaryCandidate(root, ExpressionFormatter.format(root), position, source, context, new ArrayList&lt;&gt;());</span>
+    }
+
     public Snapshot inspect(String expression, Context requestedContext) {
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        Context context = requestedContext == null ? Context.defaults() : requestedContext;</span>
-<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
-<span class="nc" id="L105">            return invalid(expression, context, &quot;expression must not be blank&quot;);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        Context context = requestedContext == null ? Context.defaults() : requestedContext;</span>
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L117">            return invalid(expression, context, &quot;expression must not be blank&quot;);</span>
         }
 
         Expr root;
         try {
-<span class="fc" id="L110">            root = parser.parseTerm(expression);</span>
-<span class="fc" id="L111">        } catch (RuntimeException exception) {</span>
-<span class="fc" id="L112">            return invalid(expression, context, &quot;expression is not parseable: &quot; + safeMessage(exception));</span>
-<span class="fc" id="L113">        }</span>
-<span class="fc" id="L114">        String formattedRoot = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L115">        String canonicalRoot = canonical(formattedRoot);</span>
-<span class="fc" id="L116">        List&lt;PositionedNode&gt; positionedNodes = positionedNodes(root);</span>
-<span class="fc" id="L117">        List&lt;RuleSource&gt; ordinaryRules = ordinaryRules(context);</span>
-<span class="fc" id="L118">        List&lt;ReusableMacro&gt; reusableMacros = reusableMacros();</span>
-<span class="fc" id="L119">        List&lt;ApplicableMove&gt; generated = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L120">        List&lt;Diagnostic&gt; diagnostics = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L122">            root = parser.parseTerm(expression);</span>
+<span class="fc" id="L123">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L124">            return invalid(expression, context, &quot;expression is not parseable: &quot; + safeMessage(exception));</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        String formattedRoot = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L127">        String canonicalRoot = canonical(formattedRoot);</span>
+<span class="fc" id="L128">        List&lt;PositionedNode&gt; positionedNodes = positionedNodes(root);</span>
+<span class="fc" id="L129">        List&lt;RuleSource&gt; ordinaryRules = ordinaryRules(context);</span>
+<span class="fc" id="L130">        List&lt;ReusableMacro&gt; reusableMacros = reusableMacros();</span>
+<span class="fc" id="L131">        List&lt;ApplicableMove&gt; generated = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L132">        List&lt;Diagnostic&gt; diagnostics = new ArrayList&lt;&gt;();</span>
 
-<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (PositionedNode positioned : positionedNodes) {</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (RuleSource source : ordinaryRules) {</span>
-<span class="fc" id="L124">                createOrdinaryCandidate(root, formattedRoot, positioned, source, context, diagnostics)</span>
-<span class="fc" id="L125">                    .ifPresent(generated::add);</span>
-<span class="fc" id="L126">            }</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (ReusableMacro macro : reusableMacros) {</span>
-<span class="fc" id="L128">                createMacroCandidate(root, formattedRoot, positioned, macro, context, diagnostics)</span>
-<span class="fc" id="L129">                    .ifPresent(generated::add);</span>
-<span class="fc" id="L130">            }</span>
-<span class="fc" id="L131">        }</span>
-<span class="fc" id="L132">        addParameterizedLocalMoves(formattedRoot, context, generated);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (PositionedNode positioned : positionedNodes) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (RuleSource source : ordinaryRules) {</span>
+<span class="fc" id="L136">                createOrdinaryCandidate(root, formattedRoot, positioned, source, context, diagnostics)</span>
+<span class="fc" id="L137">                    .ifPresent(generated::add);</span>
+<span class="fc" id="L138">            }</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (ReusableMacro macro : reusableMacros) {</span>
+<span class="fc" id="L140">                createMacroCandidate(root, formattedRoot, positioned, macro, context, diagnostics)</span>
+<span class="fc" id="L141">                    .ifPresent(generated::add);</span>
+<span class="fc" id="L142">            }</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">        addParameterizedLocalMoves(formattedRoot, context, generated);</span>
 
         // A single semantic application must not be duplicated because the same
         // registry entry was reachable through two extension surfaces.
-<span class="fc" id="L136">        Map&lt;String, ApplicableMove&gt; uniqueById = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L137">        generated.stream()</span>
-<span class="fc" id="L138">            .sorted(APPLICABLE_MOVE_ORDER)</span>
-<span class="fc" id="L139">            .forEach(candidate -&gt; uniqueById.putIfAbsent(candidate.candidateId(), candidate));</span>
-<span class="fc" id="L140">        List&lt;ApplicableMove&gt; unique = List.copyOf(uniqueById.values());</span>
-<span class="fc" id="L141">        TruncatedCandidates truncated = truncate(unique, context);</span>
-<span class="fc" id="L142">        Map&lt;String, List&lt;String&gt;&gt; candidateIdsByPath = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (ApplicableMove candidate : truncated.returned()) {</span>
-<span class="fc" id="L144">            candidateIdsByPath.computeIfAbsent(candidate.pathKey(), ignored -&gt; new ArrayList&lt;&gt;())</span>
-<span class="fc" id="L145">                .add(candidate.candidateId());</span>
-<span class="fc" id="L146">        }</span>
-<span class="fc" id="L147">        Map&lt;String, Integer&gt; generatedCountByPath = countByPath(unique);</span>
-<span class="fc" id="L148">        List&lt;AstNode&gt; astNodes = positionedNodes.stream()</span>
-<span class="fc" id="L149">            .map(positioned -&gt; new AstNode(</span>
-<span class="fc" id="L150">                positioned.pathKey(),</span>
-<span class="fc" id="L151">                positioned.parentPathKey(),</span>
-<span class="fc" id="L152">                positioned.childPathKeys(),</span>
-<span class="fc" id="L153">                positioned.nodeKind(),</span>
-<span class="fc" id="L154">                positioned.label(),</span>
-<span class="fc" id="L155">                positioned.subtreeText(),</span>
-<span class="fc" id="L156">                positioned.depth(),</span>
-<span class="fc" id="L157">                positioned.preorderIndex(),</span>
-<span class="fc" id="L158">                candidateIdsByPath.getOrDefault(positioned.pathKey(), List.of()),</span>
-<span class="fc" id="L159">                generatedCountByPath.getOrDefault(positioned.pathKey(), 0),</span>
-<span class="fc" id="L160">                truncated.omittedByPath().getOrDefault(positioned.pathKey(), 0)</span>
+<span class="fc" id="L148">        Map&lt;String, ApplicableMove&gt; uniqueById = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L149">        generated.stream()</span>
+<span class="fc" id="L150">            .sorted(APPLICABLE_MOVE_ORDER)</span>
+<span class="fc" id="L151">            .forEach(candidate -&gt; uniqueById.putIfAbsent(candidate.candidateId(), candidate));</span>
+<span class="fc" id="L152">        List&lt;ApplicableMove&gt; unique = List.copyOf(uniqueById.values());</span>
+<span class="fc" id="L153">        TruncatedCandidates truncated = truncate(unique, context);</span>
+<span class="fc" id="L154">        Map&lt;String, List&lt;String&gt;&gt; candidateIdsByPath = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (ApplicableMove candidate : truncated.returned()) {</span>
+<span class="fc" id="L156">            candidateIdsByPath.computeIfAbsent(candidate.pathKey(), ignored -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L157">                .add(candidate.candidateId());</span>
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        Map&lt;String, Integer&gt; generatedCountByPath = countByPath(unique);</span>
+<span class="fc" id="L160">        List&lt;AstNode&gt; astNodes = positionedNodes.stream()</span>
+<span class="fc" id="L161">            .map(positioned -&gt; new AstNode(</span>
+<span class="fc" id="L162">                positioned.pathKey(),</span>
+<span class="fc" id="L163">                positioned.parentPathKey(),</span>
+<span class="fc" id="L164">                positioned.childPathKeys(),</span>
+<span class="fc" id="L165">                positioned.nodeKind(),</span>
+<span class="fc" id="L166">                positioned.label(),</span>
+<span class="fc" id="L167">                positioned.subtreeText(),</span>
+<span class="fc" id="L168">                positioned.depth(),</span>
+<span class="fc" id="L169">                positioned.preorderIndex(),</span>
+<span class="fc" id="L170">                candidateIdsByPath.getOrDefault(positioned.pathKey(), List.of()),</span>
+<span class="fc" id="L171">                generatedCountByPath.getOrDefault(positioned.pathKey(), 0),</span>
+<span class="fc" id="L172">                truncated.omittedByPath().getOrDefault(positioned.pathKey(), 0)</span>
             ))
-<span class="fc" id="L162">            .toList();</span>
+<span class="fc" id="L174">            .toList();</span>
 
-<span class="fc" id="L164">        Truncation truncation = new Truncation(</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">            truncated.omittedCount() &gt; 0,</span>
-<span class="fc" id="L166">            unique.size(),</span>
-<span class="fc" id="L167">            truncated.returned().size(),</span>
-<span class="fc" id="L168">            truncated.omittedCount(),</span>
-<span class="fc" id="L169">            truncated.omittedByPath()</span>
+<span class="fc" id="L176">        Truncation truncation = new Truncation(</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            truncated.omittedCount() &gt; 0,</span>
+<span class="fc" id="L178">            unique.size(),</span>
+<span class="fc" id="L179">            truncated.returned().size(),</span>
+<span class="fc" id="L180">            truncated.omittedCount(),</span>
+<span class="fc" id="L181">            truncated.omittedByPath()</span>
         );
-<span class="fc" id="L171">        return new Snapshot(</span>
+<span class="fc" id="L183">        return new Snapshot(</span>
             SCHEMA,
             formattedRoot,
             canonicalRoot,
             context,
             astNodes,
-<span class="fc" id="L177">            truncated.returned(),</span>
+<span class="fc" id="L189">            truncated.returned(),</span>
             truncation,
             diagnostics
         );
@@ -182,115 +194,115 @@ public final class AstRuleRadarService implements AutoCloseable {
 
     /** Re-resolves a candidate from the frozen expression/context before applying it. */
     public Optional&lt;ApplicableMove&gt; resolve(String expression, String candidateId, Context context) {
-<span class="pc bpc" id="L185" title="2 of 4 branches missed.">        if (candidateId == null || candidateId.isBlank()) {</span>
-<span class="nc" id="L186">            return Optional.empty();</span>
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">        if (candidateId == null || candidateId.isBlank()) {</span>
+<span class="nc" id="L198">            return Optional.empty();</span>
         }
-<span class="fc" id="L188">        return inspect(expression, context).candidates().stream()</span>
-<span class="fc" id="L189">            .filter(candidate -&gt; candidateId.equals(candidate.candidateId()))</span>
-<span class="fc" id="L190">            .findFirst();</span>
+<span class="fc" id="L200">        return inspect(expression, context).candidates().stream()</span>
+<span class="fc" id="L201">            .filter(candidate -&gt; candidateId.equals(candidate.candidateId()))</span>
+<span class="fc" id="L202">            .findFirst();</span>
     }
 
     private Snapshot invalid(String expression, Context context, String message) {
-<span class="fc" id="L194">        return new Snapshot(</span>
+<span class="fc" id="L206">        return new Snapshot(</span>
             SCHEMA,
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            expression == null ? &quot;&quot; : expression,</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            expression == null ? &quot;&quot; : expression,</span>
             &quot;&quot;,
             context,
-<span class="fc" id="L199">            List.of(),</span>
-<span class="fc" id="L200">            List.of(),</span>
-<span class="fc" id="L201">            new Truncation(false, 0, 0, 0, Map.of()),</span>
-<span class="fc" id="L202">            List.of(new Diagnostic(&quot;INVALID_EXPRESSION&quot;, message, &quot;&quot;))</span>
+<span class="fc" id="L211">            List.of(),</span>
+<span class="fc" id="L212">            List.of(),</span>
+<span class="fc" id="L213">            new Truncation(false, 0, 0, 0, Map.of()),</span>
+<span class="fc" id="L214">            List.of(new Diagnostic(&quot;INVALID_EXPRESSION&quot;, message, &quot;&quot;))</span>
         );
     }
 
     private List&lt;RuleSource&gt; ordinaryRules(Context context) {
-<span class="fc" id="L207">        Map&lt;String, RuleSource&gt; indexed = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules()) {</span>
-<span class="fc" id="L209">            indexed.put(rule.id(), source(rule, RuleOrigin.CORE, &quot;Regelsuche core&quot;, rule.descriptor().sourceReference()));</span>
-<span class="fc" id="L210">        }</span>
+<span class="fc" id="L219">        Map&lt;String, RuleSource&gt; indexed = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules()) {</span>
+<span class="fc" id="L221">            indexed.put(rule.id(), source(rule, RuleOrigin.CORE, &quot;Regelsuche core&quot;, rule.descriptor().sourceReference()));</span>
+<span class="fc" id="L222">        }</span>
 
-<span class="fc" id="L212">        KnowledgePackSelection selection = new KnowledgePackSelection(</span>
-<span class="fc" id="L213">            context.knowledgeProfile(), context.enabledPacks(), context.disabledPacks());</span>
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        for (RewriteRule rule : new KnowledgePackRegistry().enabledRules(selection)) {</span>
-<span class="nc" id="L215">            indexed.put(rule.id(), source(rule, RuleOrigin.KNOWLEDGE_PACK,</span>
-<span class="nc" id="L216">                rule.descriptor().packId(), rule.descriptor().sourceReference()));</span>
-<span class="nc" id="L217">        }</span>
+<span class="fc" id="L224">        KnowledgePackSelection selection = new KnowledgePackSelection(</span>
+<span class="fc" id="L225">            context.knowledgeProfile(), context.enabledPacks(), context.disabledPacks());</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        for (RewriteRule rule : new KnowledgePackRegistry().enabledRules(selection)) {</span>
+<span class="nc" id="L227">            indexed.put(rule.id(), source(rule, RuleOrigin.KNOWLEDGE_PACK,</span>
+<span class="nc" id="L228">                rule.descriptor().packId(), rule.descriptor().sourceReference()));</span>
+<span class="nc" id="L229">        }</span>
 
-<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (context.includePlugins()) {</span>
-<span class="fc" id="L220">            pluginRuntime.reload();</span>
-<span class="fc" id="L221">            pluginRuntime.ruleRegistry().registrations().stream()</span>
-<span class="fc" id="L222">                .filter(registration -&gt; registration.enabled())</span>
-<span class="fc" id="L223">                .sorted(Comparator.comparing(registration -&gt; registration.id()))</span>
-<span class="fc" id="L224">                .forEach(registration -&gt; indexed.put(registration.id(), new RuleSource(</span>
-<span class="fc" id="L225">                    registration.rule(),</span>
-<span class="fc" id="L226">                    originForPluginSource(registration.source()),</span>
-<span class="fc" id="L227">                    registration.source(),</span>
-<span class="fc" id="L228">                    registration.explanation(),</span>
-<span class="fc" id="L229">                    registration.rule().descriptor().license(),</span>
-<span class="fc" id="L230">                    registration.rule().descriptor().sourceReference(),</span>
-                    &quot;REGISTERED&quot;
-                )));
-<span class="fc" id="L233">            pluginRuntime.transformationRegistry().registrations().stream()</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (context.includePlugins()) {</span>
+<span class="fc" id="L232">            pluginRuntime.reload();</span>
+<span class="fc" id="L233">            pluginRuntime.ruleRegistry().registrations().stream()</span>
 <span class="fc" id="L234">                .filter(registration -&gt; registration.enabled())</span>
 <span class="fc" id="L235">                .sorted(Comparator.comparing(registration -&gt; registration.id()))</span>
 <span class="fc" id="L236">                .forEach(registration -&gt; indexed.put(registration.id(), new RuleSource(</span>
-<span class="fc" id="L237">                    registration.transformation(),</span>
+<span class="fc" id="L237">                    registration.rule(),</span>
 <span class="fc" id="L238">                    originForPluginSource(registration.source()),</span>
 <span class="fc" id="L239">                    registration.source(),</span>
 <span class="fc" id="L240">                    registration.explanation(),</span>
-<span class="fc" id="L241">                    registration.transformation().descriptor().license(),</span>
-<span class="fc" id="L242">                    registration.transformation().descriptor().sourceReference(),</span>
+<span class="fc" id="L241">                    registration.rule().descriptor().license(),</span>
+<span class="fc" id="L242">                    registration.rule().descriptor().sourceReference(),</span>
                     &quot;REGISTERED&quot;
                 )));
-<span class="fc bfc" id="L245" title="All 2 branches covered.">            for (PatternTransformation macro : pluginRuntime.macroTransformations()) {</span>
-<span class="fc" id="L246">                indexed.putIfAbsent(macro.id(), new RuleSource(</span>
+<span class="fc" id="L245">            pluginRuntime.transformationRegistry().registrations().stream()</span>
+<span class="fc" id="L246">                .filter(registration -&gt; registration.enabled())</span>
+<span class="fc" id="L247">                .sorted(Comparator.comparing(registration -&gt; registration.id()))</span>
+<span class="fc" id="L248">                .forEach(registration -&gt; indexed.put(registration.id(), new RuleSource(</span>
+<span class="fc" id="L249">                    registration.transformation(),</span>
+<span class="fc" id="L250">                    originForPluginSource(registration.source()),</span>
+<span class="fc" id="L251">                    registration.source(),</span>
+<span class="fc" id="L252">                    registration.explanation(),</span>
+<span class="fc" id="L253">                    registration.transformation().descriptor().license(),</span>
+<span class="fc" id="L254">                    registration.transformation().descriptor().sourceReference(),</span>
+                    &quot;REGISTERED&quot;
+                )));
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            for (PatternTransformation macro : pluginRuntime.macroTransformations()) {</span>
+<span class="fc" id="L258">                indexed.putIfAbsent(macro.id(), new RuleSource(</span>
                     macro,
                     RuleOrigin.RULE_FILE,
                     &quot;active macro registry&quot;,
-<span class="fc" id="L250">                    macro.id(),</span>
-<span class="fc" id="L251">                    macro.descriptor().license(),</span>
-<span class="fc" id="L252">                    macro.descriptor().sourceReference(),</span>
+<span class="fc" id="L262">                    macro.id(),</span>
+<span class="fc" id="L263">                    macro.descriptor().license(),</span>
+<span class="fc" id="L264">                    macro.descriptor().sourceReference(),</span>
                     &quot;REGISTERED&quot;
                 ));
-<span class="fc" id="L255">            }</span>
+<span class="fc" id="L267">            }</span>
         }
-<span class="fc" id="L257">        return List.copyOf(indexed.values());</span>
+<span class="fc" id="L269">        return List.copyOf(indexed.values());</span>
     }
 
     private RuleSource source(RewriteRule rule, RuleOrigin origin, String sourceName, String reference) {
-<span class="fc" id="L261">        RuleDescriptor descriptor = rule.descriptor();</span>
-<span class="fc" id="L262">        return new RuleSource(</span>
+<span class="fc" id="L273">        RuleDescriptor descriptor = rule.descriptor();</span>
+<span class="fc" id="L274">        return new RuleSource(</span>
             rule,
             origin,
             sourceName,
-<span class="fc" id="L266">            rule.id(),</span>
-<span class="fc" id="L267">            descriptor.license(),</span>
+<span class="fc" id="L278">            rule.id(),</span>
+<span class="fc" id="L279">            descriptor.license(),</span>
             reference,
-<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            rule.isEquivalencePreservingByConstruction() ? &quot;EQUIVALENCE_PRESERVING&quot; : &quot;ASSUMED&quot;</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">            rule.isEquivalencePreservingByConstruction() ? &quot;EQUIVALENCE_PRESERVING&quot; : &quot;ASSUMED&quot;</span>
         );
     }
 
     private List&lt;ReusableMacro&gt; reusableMacros() {
-<span class="fc" id="L274">        List&lt;ReusableMacro&gt; compiled = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L275" title="All 2 branches covered.">        for (ReusableRule reusable : inventory.findAll().stream()</span>
-<span class="fc" id="L276">            .sorted(Comparator.comparing(ReusableRule::id)).toList()) {</span>
+<span class="fc" id="L286">        List&lt;ReusableMacro&gt; compiled = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (ReusableRule reusable : inventory.findAll().stream()</span>
+<span class="fc" id="L288">            .sorted(Comparator.comparing(ReusableRule::id)).toList()) {</span>
             try {
-<span class="fc" id="L278">                PatternRewriteRule rule = new PatternRewriteRule(</span>
-<span class="fc" id="L279">                    macroRuleId(reusable),</span>
-<span class="fc" id="L280">                    toPatternExpr(rulePatternParser.parse(reusable.leftPattern())),</span>
-<span class="fc" id="L281">                    toPatternExpr(rulePatternParser.parse(reusable.rightPattern())),</span>
+<span class="fc" id="L290">                PatternRewriteRule rule = new PatternRewriteRule(</span>
+<span class="fc" id="L291">                    macroRuleId(reusable),</span>
+<span class="fc" id="L292">                    toPatternExpr(rulePatternParser.parse(reusable.leftPattern())),</span>
+<span class="fc" id="L293">                    toPatternExpr(rulePatternParser.parse(reusable.rightPattern())),</span>
                     RewriteKind.NORMALIZE,
                     false,
-<span class="fc" id="L284">                    -Math.max(1, (int) Math.round(Math.max(1.0, reusable.averageImprovement()))),</span>
+<span class="fc" id="L296">                    -Math.max(1, (int) Math.round(Math.max(1.0, reusable.averageImprovement()))),</span>
                     true
                 );
-<span class="fc" id="L287">                compiled.add(new ReusableMacro(reusable, rule));</span>
-<span class="nc" id="L288">            } catch (RuntimeException ignored) {</span>
+<span class="fc" id="L299">                compiled.add(new ReusableMacro(reusable, rule));</span>
+<span class="nc" id="L300">            } catch (RuntimeException ignored) {</span>
                 // Invalid legacy inventory entries are reported only when their
                 // pattern would otherwise be inspected; they are never executable.
-<span class="fc" id="L291">            }</span>
-<span class="fc" id="L292">        }</span>
-<span class="fc" id="L293">        return List.copyOf(compiled);</span>
+<span class="fc" id="L303">            }</span>
+<span class="fc" id="L304">        }</span>
+<span class="fc" id="L305">        return List.copyOf(compiled);</span>
     }
 
     private Optional&lt;ApplicableMove&gt; createOrdinaryCandidate(
@@ -301,68 +313,68 @@ public final class AstRuleRadarService implements AutoCloseable {
         Context context,
         List&lt;Diagnostic&gt; diagnostics
     ) {
-<span class="fc" id="L304">        RewriteRule rule = source.rule();</span>
-<span class="fc" id="L305">        Expr subtree = positioned.expr();</span>
+<span class="fc" id="L316">        RewriteRule rule = source.rule();</span>
+<span class="fc" id="L317">        Expr subtree = positioned.expr();</span>
         boolean matches;
         try {
-<span class="fc" id="L308">            matches = rule.matches(subtree);</span>
-<span class="nc" id="L309">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L310">            diagnostics.add(new Diagnostic(&quot;MATCH_FAILURE&quot;, rule.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
-<span class="nc" id="L311">            return Optional.empty();</span>
-<span class="fc" id="L312">        }</span>
-<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (!matches) {</span>
-<span class="fc" id="L314">            return Optional.empty();</span>
+<span class="fc" id="L320">            matches = rule.matches(subtree);</span>
+<span class="nc" id="L321">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L322">            diagnostics.add(new Diagnostic(&quot;MATCH_FAILURE&quot;, rule.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
+<span class="nc" id="L323">            return Optional.empty();</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        if (!matches) {</span>
+<span class="fc" id="L326">            return Optional.empty();</span>
         }
         Expr rewritten;
         try {
-<span class="fc" id="L318">            rewritten = rule.apply(subtree);</span>
-<span class="nc" id="L319">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L320">            diagnostics.add(new Diagnostic(&quot;APPLICATION_FAILURE&quot;, rule.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
-<span class="nc" id="L321">            return Optional.empty();</span>
-<span class="fc" id="L322">        }</span>
-<span class="pc bpc" id="L323" title="2 of 4 branches missed.">        if (rewritten == null || rewritten.equals(subtree)) {</span>
-<span class="nc" id="L324">            return Optional.empty();</span>
+<span class="fc" id="L330">            rewritten = rule.apply(subtree);</span>
+<span class="nc" id="L331">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L332">            diagnostics.add(new Diagnostic(&quot;APPLICATION_FAILURE&quot;, rule.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
+<span class="nc" id="L333">            return Optional.empty();</span>
+<span class="fc" id="L334">        }</span>
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        if (rewritten == null || rewritten.equals(subtree)) {</span>
+<span class="nc" id="L336">            return Optional.empty();</span>
         }
-<span class="fc" id="L326">        String subtreeAfter = ExpressionFormatter.format(rewritten);</span>
+<span class="fc" id="L338">        String subtreeAfter = ExpressionFormatter.format(rewritten);</span>
         String expressionAfter;
         try {
-<span class="fc" id="L329">            expressionAfter = ExpressionFormatter.format(replaceAt(root, positioned.path(), rewritten));</span>
-<span class="nc" id="L330">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L331">            diagnostics.add(new Diagnostic(&quot;REPLACEMENT_FAILURE&quot;, rule.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
-<span class="nc" id="L332">            return Optional.empty();</span>
-<span class="fc" id="L333">        }</span>
-<span class="fc" id="L334">        List&lt;String&gt; assumptions = rule.assumptions(subtree).stream()</span>
-<span class="pc" id="L335">            .map(assumption -&gt; assumption.expression())</span>
-<span class="pc bnc" id="L336" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
-<span class="fc" id="L337">            .distinct()</span>
-<span class="fc" id="L338">            .sorted()</span>
-<span class="fc" id="L339">            .toList();</span>
-<span class="fc" id="L340">        boolean assumptionsSatisfied = context.assumptions().containsAll(assumptions);</span>
-<span class="pc bpc" id="L341" title="3 of 4 branches missed.">        if (!assumptionsSatisfied &amp;&amp; !context.includeRejectedCandidates()) {</span>
-<span class="nc" id="L342">            return Optional.empty();</span>
+<span class="fc" id="L341">            expressionAfter = ExpressionFormatter.format(replaceAt(root, positioned.path(), rewritten));</span>
+<span class="nc" id="L342">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L343">            diagnostics.add(new Diagnostic(&quot;REPLACEMENT_FAILURE&quot;, rule.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
+<span class="nc" id="L344">            return Optional.empty();</span>
+<span class="fc" id="L345">        }</span>
+<span class="fc" id="L346">        List&lt;String&gt; assumptions = rule.assumptions(subtree).stream()</span>
+<span class="pc" id="L347">            .map(assumption -&gt; assumption.expression())</span>
+<span class="pc bnc" id="L348" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L349">            .distinct()</span>
+<span class="fc" id="L350">            .sorted()</span>
+<span class="fc" id="L351">            .toList();</span>
+<span class="fc" id="L352">        boolean assumptionsSatisfied = context.assumptions().containsAll(assumptions);</span>
+<span class="pc bpc" id="L353" title="3 of 4 branches missed.">        if (!assumptionsSatisfied &amp;&amp; !context.includeRejectedCandidates()) {</span>
+<span class="nc" id="L354">            return Optional.empty();</span>
         }
-<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        CandidateOutcome outcome = assumptionsSatisfied</span>
-<span class="fc" id="L345">            ? CandidateOutcome.AVAILABLE</span>
-<span class="pc" id="L346">            : CandidateOutcome.REJECTED_ASSUMPTION;</span>
-<span class="fc" id="L347">        List&lt;Binding&gt; bindings = bindings(rule, subtree);</span>
-<span class="fc" id="L348">        return Optional.of(candidate(</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">        CandidateOutcome outcome = assumptionsSatisfied</span>
+<span class="fc" id="L357">            ? CandidateOutcome.AVAILABLE</span>
+<span class="pc" id="L358">            : CandidateOutcome.REJECTED_ASSUMPTION;</span>
+<span class="fc" id="L359">        List&lt;Binding&gt; bindings = bindings(rule, subtree);</span>
+<span class="fc" id="L360">        return Optional.of(candidate(</span>
             formattedRoot,
             positioned,
-<span class="fc" id="L351">            rule.id(),</span>
-<span class="fc" id="L352">            source.displayName(),</span>
-<span class="fc" id="L353">            source.origin(),</span>
-<span class="fc" id="L354">            source.sourceReference(),</span>
-<span class="fc" id="L355">            source.license(),</span>
-<span class="fc" id="L356">            rule.kind().name(),</span>
+<span class="fc" id="L363">            rule.id(),</span>
+<span class="fc" id="L364">            source.displayName(),</span>
+<span class="fc" id="L365">            source.origin(),</span>
+<span class="fc" id="L366">            source.sourceReference(),</span>
+<span class="fc" id="L367">            source.license(),</span>
+<span class="fc" id="L368">            rule.kind().name(),</span>
             bindings,
             assumptions,
             subtreeAfter,
             expressionAfter,
             assumptionsSatisfied,
-<span class="fc" id="L362">            source.validationStatus(),</span>
-<span class="fc" id="L363">            rule.isEquivalencePreservingByConstruction(),</span>
-<span class="fc" id="L364">            rule.mayIncreaseComplexity(),</span>
-<span class="fc" id="L365">            rule.estimatedCostDelta(),</span>
+<span class="fc" id="L374">            source.validationStatus(),</span>
+<span class="fc" id="L375">            rule.isEquivalencePreservingByConstruction(),</span>
+<span class="fc" id="L376">            rule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L377">            rule.estimatedCostDelta(),</span>
             outcome,
             null,
             context
@@ -377,65 +389,65 @@ public final class AstRuleRadarService implements AutoCloseable {
         Context context,
         List&lt;Diagnostic&gt; diagnostics
     ) {
-<span class="pc bpc" id="L380" title="2 of 4 branches missed.">        if (!context.includeLearnedMacros() || !inventory.isEnabled(macro.reusable().id())) {</span>
-<span class="nc" id="L381">            return Optional.empty();</span>
+<span class="pc bpc" id="L392" title="2 of 4 branches missed.">        if (!context.includeLearnedMacros() || !inventory.isEnabled(macro.reusable().id())) {</span>
+<span class="nc" id="L393">            return Optional.empty();</span>
         }
-<span class="fc" id="L383">        PatternRewriteRule rule = macro.rule();</span>
-<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (!rule.matches(positioned.expr())) {</span>
-<span class="fc" id="L385">            return Optional.empty();</span>
+<span class="fc" id="L395">        PatternRewriteRule rule = macro.rule();</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (!rule.matches(positioned.expr())) {</span>
+<span class="fc" id="L397">            return Optional.empty();</span>
         }
-<span class="fc" id="L387">        ReusableRule reusable = macro.reusable();</span>
-<span class="fc" id="L388">        boolean proofAccepted = reusable.proofStatus().atLeast(context.minMacroProofStatus());</span>
-<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        boolean qualityAccepted = reusable.confidenceScore() &gt;= MIN_MACRO_CONFIDENCE</span>
-<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            &amp;&amp; reusable.averageImprovement() &gt; MIN_MACRO_IMPROVEMENT</span>
-<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            &amp;&amp; reusable.occurrenceCount() &gt;= MIN_MACRO_OCCURRENCES;</span>
-<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        boolean goalAccepted = new GoalAwareMacroMoveSelector(inventory).score(</span>
-<span class="fc" id="L393">            reusable, positioned.subtreeText(), context.goalExpression()) &gt; 0.0;</span>
-<span class="fc" id="L394">        boolean assumptionsSatisfied = context.assumptions().containsAll(reusable.assumptions());</span>
+<span class="fc" id="L399">        ReusableRule reusable = macro.reusable();</span>
+<span class="fc" id="L400">        boolean proofAccepted = reusable.proofStatus().atLeast(context.minMacroProofStatus());</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        boolean qualityAccepted = reusable.confidenceScore() &gt;= MIN_MACRO_CONFIDENCE</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            &amp;&amp; reusable.averageImprovement() &gt; MIN_MACRO_IMPROVEMENT</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            &amp;&amp; reusable.occurrenceCount() &gt;= MIN_MACRO_OCCURRENCES;</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        boolean goalAccepted = new GoalAwareMacroMoveSelector(inventory).score(</span>
+<span class="fc" id="L405">            reusable, positioned.subtreeText(), context.goalExpression()) &gt; 0.0;</span>
+<span class="fc" id="L406">        boolean assumptionsSatisfied = context.assumptions().containsAll(reusable.assumptions());</span>
         CandidateOutcome outcome;
-<span class="pc bpc" id="L396" title="2 of 4 branches missed.">        if (!proofAccepted || !qualityAccepted) {</span>
-<span class="nc" id="L397">            outcome = CandidateOutcome.REJECTED_VALIDATION;</span>
-<span class="fc bfc" id="L398" title="All 2 branches covered.">        } else if (!assumptionsSatisfied) {</span>
-<span class="fc" id="L399">            outcome = CandidateOutcome.REJECTED_ASSUMPTION;</span>
+<span class="pc bpc" id="L408" title="2 of 4 branches missed.">        if (!proofAccepted || !qualityAccepted) {</span>
+<span class="nc" id="L409">            outcome = CandidateOutcome.REJECTED_VALIDATION;</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        } else if (!assumptionsSatisfied) {</span>
+<span class="fc" id="L411">            outcome = CandidateOutcome.REJECTED_ASSUMPTION;</span>
         } else {
-<span class="fc" id="L401">            outcome = CandidateOutcome.AVAILABLE;</span>
+<span class="fc" id="L413">            outcome = CandidateOutcome.AVAILABLE;</span>
         }
-<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (!goalAccepted) {</span>
-<span class="nc" id="L404">            return Optional.empty();</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (!goalAccepted) {</span>
+<span class="nc" id="L416">            return Optional.empty();</span>
         }
-<span class="pc bpc" id="L406" title="2 of 6 branches missed.">        boolean applicable = proofAccepted &amp;&amp; qualityAccepted &amp;&amp; assumptionsSatisfied;</span>
-<span class="fc bfc" id="L407" title="All 4 branches covered.">        if (!applicable &amp;&amp; !context.includeRejectedCandidates()) {</span>
-<span class="fc" id="L408">            return Optional.empty();</span>
+<span class="pc bpc" id="L418" title="2 of 6 branches missed.">        boolean applicable = proofAccepted &amp;&amp; qualityAccepted &amp;&amp; assumptionsSatisfied;</span>
+<span class="fc bfc" id="L419" title="All 4 branches covered.">        if (!applicable &amp;&amp; !context.includeRejectedCandidates()) {</span>
+<span class="fc" id="L420">            return Optional.empty();</span>
         }
         Expr rewritten;
         try {
-<span class="fc" id="L412">            rewritten = rule.apply(positioned.expr());</span>
-<span class="nc" id="L413">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L414">            diagnostics.add(new Diagnostic(&quot;MACRO_APPLICATION_FAILURE&quot;,</span>
-<span class="nc" id="L415">                reusable.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
-<span class="nc" id="L416">            return Optional.empty();</span>
-<span class="fc" id="L417">        }</span>
-<span class="fc" id="L418">        String subtreeAfter = ExpressionFormatter.format(rewritten);</span>
-<span class="fc" id="L419">        String expressionAfter = ExpressionFormatter.format(replaceAt(root, positioned.path(), rewritten));</span>
-<span class="fc" id="L420">        MacroEvidence evidence = macroEvidence(reusable);</span>
-<span class="fc" id="L421">        return Optional.of(candidate(</span>
+<span class="fc" id="L424">            rewritten = rule.apply(positioned.expr());</span>
+<span class="nc" id="L425">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L426">            diagnostics.add(new Diagnostic(&quot;MACRO_APPLICATION_FAILURE&quot;,</span>
+<span class="nc" id="L427">                reusable.id() + &quot;: &quot; + safeMessage(exception), positioned.pathKey()));</span>
+<span class="nc" id="L428">            return Optional.empty();</span>
+<span class="fc" id="L429">        }</span>
+<span class="fc" id="L430">        String subtreeAfter = ExpressionFormatter.format(rewritten);</span>
+<span class="fc" id="L431">        String expressionAfter = ExpressionFormatter.format(replaceAt(root, positioned.path(), rewritten));</span>
+<span class="fc" id="L432">        MacroEvidence evidence = macroEvidence(reusable);</span>
+<span class="fc" id="L433">        return Optional.of(candidate(</span>
             formattedRoot,
             positioned,
-<span class="fc" id="L424">            macroRuleId(reusable),</span>
-<span class="fc" id="L425">            reusable.id(),</span>
+<span class="fc" id="L436">            macroRuleId(reusable),</span>
+<span class="fc" id="L437">            reusable.id(),</span>
             RuleOrigin.LEARNED_MACRO,
-<span class="fc" id="L427">            String.join(&quot;,&quot;, reusable.supportingPathIds()),</span>
+<span class="fc" id="L439">            String.join(&quot;,&quot;, reusable.supportingPathIds()),</span>
             &quot;PROJECT&quot;,
-<span class="fc" id="L429">            rule.kind().name(),</span>
-<span class="fc" id="L430">            bindings(rule, positioned.expr()),</span>
-<span class="fc" id="L431">            reusable.assumptions(),</span>
+<span class="fc" id="L441">            rule.kind().name(),</span>
+<span class="fc" id="L442">            bindings(rule, positioned.expr()),</span>
+<span class="fc" id="L443">            reusable.assumptions(),</span>
             subtreeAfter,
             expressionAfter,
             applicable,
-<span class="fc" id="L435">            reusable.proofStatus().name(),</span>
+<span class="fc" id="L447">            reusable.proofStatus().name(),</span>
             true,
             false,
-<span class="fc" id="L438">            rule.estimatedCostDelta(),</span>
+<span class="fc" id="L450">            rule.estimatedCostDelta(),</span>
             outcome,
             evidence,
             context
@@ -443,52 +455,52 @@ public final class AstRuleRadarService implements AutoCloseable {
     }
 
     private void addParameterizedLocalMoves(String formattedRoot, Context context, List&lt;ApplicableMove&gt; target) {
-<span class="fc" id="L446">        RuleInspectionDto inspection = parameterInspectionService.inspect(formattedRoot);</span>
-<span class="fc" id="L447">        Map&lt;String, PositionedNode&gt; positionedByKey = positionedNodes(parser.parseTerm(formattedRoot)).stream()</span>
-<span class="fc" id="L448">            .collect(LinkedHashMap::new, (map, node) -&gt; map.put(node.pathKey(), node), Map::putAll);</span>
-<span class="fc bfc" id="L449" title="All 2 branches covered.">        for (RuleInspectionDto.PositionResult position : inspection.positions()) {</span>
-<span class="fc" id="L450">            PositionedNode positioned = positionedByKey.get(position.pathKey());</span>
-<span class="pc bpc" id="L451" title="1 of 2 branches missed.">            if (positioned == null) {</span>
-<span class="nc" id="L452">                continue;</span>
+<span class="fc" id="L458">        RuleInspectionDto inspection = parameterInspectionService.inspect(formattedRoot);</span>
+<span class="fc" id="L459">        Map&lt;String, PositionedNode&gt; positionedByKey = positionedNodes(parser.parseTerm(formattedRoot)).stream()</span>
+<span class="fc" id="L460">            .collect(LinkedHashMap::new, (map, node) -&gt; map.put(node.pathKey(), node), Map::putAll);</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        for (RuleInspectionDto.PositionResult position : inspection.positions()) {</span>
+<span class="fc" id="L462">            PositionedNode positioned = positionedByKey.get(position.pathKey());</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            if (positioned == null) {</span>
+<span class="nc" id="L464">                continue;</span>
             }
-<span class="fc bfc" id="L454" title="All 2 branches covered.">            for (RuleInspectionDto.RuleMatch match : position.matches()) {</span>
-<span class="pc bpc" id="L455" title="1 of 4 branches missed.">                if (match.expressionAfter() == null || match.expressionAfter().isBlank()</span>
-<span class="pc bpc" id="L456" title="2 of 4 branches missed.">                    || match.subtreeAfter() == null || match.subtreeAfter().isBlank()) {</span>
-<span class="nc" id="L457">                    continue;</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            for (RuleInspectionDto.RuleMatch match : position.matches()) {</span>
+<span class="pc bpc" id="L467" title="1 of 4 branches missed.">                if (match.expressionAfter() == null || match.expressionAfter().isBlank()</span>
+<span class="pc bpc" id="L468" title="2 of 4 branches missed.">                    || match.subtreeAfter() == null || match.subtreeAfter().isBlank()) {</span>
+<span class="nc" id="L469">                    continue;</span>
                 }
-<span class="pc bpc" id="L459" title="3 of 4 branches missed.">                if (!match.applicable() &amp;&amp; !context.includeRejectedCandidates()) {</span>
-<span class="nc" id="L460">                    continue;</span>
+<span class="pc bpc" id="L471" title="3 of 4 branches missed.">                if (!match.applicable() &amp;&amp; !context.includeRejectedCandidates()) {</span>
+<span class="nc" id="L472">                    continue;</span>
                 }
-<span class="fc" id="L462">                List&lt;Binding&gt; bindings = match.bindings().stream()</span>
-<span class="fc" id="L463">                    .map(binding -&gt; new Binding(binding.name(), binding.value(), binding.kind()))</span>
-<span class="fc" id="L464">                    .sorted(Comparator.comparing(Binding::name).thenComparing(Binding::value).thenComparing(Binding::kind))</span>
-<span class="fc" id="L465">                    .toList();</span>
-<span class="fc" id="L466">                ApplicableMove candidate = candidate(</span>
+<span class="fc" id="L474">                List&lt;Binding&gt; bindings = match.bindings().stream()</span>
+<span class="fc" id="L475">                    .map(binding -&gt; new Binding(binding.name(), binding.value(), binding.kind()))</span>
+<span class="fc" id="L476">                    .sorted(Comparator.comparing(Binding::name).thenComparing(Binding::value).thenComparing(Binding::kind))</span>
+<span class="fc" id="L477">                    .toList();</span>
+<span class="fc" id="L478">                ApplicableMove candidate = candidate(</span>
                     formattedRoot,
                     positioned,
-<span class="fc" id="L469">                    match.enumeratorId(),</span>
-<span class="fc" id="L470">                    match.kind(),</span>
+<span class="fc" id="L481">                    match.enumeratorId(),</span>
+<span class="fc" id="L482">                    match.kind(),</span>
                     RuleOrigin.CORE,
                     &quot;finite parameter enumerator&quot;,
                     &quot;PROJECT&quot;,
-<span class="fc" id="L474">                    match.kind(),</span>
+<span class="fc" id="L486">                    match.kind(),</span>
                     bindings,
-<span class="fc" id="L476">                    List.of(),</span>
-<span class="fc" id="L477">                    match.subtreeAfter(),</span>
-<span class="fc" id="L478">                    match.expressionAfter(),</span>
-<span class="fc" id="L479">                    match.applicable(),</span>
+<span class="fc" id="L488">                    List.of(),</span>
+<span class="fc" id="L489">                    match.subtreeAfter(),</span>
+<span class="fc" id="L490">                    match.expressionAfter(),</span>
+<span class="fc" id="L491">                    match.applicable(),</span>
                     &quot;ASSUMED&quot;,
                     false,
                     false,
                     0,
-<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                    match.applicable() ? CandidateOutcome.AVAILABLE : CandidateOutcome.FAILED_APPLICATION,</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                    match.applicable() ? CandidateOutcome.AVAILABLE : CandidateOutcome.FAILED_APPLICATION,</span>
                     null,
                     context
                 );
-<span class="fc" id="L488">                target.add(candidate);</span>
-<span class="fc" id="L489">            }</span>
-<span class="fc" id="L490">        }</span>
-<span class="fc" id="L491">    }</span>
+<span class="fc" id="L500">                target.add(candidate);</span>
+<span class="fc" id="L501">            }</span>
+<span class="fc" id="L502">        }</span>
+<span class="fc" id="L503">    }</span>
 
     private ApplicableMove candidate(
         String expressionBefore,
@@ -512,31 +524,31 @@ public final class AstRuleRadarService implements AutoCloseable {
         MacroEvidence macroEvidence,
         Context context
     ) {
-<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        List&lt;Binding&gt; sortedBindings = bindings == null ? List.of() : bindings.stream()</span>
-<span class="fc" id="L516">            .sorted(Comparator.comparing(Binding::name).thenComparing(Binding::value).thenComparing(Binding::kind))</span>
-<span class="fc" id="L517">            .toList();</span>
-<span class="pc bpc" id="L518" title="1 of 2 branches missed.">        List&lt;String&gt; sortedAssumptions = assumptions == null ? List.of() : assumptions.stream()</span>
-<span class="pc bpc" id="L519" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
-<span class="fc" id="L520">            .map(String::trim)</span>
-<span class="fc" id="L521">            .distinct()</span>
-<span class="fc" id="L522">            .sorted()</span>
-<span class="fc" id="L523">            .toList();</span>
-<span class="fc" id="L524">        String identityMaterial = String.join(&quot;\u001f&quot;,</span>
-<span class="fc" id="L525">            canonical(expressionBefore),</span>
-<span class="fc" id="L526">            positioned.pathKey(),</span>
-<span class="fc" id="L527">            origin.name(),</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">        List&lt;Binding&gt; sortedBindings = bindings == null ? List.of() : bindings.stream()</span>
+<span class="fc" id="L528">            .sorted(Comparator.comparing(Binding::name).thenComparing(Binding::value).thenComparing(Binding::kind))</span>
+<span class="fc" id="L529">            .toList();</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">        List&lt;String&gt; sortedAssumptions = assumptions == null ? List.of() : assumptions.stream()</span>
+<span class="pc bpc" id="L531" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L532">            .map(String::trim)</span>
+<span class="fc" id="L533">            .distinct()</span>
+<span class="fc" id="L534">            .sorted()</span>
+<span class="fc" id="L535">            .toList();</span>
+<span class="fc" id="L536">        String identityMaterial = String.join(&quot;\u001f&quot;,</span>
+<span class="fc" id="L537">            canonical(expressionBefore),</span>
+<span class="fc" id="L538">            positioned.pathKey(),</span>
+<span class="fc" id="L539">            origin.name(),</span>
             ruleId,
-<span class="fc" id="L529">            bindingKey(sortedBindings),</span>
-<span class="fc" id="L530">            String.join(&quot;\u001e&quot;, sortedAssumptions),</span>
-<span class="fc" id="L531">            canonical(expressionAfter),</span>
-<span class="fc" id="L532">            contextFingerprint(context));</span>
-<span class="fc" id="L533">        String candidateId = &quot;move:&quot; + sha256(identityMaterial);</span>
-<span class="fc" id="L534">        CandidateOutcome outcome = context.outcomeByCandidateId().getOrDefault(candidateId, defaultOutcome);</span>
-<span class="fc" id="L535">        String orderingKey = String.format(Locale.ROOT, &quot;%02d|%s|%s|%s|%s&quot;,</span>
-<span class="fc" id="L536">            origin.ordinal(), ruleId, bindingKey(sortedBindings), String.join(&quot;|&quot;, sortedAssumptions), canonical(expressionAfter));</span>
-<span class="fc" id="L537">        return new ApplicableMove(</span>
+<span class="fc" id="L541">            bindingKey(sortedBindings),</span>
+<span class="fc" id="L542">            String.join(&quot;\u001e&quot;, sortedAssumptions),</span>
+<span class="fc" id="L543">            canonical(expressionAfter),</span>
+<span class="fc" id="L544">            contextFingerprint(context));</span>
+<span class="fc" id="L545">        String candidateId = &quot;move:&quot; + sha256(identityMaterial);</span>
+<span class="fc" id="L546">        CandidateOutcome outcome = context.outcomeByCandidateId().getOrDefault(candidateId, defaultOutcome);</span>
+<span class="fc" id="L547">        String orderingKey = String.format(Locale.ROOT, &quot;%02d|%s|%s|%s|%s&quot;,</span>
+<span class="fc" id="L548">            origin.ordinal(), ruleId, bindingKey(sortedBindings), String.join(&quot;|&quot;, sortedAssumptions), canonical(expressionAfter));</span>
+<span class="fc" id="L549">        return new ApplicableMove(</span>
             candidateId,
-<span class="fc" id="L539">            positioned.pathKey(),</span>
+<span class="fc" id="L551">            positioned.pathKey(),</span>
             ruleId,
             displayName,
             origin,
@@ -545,7 +557,7 @@ public final class AstRuleRadarService implements AutoCloseable {
             ruleKind,
             sortedBindings,
             sortedAssumptions,
-<span class="fc" id="L548">            positioned.subtreeText(),</span>
+<span class="fc" id="L560">            positioned.subtreeText(),</span>
             subtreeAfter,
             expressionBefore,
             expressionAfter,
@@ -555,306 +567,306 @@ public final class AstRuleRadarService implements AutoCloseable {
             mayIncreaseComplexity,
             estimatedCostDelta,
             outcome,
-<span class="fc" id="L558">            candidateId.equals(context.selectedCandidateId()),</span>
+<span class="fc" id="L570">            candidateId.equals(context.selectedCandidateId()),</span>
             macroEvidence,
             orderingKey
         );
     }
 
     private List&lt;Binding&gt; bindings(RewriteRule rule, Expr subtree) {
-<span class="fc bfc" id="L565" title="All 2 branches covered.">        if (!(rule instanceof PatternRewriteRule patternRule)) {</span>
-<span class="fc" id="L566">            return List.of();</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">        if (!(rule instanceof PatternRewriteRule patternRule)) {</span>
+<span class="fc" id="L578">            return List.of();</span>
         }
-<span class="fc" id="L568">        Map&lt;String, Expr&gt; matched = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L569">        boolean success = EquivalenceAwarePatternMatcher.match(</span>
-<span class="fc" id="L570">            patternRule.source(), subtree, matched, patternRule.recognitionProfile());</span>
-<span class="pc bpc" id="L571" title="1 of 2 branches missed.">        if (!success) {</span>
-<span class="nc" id="L572">            return List.of();</span>
+<span class="fc" id="L580">        Map&lt;String, Expr&gt; matched = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L581">        boolean success = EquivalenceAwarePatternMatcher.match(</span>
+<span class="fc" id="L582">            patternRule.source(), subtree, matched, patternRule.recognitionProfile());</span>
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">        if (!success) {</span>
+<span class="nc" id="L584">            return List.of();</span>
         }
-<span class="fc" id="L574">        return matched.entrySet().stream()</span>
-<span class="fc" id="L575">            .map(entry -&gt; new Binding(entry.getKey(), ExpressionFormatter.format(entry.getValue()), &quot;PATTERN&quot;))</span>
-<span class="fc" id="L576">            .sorted(Comparator.comparing(Binding::name).thenComparing(Binding::value))</span>
-<span class="fc" id="L577">            .toList();</span>
+<span class="fc" id="L586">        return matched.entrySet().stream()</span>
+<span class="fc" id="L587">            .map(entry -&gt; new Binding(entry.getKey(), ExpressionFormatter.format(entry.getValue()), &quot;PATTERN&quot;))</span>
+<span class="fc" id="L588">            .sorted(Comparator.comparing(Binding::name).thenComparing(Binding::value))</span>
+<span class="fc" id="L589">            .toList();</span>
     }
 
     private MacroEvidence macroEvidence(ReusableRule reusable) {
-<span class="fc" id="L581">        List&lt;AtomicStep&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L582">        Map&lt;String, DiscoveredTransformation&gt; transformationsById = graphStore.discoveredTransformations().stream()</span>
-<span class="pc" id="L583">            .collect(LinkedHashMap::new, (map, item) -&gt; map.put(item.id(), item), Map::putAll);</span>
-<span class="fc bfc" id="L584" title="All 2 branches covered.">        for (String pathId : reusable.supportingPathIds().stream().sorted().toList()) {</span>
-<span class="fc" id="L585">            DiscoveredTransformation transformation = transformationsById.get(pathId);</span>
-<span class="pc bpc" id="L586" title="1 of 2 branches missed.">            if (transformation == null) {</span>
-<span class="fc" id="L587">                continue;</span>
+<span class="fc" id="L593">        List&lt;AtomicStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L594">        Map&lt;String, DiscoveredTransformation&gt; transformationsById = graphStore.discoveredTransformations().stream()</span>
+<span class="pc" id="L595">            .collect(LinkedHashMap::new, (map, item) -&gt; map.put(item.id(), item), Map::putAll);</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        for (String pathId : reusable.supportingPathIds().stream().sorted().toList()) {</span>
+<span class="fc" id="L597">            DiscoveredTransformation transformation = transformationsById.get(pathId);</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">            if (transformation == null) {</span>
+<span class="fc" id="L599">                continue;</span>
             }
-<span class="nc bnc" id="L589" title="All 2 branches missed.">            for (TransformationStep step : transformation.steps()) {</span>
-<span class="nc" id="L590">                steps.add(new AtomicStep(</span>
-<span class="nc" id="L591">                    steps.size(),</span>
-<span class="nc" id="L592">                    step.beforeExpression(),</span>
-<span class="nc" id="L593">                    step.afterExpression(),</span>
-<span class="nc" id="L594">                    step.ruleId(),</span>
-<span class="nc" id="L595">                    step.ruleKind().name(),</span>
-<span class="nc" id="L596">                    step.assumptions()</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">            for (TransformationStep step : transformation.steps()) {</span>
+<span class="nc" id="L602">                steps.add(new AtomicStep(</span>
+<span class="nc" id="L603">                    steps.size(),</span>
+<span class="nc" id="L604">                    step.beforeExpression(),</span>
+<span class="nc" id="L605">                    step.afterExpression(),</span>
+<span class="nc" id="L606">                    step.ruleId(),</span>
+<span class="nc" id="L607">                    step.ruleKind().name(),</span>
+<span class="nc" id="L608">                    step.assumptions()</span>
                 ));
-<span class="nc" id="L598">            }</span>
-<span class="nc" id="L599">        }</span>
-<span class="pc bpc" id="L600" title="1 of 2 branches missed.">        double compressionRatio = steps.isEmpty() ? 1.0 : Math.max(1.0, steps.size());</span>
-<span class="fc" id="L601">        return new MacroEvidence(</span>
-<span class="fc" id="L602">            reusable.id(),</span>
-<span class="fc" id="L603">            reusable.supportingPathIds(),</span>
+<span class="nc" id="L610">            }</span>
+<span class="nc" id="L611">        }</span>
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        double compressionRatio = steps.isEmpty() ? 1.0 : Math.max(1.0, steps.size());</span>
+<span class="fc" id="L613">        return new MacroEvidence(</span>
+<span class="fc" id="L614">            reusable.id(),</span>
+<span class="fc" id="L615">            reusable.supportingPathIds(),</span>
             steps,
-<span class="fc" id="L605">            reusable.confidenceScore(),</span>
-<span class="fc" id="L606">            reusable.occurrenceCount(),</span>
+<span class="fc" id="L617">            reusable.confidenceScore(),</span>
+<span class="fc" id="L618">            reusable.occurrenceCount(),</span>
             compressionRatio
         );
     }
 
     private TruncatedCandidates truncate(List&lt;ApplicableMove&gt; candidates, Context context) {
-<span class="fc" id="L612">        Map&lt;String, List&lt;ApplicableMove&gt;&gt; byPath = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L613" title="All 2 branches covered.">        for (ApplicableMove candidate : candidates) {</span>
-<span class="fc" id="L614">            byPath.computeIfAbsent(candidate.pathKey(), ignored -&gt; new ArrayList&lt;&gt;()).add(candidate);</span>
-<span class="fc" id="L615">        }</span>
-<span class="fc" id="L616">        List&lt;ApplicableMove&gt; perPositionLimited = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L617">        Map&lt;String, Integer&gt; omitted = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L618" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;ApplicableMove&gt;&gt; entry : byPath.entrySet()) {</span>
-<span class="fc" id="L619">            List&lt;ApplicableMove&gt; ordered = entry.getValue().stream().sorted(APPLICABLE_MOVE_ORDER).toList();</span>
-<span class="fc" id="L620">            int keep = Math.min(context.maxCandidatesPerPosition(), ordered.size());</span>
-<span class="fc" id="L621">            perPositionLimited.addAll(ordered.subList(0, keep));</span>
-<span class="fc bfc" id="L622" title="All 2 branches covered.">            if (keep &lt; ordered.size()) {</span>
-<span class="fc" id="L623">                omitted.put(entry.getKey(), ordered.size() - keep);</span>
+<span class="fc" id="L624">        Map&lt;String, List&lt;ApplicableMove&gt;&gt; byPath = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        for (ApplicableMove candidate : candidates) {</span>
+<span class="fc" id="L626">            byPath.computeIfAbsent(candidate.pathKey(), ignored -&gt; new ArrayList&lt;&gt;()).add(candidate);</span>
+<span class="fc" id="L627">        }</span>
+<span class="fc" id="L628">        List&lt;ApplicableMove&gt; perPositionLimited = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L629">        Map&lt;String, Integer&gt; omitted = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L630" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;ApplicableMove&gt;&gt; entry : byPath.entrySet()) {</span>
+<span class="fc" id="L631">            List&lt;ApplicableMove&gt; ordered = entry.getValue().stream().sorted(APPLICABLE_MOVE_ORDER).toList();</span>
+<span class="fc" id="L632">            int keep = Math.min(context.maxCandidatesPerPosition(), ordered.size());</span>
+<span class="fc" id="L633">            perPositionLimited.addAll(ordered.subList(0, keep));</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">            if (keep &lt; ordered.size()) {</span>
+<span class="fc" id="L635">                omitted.put(entry.getKey(), ordered.size() - keep);</span>
             }
-<span class="fc" id="L625">        }</span>
-<span class="fc" id="L626">        perPositionLimited.sort(APPLICABLE_MOVE_ORDER);</span>
-<span class="fc" id="L627">        int keepTotal = Math.min(context.maxCandidatesTotal(), perPositionLimited.size());</span>
-<span class="fc" id="L628">        List&lt;ApplicableMove&gt; returned = new ArrayList&lt;&gt;(perPositionLimited.subList(0, keepTotal));</span>
-<span class="fc bfc" id="L629" title="All 2 branches covered.">        for (ApplicableMove dropped : perPositionLimited.subList(keepTotal, perPositionLimited.size())) {</span>
-<span class="fc" id="L630">            omitted.merge(dropped.pathKey(), 1, Integer::sum);</span>
-<span class="fc" id="L631">        }</span>
-<span class="fc" id="L632">        int omittedCount = omitted.values().stream().mapToInt(Integer::intValue).sum();</span>
-<span class="fc" id="L633">        return new TruncatedCandidates(List.copyOf(returned), omittedCount, Map.copyOf(omitted));</span>
+<span class="fc" id="L637">        }</span>
+<span class="fc" id="L638">        perPositionLimited.sort(APPLICABLE_MOVE_ORDER);</span>
+<span class="fc" id="L639">        int keepTotal = Math.min(context.maxCandidatesTotal(), perPositionLimited.size());</span>
+<span class="fc" id="L640">        List&lt;ApplicableMove&gt; returned = new ArrayList&lt;&gt;(perPositionLimited.subList(0, keepTotal));</span>
+<span class="fc bfc" id="L641" title="All 2 branches covered.">        for (ApplicableMove dropped : perPositionLimited.subList(keepTotal, perPositionLimited.size())) {</span>
+<span class="fc" id="L642">            omitted.merge(dropped.pathKey(), 1, Integer::sum);</span>
+<span class="fc" id="L643">        }</span>
+<span class="fc" id="L644">        int omittedCount = omitted.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="fc" id="L645">        return new TruncatedCandidates(List.copyOf(returned), omittedCount, Map.copyOf(omitted));</span>
     }
 
     private Map&lt;String, Integer&gt; countByPath(List&lt;ApplicableMove&gt; candidates) {
-<span class="fc" id="L637">        Map&lt;String, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L638" title="All 2 branches covered.">        for (ApplicableMove candidate : candidates) {</span>
-<span class="fc" id="L639">            counts.merge(candidate.pathKey(), 1, Integer::sum);</span>
-<span class="fc" id="L640">        }</span>
-<span class="fc" id="L641">        return Map.copyOf(counts);</span>
+<span class="fc" id="L649">        Map&lt;String, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">        for (ApplicableMove candidate : candidates) {</span>
+<span class="fc" id="L651">            counts.merge(candidate.pathKey(), 1, Integer::sum);</span>
+<span class="fc" id="L652">        }</span>
+<span class="fc" id="L653">        return Map.copyOf(counts);</span>
     }
 
     private List&lt;PositionedNode&gt; positionedNodes(Expr root) {
-<span class="fc" id="L645">        List&lt;PositionedNode&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L646">        collect(root, List.of(), &quot;&quot;, 0, result);</span>
-<span class="fc" id="L647">        return List.copyOf(result);</span>
+<span class="fc" id="L657">        List&lt;PositionedNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L658">        collect(root, List.of(), &quot;&quot;, 0, result);</span>
+<span class="fc" id="L659">        return List.copyOf(result);</span>
     }
 
     private void collect(Expr expr, List&lt;Integer&gt; path, String parentKey, int depth, List&lt;PositionedNode&gt; target) {
-<span class="fc" id="L651">        String pathKey = pathKey(path);</span>
-<span class="fc" id="L652">        List&lt;Expr&gt; children = children(expr);</span>
-<span class="fc" id="L653">        List&lt;String&gt; childKeys = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L654" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
-<span class="fc" id="L655">            List&lt;Integer&gt; childPath = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L656">            childPath.add(index);</span>
-<span class="fc" id="L657">            childKeys.add(pathKey(childPath));</span>
+<span class="fc" id="L663">        String pathKey = pathKey(path);</span>
+<span class="fc" id="L664">        List&lt;Expr&gt; children = children(expr);</span>
+<span class="fc" id="L665">        List&lt;String&gt; childKeys = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
+<span class="fc" id="L667">            List&lt;Integer&gt; childPath = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L668">            childPath.add(index);</span>
+<span class="fc" id="L669">            childKeys.add(pathKey(childPath));</span>
         }
-<span class="fc" id="L659">        target.add(new PositionedNode(</span>
-<span class="fc" id="L660">            List.copyOf(path),</span>
+<span class="fc" id="L671">        target.add(new PositionedNode(</span>
+<span class="fc" id="L672">            List.copyOf(path),</span>
             pathKey,
             parentKey,
-<span class="fc" id="L663">            List.copyOf(childKeys),</span>
+<span class="fc" id="L675">            List.copyOf(childKeys),</span>
             expr,
-<span class="fc" id="L665">            nodeKind(expr),</span>
-<span class="fc" id="L666">            label(expr),</span>
-<span class="fc" id="L667">            ExpressionFormatter.format(expr),</span>
+<span class="fc" id="L677">            nodeKind(expr),</span>
+<span class="fc" id="L678">            label(expr),</span>
+<span class="fc" id="L679">            ExpressionFormatter.format(expr),</span>
             depth,
-<span class="fc" id="L669">            target.size()</span>
+<span class="fc" id="L681">            target.size()</span>
         ));
-<span class="fc bfc" id="L671" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
-<span class="fc" id="L672">            List&lt;Integer&gt; childPath = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L673">            childPath.add(index);</span>
-<span class="fc" id="L674">            collect(children.get(index), childPath, pathKey, depth + 1, target);</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">        for (int index = 0; index &lt; children.size(); index++) {</span>
+<span class="fc" id="L684">            List&lt;Integer&gt; childPath = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L685">            childPath.add(index);</span>
+<span class="fc" id="L686">            collect(children.get(index), childPath, pathKey, depth + 1, target);</span>
         }
-<span class="fc" id="L676">    }</span>
+<span class="fc" id="L688">    }</span>
 
     private List&lt;Expr&gt; children(Expr expr) {
-<span class="fc bfc" id="L679" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L680">            return List.of(binary.left(), binary.right());</span>
+<span class="fc bfc" id="L691" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L692">            return List.of(binary.left(), binary.right());</span>
         }
-<span class="fc bfc" id="L682" title="All 2 branches covered.">        if (expr instanceof FunctionExpr function) {</span>
-<span class="fc" id="L683">            return function.arguments();</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">        if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L695">            return function.arguments();</span>
         }
-<span class="fc" id="L685">        return List.of();</span>
+<span class="fc" id="L697">        return List.of();</span>
     }
 
     private String nodeKind(Expr expr) {
-<span class="fc bfc" id="L689" title="All 2 branches covered.">        if (expr instanceof BinaryExpr) {</span>
-<span class="fc" id="L690">            return &quot;BINARY_OPERATOR&quot;;</span>
+<span class="fc bfc" id="L701" title="All 2 branches covered.">        if (expr instanceof BinaryExpr) {</span>
+<span class="fc" id="L702">            return &quot;BINARY_OPERATOR&quot;;</span>
         }
-<span class="fc bfc" id="L692" title="All 2 branches covered.">        if (expr instanceof FunctionExpr) {</span>
-<span class="fc" id="L693">            return &quot;FUNCTION&quot;;</span>
+<span class="fc bfc" id="L704" title="All 2 branches covered.">        if (expr instanceof FunctionExpr) {</span>
+<span class="fc" id="L705">            return &quot;FUNCTION&quot;;</span>
         }
-<span class="fc bfc" id="L695" title="All 2 branches covered.">        if (expr instanceof NumberExpr) {</span>
-<span class="fc" id="L696">            return &quot;NUMBER&quot;;</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">        if (expr instanceof NumberExpr) {</span>
+<span class="fc" id="L708">            return &quot;NUMBER&quot;;</span>
         }
-<span class="pc bpc" id="L698" title="1 of 2 branches missed.">        if (expr instanceof VariableExpr) {</span>
-<span class="fc" id="L699">            return &quot;VARIABLE&quot;;</span>
+<span class="pc bpc" id="L710" title="1 of 2 branches missed.">        if (expr instanceof VariableExpr) {</span>
+<span class="fc" id="L711">            return &quot;VARIABLE&quot;;</span>
         }
-<span class="nc" id="L701">        return expr.getClass().getSimpleName().toUpperCase(Locale.ROOT);</span>
+<span class="nc" id="L713">        return expr.getClass().getSimpleName().toUpperCase(Locale.ROOT);</span>
     }
 
     private String label(Expr expr) {
-<span class="fc bfc" id="L705" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L706">            return binary.operator().symbol();</span>
+<span class="fc bfc" id="L717" title="All 2 branches covered.">        if (expr instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L718">            return binary.operator().symbol();</span>
         }
-<span class="fc bfc" id="L708" title="All 2 branches covered.">        if (expr instanceof FunctionExpr function) {</span>
-<span class="fc" id="L709">            return function.name();</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">        if (expr instanceof FunctionExpr function) {</span>
+<span class="fc" id="L721">            return function.name();</span>
         }
-<span class="fc bfc" id="L711" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
-<span class="fc" id="L712">            return variable.name();</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">        if (expr instanceof VariableExpr variable) {</span>
+<span class="fc" id="L724">            return variable.name();</span>
         }
-<span class="fc" id="L714">        return ExpressionFormatter.format(expr);</span>
+<span class="fc" id="L726">        return ExpressionFormatter.format(expr);</span>
     }
 
     private Expr replaceAt(Expr root, List&lt;Integer&gt; path, Expr replacement) {
-<span class="fc bfc" id="L718" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
-<span class="fc" id="L719">            return replacement;</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L731">            return replacement;</span>
         }
-<span class="fc" id="L721">        int index = path.getFirst();</span>
-<span class="fc" id="L722">        List&lt;Integer&gt; tail = path.subList(1, path.size());</span>
-<span class="fc bfc" id="L723" title="All 2 branches covered.">        if (root instanceof BinaryExpr binary) {</span>
-<span class="pc bpc" id="L724" title="2 of 3 branches missed.">            return switch (index) {</span>
-<span class="fc" id="L725">                case 0 -&gt; new BinaryExpr(replaceAt(binary.left(), tail, replacement), binary.operator(), binary.right());</span>
-<span class="nc" id="L726">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), replaceAt(binary.right(), tail, replacement));</span>
-<span class="nc" id="L727">                default -&gt; throw new IllegalArgumentException(&quot;invalid binary child index &quot; + index);</span>
+<span class="fc" id="L733">        int index = path.getFirst();</span>
+<span class="fc" id="L734">        List&lt;Integer&gt; tail = path.subList(1, path.size());</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        if (root instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L736" title="2 of 3 branches missed.">            return switch (index) {</span>
+<span class="fc" id="L737">                case 0 -&gt; new BinaryExpr(replaceAt(binary.left(), tail, replacement), binary.operator(), binary.right());</span>
+<span class="nc" id="L738">                case 1 -&gt; new BinaryExpr(binary.left(), binary.operator(), replaceAt(binary.right(), tail, replacement));</span>
+<span class="nc" id="L739">                default -&gt; throw new IllegalArgumentException(&quot;invalid binary child index &quot; + index);</span>
             };
         }
-<span class="pc bpc" id="L730" title="1 of 2 branches missed.">        if (root instanceof FunctionExpr function) {</span>
-<span class="pc bpc" id="L731" title="2 of 4 branches missed.">            if (index &lt; 0 || index &gt;= function.arguments().size()) {</span>
-<span class="nc" id="L732">                throw new IllegalArgumentException(&quot;invalid function child index &quot; + index);</span>
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">        if (root instanceof FunctionExpr function) {</span>
+<span class="pc bpc" id="L743" title="2 of 4 branches missed.">            if (index &lt; 0 || index &gt;= function.arguments().size()) {</span>
+<span class="nc" id="L744">                throw new IllegalArgumentException(&quot;invalid function child index &quot; + index);</span>
             }
-<span class="fc" id="L734">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
-<span class="fc" id="L735">            arguments.set(index, replaceAt(arguments.get(index), tail, replacement));</span>
-<span class="fc" id="L736">            return new FunctionExpr(function.name(), arguments);</span>
+<span class="fc" id="L746">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;(function.arguments());</span>
+<span class="fc" id="L747">            arguments.set(index, replaceAt(arguments.get(index), tail, replacement));</span>
+<span class="fc" id="L748">            return new FunctionExpr(function.name(), arguments);</span>
         }
-<span class="nc" id="L738">        throw new IllegalArgumentException(&quot;path descends into leaf&quot;);</span>
+<span class="nc" id="L750">        throw new IllegalArgumentException(&quot;path descends into leaf&quot;);</span>
     }
 
     private PatternExpr toPatternExpr(RulePatternNode node) {
-<span class="fc bfc" id="L742" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
-<span class="fc" id="L743">            return PatternExpr.num(number.value());</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
+<span class="fc" id="L755">            return PatternExpr.num(number.value());</span>
         }
-<span class="fc bfc" id="L745" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
-<span class="fc" id="L746">            return PatternExpr.var(variable.name());</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
+<span class="fc" id="L758">            return PatternExpr.var(variable.name());</span>
         }
-<span class="pc bpc" id="L748" title="1 of 2 branches missed.">        if (node instanceof PatternFunction function) {</span>
-<span class="nc" id="L749">            PatternExpr[] arguments = function.arguments().stream()</span>
-<span class="nc" id="L750">                .map(this::toPatternExpr)</span>
-<span class="nc" id="L751">                .toArray(PatternExpr[]::new);</span>
-<span class="nc" id="L752">            return PatternExpr.fn(function.name(), arguments);</span>
+<span class="pc bpc" id="L760" title="1 of 2 branches missed.">        if (node instanceof PatternFunction function) {</span>
+<span class="nc" id="L761">            PatternExpr[] arguments = function.arguments().stream()</span>
+<span class="nc" id="L762">                .map(this::toPatternExpr)</span>
+<span class="nc" id="L763">                .toArray(PatternExpr[]::new);</span>
+<span class="nc" id="L764">            return PatternExpr.fn(function.name(), arguments);</span>
         }
-<span class="fc" id="L754">        PatternBinary binary = (PatternBinary) node;</span>
-<span class="fc" id="L755">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>
+<span class="fc" id="L766">        PatternBinary binary = (PatternBinary) node;</span>
+<span class="fc" id="L767">        return PatternExpr.op(binary.op(), toPatternExpr(binary.left()), toPatternExpr(binary.right()));</span>
     }
 
     private String canonical(String expression) {
-<span class="pc bpc" id="L759" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
-<span class="fc" id="L760">            return &quot;&quot;;</span>
+<span class="pc bpc" id="L771" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L772">            return &quot;&quot;;</span>
         }
         try {
-<span class="fc" id="L763">            return canonicalizer.canonicalize(expression);</span>
-<span class="nc" id="L764">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L765">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L775">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L776">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L777">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
         }
     }
 
     private RuleOrigin originForPluginSource(String source) {
-<span class="pc bpc" id="L770" title="1 of 2 branches missed.">        String normalized = source == null ? &quot;&quot; : source.toLowerCase(Locale.ROOT);</span>
-<span class="pc bpc" id="L771" title="2 of 4 branches missed.">        return normalized.contains(&quot;.regelsuche&quot;) || normalized.contains(&quot;.rules&quot;)</span>
-<span class="pc bpc" id="L772" title="2 of 4 branches missed.">            || normalized.contains(&quot;rule-file&quot;) || normalized.contains(&quot;rule file&quot;)</span>
-<span class="nc" id="L773">            ? RuleOrigin.RULE_FILE</span>
-<span class="fc" id="L774">            : RuleOrigin.PLUGIN;</span>
+<span class="pc bpc" id="L782" title="1 of 2 branches missed.">        String normalized = source == null ? &quot;&quot; : source.toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L783" title="2 of 4 branches missed.">        return normalized.contains(&quot;.regelsuche&quot;) || normalized.contains(&quot;.rules&quot;)</span>
+<span class="pc bpc" id="L784" title="2 of 4 branches missed.">            || normalized.contains(&quot;rule-file&quot;) || normalized.contains(&quot;rule file&quot;)</span>
+<span class="nc" id="L785">            ? RuleOrigin.RULE_FILE</span>
+<span class="fc" id="L786">            : RuleOrigin.PLUGIN;</span>
     }
 
     private String contextFingerprint(Context context) {
-<span class="fc" id="L778">        return String.join(&quot;|&quot;,</span>
-<span class="fc" id="L779">            context.knowledgeProfile().name(),</span>
-<span class="fc" id="L780">            String.join(&quot;,&quot;, context.enabledPacks().stream().sorted().toList()),</span>
-<span class="fc" id="L781">            String.join(&quot;,&quot;, context.disabledPacks().stream().sorted().toList()),</span>
-<span class="fc" id="L782">            Boolean.toString(context.includePlugins()),</span>
-<span class="fc" id="L783">            Boolean.toString(context.includeLearnedMacros()),</span>
-<span class="fc" id="L784">            context.minMacroProofStatus().name(),</span>
-<span class="fc" id="L785">            context.searchProfile(),</span>
-<span class="fc" id="L786">            canonical(context.goalExpression()),</span>
-<span class="fc" id="L787">            String.join(&quot;,&quot;, context.assumptions())</span>
+<span class="fc" id="L790">        return String.join(&quot;|&quot;,</span>
+<span class="fc" id="L791">            context.knowledgeProfile().name(),</span>
+<span class="fc" id="L792">            String.join(&quot;,&quot;, context.enabledPacks().stream().sorted().toList()),</span>
+<span class="fc" id="L793">            String.join(&quot;,&quot;, context.disabledPacks().stream().sorted().toList()),</span>
+<span class="fc" id="L794">            Boolean.toString(context.includePlugins()),</span>
+<span class="fc" id="L795">            Boolean.toString(context.includeLearnedMacros()),</span>
+<span class="fc" id="L796">            context.minMacroProofStatus().name(),</span>
+<span class="fc" id="L797">            context.searchProfile(),</span>
+<span class="fc" id="L798">            canonical(context.goalExpression()),</span>
+<span class="fc" id="L799">            String.join(&quot;,&quot;, context.assumptions())</span>
         );
     }
 
     private String bindingKey(List&lt;Binding&gt; bindings) {
-<span class="fc" id="L792">        return bindings.stream()</span>
-<span class="fc" id="L793">            .map(binding -&gt; binding.name() + &quot;=&quot; + canonical(binding.value()) + &quot;:&quot; + binding.kind())</span>
-<span class="fc" id="L794">            .reduce((left, right) -&gt; left + &quot;|&quot; + right)</span>
-<span class="fc" id="L795">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L804">        return bindings.stream()</span>
+<span class="fc" id="L805">            .map(binding -&gt; binding.name() + &quot;=&quot; + canonical(binding.value()) + &quot;:&quot; + binding.kind())</span>
+<span class="fc" id="L806">            .reduce((left, right) -&gt; left + &quot;|&quot; + right)</span>
+<span class="fc" id="L807">            .orElse(&quot;&quot;);</span>
     }
 
     private String macroRuleId(ReusableRule reusable) {
-<span class="pc bpc" id="L799" title="1 of 2 branches missed.">        return reusable.id().startsWith(&quot;macro_&quot;) ? reusable.id() : &quot;macro_&quot; + reusable.id();</span>
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">        return reusable.id().startsWith(&quot;macro_&quot;) ? reusable.id() : &quot;macro_&quot; + reusable.id();</span>
     }
 
     private String pathKey(List&lt;Integer&gt; path) {
-<span class="fc bfc" id="L803" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
-<span class="fc" id="L804">            return &quot;root&quot;;</span>
+<span class="fc bfc" id="L815" title="All 2 branches covered.">        if (path.isEmpty()) {</span>
+<span class="fc" id="L816">            return &quot;root&quot;;</span>
         }
-<span class="fc" id="L806">        return path.stream().map(index -&gt; String.format(Locale.ROOT, &quot;%03d&quot;, index))</span>
-<span class="fc" id="L807">            .reduce((left, right) -&gt; left + &quot;.&quot; + right).orElse(&quot;root&quot;);</span>
+<span class="fc" id="L818">        return path.stream().map(index -&gt; String.format(Locale.ROOT, &quot;%03d&quot;, index))</span>
+<span class="fc" id="L819">            .reduce((left, right) -&gt; left + &quot;.&quot; + right).orElse(&quot;root&quot;);</span>
     }
 
     private String sha256(String value) {
         try {
-<span class="fc" id="L812">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L813">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L814">            StringBuilder result = new StringBuilder(digest.length * 2);</span>
-<span class="fc bfc" id="L815" title="All 2 branches covered.">            for (byte item : digest) {</span>
-<span class="fc" id="L816">                result.append(String.format(Locale.ROOT, &quot;%02x&quot;, item &amp; 0xff));</span>
+<span class="fc" id="L824">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L825">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L826">            StringBuilder result = new StringBuilder(digest.length * 2);</span>
+<span class="fc bfc" id="L827" title="All 2 branches covered.">            for (byte item : digest) {</span>
+<span class="fc" id="L828">                result.append(String.format(Locale.ROOT, &quot;%02x&quot;, item &amp; 0xff));</span>
             }
-<span class="fc" id="L818">            return result.toString();</span>
-<span class="nc" id="L819">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L820">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+<span class="fc" id="L830">            return result.toString();</span>
+<span class="nc" id="L831">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L832">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
         }
     }
 
     private String safeMessage(RuntimeException exception) {
-<span class="pc bpc" id="L825" title="1 of 2 branches missed.">        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();</span>
+<span class="pc bpc" id="L837" title="1 of 2 branches missed.">        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();</span>
     }
 
     @Override
     public void close() {
-<span class="fc" id="L830">        pluginRuntime.close();</span>
-<span class="fc" id="L831">    }</span>
+<span class="fc" id="L842">        pluginRuntime.close();</span>
+<span class="fc" id="L843">    }</span>
 
-<span class="fc" id="L833">    private static final Comparator&lt;ApplicableMove&gt; APPLICABLE_MOVE_ORDER = Comparator</span>
-<span class="fc" id="L834">        .comparing(ApplicableMove::pathKey, AstRuleRadarService::comparePathKeys)</span>
-<span class="fc" id="L835">        .thenComparing(ApplicableMove::orderingKey)</span>
-<span class="fc" id="L836">        .thenComparing(ApplicableMove::candidateId);</span>
+<span class="fc" id="L845">    private static final Comparator&lt;ApplicableMove&gt; APPLICABLE_MOVE_ORDER = Comparator</span>
+<span class="fc" id="L846">        .comparing(ApplicableMove::pathKey, AstRuleRadarService::comparePathKeys)</span>
+<span class="fc" id="L847">        .thenComparing(ApplicableMove::orderingKey)</span>
+<span class="fc" id="L848">        .thenComparing(ApplicableMove::candidateId);</span>
 
     private static int comparePathKeys(String left, String right) {
-<span class="fc bfc" id="L839" title="All 2 branches covered.">        if (&quot;root&quot;.equals(left)) {</span>
-<span class="pc bpc" id="L840" title="1 of 2 branches missed.">            return &quot;root&quot;.equals(right) ? 0 : -1;</span>
+<span class="fc bfc" id="L851" title="All 2 branches covered.">        if (&quot;root&quot;.equals(left)) {</span>
+<span class="pc bpc" id="L852" title="1 of 2 branches missed.">            return &quot;root&quot;.equals(right) ? 0 : -1;</span>
         }
-<span class="fc bfc" id="L842" title="All 2 branches covered.">        if (&quot;root&quot;.equals(right)) {</span>
-<span class="fc" id="L843">            return 1;</span>
+<span class="fc bfc" id="L854" title="All 2 branches covered.">        if (&quot;root&quot;.equals(right)) {</span>
+<span class="fc" id="L855">            return 1;</span>
         }
-<span class="fc" id="L845">        String[] a = left.split(&quot;\\.&quot;);</span>
-<span class="fc" id="L846">        String[] b = right.split(&quot;\\.&quot;);</span>
-<span class="fc" id="L847">        int min = Math.min(a.length, b.length);</span>
-<span class="fc bfc" id="L848" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
-<span class="fc" id="L849">            int comparison = Integer.compare(Integer.parseInt(a[i]), Integer.parseInt(b[i]));</span>
-<span class="pc bpc" id="L850" title="1 of 2 branches missed.">            if (comparison != 0) {</span>
-<span class="nc" id="L851">                return comparison;</span>
+<span class="fc" id="L857">        String[] a = left.split(&quot;\\.&quot;);</span>
+<span class="fc" id="L858">        String[] b = right.split(&quot;\\.&quot;);</span>
+<span class="fc" id="L859">        int min = Math.min(a.length, b.length);</span>
+<span class="fc bfc" id="L860" title="All 2 branches covered.">        for (int i = 0; i &lt; min; i++) {</span>
+<span class="fc" id="L861">            int comparison = Integer.compare(Integer.parseInt(a[i]), Integer.parseInt(b[i]));</span>
+<span class="pc bpc" id="L862" title="1 of 2 branches missed.">            if (comparison != 0) {</span>
+<span class="nc" id="L863">                return comparison;</span>
             }
         }
-<span class="fc" id="L854">        return Integer.compare(a.length, b.length);</span>
+<span class="fc" id="L866">        return Integer.compare(a.length, b.length);</span>
     }
 
-<span class="fc" id="L857">    private record PositionedNode(</span>
+<span class="fc" id="L869">    private record PositionedNode(</span>
         List&lt;Integer&gt; path,
         String pathKey,
         String parentPathKey,
@@ -868,7 +880,7 @@ public final class AstRuleRadarService implements AutoCloseable {
     ) {
     }
 
-<span class="fc" id="L871">    private record RuleSource(</span>
+<span class="fc" id="L883">    private record RuleSource(</span>
         RewriteRule rule,
         RuleOrigin origin,
         String sourceName,
@@ -879,10 +891,10 @@ public final class AstRuleRadarService implements AutoCloseable {
     ) {
     }
 
-<span class="fc" id="L882">    private record ReusableMacro(ReusableRule reusable, PatternRewriteRule rule) {</span>
+<span class="fc" id="L894">    private record ReusableMacro(ReusableRule reusable, PatternRewriteRule rule) {</span>
     }
 
-<span class="fc" id="L885">    private record TruncatedCandidates(</span>
+<span class="fc" id="L897">    private record TruncatedCandidates(</span>
         List&lt;ApplicableMove&gt; returned,
         int omittedCount,
         Map&lt;String, Integer&gt; omittedByPath

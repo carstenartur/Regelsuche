@@ -149,7 +149,7 @@ public final class ExtractionProofChecker {
 <span class="fc" id="L149">        int termCount = s.terms.size();</span>
 <span class="fc" id="L150">        s.requireTerm(certificate.inputTerm());</span>
 <span class="fc" id="L151">        s.requireTerm(certificate.outputTerm());</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        require(s.expression(expectedInput) == certificate.inputTerm(), &quot;expected input mismatch&quot;);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        require(s.expression(expectedInput) == certificate.inputTerm(), &quot;expected input mismatch&quot;);</span>
 <span class="fc" id="L153">        require(</span>
 <span class="fc bfc" id="L154" title="All 2 branches covered.">                s.expression(expectedOutput) == certificate.outputTerm(),</span>
                 &quot;expected output mismatch&quot;);

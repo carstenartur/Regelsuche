@@ -281,7 +281,7 @@ public interface DiscoveryDomain&lt;S, C, K&gt; {
             }
 <span class="pc bpc" id="L282" title="1 of 2 branches missed.">            witness = witness == null ? &quot;&quot; : witness;</span>
 <span class="fc" id="L283">            metrics = DomainCanonical.sortedMap(metrics);</span>
-<span class="pc bpc" id="L284" title="3 of 4 branches missed.">            if (status == CounterexampleStatus.FOUND &amp;&amp; witness.isBlank()) {</span>
+<span class="pc bpc" id="L284" title="1 of 4 branches missed.">            if (status == CounterexampleStatus.FOUND &amp;&amp; witness.isBlank()) {</span>
 <span class="nc" id="L285">                throw new IllegalArgumentException(</span>
                     &quot;counterexample status FOUND requires a witness&quot;);
             }
@@ -300,7 +300,7 @@ public interface DiscoveryDomain&lt;S, C, K&gt; {
             String witness,
             Map&lt;String, String&gt; metrics
         ) {
-<span class="nc" id="L303">            return new CounterexampleResult(</span>
+<span class="fc" id="L303">            return new CounterexampleResult(</span>
                 CounterexampleStatus.FOUND, attempts, witness, metrics);
         }
 
@@ -370,7 +370,7 @@ public interface DiscoveryDomain&lt;S, C, K&gt; {
             String summary,
             Map&lt;String, String&gt; metrics
         ) {
-<span class="nc" id="L373">            return new Evaluation&lt;&gt;(</span>
+<span class="fc" id="L373">            return new Evaluation&lt;&gt;(</span>
                 EvaluationStatus.INCONCLUSIVE, null, summary, metrics);
         }
 

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScalarClassAnalysis.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">ScalarClassAnalysis.java</span></div><h1>ScalarClassAnalysis.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.*;
+import de.regelsuche.egraph.proof.ScalarGuardFacts;
+import de.regelsuche.scalar.ExactRational;
+import java.util.*;
+
+/** Finite descending sign/sort lattice. make reads child classes, merge intersects evidence and retains contradictions. */
+final class ScalarClassAnalysis {
+    private final EGraph graph;
+    private final List&lt;Assumption&gt; context;
+<span class="fc" id="L13">    private final Map&lt;EClassId,ScalarGuardFacts&gt; facts = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L14">    private final Map&lt;EClassId,ScalarShapeFacts&gt; shapes = new HashMap&lt;&gt;();</span>
+    private long evaluations;
+<span class="fc" id="L16">    ScalarClassAnalysis(EGraph graph, List&lt;Assumption&gt; context) { this.graph = graph; this.context = context; }</span>
+<span class="fc" id="L17">    ScalarGuardFacts get(EClassId id) { return facts.getOrDefault(graph.find(id), ScalarGuardFacts.UNKNOWN); }</span>
+<span class="fc" id="L18">    ScalarShapeFacts shape(EClassId id) { return shapes.getOrDefault(graph.find(id),ScalarShapeFacts.EMPTY); }</span>
+    List&lt;NativeScalarSaturation.Analysis&gt; snapshot() {
+<span class="fc" id="L20">        return graph.classes().stream().map(EClass::id).sorted().map(id -&gt;</span>
+<span class="fc" id="L21">            new NativeScalarSaturation.Analysis(id.value(),get(id),shape(id))).toList();</span>
+    }
+<span class="fc" id="L23">    long evaluations() { return evaluations; }</span>
+
+    void update(Collection&lt;EClassId&gt; dirty) {
+        // Dirty closure includes affected parents. At least one of the five possible bits disappears per refinement.
+        boolean changed;
+        do {
+<span class="fc" id="L29">            changed = false;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            for (var id : dirty) {</span>
+<span class="fc" id="L31">                var root = graph.find(id);</span>
+<span class="fc" id="L32">                var merged = get(root);</span>
+<span class="fc" id="L33">                var shape = shape(root);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                for (var node : graph.classOrThrow(root).nodes()) {</span>
+<span class="fc" id="L35">                    merged = merged.merge(make(node));</span>
+<span class="fc" id="L36">                    shape = shape.merge(ScalarShapeFacts.make(node,node.children().stream().map(this::shape).toList()));</span>
+<span class="fc" id="L37">                    evaluations++;</span>
+<span class="fc" id="L38">                }</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                if (shape.contradictory()) merged = merged.merge(new ScalarGuardFacts(0,0,false));</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                if (!shape.equals(shape(root))) { shapes.put(root,shape); changed=true; }</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                if (!merged.equals(get(root))) { facts.put(root, merged); changed = true; }</span>
+<span class="fc" id="L42">            }</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        } while (changed);</span>
+<span class="fc" id="L44">    }</span>
+    private ScalarGuardFacts make(ENode node) {
+<span class="fc" id="L46">        String symbol = node.symbol();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (symbol.startsWith(&quot;num:&quot;)) return ScalarGuardFacts.of(new NumberExpr(ExactRational.fromCanonicalText(symbol.substring(4))),context);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (symbol.startsWith(&quot;var:&quot;)) return ScalarGuardFacts.variable(symbol.substring(4),context);</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        if (!symbol.startsWith(&quot;op:&quot;) &amp;&amp; !symbol.startsWith(&quot;ac:&quot;)) return ScalarGuardFacts.UNKNOWN;</span>
+<span class="fc" id="L50">        var operator = BinaryOperator.valueOf(symbol.substring(3));</span>
+<span class="fc" id="L51">        var value = get(node.children().getFirst());</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int i=1;i&lt;node.children().size();i++) value = ScalarGuardFacts.combine(operator,value,get(node.children().get(i)));</span>
+<span class="fc" id="L53">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

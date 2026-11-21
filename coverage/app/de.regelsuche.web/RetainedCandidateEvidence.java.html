@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RetainedCandidateEvidence.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">RetainedCandidateEvidence.java</span></div><h1>RetainedCandidateEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.representation.*;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.radar.AstRuleRadarService;
+import de.regelsuche.solver.ir.*;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+/** A post-run, independently recomputed occurrence review. The mathematical run's historical role bindings stay immutable. */
+<span class="nc" id="L20">final class RetainedCandidateEvidence {</span>
+    static final String SCHEMA = &quot;regelsuche.retained-candidate-occurrence-review/v1&quot;;
+<span class="fc" id="L22">    private static final JsonMapper JSON = new JsonMapper();</span>
+
+<span class="fc" id="L24">    record Step(String source, String target, String endCandidate, String rule, String application, List&lt;Integer&gt; path,</span>
+            List&lt;String&gt; premises, int maxIncrease, int maxCandidates) { }
+
+    static ObjectNode review(Path directory, RepresentationDiscoveryRunWorkspace run, String candidate, int edge,
+            AstRuleRadarService radar) throws IOException {
+<span class="fc" id="L29">        return review(directory, run, candidate, edge, radar, &quot;&quot;, List.of());</span>
+    }
+
+    static ObjectNode review(Path directory, RepresentationDiscoveryRunWorkspace run, String candidate, int edge,
+            AstRuleRadarService radar, String query, List&lt;String&gt; additionalPremises) throws IOException {
+<span class="fc" id="L34">        var reference = run.artifacts().stream().filter(a -&gt; a.role().name().equals(&quot;CANDIDATE_DOSSIERS&quot;)).findFirst().orElseThrow();</span>
+<span class="pc bpc" id="L35" title="1 of 3 branches missed.">        Step step = switch (reference.artifactSchema()) {</span>
+<span class="fc" id="L36">            case TargetFreeSearchExecution.SCHEMA -&gt; nativeStep(directory, run, candidate, edge);</span>
+<span class="fc" id="L37">            case TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA -&gt; frozenStep(directory, run, candidate, edge);</span>
+<span class="nc" id="L38">            default -&gt; throw new IllegalArgumentException(&quot;unsupported retained candidate artifact&quot;);</span>
+        };
+<span class="fc" id="L40">        var review = JSON.createObjectNode().put(&quot;schema&quot;, SCHEMA).put(&quot;runId&quot;, run.runId())</span>
+<span class="fc" id="L41">            .put(&quot;artifactHash&quot;, reference.targetContentHash()).put(&quot;candidateId&quot;, candidate).put(&quot;edgeSequence&quot;, edge)</span>
+<span class="fc" id="L42">            .put(&quot;informationBoundaryHash&quot;, run.plan().informationBoundaryHash()).put(&quot;ruleInventoryHash&quot;, run.plan().ruleInventoryHash());</span>
+<span class="fc" id="L43">        review.set(&quot;selectedStep&quot;, JSON.valueToTree(step));</span>
+<span class="fc" id="L44">        String binding = SolverIr.sha256(review.toString());</span>
+<span class="fc" id="L45">        review.put(&quot;sourceBindingHash&quot;, binding);</span>
+<span class="fc" id="L46">        boolean frozen = TargetFreeSymPyBridgeDiscoveryScenario.SCHEMA.equals(reference.artifactSchema());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        var packs = frozen ? KnowledgePackSelection.CORE.enablePack(TargetFreeSymPyBridgeDiscoveryScenario.PACK_ID) : KnowledgePackSelection.CORE;</span>
+<span class="fc" id="L48">        var boundary = RepresentationDiscoveryInformationBoundary.fromKnowledgePacks(run.plan().informationTrack(), packs);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        var catalog = frozen ? KnownStructureCatalog.fromKnowledgePacks(packs) : KnownStructureCatalog.empty();</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        if (!boundary.contentHash().equals(run.plan().informationBoundaryHash()) || !catalog.contentHash().equals(run.plan().knownStructureCatalogHash())) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(&quot;installed review catalog or source boundary differs from retained context&quot;);</span>
+        }
+<span class="fc" id="L53">        review.set(&quot;candidateComparison&quot;, CandidateRepresentationReview.compare(run.input().displayText(), step.endCandidate(),</span>
+<span class="fc" id="L54">            boundary, catalog, step.maxIncrease(), step.maxCandidates()));</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!boundary.candidateFormationRuleInventoryHash().equals(run.plan().ruleInventoryHash())) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;installed formation inventory differs from the retained search&quot;);</span>
+        }
+<span class="fc" id="L58">        RewriteRule rule = boundary.candidateFormationRules().stream().filter(r -&gt; r.id().equals(step.rule())).findFirst().orElseThrow();</span>
+<span class="fc" id="L59">        var matched = occurrence(step, rule);</span>
+<span class="fc" id="L60">        review.set(&quot;occurrence&quot;, JSON.valueToTree(matched.position().path()));</span>
+<span class="fc" id="L61">        review.put(&quot;subtreeBefore&quot;, matched.sourceOccurrenceExpression()).put(&quot;subtreeAfter&quot;, matched.transformedOccurrenceExpression());</span>
+<span class="fc" id="L62">        var move = radar.inspectFormationOccurrence(step.source(), matched.position().path(), rule, step.premises())</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">            .filter(r -&gt; r.expressionAfter().equals(step.target()) &amp;&amp; r.subtreeBefore().equals(matched.sourceOccurrenceExpression())</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                &amp;&amp; r.subtreeAfter().equals(matched.transformedOccurrenceExpression()));</span>
+<span class="fc" id="L65">        move.ifPresent(r -&gt; review.set(&quot;radar&quot;, JSON.valueToTree(r)));</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        review.put(&quot;radarStatus&quot;, move.isPresent() ? &quot;REPRODUCED_EXACT_OCCURRENCE&quot; : &quot;NO_EXACT_RADAR_MATCH&quot;);</span>
+<span class="fc" id="L67">        var measures = new SemanticDescriptionMeasurer();</span>
+<span class="fc" id="L68">        review.set(&quot;sourceMetrics&quot;, JSON.valueToTree(measures.measure(step.source())));</span>
+<span class="fc" id="L69">        review.set(&quot;targetMetrics&quot;, JSON.valueToTree(measures.measure(step.target())));</span>
+<span class="fc" id="L70">        var root = new ExpressionParser().parseTerm(step.source());</span>
+<span class="fc" id="L71">        var subtree = matched.position().subtreeAt(root).orElseThrow();</span>
+<span class="fc" id="L72">        var guards = review.putArray(&quot;guards&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        for (var guard : rule.assumptions(subtree)) {</span>
+<span class="nc" id="L74">            guards.add(CandidateGuardReview.evaluate(guard, step.premises(), List.of()));</span>
+<span class="nc" id="L75">        }</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!query.isEmpty()) {</span>
+<span class="nc" id="L77">            var parser = new StructuredAssumptionParser();</span>
+<span class="nc" id="L78">            var predicate = parser.parse(List.of(query)).getFirst();</span>
+<span class="nc" id="L79">            parser.parse(additionalPremises);</span>
+<span class="nc" id="L80">            var variables = new java.util.HashSet&lt;&gt;(predicate.left().referencedSymbols());</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            if (predicate.right() != null) variables.addAll(predicate.right().referencedSymbols());</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (!measures.measure(step.source()).variableSymbols().containsAll(variables)) {</span>
+<span class="nc" id="L83">                throw new IllegalArgumentException(&quot;review guard refers to a symbol outside the selected source&quot;);</span>
+            }
+<span class="nc" id="L85">            var requirement = de.regelsuche.assumption.Assumption.customPredicate(query, variables.stream().sorted().toList());</span>
+<span class="nc" id="L86">            review.set(&quot;supplementalGuardReview&quot;, CandidateGuardReview.evaluate(requirement, step.premises(), additionalPremises));</span>
+        }
+<span class="fc" id="L88">        verify(review, step, binding, matched.transformation().assumptions());</span>
+<span class="fc" id="L89">        return review.put(&quot;contentHash&quot;, SolverIr.sha256(review.toString()));</span>
+    }
+
+    private static AstRewriteTransformationEngine.GeneratedTransformation occurrence(Step step, RewriteRule rule) {
+<span class="fc" id="L93">        var matched = new ArrayList&lt;AstRewriteTransformationEngine.GeneratedTransformation&gt;();</span>
+<span class="fc" id="L94">        var engine = new AstRewriteTransformationEngine(List.of(rule), step.maxIncrease(), step.maxCandidates());</span>
+<span class="fc" id="L95">        engine.transformWithOccurrences(step.source(), generated -&gt; {</span>
+<span class="fc" id="L96">            var transformation = generated.transformation();</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">            if (transformation.applicationKey().equals(step.application()) &amp;&amp; transformation.transformedExpression().equals(step.target())</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">                    &amp;&amp; (step.path() == null || step.path().equals(generated.position().path()))) matched.add(generated);</span>
+<span class="fc" id="L99">        });</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (matched.size() != 1) throw new IllegalArgumentException(&quot;stored application does not identify one reproducible occurrence&quot;);</span>
+<span class="fc" id="L101">        return matched.getFirst();</span>
+    }
+
+    private static Step nativeStep(Path directory, RepresentationDiscoveryRunWorkspace run, String candidate, int edge) throws IOException {
+<span class="fc" id="L105">        String raw = TargetFreeSearchArtifactStore.read(directory, run).orElseThrow();</span>
+<span class="fc" id="L106">        var content = TargetFreeSearchExecution.fromCanonicalBytes(run, raw.getBytes(StandardCharsets.UTF_8)).content();</span>
+<span class="fc" id="L107">        var state = content.states().stream().filter(s -&gt; s.stateId().equals(candidate)).findFirst().orElseThrow();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        var transition = content.transitions().stream().filter(t -&gt; t.sequence() == edge).findFirst().orElseThrow();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (!state.generationSequences().contains(transition.generationSequence())) throw new IllegalArgumentException(&quot;edge outside candidate path&quot;);</span>
+<span class="fc" id="L110">        var generation = content.generations().get(transition.generationSequence());</span>
+<span class="fc" id="L111">        return new Step(generation.sourceExpression(), generation.transformedExpression(), JSON.readTree(state.canonicalStateJson()).required(&quot;expression&quot;).asText(), generation.ruleId(), generation.applicationKey(),</span>
+<span class="fc" id="L112">            generation.occurrencePath(), run.input().assumptions(), 12, content.heuristic().maxCandidatesPerState());</span>
+    }
+
+    private static Step frozenStep(Path directory, RepresentationDiscoveryRunWorkspace run, String candidate, int edge) throws IOException {
+<span class="fc" id="L116">        String raw = RetainedCandidateDossierRepository.read(directory, run).orElseThrow();</span>
+<span class="fc" id="L117">        var search = RetainedCandidateDossierRepository.decode(run, raw.getBytes(StandardCharsets.UTF_8)).content().search();</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        var transition = search.transitions().stream().filter(t -&gt; t.sequence() == edge &amp;&amp; t.toStateHash().equals(candidate))</span>
+<span class="pc" id="L119">            .findFirst().orElseThrow(() -&gt; new IllegalArgumentException(&quot;edge outside selected frozen candidate&quot;));</span>
+<span class="fc" id="L120">        var source = search.state(transition.fromStateHash());</span>
+<span class="fc" id="L121">        return new Step(source.expression(), transition.transformedExpression(), search.state(candidate).expression(), transition.ruleId(), transition.applicationKey(),</span>
+<span class="fc" id="L122">            null, run.input().assumptions(), search.budget().maxAstSizeIncreasePerStep(), search.budget().maxCandidatesPerState());</span>
+    }
+
+    private static void verify(ObjectNode review, Step step, String binding, List&lt;String&gt; required) throws IOException {
+<span class="fc" id="L126">        var assumptions = java.util.stream.Stream.concat(step.premises().stream(), required.stream()).distinct().sorted().toList();</span>
+<span class="fc" id="L127">        review.set(&quot;obligationAssumptions&quot;, JSON.valueToTree(assumptions));</span>
+        try {
+<span class="fc" id="L129">            var obligation = new SolverObligationFactory().equality(&quot;retained-occurrence-equality&quot;, step.source(), step.target(), assumptions,</span>
+                SolverIr.RequestedEvidence.SYMBOLIC_CERTIFICATE, new SolverIr.SourceProvenance(&quot;retained-candidate-review&quot;, SCHEMA, binding));
+<span class="fc" id="L131">            review.set(&quot;obligation&quot;, JSON.readTree(obligation.toCanonicalJson()));</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">            if (!polynomialAdmitted(step.source()) || !polynomialAdmitted(step.target())) {</span>
+<span class="fc" id="L133">                review.put(&quot;verificationStatus&quot;, &quot;OUTSIDE_BOUNDED_POLYNOMIAL_FRAGMENT&quot;);</span>
+<span class="fc" id="L134">                return;</span>
+            }
+<span class="fc" id="L136">            var execution = new PolynomialNormalFormSolverBackend().execute(obligation);</span>
+<span class="fc" id="L137">            review.set(&quot;verification&quot;, JSON.readTree(execution.toCanonicalJson()));</span>
+<span class="fc" id="L138">            review.set(&quot;solverResult&quot;, JSON.readTree(execution.result().toCanonicalJson()));</span>
+<span class="fc" id="L139">            review.put(&quot;verificationStatus&quot;, execution.result().status().name());</span>
+<span class="nc" id="L140">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L141">            review.put(&quot;verificationStatus&quot;, &quot;UNSUPPORTED_TYPED_OBLIGATION&quot;);</span>
+<span class="nc" id="L142">            review.put(&quot;verificationDetail&quot;, unsupported.getMessage());</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc" id="L144">    }</span>
+
+    private static boolean polynomialAdmitted(String expression) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (expression.length() &gt; 256) return false;</span>
+<span class="fc" id="L148">        return new ExactParsedUnivariatePolynomialView().analyze(new ExpressionParser().parseExactTerm(expression)).supported();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

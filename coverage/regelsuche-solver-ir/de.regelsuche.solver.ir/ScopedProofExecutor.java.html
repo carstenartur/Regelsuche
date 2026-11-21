@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ScopedProofExecutor.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">ScopedProofExecutor.java</span></div><h1>ScopedProofExecutor.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import java.nio.file.Path;
+import java.util.Objects;
+
+/**
+ * Solver-neutral receiver port for a scoped proof proposal.
+ * A confirmed receipt must retain both the kernel execution and the independent
+ * reconstruction. It is not a synonym for an unverified search candidate.
+ */
+@FunctionalInterface
+public interface ScopedProofExecutor {
+    VerifiedReplay verify(ScopedProofDag proposal);
+
+    /** Fail closed unless a concrete receiver independently admits this scoped theory. */
+    default boolean supports(SolverIr.Obligation obligation) {
+<span class="nc" id="L17">        return false;</span>
+    }
+
+    record VerifiedReplay(String proposalHash, SolverIr.ResultStatus status, String message,
+                          String kernelHash, Path kernelDirectory,
+                          String rebuildHash, Path rebuildDirectory) {
+<span class="nc" id="L23">        public VerifiedReplay {</span>
+<span class="nc" id="L24">            Objects.requireNonNull(proposalHash, &quot;proposalHash&quot;);</span>
+<span class="nc" id="L25">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="nc" id="L26">            message = Objects.requireNonNullElse(message, &quot;&quot;);</span>
+<span class="nc" id="L27">            kernelHash = Objects.requireNonNullElse(kernelHash, &quot;&quot;);</span>
+<span class="nc" id="L28">            rebuildHash = Objects.requireNonNullElse(rebuildHash, &quot;&quot;);</span>
+<span class="nc bnc" id="L29" title="All 2 branches missed.">            if (status == SolverIr.ResultStatus.CONFIRMED</span>
+<span class="nc bnc" id="L30" title="All 8 branches missed.">                &amp;&amp; (kernelHash.isBlank() || rebuildHash.isBlank()</span>
+                    || kernelDirectory == null || rebuildDirectory == null)) {
+<span class="nc" id="L32">                throw new IllegalArgumentException(</span>
+                    &quot;A confirmed scoped proof requires kernel and independent replay evidence&quot;);
+            }
+<span class="nc" id="L35">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

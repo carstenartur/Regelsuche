@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativeScalarRules.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">NativeScalarRules.java</span></div><h1>NativeScalarRules.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.egraph.proof.ScalarExtractionProof;
+import de.regelsuche.egraph.proof.ScalarGuardFacts;
+import de.regelsuche.transform.PatternExpr;
+import java.util.*;
+
+/** Directed match plans over e-nodes and canonical child classes. Syntax extraction records an actual matched witness. */
+final class NativeScalarRules {
+<span class="fc" id="L11">    private static final FlatAcMatchPlan DOUBLE = FlatAcMatchPlan.compile(PatternExpr.op(BinaryOperator.ADD,</span>
+<span class="fc" id="L12">        PatternExpr.var(&quot;term&quot;),PatternExpr.var(&quot;term&quot;)));</span>
+    private NativeScalarRules() {}
+
+    static void apply(NativeScalarSaturation run, String rule, List&lt;EClassId&gt; roots, NativeScalarSaturation.Account work) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (rule.equals(&quot;ast_double_term&quot;)) { doubles(run,rule,roots,work); return; }</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        for (var raw : roots) {</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">            if (!work.spend(1,run.budget.perRuleFuel())) return;</span>
+<span class="fc" id="L19">            work.roots++;</span>
+<span class="fc" id="L20">            var root = run.graph.find(raw);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            for (var node : List.copyOf(run.graph.classOrThrow(root).nodes())) {</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">                if (!work.spend(1,run.budget.perRuleFuel())) return;</span>
+<span class="fc" id="L23">                work.nodes++;</span>
+<span class="pc bpc" id="L24" title="1 of 7 branches missed.">                switch (rule) {</span>
+<span class="fc" id="L25">                    case &quot;ast_add_zero_left&quot;,&quot;ast_add_zero_right&quot; -&gt; neutral(run,rule,root,node,BinaryOperator.ADD,0,work);</span>
+<span class="fc" id="L26">                    case &quot;ast_multiply_one_left&quot;,&quot;ast_multiply_one_right&quot; -&gt; neutral(run,rule,root,node,BinaryOperator.MUL,1,work);</span>
+<span class="fc" id="L27">                    case &quot;ast_divide_one&quot; -&gt; ordered(run,rule,root,node,BinaryOperator.DIV,1,work);</span>
+<span class="fc" id="L28">                    case &quot;ast_subtract_zero&quot; -&gt; ordered(run,rule,root,node,BinaryOperator.SUB,0,work);</span>
+<span class="fc" id="L29">                    case &quot;ast_factor_common_left&quot;,&quot;ast_factor_common_right&quot; -&gt; factor(run,rule,root,node,work);</span>
+<span class="fc" id="L30">                    case &quot;ast_cancel_division_factor&quot; -&gt; cancel(run,rule,root,node,work);</span>
+<span class="nc" id="L31">                    default -&gt; throw new IllegalArgumentException(&quot;rule without native plan: &quot; + rule);</span>
+                }
+<span class="fc" id="L33">            }</span>
+<span class="fc" id="L34">        }</span>
+<span class="fc" id="L35">    }</span>
+    private static void doubles(NativeScalarSaturation run, String rule, List&lt;EClassId&gt; roots, NativeScalarSaturation.Account work) {
+<span class="fc" id="L37">        int left = run.budget.perRuleFuel()-work.spent;</span>
+<span class="fc" id="L38">        var matched = DOUBLE.matchRoots(run.graph, roots,left);</span>
+<span class="fc" id="L39">        work.spend(matched.work(),run.budget.perRuleFuel());</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        work.capped |= !matched.complete();</span>
+<span class="fc" id="L41">        work.roots += matched.candidateRoots();</span>
+<span class="fc" id="L42">        work.nodes += matched.nodesScanned();</span>
+<span class="fc" id="L43">        work.tuples += matched.tupleAttempts();</span>
+<span class="fc" id="L44">        work.duplicates += matched.duplicateBindings();</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        for (var match : matched.matches()) {</span>
+<span class="nc" id="L46">            var subject = match.bindings().get(&quot;term&quot;);</span>
+<span class="nc" id="L47">            var two = run.graph.add(ENode.leaf(&quot;num:2&quot;));</span>
+<span class="nc" id="L48">            var target = run.graph.add(new ENode(&quot;ac:MUL&quot;,List.of(two,subject)));</span>
+<span class="nc" id="L49">            Expr term = run.syntax(subject);</span>
+<span class="nc" id="L50">            run.apply(rule,match.root(),target,new BinaryExpr(term,BinaryOperator.ADD,term),</span>
+                new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,term),work);
+<span class="nc" id="L52">        }</span>
+<span class="fc" id="L53">    }</span>
+    private static void neutral(NativeScalarSaturation run,String rule,EClassId root,ENode node,BinaryOperator op,int literal,
+                                NativeScalarSaturation.Account work) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!node.symbol().equals(&quot;ac:&quot;+op)) return;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        for (int i=0;i&lt;node.children().size();i++) {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (!work.spend(1,run.budget.perRuleFuel())) return;</span>
+<span class="fc" id="L59">            work.tuples++;</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (!hasLiteral(run,node.children().get(i),literal)) continue;</span>
+<span class="fc" id="L61">            var rest = new ArrayList&lt;&gt;(node.children()); rest.remove(i);</span>
+<span class="fc" id="L62">            var right = group(run,rest,op);</span>
+<span class="fc" id="L63">            Expr target = productSyntax(run,rest,op);</span>
+            // This ground source uses the actual literal witness even if another representative is cheaper.
+<span class="fc" id="L65">            var operands = new ArrayList&lt;Expr&gt;(node.children().stream().map(run::syntax).toList());</span>
+<span class="fc" id="L66">            operands.set(i,new NumberExpr(literal));</span>
+<span class="fc" id="L67">            run.apply(rule,root,right,ScalarExtractionProof.join(operands,op),target,work);</span>
+        }
+<span class="fc" id="L69">    }</span>
+    private static void ordered(NativeScalarSaturation run,String rule,EClassId root,ENode node,BinaryOperator op,int literal,
+                                NativeScalarSaturation.Account work) {
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if (!node.symbol().equals(&quot;op:&quot;+op) || !hasLiteral(run,node.children().get(1),literal)) return;</span>
+<span class="nc" id="L73">        var target = node.children().getFirst();</span>
+<span class="nc" id="L74">        var term = run.syntax(target);</span>
+<span class="nc" id="L75">        run.apply(rule,root,target,new BinaryExpr(term,op,new NumberExpr(literal)),term,work);</span>
+<span class="nc" id="L76">    }</span>
+    private static boolean hasLiteral(NativeScalarSaturation run,EClassId child,int literal) {
+<span class="fc" id="L78">        return run.graph.classOrThrow(run.graph.find(child)).nodes().contains(ENode.leaf(&quot;num:&quot;+literal));</span>
+    }
+    private static void factor(NativeScalarSaturation run,String rule,EClassId root,ENode node,NativeScalarSaturation.Account work) {
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (!node.symbol().equals(&quot;ac:ADD&quot;) || node.children().size()!=2) return;</span>
+<span class="fc" id="L82">        var left = List.copyOf(run.graph.classOrThrow(run.graph.find(node.children().get(0))).nodes());</span>
+<span class="fc" id="L83">        var right = List.copyOf(run.graph.classOrThrow(run.graph.find(node.children().get(1))).nodes());</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        for (var a : left) for(var b : right) {</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (!work.spend(1,run.budget.perRuleFuel())) return;</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">            if (!a.symbol().equals(&quot;ac:MUL&quot;) || !b.symbol().equals(&quot;ac:MUL&quot;)) continue;</span>
+<span class="fc bfc" id="L87" title="All 4 branches covered.">            for (int i=0;i&lt;a.children().size();i++) for (int j=0;j&lt;b.children().size();j++) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (!work.spend(1,run.budget.perRuleFuel())) return;</span>
+<span class="fc" id="L89">                work.tuples++;</span>
+<span class="fc" id="L90">                var common = run.graph.find(a.children().get(i));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                if (common.equals(run.graph.find(b.children().get(j)))) {</span>
+<span class="fc" id="L92">                    var ax=new ArrayList&lt;&gt;(a.children()); ax.remove(i);</span>
+<span class="fc" id="L93">                    var bx=new ArrayList&lt;&gt;(b.children()); bx.remove(j);</span>
+<span class="fc" id="L94">                    var sum=run.graph.add(new ENode(&quot;ac:ADD&quot;,List.of(group(run,ax,BinaryOperator.MUL),group(run,bx,BinaryOperator.MUL))));</span>
+<span class="fc" id="L95">                    var rhs=run.graph.add(new ENode(&quot;ac:MUL&quot;,List.of(common,sum)));</span>
+<span class="fc" id="L96">                    Expr before=new BinaryExpr(productSyntax(run,a.children(),BinaryOperator.MUL),BinaryOperator.ADD,productSyntax(run,b.children(),BinaryOperator.MUL));</span>
+<span class="fc" id="L97">                    Expr after=new BinaryExpr(run.syntax(common),BinaryOperator.MUL,</span>
+<span class="fc" id="L98">                        new BinaryExpr(productSyntax(run,ax,BinaryOperator.MUL),BinaryOperator.ADD,productSyntax(run,bx,BinaryOperator.MUL)));</span>
+<span class="fc" id="L99">                    run.apply(rule,root,rhs,before,after,work);</span>
+                }
+            }
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">    }</span>
+
+    private static void cancel(NativeScalarSaturation run,String rule,EClassId root,ENode node,NativeScalarSaturation.Account work) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!node.symbol().equals(&quot;op:DIV&quot;)) return;</span>
+<span class="fc" id="L107">        var numerator = run.graph.find(node.children().getFirst());</span>
+<span class="fc" id="L108">        var denominator = run.graph.find(node.children().get(1));</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (var product : List.copyOf(run.graph.classOrThrow(numerator).nodes())) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (!product.symbol().equals(&quot;ac:MUL&quot;)) continue;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            for (int i=0;i&lt;product.children().size();i++) {</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                if (!work.spend(1,run.budget.perRuleFuel())) return;</span>
+<span class="fc" id="L113">                work.tuples++;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                if (!run.graph.find(product.children().get(i)).equals(denominator)) continue;</span>
+<span class="fc" id="L115">                var factor = run.syntax(denominator);</span>
+<span class="fc" id="L116">                var truth = run.facts.get(denominator).evaluate(ScalarGuardFacts.Predicate.NONZERO);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (truth != ScalarGuardFacts.Truth.TRUE) {</span>
+<span class="fc" id="L118">                    work.rejected++;</span>
+<span class="fc" id="L119">                    run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),false));</span>
+<span class="fc" id="L120">                    break;</span>
+                }
+<span class="fc" id="L122">                var rest = new ArrayList&lt;&gt;(product.children()); rest.remove(i);</span>
+<span class="fc" id="L123">                Expr before = new BinaryExpr(productSyntax(run,product.children(),BinaryOperator.MUL),BinaryOperator.DIV,factor);</span>
+<span class="fc" id="L124">                int previous = work.unions;</span>
+<span class="fc" id="L125">                run.apply(rule,root,group(run,rest,BinaryOperator.MUL),before,productSyntax(run,rest,BinaryOperator.MUL),work);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),work.unions&gt;previous));</span>
+<span class="fc" id="L127">                break;</span>
+            }
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">    }</span>
+    private static EClassId group(NativeScalarSaturation run,List&lt;EClassId&gt; ids,BinaryOperator op) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        return ids.size()==1 ? run.graph.find(ids.getFirst()) : run.graph.add(new ENode(&quot;ac:&quot;+op,ids));</span>
+    }
+    private static Expr productSyntax(NativeScalarSaturation run,List&lt;EClassId&gt; ids,BinaryOperator op) {
+<span class="fc" id="L135">        return ScalarExtractionProof.join(ids.stream().map(run::syntax).toList(),op);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

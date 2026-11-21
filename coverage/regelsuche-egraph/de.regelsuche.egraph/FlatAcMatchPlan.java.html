@@ -50,85 +50,94 @@ public final class FlatAcMatchPlan {
 <span class="fc" id="L50">        return new FlatAcMatchPlan(top.operator(), arity, counts);</span>
     }
 
-    public record Result(List&lt;EGraphPatternMatcher.Match&gt; matches, int work, boolean complete) {
-<span class="fc" id="L54">        public Result { matches = List.copyOf(matches); }</span>
+    public record Result(List&lt;EGraphPatternMatcher.Match&gt; matches, int work, boolean complete, int candidateRoots, int nodesScanned, int tupleAttempts, int duplicateBindings) {
+<span class="nc" id="L54">        public Result(List&lt;EGraphPatternMatcher.Match&gt; matches,int work,boolean complete) { this(matches,work,complete,0,0,0,0); }</span>
+<span class="fc" id="L55">        public Result { matches = List.copyOf(matches); }</span>
     }
 
     Result match(EGraph graph, int limit) {
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (!graph.usesArithmeticAc()) throw new IllegalArgumentException(&quot;flat AC plans require the exact scalar AC graph&quot;);</span>
-<span class="fc bfc" id="L59" title="All 4 branches covered.">        if (limit &lt; 0 || limit &gt; MAX_WORK) throw new IllegalArgumentException(&quot;invalid flat AC work limit&quot;);</span>
-<span class="fc" id="L60">        return new Scan(graph, limit).run();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!graph.usesArithmeticAc()) throw new IllegalArgumentException(&quot;flat AC plans require the exact scalar AC graph&quot;);</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        if (limit &lt; 0 || limit &gt; MAX_WORK) throw new IllegalArgumentException(&quot;invalid flat AC work limit&quot;);</span>
+<span class="fc" id="L61">        return matchRoots(graph, graph.classesWith(signature), limit);</span>
+    }
+
+    Result matchRoots(EGraph graph, java.util.Collection&lt;EClassId&gt; roots, int limit) {
+<span class="pc bpc" id="L65" title="3 of 6 branches missed.">        if (!graph.usesArithmeticAc() || limit &lt; 0 || limit &gt; MAX_WORK) throw new IllegalArgumentException(&quot;invalid native AC plan scope&quot;);</span>
+<span class="fc" id="L66">        return new Scan(graph, limit).run(roots);</span>
     }
 
     private final class Scan {
         private final EGraph graph;
         private final int limit;
-        private int work;
-<span class="fc" id="L67">        private boolean complete = true;</span>
-<span class="fc" id="L68">        private final LinkedHashSet&lt;EGraphPatternMatcher.Match&gt; matches = new LinkedHashSet&lt;&gt;();</span>
+        private int work, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings;
+<span class="fc" id="L73">        private boolean complete = true;</span>
+<span class="fc" id="L74">        private final LinkedHashSet&lt;EGraphPatternMatcher.Match&gt; matches = new LinkedHashSet&lt;&gt;();</span>
 
-<span class="fc" id="L70">        private Scan(EGraph graph, int limit) {</span>
-<span class="fc" id="L71">            this.graph = graph;</span>
-<span class="fc" id="L72">            this.limit = limit;</span>
-<span class="fc" id="L73">        }</span>
+<span class="fc" id="L76">        private Scan(EGraph graph, int limit) {</span>
+<span class="fc" id="L77">            this.graph = graph;</span>
+<span class="fc" id="L78">            this.limit = limit;</span>
+<span class="fc" id="L79">        }</span>
 
         private boolean spend() {
-<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (work == limit) {</span>
-<span class="fc" id="L77">                complete = false;</span>
-<span class="fc" id="L78">                return false;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (work == limit) {</span>
+<span class="fc" id="L83">                complete = false;</span>
+<span class="fc" id="L84">                return false;</span>
             }
-<span class="fc" id="L80">            work++;</span>
-<span class="fc" id="L81">            return true;</span>
+<span class="fc" id="L86">            work++;</span>
+<span class="fc" id="L87">            return true;</span>
         }
 
-        private Result run() {
-<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (var candidate : graph.classesWith(signature)) {</span>
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (!spend()) break;</span>
-<span class="fc" id="L87">                var root = graph.find(candidate);</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">                for (var node : graph.classOrThrow(root).nodes()) {</span>
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                    if (!spend()) break;</span>
-<span class="pc bpc" id="L90" title="2 of 4 branches missed.">                    if (!signature.symbol().equals(node.symbol()) || signature.arity() != node.children().size()) continue;</span>
-<span class="fc" id="L91">                    var counts = new TreeMap&lt;EClassId, Integer&gt;();</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">                    for (var child : node.children()) {</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">                        if (!spend()) break;</span>
-<span class="fc" id="L94">                        counts.merge(graph.find(child), 1, Integer::sum);</span>
-<span class="fc" id="L95">                    }</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">                    if (complete) {</span>
-<span class="fc" id="L97">                        var ids = List.copyOf(counts.keySet());</span>
-<span class="fc" id="L98">                        int[] remaining = counts.values().stream().mapToInt(Integer::intValue).toArray();</span>
-<span class="fc" id="L99">                        bind(root, ids, remaining, 0, new LinkedHashMap&lt;&gt;());</span>
+        private Result run(java.util.Collection&lt;EClassId&gt; roots) {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (var candidate : roots) {</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                if (!spend()) break;</span>
+<span class="fc" id="L93">                candidateRoots++;</span>
+<span class="fc" id="L94">                var root = graph.find(candidate);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                for (var node : graph.classOrThrow(root).nodes()) {</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                    if (!spend()) break;</span>
+<span class="fc" id="L97">                    nodesScanned++;</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">                    if (!signature.symbol().equals(node.symbol()) || signature.arity() != node.children().size()) continue;</span>
+<span class="fc" id="L99">                    var counts = new TreeMap&lt;EClassId, Integer&gt;();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                    for (var child : node.children()) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                        if (!spend()) break;</span>
+<span class="fc" id="L102">                        counts.merge(graph.find(child), 1, Integer::sum);</span>
+<span class="fc" id="L103">                    }</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    if (complete) {</span>
+<span class="fc" id="L105">                        var ids = List.copyOf(counts.keySet());</span>
+<span class="fc" id="L106">                        int[] remaining = counts.values().stream().mapToInt(Integer::intValue).toArray();</span>
+<span class="fc" id="L107">                        bind(root, ids, remaining, 0, new LinkedHashMap&lt;&gt;());</span>
                     }
-<span class="fc bfc" id="L101" title="All 2 branches covered.">                    if (!complete) break;</span>
-<span class="fc" id="L102">                }</span>
-<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (!complete) break;</span>
-<span class="fc" id="L104">            }</span>
-<span class="fc" id="L105">            return new Result(List.copyOf(matches), work, complete);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                    if (!complete) break;</span>
+<span class="fc" id="L110">                }</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                if (!complete) break;</span>
+<span class="fc" id="L112">            }</span>
+<span class="fc" id="L113">            return new Result(List.copyOf(matches), work, complete, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings);</span>
         }
 
         private void bind(EClassId root, List&lt;EClassId&gt; ids, int[] remaining,
                           int depth, Map&lt;String, EClassId&gt; bindings) {
-<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (depth == slots.size()) {</span>
-<span class="fc" id="L111">                matches.add(new EGraphPatternMatcher.Match(root, bindings));</span>
-<span class="fc" id="L112">                return;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (depth == slots.size()) {</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (!matches.add(new EGraphPatternMatcher.Match(root, bindings))) duplicateBindings++;</span>
+<span class="fc" id="L120">                return;</span>
             }
-<span class="fc" id="L114">            var slot = slots.get(depth);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            for (int i = 0; i &lt; ids.size(); i++) {</span>
-<span class="fc bfc" id="L116" title="All 2 branches covered.">                if (!spend()) return;</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (remaining[i] &lt; slot.occurrences()) continue;</span>
-<span class="fc" id="L118">                remaining[i] -= slot.occurrences();</span>
-<span class="fc" id="L119">                bindings.put(slot.name(), ids.get(i));</span>
-<span class="fc" id="L120">                bind(root, ids, remaining, depth + 1, bindings);</span>
-<span class="fc" id="L121">                bindings.remove(slot.name());</span>
-<span class="fc" id="L122">                remaining[i] += slot.occurrences();</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">                if (!complete) return;</span>
+<span class="fc" id="L122">            var slot = slots.get(depth);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (int i = 0; i &lt; ids.size(); i++) {</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                if (!spend()) return;</span>
+<span class="fc" id="L125">                tupleAttempts++;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                if (remaining[i] &lt; slot.occurrences()) continue;</span>
+<span class="fc" id="L127">                remaining[i] -= slot.occurrences();</span>
+<span class="fc" id="L128">                bindings.put(slot.name(), ids.get(i));</span>
+<span class="fc" id="L129">                bind(root, ids, remaining, depth + 1, bindings);</span>
+<span class="fc" id="L130">                bindings.remove(slot.name());</span>
+<span class="fc" id="L131">                remaining[i] += slot.occurrences();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (!complete) return;</span>
             }
-<span class="fc" id="L125">        }</span>
+<span class="fc" id="L134">        }</span>
     }
 
     @Override public boolean equals(Object other) {
-<span class="pc bpc" id="L129" title="2 of 6 branches missed.">        return other instanceof FlatAcMatchPlan plan &amp;&amp; signature.equals(plan.signature) &amp;&amp; slots.equals(plan.slots);</span>
+<span class="pc bpc" id="L138" title="2 of 6 branches missed.">        return other instanceof FlatAcMatchPlan plan &amp;&amp; signature.equals(plan.signature) &amp;&amp; slots.equals(plan.slots);</span>
     }
 
-<span class="nc" id="L132">    @Override public int hashCode() { return Objects.hash(signature, slots); }</span>
+<span class="nc" id="L141">    @Override public int hashCode() { return Objects.hash(signature, slots); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

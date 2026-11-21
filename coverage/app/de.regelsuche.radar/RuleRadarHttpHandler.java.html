@@ -48,166 +48,170 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
 <span class="fc" id="L48">        this.jsonRequestBody = new StreamingJsonRequestBody(maxRequestBytes);</span>
 <span class="fc" id="L49">    }</span>
 
+    public AstRuleRadarService service() {
+<span class="fc" id="L52">        return radar;</span>
+    }
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-<span class="fc" id="L53">        String path = exchange.getRequestURI().getPath();</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">        String suffix = path.length() &lt;= PREFIX.length() ? &quot;&quot; : path.substring(PREFIX.length());</span>
+<span class="fc" id="L57">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        String suffix = path.length() &lt;= PREFIX.length() ? &quot;&quot; : path.substring(PREFIX.length());</span>
         try {
-<span class="pc bpc" id="L56" title="1 of 5 branches missed.">            switch (suffix) {</span>
-<span class="fc" id="L57">                case &quot;/inspect&quot; -&gt; handleInspect(exchange);</span>
-<span class="fc" id="L58">                case &quot;/apply&quot; -&gt; handleApply(exchange);</span>
-<span class="fc" id="L59">                case &quot;/search&quot; -&gt; handleSearch(exchange);</span>
-<span class="fc" id="L60">                case &quot;&quot;, &quot;/&quot; -&gt; sendJson(exchange, 200, capabilityDocument());</span>
-<span class="nc" id="L61">                default -&gt; sendError(exchange, 404, &quot;NOT_FOUND&quot;, &quot;unknown rule-radar endpoint&quot;);</span>
+<span class="pc bpc" id="L60" title="1 of 5 branches missed.">            switch (suffix) {</span>
+<span class="fc" id="L61">                case &quot;/inspect&quot; -&gt; handleInspect(exchange);</span>
+<span class="fc" id="L62">                case &quot;/apply&quot; -&gt; handleApply(exchange);</span>
+<span class="fc" id="L63">                case &quot;/search&quot; -&gt; handleSearch(exchange);</span>
+<span class="fc" id="L64">                case &quot;&quot;, &quot;/&quot; -&gt; sendJson(exchange, 200, capabilityDocument());</span>
+<span class="nc" id="L65">                default -&gt; sendError(exchange, 404, &quot;NOT_FOUND&quot;, &quot;unknown rule-radar endpoint&quot;);</span>
             }
-<span class="fc" id="L63">        } catch (BoundedRequestBody.PayloadTooLargeException exception) {</span>
-<span class="fc" id="L64">            sendPayloadTooLarge(exchange, exception.limitBytes());</span>
-<span class="fc" id="L65">        } catch (StreamingJsonRequestBody.MalformedJsonRequestException exception) {</span>
-<span class="fc" id="L66">            sendError(exchange, 400, &quot;INVALID_JSON&quot;, &quot;invalid JSON request body&quot;);</span>
-<span class="nc" id="L67">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L68">            sendError(exchange, 400, &quot;INVALID_REQUEST&quot;, safeMessage(exception));</span>
-<span class="nc" id="L69">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L70">            sendError(exchange, 500, &quot;RADAR_FAILURE&quot;, safeMessage(exception));</span>
-<span class="pc" id="L71">        }</span>
-<span class="fc" id="L72">    }</span>
+<span class="fc" id="L67">        } catch (BoundedRequestBody.PayloadTooLargeException exception) {</span>
+<span class="fc" id="L68">            sendPayloadTooLarge(exchange, exception.limitBytes());</span>
+<span class="fc" id="L69">        } catch (StreamingJsonRequestBody.MalformedJsonRequestException exception) {</span>
+<span class="fc" id="L70">            sendError(exchange, 400, &quot;INVALID_JSON&quot;, &quot;invalid JSON request body&quot;);</span>
+<span class="nc" id="L71">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L72">            sendError(exchange, 400, &quot;INVALID_REQUEST&quot;, safeMessage(exception));</span>
+<span class="nc" id="L73">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L74">            sendError(exchange, 500, &quot;RADAR_FAILURE&quot;, safeMessage(exception));</span>
+<span class="pc" id="L75">        }</span>
+<span class="fc" id="L76">    }</span>
 
     private void handleInspect(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L76">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
-<span class="nc" id="L77">            return;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L80">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
+<span class="nc" id="L81">            return;</span>
         }
-<span class="fc" id="L79">        RuleRadarRequestBody body = readRequest(exchange);</span>
-<span class="fc" id="L80">        Snapshot snapshot = radar.inspect(body.expression(), body.context());</span>
+<span class="fc" id="L83">        RuleRadarRequestBody body = readRequest(exchange);</span>
+<span class="fc" id="L84">        Snapshot snapshot = radar.inspect(body.expression(), body.context());</span>
         // Invalid expressions are a normal, structured inspection result rather
         // than an uncaught server error.
-<span class="fc" id="L83">        sendJson(exchange, 200, RuleRadarJson.snapshot(snapshot));</span>
-<span class="fc" id="L84">    }</span>
+<span class="fc" id="L87">        sendJson(exchange, 200, RuleRadarJson.snapshot(snapshot));</span>
+<span class="fc" id="L88">    }</span>
 
     private void handleApply(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L88">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
-<span class="nc" id="L89">            return;</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L92">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
+<span class="nc" id="L93">            return;</span>
         }
-<span class="fc" id="L91">        RuleRadarRequestBody body = readRequest(exchange);</span>
-<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (body.expression().isBlank() || body.candidateId().isBlank()) {</span>
-<span class="fc" id="L93">            sendError(exchange, 400, &quot;MISSING_FIELD&quot;, &quot;expression and candidateId are required&quot;);</span>
-<span class="fc" id="L94">            return;</span>
+<span class="fc" id="L95">        RuleRadarRequestBody body = readRequest(exchange);</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        if (body.expression().isBlank() || body.candidateId().isBlank()) {</span>
+<span class="fc" id="L97">            sendError(exchange, 400, &quot;MISSING_FIELD&quot;, &quot;expression and candidateId are required&quot;);</span>
+<span class="fc" id="L98">            return;</span>
         }
-<span class="fc" id="L96">        Context context = body.context();</span>
-<span class="fc" id="L97">        ApplicableMove candidate = radar.resolve(</span>
-<span class="fc" id="L98">            body.expression(), body.candidateId(), context).orElse(null);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (candidate == null) {</span>
-<span class="nc" id="L100">            sendError(exchange, 409, &quot;STALE_CANDIDATE&quot;,</span>
+<span class="fc" id="L100">        Context context = body.context();</span>
+<span class="fc" id="L101">        ApplicableMove candidate = radar.resolve(</span>
+<span class="fc" id="L102">            body.expression(), body.candidateId(), context).orElse(null);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (candidate == null) {</span>
+<span class="nc" id="L104">            sendError(exchange, 409, &quot;STALE_CANDIDATE&quot;,</span>
                 &quot;candidate is no longer present for the frozen expression and context&quot;);
-<span class="nc" id="L102">            return;</span>
+<span class="nc" id="L106">            return;</span>
         }
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (!candidate.applicable()) {</span>
-<span class="nc" id="L105">            sendError(exchange, 422, candidate.outcome().name(),</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (!candidate.applicable()) {</span>
+<span class="nc" id="L109">            sendError(exchange, 422, candidate.outcome().name(),</span>
                 &quot;candidate is visible for audit but is not executable in the current context&quot;);
-<span class="nc" id="L107">            return;</span>
+<span class="nc" id="L111">            return;</span>
         }
-<span class="fc" id="L109">        Snapshot refreshed = radar.inspect(candidate.expressionAfter(), withoutSelectionAndOutcomes(context));</span>
-<span class="fc" id="L110">        sendJson(exchange, 200, RuleRadarJson.applyResult(</span>
+<span class="fc" id="L113">        Snapshot refreshed = radar.inspect(candidate.expressionAfter(), withoutSelectionAndOutcomes(context));</span>
+<span class="fc" id="L114">        sendJson(exchange, 200, RuleRadarJson.applyResult(</span>
             candidate,
             refreshed,
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            !candidate.expressionBefore().equals(candidate.expressionAfter())</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            !candidate.expressionBefore().equals(candidate.expressionAfter())</span>
         ));
-<span class="fc" id="L115">    }</span>
+<span class="fc" id="L119">    }</span>
 
     private void handleSearch(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L119">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
-<span class="nc" id="L120">            return;</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L123">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
+<span class="nc" id="L124">            return;</span>
         }
-<span class="fc" id="L122">        RuleRadarRequestBody body = readRequest(exchange);</span>
-<span class="fc" id="L123">        RuleRadarSearchService.SearchRequest request = new RuleRadarSearchService.SearchRequest(</span>
-<span class="fc" id="L124">            body.expression(),</span>
-<span class="fc" id="L125">            body.targetExpression(),</span>
-<span class="fc" id="L126">            body.context(),</span>
-<span class="fc" id="L127">            body.maxDepth(),</span>
-<span class="fc" id="L128">            body.maxStates(),</span>
-<span class="fc" id="L129">            body.maxMovesPerState()</span>
+<span class="fc" id="L126">        RuleRadarRequestBody body = readRequest(exchange);</span>
+<span class="fc" id="L127">        RuleRadarSearchService.SearchRequest request = new RuleRadarSearchService.SearchRequest(</span>
+<span class="fc" id="L128">            body.expression(),</span>
+<span class="fc" id="L129">            body.targetExpression(),</span>
+<span class="fc" id="L130">            body.context(),</span>
+<span class="fc" id="L131">            body.maxDepth(),</span>
+<span class="fc" id="L132">            body.maxStates(),</span>
+<span class="fc" id="L133">            body.maxMovesPerState()</span>
         );
-<span class="fc" id="L131">        sendJson(exchange, 200, RuleRadarJson.searchResult(search.search(request)));</span>
-<span class="fc" id="L132">    }</span>
+<span class="fc" id="L135">        sendJson(exchange, 200, RuleRadarJson.searchResult(search.search(request)));</span>
+<span class="fc" id="L136">    }</span>
 
     private Context withoutSelectionAndOutcomes(Context context) {
-<span class="fc" id="L135">        return new Context(</span>
-<span class="fc" id="L136">            context.knowledgeProfile(),</span>
-<span class="fc" id="L137">            context.enabledPacks(),</span>
-<span class="fc" id="L138">            context.disabledPacks(),</span>
-<span class="fc" id="L139">            context.includePlugins(),</span>
-<span class="fc" id="L140">            context.includeLearnedMacros(),</span>
-<span class="fc" id="L141">            context.minMacroProofStatus(),</span>
-<span class="fc" id="L142">            context.searchProfile(),</span>
-<span class="fc" id="L143">            context.goalExpression(),</span>
-<span class="fc" id="L144">            context.maxCandidatesPerPosition(),</span>
-<span class="fc" id="L145">            context.maxCandidatesTotal(),</span>
-<span class="fc" id="L146">            context.assumptions(),</span>
-<span class="fc" id="L147">            context.includeRejectedCandidates(),</span>
+<span class="fc" id="L139">        return new Context(</span>
+<span class="fc" id="L140">            context.knowledgeProfile(),</span>
+<span class="fc" id="L141">            context.enabledPacks(),</span>
+<span class="fc" id="L142">            context.disabledPacks(),</span>
+<span class="fc" id="L143">            context.includePlugins(),</span>
+<span class="fc" id="L144">            context.includeLearnedMacros(),</span>
+<span class="fc" id="L145">            context.minMacroProofStatus(),</span>
+<span class="fc" id="L146">            context.searchProfile(),</span>
+<span class="fc" id="L147">            context.goalExpression(),</span>
+<span class="fc" id="L148">            context.maxCandidatesPerPosition(),</span>
+<span class="fc" id="L149">            context.maxCandidatesTotal(),</span>
+<span class="fc" id="L150">            context.assumptions(),</span>
+<span class="fc" id="L151">            context.includeRejectedCandidates(),</span>
             &quot;&quot;,
-<span class="fc" id="L149">            Map.of()</span>
+<span class="fc" id="L153">            Map.of()</span>
         );
     }
 
     private String capabilityDocument() {
-<span class="fc" id="L154">        JsonWriter writer = new JsonWriter().beginObject();</span>
-<span class="fc" id="L155">        writer.property(&quot;schema&quot;, &quot;regelsuche.ast-rule-radar-http/v1&quot;);</span>
-<span class="fc" id="L156">        writer.stringArray(&quot;endpoints&quot;, List.of(</span>
+<span class="fc" id="L158">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L159">        writer.property(&quot;schema&quot;, &quot;regelsuche.ast-rule-radar-http/v1&quot;);</span>
+<span class="fc" id="L160">        writer.stringArray(&quot;endpoints&quot;, List.of(</span>
             &quot;POST /api/rule-radar/inspect&quot;,
             &quot;POST /api/rule-radar/apply&quot;,
             &quot;POST /api/rule-radar/search&quot;
         ));
-<span class="fc" id="L161">        writer.stringArray(&quot;candidateOutcomes&quot;, java.util.Arrays.stream(CandidateOutcome.values())</span>
-<span class="fc" id="L162">            .map(Enum::name).toList());</span>
-<span class="fc" id="L163">        writer.stringArray(&quot;ruleOrigins&quot;, java.util.Arrays.stream(AstRuleRadar.RuleOrigin.values())</span>
-<span class="fc" id="L164">            .map(Enum::name).toList());</span>
-<span class="fc" id="L165">        writer.property(&quot;claimBoundary&quot;,</span>
+<span class="fc" id="L165">        writer.stringArray(&quot;candidateOutcomes&quot;, java.util.Arrays.stream(CandidateOutcome.values())</span>
+<span class="fc" id="L166">            .map(Enum::name).toList());</span>
+<span class="fc" id="L167">        writer.stringArray(&quot;ruleOrigins&quot;, java.util.Arrays.stream(AstRuleRadar.RuleOrigin.values())</span>
+<span class="fc" id="L168">            .map(Enum::name).toList());</span>
+<span class="fc" id="L169">        writer.property(&quot;claimBoundary&quot;,</span>
             &quot;Candidate visibility and rewrite success are not formal proof; validation and proof metadata remain authoritative.&quot;);
-<span class="fc" id="L167">        return writer.endObject().toString();</span>
+<span class="fc" id="L171">        return writer.endObject().toString();</span>
     }
 
     private RuleRadarRequestBody readRequest(HttpExchange exchange)
             throws IOException {
-<span class="fc" id="L172">        return RuleRadarRequestBody.read(jsonRequestBody, exchange);</span>
+<span class="fc" id="L176">        return RuleRadarRequestBody.read(jsonRequestBody, exchange);</span>
     }
 
     private void sendPayloadTooLarge(HttpExchange exchange, int limitBytes) throws IOException {
-<span class="fc" id="L176">        JsonWriter writer = new JsonWriter().beginObject()</span>
-<span class="fc" id="L177">            .property(&quot;error&quot;, true)</span>
-<span class="fc" id="L178">            .property(&quot;code&quot;, &quot;PAYLOAD_TOO_LARGE&quot;)</span>
-<span class="fc" id="L179">            .property(&quot;message&quot;, &quot;request body exceeds configured limit&quot;)</span>
-<span class="fc" id="L180">            .property(&quot;limitBytes&quot;, limitBytes)</span>
-<span class="fc" id="L181">            .endObject();</span>
-<span class="fc" id="L182">        sendJson(exchange, 413, writer.toString());</span>
-<span class="fc" id="L183">    }</span>
+<span class="fc" id="L180">        JsonWriter writer = new JsonWriter().beginObject()</span>
+<span class="fc" id="L181">            .property(&quot;error&quot;, true)</span>
+<span class="fc" id="L182">            .property(&quot;code&quot;, &quot;PAYLOAD_TOO_LARGE&quot;)</span>
+<span class="fc" id="L183">            .property(&quot;message&quot;, &quot;request body exceeds configured limit&quot;)</span>
+<span class="fc" id="L184">            .property(&quot;limitBytes&quot;, limitBytes)</span>
+<span class="fc" id="L185">            .endObject();</span>
+<span class="fc" id="L186">        sendJson(exchange, 413, writer.toString());</span>
+<span class="fc" id="L187">    }</span>
 
     private void sendError(HttpExchange exchange, int status, String code, String message) throws IOException {
-<span class="fc" id="L186">        JsonWriter writer = new JsonWriter().beginObject()</span>
-<span class="fc" id="L187">            .property(&quot;error&quot;, true)</span>
-<span class="fc" id="L188">            .property(&quot;code&quot;, code)</span>
-<span class="fc" id="L189">            .property(&quot;message&quot;, message)</span>
-<span class="fc" id="L190">            .endObject();</span>
-<span class="fc" id="L191">        sendJson(exchange, status, writer.toString());</span>
-<span class="fc" id="L192">    }</span>
+<span class="fc" id="L190">        JsonWriter writer = new JsonWriter().beginObject()</span>
+<span class="fc" id="L191">            .property(&quot;error&quot;, true)</span>
+<span class="fc" id="L192">            .property(&quot;code&quot;, code)</span>
+<span class="fc" id="L193">            .property(&quot;message&quot;, message)</span>
+<span class="fc" id="L194">            .endObject();</span>
+<span class="fc" id="L195">        sendJson(exchange, status, writer.toString());</span>
+<span class="fc" id="L196">    }</span>
 
     private void sendJson(HttpExchange exchange, int status, String json) throws IOException {
-<span class="fc" id="L195">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L196">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
-<span class="fc" id="L197">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
-<span class="fc" id="L198">        exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L199">        try (var output = exchange.getResponseBody()) {</span>
-<span class="fc" id="L200">            output.write(bytes);</span>
+<span class="fc" id="L199">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L200">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
+<span class="fc" id="L201">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L202">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L203">        try (var output = exchange.getResponseBody()) {</span>
+<span class="fc" id="L204">            output.write(bytes);</span>
         }
-<span class="fc" id="L202">    }</span>
+<span class="fc" id="L206">    }</span>
 
     private String safeMessage(RuntimeException exception) {
-<span class="nc bnc" id="L205" title="All 2 branches missed.">        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();</span>
     }
 
     @Override
     public void close() {
-<span class="fc" id="L210">        radar.close();</span>
-<span class="fc" id="L211">    }</span>
+<span class="fc" id="L214">        radar.close();</span>
+<span class="fc" id="L215">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
