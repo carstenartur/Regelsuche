@@ -145,6 +145,15 @@ class MavenParallelVerificationWorkflowContractTest {
         "regelsuche-math-sympy/target/site/jacoco/**"));
     assertTrue(sympy.contains("if-no-files-found: error"),
         "missing runtime evidence must fail the isolated authority");
+    String sympyProducer = Files.readString(root.resolve(
+        "regelsuche-math-sympy/src/maven-test/java/de/regelsuche/math/sympy/SympyRuntimeContainerIT.java"));
+    assertTrue(sympyProducer.contains("retainCoverageInputs(root, target);"),
+        "isolated worker must retain its own tested classes, sources and execution data");
+    assertTrue(sympyProducer.contains("target.resolve(\"site/jacoco/inputs\")"),
+        "the independent artifact must retain renderable JaCoCo inputs");
+    assertTrue(sympyProducer.contains("target.resolve(\"jacoco.exec\")"));
+    assertTrue(sympyProducer.contains("inputs.resolve(\"execution-data/jacoco.exec\")"));
+
 
     assertTrue(maven.contains("actions/checkout@"),
         "the Maven authority must start from a separate fresh checkout");
