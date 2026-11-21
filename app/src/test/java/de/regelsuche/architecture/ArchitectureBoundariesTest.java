@@ -1,5 +1,6 @@
 package de.regelsuche.architecture;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,7 +88,7 @@ class ArchitectureBoundariesTest {
             ":regelsuche-math-algorithms", ":regelsuche-optimization-sdk", ":regelsuche-discovery"));
         expectedProjectDependencies.put("regelsuche-cli", List.of());
         expectedProjectDependencies.put("regelsuche-discovery", List.of(":regelsuche-core", ":regelsuche-search",
-            ":regelsuche-validation", ":regelsuche-math-algorithms"));
+            ":regelsuche-validation", ":regelsuche-solver-ir", ":regelsuche-math-algorithms"));
         expectedProjectDependencies.put("regelsuche-quality", List.of());
         expectedProjectDependencies.put("regelsuche-plugin-api", List.of(":regelsuche-search"));
         expectedProjectDependencies.put("regelsuche-extension-api", List.of(":regelsuche-core"));
@@ -111,6 +112,16 @@ class ArchitectureBoundariesTest {
                     () -> entry.getKey() + " declares unexpected project dependency " + declaredDependency);
             }
         }
+    }
+
+    @Test
+    void physicalModuleDependencyScannerDoesNotConflateTestAdaptersWithRuntimeEdges() {
+        String fixture = "api project(':regelsuche-core')\n"
+            + "implementation project(':regelsuche-solver-ir')\n"
+            + "testImplementation project(':regelsuche-solver-portfolio')\n"
+            + "testRuntimeOnly project(':regelsuche-solver-portfolio')\n";
+        assertEquals(List.of(":regelsuche-core", ":regelsuche-solver-ir"),
+            projectDependencyTokens(fixture));
     }
 
     @Test
@@ -278,7 +289,13 @@ class ArchitectureBoundariesTest {
 
     private static List<String> projectDependencyTokens(String buildFileContent) {
         return buildFileContent.lines()
-            .filter(line -> line.contains("project(':"))
+            .map(String::trim)
+            // Only production edges participate in the physical module topology.
+            // Proof adapters used by test-only end-to-end checks are not runtime dependencies.
+            .filter(line -> line.startsWith("api project(':")
+                || line.startsWith("implementation project(':")
+                || line.startsWith("compileOnly project(':")
+                || line.startsWith("runtimeOnly project(':"))
             .map(line -> line.substring(line.indexOf("project(':") + "project('".length()))
             .map(token -> token.substring(0, token.indexOf("')")))
             .toList();

@@ -60,6 +60,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <argLine>@{argLine} --enable-native-access=ALL-UNNAMED -Xms512m -Xmx2g</argLine>
+          <excludedGroups>sympy-runtime</excludedGroups>
           <forkCount>1</forkCount>
           <reuseForks>true</reuseForks>
         </configuration>
@@ -85,4 +86,62 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>full</id>
+      <dependencies>
+    <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-console</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.testcontainers</groupId><artifactId>testcontainers-junit-jupiter</artifactId><scope>test</scope></dependency>
+      </dependencies>
+      <build><plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
+          <executions><execution><id>default-testCompile</id>
+            <configuration><compileSourceRoots>
+              <compileSourceRoot>${project.basedir}/src/test/java</compileSourceRoot>
+              <compileSourceRoot>${project.basedir}/src/maven-test/java</compileSourceRoot>
+            </compileSourceRoots></configuration>
+          </execution></executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId>
+          <executions><execution><id>clear-sympy-runtime-staging</id><phase>initialize</phase><goals><goal>clean</goal></goals>
+            <configuration><excludeDefaultDirectories>true</excludeDefaultDirectories><filesets>
+              <fileset><directory>${project.build.directory}/runtime-lib</directory><followSymlinks>false</followSymlinks></fileset>
+              <fileset><directory>${project.build.directory}/reports/sympy-runtime</directory><followSymlinks>false</followSymlinks></fileset>
+            </filesets></configuration>
+          </execution></executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-dependency-plugin</artifactId>
+          <executions>
+            <execution><id>stage-sympy-test-runtime</id><phase>prepare-package</phase><goals><goal>copy-dependencies</goal></goals>
+              <configuration><includeScope>test</includeScope><includeTypes>jar</includeTypes><prependGroupId>true</prependGroupId>
+                <outputDirectory>${project.build.directory}/runtime-lib</outputDirectory></configuration>
+            </execution>
+            <execution><id>stage-sympy-coverage-agent</id><phase>prepare-package</phase><goals><goal>copy</goal></goals>
+              <configuration><artifactItems><artifactItem>
+                <groupId>org.jacoco</groupId><artifactId>org.jacoco.agent</artifactId><version>${jacoco.version}</version><classifier>runtime</classifier>
+                <outputDirectory>${project.build.directory}</outputDirectory><destFileName>runtime-jacoco.jar</destFileName>
+              </artifactItem></artifactItems></configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
+          <executions><execution><id>qualify-external-sympy-runtime</id><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
+          <configuration>
+            <test>de.regelsuche.math.sympy.SympyRuntimeContainerIT</test>
+            <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+            <forkedProcessTimeoutInSeconds>1200</forkedProcessTimeoutInSeconds>
+            <systemPropertyVariables>
+              <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+              <regelsuche.sympy.target>${project.build.directory}</regelsuche.sympy.target>
+              <regelsuche.sympy.jar>${project.build.finalName}.jar</regelsuche.sympy.jar>
+            </systemPropertyVariables>
+          </configuration>
+        </plugin>
+      </plugins></build>
+    </profile>
+  </profiles>
 </project>

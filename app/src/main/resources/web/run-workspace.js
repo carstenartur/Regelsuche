@@ -137,6 +137,12 @@
     }
 
     const store = api.createStore(load, render);
+    window.RegelsucheNativeSearch.attach(async (runId) => {
+        activateRun();
+        await store.open(runId.slice(7), 'CANDIDATE_DOSSIERS');
+        offset = 0;
+        loadHistory();
+    }, responseReply);
 
     function renderDuplication(parent, run) {
         const form = element('form', undefined, parent); form.id = 'duplicateRetainedRun';

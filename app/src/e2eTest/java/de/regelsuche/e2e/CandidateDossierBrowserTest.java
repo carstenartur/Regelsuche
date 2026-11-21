@@ -123,6 +123,9 @@ class CandidateDossierBrowserTest {
         assertTrue((Boolean) page.evaluate("document.activeElement.dataset.candidateId === '" + other.stateHash() + "'"));
         page.locator("[data-candidate-id='" + bridgeId + "']").first().click();
         if (entry.equals("/")) {
+            page.locator("[data-review-role='PROOF_OBLIGATIONS']").click();
+            page.waitForFunction("document.querySelector('#candidateOccurrenceReview')?.textContent.includes('OUTSIDE_BOUNDED_POLYNOMIAL_FRAGMENT')");
+            assertEquals(bridgeId, page.locator("#candidateDossierDetail").getAttribute("data-candidate-id"));
             Path evidence = Path.of("build/reports/candidate-dossier-ui"); Files.createDirectories(evidence);
             page.locator("#candidateDossierDetail").evaluate("element => element.scrollIntoView({block: 'start'})");
             page.screenshot(new Page.ScreenshotOptions().setPath(evidence.resolve("dossier-desktop.png")));

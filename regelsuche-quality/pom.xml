@@ -14,7 +14,10 @@
   <artifactId>regelsuche-quality</artifactId>
   <name>Regelsuche Quality Evidence</name>
 
+  <properties><regelsuche.skipReleasedSdkConsumers>true</regelsuche.skipReleasedSdkConsumers></properties>
+
   <dependencies>
+    <dependency><groupId>org.apache.commons</groupId><artifactId>commons-compress</artifactId><scope>test</scope></dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
@@ -28,6 +31,15 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
+        <executions><execution><id>default-testCompile</id>
+          <configuration><compileSourceRoots>
+            <compileSourceRoot>${project.basedir}/src/test/java</compileSourceRoot>
+            <compileSourceRoot>${project.basedir}/src/maven-test/java</compileSourceRoot>
+          </compileSourceRoots></configuration>
+        </execution></executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
@@ -38,13 +50,48 @@
           </systemPropertyVariables>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>qualify-released-sdk-maven-consumers</id>
+            <goals><goal>integration-test</goal><goal>verify</goal></goals>
+            <configuration>
+              <test>de.regelsuche.quality.sdk.ReleasedSdkConsumersIT</test>
+              <skipITs>${regelsuche.skipReleasedSdkConsumers}</skipITs>
+              <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+              <summaryFile>${project.build.directory}/failsafe-reports/released-sdk-summary.xml</summaryFile>
+              <forkedProcessTimeoutInSeconds>2400</forkedProcessTimeoutInSeconds>
+              <systemPropertyVariables>
+                <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+                <regelsuche.mavenHome>${maven.home}</regelsuche.mavenHome>
+              </systemPropertyVariables>
+            </configuration>
+          </execution>
+          <execution>
+            <id>replay-original-jmh-ci-decisions</id>
+            <goals><goal>integration-test</goal><goal>verify</goal></goals>
+            <configuration>
+              <test>de.regelsuche.quality.jmh.JmhRetainedCiReplayIT</test>
+              <failIfNoTests>true</failIfNoTests>
+              <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+              <systemPropertyVariables>
+                <regelsuche.repositoryRoot>${maven.multiModuleProjectDirectory}</regelsuche.repositoryRoot>
+              </systemPropertyVariables>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <profiles>
+    <profile><id>full</id><properties><regelsuche.skipReleasedSdkConsumers>false</regelsuche.skipReleasedSdkConsumers></properties></profile>
+    <profile><id>released-sdk-consumers</id><properties><regelsuche.skipReleasedSdkConsumers>false</regelsuche.skipReleasedSdkConsumers></properties></profile>
     <profile>
       <id>verify-cross-authority-coverage</id>
       <properties>
-        <regelsuche.coverage.isolatedReport>build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml</regelsuche.coverage.isolatedReport>
+        <regelsuche.coverage.isolatedReport>build/authority-evidence/sympy/site/jacoco/jacoco.xml</regelsuche.coverage.isolatedReport>
         <regelsuche.coverage.publish>false</regelsuche.coverage.publish>
       </properties>
       <build>

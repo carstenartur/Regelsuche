@@ -49,6 +49,10 @@ ENV REGELSUCHE_SYMPY_PYTHON=/opt/regelsuche-sympy/bin/python
 USER regelsuche
 COPY scripts/sympy_rule_reference/ /opt/regelsuche-sympy-reference/
 RUN /opt/regelsuche-sympy/bin/python /opt/regelsuche-sympy-reference/reference.py --verify
+ARG REGELSUCHE_PREPARATION_REVISION
+RUN ./bin/regelsuche-benchmarks --native-scalar-comparison /opt/regelsuche-sympy-reference/reference.py \
+        "$REGELSUCHE_PREPARATION_REVISION" /opt/regelsuche-benchmarks/native-scalar-reference \
+    && sha256sum /opt/regelsuche-benchmarks/native-scalar-reference/comparison.json
 VOLUME ["/output"]
 
 ENTRYPOINT ["./bin/regelsuche-benchmarks"]

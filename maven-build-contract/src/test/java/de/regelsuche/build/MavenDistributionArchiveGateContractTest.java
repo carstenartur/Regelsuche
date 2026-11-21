@@ -1,8 +1,11 @@
 package de.regelsuche.build;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
@@ -14,14 +17,23 @@ class MavenDistributionArchiveGateContractTest {
     @Test
     void fullLifecycleRunsTheInstalledClientAfterPackaging() throws Exception {
         Element execution = execution("regelsuche-quality-aggregate/pom.xml", "verify-installed-python-client");
-        assertEquals("verify", text(execution, "phase"));
-        assertEquals("test", value(execution, "goals", "goal"));
+        var xpath = XPathFactory.newInstance().newXPath();
+        assertEquals("maven-failsafe-plugin", xpath.evaluate("ancestor::*[local-name()='plugin']/*[local-name()='artifactId']", execution));
+        assertEquals("integration-test", xpath.evaluate("*[local-name()='goals']/*[local-name()='goal'][1]", execution));
+        assertEquals("verify", xpath.evaluate("*[local-name()='goals']/*[local-name()='goal'][2]", execution));
+        String driver = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(
+            "regelsuche-quality-aggregate/src/test/java/de/regelsuche/quality/aggregate/MavenPythonClientDistributionIT.java"));
+        assertFalse(driver.contains("ProcessBuilder("), "No host interpreter in external client qualification");
+        // /client/tests/test_*.py resolves parents[2] to /; it expects /docs/examples there.
+        assertTrue(driver.contains("root.resolve(\"docs/examples/linear-solution.json\")), \"/docs/examples/linear-solution.json\""),
+            "Mounted client unit-test fixture must remain at its real source-relative path");
+        assertTrue(driver.contains("root.resolve(\"docs/examples/linear-solution.json\")), \"/input/proof.json\""),
+            "Keep the distinct offline CLI proof fixture from the original distribution");
         Element configuration = child(execution, "configuration");
         assertEquals("de.regelsuche.quality.aggregate.MavenPythonClientDistributionIT", text(configuration, "test"));
         assertEquals("false", text(configuration, "skipTests"));
         assertEquals("false", text(configuration, "skip"));
         assertEquals("true", text(configuration, "failIfNoSpecifiedTests"));
-        var xpath = XPathFactory.newInstance().newXPath();
         assertEquals("full", xpath.evaluate("ancestor::*[local-name()='profile']/*[local-name()='id']", execution));
     }
 

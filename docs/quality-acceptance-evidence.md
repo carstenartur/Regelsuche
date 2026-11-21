@@ -92,7 +92,7 @@ into that tree. An existing canonical SymPy XML is ambiguous and fails the join.
 ```bash
 mvn -pl regelsuche-quality -Pverify-cross-authority-coverage -DskipTests verify \
   -Dregelsuche.coverage.evidenceRoot=/absolute/path/to/evidence-tree \
-  -Dregelsuche.coverage.isolatedReport=build/authority-evidence/sympy/regelsuche-math-sympy/build/reports/jacoco/test/jacocoTestReport.xml
+  -Dregelsuche.coverage.isolatedReport=build/authority-evidence/sympy/site/jacoco/jacoco.xml
 ```
 
 The profile defaults to the isolated report path shown above and the current

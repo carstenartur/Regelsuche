@@ -52,7 +52,7 @@ Die **Standarddemo läuft ohne externe Infrastruktur**. Sie benötigt weder eine
 Datenbank noch einen externen Solver. Im Repository-Verzeichnis mit Docker:
 
 ```bash
-docker build -t regelsuche .
+docker build --build-arg "REGELSUCHE_PREPARATION_REVISION=$(git rev-parse HEAD)" -t regelsuche .
 docker run --rm -p 127.0.0.1:8080:8080 regelsuche
 ```
 
