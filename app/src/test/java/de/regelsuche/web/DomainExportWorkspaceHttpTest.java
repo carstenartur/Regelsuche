@@ -9,6 +9,8 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.*;
 import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.*;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -107,6 +109,64 @@ class DomainExportWorkspaceHttpTest {
         assertEquals(400, request("POST", "", upload()).statusCode());
         assertEquals(400, request("POST", "", "{\"schema\":\"x\",\"schema\":\"y\",\"files\":{}}").statusCode());
         assertEquals(0, json.readTree(request("GET", "", null).body()).path("exports").size());
+    }
+
+    @Test void retainsLogicalExportThroughHttpWithoutIssuingProofOrReplayAuthority() throws Exception {
+        var domain = new ScopedLogicDiscoveryDomain(proposal -> {
+            throw new AssertionError("retained workspace must not call a proof receiver");
+        }, 0);
+        var proposition = new Symbol("p");
+        var context = Obligation.create("http-logical-source", List.of(new SymbolDeclaration("p", Sort.PROPOSITION)),
+            List.of(Theory.SCOPED_ANALYSIS), List.of(Predicate.holds("given", proposition)), Goal.holds(proposition),
+            RequestedEvidence.FORMAL_PROOF, new SourceProvenance("public-control", "http", SolverIr.sha256("public context")));
+        evidence = new DomainDiscoveryRunner().run("http-logical-export", domain,
+            DiscoverySeed.create("context", domain.domainId(), context.toCanonicalJson(), "public HTTP control"),
+            new DiscoveryBudget(0, 4, 4, 4, 4, 4)).evidence();
+        Path source = temporary.resolve("logical-source");
+        runId = new DomainDiscoveryExport().write(source, evidence).contentHash();
+        Path manifest = source.resolve("export-manifest.json");
+        Files.writeString(manifest, Files.readString(manifest) + "\r\n");
+        for (String name : files.keySet()) {
+            files.put(name, Base64.getEncoder().encodeToString(Files.readAllBytes(source.resolve(name))));
+        }
+        var imported = request("POST", "", upload());
+        assertEquals(201, imported.statusCode(), imported.body());
+        var view = json.readTree(imported.body());
+        assertEquals("scoped-logic", view.path("domainId").asText());
+        assertFalse(view.path("replaySupported").asBoolean());
+        assertEquals(imported.body(), request("GET", path(), null).body());
+        assertEquals(1, json.readTree(request("GET", "", null).body()).path("exports").size());
+        for (var file : files.entrySet()) {
+            var downloaded = request("GET", path() + "/files/" + file.getKey(), null);
+            assertEquals(200, downloaded.statusCode(), downloaded.body());
+            assertArrayEquals(Base64.getDecoder().decode(file.getValue()), downloaded.body().getBytes(StandardCharsets.UTF_8));
+        }
+        String bound = replayRequest(view.path("contentHash").asText(), evidence.contentHash());
+        var replay = request("POST", path() + "/replay", bound);
+        assertEquals(409, replay.statusCode(), replay.body());
+        assertEquals("REPLAY_NOT_REPRODUCED", json.readTree(replay.body()).path("code").asText());
+        var assessment = request("POST", path() + "/assessment", bound);
+        assertEquals(200, assessment.statusCode(), assessment.body());
+        var assessed = json.readTree(assessment.body());
+        assertEquals("REPLAY_NOT_CONFIGURED", assessed.path("replayStatus").asText());
+        assertEquals("NOT_EVALUATED", assessed.path("proof").path("status").asText());
+        assertEquals("BLOCKED", assessed.path("release").path("status").asText());
+        var retainedAssessment = request("GET", path() + "/assessment/"
+            + assessed.path("contentHash").asText().substring(7), null);
+        assertEquals(200, retainedAssessment.statusCode(), retainedAssessment.body());
+        assertEquals(assessment.body(), retainedAssessment.body());
+        for (String action : List.of("validate", "model-proof")) {
+            var response = request("POST", path() + "/" + action, bound);
+            assertEquals(200, response.statusCode(), response.body());
+            var receipt = json.readTree(response.body());
+            assertEquals("UNSUPPORTED", receipt.path("status").asText());
+            assertEquals("SCOPED_PROOF_REPLAY_NOT_CONFIGURED", receipt.path("detail").asText());
+            var retained = request("GET", path() + "/" + action + "/"
+                + receipt.path("contentHash").asText().substring(7), null);
+            assertEquals(200, retained.statusCode(), retained.body());
+            assertEquals(response.body(), retained.body());
+        }
+        assertEquals(imported.body(), request("GET", path(), null).body());
     }
 
     @Test void preservesFirstExactBytesWhenManifestIdentityIsReused() throws Exception {
