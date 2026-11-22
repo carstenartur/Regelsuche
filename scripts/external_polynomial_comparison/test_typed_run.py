@@ -1,15 +1,69 @@
 """Contract tests, not execution or tuning of the external development corpus."""
+import base64
 import hashlib
+import os
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import sys
 import unittest
+from unittest.mock import patch
 from external_polynomial_comparison import run_typed as typed
 
 ROOT = Path(__file__).resolve().parents[2]
 
 class TypedRunnerTest(unittest.TestCase):
+    def test_portable_execution_refuses_missing_registration_before_allocating_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            previous = Path.cwd()
+            try:
+                os.chdir(source)
+                with patch.dict(os.environ, {'REGELSUCHE_NATIVE_SOURCE_VERIFIER_CLASSPATH': '/worker/verifier'}):
+                    with self.assertRaisesRegex(ValueError, 'requires.*source registration'):
+                        typed.execute(ROOT / 'config/benchmarks/typed-external-polynomial-v1.json',
+                                      source / 'classpath.txt', source / 'results')
+            finally:
+                os.chdir(previous)
+            self.assertFalse((source / 'results').exists())
+
+    def test_registered_revision_requires_real_typed_ancestry_and_matching_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = root / 'build/authority-evidence'
+            receipt.mkdir(parents=True)
+            original = Path('config/benchmarks/polynomial-freeze-source-objects.json.gz')
+            (root / original).parent.mkdir(parents=True)
+            shutil.copyfile(ROOT / original, root / original)
+            proof = receipt / 'polynomial-source.json'
+
+            def register(parent_line):
+                tree = 'a' * 40
+                commit = f'tree {tree}\n{parent_line}\nfixture head\n'.encode()
+                revision = hashlib.sha1(f'commit {len(commit)}\0'.encode() + commit).hexdigest()
+                payload = base64.b64encode(commit).decode('ascii')
+                (receipt / 'quality-source-tree.json').write_text(json.dumps({
+                    'schema': 'regelsuche.quality.source-tree/v1', 'revision': revision, 'commit': payload}))
+                proof.write_text(json.dumps({
+                    'schema': 'regelsuche.polynomial-source-witness/v1', 'revision': revision,
+                    'objects': {revision: {'type': 'commit', 'data': payload}}}))
+                return {'sourceRevision': revision, 'sourceTreeHash': 'git:' + tree}
+
+            source = register('parent ' + typed.FREEZE_COMMIT + '\n')
+            with patch.object(typed, 'portable_source_provenance', return_value=source):
+                self.assertEqual(source, typed.registered_provenance(root))
+            with patch.object(typed, 'portable_source_provenance', return_value=dict(source, sourceRevision='f' * 40)):
+                with self.assertRaisesRegex(ValueError, 'different registered source'):
+                    typed.registered_provenance(root)
+            unrelated = register('')
+            with patch.object(typed, 'portable_source_provenance', return_value=unrelated):
+                with self.assertRaisesRegex(ValueError, 'not a proved ancestor'):
+                    typed.registered_provenance(root)
+                proof.unlink()
+                with self.assertRaisesRegex(ValueError, 'requires.*ancestry witness'):
+                    typed.registered_provenance(root)
+
     def protocol(self):
         return typed.load_protocol(ROOT / 'config/benchmarks/typed-external-polynomial-v1.json')
 

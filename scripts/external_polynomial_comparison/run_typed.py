@@ -13,6 +13,7 @@ import time
 from .run import (Session, canonical, judge, paired_comparisons, require_matrix,
                   summarize, untimed, verify_row)
 from .polynomial import LIMITS, Unsupported, polynomial
+from .registered_source import portable_source_provenance, require_ancestor
 
 PROTOCOL_HASH = 'ccf2d953cbc43b99f9eb9ec5abe3512bcd9eb8df63a3ae2ccbf8c09264d7078e'
 FREEZE_COMMIT = 'c7f0f6cfc69e1b45b37497109bf5a11686d08f9a'
@@ -123,12 +124,27 @@ def lifecycle(protocol: dict, metadata: dict, rows: list[dict]) -> dict:
     return result
 
 
+def registered_provenance(repository: Path):
+    source = portable_source_provenance(repository)
+    if source is not None:
+        proof = repository / 'build/authority-evidence/polynomial-source.json'
+        if not proof.is_file():
+            raise ValueError('typed study requires the registered ancestry witness')
+        if require_ancestor(repository, proof, FREEZE_COMMIT) != source['sourceRevision']:
+            raise ValueError('typed ancestry witness names a different registered source')
+    return source
+
+
 def execute(protocol_path: Path, classpath_path: Path, output: Path) -> dict:
     controller_start = time.process_time_ns()
     protocol = load_protocol(protocol_path)
-    subprocess.run(['git', 'merge-base', '--is-ancestor', FREEZE_COMMIT, 'HEAD'], check=True, capture_output=True)
-    subprocess.run(['git', 'diff', '--exit-code', 'HEAD'], check=True, capture_output=True)
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    source = registered_provenance(Path.cwd())
+    if source is None:
+        subprocess.run(['git', 'merge-base', '--is-ancestor', FREEZE_COMMIT, 'HEAD'], check=True, capture_output=True)
+        subprocess.run(['git', 'diff', '--exit-code', 'HEAD'], check=True, capture_output=True)
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+    else:
+        revision = source['sourceRevision']
     classpath = classpath_path.read_text(encoding='utf-8').strip()
     if not classpath:
         raise ValueError('empty Java classpath')
@@ -205,6 +221,8 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path) -> dict:
         metadata['controllerCpuScope'] = 'SETUP_TRAIN_FREEZE_WARMUP_QUERIES_BINDING_AND_COMMON_VERIFICATION;EXCLUDES_FINAL_REPORT_EXPORT'
         (output / 'metadata.json').write_bytes(canonical(metadata))
         (output / 'rows.json').write_bytes(canonical(rows))
+    if source is not None and registered_provenance(Path.cwd()) != source:
+        raise ValueError('registered source changed during typed execution')
     summary = summarize(protocol, rows)
     for name, value in [('summary.json', summary), ('paired-comparisons.json', paired_comparisons(protocol, rows)),
                         ('canonical-rows.json', untimed(rows)), ('lifecycle.json', lifecycle(protocol, metadata, rows))]:
