@@ -1,0 +1,18 @@
+{
+  "schema": "regelsuche.finite-search-knowledge-comparison-plan/v1",
+  "information": "PUBLIC_TARGET_DIRECTED_EXACT_SYNTAX",
+  "inventory": "regelsuche.reversible-factor-add/v1",
+  "historicalCorpusSha256": "53bff974a9ecb101b85e01f202d095fb2a99f5f33127ed7ec0e4ade2685ac422",
+  "historicalCases": "all thirteen SYNTAX_EXACT cases at their original oracleMaxDepth",
+  "excludedCase": "sophie-germain retains its original VALUE_EQUIVALENT relation; do not relabel it syntax-exact",
+  "additionalCases": {"family": "independent factors in ordered tuple arguments", "factorSites": [3, 5, 7], "depth": "exactly the number of sites"},
+  "reference": {"maxStates": 4096, "maxTransitions": 100000, "maxNativeCalls": 100000, "claim": "only complete bounded closure yields reference absence"},
+  "arms": ["ONE_SIDED", "BIDIRECTIONAL", "ITERATIVE_DEEPENING", "GUIDED_CACHE_1", "GUIDED_CACHE_128", "PORTFOLIO_1", "PORTFOLIO_3", "TABLE_COLD", "TABLE_RESTORED", "TABLE_WARM"],
+  "perArmNativeCallCap": 4096,
+  "guidedControllerOperationCap": 262144,
+  "portfolio": {"lanes": ["ONE_SIDED", "BIDIRECTIONAL", "ITERATIVE_DEEPENING"], "nativeCallsPerLane": 1365, "selection": "all-lane barrier then shortest witness and stable lane ID"},
+  "table": {"language": "complete source-generated depth-bounded closure", "cold": "acquisition plus query plus fresh replay", "restored": "full independent regeneration plus query plus fresh replay", "warm": "query plus fresh replay; acquisition separately retained, never erased"},
+  "measurements": {"canonical": ["actual native generation calls", "generated candidates", "controller and table lookup observations", "cache hits", "replacements", "independently replayed witness depth", "source-only persisted tables"], "runtime": ["wall nanoseconds", "current-thread allocated bytes or explicit unsupported -1"], "runtimeProtocol": "one retained host diagnostic per arm; no JIT-fork or statistical speedup claim; portfolio thread allocation is not observed"},
+  "workComparison": "native calls use the same reciprocal fragment, but controller observations are not a complete shared mechanical currency; full-work efficiency remains unmatched",
+  "stretchTarget": "1000x remains unmet unless a separate preregistered complete-work and correctness study demonstrates it"
+}
