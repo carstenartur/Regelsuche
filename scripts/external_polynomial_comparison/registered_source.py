@@ -3,6 +3,9 @@ import base64
 import gzip
 import hashlib
 import json
+import os
+import re
+import subprocess
 from pathlib import Path
 
 
@@ -44,3 +47,25 @@ def require_ancestor(repo, receipt, ancestor):
         seen.add(revision)
         search.extend(parents[revision])
     raise ValueError('published polynomial freeze is not a proved ancestor of the current source')
+
+
+def portable_source_provenance(repository):
+    """Use the configured Maven verifier for the registered source in the native worker."""
+    key = 'REGELSUCHE_NATIVE_SOURCE_VERIFIER_CLASSPATH'
+    if key not in os.environ:
+        return None
+    root = Path(repository).resolve()
+    verifier = os.environ[key]
+    registration = root / 'build/authority-evidence/quality-source-tree.json'
+    if not verifier or not registration.is_file():
+        raise ValueError('native worker requires a verifier classpath and source registration')
+    checked = subprocess.run(
+        ['java', '--enable-native-access=ALL-UNNAMED', '-cp', verifier,
+         'de.regelsuche.release.PolynomialArchiveProvenanceMain', str(root)],
+        check=True, capture_output=True, timeout=180)
+    identity = json.loads(checked.stdout)
+    if not isinstance(identity, dict) or identity.get('trackedChangesPresent') is not False or any(
+            not isinstance(identity.get(key), str) or not re.fullmatch(r'[0-9a-f]{40}', identity[key])
+            for key in ('revision', 'tree')):
+        raise ValueError('native worker received invalid registered source identity')
+    return {'sourceRevision': identity['revision'], 'sourceTreeHash': 'git:' + identity['tree']}
