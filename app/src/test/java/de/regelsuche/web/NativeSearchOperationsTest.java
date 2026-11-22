@@ -79,6 +79,10 @@ class NativeSearchOperationsTest {
         assertEquals("INTERRUPTED", stopped.status());
         assertEquals("HOST_STOP", stopped.terminalReason());
         assertNull(stopped.workspaceRunId());
+        // await() is also the synchronization boundary for the old worker's file lease.
+        var releasedLease = new NativeSearchOperationStore(runs).tryLease();
+        assertNotNull(releasedLease, "terminal await must not return while the old worker owns the file lease");
+        NativeSearchOperationStore.release(releasedLease);
         try (var failed = new NativeSearchOperations(runs, () -> REVISION, (source,budget,revision,events) -> {
             throw new java.io.IOException("worker unavailable");
         })) {
