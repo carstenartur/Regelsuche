@@ -18,7 +18,7 @@ class MavenGitFreeFullLifecycleContractTest {
     private static final String STEP =
         "      - name: Reproduce full Maven lifecycle from a Git-free source archive";
     private static final String NEXT =
-        "      - name: Retain Maven product verification evidence";
+        "  external-polynomial-comparison:";
     private static final String ARCHIVE_ROOT = "${{ steps.source_archive.outputs.root }}";
     private static final String FULL_COMMAND =
         "mvn --batch-mode --no-transfer-progress -Pfull verify";
