@@ -50,11 +50,42 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
       "maven-product-verification", GIT_FREE_AUTHORITY, "external-polynomial-comparison",
       "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
-      "maven-polynomial-qualification");
+      "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-student-sdk-archive-qualification");
   private static final Pattern FAILURE_TERM =
       Pattern.compile("needs\\.([A-Za-z][A-Za-z0-9_-]*)\\.result != 'success'");
   private static final String ROUTINE_FAILURE_GROUP = " || (github.event_name != 'create' && (";
   private static final String REJECTION_STEP = "Reject incomplete verification authority";
+
+  @Test
+  void onlyObsoletePullRequestsCancelRunningVerification() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    assertEquals("${{ github.event_name == 'pull_request' }}",
+        workflow.path("concurrency").path("cancel-in-progress").asText(),
+        "main and manually repeated ancestor runs must complete their acceptance evidence");
+  }
+
+  @Test
+  void reportPublicationRequiresCurrentMainAndSuccessfulRemoteLookup() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    List<JsonNode> steps = workflow.path("jobs").path("publish-pages")
+        .path("steps").valueStream().toList();
+    JsonNode publish = steps.getLast();
+    assertTrue(publish.path("uses").asText().startsWith("peaceiris/actions-gh-pages@"));
+    assertEquals("${{ steps.current-main.outputs.current == 'true' }}",
+        publish.path("if").asText(), "a superseded main run must not publish stale reports");
+    JsonNode guard = steps.get(steps.size() - 2);
+    assertEquals("current-main", guard.path("id").asText());
+    assertFalse(guard.has("continue-on-error"));
+    String script = guard.path("run").asText();
+    assertTrue(script.startsWith("set -euo pipefail\n"),
+        "failed remote lookup must stop publication, not reuse a stale local ref");
+    assertTrue(script.contains("git ls-remote --exit-code origin refs/heads/main"));
+    assertTrue(script.contains("if [[ \"$remote_sha\" == \"$GITHUB_SHA\" ]]; then"));
+    assertTrue(script.contains("echo \"current=true\" >> \"$GITHUB_OUTPUT\""));
+    assertTrue(script.contains("echo \"current=false\" >> \"$GITHUB_OUTPUT\""));
+  }
 
   @Test
   void independentAuthoritiesRunInParallelAndConvergeFailClosed()
@@ -449,6 +480,28 @@ class MavenParallelVerificationWorkflowContractTest {
       assertTrue(names.add(failure.group(1)), "duplicate authority " + term);
     }
     return names;
+  }
+
+  @Test
+  void studentArchiveUsesCleanMavenStagingAndRetainsOnlyQualificationEvidence() throws IOException {
+    var jobs = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
+    var job = jobs.required("maven-student-sdk-archive-qualification");
+    assertEquals("github.event_name != 'create'", job.required("if").asText());
+    var steps = job.required("steps");
+    assertEquals("${{ github.event.pull_request.head.sha || github.sha }}", steps.get(0).required("with").required("ref").asText());
+    assertEquals("false", steps.get(0).required("with").required("persist-credentials").asText());
+    String commands = steps.get(2).required("run").asText();
+    int stage = commands.indexOf("-Psdk-release");
+    int packageArchive = commands.indexOf("#packageConfiguredRepository");
+    int qualify = commands.indexOf("#qualifyConfiguredArchive");
+    assertTrue(stage >= 0 && packageArchive > stage && qualify > packageArchive);
+    assertTrue(commands.substring(stage, packageArchive).contains("-DskipTests clean install"));
+    assertTrue(commands.contains("work=$(mktemp -d \"$RUNNER_TEMP/student-sdk-archive/work.XXXXXXXX\")"));
+    assertTrue(commands.contains("-Dregelsuche.studentSdk.qualify=true"));
+    assertFalse(commands.contains("git tag") || commands.contains("gh release") || commands.contains("git push"));
+    var artifact = steps.get(3).required("with");
+    assertEquals("${{ runner.temp }}/student-sdk-archive/evidence", artifact.required("path").asText());
+    assertEquals("error", artifact.required("if-no-files-found").asText());
   }
 
   @Test

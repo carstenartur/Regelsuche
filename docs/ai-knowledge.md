@@ -172,9 +172,28 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Integrated main after #1361 (2026-11-22)
+
+The current reference comes from main `9d1d4ac0ece4fd056cf9f952795772feba6baa82`,
+tree `eb8e739a8084b063c5f480837fc1da2f78cbcd48`. The fully successful
+[#1361 CI](https://github.com/carstenartur/Regelsuche/actions/runs/45030696246)
+tested GitHub merge commit `28c7446500ab435f4fca30f093b5a2509f3387be` with that
+identical tree. All eleven source jobs, the aggregate gate and CodeQL passed.
+The separate push run for `9d1d4ac` was cancelled. The retained CI artifact binds
+the clean tested checkout and all 293 indexed files by length and SHA-256.
+
+The [active snapshot](../ai-knowledge/baseline-history/2026-11-22-main-9d1d4ac/metrics-snapshot.json)
+projects the original passing extractor 0.1.10 measurement of **861,185** context
+tokens and concept radius **119**. The later main `d599e2d` measurement of 873,185
+tokens had exceeded the prior reference by 17,980. The same measurement replays
+at **+12,000** tokens and **+2** radius units against #1361 under the existing
+15,000-token and three-radius limits. The [CI evidence and original failure](../ai-knowledge/baseline-history/2026-11-22-main-9d1d4ac/README.md)
+bind both source trees and report identities. The updated checkout still receives
+fresh extraction and complete integration CI.
+
 ### Accepted main after Maven and proof-authority integration (2026-11-22)
 
-The current reference is the original extractor 0.1.10 projection of accepted main
+The preceding reference is the original extractor 0.1.10 projection of accepted main
 `98a60e30629f65bc12bb573e9beb46b04053e66c`, tree
 `e62f351b3aa4c9a7901d0737b85db8443c50505b`.
 [Main CI 45008332052](https://github.com/carstenartur/Regelsuche/actions/runs/45008332052)
@@ -187,7 +206,7 @@ within the unchanged **15,000** allowance. Concept radius increased from 117 to 
 The [accepted-main provenance](../ai-knowledge/baseline-history/2026-11-22-main-98a60e30/provenance.json)
 binds the source, original CI, artifact digest, unchanged policies and retained
 native reports. The [projected snapshot](../ai-knowledge/baseline-history/2026-11-22-main-98a60e30/metrics-snapshot.json)
-is the active reference. Pending feature branches supply no baseline values and
+remains in the baseline history. Pending feature branches supply no baseline values and
 still require their own complete acceptance. Thresholds, selectors and exceptions
 retain their existing definitions.
 
