@@ -47,13 +47,14 @@ Host-Python-Interpreter. Bei einer konkreten Release-Prüfung bindet der
 Workflow zusätzlich die erwartete Version über
 `-Dregelsuche.expectedDevelopmentVersion=<Release-Version>`.
 
-Die **schreibende** Umstellung beim Release und beim Wechsel auf die nächste
-Entwicklungsversion verwendet während der Übergangsphase weiterhin
-`.github/scripts/update-release-metadata.py`. Dessen frühere
-`--check`-Variante ist nicht mehr der dokumentierte Standard für neue
-Checkouts. Diese Teilmigration bedeutet **noch keine Maven-only-Gesamtabnahme**:
-Gradle- und andere Host-basierte Prüf- und Erzeugungspfade sind im laufenden
-Build-Vertrag weiterhin vorhanden (siehe [#749](https://github.com/carstenartur/Regelsuche/issues/749)).
+Der Release-Workflow schreibt die veröffentlichte Version und die nächste
+Entwicklungsversion über `MavenReleaseMetadataTransitionTest`. Vor dem
+Schreiben prüft er den vollständigen deklarierten Reaktor einschließlich
+inaktiver Profile. Er baut die neuen Metadaten zunächst in einem temporären
+Verzeichnis auf und prüft alle Versions- und Datumsangaben gemeinsam. Für
+die Nachbereitung verarbeitet er ausschließlich den separaten sauberen
+Main-Checkout. Bei alten, bereits veröffentlichten Tags ohne Java-Verifier
+verwendet die Leseprüfung den im historischen Tag enthaltenen Prüfer.
 
 Bei `version=0.4.0-SNAPSHOT` ist die zu veröffentlichende Version `0.4.0` und
 der Tag `v0.4.0`. Die Angabe der nächsten Version verändert nicht die zu
