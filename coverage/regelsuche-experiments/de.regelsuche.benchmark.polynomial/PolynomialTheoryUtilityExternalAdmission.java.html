@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityExternalAdmission.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityExternalAdmission.java</span></div><h1>PolynomialTheoryUtilityExternalAdmission.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.polynomial.ExactRationalField;
+import de.regelsuche.polynomial.FactorizationEngine;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/** Source-only inspection that stops each frozen row immediately before its first backend operation. */
+public final class PolynomialTheoryUtilityExternalAdmission {
+    private static final String PROFILE = &quot;OPTIONAL_EXTERNAL_VERIFIED_FACTORIZATION&quot;;
+
+    private PolynomialTheoryUtilityExternalAdmission() {}
+
+    public record Prefix(PolynomialTheoryUtilityExecutionInput input,
+            List&lt;PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.Occurrence&gt; completed,
+            List&lt;Integer&gt; pendingPath, Optional&lt;FactorizationRequest&lt;ExactRational&gt;&gt; firstRequest,
+            PolynomialWorkLedger admittedWork) {
+<span class="fc" id="L24">        public Prefix {</span>
+<span class="fc" id="L25">            completed = List.copyOf(completed);</span>
+<span class="fc" id="L26">            pendingPath = List.copyOf(pendingPath);</span>
+<span class="fc" id="L27">        }</span>
+    }
+
+    public static List&lt;Prefix&gt; inspect() {
+<span class="fc" id="L31">        var cases = PolynomialTheoryUtilityCaseCorpus.load().cases().stream().collect(Collectors.toMap(</span>
+<span class="fc" id="L32">            PolynomialTheoryUtilityCaseCorpus.FormationCase::caseId, Function.identity()));</span>
+<span class="fc" id="L33">        return PolynomialTheoryUtilityExecutionInputs.freeze().inputs().stream()</span>
+<span class="fc" id="L34">            .filter(input -&gt; PROFILE.equals(input.profileId()))</span>
+<span class="fc" id="L35">            .map(input -&gt; inspect(input, cases.get(input.caseId()))).toList();</span>
+    }
+
+    private static Prefix inspect(PolynomialTheoryUtilityExecutionInput input,
+            PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
+<span class="fc" id="L40">        var authority = new PolynomialTheoryUtilityWorkAuthority(input);</span>
+<span class="fc" id="L41">        var source = PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.parse(formation.sourceExpression(), authority);</span>
+<span class="fc" id="L42">        var observations = new ArrayList&lt;PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.Occurrence&gt;();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (var path : PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.paths(formation)) {</span>
+            try {
+<span class="fc" id="L45">                observations.add(PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.executeOccurrence(</span>
+<span class="fc" id="L46">                    source, path, authority, () -&gt; ENTRY));</span>
+<span class="fc" id="L47">            } catch (ReachedEngine entry) {</span>
+<span class="fc" id="L48">                return new Prefix(input, observations, path, Optional.of(entry.request), authority.ledger());</span>
+<span class="fc" id="L49">            }</span>
+<span class="fc" id="L50">        }</span>
+<span class="fc" id="L51">        return new Prefix(input, observations, List.of(), Optional.empty(), authority.ledger());</span>
+    }
+
+    // Stop before the verifier can turn a sentinel report into a mathematical outcome.
+    private static final class ReachedEngine extends Error {
+        private final FactorizationRequest&lt;ExactRational&gt; request;
+        private ReachedEngine(FactorizationRequest&lt;ExactRational&gt; request) {
+<span class="fc" id="L58">            super(null, null, false, false);</span>
+<span class="fc" id="L59">            this.request = request;</span>
+<span class="fc" id="L60">        }</span>
+    }
+
+<span class="fc" id="L63">    private static final FactorizationEngine&lt;ExactRational&gt; ENTRY = new FactorizationEngine&lt;&gt;() {</span>
+        public String engineId() {
+<span class="fc" id="L65">            return PolynomialTheoryUtilityExecutionPlan.PROFILES.stream().filter(p -&gt; PROFILE.equals(p.profileId()))</span>
+<span class="fc" id="L66">                .findFirst().orElseThrow().engineId();</span>
+        }
+<span class="fc" id="L68">        public String coefficientDomainId() { return ExactRationalField.INSTANCE.id(); }</span>
+        public EngineResult&lt;ExactRational&gt; propose(FactorizationRequest&lt;ExactRational&gt; request) {
+<span class="fc" id="L70">            throw new ReachedEngine(request);</span>
+        }
+    };
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

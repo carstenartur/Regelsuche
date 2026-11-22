@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EnergyGameVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">EnergyGameVerifier.java</span></div><h1>EnergyGameVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Checks an inductive energy invariant without running credit lifting. */
+public final class EnergyGameVerifier {
+    private EnergyGameVerifier() {}
+<span class="fc" id="L12">    public enum Status { VERIFIED, INVALID, UNAVAILABLE }</span>
+<span class="fc" id="L13">    public record Verification(Status status, String reason, long work) {</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        public boolean valid() { return status == Status.VERIFIED; }</span>
+    }
+
+    public static Verification verify(EnergyGame.Request request, EnergyGame.Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L19">        Objects.requireNonNull(request); Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L20">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L22">            long cells = EnergyGameSupport.inspect(request, work);</span>
+<span class="fc" id="L23">            cells += EnergyGameSupport.inspect(certificate.source(), work);</span>
+<span class="fc" id="L24">            cells += 2L * certificate.credits().size() + 2L * certificate.strategy().size();</span>
+<span class="fc" id="L25">            work.cells(cells);</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            if (!matchesSource(request, certificate.source(), work)) return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc" id="L27">            var graph = request.graph();</span>
+<span class="fc" id="L28">            var credits = certificate.credits();</span>
+<span class="fc" id="L29">            var strategy = certificate.strategy();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            if (!credits.containsKey(graph.start())) return invalid(&quot;MISSING_START&quot;, work);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (var entry : credits.entrySet()) {</span>
+<span class="fc" id="L32">                work.charge(1); work.check(entry.getValue());</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">                if (entry.getKey() &lt; 0 || entry.getKey() &gt;= graph.owners().size()) return invalid(&quot;REGION_VERTEX&quot;, work);</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">                if (entry.getValue().signum() &lt; 0 || entry.getValue().compareTo(request.maximumCredit()) &gt; 0)</span>
+<span class="nc" id="L35">                    return invalid(&quot;CREDIT_RANGE&quot;, work);</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">                if (graph.owners().get(entry.getKey()) == EnergyGame.Owner.MAX &amp;&amp; !strategy.containsKey(entry.getKey()))</span>
+<span class="nc" id="L37">                    return invalid(&quot;MISSING_MAX_CHOICE&quot;, work);</span>
+<span class="fc" id="L38">            }</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            for (var entry : strategy.entrySet()) {</span>
+<span class="fc" id="L40">                work.charge(1);</span>
+<span class="fc" id="L41">                int vertex = entry.getKey(), id = entry.getValue();</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">                if (!credits.containsKey(vertex) || graph.owners().get(vertex) != EnergyGame.Owner.MAX)</span>
+<span class="nc" id="L43">                    return invalid(&quot;EXTRANEOUS_STRATEGY&quot;, work);</span>
+<span class="pc bpc" id="L44" title="3 of 6 branches missed.">                if (id &lt; 0 || id &gt;= graph.edges().size() || graph.edges().get(id).from() != vertex)</span>
+<span class="nc" id="L45">                    return invalid(&quot;INVALID_MAX_EDGE&quot;, work);</span>
+<span class="fc" id="L46">            }</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            for (int id = 0; id &lt; graph.edges().size(); id++) {</span>
+<span class="fc" id="L48">                work.charge(1);</span>
+<span class="fc" id="L49">                var edge = graph.edges().get(id);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                if (!credits.containsKey(edge.from())) continue;</span>
+<span class="fc bfc" id="L51" title="All 4 branches covered.">                if (graph.owners().get(edge.from()) == EnergyGame.Owner.MAX &amp;&amp; strategy.get(edge.from()) != id) continue;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                if (!credits.containsKey(edge.to())) return invalid(&quot;REGION_NOT_CLOSED&quot;, work);</span>
+<span class="fc" id="L53">                BigInteger available = work.check(credits.get(edge.from()).add(edge.weight()));</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (available.compareTo(credits.get(edge.to())) &lt; 0) return invalid(&quot;ENERGY_INEQUALITY&quot;, work);</span>
+            }
+<span class="fc" id="L56">            work.charge(0);</span>
+<span class="fc" id="L57">            return new Verification(Status.VERIFIED, &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L58">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L59">            return new Verification(Status.UNAVAILABLE, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    private static boolean matchesSource(EnergyGame.Request expected, EnergyGame.Request supplied,
+            CertificateWork work) {
+<span class="fc" id="L65">        work.charge(1);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (expected == supplied) return true;</span>
+<span class="fc" id="L67">        var first = expected.graph();</span>
+<span class="fc" id="L68">        var second = supplied.graph();</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (first.start() != second.start() || first.owners().size() != second.owners().size()</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                || first.edges().size() != second.edges().size()</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                || !work.check(expected.maximumCredit()).equals(work.check(supplied.maximumCredit()))) return false;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (int v = 0; v &lt; first.owners().size(); v++) {</span>
+<span class="fc" id="L73">            work.charge(1);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (first.owners().get(v) != second.owners().get(v)) return false;</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int id = 0; id &lt; first.edges().size(); id++) {</span>
+<span class="fc" id="L77">            work.charge(1);</span>
+<span class="fc" id="L78">            var a = first.edges().get(id);</span>
+<span class="fc" id="L79">            var b = second.edges().get(id);</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">            if (a.from() != b.from() || a.to() != b.to()</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                    || !work.check(a.weight()).equals(work.check(b.weight()))) return false;</span>
+        }
+<span class="fc" id="L83">        return true;</span>
+    }
+
+    private static Verification invalid(String reason, CertificateWork work) {
+<span class="fc" id="L87">        work.charge(0);</span>
+<span class="fc" id="L88">        return new Verification(Status.INVALID, reason, work.used());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

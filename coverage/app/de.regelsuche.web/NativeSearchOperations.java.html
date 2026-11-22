@@ -166,20 +166,23 @@ final class NativeSearchOperations implements AutoCloseable {
     synchronized NativeSearchOperation await(String id,long timeout,TimeUnit unit) throws Exception {
 <span class="fc" id="L167">        long deadline=System.nanoTime()+unit.toNanos(timeout);</span>
 <span class="fc" id="L168">        var current=find(id).orElseThrow();</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">        while (!current.terminal()) {</span>
-<span class="fc" id="L170">            long remaining=deadline-System.nanoTime();</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (remaining&lt;=0) throw new TimeoutException();</span>
-<span class="fc" id="L172">            TimeUnit.NANOSECONDS.timedWait(this,remaining);</span>
-<span class="fc" id="L173">            current=find(id).orElseThrow();</span>
-<span class="fc" id="L174">        }</span>
-<span class="fc" id="L175">        return current;</span>
+        // A terminal record is durable before execute() releases its workspace lease.
+        // Do not return to the owning caller until that lease is released: an immediate
+        // next operation must not fail solely because terminal persistence won the race.
+<span class="pc bpc" id="L172" title="5 of 8 branches missed.">        while (!current.terminal() || (lease != null &amp;&amp; active != null &amp;&amp; active.operationId().equals(id))) {</span>
+<span class="fc" id="L173">            long remaining=deadline-System.nanoTime();</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (remaining&lt;=0) throw new TimeoutException();</span>
+<span class="fc" id="L175">            TimeUnit.NANOSECONDS.timedWait(this,remaining);</span>
+<span class="fc" id="L176">            current=find(id).orElseThrow();</span>
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">        return current;</span>
     }
 
     @Override public void close() {
-<span class="fc" id="L179">        synchronized(this) { closing=true; notifyAll(); }</span>
+<span class="fc" id="L182">        synchronized(this) { closing=true; notifyAll(); }</span>
         // A queued operation must start even when shutdown immediately follows its creation so it can persist interruption.
-<span class="fc" id="L181">        executor.shutdown();</span>
-<span class="fc" id="L182">    }</span>
+<span class="fc" id="L184">        executor.shutdown();</span>
+<span class="fc" id="L185">    }</span>
     private static final class Stopped extends RuntimeException { }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

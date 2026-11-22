@@ -60,12 +60,50 @@ gleichen Pivotspalten. Der exakte Zertifikatsprüfer bleibt unverändert.
 
 ## Wichtige zusätzliche Möglichkeiten
 
+### Ergänzung vom 22. November 2026: begrenzte Suchfähigkeiten
+
+Ausgehend von `98a60e30629f65bc12bb573e9beb46b04053e66c` ergänzt der aktuelle
+Quellstand die zuvor nur vorgelegte Gram-Prüfung um [SOS- und Potentialsuche](sos-synthesis.md).
+Exakte Koeffizientengleichungen bestimmen rationale Gram-Einträge und signierte
+Gleichungsmultiplikatoren; ein endliches Gitter begrenzt freie Koordinaten.
+Der unabhängige Prüfer rekonstruiert die Identität und prüft jede PSD-Matrix.
+Potentiale binden zusätzlich die simultane Transition und den aktiven Bereich.
+
+Die [allgemeine bilineare Katalogsuche](bilinear-program-search.md) erweitert
+die vorhandenen Paarmuster: mehrere Ausgaben teilen frei gesuchte Produkte
+aus vorgegebenen linearen Formen. Das Faltungsbeispiel braucht drei statt
+vier variable Produkte, aber vier statt einer Addition und zwei explizite
+Vorzeichenfaktoren. Dies ist ein Operationsvergleich, keine Laufzeitmessung.
+Die [Erweiterungsspezifikation](../superpowers/specs/2026-11-22-mathematical-certificate-expansion.md)
+grenzt diese Suche von optimalem Tensor-Rang und vollständigen asymptotischen Algorithmen ab.
+
+Die Blockrealisierung aus Familie 116 verbindet nun jede Inverse im rationalen
+Quellbaum mit einer Definitionsbedingung. Eine konkrete Matrixbelegung wird
+durch eine direkte Auswertung des ursprünglichen Baums gegengeprüft.
+[Realisierung rationaler Formeln](rational-formula-realization.md)
+
+Die simultane Auswertung aus Familie 142 motiviert eine eigenständige
+Quotientenrechnung. Erreichte Nulltests und Inverse können einen quadratfreien
+Modul aufteilen. Ein Zertifikat deckt den ganzen Modul ab und weist auch
+undefinierte Komponenten aus. [Dynamische Auswertung](dynamic-algebra-evaluation.md)
+
+Die [lokale Constraint-Zählung](finite-constraint-counting.md) ergänzt nun
+exakte gewichtete boolesche Faktoren, bedingte Anzahlen und eine unabhängig
+geprüfte Eliminationsspur. Die Umsetzung nutzt gewöhnliche begrenzte
+Variablenelimination; ihre Korrektheit hängt nicht von der allgemeinen
+Komplexitätsbehauptung aus Familie 378 ab.
+
+Für Familie 104 wurde der [endliche Energie-/Kreditnachweis](energy-game-certificates.md)
+übertragen. Lokale Ungleichungen an ausgewählten Max- und allen Min-Kanten
+begründen die Garantie auf zyklischen Pfaden. Die beschränkte Suche ist kein
+Port des vollständigen quasipolynomiellen Mean-Payoff-Verfahrens.
+
 | Möglichkeit | Abgrenzung zum vorhandenen Code |
 | --- | --- |
-| Weitere Varianten aus Familie 116 | Der Katalog enthält auch Trefferlisten für Formeln mit Inversen und Trefferpunkte in positiver Charakteristik. Der aktuelle Formeltyp hat keine Inversen und ist auf rationale Koeffizienten beschränkt. „Rational“ bezeichnet hier die Koeffizienten, nicht rationale Ausdrücke mit inversen Variablen. Die [Lean-Beschreibung](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/116.md) trennt die beiden formalisierten Formelklassen. |
+| Weitere Varianten aus Familie 116 | Der Katalog enthält auch Trefferlisten für Formeln mit Inversen und Trefferpunkte in positiver Charakteristik. Der ältere Identitätsprüfer arbeitet mit divisionsfreien Formeln über rationalen Koeffizienten. Der neue Typ `RationalFormula` unterstützt Inverse und die Prüfung einer gegebenen rationalen Matrixbelegung. Die Konstruktion einer allgemeinen Trefferliste und der allgemeine Identitätstest für rationale Formeln bleiben offen. Die [Lean-Beschreibung](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/116.md) trennt die beiden formalisierten Formelklassen. |
 | Deterministische Faktorisierung aus Familie 142 | Vorhanden ist [klassische Berlekamp-Faktorisierung](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/FiniteFieldFactorization.java) mit Enumeration von Körperresten und einer [begrenzten Policy](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/FiniteFieldFactorizationPolicy.java). Die Familie behauptet dagegen vollständige Faktorisierung in einer Bitkomplexität polynomial in Grad und `log(p)`; ihr [Manuskript](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/Deterministic-Polynomial-Factorization-over-Prime-Fields-October-4-2026/Deterministic-Polynomial-Factorization-over-Prime-Fields.pdf) ist damit nicht schon implementiert. |
 | Allgemeine Graphen und Zählverfahren | Bipartites Matching deckt weder allgemeine Graph-Matchings und vorgeschriebene Gradfaktoren aus Familie 120 noch approximatives Matchingzählen aus Familie 113 ab. Diese sind eigene Algorithmus- und Verifikationsaufgaben. |
-| Allgemeine bilineare Entdeckung | Die vorhandenen Montgomery-Vorschläge prüfen zwei konkrete, allgemein parametrisierte Schemata. Eine Suche nach beliebigen Bilinearformen oder minimalem Tensor-Rang folgt nicht aus einem linearen Kernlöser; die [akzeptierte Transferspezifikation](../superpowers/specs/2026-11-20-mathematical-transfer-design.md) lässt diese nichtlineare Aufgabe ausdrücklich offen. |
+| Unbeschränkte bilineare Entdeckung | Der neue `BilinearProgramSearch` sucht gemeinsame Programme innerhalb expliziter rationaler Formenkataloge. Unbeschränkte Suche und allgemeiner minimaler Tensor-Rang bleiben offen; der begrenzte Befund steht [separat](bilinear-program-search.md). |
 
 Diese verbleibenden Ansatzpunkte gehören nicht zur oben aufgeführten
 Implementierung. Für einen weiteren Transfer braucht es einen begrenzten

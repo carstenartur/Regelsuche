@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SosVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">SosVerifier.java</span></div><h1>SosVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+
+/** Reconstruct each full quadratic form and signed ideal term against the expected source. */
+public final class SosVerifier {
+    private SosVerifier() {}
+
+    public static SosSynthesis.Verification verify(SosSynthesis.Request request, SosSynthesis.Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L17">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L19">            return replay(request, certificate, work, cancellation);</span>
+<span class="fc" id="L20">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L21">            return new SosSynthesis.Verification(SosSynthesis.Status.INCONCLUSIVE, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    static SosSynthesis.Verification replay(SosSynthesis.Request request, SosSynthesis.Certificate proof,
+            CertificateWork work, BooleanSupplier cancellation) {
+<span class="fc" id="L27">        SosPolynomials.validate(request, work);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (proof.source() != request) {</span>
+<span class="fc" id="L29">            SosPolynomials.validate(proof.source(), work);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            if (!SosSourceComparison.template(request.template(), proof.source().template(), work)</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">                    || !SosSourceComparison.polynomial(request.target(), proof.source().target(), work)) {</span>
+<span class="fc" id="L32">                return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+            }
+        }
+<span class="fc" id="L35">        var premises = request.template().premises();</span>
+<span class="fc" id="L36">        int gramCount = 1;</span>
+<span class="fc" id="L37">        var basis = request.template().basis();</span>
+<span class="fc" id="L38">        long cells = (long) basis.size() * basis.size();</span>
+<span class="fc" id="L39">        work.cells(cells);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (var premise : premises) {</span>
+<span class="fc" id="L41">            long n = premise.basis().size();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (premise.relation() == SosSynthesis.Relation.NONNEGATIVE) {</span>
+<span class="fc" id="L43">                gramCount++;</span>
+<span class="fc" id="L44">                cells += n * n;</span>
+            } else {
+<span class="fc" id="L46">                cells += n;</span>
+            }
+<span class="fc" id="L48">            work.cells(cells);</span>
+<span class="fc" id="L49">        }</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        if (proof.grams().size() != gramCount || proof.multipliers().size() != premises.size() + 1 - gramCount) {</span>
+<span class="nc" id="L51">            return invalid(&quot;BLOCK_COUNT&quot;, work);</span>
+        }
+<span class="fc" id="L53">        var sum = new SosPolynomials.Accumulator();</span>
+<span class="fc" id="L54">        String error = addGram(sum, basis, proof.grams().getFirst(), SosPolynomials.ONE, work, cancellation);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (error != null) return invalid(error, work);</span>
+<span class="fc" id="L56">        int gram = 1;</span>
+<span class="fc" id="L57">        int equality = 0;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (var premise : premises) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            if (premise.relation() == SosSynthesis.Relation.NONNEGATIVE) {</span>
+<span class="fc" id="L60">                error = addGram(sum, premise.basis(), proof.grams().get(gram++), premise.polynomial(), work, cancellation);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                if (error != null) return invalid(error, work);</span>
+            } else {
+<span class="fc" id="L63">                var coefficients = proof.multipliers().get(equality++);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (coefficients.size() != premise.basis().size()) return invalid(&quot;MULTIPLIER_DIMENSION&quot;, work);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                for (int i = 0; i &lt; coefficients.size(); i++) {</span>
+<span class="fc" id="L66">                    accumulate(sum, premise.basis().get(i), coefficients.get(i), premise.polynomial(), work);</span>
+                }
+            }
+<span class="fc" id="L69">        }</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (sum.terms.size() != request.target().termCount()) return invalid(&quot;COEFFICIENT_IDENTITY&quot;, work);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var term : request.target().terms().entrySet()) {</span>
+<span class="fc" id="L72">            var value = work.check(term.getValue().exactValue());</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (!value.equals(sum.terms.get(term.getKey()))) return invalid(&quot;COEFFICIENT_IDENTITY&quot;, work);</span>
+<span class="fc" id="L74">        }</span>
+<span class="fc" id="L75">        work.charge(0);</span>
+<span class="fc" id="L76">        return new SosSynthesis.Verification(SosSynthesis.Status.VERIFIED, &quot;VERIFIED&quot;, work.used());</span>
+    }
+
+    private static String addGram(SosPolynomials.Accumulator sum, List&lt;Monomial&gt; basis, SosSynthesis.Gram gram,
+            Polynomial factor, CertificateWork work, BooleanSupplier cancellation) {
+<span class="fc" id="L81">        var matrix = gram.matrix();</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (basis.size() != matrix.size()) return &quot;GRAM_DIMENSION&quot;;</span>
+<span class="fc" id="L83">        var psd = GramPositivity.checkMatrix(matrix, work.remainingLimits(), cancellation);</span>
+<span class="fc" id="L84">        work.charge(psd.work());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (psd.classification() == GramPositivity.Classification.UNAVAILABLE) {</span>
+<span class="fc" id="L86">            throw new CertificateWork.Stop(psd.reason());</span>
+        }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (psd.classification() != GramPositivity.Classification.POSITIVE_DEFINITE</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                &amp;&amp; psd.classification() != GramPositivity.Classification.POSITIVE_SEMIDEFINITE) return psd.reason();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (int j = 0; j &lt; basis.size(); j++) {</span>
+<span class="fc" id="L92">                work.charge(1);</span>
+<span class="fc" id="L93">                var value = matrix.get(i).get(j);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (!value.isZero()) {</span>
+<span class="fc" id="L95">                    var product = SosPolynomials.times(basis.get(i), basis.get(j), work);</span>
+<span class="fc" id="L96">                    accumulate(sum, product, value, factor, work);</span>
+                }
+            }
+        }
+<span class="fc" id="L100">        return null;</span>
+    }
+
+    private static void accumulate(SosPolynomials.Accumulator sum, Monomial monomial, ExactRational coefficient,
+            Polynomial factor, CertificateWork work) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (work.check(coefficient).isZero()) return;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (var term : factor.terms().entrySet()) {</span>
+<span class="fc" id="L107">            var product = SosPolynomials.times(monomial, term.getKey(), work);</span>
+<span class="fc" id="L108">            sum.add(product, work.mul(coefficient, term.getValue().exactValue()), work);</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">    }</span>
+
+    private static SosSynthesis.Verification invalid(String reason, CertificateWork work) {
+<span class="fc" id="L113">        work.charge(0);</span>
+<span class="fc" id="L114">        return new SosSynthesis.Verification(SosSynthesis.Status.INVALID_CERTIFICATE, reason, work.used());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

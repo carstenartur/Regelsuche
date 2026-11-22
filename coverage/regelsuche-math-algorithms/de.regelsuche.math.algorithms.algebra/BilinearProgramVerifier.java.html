@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearProgramVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearProgramVerifier.java</span></div><h1>BilinearProgramVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Cost;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Rejection;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Result;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+
+/** Independent coefficient expansion and exact execution of certified U/V/W programs. */
+public final class BilinearProgramVerifier {
+    private BilinearProgramVerifier() {}
+
+    public static Result&lt;Cost&gt; verify(Request request, BilinearProgram program,
+                                      IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L20">        return BilinearProgram.run(limits, cancellation,</span>
+<span class="fc" id="L21">            work -&gt; check(request, program, request.checkInputs(work), work));</span>
+    }
+
+    static Cost check(Request request, BilinearProgram program, long sourceCells, CertificateWork work) {
+<span class="fc" id="L25">        var tensor = request.tensor();</span>
+<span class="fc" id="L26">        int rank = program.u().size();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (rank &gt; request.maximumProducts()) throw new Rejection(&quot;PRODUCT_LIMIT&quot;);</span>
+<span class="pc bpc" id="L28" title="1 of 4 branches missed.">        if (program.v().size() != rank || program.w().size() != tensor.outputs().size()) {</span>
+<span class="fc" id="L29">            throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
+        }
+<span class="fc" id="L31">        work.cells(sourceCells + certificateCells(request, rank));</span>
+<span class="fc" id="L32">        checkRows(program.u(), tensor.leftSize(), work);</span>
+<span class="fc" id="L33">        checkRows(program.v(), tensor.rightSize(), work);</span>
+<span class="fc" id="L34">        checkRows(program.w(), rank, work);</span>
+<span class="fc" id="L35">        checkDictionary(program.u(), request.leftForms(), work);</span>
+<span class="fc" id="L36">        checkDictionary(program.v(), request.rightForms(), work);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (int k = 0; k &lt; tensor.outputs().size(); k++) {</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            for (int i = 0; i &lt; tensor.leftSize(); i++) {</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                for (int j = 0; j &lt; tensor.rightSize(); j++) {</span>
+<span class="fc" id="L40">                    work.charge(1);</span>
+<span class="fc" id="L41">                    var sum = ExactRational.ZERO;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                    for (int p = 0; p &lt; rank; p++) {</span>
+<span class="fc" id="L43">                        var uv = work.mul(program.u().get(p).get(i), program.v().get(p).get(j));</span>
+<span class="fc" id="L44">                        sum = work.add(sum, work.mul(program.w().get(k).get(p), uv));</span>
+                    }
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                    if (!sum.equals(tensor.outputs().get(k).get(i * tensor.rightSize() + j))) {</span>
+<span class="fc" id="L47">                        throw new Rejection(&quot;COEFFICIENT_MISMATCH&quot;);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L52">        return BilinearProgramSchedule.cost(program, work);</span>
+    }
+
+    private static long certificateCells(Request request, int rank) {
+<span class="fc" id="L56">        var tensor = request.tensor();</span>
+<span class="fc" id="L57">        return rank * (2L + tensor.leftSize() + tensor.rightSize())</span>
+<span class="fc" id="L58">            + tensor.outputs().size() * (1L + rank);</span>
+    }
+
+    private static void checkRows(List&lt;List&lt;ExactRational&gt;&gt; rows, int width, CertificateWork work) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L63">            work.charge(1);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (row.size() != width) throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            for (var value : row) work.check(value);</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">    }</span>
+
+    private static void checkDictionary(List&lt;List&lt;ExactRational&gt;&gt; forms, List&lt;List&lt;ExactRational&gt;&gt; dictionary,
+                                        CertificateWork work) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var form : forms) {</span>
+<span class="fc" id="L72">            boolean found = false;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (var candidate : dictionary) {</span>
+<span class="fc" id="L74">                work.charge(form.size());</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (candidate.equals(form)) {</span>
+<span class="fc" id="L76">                    found = true;</span>
+<span class="fc" id="L77">                    break;</span>
+                }
+<span class="fc" id="L79">            }</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (!found) throw new Rejection(&quot;FORM_OUTSIDE_DICTIONARY&quot;);</span>
+<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">    }</span>
+
+    /** Verify against the source, then execute with the same resource account. */
+    public static Result&lt;List&lt;ExactRational&gt;&gt; evaluate(Request request, BilinearProgram program,
+            List&lt;ExactRational&gt; x, List&lt;ExactRational&gt; y, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L87">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L88">            var tensor = request.tensor();</span>
+<span class="fc" id="L89">            long inputCells = (long) tensor.leftSize() + tensor.rightSize();</span>
+<span class="fc" id="L90">            work.cells(inputCells);</span>
+<span class="fc" id="L91">            work.charge(inputCells);</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            if (x.size() != tensor.leftSize() || y.size() != tensor.rightSize()) {</span>
+<span class="fc" id="L93">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+            }
+<span class="fc" id="L95">            var left = List.copyOf(x);</span>
+<span class="fc" id="L96">            var right = List.copyOf(y);</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">            if (left.size() != tensor.leftSize() || right.size() != tensor.rightSize()) {</span>
+<span class="nc" id="L98">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+            }
+<span class="fc" id="L100">            long source = request.checkInputs(work);</span>
+<span class="fc" id="L101">            int rank = program.u().size();</span>
+<span class="fc" id="L102">            check(request, program, source, work);</span>
+<span class="fc" id="L103">            work.cells(source + certificateCells(request, rank) + inputCells</span>
+<span class="fc" id="L104">                + rank + tensor.outputs().size() + 3L);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (var value : left) work.check(value);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (var value : right) work.check(value);</span>
+<span class="fc" id="L107">            var products = new ArrayList&lt;ExactRational&gt;(rank);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int p = 0; p &lt; rank; p++) {</span>
+<span class="fc" id="L109">                var a = BilinearProgramSchedule.dot(program.u().get(p), left, work);</span>
+<span class="fc" id="L110">                var b = BilinearProgramSchedule.dot(program.v().get(p), right, work);</span>
+<span class="fc" id="L111">                products.add(work.mul(a, b));</span>
+            }
+<span class="fc" id="L113">            var values = new ArrayList&lt;ExactRational&gt;(program.w().size());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (var weights : program.w()) values.add(BilinearProgramSchedule.dot(weights, products, work));</span>
+<span class="fc" id="L115">            return List.copyOf(values);</span>
+        });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

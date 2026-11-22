@@ -159,7 +159,7 @@ public final class QualityAcceptanceCollection {
 <span class="fc" id="L159">                case &quot;boolean&quot; -&gt; value.isBoolean();</span>
 <span class="fc" id="L160">                case &quot;integer&quot; -&gt; value.isIntegralNumber();</span>
 <span class="pc bpc" id="L161" title="2 of 4 branches missed.">                case &quot;nullableInteger&quot; -&gt; value.isNull() || value.isIntegralNumber();</span>
-<span class="pc bpc" id="L162" title="2 of 6 branches missed.">                case &quot;number&quot; -&gt; value.isNumber() &amp;&amp; (value.isIntegralNumber() || Double.isFinite(value.doubleValue()));</span>
+<span class="pc bpc" id="L162" title="3 of 6 branches missed.">                case &quot;number&quot; -&gt; value.isNumber() &amp;&amp; (value.isIntegralNumber() || Double.isFinite(value.doubleValue()));</span>
 <span class="nc" id="L163">                default -&gt; throw new IllegalArgumentException(&quot;unknown retention type &quot; + shape);</span>
             };
 <span class="fc" id="L165">            require(valid, label + &quot; has the wrong JSON type&quot;);</span>

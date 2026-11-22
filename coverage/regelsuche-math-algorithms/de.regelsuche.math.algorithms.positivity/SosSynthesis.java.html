@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SosSynthesis.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">SosSynthesis.java</span></div><h1>SosSynthesis.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Bounded rational Gram search for polynomial nonnegativity on a basic semialgebraic set. */
+public final class SosSynthesis {
+    private SosSynthesis() {}
+
+<span class="fc" id="L18">    public enum Relation { NONNEGATIVE, ZERO }</span>
+<span class="fc" id="L19">    public enum Status { VERIFIED, INVALID_CERTIFICATE, INCONCLUSIVE }</span>
+
+    /** The basis describes an SOS multiplier for g &gt;= 0 or a free polynomial multiplier for h = 0. */
+    public record Premise(Relation relation, Polynomial polynomial, List&lt;Monomial&gt; basis) {
+<span class="fc" id="L23">        public Premise {</span>
+<span class="fc" id="L24">            Objects.requireNonNull(relation);</span>
+<span class="fc" id="L25">            Objects.requireNonNull(polynomial);</span>
+<span class="fc" id="L26">            basis = checkedBasis(basis);</span>
+<span class="fc" id="L27">        }</span>
+    }
+
+    /** The first basis is the unweighted Gram block. Free entries range over the supplied rational grid. */
+    public record Template(List&lt;Monomial&gt; basis, List&lt;Premise&gt; premises, List&lt;ExactRational&gt; freeValues) {
+<span class="fc" id="L32">        public Template {</span>
+<span class="fc" id="L33">            basis = checkedBasis(basis);</span>
+<span class="fc" id="L34">            premises = List.copyOf(premises);</span>
+<span class="fc" id="L35">            freeValues = checkedValues(freeValues);</span>
+<span class="fc" id="L36">        }</span>
+    }
+
+    public record Request(Polynomial target, Template template) {
+<span class="fc" id="L40">        public Request {</span>
+<span class="fc" id="L41">            Objects.requireNonNull(target);</span>
+<span class="fc" id="L42">            Objects.requireNonNull(template);</span>
+<span class="fc" id="L43">        }</span>
+    }
+    public record Gram(List&lt;List&lt;ExactRational&gt;&gt; matrix) {
+<span class="fc" id="L46">        public Gram { matrix = matrix.stream().map(List::copyOf).toList(); }</span>
+    }
+
+    /** Unweighted Gram first, then the inequality Grams in premise order. Multipliers follow equality order. */
+    public record Certificate(Request source, List&lt;Gram&gt; grams, List&lt;List&lt;ExactRational&gt;&gt; multipliers) {
+<span class="fc" id="L51">        public Certificate {</span>
+<span class="fc" id="L52">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L53">            grams = List.copyOf(grams);</span>
+<span class="fc" id="L54">            multipliers = multipliers.stream().map(List::copyOf).toList();</span>
+<span class="fc" id="L55">        }</span>
+    }
+<span class="fc" id="L57">    public record Result(Status status, Optional&lt;Certificate&gt; certificate, String reason, long work) {}</span>
+<span class="fc" id="L58">    public record Verification(Status status, String reason, long work) {</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        public boolean valid() { return status == Status.VERIFIED; }</span>
+    }
+
+    public static Result search(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L63">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L65">            var proof = find(request, work, cancellation);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            return new Result(proof.isPresent() ? Status.VERIFIED : Status.INCONCLUSIVE, proof,</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                proof.isPresent() ? &quot;VERIFIED&quot; : &quot;SEARCH_SPACE_EXHAUSTED&quot;, work.used());</span>
+<span class="fc" id="L68">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L69">            return new Result(Status.INCONCLUSIVE, Optional.empty(), stop.getMessage(), work.used());</span>
+        }
+    }
+
+    static Optional&lt;Certificate&gt; find(Request request, CertificateWork work, BooleanSupplier cancellation) {
+<span class="fc" id="L74">        SosPolynomials.validate(request, work);</span>
+<span class="fc" id="L75">        return SosGramSystem.search(request, work, cancellation);</span>
+    }
+
+    static List&lt;Monomial&gt; checkedBasis(List&lt;Monomial&gt; source) {
+<span class="fc" id="L79">        var result = List.copyOf(source);</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (result.isEmpty() || new HashSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;BASIS_MUST_BE_NONEMPTY_AND_DISTINCT&quot;);</span>
+        }
+<span class="fc" id="L83">        return result;</span>
+    }
+
+    static List&lt;ExactRational&gt; checkedValues(List&lt;ExactRational&gt; values) {
+<span class="fc" id="L87">        var result = List.copyOf(values);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (result.isEmpty()) throw new IllegalArgumentException(&quot;EMPTY_COEFFICIENT_GRID&quot;);</span>
+<span class="fc" id="L89">        return result;</span>
+    }
+
+    /** Advance a finite Cartesian product without recursion or precomputing its cardinality. */
+    static boolean advance(int[] digits, int radix, CertificateWork work) {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int i = digits.length-1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L95">            work.charge(1);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (++digits[i] &lt; radix) return true;</span>
+<span class="fc" id="L97">            digits[i] = 0;</span>
+        }
+<span class="fc" id="L99">        work.charge(0);</span>
+<span class="fc" id="L100">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

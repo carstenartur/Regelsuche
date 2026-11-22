@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SosPolynomials.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">SosPolynomials.java</span></div><h1>SosPolynomials.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.scalar.ExactRational;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Bounded sparse arithmetic for Gram identities and simultaneous polynomial substitutions. */
+final class SosPolynomials {
+<span class="fc" id="L14">    static final Polynomial ONE = Polynomial.constant(Rational.ONE);</span>
+    private SosPolynomials() {}
+
+    static void validate(SosSynthesis.Request request, CertificateWork work) {
+<span class="fc" id="L18">        long targetSize = polynomialSize(request.target(), work);</span>
+<span class="fc" id="L19">        var template = request.template();</span>
+<span class="fc" id="L20">        long size = targetSize + basisSize(template.basis(), work);</span>
+<span class="fc" id="L21">        work.cells(template.premises().size());</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (var premise : template.premises()) {</span>
+<span class="fc" id="L23">            size += basisSize(premise.basis(), work) + polynomialSize(premise.polynomial(), work) + 1;</span>
+<span class="fc" id="L24">            work.cells(size);</span>
+<span class="fc" id="L25">        }</span>
+<span class="fc" id="L26">        work.cells(size + template.freeValues().size());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (var value : template.freeValues()) work.check(value);</span>
+<span class="fc" id="L28">    }</span>
+
+    static long basisSize(List&lt;Monomial&gt; basis, CertificateWork work) {
+<span class="fc" id="L31">        long size = basis.size();</span>
+<span class="fc" id="L32">        work.cells(size);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        for (var monomial : basis) {</span>
+<span class="fc" id="L34">            size += monomialSize(monomial, work);</span>
+<span class="fc" id="L35">            work.cells(size);</span>
+<span class="fc" id="L36">        }</span>
+<span class="fc" id="L37">        return size;</span>
+    }
+
+    static long polynomialSize(Polynomial source, CertificateWork work) {
+<span class="fc" id="L41">        long size = source.termCount();</span>
+<span class="fc" id="L42">        work.cells(size);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (var term : source.terms().entrySet()) {</span>
+<span class="fc" id="L44">            size += monomialSize(term.getKey(), work);</span>
+<span class="fc" id="L45">            work.cells(size);</span>
+<span class="fc" id="L46">            work.check(term.getValue().numerator());</span>
+<span class="fc" id="L47">            work.check(term.getValue().denominator());</span>
+<span class="fc" id="L48">        }</span>
+<span class="fc" id="L49">        return size;</span>
+    }
+
+    private static long monomialSize(Monomial monomial, CertificateWork work) {
+<span class="fc" id="L53">        work.cells(monomial.powers().size());</span>
+<span class="fc" id="L54">        work.charge(1L + monomial.powers().size());</span>
+<span class="fc" id="L55">        return monomial.powers().size();</span>
+    }
+
+    static Monomial times(Monomial a, Monomial b, CertificateWork work) {
+<span class="fc" id="L59">        work.cells((long)a.powers().size() + b.powers().size());</span>
+<span class="fc" id="L60">        work.charge(1L + a.powers().size());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (var power : b.powers().entrySet()) {</span>
+<span class="fc" id="L62">            work.charge(1);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (power.getValue() &gt; Integer.MAX_VALUE-a.exponentOf(power.getKey())) {</span>
+<span class="fc" id="L64">                throw new CertificateWork.Stop(&quot;EXPONENT_LIMIT&quot;);</span>
+            }
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        return a.multiply(b);</span>
+    }
+
+    /** Count retained monomial exponents as well as coefficients during sparse expansion. */
+<span class="fc" id="L71">    static final class Accumulator {</span>
+<span class="fc" id="L72">        final Map&lt;Monomial, ExactRational&gt; terms = new HashMap&lt;&gt;();</span>
+        private long cells;
+
+        void add(Monomial monomial, ExactRational value, CertificateWork work) {
+<span class="fc" id="L76">            var previous = terms.get(monomial);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            var sum = work.add(previous == null ? ExactRational.ZERO : previous, value);</span>
+<span class="fc" id="L78">            long size = 1L + monomial.powers().size();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (sum.isZero()) {</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                if (previous != null) {</span>
+<span class="fc" id="L81">                    terms.remove(monomial);</span>
+<span class="fc" id="L82">                    cells -= size;</span>
+                }
+            } else {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                if (previous == null) {</span>
+<span class="fc" id="L86">                    work.cells(cells+size);</span>
+<span class="fc" id="L87">                    cells += size;</span>
+                }
+<span class="fc" id="L89">                terms.put(monomial, sum);</span>
+            }
+<span class="fc" id="L91">        }</span>
+    }
+
+    static Polynomial fromTerms(Map&lt;Monomial, ExactRational&gt; terms, CertificateWork work) {
+<span class="fc" id="L95">        var result = Polynomial.zero();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (var term : terms.entrySet()) {</span>
+            // The immutable polynomial API copies each accumulated term map.
+<span class="fc" id="L98">            work.charge(1L + result.termCount());</span>
+<span class="fc" id="L99">            result = result.add(Polynomial.term(term.getKey(), Rational.fromExact(work.check(term.getValue()))));</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">        work.charge(0);</span>
+<span class="fc" id="L102">        return result;</span>
+    }
+
+    static Map&lt;Monomial, ExactRational&gt; product(Map&lt;Monomial, ExactRational&gt; a, Map&lt;Monomial, ExactRational&gt; b,
+            CertificateWork work) {
+<span class="fc" id="L107">        work.charge(1);</span>
+<span class="fc" id="L108">        var result = new Accumulator();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (var left : a.entrySet()) {</span>
+<span class="fc" id="L110">            work.charge(1);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            for (var right : b.entrySet()) {</span>
+<span class="fc" id="L112">                result.add(times(left.getKey(), right.getKey(), work), work.mul(left.getValue(), right.getValue()), work);</span>
+<span class="fc" id="L113">            }</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc" id="L115">        return result.terms;</span>
+    }
+
+    static Accumulator coefficients(Polynomial source, CertificateWork work) {
+<span class="fc" id="L119">        var terms = new Accumulator();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (var entry : source.terms().entrySet()) terms.add(entry.getKey(), entry.getValue().exactValue(), work);</span>
+<span class="fc" id="L121">        return terms;</span>
+    }
+
+    /** Computes V(x) - V(T(x)) - delta. Unassigned variables retain their original values. */
+    static Polynomial decrease(Polynomial potential, Map&lt;String, Polynomial&gt; transition, ExactRational delta,
+            CertificateWork work) {
+<span class="fc" id="L127">        var result = coefficients(potential, work);</span>
+<span class="fc" id="L128">        var constant = Monomial.constant();</span>
+<span class="fc" id="L129">        result.add(constant, work.sub(ExactRational.ZERO, delta), work);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (var term : potential.terms().entrySet()) {</span>
+<span class="fc" id="L131">            var negative = work.sub(ExactRational.ZERO, term.getValue().exactValue());</span>
+<span class="fc" id="L132">            Map&lt;Monomial, ExactRational&gt; substituted = Map.of(constant, negative);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            for (var power : term.getKey().powers().entrySet()) {</span>
+<span class="fc" id="L134">                var image = transition.get(power.getKey());</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                var factor = image == null ? Map.of(Monomial.variable(power.getKey()), ExactRational.ONE)</span>
+<span class="fc" id="L136">                    : coefficients(image, work).terms;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                for (int exponent = power.getValue(); exponent &gt; 0; exponent &gt;&gt;&gt;= 1) {</span>
+<span class="fc" id="L138">                    work.charge(1);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                    if ((exponent &amp; 1) != 0) substituted = product(substituted, factor, work);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                    if (exponent &gt; 1) factor = product(factor, factor, work);</span>
+                }
+<span class="fc" id="L142">            }</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            for (var item : substituted.entrySet()) result.add(item.getKey(), item.getValue(), work);</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">        return fromTerms(result.terms, work);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

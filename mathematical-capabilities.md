@@ -1,6 +1,6 @@
 # Mathematische Funktionen: Quelle, Release und Oberfläche
 
-Stand: 20. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
+Stand: 22. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
 genannten Funktionen. Mathematische Verträge und ausgeführte Vergleiche stehen
 in den verlinkten Fachseiten; der [Strategien-Index](research/strategies.md)
 führt Hypothesen, Befunde und Folgerungen.
@@ -24,7 +24,13 @@ Ein eigener Build dieses Checkouts ist für die neuen APIs erforderlich.
 | Endliche Montgomery-Pläne | `MontgomerySchedule`, `MontgomeryReductionPlanner` | `MontgomeryScheduleSdk` | nein | Live-Zertifikatsdemo |
 | Rationale Bernstein-Schranken und Positivitätsbeweise | `BernsteinPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
 | Exakte Gram-Matrix und Polynomidentität | `GramPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
+| Begrenzte SOS- und polynomielle Potentialsuche | `SosSynthesis`, `SosVerifier`, `PolynomialPotential` | `SosSynthesisSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Gemeinsame bilineare Programme aus Formenkatalogen | `BilinearProgramSearch`, `BilinearProgramVerifier` | `BilinearProgramSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Rationale nichtkommutative Formeln auf gegebenen Matrizen | `RationalFormulaRealization`, `RationalFormulaVerifier` | `RationalFormulaSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
+| Dynamische Auswertung über quadratfreien Primkörperquotienten | `DynamicAlgebraEvaluation`, `DynamicAlgebraVerifier` | `DynamicAlgebraSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
 | Quellengebundener endlicher Beweis-DAG | `FiniteProofDag` | `FiniteProofDagSdk`, `FiniteProofDagJson` | nein | versionierter JSON-Transport; Java-/SDK-Beispiele |
+| Exakte gewichtete lokale Constraint-Zählung | `FiniteConstraintCounter`, `FiniteConstraintVerifier` | `FiniteConstraintSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Zyklische Energie-/Kreditzertifikate | `EnergyGame`, `EnergyGameVerifier` | `EnergyGameSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
 direkte Gegenrechnung nun um eine tatsächlich ausgeführte Reduktion über
@@ -34,12 +40,19 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
 
 ## Verträge und Reproduktion
 
+- [Exakte lokale Constraint-Zählung](research/finite-constraint-counting.md),
+  [zyklische Energiespiel-Zertifikate](research/energy-game-certificates.md).
+
 - [Kongruenzüberdeckung](research/congruence-coverage.md),
   [Hunter und endliche Beweis-DAGs](research/hunter-finite-proofs.md),
   [Hall-Zertifikate](research/bipartite-matching.md).
 - [Polynompositivität](research/polynomial-positivity.md),
+  [SOS- und Potentialsuche](research/sos-synthesis.md),
+  [bilineare Programmsuche](research/bilinear-program-search.md),
   [modulare Kernrekonstruktion](research/modular-kernel-profile-recovery.md),
   [Polynomkongruenzen](research/polynomial-congruences.md).
+- [Rationale Matrixformeln und Definitionsbedingungen](research/rational-formula-realization.md),
+  [dynamische Quotientenalgebren](research/dynamic-algebra-evaluation.md).
 - [Montgomery-Pläne](research/montgomery-schedules.md),
   [nichtkommutative Identitäten](research/noncommutative-identity.md),
   [gemeinsame bilineare Vorschläge](research/bilinear-core-proposals.md).

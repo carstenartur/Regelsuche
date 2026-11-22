@@ -1,0 +1,98 @@
+{
+  "schema": "regelsuche.jdk-regex-admission-review-control/v1",
+  "scope": "Public declared-event diagnostics. The full-work receiver still refuses at json.loads.",
+  "sourceRevision": "a81b9b72b20b421c8dce43699b6e4f1128730cbc",
+  "sourceTree": "f9bd02419c6ebb448e38e319aa29392853fb5cd9",
+  "publicInputSha256": "85148c685548affdba51ffff6459e111dec63468487bc066559c48ba898b4aa1",
+  "runtimeManifest": "scripts/frozen_sympy_jvm_runtime.json",
+  "meterSha256": {
+    "scripts/FrozenGraalPyJsonAdmission.java": "2e1ab19f3ee741389734276a2c20f76d9a738eed0223b8c19a2aa3cc909c2da9",
+    "scripts/FrozenGraalPyJsonAdmissionControl.java": "7a14f477cd4f02e8c2af59f51d117be5924ce6102ed10b14bebdacaebcecb7e4",
+    "scripts/FrozenGraalPyRegexAdmission.java": "c7a7821169d39407640bd1f1ba371d010cf5ea06e92f60937bbb925e9f939918",
+    "scripts/frozen-jvm/FrozenJdkStringTransformer.java": "c21de5451da3668415e513cebd5c3e5b6008f5e733db106ed07f03763171d956",
+    "scripts/frozen-jvm/FrozenStringPrimitives.java": "cc9c4234ef1fb75c294982dfd001763d208550c6b0eeaf6c1e2eb5af06b683ad",
+    "scripts/frozen-jvm/FrozenStringPrimitivesControl.java": "c95ac8c4939056ee7a779f06b7552045817362f4b1f89c5c46a0ab7dc3dd45e9",
+    "scripts/frozen_graalpy_json_admission.py": "90683590b93c6ab0df1daa17129ba788512cb647a4a943a38394015ff7ce8b72",
+    "scripts/frozen_sympy_jvm_runtime.json": "cff6b42bab75e927a9b8aa7bc550b13778947b2edb86e8bfd9798943551c2775",
+    "scripts/verify-frozen-graalpy-json-admission.py": "b9277b12e1d95787f206e258630357b304fe22620e9f73d8f8d33179e1a8e5af"
+  },
+  "strictReceiverFullBackendBoundary": "transport.json.loads",
+  "red": {
+    "exitCode": 1,
+    "expectedFirstRefusedStage": "gap.jdk-call.java/lang/String.length()I",
+    "observedFirstRefusedStage": "gap.regex.method-name-conversion",
+    "rawLogSha256": "9757cb557f6144d4be6b34bb748d3ffefde923a3b61e2cc2b3b829f41552dd8e"
+  },
+  "green": [
+    {
+      "mode": "bulk",
+      "terminal": "UNMEASURED",
+      "firstRefusedStage": "gap.jdk-call.java/lang/String.length()I",
+      "declaredEvents": 30,
+      "checkedPrefixLimits": 31,
+      "sourceByteReadEvents": 0,
+      "targetByteWriteEvents": 0,
+      "methodNameFieldReadEvents": 0,
+      "independentCopyLimits": 7,
+      "eventVectorSha256": "5fc3b96e74fd1bd14e967a98ae206d29a1dc558891654dd225cee88d43e4ed50",
+      "rawLogSha256": "7904e53e001387945911b8fe29dd22f85c5fcb90178739f03db5e04a241f8708"
+    },
+    {
+      "mode": "bulk-survey",
+      "terminal": "UNMEASURED",
+      "firstRefusedStage": "gap.regex.options-materialize",
+      "declaredEvents": 373,
+      "checkedPrefixLimits": 374,
+      "sourceByteReadEvents": 96,
+      "targetByteWriteEvents": 96,
+      "methodNameFieldReadEvents": 1,
+      "independentCopyLimits": 7,
+      "eventVectorSha256": "b787a6e240ca10843194d631747f16a8f55b039e817b74dd57393ac6b2cd453d",
+      "rawLogSha256": "8c4217892be179e15cd889421d4dec8fd49206f7c48c1264e11b911d2905c8b4"
+    }
+  ],
+  "strictJdkBoundary": {
+    "class": "java.lang.AbstractStringBuilder",
+    "method": "append(java.lang.String)",
+    "bytecodeOffset": 26,
+    "invocation": "java.lang.String.length()I",
+    "nextDeclaredEventOneBased": 31,
+    "earlierEventsIncludeHighLevelCalls": [
+      "json.loads.isinstance",
+      "TruffleString.CodePointLengthNode.execute"
+    ],
+    "admittedDeclaredEvents": [
+      "json.loads.isinstance",
+      "startswith.length",
+      "startswith.length",
+      "startswith.start-negative",
+      "startswith.end-past-length",
+      "startswith.remaining-subtract",
+      "startswith.remaining-too-short",
+      "startswith.prefix-mode",
+      "startswith.region-loop-test",
+      "startswith.region-loop-visit",
+      "startswith.read-code-unit",
+      "startswith.read-code-unit",
+      "startswith.code-unit-equality",
+      "json.loads.cls.is-none",
+      "json.loads.object_hook.is-none",
+      "json.loads.parse_int.is-none",
+      "json.loads.parse_float.is-none",
+      "json.loads.parse_constant.is-none",
+      "json.loads.object_pairs_hook.is-none",
+      "json.loads.not-kw",
+      "regex.select-method",
+      "regex.must-advance",
+      "regex.read-matchRegexp",
+      "regex.cached-or-compile",
+      "regex.binary",
+      "regex.select-encoding",
+      "jdk.AbstractStringBuilder.append.IFNONNULL",
+      "jdk.AbstractStringBuilder.append.GETFIELD.coder",
+      "jdk.AbstractStringBuilder.append.GETFIELD.count",
+      "jdk.AbstractStringBuilder.append.GETFIELD.value"
+    ]
+  },
+  "surveyEventVectorMatchesArchivedTrace": true
+}

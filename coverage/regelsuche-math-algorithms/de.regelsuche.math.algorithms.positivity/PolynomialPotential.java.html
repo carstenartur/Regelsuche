@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialPotential.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">PolynomialPotential.java</span></div><h1>PolynomialPotential.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+import java.util.function.BooleanSupplier;
+
+/** Polynomial potential search for a simultaneous transition and a caller-supplied active domain. */
+public final class PolynomialPotential {
+    private PolynomialPotential() {}
+
+    /**
+     * Unassigned variables are unchanged. Confirmation asserts that every active state is in the
+     * supplied domain and every actual step follows the specified transition (including frame variables).
+     */
+    public record Request(Map&lt;String, Polynomial&gt; transition, SosSynthesis.Template domain, List&lt;Monomial&gt; basis,
+            List&lt;ExactRational&gt; coefficients, ExactRational minimumDecrease, boolean transitionDomainConfirmed) {
+<span class="fc" id="L28">        public Request {</span>
+<span class="fc" id="L29">            var snapshot = new TreeMap&lt;String, Polynomial&gt;();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            for (var entry : transition.entrySet()) {</span>
+<span class="fc" id="L31">                var name = Objects.requireNonNull(entry.getKey());</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                if (name.isBlank()) throw new IllegalArgumentException(&quot;EMPTY_VARIABLE&quot;);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">                if (snapshot.put(name, Objects.requireNonNull(entry.getValue())) != null) {</span>
+<span class="fc" id="L34">                    throw new IllegalArgumentException(&quot;DUPLICATE_VARIABLE&quot;);</span>
+                }
+<span class="fc" id="L36">            }</span>
+<span class="fc" id="L37">            transition = Collections.unmodifiableNavigableMap(snapshot);</span>
+<span class="fc" id="L38">            Objects.requireNonNull(domain);</span>
+<span class="fc" id="L39">            basis = SosSynthesis.checkedBasis(basis);</span>
+<span class="fc" id="L40">            coefficients = SosSynthesis.checkedValues(coefficients);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (minimumDecrease.signum() &lt;= 0) throw new IllegalArgumentException(&quot;NONPOSITIVE_DECREASE&quot;);</span>
+<span class="fc" id="L42">        }</span>
+    }
+
+    public record Certificate(Request source, Polynomial potential, SosSynthesis.Certificate nonnegative,
+            SosSynthesis.Certificate decrease) {
+<span class="fc" id="L47">        public Certificate {</span>
+<span class="fc" id="L48">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L49">            Objects.requireNonNull(potential);</span>
+<span class="fc" id="L50">            Objects.requireNonNull(nonnegative);</span>
+<span class="fc" id="L51">            Objects.requireNonNull(decrease);</span>
+<span class="fc" id="L52">        }</span>
+    }
+<span class="fc" id="L54">    public record Result(SosSynthesis.Status status, Optional&lt;Certificate&gt; certificate, String reason, long work) {}</span>
+<span class="fc" id="L55">    public record Verification(SosSynthesis.Status status, boolean terminationUnderContract, String reason, long work) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        public boolean valid() { return status == SosSynthesis.Status.VERIFIED; }</span>
+    }
+
+    public static Result search(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L60">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L62">            validate(request, work);</span>
+<span class="fc" id="L63">            var digits = new int[request.basis().size()];</span>
+            do {
+<span class="fc" id="L65">                var terms = new HashMap&lt;Monomial, ExactRational&gt;();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                for (int i = 0; i &lt; digits.length; i++) {</span>
+<span class="fc" id="L67">                    var coefficient = request.coefficients().get(digits[i]);</span>
+<span class="fc" id="L68">                    work.charge(1);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                    if (!coefficient.isZero()) terms.put(request.basis().get(i), coefficient);</span>
+                }
+<span class="fc" id="L71">                var potential = SosPolynomials.fromTerms(terms, work);</span>
+<span class="fc" id="L72">                var result = tryPotential(request, potential, work, cancellation);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if (result.isPresent()) return new Result(SosSynthesis.Status.VERIFIED, result, &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            } while (SosSynthesis.advance(digits, request.coefficients().size(), work));</span>
+<span class="fc" id="L75">            return new Result(SosSynthesis.Status.INCONCLUSIVE, Optional.empty(), &quot;SEARCH_SPACE_EXHAUSTED&quot;, work.used());</span>
+<span class="nc" id="L76">        } catch (CertificateWork.Stop stop) {</span>
+<span class="nc" id="L77">            return new Result(SosSynthesis.Status.INCONCLUSIVE, Optional.empty(), stop.getMessage(), work.used());</span>
+        }
+    }
+
+    private static Optional&lt;Certificate&gt; tryPotential(Request request, Polynomial potential, CertificateWork work,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L83">        var first = new SosSynthesis.Request(potential, request.domain());</span>
+<span class="fc" id="L84">        var nonnegative = SosSynthesis.find(first, work, cancellation);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (nonnegative.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L86">        var second = decreaseRequest(request, potential, work);</span>
+<span class="fc" id="L87">        var decrease = SosSynthesis.find(second, work, cancellation);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (decrease.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L89">        var proof = new Certificate(request, potential, nonnegative.orElseThrow(), decrease.orElseThrow());</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (replay(request, proof, work, cancellation).valid()) return Optional.of(proof);</span>
+<span class="nc" id="L91">        return Optional.empty();</span>
+    }
+
+    public static Verification verify(Request request, Certificate proof, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L96">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L98">            validate(request, work);</span>
+<span class="fc" id="L99">            return replay(request, proof, work, cancellation);</span>
+<span class="fc" id="L100">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L101">            return new Verification(SosSynthesis.Status.INCONCLUSIVE, false, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    private static Verification replay(Request request, Certificate proof, CertificateWork work,
+            BooleanSupplier cancellation) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (proof.source() != request) {</span>
+<span class="fc" id="L108">            validate(proof.source(), work);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (!sameSource(request, proof.source(), work)) return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+        }
+<span class="fc" id="L111">        var potential = proof.potential();</span>
+<span class="fc" id="L112">        SosPolynomials.polynomialSize(potential, work);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!inCandidateSpace(request, potential, work)) return invalid(&quot;POTENTIAL_BASIS&quot;, work);</span>
+<span class="fc" id="L114">        var first = new SosSynthesis.Request(potential, request.domain());</span>
+<span class="fc" id="L115">        var nonnegative = SosVerifier.replay(first, proof.nonnegative(), work, cancellation);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (!nonnegative.valid()) return invalid(nonnegative.reason(), work);</span>
+<span class="fc" id="L117">        var claimed = proof.decrease().source().target();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (!PotentialIdentity.matches(request, potential, claimed, work)) return invalid(&quot;DECREASE_IDENTITY&quot;, work);</span>
+<span class="fc" id="L119">        var decrease = SosVerifier.replay(new SosSynthesis.Request(claimed, request.domain()), proof.decrease(),</span>
+            work, cancellation);
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (!decrease.valid()) return invalid(decrease.reason(), work);</span>
+<span class="fc" id="L122">        work.charge(0);</span>
+<span class="fc" id="L123">        return new Verification(SosSynthesis.Status.VERIFIED, request.transitionDomainConfirmed(), &quot;VERIFIED&quot;, work.used());</span>
+    }
+
+    private static boolean sameSource(Request a, Request b, CertificateWork work) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (a.transitionDomainConfirmed() != b.transitionDomainConfirmed()</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                || !work.check(a.minimumDecrease()).equals(b.minimumDecrease())</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                || a.transition().size() != b.transition().size()</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                || !SosSourceComparison.basis(a.basis(), b.basis(), work)</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                || !SosSourceComparison.values(a.coefficients(), b.coefficients(), work)</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                || !SosSourceComparison.template(a.domain(), b.domain(), work)) return false;</span>
+<span class="fc" id="L133">        var right = b.transition().entrySet().iterator();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (var left : a.transition().entrySet()) {</span>
+<span class="fc" id="L135">            work.charge(1);</span>
+<span class="fc" id="L136">            var other = right.next();</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (SosSourceComparison.compareNames(left.getKey(), other.getKey(), work) != 0</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    || !SosSourceComparison.polynomial(left.getValue(), other.getValue(), work)) return false;</span>
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">        return true;</span>
+    }
+
+    private static boolean inCandidateSpace(Request request, Polynomial potential, CertificateWork work) {
+<span class="fc" id="L144">        int nonzero = 0;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (var monomial : request.basis()) {</span>
+<span class="fc" id="L146">            var value = potential.terms().getOrDefault(monomial, Rational.ZERO).exactValue();</span>
+<span class="fc" id="L147">            work.charge(request.coefficients().size());</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (!request.coefficients().contains(value)) return false;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (!value.isZero()) nonzero++;</span>
+<span class="fc" id="L150">        }</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        return nonzero == potential.termCount();</span>
+    }
+
+    private static SosSynthesis.Request decreaseRequest(Request request, Polynomial potential, CertificateWork work) {
+<span class="fc" id="L155">        var target = SosPolynomials.decrease(potential, request.transition(), request.minimumDecrease(), work);</span>
+<span class="fc" id="L156">        return new SosSynthesis.Request(target, request.domain());</span>
+    }
+
+    private static void validate(Request request, CertificateWork work) {
+<span class="fc" id="L160">        work.check(request.minimumDecrease());</span>
+<span class="fc" id="L161">        long cells = SosPolynomials.basisSize(request.basis(), work) + request.transition().size();</span>
+<span class="fc" id="L162">        work.cells(cells + request.coefficients().size());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (var value : request.coefficients()) work.check(value);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (var entry : request.transition().entrySet()) {</span>
+<span class="fc" id="L165">            work.charge(1L + entry.getKey().length() / 64);</span>
+<span class="fc" id="L166">            cells += SosPolynomials.polynomialSize(entry.getValue(), work);</span>
+<span class="fc" id="L167">            work.cells(cells);</span>
+<span class="fc" id="L168">        }</span>
+<span class="fc" id="L169">        var domain = request.domain();</span>
+<span class="fc" id="L170">        SosPolynomials.validate(new SosSynthesis.Request(Polynomial.zero(), domain), work);</span>
+<span class="fc" id="L171">        long n = domain.basis().size();</span>
+<span class="fc" id="L172">        long scalarEntries = n*n;</span>
+<span class="fc" id="L173">        work.cells(2*scalarEntries);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (var premise : domain.premises()) {</span>
+<span class="fc" id="L175">            n = premise.basis().size();</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            scalarEntries += premise.relation() == SosSynthesis.Relation.ZERO ? n : n*n;</span>
+<span class="fc" id="L177">            work.cells(2*scalarEntries);</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">    }</span>
+
+    private static Verification invalid(String reason, CertificateWork work) {
+<span class="fc" id="L182">        work.charge(0);</span>
+<span class="fc" id="L183">        return new Verification(SosSynthesis.Status.INVALID_CERTIFICATE, false, reason, work.used());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

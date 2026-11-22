@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteConstraintSupport.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">FiniteConstraintSupport.java</span></div><h1>FiniteConstraintSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import java.math.BigInteger;
+
+/** Shared shape and integer-cost primitives; no elimination or certificate decisions. */
+final class FiniteConstraintSupport {
+    static final int MAX_WIDTH = 20;
+
+    private FiniteConstraintSupport() {}
+
+    static long inspect(FiniteConstraintCounter.Problem problem, CertificateWork work) {
+<span class="fc" id="L13">        long cells = problem.variableCount() + 2L * problem.fixed().size() + problem.factors().size();</span>
+<span class="fc" id="L14">        work.cells(cells);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        for (var factor : problem.factors()) {</span>
+<span class="fc" id="L16">            cells += factor.values().size() + factor.variables().size(); work.cells(cells);</span>
+<span class="fc" id="L17">            work.charge(1L + factor.variables().size());</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">            for (BigInteger value : factor.values()) work.check(value);</span>
+<span class="fc" id="L19">        }</span>
+<span class="fc" id="L20">        work.charge(1L + problem.fixed().size());</span>
+<span class="fc" id="L21">        return cells;</span>
+    }
+
+    static int tableSize(int width, CertificateWork work) {
+<span class="fc" id="L25">        requireWidth(width);</span>
+<span class="fc" id="L26">        int size = 1 &lt;&lt; width; work.cells(size); return size;</span>
+    }
+
+    static void requireWidth(int width) {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (width &gt; MAX_WIDTH) throw new CertificateWork.Stop(&quot;WIDTH_LIMIT&quot;);</span>
+<span class="fc" id="L31">    }</span>
+
+    static BigInteger add(BigInteger a, BigInteger b, CertificateWork work) {
+<span class="fc" id="L34">        work.charge(1); work.check(a); work.check(b); return work.check(a.add(b));</span>
+    }
+
+    static BigInteger multiply(BigInteger a, BigInteger b, CertificateWork work) {
+<span class="fc" id="L38">        work.charge(1); work.check(a); work.check(b); return work.check(a.multiply(b));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

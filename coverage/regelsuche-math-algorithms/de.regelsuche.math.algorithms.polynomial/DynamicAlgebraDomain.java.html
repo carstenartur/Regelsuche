@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DynamicAlgebraDomain.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">DynamicAlgebraDomain.java</span></div><h1>DynamicAlgebraDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.polynomial.DynamicAlgebraEvaluation.*;
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.PolynomialVariable;
+import de.regelsuche.polynomial.PolynomialWorkSink;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.List;
+
+/** Per-call budget, validated formula and shared quotient arithmetic. */
+final class DynamicAlgebraDomain {
+<span class="fc" id="L15">    static final List&lt;BigInteger&gt; ONE = List.of(BigInteger.ONE);</span>
+    final CertificateWork work;
+    final List&lt;BigInteger&gt; modulus;
+    final int nodes;
+    private final PrimeField field;
+    private final PolynomialRing&lt;BigInteger&gt; ring;
+    private final PolynomialWorkSink sink;
+    private final long workspace;
+
+<span class="fc" id="L24">    DynamicAlgebraDomain(Request request, CertificateWork work) {</span>
+<span class="fc" id="L25">        this.work = work;</span>
+<span class="fc" id="L26">        var shape = inspect(request, work);</span>
+<span class="fc" id="L27">        nodes = shape.nodes;</span>
+<span class="fc" id="L28">        int prime = request.prime();</span>
+        // PrimeField.of checks odd trial divisors through sqrt(prime), at most 23170 tests.
+<span class="fc" id="L30">        work.charge(1L + (long) Math.ceil(Math.sqrt(Math.max(0, prime))) / 2);</span>
+        try {
+<span class="fc" id="L32">            field = PrimeField.of(prime);</span>
+<span class="fc" id="L33">        } catch (IllegalArgumentException invalidPrime) {</span>
+<span class="fc" id="L34">            throw new Invalid(&quot;CHARACTERISTIC_NOT_PRIME&quot;);</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        work.charge(0);</span>
+<span class="fc" id="L37">        ring = new PolynomialRing&lt;&gt;(field, List.of(new PolynomialVariable(&quot;T&quot;)), PolynomialRing.MonomialOrder.LEXICOGRAPHIC);</span>
+<span class="fc" id="L38">        sink = (stage, units) -&gt; work.charge(units);</span>
+<span class="fc" id="L39">        work.cells(shape.cells + 4L * request.modulus().size());</span>
+<span class="fc" id="L40">        var raw = view(request.modulus());</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (raw.degree() &lt;= 0) throw new Invalid(&quot;MODULUS_MUST_BE_NONCONSTANT&quot;);</span>
+        // At most d live components. Each can retain at most one coefficient vector of width d+1
+        // per formula occurrence and temporary stack frame. Reserve space before constructing them.
+<span class="fc" id="L44">        long width = raw.coefficientCount();</span>
+<span class="fc" id="L45">        work.cells(width * width);</span>
+<span class="fc" id="L46">        workspace = shape.cells + 24L * shape.maxWidth + 6L * width * width * (nodes + 1L);</span>
+<span class="fc" id="L47">        work.cells(workspace);</span>
+<span class="fc" id="L48">        modulus = raw.monic(field, sink, &quot;normalize&quot;).coefficients();</span>
+<span class="fc" id="L49">        var derivative = raw.derivative(sink, &quot;derivative&quot;).coefficients();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (!gcd(modulus, derivative).equals(ONE)) throw new Invalid(&quot;MODULUS_NOT_SQUARE_FREE&quot;);</span>
+<span class="fc" id="L51">    }</span>
+
+<span class="fc" id="L53">    void certificateCells(long cells) { work.cells(workspace + cells); }</span>
+
+<span class="fc" id="L55">    static final class Shape {</span>
+        private int nodes;
+        private long cells;
+        private int maxWidth;
+<span class="fc" id="L59">        long cells() { return cells; }</span>
+    }
+
+    static Shape inspect(Request request, CertificateWork work) {
+<span class="fc" id="L63">        var shape = new Shape();</span>
+<span class="fc" id="L64">        inspectCoefficients(request.modulus(), shape, work);</span>
+<span class="fc" id="L65">        inspectExpression(request.expression(), 1, shape, work);</span>
+<span class="fc" id="L66">        return shape;</span>
+    }
+
+    private static void inspectCoefficients(List&lt;BigInteger&gt; values, Shape shape, CertificateWork work) {
+<span class="fc" id="L70">        shape.cells += values.size();</span>
+<span class="fc" id="L71">        shape.maxWidth = Math.max(shape.maxWidth, values.size());</span>
+<span class="fc" id="L72">        work.cells(shape.cells);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (var value : values) work.check(value);</span>
+<span class="fc" id="L74">    }</span>
+
+    private static void inspectExpression(Expr expr, int depth, Shape shape, CertificateWork work) {
+<span class="fc" id="L77">        work.charge(1);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (depth &gt; 64) throw new CertificateWork.Stop(&quot;FORMULA_DEPTH_LIMIT&quot;);</span>
+<span class="fc" id="L79">        shape.nodes++;</span>
+<span class="fc" id="L80">        work.cells(++shape.cells);</span>
+<span class="fc bfc" id="L81" title="All 5 branches covered.">        switch (expr) {</span>
+<span class="fc" id="L82">            case Literal literal -&gt; inspectCoefficients(literal.coefficients(), shape, work);</span>
+<span class="fc" id="L83">            case Inverse inverse -&gt; inspectExpression(inverse.operand(), depth + 1, shape, work);</span>
+<span class="fc" id="L84">            case Add add -&gt; {</span>
+<span class="fc" id="L85">                inspectExpression(add.left(), depth + 1, shape, work);</span>
+<span class="fc" id="L86">                inspectExpression(add.right(), depth + 1, shape, work);</span>
+<span class="fc" id="L87">            }</span>
+<span class="fc" id="L88">            case Product product -&gt; {</span>
+<span class="fc" id="L89">                inspectExpression(product.left(), depth + 1, shape, work);</span>
+<span class="fc" id="L90">                inspectExpression(product.right(), depth + 1, shape, work);</span>
+<span class="fc" id="L91">            }</span>
+<span class="fc" id="L92">            case IfZero test -&gt; {</span>
+<span class="fc" id="L93">                inspectExpression(test.condition(), depth + 1, shape, work);</span>
+<span class="fc" id="L94">                inspectExpression(test.whenZero(), depth + 1, shape, work);</span>
+<span class="fc" id="L95">                inspectExpression(test.whenUnit(), depth + 1, shape, work);</span>
+            }
+        }
+<span class="fc" id="L98">    }</span>
+
+    private UnivariatePolynomialView&lt;BigInteger&gt; view(List&lt;BigInteger&gt; a) {
+<span class="fc" id="L101">        work.charge(1L + a.size());</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (var c : a) work.check(c);</span>
+<span class="fc" id="L103">        return UnivariatePolynomialView.of(ring, a);</span>
+    }
+
+    List&lt;BigInteger&gt; add(List&lt;BigInteger&gt; a, List&lt;BigInteger&gt; b) {
+<span class="fc" id="L107">        return view(a).add(view(b), sink, &quot;add&quot;).coefficients();</span>
+    }
+
+    List&lt;BigInteger&gt; multiply(List&lt;BigInteger&gt; a, List&lt;BigInteger&gt; b) {
+<span class="fc" id="L111">        return view(a).multiply(view(b), sink, &quot;multiply&quot;).coefficients();</span>
+    }
+
+    List&lt;BigInteger&gt; remainder(List&lt;BigInteger&gt; a, List&lt;BigInteger&gt; mod) {
+<span class="fc" id="L115">        return view(a).divideAndRemainderMonic(view(mod), sink, &quot;reduce&quot;).remainder().coefficients();</span>
+    }
+
+    List&lt;BigInteger&gt; quotient(List&lt;BigInteger&gt; a, List&lt;BigInteger&gt; factor) {
+<span class="fc" id="L119">        return view(a).exactQuotient(view(factor), field, sink, &quot;quotient&quot;).coefficients();</span>
+    }
+
+    List&lt;BigInteger&gt; gcd(List&lt;BigInteger&gt; a, List&lt;BigInteger&gt; b) {
+<span class="fc" id="L123">        var first = view(a);</span>
+<span class="fc" id="L124">        var second = view(b);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        while (!second.isZero()) {</span>
+<span class="fc" id="L126">            work.charge(1);</span>
+<span class="fc" id="L127">            var next = first.divideAndRemainder(second, field, sink, &quot;gcd&quot;).remainder();</span>
+<span class="fc" id="L128">            first = second;</span>
+<span class="fc" id="L129">            second = next;</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        return first.monic(field, sink, &quot;monic&quot;).coefficients();</span>
+    }
+
+    // Track the Bézout coefficient of the operand through the core's exact quotient divisions.
+    List&lt;BigInteger&gt; inverse(List&lt;BigInteger&gt; a, List&lt;BigInteger&gt; mod) {
+<span class="fc" id="L136">        var r0 = view(mod);</span>
+<span class="fc" id="L137">        var r1 = view(a);</span>
+<span class="fc" id="L138">        var s0 = UnivariatePolynomialView.zero(ring);</span>
+<span class="fc" id="L139">        var s1 = UnivariatePolynomialView.one(ring);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        while (!r1.isZero()) {</span>
+<span class="fc" id="L141">            work.charge(1);</span>
+<span class="fc" id="L142">            var division = r0.divideAndRemainder(r1, field, sink, &quot;bezout&quot;);</span>
+<span class="fc" id="L143">            var next = s0.subtract(division.quotient().multiply(s1, sink, &quot;multiply&quot;), sink, &quot;subtract&quot;);</span>
+<span class="fc" id="L144">            r0 = r1;</span>
+<span class="fc" id="L145">            r1 = division.remainder();</span>
+<span class="fc" id="L146">            s0 = s1;</span>
+<span class="fc" id="L147">            s1 = next;</span>
+<span class="fc" id="L148">        }</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (r0.degree() != 0) throw new IllegalStateException(&quot;EXPECTED_UNIT&quot;);</span>
+<span class="fc" id="L150">        var normalized = s0.scale(field.divide(BigInteger.ONE, r0.coefficient(0)), sink, &quot;scale&quot;);</span>
+<span class="fc" id="L151">        return remainder(normalized.coefficients(), mod);</span>
+    }
+
+    void canonical(List&lt;BigInteger&gt; a, int maxWidth) {
+<span class="fc" id="L155">        work.charge(1);</span>
+<span class="pc bpc" id="L156" title="2 of 6 branches missed.">        if (a.size() &gt; maxWidth || (!a.isEmpty() &amp;&amp; a.getLast().signum() == 0)) throw new Invalid(&quot;NONCANONICAL_POLYNOMIAL&quot;);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (var c : a) {</span>
+<span class="fc" id="L158">            work.check(c);</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">            if (c.signum() &lt; 0 || c.compareTo(field.modulus()) &gt;= 0) throw new Invalid(&quot;NONCANONICAL_COEFFICIENT&quot;);</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

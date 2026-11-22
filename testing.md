@@ -200,9 +200,10 @@ bleiben zur laufenden Qualifikation gesondert verfügbar.
 
 ### Git-freier Maven-Vollprofil-Nachbau
 
-Der CI-Job **Complete Maven product and Docker authority** extrahiert den
-aktuellen Checkout außerdem mit `git archive` in ein frisches Verzeichnis
-**ohne `.git`**. Dort wird der ungefilterte Maven-Reaktor mit
+Der CI-Job **Complete Git-free Maven lifecycle** startet parallel zu
+**Complete Maven product and Docker authority** auf einem eigenen Runner.
+Er registriert dieselbe CI-Revision und extrahiert sie mit `git archive` in
+ein frisches Verzeichnis **ohne `.git`**. Dort wird der ungefilterte Maven-Reaktor mit
 `mvn -Pfull verify` geprüft; nicht nur eine ausgewählte `-pl`-Teilmenge.
 Die tatsächliche Checkout-Revision wird für die vorhandenen
 Vorbereitungstests ausdrücklich mit `REGELSUCHE_PREPARATION_REVISION`
@@ -213,7 +214,9 @@ Surefire-Berichte der fünf deklarierten Kernmodule und die ausgeführten
 PostgreSQL-/Neo4j-/Docker-Tests aus Failsafe. Fehlende, ausschließlich
 übersprungene oder fehlgeschlagene Nachweise gelten nicht als Erfolg.
 Die Repository-Vertragsprüfung lehnt eine Rückkehr zum selektiven
-Quellarchiv-Replay und das Abschalten der Prüftests ab.
+Quellarchiv-Replay und das Abschalten der Prüftests ab. Der Pflichtcheck
+`Checkout-local ciCheck` wartet bei regulären Läufen auf beide Maven-Jobs
+und verlangt für beide einen erfolgreichen Abschluss.
 
 Dieser Nachbau ist ein **zusätzlicher Reproduktionsnachweis**: Die
 verbleibenden Gradle-, Python-/Shell- und Host-Autoritäten sind noch nicht

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FrozenSymPyOperationObservation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-sympy</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.sympy</a> &gt; <span class="el_source">FrozenSymPyOperationObservation.java</span></div><h1>FrozenSymPyOperationObservation.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.sympy;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Diagnostic receipt from an explicitly pinned historical backend process. */
+public final class FrozenSymPyOperationObservation {
+<span class="fc" id="L14">    public enum Coverage { DECLARED_OPERATIONS, COMPLETE_BACKEND_WORK }</span>
+<span class="fc" id="L15">    public enum Status { OBSERVED, WORK_EXHAUSTED, UNMEASURED }</span>
+
+<span class="fc" id="L17">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L18">        .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L19">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+    private static final String BRIDGE = &quot;d67e266e11c92fdd3e5e2c85c30a89a7b5292f56e291bc86a9d036ac7aab23c4&quot;;
+    private static final String PINS = &quot;5d1e9fdc4960ffa6112bcbe475700a34c7914518c2c58bb9197ea9d26750a14c&quot;;
+
+    private final Status status;
+    private final PolynomialWorkLedger work;
+    private final String receipt;
+
+<span class="fc" id="L27">    private FrozenSymPyOperationObservation(Status status, PolynomialWorkLedger work, String receipt) {</span>
+<span class="fc" id="L28">        this.status = status;</span>
+<span class="fc" id="L29">        this.work = work;</span>
+<span class="fc" id="L30">        this.receipt = receipt;</span>
+<span class="fc" id="L31">    }</span>
+
+<span class="fc" id="L33">    public Status status() { return status; }</span>
+<span class="fc" id="L34">    public PolynomialWorkLedger work() { return work; }</span>
+<span class="fc" id="L35">    public String receipt() { return receipt; }</span>
+
+    static FrozenSymPyOperationObservation decode(String receipt, String inputHash, String meterHash, long limit, Coverage goal) {
+        JsonNode root;
+        try {
+<span class="fc" id="L40">            root = JSON.readTree(receipt);</span>
+<span class="fc" id="L41">        } catch (JsonProcessingException malformed) {</span>
+<span class="fc" id="L42">            throw new IllegalArgumentException(&quot;malformed frozen operation receipt&quot;, malformed);</span>
+<span class="fc" id="L43">        }</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        require(root != null &amp;&amp; root.isObject(), &quot;expected receipt object&quot;);</span>
+<span class="fc" id="L45">        requireIdentity(root, inputHash, meterHash);</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        require(root.path(&quot;strictNative&quot;).isBoolean() &amp;&amp; root.path(&quot;strictNative&quot;).booleanValue(), &quot;strict native checks required&quot;);</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        require(root.path(&quot;studyAuthorized&quot;).isBoolean() &amp;&amp; !root.path(&quot;studyAuthorized&quot;).booleanValue(), &quot;diagnostic receipt required&quot;);</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">        require(limit &gt;= 0 &amp;&amp; unsigned(root.path(&quot;workLimit&quot;)) == limit, &quot;foreign work limit&quot;);</span>
+<span class="fc" id="L49">        var ledger = readLedger(root.path(&quot;stages&quot;));</span>
+<span class="fc" id="L50">        long used = unsigned(root.path(&quot;used&quot;));</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        require(used &lt;= limit &amp;&amp; used == ledger.totalWorkUnits(), &quot;inconsistent operation ledger&quot;);</span>
+<span class="fc" id="L52">        require(goal.name().equals(root.path(&quot;coverageGoal&quot;).textValue()), &quot;foreign coverage boundary&quot;);</span>
+<span class="fc" id="L53">        require(root.path(&quot;boundaryGaps&quot;).isObject(), &quot;missing semantic boundary inventory&quot;);</span>
+<span class="fc" id="L54">        Status status = Status.valueOf(root.path(&quot;status&quot;).asText());</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">        if (goal == Coverage.COMPLETE_BACKEND_WORK &amp;&amp; !root.path(&quot;boundaryGaps&quot;).isEmpty()) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            require(status == Status.UNMEASURED, &quot;uncovered work cannot be a completed prefix&quot;);</span>
+        }
+<span class="fc" id="L58">        verifyOutcome(root, status, used, limit);</span>
+<span class="fc" id="L59">        return new FrozenSymPyOperationObservation(status, ledger, receipt);</span>
+    }
+
+    private static void requireIdentity(JsonNode root, String inputHash, String meterHash) {
+<span class="fc" id="L63">        Map.of(</span>
+            &quot;schema&quot;, &quot;regelsuche.frozen-sympy-operation-observation/v1&quot;,
+            &quot;runtime&quot;, &quot;graalpy&quot;, &quot;implementationVersion&quot;, &quot;25.1.3&quot;,
+            &quot;sympy&quot;, &quot;1.14.0&quot;, &quot;mpmath&quot;, &quot;1.3.0&quot;,
+            &quot;stdlibRandomSha256&quot;, &quot;0693d4ded36916f5b07d6c395cc331dbf1011bb70e90daaa29eaa32490a09425&quot;,
+            &quot;inputSha256&quot;, inputHash, &quot;meterSha256&quot;, meterHash,
+            &quot;bridgeSha256&quot;, BRIDGE, &quot;pinsSha256&quot;, PINS
+<span class="fc" id="L70">        ).forEach((key, expected) -&gt; require(expected.equals(root.path(key).textValue()), &quot;wrong &quot; + key));</span>
+<span class="fc" id="L71">    }</span>
+
+    private static PolynomialWorkLedger readLedger(JsonNode stages) {
+<span class="fc" id="L74">        require(stages.isObject(), &quot;expected operation stages&quot;);</span>
+<span class="fc" id="L75">        Map&lt;String, Long&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L76">        stages.properties().forEach(entry -&gt; {</span>
+<span class="fc" id="L77">            String name = entry.getKey();</span>
+<span class="fc" id="L78">            require(name.matches(&quot;(sympy|mpmath|random|graalpy|regelsuche_frozen_bridge)\\.[A-Za-z0-9_.&lt;&gt;-]+&quot;), &quot;foreign operation stage&quot;);</span>
+<span class="fc" id="L79">            long units = unsigned(entry.getValue());</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            require(units &gt; 0, &quot;empty stage&quot;);</span>
+<span class="fc" id="L81">            values.put(name, units);</span>
+<span class="fc" id="L82">        });</span>
+<span class="fc" id="L83">        return new PolynomialWorkLedger(values);</span>
+    }
+
+    private static void verifyOutcome(JsonNode root, Status status, long used, long limit) {
+<span class="fc" id="L87">        JsonNode opaque = root.path(&quot;opaqueCalls&quot;);</span>
+<span class="fc" id="L88">        JsonNode foreign = root.path(&quot;foreignCallbacks&quot;);</span>
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        require(opaque.isArray() &amp;&amp; foreign.isObject(), &quot;missing operation coverage record&quot;);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (status == Status.OBSERVED) {</span>
+<span class="fc bfc" id="L91" title="All 8 branches covered.">            require(opaque.isEmpty() &amp;&amp; foreign.isEmpty() &amp;&amp; root.path(&quot;result&quot;).isObject() &amp;&amp; root.path(&quot;reason&quot;).isNull(),</span>
+                &quot;invalid completed observation&quot;);
+        } else {
+<span class="pc bpc" id="L94" title="1 of 6 branches missed.">            require(root.path(&quot;result&quot;).isNull() &amp;&amp; root.path(&quot;reason&quot;).isTextual() &amp;&amp; !root.path(&quot;reason&quot;).textValue().isBlank(), &quot;invalid interrupted observation&quot;);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (status == Status.WORK_EXHAUSTED) {</span>
+<span class="pc bpc" id="L96" title="2 of 6 branches missed.">                require(used == limit &amp;&amp; opaque.isEmpty() &amp;&amp; foreign.isEmpty(), &quot;incomplete budget prefix&quot;);</span>
+            }
+        }
+<span class="fc" id="L99">    }</span>
+
+    private static long unsigned(JsonNode node) {
+<span class="pc bpc" id="L102" title="1 of 6 branches missed.">        require(node.isIntegralNumber() &amp;&amp; node.canConvertToLong() &amp;&amp; node.longValue() &gt;= 0, &quot;invalid work count&quot;);</span>
+<span class="fc" id="L103">        return node.longValue();</span>
+    }
+
+    private static void require(boolean condition, String message) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(message);</span>
+<span class="fc" id="L108">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

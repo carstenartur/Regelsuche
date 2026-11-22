@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DynamicAlgebraEvaluation.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">DynamicAlgebraEvaluation.java</span></div><h1>DynamicAlgebraEvaluation.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+
+/** Dynamic evaluation in the product of fields represented by a square-free quotient. */
+public final class DynamicAlgebraEvaluation {
+    private DynamicAlgebraEvaluation() {}
+
+    public sealed interface Expr permits Literal, Add, Product, Inverse, IfZero {}
+
+    /** Ascending integer coefficients, reduced in the requested field. */
+    public record Literal(List&lt;BigInteger&gt; coefficients) implements Expr {
+<span class="fc" id="L20">        public Literal { coefficients = List.copyOf(coefficients); }</span>
+    }
+    public record Add(Expr left, Expr right) implements Expr {
+<span class="fc" id="L23">        public Add { Objects.requireNonNull(left); Objects.requireNonNull(right); }</span>
+    }
+    public record Product(Expr left, Expr right) implements Expr {
+<span class="fc" id="L26">        public Product { Objects.requireNonNull(left); Objects.requireNonNull(right); }</span>
+    }
+    public record Inverse(Expr operand) implements Expr {
+<span class="fc" id="L29">        public Inverse { Objects.requireNonNull(operand); }</span>
+    }
+    public record IfZero(Expr condition, Expr whenZero, Expr whenUnit) implements Expr {
+<span class="fc" id="L32">        public IfZero {</span>
+<span class="fc" id="L33">            Objects.requireNonNull(condition);</span>
+<span class="fc" id="L34">            Objects.requireNonNull(whenZero);</span>
+<span class="fc" id="L35">            Objects.requireNonNull(whenUnit);</span>
+<span class="fc" id="L36">        }</span>
+    }
+
+    public record Request(int prime, List&lt;BigInteger&gt; modulus, Expr expression) {
+<span class="fc" id="L40">        public Request { modulus = List.copyOf(modulus); Objects.requireNonNull(expression); }</span>
+    }
+
+    /** One witness per reached inverse or conditional, in strict left-to-right evaluation order. */
+    public sealed interface Decision permits Zero, Unit {}
+<span class="fc" id="L45">    public record Zero() implements Decision {}</span>
+    public record Unit(List&lt;BigInteger&gt; inverse) implements Decision {
+<span class="fc" id="L47">        public Unit { inverse = List.copyOf(inverse); }</span>
+    }
+
+    /** An absent value means that evaluation reached an inverse of zero on this entire component. */
+    public record Branch(List&lt;BigInteger&gt; factor, Optional&lt;List&lt;BigInteger&gt;&gt; value, List&lt;Decision&gt; decisions) {
+<span class="fc" id="L52">        public Branch {</span>
+<span class="fc" id="L53">            factor = List.copyOf(factor);</span>
+<span class="fc" id="L54">            value = value.map(List::copyOf);</span>
+<span class="fc" id="L55">            decisions = List.copyOf(decisions);</span>
+<span class="fc" id="L56">        }</span>
+    }
+    public record Certificate(Request source, List&lt;Branch&gt; branches) {
+<span class="fc" id="L59">        public Certificate { Objects.requireNonNull(source); branches = List.copyOf(branches); }</span>
+    }
+
+<span class="fc" id="L62">    public enum Status { VERIFIED, REJECTED, INCONCLUSIVE }</span>
+    public record Result&lt;T&gt;(Status status, String reason, Optional&lt;T&gt; value, long work) {
+<span class="fc" id="L64">        public Result {</span>
+<span class="fc" id="L65">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L66">            Objects.requireNonNull(reason);</span>
+<span class="fc" id="L67">            Objects.requireNonNull(value);</span>
+<span class="pc bpc" id="L68" title="2 of 6 branches missed.">            if ((status == Status.VERIFIED) != value.isPresent() || work &lt; 0) {</span>
+<span class="nc" id="L69">                throw new IllegalArgumentException(&quot;INVALID_DYNAMIC_RESULT&quot;);</span>
+            }
+<span class="fc" id="L71">        }</span>
+    }
+
+    public static Result&lt;Certificate&gt; evaluate(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L75">        return bounded(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L76">            var domain = new DynamicAlgebraDomain(request, work);</span>
+<span class="fc" id="L77">            var certificate = new DynamicAlgebraBranches(domain).build(request);</span>
+<span class="fc" id="L78">            DynamicAlgebraVerifier.check(request, certificate, domain);</span>
+<span class="fc" id="L79">            return certificate;</span>
+        });
+    }
+
+    static &lt;T&gt; Result&lt;T&gt; bounded(IterationLimits limits, BooleanSupplier cancellation,
+                                 Function&lt;CertificateWork, T&gt; body) {
+<span class="fc" id="L85">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L87">            work.charge(0);</span>
+<span class="fc" id="L88">            var result = body.apply(work);</span>
+<span class="fc" id="L89">            work.charge(0);</span>
+<span class="fc" id="L90">            return new Result&lt;&gt;(Status.VERIFIED, &quot;VERIFIED&quot;, Optional.of(result), work.used());</span>
+<span class="fc" id="L91">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L92">            return new Result&lt;&gt;(Status.INCONCLUSIVE, stop.getMessage(), Optional.empty(), work.used());</span>
+<span class="fc" id="L93">        } catch (Invalid invalid) {</span>
+<span class="fc" id="L94">            return new Result&lt;&gt;(Status.REJECTED, invalid.getMessage(), Optional.empty(), work.used());</span>
+        }
+    }
+
+    static final class Invalid extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+<span class="fc" id="L100">        Invalid(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

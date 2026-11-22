@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DynamicAlgebraBranches.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">DynamicAlgebraBranches.java</span></div><h1>DynamicAlgebraBranches.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.math.algorithms.polynomial.DynamicAlgebraEvaluation.*;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/** Splits only at a reached inverse or zero test and continues its enclosing computation on both factors. */
+final class DynamicAlgebraBranches {
+    private final DynamicAlgebraDomain domain;
+
+<span class="fc" id="L13">    DynamicAlgebraBranches(DynamicAlgebraDomain domain) { this.domain = domain; }</span>
+
+<span class="fc" id="L15">    private record Trace(Decision decision, Trace previous) {}</span>
+<span class="fc" id="L16">    private record Component(List&lt;BigInteger&gt; factor, Trace trace) {</span>
+        Component decision(List&lt;BigInteger&gt; nextFactor, Decision decision) {
+<span class="fc" id="L18">            return new Component(nextFactor, new Trace(decision, trace));</span>
+        }
+    }
+    // A null internal residue propagates an explicitly undefined terminal.
+<span class="fc" id="L22">    private record Partial(Component component, List&lt;BigInteger&gt; value) {}</span>
+
+    Certificate build(Request request) {
+<span class="fc" id="L25">        var leaves = eval(request.expression(), new Component(domain.modulus, null));</span>
+<span class="fc" id="L26">        var branches = new ArrayList&lt;Branch&gt;(leaves.size());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (var leaf : leaves) {</span>
+<span class="fc" id="L28">            domain.work.charge(1);</span>
+<span class="fc" id="L29">            var component = leaf.component();</span>
+<span class="fc" id="L30">            var backwards = new ArrayList&lt;Decision&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (var trace = component.trace(); trace != null; trace = trace.previous()) {</span>
+<span class="fc" id="L32">                domain.work.charge(1);</span>
+<span class="fc" id="L33">                var hint = trace.decision();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                if (hint instanceof Unit unit) hint = new Unit(domain.remainder(unit.inverse(), component.factor()));</span>
+<span class="fc" id="L35">                backwards.add(hint);</span>
+            }
+<span class="fc" id="L37">            branches.add(new Branch(component.factor(), Optional.ofNullable(leaf.value()), backwards.reversed()));</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        return new Certificate(request, branches);</span>
+    }
+
+    private List&lt;Partial&gt; eval(Expr expression, Component component) {
+<span class="fc" id="L43">        domain.work.charge(1);</span>
+<span class="fc bfc" id="L44" title="All 5 branches covered.">        return switch (expression) {</span>
+<span class="fc" id="L45">            case Literal literal -&gt; List.of(new Partial(component, domain.remainder(literal.coefficients(), component.factor())));</span>
+<span class="fc" id="L46">            case Add add -&gt; binary(add.left(), add.right(), component, false);</span>
+<span class="fc" id="L47">            case Product product -&gt; binary(product.left(), product.right(), component, true);</span>
+<span class="fc" id="L48">            case Inverse inverse -&gt; decide(inverse.operand(), component, null);</span>
+<span class="fc" id="L49">            case IfZero test -&gt; decide(test.condition(), component, test);</span>
+        };
+    }
+
+    private List&lt;Partial&gt; binary(Expr left, Expr right, Component component, boolean multiply) {
+<span class="fc" id="L54">        var results = new ArrayList&lt;Partial&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (var a : eval(left, component)) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (a.value() == null) {</span>
+<span class="fc" id="L57">                results.add(a);</span>
+<span class="fc" id="L58">                continue;</span>
+            }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            for (var b : eval(right, a.component())) {</span>
+<span class="fc" id="L61">                domain.work.charge(1);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (b.value() == null) {</span>
+<span class="fc" id="L63">                    results.add(b);</span>
+                } else {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                    var raw = multiply ? domain.multiply(a.value(), b.value()) : domain.add(a.value(), b.value());</span>
+<span class="fc" id="L66">                    results.add(new Partial(b.component(), domain.remainder(raw, b.component().factor())));</span>
+                }
+<span class="fc" id="L68">            }</span>
+<span class="fc" id="L69">        }</span>
+<span class="fc" id="L70">        return results;</span>
+    }
+
+    private List&lt;Partial&gt; decide(Expr operand, Component component, IfZero test) {
+<span class="fc" id="L74">        var results = new ArrayList&lt;Partial&gt;();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var evaluated : eval(operand, component)) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (evaluated.value() == null) {</span>
+<span class="fc" id="L77">                results.add(evaluated);</span>
+<span class="fc" id="L78">                continue;</span>
+            }
+<span class="fc" id="L80">            var current = evaluated.component();</span>
+<span class="fc" id="L81">            var factor = current.factor();</span>
+<span class="fc" id="L82">            var common = domain.gcd(factor, evaluated.value());</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            if (!common.equals(DynamicAlgebraDomain.ONE)) {</span>
+<span class="fc" id="L84">                var zero = current.decision(common, new Zero());</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                if (test == null) results.add(new Partial(zero, null));</span>
+<span class="fc" id="L86">                else results.addAll(eval(test.whenZero(), zero));</span>
+            }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (!common.equals(factor)) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                var complement = common.equals(DynamicAlgebraDomain.ONE) ? factor : domain.quotient(factor, common);</span>
+<span class="fc" id="L90">                var inverse = domain.inverse(domain.remainder(evaluated.value(), complement), complement);</span>
+<span class="fc" id="L91">                var unit = current.decision(complement, new Unit(inverse));</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (test == null) results.add(new Partial(unit, inverse));</span>
+<span class="fc" id="L93">                else results.addAll(eval(test.whenUnit(), unit));</span>
+            }
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        return results;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

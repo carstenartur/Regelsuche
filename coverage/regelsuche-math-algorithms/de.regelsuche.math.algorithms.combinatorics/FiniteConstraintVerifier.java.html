@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteConstraintVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">FiniteConstraintVerifier.java</span></div><h1>FiniteConstraintVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Certificate;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Factor;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Problem;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Step;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Replays every local summation and checks source binding, total and a positive-weight witness. */
+public final class FiniteConstraintVerifier {
+    private FiniteConstraintVerifier() {}
+<span class="fc" id="L23">    public enum Status { VERIFIED, INVALID, UNAVAILABLE }</span>
+<span class="fc" id="L24">    public record Verification(Status status, String reason, long work) {</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        public boolean valid() { return status == Status.VERIFIED; }</span>
+    }
+
+    public static Verification verify(Problem source, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L30">        Objects.requireNonNull(source); Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L31">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L33">            long retained = FiniteConstraintSupport.inspect(source, work);</span>
+<span class="fc" id="L34">            retained += FiniteConstraintSupport.inspect(certificate.source(), work); work.cells(retained);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            if (!matchesSource(source, certificate.source(), work)) return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (certificate.steps().size() != source.variableCount() - source.fixed().size()) return invalid(&quot;STEP_COUNT&quot;, work);</span>
+<span class="fc" id="L37">            work.check(certificate.total());</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (certificate.total().signum() &lt; 0) return invalid(&quot;NEGATIVE_TOTAL&quot;, work);</span>
+<span class="fc" id="L39">            retained = inspectCertificate(certificate, retained, work);</span>
+<span class="fc" id="L40">            var active = new LinkedHashMap&lt;Integer, Factor&gt;();</span>
+<span class="fc" id="L41">            retained = conditionSource(source, active, retained, work);</span>
+<span class="fc" id="L42">            String failure = replay(source, certificate, active, retained, work);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (failure != null) return invalid(failure, work);</span>
+<span class="fc" id="L44">            failure = checkResult(source, certificate, active, work);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (failure != null) return invalid(failure, work);</span>
+<span class="fc" id="L46">            work.charge(0);</span>
+<span class="fc" id="L47">            return new Verification(Status.VERIFIED, &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L48">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L49">            return new Verification(Status.UNAVAILABLE, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    private static long inspectCertificate(Certificate certificate, long retained, CertificateWork work) {
+<span class="fc" id="L54">        retained += certificate.steps().size() + 2L * certificate.witness().map(java.util.Map::size).orElse(0);</span>
+<span class="fc" id="L55">        work.cells(retained);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (var step : certificate.steps()) {</span>
+<span class="fc" id="L57">            retained += step.inputs().size() + step.output().variables().size() + step.output().values().size();</span>
+<span class="fc" id="L58">            work.cells(retained); work.charge(1L + step.inputs().size() + step.output().variables().size());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (BigInteger value : step.output().values()) work.check(value);</span>
+<span class="fc" id="L60">        }</span>
+<span class="fc" id="L61">        return retained;</span>
+    }
+
+    private static long conditionSource(Problem source, Map&lt;Integer, Factor&gt; active,
+            long retained, CertificateWork work) {
+        // Independently condition each source factor by visiting its original table.
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (int id = 0; id &lt; source.factors().size(); id++) {</span>
+<span class="fc" id="L68">            Factor original = source.factors().get(id);</span>
+<span class="fc" id="L69">            var free = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            for (int variable : original.variables()) {</span>
+<span class="fc" id="L71">                work.charge(1);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                if (!source.fixed().containsKey(variable)) {</span>
+<span class="fc" id="L73">                    work.cells(retained + free.size() + 1L);</span>
+<span class="fc" id="L74">                    free.add(variable);</span>
+                }
+<span class="fc" id="L76">            }</span>
+<span class="fc" id="L77">            int size = FiniteConstraintSupport.tableSize(free.size(), work);</span>
+<span class="fc" id="L78">            retained += size + free.size() + 1L;</span>
+<span class="fc" id="L79">            work.cells(retained + size + free.size());</span>
+<span class="fc" id="L80">            work.charge(size);</span>
+<span class="fc" id="L81">            var values = new ArrayList&lt;BigInteger&gt;(Collections.nCopies(size, BigInteger.ZERO));</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int index = 0; index &lt; original.values().size(); index++) {</span>
+<span class="fc" id="L83">                int reduced = 0, position = 0;</span>
+<span class="fc" id="L84">                boolean matches = true;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                for (int bit = 0; bit &lt; original.variables().size(); bit++) {</span>
+<span class="fc" id="L86">                    work.charge(1);</span>
+<span class="fc" id="L87">                    int variable = original.variables().get(bit);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                    boolean value = ((index &gt;&gt;&gt; bit) &amp; 1) != 0;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    if (source.fixed().containsKey(variable)) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                        if (value != source.fixed().get(variable)) matches = false;</span>
+                    } else {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                        if (value) reduced |= 1 &lt;&lt; position;</span>
+<span class="fc" id="L93">                        position++;</span>
+                    }
+                }
+<span class="fc" id="L96">                work.charge(1);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (matches) values.set(reduced, original.values().get(index));</span>
+            }
+<span class="fc" id="L99">            work.charge(2L * (size + free.size()));</span>
+<span class="fc" id="L100">            active.put(id, new Factor(free, values));</span>
+<span class="fc" id="L101">            work.charge(0);</span>
+        }
+<span class="fc" id="L103">        return retained;</span>
+    }
+
+    private static String replay(Problem source, Certificate certificate, Map&lt;Integer, Factor&gt; active,
+            long retained, CertificateWork work) {
+<span class="fc" id="L108">        var eliminated = new HashSet&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (int index = 0; index &lt; certificate.steps().size(); index++) {</span>
+<span class="fc" id="L110">            var step = certificate.steps().get(index);</span>
+<span class="fc" id="L111">            int variable = step.variable(); work.charge(1);</span>
+<span class="pc bpc" id="L112" title="3 of 6 branches missed.">            if (variable &lt; 0 || variable &gt;= source.variableCount() || source.fixed().containsKey(variable)</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                    || eliminated.contains(variable)) return &quot;ELIMINATION_VARIABLE&quot;;</span>
+<span class="fc" id="L114">            retained += 2; // eliminated-variable entry and active output entry</span>
+<span class="fc" id="L115">            work.cells(retained);</span>
+<span class="fc" id="L116">            eliminated.add(variable);</span>
+<span class="fc" id="L117">            String failure = checkBucket(step, active, retained, work);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (failure != null) return failure;</span>
+<span class="fc" id="L119">            failure = checkSum(step, active, work);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (failure != null) return failure;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (int id : step.inputs()) {</span>
+<span class="fc" id="L122">                work.charge(1);</span>
+<span class="fc" id="L123">                active.remove(id);</span>
+<span class="fc" id="L124">            }</span>
+<span class="fc" id="L125">            active.put(source.factors().size() + index, step.output());</span>
+        }
+<span class="fc" id="L127">        return null;</span>
+    }
+
+    private static String checkBucket(Step step, Map&lt;Integer, Factor&gt; active,
+            long retained, CertificateWork work) {
+<span class="fc" id="L132">        int variable = step.variable();</span>
+<span class="fc" id="L133">        var scope = step.output().variables();</span>
+<span class="fc" id="L134">        work.cells(retained + 3L * scope.size() + 2);</span>
+<span class="fc" id="L135">        boolean[] seen = new boolean[scope.size()];</span>
+<span class="fc" id="L136">        int nextInput = 0, seenCount = 0;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (var entry : active.entrySet()) {</span>
+<span class="fc" id="L138">            work.charge(1L + entry.getValue().variables().size());</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (!entry.getValue().variables().contains(variable)) continue;</span>
+<span class="pc bpc" id="L140" title="2 of 4 branches missed.">            if (nextInput == step.inputs().size() || !entry.getKey().equals(step.inputs().get(nextInput++))) {</span>
+<span class="nc" id="L141">                return &quot;BUCKET_MISMATCH&quot;;</span>
+            }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            for (int member : entry.getValue().variables()) {</span>
+<span class="fc" id="L144">                work.charge(1);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (member == variable) continue;</span>
+<span class="fc" id="L146">                int position = Collections.binarySearch(scope, member);</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                if (position &lt; 0) return &quot;OUTPUT_SCOPE&quot;;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                if (!seen[position]) {</span>
+<span class="fc" id="L149">                    seen[position] = true;</span>
+<span class="fc" id="L150">                    seenCount++;</span>
+                }
+<span class="fc" id="L152">            }</span>
+<span class="fc" id="L153">        }</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (nextInput != step.inputs().size()) return &quot;BUCKET_MISMATCH&quot;;</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (seenCount != scope.size()) return &quot;OUTPUT_SCOPE&quot;;</span>
+<span class="fc" id="L156">        return null;</span>
+    }
+
+    private static String checkSum(Step step, Map&lt;Integer, Factor&gt; active, CertificateWork work) {
+<span class="fc" id="L160">        int variable = step.variable();</span>
+<span class="fc" id="L161">        var scope = step.output().variables();</span>
+<span class="fc" id="L162">        int size = FiniteConstraintSupport.tableSize(scope.size(), work);</span>
+<span class="fc" id="L163">        var assignment = new HashMap&lt;Integer, Boolean&gt;();</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int mask = 0; mask &lt; size; mask++) {</span>
+<span class="fc" id="L165">            int position = 0;</span>
+<span class="fc bfc" id="L166" title="All 4 branches covered.">            for (int v : scope) { work.charge(1); assignment.put(v, ((mask &gt;&gt;&gt; position++) &amp; 1) != 0); }</span>
+<span class="fc" id="L167">            BigInteger expected = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (boolean bit : new boolean[] {false, true}) {</span>
+<span class="fc" id="L169">                assignment.put(variable, bit);</span>
+<span class="fc" id="L170">                BigInteger term = BigInteger.ONE;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                for (int id : step.inputs()) {</span>
+<span class="fc" id="L172">                    Factor factor = active.get(id);</span>
+<span class="fc" id="L173">                    int row = 0;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    for (int k = 0; k &lt; factor.variables().size(); k++) {</span>
+<span class="fc" id="L175">                        work.charge(1);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                        if (assignment.get(factor.variables().get(k))) row |= 1 &lt;&lt; k;</span>
+                    }
+<span class="fc" id="L178">                    term = FiniteConstraintSupport.multiply(term, factor.values().get(row), work);</span>
+<span class="fc" id="L179">                }</span>
+<span class="fc" id="L180">                expected = FiniteConstraintSupport.add(expected, term, work);</span>
+            }
+<span class="fc" id="L182">            work.charge(1);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (!expected.equals(step.output().values().get(mask))) return &quot;LOCAL_SUM_MISMATCH&quot;;</span>
+        }
+<span class="fc" id="L185">        return null;</span>
+    }
+
+    private static String checkResult(Problem source, Certificate certificate,
+            Map&lt;Integer, Factor&gt; active, CertificateWork work) {
+<span class="fc" id="L190">        BigInteger total = BigInteger.ONE;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (Factor factor : active.values()) {</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (!factor.variables().isEmpty()) return &quot;REMAINING_VARIABLE&quot;;</span>
+<span class="fc" id="L193">            total = FiniteConstraintSupport.multiply(total, factor.values().get(0), work);</span>
+<span class="fc" id="L194">        }</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (!total.equals(certificate.total())) return &quot;TOTAL_MISMATCH&quot;;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (total.signum() == 0) {</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (certificate.witness().isPresent()) return &quot;ZERO_WITH_WITNESS&quot;;</span>
+        } else {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (certificate.witness().isEmpty()) return &quot;MISSING_WITNESS&quot;;</span>
+<span class="fc" id="L200">            var assignment = certificate.witness().orElseThrow();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (assignment.size() != source.variableCount()) return &quot;WITNESS_SHAPE&quot;;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            for (int v = 0; v &lt; source.variableCount(); v++) {</span>
+<span class="fc" id="L203">                work.charge(1);</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">                if (!assignment.containsKey(v) || (source.fixed().containsKey(v)</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                        &amp;&amp; !assignment.get(v).equals(source.fixed().get(v)))) return &quot;WITNESS_DOMAIN&quot;;</span>
+            }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            for (Factor factor : source.factors()) {</span>
+<span class="fc" id="L208">                work.charge(1);</span>
+<span class="fc" id="L209">                int row = 0;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                for (int k = 0; k &lt; factor.variables().size(); k++) {</span>
+<span class="fc" id="L211">                    work.charge(1);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                    if (assignment.get(factor.variables().get(k))) row |= 1 &lt;&lt; k;</span>
+                }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                if (factor.values().get(row).signum() == 0) return &quot;WITNESS_ZERO_WEIGHT&quot;;</span>
+<span class="fc" id="L215">            }</span>
+        }
+<span class="fc" id="L217">        return null;</span>
+    }
+
+    private static boolean matchesSource(Problem expected, Problem supplied, CertificateWork work) {
+<span class="fc" id="L221">        work.charge(1);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (expected == supplied) return true;</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">        if (expected.variableCount() != supplied.variableCount() || expected.fixed().size() != supplied.fixed().size()</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                || expected.factors().size() != supplied.factors().size()) return false;</span>
+
+        // The defensive snapshots iterate integer keys in sorted order.
+<span class="fc" id="L227">        var recordedFixed = supplied.fixed().entrySet().iterator();</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (var fixed : expected.fixed().entrySet()) {</span>
+<span class="fc" id="L229">            work.charge(1);</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (!fixed.equals(recordedFixed.next())) return false;</span>
+<span class="fc" id="L231">        }</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        for (int id = 0; id &lt; expected.factors().size(); id++) {</span>
+<span class="nc" id="L233">            work.charge(1);</span>
+<span class="nc" id="L234">            Factor a = expected.factors().get(id);</span>
+<span class="nc" id="L235">            Factor b = supplied.factors().get(id);</span>
+<span class="nc" id="L236">            work.charge(a.variables().size());</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            if (!a.variables().equals(b.variables())) return false;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            for (int row = 0; row &lt; a.values().size(); row++) {</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                if (!work.check(a.values().get(row)).equals(work.check(b.values().get(row)))) return false;</span>
+            }
+        }
+<span class="fc" id="L242">        return true;</span>
+    }
+
+    private static Verification invalid(String reason, CertificateWork work) {
+<span class="fc" id="L246">        work.charge(0);</span>
+<span class="fc" id="L247">        return new Verification(Status.INVALID, reason, work.used());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

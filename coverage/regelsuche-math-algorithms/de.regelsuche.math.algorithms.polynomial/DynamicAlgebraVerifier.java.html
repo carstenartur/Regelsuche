@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DynamicAlgebraVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">DynamicAlgebraVerifier.java</span></div><h1>DynamicAlgebraVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.polynomial.DynamicAlgebraEvaluation.*;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Checks complete factor coverage and replays the original expression separately on each fixed factor. */
+public final class DynamicAlgebraVerifier {
+    private DynamicAlgebraVerifier() {}
+
+    public static Result&lt;Boolean&gt; verify(Request request, Certificate certificate,
+                                         IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L16">        return DynamicAlgebraEvaluation.bounded(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L17">            var domain = new DynamicAlgebraDomain(request, work);</span>
+<span class="fc" id="L18">            check(request, certificate, domain);</span>
+<span class="fc" id="L19">            return true;</span>
+        });
+    }
+
+    static void check(Request expected, Certificate certificate, DynamicAlgebraDomain domain) {
+<span class="fc" id="L24">        long retained = 0;</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (certificate.source() != expected) {</span>
+<span class="fc" id="L26">            var shape = DynamicAlgebraDomain.inspect(certificate.source(), domain.work);</span>
+<span class="fc" id="L27">            retained = shape.cells();</span>
+<span class="fc" id="L28">            domain.certificateCells(retained);</span>
+<span class="fc" id="L29">            domain.work.charge(retained);</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (!expected.equals(certificate.source())) throw new Invalid(&quot;SOURCE_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L32">        var branches = certificate.branches();</span>
+<span class="fc" id="L33">        int degree = domain.modulus.size() - 1;</span>
+<span class="fc" id="L34">        domain.certificateCells(retained + branches.size());</span>
+<span class="pc bpc" id="L35" title="2 of 4 branches missed.">        if (branches.isEmpty() || branches.size() &gt; degree) throw new Invalid(&quot;BRANCH_COUNT&quot;);</span>
+<span class="fc" id="L36">        var product = DynamicAlgebraDomain.ONE;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (var branch : branches) {</span>
+<span class="fc" id="L38">            int size = branch.factor().size();</span>
+<span class="fc" id="L39">            retained += 1L + size + branch.decisions().size() + branch.value().map(List::size).orElse(0);</span>
+<span class="fc" id="L40">            domain.certificateCells(retained);</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">            if (size &lt; 2 || size + (long) product.size() - 1 &gt; domain.modulus.size()) throw new Invalid(&quot;FACTOR_DEGREE&quot;);</span>
+<span class="fc" id="L42">            domain.canonical(branch.factor(), degree + 1);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if (!branch.factor().getLast().equals(BigInteger.ONE)) throw new Invalid(&quot;FACTOR_NOT_MONIC&quot;);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (!domain.gcd(product, branch.factor()).equals(DynamicAlgebraDomain.ONE)) throw new Invalid(&quot;FACTORS_OVERLAP&quot;);</span>
+<span class="fc" id="L45">            product = domain.multiply(product, branch.factor());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            if (branch.value().isPresent()) domain.canonical(branch.value().orElseThrow(), size - 1);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (branch.decisions().size() &gt; domain.nodes) throw new Invalid(&quot;TOO_MANY_DECISIONS&quot;);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (var decision : branch.decisions()) {</span>
+<span class="fc" id="L49">                domain.work.charge(1);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                if (decision instanceof Unit unit) {</span>
+<span class="fc" id="L51">                    retained += unit.inverse().size();</span>
+<span class="fc" id="L52">                    domain.certificateCells(retained);</span>
+<span class="fc" id="L53">                    domain.canonical(unit.inverse(), size - 1);</span>
+                }
+<span class="fc" id="L55">            }</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!product.equals(domain.modulus)) throw new Invalid(&quot;INCOMPLETE_FACTOR_COVER&quot;);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (var branch : branches) {</span>
+<span class="fc" id="L59">            var replay = new Replay(branch, domain);</span>
+<span class="fc" id="L60">            var value = replay.value(expected.expression());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            if (replay.index != branch.decisions().size()) throw new Invalid(&quot;UNUSED_DECISION&quot;);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (!Optional.ofNullable(value).equals(branch.value())) throw new Invalid(&quot;BRANCH_VALUE_MISMATCH&quot;);</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">    }</span>
+
+    // On a fixed factor a witness must be either identically zero or a two-sided unit.
+    // A mixed zero divisor cannot pass either check. No factor search or Bézout synthesis occurs here.
+    private static final class Replay {
+        private final Branch branch;
+        private final DynamicAlgebraDomain domain;
+        private int index;
+
+<span class="fc" id="L73">        Replay(Branch branch, DynamicAlgebraDomain domain) {</span>
+<span class="fc" id="L74">            this.branch = branch;</span>
+<span class="fc" id="L75">            this.domain = domain;</span>
+<span class="fc" id="L76">        }</span>
+
+        List&lt;BigInteger&gt; value(Expr expression) {
+<span class="fc" id="L79">            domain.work.charge(1);</span>
+<span class="fc bfc" id="L80" title="All 5 branches covered.">            return switch (expression) {</span>
+<span class="fc" id="L81">                case Literal literal -&gt; domain.remainder(literal.coefficients(), branch.factor());</span>
+<span class="fc" id="L82">                case Add add -&gt; binary(add.left(), add.right(), false);</span>
+<span class="fc" id="L83">                case Product product -&gt; binary(product.left(), product.right(), true);</span>
+<span class="fc" id="L84">                case Inverse inverse -&gt; {</span>
+<span class="fc" id="L85">                    var operand = value(inverse.operand());</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                    yield operand == null ? null : checkedInverse(operand);</span>
+                }
+<span class="fc" id="L88">                case IfZero test -&gt; {</span>
+<span class="fc" id="L89">                    var condition = value(test.condition());</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                    if (condition == null) yield null;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                    yield value(checkedInverse(condition) == null ? test.whenZero() : test.whenUnit());</span>
+                }
+            };
+        }
+
+        private List&lt;BigInteger&gt; binary(Expr left, Expr right, boolean multiply) {
+<span class="fc" id="L97">            var a = value(left);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (a == null) return null;</span>
+<span class="fc" id="L99">            var b = value(right);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (b == null) return null;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            var result = multiply ? domain.multiply(a, b) : domain.add(a, b);</span>
+<span class="fc" id="L102">            return domain.remainder(result, branch.factor());</span>
+        }
+
+        private List&lt;BigInteger&gt; checkedInverse(List&lt;BigInteger&gt; operand) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (index == branch.decisions().size()) throw new Invalid(&quot;MISSING_DECISION&quot;);</span>
+<span class="fc" id="L107">            var decision = branch.decisions().get(index++);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (decision instanceof Zero) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                if (!operand.isEmpty()) throw new Invalid(&quot;FALSE_ZERO_DECISION&quot;);</span>
+<span class="fc" id="L110">                return null;</span>
+            }
+<span class="fc" id="L112">            var inverse = ((Unit) decision).inverse();</span>
+<span class="fc" id="L113">            var check = domain.remainder(domain.multiply(operand, inverse), branch.factor());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (!check.equals(DynamicAlgebraDomain.ONE)) throw new Invalid(&quot;FALSE_INVERSE&quot;);</span>
+<span class="fc" id="L115">            return inverse;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

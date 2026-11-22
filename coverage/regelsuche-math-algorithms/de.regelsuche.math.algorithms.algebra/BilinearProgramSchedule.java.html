@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearProgramSchedule.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearProgramSchedule.java</span></div><h1>BilinearProgramSchedule.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Cost;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+
+/** Ordered sparse dot products. An addition may overwrite its accumulator and a product its operands. */
+final class BilinearProgramSchedule {
+    private BilinearProgramSchedule() {}
+
+    static ExactRational dot(List&lt;ExactRational&gt; form, List&lt;ExactRational&gt; values, CertificateWork work) {
+<span class="fc" id="L13">        ExactRational accumulator = null;</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        for (int i = 0; i &lt; form.size(); i++) {</span>
+<span class="fc" id="L15">            work.charge(1);</span>
+<span class="fc" id="L16">            var coefficient = form.get(i);</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">            if (coefficient.isZero()) continue;</span>
+<span class="fc" id="L18">            var term = values.get(i);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">            if (!coefficient.isOne()) term = work.mul(coefficient, term);</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">            accumulator = accumulator == null ? term : work.add(accumulator, term);</span>
+        }
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        return accumulator == null ? ExactRational.ZERO : accumulator;</span>
+    }
+
+    static Cost cost(BilinearProgram program, CertificateWork work) {
+<span class="fc" id="L26">        int rank = program.u().size();</span>
+<span class="fc" id="L27">        long additions = 0;</span>
+<span class="fc" id="L28">        long scalings = 0;</span>
+<span class="fc" id="L29">        long peak = rank;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (int p = 0; p &lt; rank; p++) {</span>
+<span class="fc" id="L31">            var left = profile(program.u().get(p), work);</span>
+<span class="fc" id="L32">            var right = profile(program.v().get(p), work);</span>
+<span class="fc" id="L33">            additions += left.additions() + right.additions();</span>
+<span class="fc" id="L34">            scalings += left.scalings() + right.scalings();</span>
+<span class="fc" id="L35">            peak = Math.max(peak, p + left.peak());</span>
+<span class="fc" id="L36">            peak = Math.max(peak, p + left.resultSlots() + right.peak());</span>
+        }
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (var weights : program.w()) {</span>
+<span class="fc" id="L39">            var output = profile(weights, work);</span>
+<span class="fc" id="L40">            additions += output.additions();</span>
+<span class="fc" id="L41">            scalings += output.scalings();</span>
+<span class="fc" id="L42">            peak = Math.max(peak, rank + output.peak());</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        return new Cost(rank, additions, scalings, peak);</span>
+    }
+
+<span class="fc" id="L47">    private record Profile(long additions, long scalings, int resultSlots, int peak) {}</span>
+
+    private static Profile profile(List&lt;ExactRational&gt; form, CertificateWork work) {
+<span class="fc" id="L50">        int terms = 0;</span>
+<span class="fc" id="L51">        long scalings = 0;</span>
+<span class="fc" id="L52">        int peak = 0;</span>
+<span class="fc" id="L53">        int accumulatorSlots = 0;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (var coefficient : form) {</span>
+<span class="fc" id="L55">            work.charge(1);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (coefficient.isZero()) continue;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            boolean scale = !coefficient.isOne();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            if (scale) {</span>
+<span class="fc" id="L59">                scalings++;</span>
+<span class="fc" id="L60">                peak = Math.max(peak, accumulatorSlots + 1);</span>
+            }
+<span class="fc" id="L62">            terms++;</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">            if (scale || terms &gt; 1) accumulatorSlots = 1;</span>
+<span class="fc" id="L64">            peak = Math.max(peak, accumulatorSlots);</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">        return new Profile(Math.max(0, terms - 1), scalings, accumulatorSlots, peak);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

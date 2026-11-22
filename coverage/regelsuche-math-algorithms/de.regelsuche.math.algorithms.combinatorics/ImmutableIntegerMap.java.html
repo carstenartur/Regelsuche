@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ImmutableIntegerMap.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">ImmutableIntegerMap.java</span></div><h1>ImmutableIntegerMap.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import java.util.AbstractMap;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
+/** Defensive snapshots with ordered iteration and logarithmic lookup on sparse integer keys. */
+final class ImmutableIntegerMap&lt;V&gt; extends AbstractMap&lt;Integer, V&gt; {
+    private final Map&lt;Integer, V&gt; entries;
+
+<span class="fc" id="L18">    private ImmutableIntegerMap(TreeMap&lt;Integer, V&gt; entries) {</span>
+<span class="fc" id="L19">        this.entries = Collections.unmodifiableMap(entries);</span>
+<span class="fc" id="L20">    }</span>
+
+    static &lt;V&gt; Map&lt;Integer, V&gt; copyOf(Map&lt;Integer, V&gt; source) {
+<span class="fc" id="L23">        return copyOf(source, null);</span>
+    }
+
+    /** Copy a budgeted producer's map after it has reserved the key and value cells. */
+    static &lt;V&gt; Map&lt;Integer, V&gt; copyOf(Map&lt;Integer, V&gt; source, CertificateWork work) {
+<span class="fc" id="L28">        Objects.requireNonNull(source);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (source instanceof ImmutableIntegerMap&lt;?&gt;) return source;</span>
+<span class="fc" id="L30">        var copy = new TreeMap&lt;Integer, V&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (var entry : source.entrySet()) {</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (work != null) work.charge(1);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            if (copy.put(Objects.requireNonNull(entry.getKey()), Objects.requireNonNull(entry.getValue())) != null) {</span>
+<span class="fc" id="L34">                throw new IllegalArgumentException(&quot;DUPLICATE_INTEGER_KEY&quot;);</span>
+            }
+<span class="fc" id="L36">        }</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (work != null) work.charge(0);</span>
+<span class="fc" id="L38">        return new ImmutableIntegerMap&lt;&gt;(copy);</span>
+    }
+
+    @Override public Set&lt;Entry&lt;Integer, V&gt;&gt; entrySet() {
+<span class="fc" id="L42">        return entries.entrySet();</span>
+    }
+
+    @Override public int size() {
+<span class="fc" id="L46">        return entries.size();</span>
+    }
+
+    @Override public V get(Object key) {
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        return Objects.requireNonNull(key) instanceof Integer ? entries.get(key) : null;</span>
+    }
+
+    @Override public boolean containsKey(Object key) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        return get(key) != null;</span>
+    }
+
+    @Override public boolean containsValue(Object value) {
+<span class="nc" id="L58">        return entries.containsValue(Objects.requireNonNull(value));</span>
+    }
+
+    @Override public Set&lt;Integer&gt; keySet() {
+<span class="fc" id="L62">        return Collections.unmodifiableSet(super.keySet());</span>
+    }
+
+    @Override public Collection&lt;V&gt; values() {
+<span class="nc" id="L66">        return Collections.unmodifiableCollection(super.values());</span>
+    }
+
+    @Override public V put(Integer key, V value) {
+<span class="nc" id="L70">        return entries.put(key, value);</span>
+    }
+
+    @Override public void putAll(Map&lt;? extends Integer, ? extends V&gt; source) {
+<span class="nc" id="L74">        entries.putAll(source);</span>
+<span class="nc" id="L75">    }</span>
+
+    @Override public V putIfAbsent(Integer key, V value) {
+<span class="nc" id="L78">        return entries.putIfAbsent(key, value);</span>
+    }
+
+    @Override public V remove(Object key) {
+<span class="nc" id="L82">        return entries.remove(key);</span>
+    }
+
+    @Override public boolean remove(Object key, Object value) {
+<span class="nc" id="L86">        return entries.remove(key, value);</span>
+    }
+
+    @Override public void clear() {
+<span class="nc" id="L90">        entries.clear();</span>
+<span class="nc" id="L91">    }</span>
+
+    @Override public V replace(Integer key, V value) {
+<span class="nc" id="L94">        return entries.replace(key, value);</span>
+    }
+
+    @Override public boolean replace(Integer key, V previous, V replacement) {
+<span class="nc" id="L98">        return entries.replace(key, previous, replacement);</span>
+    }
+
+    @Override public void replaceAll(BiFunction&lt;? super Integer, ? super V, ? extends V&gt; function) {
+<span class="nc" id="L102">        entries.replaceAll(function);</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override public V compute(Integer key, BiFunction&lt;? super Integer, ? super V, ? extends V&gt; function) {
+<span class="nc" id="L106">        return entries.compute(key, function);</span>
+    }
+
+    @Override public V computeIfPresent(Integer key, BiFunction&lt;? super Integer, ? super V, ? extends V&gt; function) {
+<span class="nc" id="L110">        return entries.computeIfPresent(key, function);</span>
+    }
+
+    @Override public V computeIfAbsent(Integer key, Function&lt;? super Integer, ? extends V&gt; function) {
+<span class="nc" id="L114">        return entries.computeIfAbsent(key, function);</span>
+    }
+
+    @Override public V merge(Integer key, V value, BiFunction&lt;? super V, ? super V, ? extends V&gt; function) {
+<span class="nc" id="L118">        return entries.merge(key, value, function);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalFormulaVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.noncommutative</a> &gt; <span class="el_source">RationalFormulaVerifier.java</span></div><h1>RationalFormulaVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.noncommutative;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Inverse;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Product;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Scalar;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Sum;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Variable;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.Certificate;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.Constant;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.Status;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.VariableTerm;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.TreeMap;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.Status.INVALID_CERTIFICATE;
+import static de.regelsuche.scalar.ExactRational.NEGATIVE_ONE;
+import static de.regelsuche.scalar.ExactRational.ONE;
+import static de.regelsuche.scalar.ExactRational.ZERO;
+
+/** Independent structural checking and exact evaluation at a concrete rational matrix assignment. */
+public final class RationalFormulaVerifier {
+    private RationalFormulaVerifier() {}
+
+    /** Square rational matrix in row-major order. */
+    public record Matrix(int order, List&lt;ExactRational&gt; entries) {
+<span class="fc" id="L35">        public Matrix {</span>
+<span class="fc" id="L36">            entries = List.copyOf(entries);</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">            if (order &lt; 1 || (long) order * order != entries.size()) {</span>
+<span class="nc" id="L38">                throw new IllegalArgumentException(&quot;INVALID_MATRIX_ORDER&quot;);</span>
+            }
+<span class="fc" id="L40">        }</span>
+    }
+
+    /** An explicit common order also covers formulas without variables. */
+    public record Assignment(int order, Map&lt;Integer, Matrix&gt; variables) {
+<span class="fc" id="L45">        public Assignment {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (order &lt; 1) throw new IllegalArgumentException(&quot;INVALID_ASSIGNMENT_ORDER&quot;);</span>
+<span class="fc" id="L47">            var ordered = new TreeMap&lt;Integer, Matrix&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (var entry : variables.entrySet()) {</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                if (ordered.put(Objects.requireNonNull(entry.getKey()), Objects.requireNonNull(entry.getValue())) != null) {</span>
+<span class="fc" id="L50">                    throw new IllegalArgumentException(&quot;DUPLICATE_VARIABLE_ID&quot;);</span>
+                }
+<span class="fc" id="L52">            }</span>
+<span class="fc" id="L53">            variables = Collections.unmodifiableMap(ordered);</span>
+<span class="fc" id="L54">        }</span>
+    }
+
+<span class="fc" id="L57">    public record Verification(Status status, String reason, long work) {}</span>
+
+<span class="fc" id="L59">    public record Evaluation(Status status, RationalFormula source, Assignment assignment, Optional&lt;Matrix&gt; value,</span>
+                             OptionalInt inverseOccurrence, String reason, long work) {}
+
+    public static Verification verify(RationalFormula source, Certificate certificate, IterationLimits limits,
+                                      BooleanSupplier cancelled) {
+<span class="fc" id="L64">        var work = new RationalFormulaWork(limits, cancelled);</span>
+        try {
+<span class="fc" id="L66">            checkStructure(source, certificate, work);</span>
+<span class="fc" id="L67">            work.ledger.charge(0);</span>
+<span class="fc" id="L68">            return new Verification(Status.VERIFIED, &quot;&quot;, work.ledger.used());</span>
+<span class="fc" id="L69">        } catch (Rejected rejected) {</span>
+<span class="fc" id="L70">            return new Verification(rejected.status, rejected.getMessage(), work.ledger.used());</span>
+<span class="fc" id="L71">        } catch (CertificateWork.Stop stopped) {</span>
+<span class="fc" id="L72">            return new Verification(RationalFormulaWork.status(stopped), stopped.getMessage(), work.ledger.used());</span>
+        }
+    }
+
+    public static Evaluation evaluate(RationalFormula source, Certificate certificate, Assignment assignment,
+                                      IterationLimits limits, BooleanSupplier cancelled) {
+<span class="fc" id="L78">        Objects.requireNonNull(assignment, &quot;assignment&quot;);</span>
+<span class="fc" id="L79">        var work = new RationalFormulaWork(limits, cancelled);</span>
+        try {
+<span class="fc" id="L81">            checkStructure(source, certificate, work);</span>
+<span class="fc" id="L82">            return new RationalFormulaEvaluation(source, certificate, assignment, work).check();</span>
+<span class="fc" id="L83">        } catch (Rejected rejected) {</span>
+<span class="fc" id="L84">            return failedEvaluation(rejected.status, source, assignment, rejected.getMessage(), work);</span>
+<span class="fc" id="L85">        } catch (CertificateWork.Stop stopped) {</span>
+<span class="fc" id="L86">            return failedEvaluation(RationalFormulaWork.status(stopped), source, assignment, stopped.getMessage(), work);</span>
+        }
+    }
+
+    private static Evaluation failedEvaluation(Status status, RationalFormula source, Assignment assignment,
+                                                String reason, RationalFormulaWork work) {
+<span class="fc" id="L92">        return new Evaluation(status, source, assignment, Optional.empty(), OptionalInt.empty(), reason,</span>
+<span class="fc" id="L93">            work.ledger.used());</span>
+    }
+
+    static void checkStructure(RationalFormula source, Certificate certificate, RationalFormulaWork work) {
+<span class="fc" id="L97">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L98">        Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L99">        var check = new Structure(certificate, work);</span>
+<span class="fc" id="L100">        check.source(source, certificate.source(), 1);</span>
+<span class="fc" id="L101">        check.root(source);</span>
+<span class="fc" id="L102">    }</span>
+
+    static final class Rejected extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final Status status;
+
+        Rejected(Status status, String reason) {
+<span class="fc" id="L109">            super(reason, null, false, false);</span>
+<span class="fc" id="L110">            this.status = status;</span>
+<span class="fc" id="L111">        }</span>
+    }
+
+    private static void expect(boolean condition, String reason) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (!condition) throw new Rejected(INVALID_CERTIFICATE, reason);</span>
+<span class="fc" id="L116">    }</span>
+
+<span class="fc" id="L118">    private record Masks(byte[] u, byte[] v) {</span>
+<span class="fc" id="L119">        int order() { return u.length; }</span>
+    }
+
+    /** Checks the supplied entries in place. Only the {-1,0,1} selector masks are derived. */
+    private static final class Structure {
+        private final Certificate certificate;
+        private final RationalFormulaWork work;
+        private int nodeIndex;
+        private int obligationIndex;
+
+<span class="fc" id="L129">        Structure(Certificate certificate, RationalFormulaWork work) {</span>
+<span class="fc" id="L130">            this.certificate = certificate;</span>
+<span class="fc" id="L131">            this.work = work;</span>
+<span class="fc" id="L132">        }</span>
+
+        void source(RationalFormula expected, RationalFormula recorded, int depth) {
+<span class="fc" id="L135">            work.enter(depth);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (expected == recorded) return;</span>
+<span class="pc bpc" id="L137" title="1 of 5 branches missed.">            switch (expected) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                case Scalar scalar -&gt; expect(recorded instanceof Scalar other</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                    &amp;&amp; work.ledger.check(scalar.value()).equals(work.ledger.check(other.value())), &quot;SOURCE_SCALAR&quot;);</span>
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">                case Variable variable -&gt; expect(recorded instanceof Variable other &amp;&amp; variable.id() == other.id(),</span>
+                    &quot;SOURCE_VARIABLE&quot;);
+<span class="fc" id="L142">                case Sum sum -&gt; {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                    if (!(recorded instanceof Sum other)) throw new Rejected(INVALID_CERTIFICATE, &quot;SOURCE_SUM&quot;);</span>
+<span class="fc" id="L144">                    source(sum.left(), other.left(), depth + 1);</span>
+<span class="fc" id="L145">                    source(sum.right(), other.right(), depth + 1);</span>
+<span class="fc" id="L146">                }</span>
+<span class="fc" id="L147">                case Product product -&gt; {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                    if (!(recorded instanceof Product other)) throw new Rejected(INVALID_CERTIFICATE, &quot;SOURCE_PRODUCT&quot;);</span>
+<span class="nc" id="L149">                    source(product.left(), other.left(), depth + 1);</span>
+<span class="nc" id="L150">                    source(product.right(), other.right(), depth + 1);</span>
+<span class="nc" id="L151">                }</span>
+<span class="fc" id="L152">                case Inverse inverse -&gt; {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    if (!(recorded instanceof Inverse other)) throw new Rejected(INVALID_CERTIFICATE, &quot;SOURCE_INVERSE&quot;);</span>
+<span class="fc" id="L154">                    source(inverse.operand(), other.operand(), depth + 1);</span>
+                }
+            }
+<span class="fc" id="L157">        }</span>
+
+        void root(RationalFormula source) {
+<span class="fc" id="L160">            int order = certificate.pencil().order();</span>
+<span class="fc" id="L161">            work.ledger.cells((long) order * order + certificate.u().size() + certificate.v().size()</span>
+<span class="fc" id="L162">                + certificate.obligations().size());</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">            expect(certificate.u().size() == order &amp;&amp; certificate.v().size() == order, &quot;SELECTOR_LENGTH&quot;);</span>
+<span class="fc" id="L164">            Masks masks = node(source, 0, 1);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            expect(masks.order() == order, &quot;PENCIL_ORDER&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            expect(obligationIndex == certificate.obligations().size(), &quot;EXTRA_INVERSE_OBLIGATION&quot;);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            for (int i = 0; i &lt; order; i++) {</span>
+<span class="fc" id="L168">                expect(work.ledger.check(certificate.u().get(i)).equals(unit(masks.u()[i])), &quot;ROW_SELECTOR&quot;);</span>
+<span class="fc" id="L169">                expect(work.ledger.check(certificate.v().get(i)).equals(unit(masks.v()[i])), &quot;COLUMN_SELECTOR&quot;);</span>
+            }
+<span class="fc" id="L171">        }</span>
+
+        private Masks node(RationalFormula source, int offset, int depth) {
+<span class="fc" id="L174">            work.enter(depth);</span>
+<span class="fc bfc" id="L175" title="All 5 branches covered.">            Masks masks = switch (source) {</span>
+<span class="fc" id="L176">                case Scalar scalar -&gt; {</span>
+<span class="fc" id="L177">                    work.ledger.check(scalar.value());</span>
+<span class="fc" id="L178">                    Masks leaf = leaf(offset);</span>
+<span class="fc" id="L179">                    constant(offset, offset + 1, scalar.value().negate());</span>
+<span class="fc" id="L180">                    yield leaf;</span>
+                }
+<span class="fc" id="L182">                case Variable variable -&gt; {</span>
+<span class="fc" id="L183">                    Masks leaf = leaf(offset);</span>
+<span class="fc" id="L184">                    var entry = certificate.pencil().entry(offset, offset + 1);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                    expect(entry instanceof VariableTerm term &amp;&amp; term.variableId() == variable.id()</span>
+<span class="pc bpc" id="L186" title="2 of 4 branches missed.">                        &amp;&amp; work.ledger.check(term.coefficient()).equals(NEGATIVE_ONE), &quot;LEAF_VARIABLE&quot;);</span>
+<span class="fc" id="L187">                    yield leaf;</span>
+                }
+<span class="fc" id="L189">                case Sum sum -&gt; binary(sum.left(), sum.right(), offset, depth, false);</span>
+<span class="fc" id="L190">                case Product product -&gt; binary(product.left(), product.right(), offset, depth, true);</span>
+<span class="fc" id="L191">                case Inverse inverse -&gt; inverse(inverse.operand(), offset, depth);</span>
+<span class="fc" id="L192">            };</span>
+<span class="fc" id="L193">            nodeIndex++;</span>
+<span class="fc" id="L194">            return masks;</span>
+        }
+
+        private Masks leaf(int offset) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            expect(offset + 2 &lt;= certificate.pencil().order(), &quot;LEAF_ORDER&quot;);</span>
+<span class="fc" id="L199">            constant(offset, offset, ONE);</span>
+<span class="fc" id="L200">            constant(offset + 1, offset, ZERO);</span>
+<span class="fc" id="L201">            constant(offset + 1, offset + 1, ONE);</span>
+<span class="fc" id="L202">            work.reserve(4);</span>
+<span class="fc" id="L203">            return new Masks(new byte[]{1, 0}, new byte[]{0, 1});</span>
+        }
+
+        private Masks binary(RationalFormula left, RationalFormula right, int offset, int depth, boolean product) {
+<span class="fc" id="L207">            Masks a = node(left, offset, depth + 1);</span>
+<span class="fc" id="L208">            int split = offset + a.order();</span>
+<span class="fc" id="L209">            Masks b = node(right, split, depth + 1);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (int i = 0; i &lt; a.order(); i++) {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                for (int j = 0; j &lt; b.order(); j++) {</span>
+<span class="fc" id="L212">                    constant(split + j, offset + i, ZERO);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                    constant(offset + i, split + j, product ? unit(-a.v()[i] * b.u()[j]) : ZERO);</span>
+                }
+            }
+<span class="fc" id="L216">            int order = a.order() + b.order();</span>
+<span class="fc" id="L217">            work.reserve(2L * order);</span>
+<span class="fc" id="L218">            byte[] u = new byte[order];</span>
+<span class="fc" id="L219">            byte[] v = new byte[order];</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            for (int i = 0; i &lt; order; i++) {</span>
+<span class="fc" id="L221">                work.ledger.charge(1);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                if (i &lt; a.order()) {</span>
+<span class="fc" id="L223">                    u[i] = a.u()[i];</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                    v[i] = product ? 0 : a.v()[i];</span>
+                } else {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                    u[i] = product ? 0 : b.u()[i - a.order()];</span>
+<span class="fc" id="L227">                    v[i] = b.v()[i - a.order()];</span>
+                }
+            }
+<span class="fc" id="L230">            return new Masks(u, v);</span>
+        }
+
+        private Masks inverse(RationalFormula operand, int offset, int depth) {
+<span class="fc" id="L234">            Masks child = node(operand, offset, depth + 1);</span>
+<span class="fc" id="L235">            int order = child.order() + 1;</span>
+<span class="fc" id="L236">            int border = offset + order - 1;</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            expect(border &lt; certificate.pencil().order(), &quot;INVERSE_ORDER&quot;);</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            for (int i = 0; i &lt; child.order(); i++) {</span>
+<span class="fc" id="L239">                constant(offset + i, border, unit(child.v()[i]));</span>
+<span class="fc" id="L240">                constant(border, offset + i, unit(child.u()[i]));</span>
+            }
+<span class="fc" id="L242">            constant(border, border, ZERO);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            expect(obligationIndex &lt; certificate.obligations().size(), &quot;MISSING_INVERSE_OBLIGATION&quot;);</span>
+<span class="fc" id="L244">            var obligation = certificate.obligations().get(obligationIndex++);</span>
+<span class="pc bpc" id="L245" title="2 of 6 branches missed.">            expect(obligation.occurrence() == nodeIndex &amp;&amp; obligation.offset() == offset &amp;&amp; obligation.order() == order,</span>
+                &quot;INVERSE_OCCURRENCE&quot;);
+<span class="fc" id="L247">            work.reserve(2L * order);</span>
+<span class="fc" id="L248">            byte[] u = new byte[order];</span>
+<span class="fc" id="L249">            byte[] v = new byte[order];</span>
+<span class="fc" id="L250">            u[order - 1] = -1;</span>
+<span class="fc" id="L251">            v[order - 1] = 1;</span>
+<span class="fc" id="L252">            return new Masks(u, v);</span>
+        }
+
+        private void constant(int row, int column, ExactRational value) {
+<span class="fc" id="L256">            work.ledger.charge(1);</span>
+<span class="fc" id="L257">            var entry = certificate.pencil().entry(row, column);</span>
+<span class="pc bpc" id="L258" title="1 of 4 branches missed.">            expect(entry instanceof Constant scalar &amp;&amp; work.ledger.check(scalar.value()).equals(value), &quot;PENCIL_ENTRY&quot;);</span>
+<span class="fc" id="L259">        }</span>
+
+        private static ExactRational unit(int sign) {
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (sign == 0) return ZERO;</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            return sign &gt; 0 ? ONE : NEGATIVE_ONE;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SosSourceComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.positivity</a> &gt; <span class="el_source">SosSourceComparison.java</span></div><h1>SosSourceComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.positivity;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Monomial;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+import java.util.TreeMap;
+
+/** Structural source binding for the validated sparse polynomials and ordered SOS templates. */
+final class SosSourceComparison {
+    private SosSourceComparison() {}
+
+    static boolean template(SosSynthesis.Template a, SosSynthesis.Template b, CertificateWork work) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="pc bpc" id="L17" title="1 of 4 branches missed.">        if (a.premises().size() != b.premises().size() || !basis(a.basis(), b.basis(), work)</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">                || !values(a.freeValues(), b.freeValues(), work)) return false;</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        for (int i = 0; i &lt; a.premises().size(); i++) {</span>
+<span class="fc" id="L20">            work.charge(1);</span>
+<span class="fc" id="L21">            var left = a.premises().get(i);</span>
+<span class="fc" id="L22">            var right = b.premises().get(i);</span>
+<span class="pc bpc" id="L23" title="1 of 4 branches missed.">            if (left.relation() != right.relation() || !basis(left.basis(), right.basis(), work)</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">                    || !polynomial(left.polynomial(), right.polynomial(), work)) return false;</span>
+        }
+<span class="fc" id="L26">        return true;</span>
+    }
+
+    static boolean values(List&lt;ExactRational&gt; a, List&lt;ExactRational&gt; b, CertificateWork work) {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (a.size() != b.size()) return false;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (int i = 0; i &lt; a.size(); i++) {</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (!work.check(a.get(i)).equals(b.get(i))) return false;</span>
+        }
+<span class="fc" id="L35">        return true;</span>
+    }
+
+    static boolean basis(List&lt;Monomial&gt; a, List&lt;Monomial&gt; b, CertificateWork work) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (a.size() != b.size()) return false;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (int i = 0; i &lt; a.size(); i++) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (compareMonomials(a.get(i), b.get(i), work) != 0) return false;</span>
+        }
+<span class="fc" id="L44">        return true;</span>
+    }
+
+    static boolean polynomial(Polynomial a, Polynomial b, CertificateWork work) {
+<span class="fc" id="L48">        work.charge(1);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (a == b) return true;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (a.termCount() != b.termCount()) return false;</span>
+        // Polynomial terms are unordered. A checked tree lookup avoids a hash-bucket scan over
+        // arbitrarily many colliding monomials with no budget checkpoints.
+<span class="fc" id="L53">        work.cells(a.termCount());</span>
+<span class="fc" id="L54">        var index = new TreeMap&lt;Monomial, Rational&gt;((left, right) -&gt; compareMonomials(left, right, work));</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (var term : a.terms().entrySet()) {</span>
+<span class="fc" id="L56">            work.charge(1);</span>
+<span class="fc" id="L57">            index.put(term.getKey(), term.getValue());</span>
+<span class="fc" id="L58">        }</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var term : b.terms().entrySet()) {</span>
+<span class="fc" id="L60">            var coefficient = index.get(term.getKey());</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">            if (coefficient == null || !work.check(term.getValue().exactValue()).equals(coefficient.exactValue())) return false;</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">        return true;</span>
+    }
+
+    private static int compareMonomials(Monomial a, Monomial b, CertificateWork work) {
+<span class="fc" id="L67">        work.charge(1);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (a == b) return 0;</span>
+<span class="fc" id="L69">        int count = Integer.compare(a.powers().size(), b.powers().size());</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (count != 0) return count;</span>
+        // Monomial stores its variable/exponent entries in ascending variable order.
+<span class="fc" id="L72">        var right = b.powers().entrySet().iterator();</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        for (var left : a.powers().entrySet()) {</span>
+<span class="fc" id="L74">            work.charge(1);</span>
+<span class="fc" id="L75">            var other = right.next();</span>
+<span class="fc" id="L76">            int name = compareNames(left.getKey(), other.getKey(), work);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (name != 0) return name;</span>
+<span class="nc" id="L78">            int exponent = Integer.compare(left.getValue(), other.getValue());</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (exponent != 0) return exponent;</span>
+<span class="nc" id="L80">        }</span>
+<span class="nc" id="L81">        return 0;</span>
+    }
+
+    static int compareNames(String a, String b, CertificateWork work) {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (a == b) return 0;</span>
+<span class="fc" id="L86">        int common = Math.min(a.length(), b.length());</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (int start = 0; start &lt; common;) {</span>
+<span class="fc" id="L88">            work.charge(1);</span>
+<span class="fc" id="L89">            int end = start + Math.min(64, common - start);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (int i = start; i &lt; end; i++) {</span>
+<span class="fc" id="L91">                int order = Character.compare(a.charAt(i), b.charAt(i));</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (order != 0) return order;</span>
+            }
+<span class="fc" id="L94">            start = end;</span>
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        return Integer.compare(a.length(), b.length());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

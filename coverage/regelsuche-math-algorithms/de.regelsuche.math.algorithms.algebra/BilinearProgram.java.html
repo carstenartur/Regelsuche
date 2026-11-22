@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearProgram.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearProgram.java</span></div><h1>BilinearProgram.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+
+/** U and V hold one row per product; W holds one row of product weights per output. */
+public record BilinearProgram(List&lt;List&lt;ExactRational&gt;&gt; u, List&lt;List&lt;ExactRational&gt;&gt; v,
+                             List&lt;List&lt;ExactRational&gt;&gt; w) {
+<span class="fc" id="L15">    public BilinearProgram {</span>
+<span class="fc" id="L16">        u = copyRows(u);</span>
+<span class="fc" id="L17">        v = copyRows(v);</span>
+<span class="fc" id="L18">        w = copyRows(w);</span>
+<span class="fc" id="L19">    }</span>
+
+    private static List&lt;List&lt;ExactRational&gt;&gt; copyRows(List&lt;List&lt;ExactRational&gt;&gt; rows) {
+<span class="fc" id="L22">        return rows.stream().map(List::copyOf).toList();</span>
+    }
+
+    /** One flattened, left-major coefficient matrix per output. */
+    public record Tensor(int leftSize, int rightSize, List&lt;List&lt;ExactRational&gt;&gt; outputs) {
+<span class="fc" id="L27">        public Tensor {</span>
+<span class="fc" id="L28">            outputs = copyRows(outputs);</span>
+<span class="pc bpc" id="L29" title="3 of 6 branches missed.">            if (leftSize &lt; 1 || rightSize &lt; 1 || outputs.isEmpty()) {</span>
+<span class="nc" id="L30">                throw new IllegalArgumentException(&quot;EMPTY_TENSOR_DIMENSION&quot;);</span>
+            }
+<span class="fc" id="L32">            requireWidth(outputs, (long) leftSize * rightSize);</span>
+<span class="fc" id="L33">        }</span>
+    }
+
+    /** Every pair from the left and right dictionaries is eligible, in the supplied order. */
+    public record Request(Tensor tensor, List&lt;List&lt;ExactRational&gt;&gt; leftForms,
+                          List&lt;List&lt;ExactRational&gt;&gt; rightForms, int maximumProducts) {
+<span class="fc" id="L39">        public Request {</span>
+<span class="fc" id="L40">            Objects.requireNonNull(tensor);</span>
+<span class="fc" id="L41">            leftForms = copyRows(leftForms);</span>
+<span class="fc" id="L42">            rightForms = copyRows(rightForms);</span>
+<span class="fc" id="L43">            requireWidth(leftForms, tensor.leftSize());</span>
+<span class="fc" id="L44">            requireWidth(rightForms, tensor.rightSize());</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (maximumProducts &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_PRODUCT_LIMIT&quot;);</span>
+<span class="fc" id="L46">        }</span>
+
+        long checkInputs(CertificateWork work) {
+<span class="fc" id="L49">            long cells = matrixCells(tensor.outputs()) + matrixCells(leftForms) + matrixCells(rightForms);</span>
+<span class="fc" id="L50">            work.cells(cells);</span>
+<span class="fc" id="L51">            checkEntries(tensor.outputs(), work);</span>
+<span class="fc" id="L52">            checkEntries(leftForms, work);</span>
+<span class="fc" id="L53">            checkEntries(rightForms, work);</span>
+<span class="fc" id="L54">            return cells;</span>
+        }
+    }
+
+    private static void requireWidth(List&lt;List&lt;ExactRational&gt;&gt; rows, long width) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (row.size() != width) throw new IllegalArgumentException(&quot;INVALID_ROW_WIDTH&quot;);</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">    }</span>
+
+    // Rectangular matrices only. A row descriptor counts even for zero-width output weights.
+    static long matrixCells(List&lt;List&lt;ExactRational&gt;&gt; rows) {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        return rows.isEmpty() ? 0 : (long) rows.size() * (1L + rows.getFirst().size());</span>
+    }
+
+    static void checkEntries(List&lt;List&lt;ExactRational&gt;&gt; rows, CertificateWork work) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L71">            work.charge(1);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (var value : row) work.check(value);</span>
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">    }</span>
+
+    /** Straight-line schedule counts with nonunit scaling (including -1) and peak scalar temporaries. */
+<span class="fc" id="L77">    public record Cost(long variableMultiplications, long additions,</span>
+                       long constantMultiplications, long peakTemporaries) {}
+
+    public record Witness(BilinearProgram program, Cost cost) {
+<span class="fc" id="L81">        public Witness {</span>
+<span class="fc" id="L82">            Objects.requireNonNull(program);</span>
+<span class="fc" id="L83">            Objects.requireNonNull(cost);</span>
+<span class="fc" id="L84">        }</span>
+    }
+
+<span class="fc" id="L87">    public enum Status { VERIFIED, REJECTED, INCONCLUSIVE }</span>
+
+    public record Result&lt;T&gt;(Status status, String reason, Optional&lt;T&gt; value, long work) {
+<span class="fc" id="L90">        public Result {</span>
+<span class="fc" id="L91">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L92">            Objects.requireNonNull(reason);</span>
+<span class="fc" id="L93">            Objects.requireNonNull(value);</span>
+<span class="pc bpc" id="L94" title="2 of 6 branches missed.">            if ((status == Status.VERIFIED) != value.isPresent() || work &lt; 0) {</span>
+<span class="nc" id="L95">                throw new IllegalArgumentException(&quot;INVALID_BILINEAR_RESULT&quot;);</span>
+            }
+<span class="fc" id="L97">        }</span>
+    }
+
+    static &lt;T&gt; Result&lt;T&gt; run(IterationLimits limits, BooleanSupplier cancellation,
+                             Function&lt;CertificateWork, T&gt; operation) {
+<span class="fc" id="L102">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L104">            work.charge(0);</span>
+<span class="fc" id="L105">            T verified = operation.apply(work);</span>
+<span class="fc" id="L106">            work.charge(0);</span>
+<span class="fc" id="L107">            return new Result&lt;&gt;(Status.VERIFIED, &quot;VERIFIED&quot;, Optional.of(verified), work.used());</span>
+<span class="fc" id="L108">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L109">            return new Result&lt;&gt;(Status.INCONCLUSIVE, stop.getMessage(), Optional.empty(), work.used());</span>
+<span class="fc" id="L110">        } catch (Rejection invalid) {</span>
+<span class="fc" id="L111">            return new Result&lt;&gt;(Status.REJECTED, invalid.getMessage(), Optional.empty(), work.used());</span>
+        }
+    }
+
+    static final class Rejection extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+<span class="fc" id="L117">        Rejection(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
