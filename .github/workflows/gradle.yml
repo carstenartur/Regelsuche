@@ -188,21 +188,9 @@ jobs:
           mvn --batch-mode --no-transfer-progress \
             -f playwright-bootstrap/pom.xml \
             org.codehaus.mojo:exec-maven-plugin:3.5.0:java
-      - name: Prepare the exact Git-free source archive
-        id: source_archive
-        run: |
-          set -euo pipefail
-          source_root="$(mktemp -d "${RUNNER_TEMP}/regelsuche-maven-source.XXXXXXXX")"
-          echo "root=$source_root" >> "$GITHUB_OUTPUT"
-          git archive --format=tar HEAD | tar -xf - -C "$source_root"
-          mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am \
-            -Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false \
-            -DdisableXmlReport=true -Dsurefire.useFile=false -Djacoco.skip=true \
-            -Dregelsuche.qualityAcceptance.registerArchive=true \
-            "-Dregelsuche.qualityAcceptance.registration=$source_root/build/authority-evidence/quality-source-tree.json" test
       - name: Verify the complete Maven product and Docker contract
         id: full_maven_product
-        run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify
+        run: mvn --batch-mode --no-transfer-progress -Pfull,sdk-release,web-workbench-image verify
       - name: Retain the original full Maven reactor reports
         if: ${{ always() && !cancelled() && steps.full_maven_product.outcome != 'skipped' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -223,11 +211,13 @@ jobs:
           reports=(**/target/surefire-reports/TEST-*.xml **/target/failsafe-reports/TEST-*.xml)
           cp --parents -- "${reports[@]}" "$report_root"
           echo "root=$report_root" >> "$GITHUB_OUTPUT"
-      - name: Verify Maven Web Workbench Docker image through JUnit/Testcontainers
-        timeout-minutes: 40
+      - name: Verify executed Web Workbench image tests from the retained Maven XML
+        id: verify_workbench_evidence
+        env:
+          REGELSUCHE_MAVEN_REPORT_ROOT: ${{ steps.full_maven_reports.outputs.root }}
         run: >-
-          mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image
-          -pl regelsuche-integration-tests -am verify
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -Pverify-workbench-report
+          "-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}" test
       - name: Replay retained Maven Surefire and Failsafe pages without Gradle inputs
         env:
           REGELSUCHE_MAVEN_REPORT_ROOT: ${{ steps.full_maven_reports.outputs.root }}
@@ -235,6 +225,74 @@ jobs:
           mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
           -Dregelsuche.tests.mavenPages=true
           "-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}" verify
+      - name: Retain Maven product verification evidence
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: maven-product-verification
+          path: |
+            build/reports/released-sdk-maven-consumers/**
+            build/reports/python-client/**
+            app/target/reports/hidden-rule-pilot/**
+            regelsuche-jmh/target/reports/jmh/**
+            regelsuche-sympy-jmh/target/reports/jmh/**
+            regelsuche-browser-tests/target/reports/browser/**
+            regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+            **/target/discovery-artifacts/**
+            public/maven-tests/**
+          include-hidden-files: true
+          if-no-files-found: warn
+
+  maven-git-free-verification:
+    name: Complete Git-free Maven lifecycle
+    if: github.event_name != 'create'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    env:
+      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REGELSUCHE_AUTHORITY_GITHUB_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0, ref: "${{ github.sha }}" }
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with:
+          distribution: temurin
+          java-version: '25'
+          problem-matcher: true
+          verify-signature: true
+          cache: maven
+      - name: Install independent Maven checkout prerequisites
+        run: |
+          # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+          # The 22.04 hosted mirrorlist can stall for an hour on its Azure HTTP entry.
+          # Prefer the same official Ubuntu archive over HTTPS; retain package pins.
+          if test -f /etc/apt/apt-mirrors.txt; then
+            sudo sed -i 's#http://azure.archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            patchelf=0.14.3-1 \
+            python3-venv \
+            z3=4.8.12-1
+          mvn --batch-mode --no-transfer-progress \
+            -f playwright-bootstrap/pom.xml \
+            org.codehaus.mojo:exec-maven-plugin:3.5.0:java
+      - name: Prepare the exact Git-free source archive
+        id: source_archive
+        run: |
+          set -euo pipefail
+          source_root="$(mktemp -d "${RUNNER_TEMP}/regelsuche-maven-source.XXXXXXXX")"
+          echo "root=$source_root" >> "$GITHUB_OUTPUT"
+          git archive --format=tar HEAD | tar -xf - -C "$source_root"
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am \
+            -Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false \
+            -DdisableXmlReport=true -Dsurefire.useFile=false -Djacoco.skip=true \
+            -Dregelsuche.qualityAcceptance.registerArchive=true \
+            "-Dregelsuche.qualityAcceptance.registration=$source_root/build/authority-evidence/quality-source-tree.json" test
       - name: Reproduce full Maven lifecycle from a Git-free source archive
         env:
           REGELSUCHE_SOURCE_ARCHIVE_ROOT: ${{ steps.source_archive.outputs.root }}
@@ -274,25 +332,6 @@ jobs:
             ${{ steps.source_archive.outputs.root }}/build/reports/python-client/**
             ${{ steps.source_archive.outputs.root }}/build/reports/released-sdk-maven-consumers/**
           if-no-files-found: error
-      - name: Retain Maven product verification evidence
-        if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: maven-product-verification
-          path: |
-            build/reports/released-sdk-maven-consumers/**
-            build/reports/python-client/**
-            app/target/reports/hidden-rule-pilot/**
-            regelsuche-jmh/target/reports/jmh/**
-            regelsuche-sympy-jmh/target/reports/jmh/**
-            regelsuche-browser-tests/target/reports/browser/**
-            regelsuche-quality-aggregate/target/reports/release-readiness-qualified/**
-            **/target/surefire-reports/**
-            **/target/failsafe-reports/**
-            **/target/discovery-artifacts/**
-            public/maven-tests/**
-          include-hidden-files: true
-          if-no-files-found: warn
 
   maven-student-sdk-archive-qualification:
     name: Fresh Maven Student SDK archive qualification
@@ -531,7 +570,7 @@ jobs:
 
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs, native-scalar-reproduction, maven-polynomial-qualification, maven-native-polynomial-study, maven-typed-polynomial-study, maven-student-sdk-archive-qualification]
+    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, maven-git-free-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs, native-scalar-reproduction, maven-polynomial-qualification, maven-native-polynomial-study, maven-typed-polynomial-study, maven-student-sdk-archive-qualification]
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
@@ -539,7 +578,7 @@ jobs:
     steps:
       - name: Reject incomplete verification authority
         if: >-
-          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success' || needs.native-scalar-reproduction.result != 'success' || needs.maven-polynomial-qualification.result != 'success' || needs.maven-native-polynomial-study.result != 'success' || needs.maven-typed-polynomial-study.result != 'success' || needs.maven-student-sdk-archive-qualification.result != 'success')) }}
+          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.maven-git-free-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success' || needs.native-scalar-reproduction.result != 'success' || needs.maven-polynomial-qualification.result != 'success' || needs.maven-native-polynomial-study.result != 'success' || needs.maven-typed-polynomial-study.result != 'success' || needs.maven-student-sdk-archive-qualification.result != 'success')) }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
@@ -579,7 +618,7 @@ jobs:
           if-no-files-found: error
       - name: Retain converged coverage evidence
         if: >-
-          ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || needs.maven-product-verification.result == 'success') }}
+          ${{ always() && !cancelled() && needs.gradle-verification.result == 'success' && needs.jmh-verification.result == 'success' && needs.sympy-runtime-verification.result == 'success' && (github.event_name == 'create' || (needs.maven-product-verification.result == 'success' && needs.maven-git-free-verification.result == 'success')) }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: coverage-verification
@@ -590,7 +629,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} TypedPolynomial=${{ needs.typed-external-polynomial-comparison.result }} MavenPolynomial=${{ needs.maven-polynomial-qualification.result }} MavenNativePolynomial=${{ needs.maven-native-polynomial-study.result }} MavenTypedPolynomial=${{ needs.maven-typed-polynomial-study.result }} MavenStudentSdkArchive=${{ needs.maven-student-sdk-archive-qualification.result }} Coverage=success"
+        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} MavenGitFree=${{ needs.maven-git-free-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} TypedPolynomial=${{ needs.typed-external-polynomial-comparison.result }} MavenPolynomial=${{ needs.maven-polynomial-qualification.result }} MavenNativePolynomial=${{ needs.maven-native-polynomial-study.result }} MavenTypedPolynomial=${{ needs.maven-typed-polynomial-study.result }} MavenStudentSdkArchive=${{ needs.maven-student-sdk-archive-qualification.result }} Coverage=success"
 
   publish-pages:
     name: Publish generated reports

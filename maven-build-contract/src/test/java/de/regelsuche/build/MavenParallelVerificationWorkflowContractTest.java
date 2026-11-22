@@ -33,7 +33,8 @@ class MavenParallelVerificationWorkflowContractTest {
       .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
   private static final String PLAYWRIGHT_VERSION = "1.65.0";
   private static final String FULL_MAVEN_COMMAND =
-      "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
+      "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release,web-workbench-image verify";
+  private static final String GIT_FREE_AUTHORITY = "maven-git-free-verification";
   private static final String COVERAGE_PROFILE = "verify-cross-authority-coverage";
   private static final String PUBLISH_COVERAGE = "regelsuche.coverage.publish";
   private static final String COVERAGE_MAVEN_COMMAND =
@@ -47,7 +48,7 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final Set<String> SHOWCASE_AUTHORITIES = Set.of(
       "gradle-verification", "jmh-verification", "sympy-runtime-verification");
   private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
-      "maven-product-verification", "external-polynomial-comparison",
+      "maven-product-verification", GIT_FREE_AUTHORITY, "external-polynomial-comparison",
       "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
       "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-student-sdk-archive-qualification");
   private static final Pattern FAILURE_TERM =
@@ -78,7 +79,7 @@ class MavenParallelVerificationWorkflowContractTest {
     String maven = section(
         workflow,
         "  maven-product-verification:\n",
-        "  external-polynomial-comparison:\n");
+        "  " + GIT_FREE_AUTHORITY + ":\n");
     String convergence = section(
         workflow,
         "  verification:\n",
@@ -180,7 +181,9 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(maven.contains(
         "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"));
     assertTrue(maven.contains(FULL_MAVEN_COMMAND),
-        "the complete product and Docker contract must remain unchanged");
+        "the complete checkout reactor must also run the Web Workbench image suite");
+    assertFalse(maven.contains("-Pfull,web-workbench-image"),
+        "Web Workbench must not rerun the upstream reactor");
     assertFalse(maven.contains("needs:"),
         "Maven must begin concurrently rather than wait for another authority");
     assertFalse(maven.contains("actions/download-artifact@"),
@@ -222,6 +225,13 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(convergence.contains(
         "needs.sympy-runtime-verification.result == 'success'"),
         "coverage retention must require the independent runtime authority");
+    JsonNode coverageRetention = jobs.required("verification").required("steps")
+        .valueStream().filter(step -> "coverage-verification".equals(step.path("with").path("name").asText()))
+        .findFirst().orElseThrow();
+    assertTrue(compact(coverageRetention.required("if").asText()).contains(
+        "(github.event_name == 'create' || (needs.maven-product-verification.result == 'success' && "
+            + "needs." + GIT_FREE_AUTHORITY + ".result == 'success'))"),
+        "routine coverage retention must require both Maven authorities");
     assertTrue(convergence.contains("if-no-files-found: error"),
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
@@ -260,16 +270,9 @@ class MavenParallelVerificationWorkflowContractTest {
         .required("steps").valueStream().toList();
     var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
         .findFirst().orElseThrow();
-    var registration = steps.stream()
-        .filter(step -> step.path("run").asText().contains("-Dregelsuche.qualityAcceptance.registerArchive=true"))
-        .findFirst().orElseThrow();
-    assertTrue(steps.indexOf(registration) < steps.indexOf(product),
-        "register the archive before the full lifecycle produces reports in the original checkout");
-    var registrationCommand = registration.path("run").asText();
-    assertTrue(registrationCommand.contains("-DdisableXmlReport=true")
-        && registrationCommand.contains("-Dsurefire.useFile=false")
-        && registrationCommand.contains("-Djacoco.skip=true"),
-        "an early failure must not publish registration-only output as the full reactor result");
+    assertFalse(steps.stream().anyMatch(step ->
+        step.path("run").asText().contains("-Dregelsuche.qualityAcceptance.registerArchive=true")),
+        "the checkout reactor must run independently of archive preparation");
 
     var retention = steps.stream()
         .filter(step -> "maven-full-reactor-verification".equals(step.path("with").path("name").asText()))
@@ -285,6 +288,33 @@ class MavenParallelVerificationWorkflowContractTest {
     var paths = retention.required("with").required("path").asText().lines().map(String::strip).toList();
     assertTrue(paths.containsAll(List.of("**/target/surefire-reports/**", "**/target/failsafe-reports/**",
         "**/target/jacoco.exec", "**/target/site/jacoco/**")), "retain the original test and JaCoCo evidence");
+  }
+
+  @Test
+  void gitFreeLifecycleStartsWithoutWaitingForTheCheckoutAndOwnsItsSource() throws IOException {
+    var jobs = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml"))).required("jobs");
+    var archive = jobs.get(GIT_FREE_AUTHORITY);
+    assertNotNull(archive, "the complete Git-free lifecycle must be an independent CI job");
+    assertEquals("github.event_name != 'create'", archive.required("if").asText());
+    assertFalse(archive.has("needs"), "archive verification must start in parallel with checkout verification");
+    assertFalse(archive.has("continue-on-error"));
+    assertEquals("${{ github.sha }}", archive.required("env").required("REGELSUCHE_AUTHORITY_GITHUB_SHA").asText());
+    var steps = archive.required("steps").valueStream().toList();
+    assertFalse(steps.stream().anyMatch(step -> step.path("uses").asText().startsWith("actions/download-artifact@")),
+        "the archive must be prepared from its own checkout");
+    assertFalse(steps.stream().anyMatch(step -> step.has("continue-on-error")));
+    var checkout = steps.stream().filter(step -> step.path("uses").asText().startsWith("actions/checkout@"))
+        .findFirst().orElseThrow();
+    assertEquals("${{ github.sha }}", checkout.required("with").required("ref").asText());
+    assertEquals("0", checkout.required("with").required("fetch-depth").asText());
+    var registration = steps.stream().filter(step -> "source_archive".equals(step.path("id").asText()))
+        .findFirst().orElseThrow();
+    assertTrue(steps.indexOf(checkout) < steps.indexOf(registration));
+    var registrationCommand = registration.required("run").asText();
+    assertTrue(registrationCommand.contains("-DdisableXmlReport=true")
+        && registrationCommand.contains("-Dsurefire.useFile=false")
+        && registrationCommand.contains("-Djacoco.skip=true"),
+        "registration-only output must not be retained as reactor evidence");
   }
 
   @Test
@@ -310,6 +340,48 @@ class MavenParallelVerificationWorkflowContractTest {
     assertEquals("${{ steps.full_maven_reports.outputs.root }}",
         replay.required("env").required("REGELSUCHE_MAVEN_REPORT_ROOT").asText());
     assertTrue(replay.path("run").asText().contains("-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}"));
+  }
+
+  @Test
+  void workbenchImageEvidenceMustComeFromTheUnmodifiedCheckoutSnapshot() throws Exception {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var snapshot = steps.stream().filter(step -> "full_maven_reports".equals(step.path("id").asText()))
+        .findFirst().orElseThrow();
+    var proof = steps.stream().filter(step -> "verify_workbench_evidence".equals(step.path("id").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("the checkout must verify the executed Workbench image suite"));
+    assertTrue(steps.indexOf(snapshot) < steps.indexOf(proof));
+    assertFalse(proof.has("if") || proof.has("continue-on-error"));
+    assertEquals("${{ steps.full_maven_reports.outputs.root }}",
+        proof.required("env").required("REGELSUCHE_MAVEN_REPORT_ROOT").asText());
+    assertEquals("mvn --batch-mode --no-transfer-progress -pl maven-build-contract -Pverify-workbench-report "
+        + "\"-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}\" "
+        + "test", proof.required("run").asText().strip());
+
+    var pom = parse(repositoryRoot().resolve("maven-build-contract/pom.xml")).getDocumentElement();
+    var profile = requiredChild(directChild(pom, "profiles"), "profile", "id", "verify-workbench-report");
+    var surefire = requiredChild(directChild(directChild(profile, "build"), "plugins"),
+        "plugin", "artifactId", "maven-surefire-plugin");
+    var selector = directChild(surefire, "configuration");
+    assertStrictWorkbenchReportSelector(selector);
+    for (String flag : List.of("failIfNoTests", "failIfNoSpecifiedTests")) {
+      var permissive = (Element) selector.cloneNode(true);
+      directChild(permissive, flag).setTextContent("false");
+      assertThrows(AssertionError.class, () -> assertStrictWorkbenchReportSelector(permissive));
+    }
+    var missingTest = (Element) selector.cloneNode(true);
+    missingTest.removeChild(directChild(missingTest, "test"));
+    assertThrows(AssertionError.class, () -> assertStrictWorkbenchReportSelector(missingTest));
+  }
+
+  private static void assertStrictWorkbenchReportSelector(Element selector) {
+    assertEquals("MavenBuildContractTest#checkoutReportRequiresExecutedWorkbenchImageTests",
+        directChildText(selector, "test"));
+    assertEquals("true", directChildText(selector, "failIfNoTests"));
+    assertEquals("true", directChildText(selector, "failIfNoSpecifiedTests"));
+    assertEquals("true", directChildText(directChild(selector, "systemPropertyVariables"),
+        "regelsuche.tests.requireWorkbenchImageReport"));
   }
 
   @Test

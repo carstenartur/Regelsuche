@@ -17,6 +17,32 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Rationale SOS-Zeugen und polynomielle Potentiale suchen
+
+- **Hypothese.** Exakte Koeffizientengleichungen und begrenzte rationale Gitter können prüfbare Ungleichungszeugen und Potentiale aus einer vorgegebenen Basis finden.
+- **Umsetzungsstand.** `SosSynthesis` löst Gram-Koeffizientengleichungen einschließlich polynomialer Nichtnegativitätsprämissen und signierter Gleichungsmultiplikatoren. `SosVerifier` rekonstruiert die vollständige Identität und prüft alle PSD-Blöcke. `PolynomialPotential` sucht zusätzlich beide Ungleichungen für eine simultane Transition; das SDK delegiert.
+- **Befund.** Alle 144 binären quadratischen Fälle stimmen mit dem unabhängigen Determinantenkriterium überein: 72 erhalten einen Zeugen, darunter elf singuläre; 72 bleiben offen. Weitere Prüfungen decken freie Gram-Koordinaten, drei Variablen, nichtlineare Transitionen, unveränderte Rahmenvariablen und verfälschte Quellen ab. Das ausführbare Beispiel findet `V=x²` für `x -> x-1` auf `x>=1`. [Vertrag, Tests und Reproduktion](sos-synthesis.md)
+- **Folgerung.** Für kleine explizite Basis- und Gitterräume einsetzen. Ein Suchabbruch widerlegt keine Ungleichung. Eine Terminierungsfolgerung setzt den bestätigten aktiven Bereich und tatsächlichen Übergang voraus.
+
+- [`SosSynthesis.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/SosSynthesis.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/SosSynthesis.java | public final class SosSynthesis { -->
+- [`SosVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/SosVerifier.java#L12) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/SosVerifier.java | public final class SosVerifier { -->
+- [`PolynomialPotential.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/PolynomialPotential.java#L19) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/positivity/PolynomialPotential.java | public final class PolynomialPotential { -->
+- [`SosSynthesisTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/SosSynthesisTest.java#L17) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/SosSynthesisTest.java | class SosSynthesisTest { -->
+- [`PolynomialPotentialTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/PolynomialPotentialTest.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/positivity/PolynomialPotentialTest.java | class PolynomialPotentialTest { -->
+- [`SosSynthesisSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/positivity/SosSynthesisSdk.java#L11) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/positivity/SosSynthesisSdk.java | public final class SosSynthesisSdk { -->
+
+## Gemeinsame bilineare Programme in endlichen Formenkatalogen
+
+- **Hypothese.** Ein gemeinsames rationales Tensorprogramm kann mehrere Ausgaben mit weniger variablen Multiplikationen berechnen, wenn geeignete lineare Eingabeformen im Katalog liegen.
+- **Umsetzungsstand.** `BilinearProgramSearch` enumeriert Produktmengen und löst die Ausgabegewichte gemeinsam durch exakte Elimination. `BilinearProgramVerifier` prüft Katalogzugehörigkeit und jeden Tensorkoeffizienten. Die SDK-Auswertung prüft den Auftrag erneut und verwendet das Restbudget.
+- **Befund.** Zweiterm-Faltung verwendet drei statt vier variable Produkte, vier statt einer Addition, zwei explizite Vorzeichenfaktoren und fünf temporäre Skalarplätze. Alle 81 ternären Eingaben stimmen direkt überein. Zwei dichte rationale Ausgaben wurden auf 64 rationalen Eingabepaaren unabhängig kontrahiert; asymmetrische Dimensionen und manipulierter Quell-/Programmstand sind abgedeckt. [Vertrag, Kosten und Reproduktion](bilinear-program-search.md)
+- **Folgerung.** Der Befund belegt exakte Wiederverwendung von Produkten im angegebenen Katalog. Laufzeitgewinn, allgemeiner optimaler Tensor-Rang und automatische Java-Umschreibung benötigen eigene Nachweise.
+
+- [`BilinearProgramSearch.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/BilinearProgramSearch.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/BilinearProgramSearch.java | public final class BilinearProgramSearch { -->
+- [`BilinearProgramVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/BilinearProgramVerifier.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/BilinearProgramVerifier.java | public final class BilinearProgramVerifier { -->
+- [`BilinearProgramSearchTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/BilinearProgramSearchTest.java#L18) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/BilinearProgramSearchTest.java | class BilinearProgramSearchTest { -->
+- [`BilinearProgramSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/algebra/BilinearProgramSdk.java#L13) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/algebra/BilinearProgramSdk.java | public final class BilinearProgramSdk { -->
+
 ## Native bedingte Skalarsättigung
 
 - **Hypothese.** Native AC-Multimengen und bestätigte Nichtnullbedingungen können in einem endlichen rationalen Fragment Darstellungen erschließen, die eine geordnete Pfadsuche aus derselben Quelle verfehlt.

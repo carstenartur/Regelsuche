@@ -21,12 +21,17 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 class MavenBuildContractTest {
+    private static final String WORKBENCH_IMAGE_REPORT =
+        "regelsuche-integration-tests/target/failsafe-reports/"
+            + "TEST-de.regelsuche.dockere2e.WebWorkbenchDockerImageTest.xml";
+
     private static final List<String> EXPECTED_MODULES = List.of(
         "regelsuche-core",
         "regelsuche-egraph",
@@ -210,6 +215,33 @@ class MavenBuildContractTest {
     }
 
     @Test
+    @EnabledIfSystemProperty(named = "regelsuche.tests.requireWorkbenchImageReport", matches = "true")
+    void checkoutReportRequiresExecutedWorkbenchImageTests() throws Exception {
+        String snapshot = System.getProperty("regelsuche.tests.mavenReportRoot");
+        assertNotNull(snapshot, "the Workbench report snapshot must be configured");
+        assertFalse(snapshot.isBlank(), "the Workbench report snapshot must be configured");
+        executedContainerSuite(Path.of(snapshot).resolve(WORKBENCH_IMAGE_REPORT), true);
+    }
+
+    @Test
+    void workbenchImageEvidenceRejectsMissingEmptyFailedErroredOrSkippedTests(@TempDir Path temporary)
+            throws Exception {
+        Path report = temporary.resolve(WORKBENCH_IMAGE_REPORT);
+        assertThrows(AssertionError.class, () -> executedContainerSuite(report, true));
+        Files.createDirectories(report.getParent());
+        for (String counters : List.of(
+                "tests='0' failures='0' errors='0' skipped='0'",
+                "tests='11' failures='1' errors='0' skipped='0'",
+                "tests='11' failures='0' errors='1' skipped='0'",
+                "tests='11' failures='0' errors='0' skipped='1'")) {
+            Files.writeString(report, "<testsuite " + counters + "/>");
+            assertThrows(AssertionError.class, () -> executedContainerSuite(report, true));
+        }
+        Files.writeString(report, "<testsuite tests='11' failures='0' errors='0' skipped='0'/>");
+        assertEquals(11, executedContainerSuite(report, true));
+    }
+
+    @Test
     void containerReplayRejectsPartialSkippedFailedAndUnsafeEvidence(
             @TempDir Path temporary) throws Exception {
         Path reports = temporary.resolve("regelsuche-integration-tests/target/failsafe-reports");
@@ -251,26 +283,33 @@ class MavenBuildContractTest {
         Map<String, Long> executed = new LinkedHashMap<>();
         for (String suite : SOURCE_ARCHIVE_CONTAINER_SUITES) {
             Path report = reports.resolve("TEST-de.regelsuche.dockere2e." + suite + ".xml");
-            assertTrue(Files.isRegularFile(report),
-                () -> "missing container-backed Failsafe suite: " + report);
-            Element xml = parse(report).getDocumentElement();
-            assertEquals("testsuite", xml.getLocalName(),
-                () -> "invalid Failsafe suite in " + report);
-            int tests = Integer.parseInt(xml.getAttribute("tests"));
-            int failures = Integer.parseInt(xml.getAttribute("failures"));
-            int errors = Integer.parseInt(xml.getAttribute("errors"));
-            int skipped = Integer.parseInt(xml.getAttribute("skipped"));
-            assertTrue(tests > 0 && failures >= 0 && errors >= 0 && skipped >= 0
-                && failures + errors + skipped <= tests,
-                () -> "invalid Failsafe counters in " + report);
-            assertEquals(0, failures, () -> "failed container-backed test in " + report);
-            assertEquals(0, errors, () -> "errored container-backed test in " + report);
-            long run = tests - skipped;
-            assertTrue(run > 0,
-                () -> "no executed container-backed tests (skipped/empty): " + report);
-            executed.put(suite, run);
+            executed.put(suite, executedContainerSuite(report, false));
         }
         return executed;
+    }
+
+    private static long executedContainerSuite(Path report, boolean requireAllTests) throws Exception {
+        assertTrue(Files.isRegularFile(report),
+            () -> "missing container-backed Failsafe suite: " + report);
+        Element xml = parse(report).getDocumentElement();
+        assertEquals("testsuite", xml.getLocalName(),
+            () -> "invalid Failsafe suite in " + report);
+        int tests = Integer.parseInt(xml.getAttribute("tests"));
+        int failures = Integer.parseInt(xml.getAttribute("failures"));
+        int errors = Integer.parseInt(xml.getAttribute("errors"));
+        int skipped = Integer.parseInt(xml.getAttribute("skipped"));
+        assertTrue(tests > 0 && failures >= 0 && errors >= 0 && skipped >= 0
+            && failures + errors + skipped <= tests,
+            () -> "invalid Failsafe counters in " + report);
+        assertEquals(0, failures, () -> "failed container-backed test in " + report);
+        assertEquals(0, errors, () -> "errored container-backed test in " + report);
+        long run = tests - skipped;
+        assertTrue(run > 0,
+            () -> "no executed container-backed tests (skipped/empty): " + report);
+        if (requireAllTests) {
+            assertEquals(0, skipped, () -> "skipped container-backed test in " + report);
+        }
+        return run;
     }
 
     private static Map<String, Long> executedFirstSliceSurefireTests(Path root) throws Exception {
