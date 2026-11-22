@@ -5,8 +5,10 @@ import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.scalar.ExactRational;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import static de.regelsuche.math.algorithms.positivity.SosSynthesisTest.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -70,6 +72,93 @@ class PolynomialPotentialTest {
         var replay = PolynomialPotential.verify(request, proof, small, () -> false);
         assertEquals("TERM_LIMIT", replay.reason());
         assertFalse(replay.valid());
+    }
+
+    @Test void collidingZeroTransitionsConsumeWorkAndCanBeCancelledDuringValidation() {
+        var request = collisionRequest("0", "z");
+        var proof = PolynomialPotential.search(request, LIMITS, () -> false).certificate().orElseThrow();
+        var tiny = PolynomialPotential.verify(request, proof, LIMITS.withMaximumWork(200), () -> false);
+        assertEquals("WORK_LIMIT", tiny.reason());
+        var polls = new AtomicInteger();
+        var stopped = PolynomialPotential.verify(request, proof, LIMITS, () -> polls.incrementAndGet() == 300);
+        assertEquals("CANCELLED", stopped.reason());
+        assertTrue(stopped.work() >= 50, "The zero transitions traversed before cancellation must count.");
+        assertFalse(stopped.terminationUnderContract());
+    }
+
+    @Test void cancelsInSourceComparisonBeforeAChangedLastTransition() {
+        var request = collisionRequest("0", "z");
+        var proof = PolynomialPotential.search(request, LIMITS, () -> false).certificate().orElseThrow();
+        var early = collisionRequest("1", "z");
+        var late = collisionRequest("0", "y");
+        var seen = new AtomicInteger();
+        var mismatch = PolynomialPotential.verify(early, proof, LIMITS, () -> { seen.incrementAndGet(); return false; });
+        assertEquals("SOURCE_MISMATCH", mismatch.reason());
+        // Equal input shapes and values give the same validation cost. The late mismatch follows
+        // all 256 colliding names. Cancel after the early mismatch's checkpoint plus 40 more.
+        int cancelAt = seen.get() + 40;
+        seen.set(0);
+        var stopped = PolynomialPotential.verify(late, proof, LIMITS, () -> seen.incrementAndGet() == cancelAt);
+        assertEquals("CANCELLED", stopped.reason());
+        assertEquals("SOURCE_MISMATCH", PolynomialPotential.verify(late, proof, LIMITS, () -> false).reason());
+        assertTrue(PolynomialPotential.verify(collisionRequest("0","z"), proof, LIMITS, () -> false).valid());
+    }
+
+    @Test void snapshotAndReplayBindEveryRequestFieldAndUnorderedPolynomialTerms() {
+        var domain = template(List.of(C), new SosSynthesis.Premise(SosSynthesis.Relation.NONNEGATIVE, x, List.of(C)));
+        var transition = new LinkedHashMap<String, Polynomial>();
+        transition.put("x", x.subtract(one));
+        transition.put("unused", x.add(y));
+        var basis = List.of(X);
+        var grid = List.of(ExactRational.ONE);
+        var delta = ExactRational.ONE;
+        var req = new PolynomialPotential.Request(transition, domain, basis, grid, delta, true);
+        var proof = PolynomialPotential.search(req, LIMITS, () -> false).certificate().orElseThrow();
+        transition.put("unused", y.add(x));
+        var equivalent = new PolynomialPotential.Request(transition, domain, basis, grid, delta, true);
+        assertTrue(PolynomialPotential.verify(equivalent, proof, LIMITS, () -> false).valid());
+        var differentPremise = new SosSynthesis.Premise(SosSynthesis.Relation.ZERO, x, List.of(C));
+        for (var changed : List.of(
+                new PolynomialPotential.Request(transition, domain, basis, grid, delta, false),
+                new PolynomialPotential.Request(transition, domain, basis, grid, ExactRational.integer(2), true),
+                new PolynomialPotential.Request(transition, domain, List.of(Y), grid, delta, true),
+                new PolynomialPotential.Request(transition, domain, basis, GRID, delta, true),
+                new PolynomialPotential.Request(transition, template(List.of(C), differentPremise), basis, grid, delta, true),
+                new PolynomialPotential.Request(transition, new SosSynthesis.Template(domain.basis(),
+                    domain.premises(), grid), basis, grid, delta, true))) {
+            assertEquals("SOURCE_MISMATCH", PolynomialPotential.verify(changed, proof, LIMITS, () -> false).reason());
+        }
+        transition.put("unused", y);
+        assertEquals(x.add(y), req.transition().get("unused"));
+        assertThrows(UnsupportedOperationException.class, () -> req.transition().remove("absent"));
+        transition.put("unused", null);
+        assertThrows(NullPointerException.class, () -> new PolynomialPotential.Request(transition, domain, basis, grid, delta, true));
+        transition.clear();
+        transition.put(null, x);
+        assertThrows(NullPointerException.class, () -> new PolynomialPotential.Request(transition, domain, basis, grid, delta, true));
+    }
+
+    @Test void twoIdentityKeysWithTheSameVariableNameRemainAnInvalidTransition() {
+        var names = new java.util.IdentityHashMap<String, Polynomial>();
+        names.put(new String("x"), x);
+        names.put(new String("x"), y);
+        assertThrows(IllegalArgumentException.class, () -> new PolynomialPotential.Request(names,
+            template(List.of(C)), List.of(X), GRID, ExactRational.ONE, false));
+    }
+
+    private static PolynomialPotential.Request collisionRequest(String first, String last) {
+        var transition = new LinkedHashMap<String, Polynomial>();
+        transition.put(first, Polynomial.zero());
+        for (int i = 0; i < 256; i++) {
+            var name = new StringBuilder();
+            for (int j = 0; j < 8; j++) name.append(((i >>> j) & 1) == 0 ? "Aa" : "BB");
+            transition.put(name.toString(), Polynomial.zero());
+        }
+        transition.put("x", x.subtract(one));
+        transition.put(last, Polynomial.zero());
+        var domain = template(List.of(C), new SosSynthesis.Premise(SosSynthesis.Relation.NONNEGATIVE, x, List.of(C)));
+        return new PolynomialPotential.Request(transition, domain, List.of(X), List.of(ExactRational.ONE),
+            ExactRational.ONE, false);
     }
 
     @Test void zeroCandidateCanCertifyAnEmptyActiveDomain() {

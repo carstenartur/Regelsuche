@@ -6,11 +6,13 @@ import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.scalar.ExactRational;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.BooleanSupplier;
 
 /** Polynomial potential search for a simultaneous transition and a caller-supplied active domain. */
@@ -24,8 +26,15 @@ public final class PolynomialPotential {
     public record Request(Map<String, Polynomial> transition, SosSynthesis.Template domain, List<Monomial> basis,
             List<ExactRational> coefficients, ExactRational minimumDecrease, boolean transitionDomainConfirmed) {
         public Request {
-            transition = Map.copyOf(transition);
-            if (transition.keySet().stream().anyMatch(String::isBlank)) throw new IllegalArgumentException("EMPTY_VARIABLE");
+            var snapshot = new TreeMap<String, Polynomial>();
+            for (var entry : transition.entrySet()) {
+                var name = Objects.requireNonNull(entry.getKey());
+                if (name.isBlank()) throw new IllegalArgumentException("EMPTY_VARIABLE");
+                if (snapshot.put(name, Objects.requireNonNull(entry.getValue())) != null) {
+                    throw new IllegalArgumentException("DUPLICATE_VARIABLE");
+                }
+            }
+            transition = Collections.unmodifiableNavigableMap(snapshot);
             Objects.requireNonNull(domain);
             basis = SosSynthesis.checkedBasis(basis);
             coefficients = SosSynthesis.checkedValues(coefficients);
@@ -97,7 +106,7 @@ public final class PolynomialPotential {
             BooleanSupplier cancellation) {
         if (proof.source() != request) {
             validate(proof.source(), work);
-            if (!request.equals(proof.source())) return invalid("SOURCE_MISMATCH", work);
+            if (!sameSource(request, proof.source(), work)) return invalid("SOURCE_MISMATCH", work);
         }
         var potential = proof.potential();
         SosPolynomials.polynomialSize(potential, work);
@@ -112,6 +121,23 @@ public final class PolynomialPotential {
         if (!decrease.valid()) return invalid(decrease.reason(), work);
         work.charge(0);
         return new Verification(SosSynthesis.Status.VERIFIED, request.transitionDomainConfirmed(), "VERIFIED", work.used());
+    }
+
+    private static boolean sameSource(Request a, Request b, CertificateWork work) {
+        if (a.transitionDomainConfirmed() != b.transitionDomainConfirmed()
+                || !work.check(a.minimumDecrease()).equals(b.minimumDecrease())
+                || a.transition().size() != b.transition().size()
+                || !SosSourceComparison.basis(a.basis(), b.basis(), work)
+                || !SosSourceComparison.values(a.coefficients(), b.coefficients(), work)
+                || !SosSourceComparison.template(a.domain(), b.domain(), work)) return false;
+        var right = b.transition().entrySet().iterator();
+        for (var left : a.transition().entrySet()) {
+            work.charge(1);
+            var other = right.next();
+            if (SosSourceComparison.compareNames(left.getKey(), other.getKey(), work) != 0
+                    || !SosSourceComparison.polynomial(left.getValue(), other.getValue(), work)) return false;
+        }
+        return true;
     }
 
     private static boolean inCandidateSpace(Request request, Polynomial potential, CertificateWork work) {
@@ -135,8 +161,9 @@ public final class PolynomialPotential {
         long cells = SosPolynomials.basisSize(request.basis(), work) + request.transition().size();
         work.cells(cells + request.coefficients().size());
         for (var value : request.coefficients()) work.check(value);
-        for (var polynomial : request.transition().values()) {
-            cells += SosPolynomials.polynomialSize(polynomial, work);
+        for (var entry : request.transition().entrySet()) {
+            work.charge(1L + entry.getKey().length() / 64);
+            cells += SosPolynomials.polynomialSize(entry.getValue(), work);
             work.cells(cells);
         }
         var domain = request.domain();

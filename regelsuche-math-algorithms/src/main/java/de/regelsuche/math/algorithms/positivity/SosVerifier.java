@@ -27,7 +27,10 @@ public final class SosVerifier {
         SosPolynomials.validate(request, work);
         if (proof.source() != request) {
             SosPolynomials.validate(proof.source(), work);
-            if (!request.equals(proof.source())) return invalid("SOURCE_MISMATCH", work);
+            if (!SosSourceComparison.template(request.template(), proof.source().template(), work)
+                    || !SosSourceComparison.polynomial(request.target(), proof.source().target(), work)) {
+                return invalid("SOURCE_MISMATCH", work);
+            }
         }
         var premises = request.template().premises();
         int gramCount = 1;
