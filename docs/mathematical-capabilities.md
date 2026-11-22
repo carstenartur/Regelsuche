@@ -26,6 +26,8 @@ Ein eigener Build dieses Checkouts ist für die neuen APIs erforderlich.
 | Exakte Gram-Matrix und Polynomidentität | `GramPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
 | Begrenzte SOS- und polynomielle Potentialsuche | `SosSynthesis`, `SosVerifier`, `PolynomialPotential` | `SosSynthesisSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 | Gemeinsame bilineare Programme aus Formenkatalogen | `BilinearProgramSearch`, `BilinearProgramVerifier` | `BilinearProgramSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Rationale nichtkommutative Formeln auf gegebenen Matrizen | `RationalFormulaRealization`, `RationalFormulaVerifier` | `RationalFormulaSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
+| Dynamische Auswertung über quadratfreien Primkörperquotienten | `DynamicAlgebraEvaluation`, `DynamicAlgebraVerifier` | `DynamicAlgebraSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
 | Quellengebundener endlicher Beweis-DAG | `FiniteProofDag` | `FiniteProofDagSdk`, `FiniteProofDagJson` | nein | versionierter JSON-Transport; Java-/SDK-Beispiele |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
@@ -44,6 +46,8 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
   [bilineare Programmsuche](research/bilinear-program-search.md),
   [modulare Kernrekonstruktion](research/modular-kernel-profile-recovery.md),
   [Polynomkongruenzen](research/polynomial-congruences.md).
+- [Rationale Matrixformeln und Definitionsbedingungen](research/rational-formula-realization.md),
+  [dynamische Quotientenalgebren](research/dynamic-algebra-evaluation.md).
 - [Montgomery-Pläne](research/montgomery-schedules.md),
   [nichtkommutative Identitäten](research/noncommutative-identity.md),
   [gemeinsame bilineare Vorschläge](research/bilinear-core-proposals.md).

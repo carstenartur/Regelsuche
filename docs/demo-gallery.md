@@ -13,10 +13,12 @@ Sie besitzen noch keine eigene Workbench-Karte und sind nicht im veröffentlicht
 | --- | --- | --- |
 | [SOS-Potential](../examples/external-consumers/SosPotential.java) | Sucht `V=x²` für `x -> x-1` auf aktiven Zuständen `x>=1`, Mindestabnahme 1 | [SOS, Voraussetzungen und Übergangsvertrag](research/sos-synthesis.md) |
 | [Bilineare Faltung](../examples/external-consumers/BilinearSearch.java) | Drei gemeinsame Produkte; `(2,3)*(4,5)` ergibt `[8,22,15]` | [Vollständiger Koeffizientenvergleich und Operationskosten](research/bilinear-program-search.md) |
+| [Rationale Matrixformel](../examples/external-consumers/RationalMatrixFormula.java) | $(X^{-1})^{-1}+I$ ist an der singulären Beispielmatrix undefiniert und ergibt an der invertierbaren Matrix die Einträge `[2,1,0,3]` in Zeilenfolge | [Affine Realisierung und Definitionsbedingungen](research/rational-formula-realization.md) |
+| [Dynamische Quotientenalgebra](../examples/external-consumers/DynamicQuotient.java) | $1/(T-1)$ über $\mathbb F_5$ modulo $T^2-1$ ist auf $T-1$ undefiniert und auf $T+1$ gleich 2 | [Teilerfremde Abdeckung und Zweigprüfung](research/dynamic-algebra-evaluation.md) |
 
 Mit den aus diesem Checkout gebauten SDK- und Kern-JARs samt Laufzeitabhängigkeiten
 in `lib/`: `java --class-path 'lib/*' examples/external-consumers/SosPotential.java`.
-Für das zweite Beispiel den Dateinamen durch `BilinearSearch.java` ersetzen.
+Für die anderen Beispiele den jeweiligen verlinkten Dateinamen einsetzen.
 
 ## Sophie-Germain in der Workbench faktorisieren
 

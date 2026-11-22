@@ -23,7 +23,23 @@ requires the caller's explicit transition/domain contract. See [SOS and potentia
 for a multioutput rational tensor from finite input-form dictionaries. The
 verifier checks every tensor coefficient; reported costs include additions,
 constant factors and temporary slots. See [search limits and executable example](../docs/research/bilinear-program-search.md).
-Both APIs belong to this source checkout and are absent from the released 0.5.3 binary.
+
+`noncommutative.RationalFormulaSdk.realize` constructs an affine pencil for a
+rational formula. `verify` binds it to every inverse occurrence. `evaluate`
+uses the supplied rational square matrices and reports the exact value or
+the singular inverse that makes this assignment undefined. These operations
+take `IterationLimits` and a cancellation token.
+[Mathematical contract](../docs/research/rational-formula-realization.md) · [Java 25 example](../examples/external-consumers/RationalMatrixFormula.java)
+
+`polynomial.DynamicAlgebraSdk.evaluate` splits a square-free quotient over a
+prime field when an inverse or zero test encounters a zero divisor. Each
+terminal factor carries a value or an explicit undefined result. `verify`
+checks the complete coprime factor cover, values and decisions against the
+original expression. Both methods accept an `OptimizationBudget` and a
+cancellation token. [Mathematical contract](../docs/research/dynamic-algebra-evaluation.md) · [Java 25 example](../examples/external-consumers/DynamicQuotient.java)
+
+These four APIs require the `0.5.4-SNAPSHOT` source checkout and a Java 25
+build. Release 0.5.3 predates them. Their examples run as Java programs.
 
 `positivity.PolynomialPositivitySdk` exposes rational polynomial `bounds` and
 `verifyBounds`, subdivision `prove` and `verify`, exact `checkMatrix`, and

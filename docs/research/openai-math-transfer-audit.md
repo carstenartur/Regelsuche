@@ -77,9 +77,19 @@ Vorzeichenfaktoren. Dies ist ein Operationsvergleich, keine Laufzeitmessung.
 Die [Erweiterungsspezifikation](../superpowers/specs/2026-11-22-mathematical-certificate-expansion.md)
 grenzt diese Suche von optimalem Tensor-Rang und vollständigen asymptotischen Algorithmen ab.
 
+Die Blockrealisierung aus Familie 116 verbindet nun jede Inverse im rationalen
+Quellbaum mit einer Definitionsbedingung. Eine konkrete Matrixbelegung wird
+durch eine direkte Auswertung des ursprünglichen Baums gegengeprüft.
+[Realisierung rationaler Formeln](rational-formula-realization.md)
+
+Die simultane Auswertung aus Familie 142 motiviert eine eigenständige
+Quotientenrechnung. Erreichte Nulltests und Inverse können einen quadratfreien
+Modul aufteilen. Ein Zertifikat deckt den ganzen Modul ab und weist auch
+undefinierte Komponenten aus. [Dynamische Auswertung](dynamic-algebra-evaluation.md)
+
 | Möglichkeit | Abgrenzung zum vorhandenen Code |
 | --- | --- |
-| Weitere Varianten aus Familie 116 | Der Katalog enthält auch Trefferlisten für Formeln mit Inversen und Trefferpunkte in positiver Charakteristik. Der aktuelle Formeltyp hat keine Inversen und ist auf rationale Koeffizienten beschränkt. „Rational“ bezeichnet hier die Koeffizienten, nicht rationale Ausdrücke mit inversen Variablen. Die [Lean-Beschreibung](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/116.md) trennt die beiden formalisierten Formelklassen. |
+| Weitere Varianten aus Familie 116 | Der Katalog enthält auch Trefferlisten für Formeln mit Inversen und Trefferpunkte in positiver Charakteristik. Der ältere Identitätsprüfer arbeitet mit divisionsfreien Formeln über rationalen Koeffizienten. Der neue Typ `RationalFormula` unterstützt Inverse und die Prüfung einer gegebenen rationalen Matrixbelegung. Die Konstruktion einer allgemeinen Trefferliste und der allgemeine Identitätstest für rationale Formeln bleiben offen. Die [Lean-Beschreibung](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/116.md) trennt die beiden formalisierten Formelklassen. |
 | Deterministische Faktorisierung aus Familie 142 | Vorhanden ist [klassische Berlekamp-Faktorisierung](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/FiniteFieldFactorization.java) mit Enumeration von Körperresten und einer [begrenzten Policy](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/FiniteFieldFactorizationPolicy.java). Die Familie behauptet dagegen vollständige Faktorisierung in einer Bitkomplexität polynomial in Grad und `log(p)`; ihr [Manuskript](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/Deterministic-Polynomial-Factorization-over-Prime-Fields-October-4-2026/Deterministic-Polynomial-Factorization-over-Prime-Fields.pdf) ist damit nicht schon implementiert. |
 | Allgemeine Graphen und Zählverfahren | Bipartites Matching deckt weder allgemeine Graph-Matchings und vorgeschriebene Gradfaktoren aus Familie 120 noch approximatives Matchingzählen aus Familie 113 ab. Diese sind eigene Algorithmus- und Verifikationsaufgaben. |
 | Unbeschränkte bilineare Entdeckung | Der neue `BilinearProgramSearch` sucht gemeinsame Programme innerhalb expliziter rationaler Formenkataloge. Unbeschränkte Suche und allgemeiner minimaler Tensor-Rang bleiben offen; der begrenzte Befund steht [separat](bilinear-program-search.md). |
