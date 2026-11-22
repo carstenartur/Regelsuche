@@ -4,6 +4,20 @@ Die Beispiele zeigen, was Regelsuche aus einer Eingabe herleitet, welche
 Prüfungen sie ausführt und wie sich der Aufwand vergleichen lässt. Die
 Bildschirmaufnahmen stammen aus der laufenden Anwendung. [Workbench starten](../README.md#schnellstart)
 
+## Neue ausführbare Beispiele im Quell-SDK
+
+Diese Java-25-Beispiele verwenden den aktuellen `0.5.4-SNAPSHOT`-Quellstand.
+Sie besitzen noch keine eigene Workbench-Karte und sind nicht im veröffentlichten SDK 0.5.3 enthalten.
+
+| Beispiel | Geprüftes Ergebnis | Vertrag und Grenzen |
+| --- | --- | --- |
+| [SOS-Potential](../examples/external-consumers/SosPotential.java) | Sucht `V=x²` für `x -> x-1` auf aktiven Zuständen `x>=1`, Mindestabnahme 1 | [SOS, Voraussetzungen und Übergangsvertrag](research/sos-synthesis.md) |
+| [Bilineare Faltung](../examples/external-consumers/BilinearSearch.java) | Drei gemeinsame Produkte; `(2,3)*(4,5)` ergibt `[8,22,15]` | [Vollständiger Koeffizientenvergleich und Operationskosten](research/bilinear-program-search.md) |
+
+Mit den aus diesem Checkout gebauten SDK- und Kern-JARs samt Laufzeitabhängigkeiten
+in `lib/`: `java --class-path 'lib/*' examples/external-consumers/SosPotential.java`.
+Für das zweite Beispiel den Dateinamen durch `BilinearSearch.java` ersetzen.
+
 ## Sophie-Germain in der Workbench faktorisieren
 
 Wähle unter den Demo-Karten **Sophie-Germain faktorisieren**. Die Demo nutzt

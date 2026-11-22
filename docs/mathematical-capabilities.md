@@ -1,6 +1,6 @@
 # Mathematische Funktionen: Quelle, Release und Oberfläche
 
-Stand: 20. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
+Stand: 22. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
 genannten Funktionen. Mathematische Verträge und ausgeführte Vergleiche stehen
 in den verlinkten Fachseiten; der [Strategien-Index](research/strategies.md)
 führt Hypothesen, Befunde und Folgerungen.
@@ -24,6 +24,8 @@ Ein eigener Build dieses Checkouts ist für die neuen APIs erforderlich.
 | Endliche Montgomery-Pläne | `MontgomerySchedule`, `MontgomeryReductionPlanner` | `MontgomeryScheduleSdk` | nein | Live-Zertifikatsdemo |
 | Rationale Bernstein-Schranken und Positivitätsbeweise | `BernsteinPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
 | Exakte Gram-Matrix und Polynomidentität | `GramPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
+| Begrenzte SOS- und polynomielle Potentialsuche | `SosSynthesis`, `SosVerifier`, `PolynomialPotential` | `SosSynthesisSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Gemeinsame bilineare Programme aus Formenkatalogen | `BilinearProgramSearch`, `BilinearProgramVerifier` | `BilinearProgramSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 | Quellengebundener endlicher Beweis-DAG | `FiniteProofDag` | `FiniteProofDagSdk`, `FiniteProofDagJson` | nein | versionierter JSON-Transport; Java-/SDK-Beispiele |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
@@ -38,6 +40,8 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
   [Hunter und endliche Beweis-DAGs](research/hunter-finite-proofs.md),
   [Hall-Zertifikate](research/bipartite-matching.md).
 - [Polynompositivität](research/polynomial-positivity.md),
+  [SOS- und Potentialsuche](research/sos-synthesis.md),
+  [bilineare Programmsuche](research/bilinear-program-search.md),
   [modulare Kernrekonstruktion](research/modular-kernel-profile-recovery.md),
   [Polynomkongruenzen](research/polynomial-congruences.md).
 - [Montgomery-Pläne](research/montgomery-schedules.md),
