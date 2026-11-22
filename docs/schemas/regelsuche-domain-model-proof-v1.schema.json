@@ -561,6 +561,99 @@
           }
         }
       }
+    },
+    {
+      "$comment": "Scoped exports retain source assertions only: no independent proof receiver is configured.",
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "domainId": {
+                "const": "scoped-logic"
+              }
+            },
+            "required": [
+              "domainId"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "UNSUPPORTED"
+          },
+          "detail": {
+            "const": "SCOPED_PROOF_REPLAY_NOT_CONFIGURED"
+          },
+          "failureClass": {
+            "const": ""
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "NOT_EVALUATED"
+              },
+              "admission": {
+                "properties": {
+                  "executed": {
+                    "const": 0
+                  },
+                  "skipped": {
+                    "const": 0
+                  }
+                }
+              },
+              "actualEvidenceHash": {
+                "type": "null"
+              },
+              "resources": {
+                "type": "null"
+              },
+              "resourceObservation": {
+                "const": "UNAVAILABLE"
+              }
+            }
+          },
+          "finiteCheck": {
+            "type": "null"
+          },
+          "model": {
+            "type": "null"
+          },
+          "proof": {
+            "type": "null"
+          },
+          "work": {
+            "properties": {
+              "preparation": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_RUN"
+                  }
+                }
+              },
+              "binding": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_RUN"
+                  }
+                }
+              },
+              "queries": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_RUN"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {

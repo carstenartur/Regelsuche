@@ -1,5 +1,6 @@
 import json
 import hashlib
+import os
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,13 @@ from external_polynomial_comparison.run_schema import snapshot_runtime, _file_in
 
 
 class NativeComparisonTest(unittest.TestCase):
+    def test_configured_archive_admission_refuses_a_missing_source_registration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.dict(os.environ, {'REGELSUCHE_NATIVE_SOURCE_VERIFIER_CLASSPATH': '/worker/verifier'}):
+                with self.assertRaisesRegex(ValueError, 'requires.*source registration'):
+                    native.source_provenance(root)
+
     def test_response_binding_rejects_wrong_source_model_and_hidden_costs(self):
         response = dict(status='CANDIDATE', profile='NATIVE_BASE', input='x+0', output='x', target='',
                         targetReached=False, modelHash='bound', search=json.dumps({'totalWork': 7}),

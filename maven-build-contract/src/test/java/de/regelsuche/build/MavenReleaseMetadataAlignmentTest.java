@@ -28,8 +28,7 @@ import org.w3c.dom.Node;
 
 /**
  * Read-only JDK/Maven authority for the version-alignment check in the release
- * lifecycle. The older Python helper still performs version mutations; its
- * read-only check is no longer required for a fresh development release.
+ * lifecycle. ReleaseMetadataTransition uses the same verifier before and after a metadata change.
  */
 class MavenReleaseMetadataAlignmentTest {
     private static final JsonFactory JSON_FACTORY = JsonFactory.builder()
@@ -180,7 +179,7 @@ class MavenReleaseMetadataAlignmentTest {
         assertThrows(IOException.class, () -> verify(root, "1.2.3-SNAPSHOT"));
     }
 
-    static void verify(Path root, String expected) throws Exception {
+    static Set<Path> verify(Path root, String expected) throws Exception {
         require(expected != null && expected.matches("[0-9]+\\.[0-9]+\\.[0-9]+(?:-SNAPSHOT)?"),
             "invalid required release version");
         require(expected.equals(oneVersion(read(root, "release.properties"))),
@@ -210,6 +209,7 @@ class MavenReleaseMetadataAlignmentTest {
         require(!visited.isEmpty(), "no Maven POMs visited");
         System.out.println("releaseMetadata=VERIFIED version=" + expected
             + " mavenPoms=" + visited.size() + " openapi=true");
+        return Set.copyOf(visited);
     }
 
     private static void verifyPublicationDates(Path root, String version) throws IOException {
@@ -294,7 +294,7 @@ class MavenReleaseMetadataAlignmentTest {
         }
     }
 
-    private static String oneVersion(String properties) {
+    static String oneVersion(String properties) {
         Matcher matcher = VERSION_LINE.matcher(properties);
         require(matcher.find(), "release.properties has no version");
         String version = matcher.group(1);
@@ -351,7 +351,7 @@ class MavenReleaseMetadataAlignmentTest {
             }
         }
         for (String name : modules) {
-            require(MODULE.matcher(name).matches(), "invalid Maven module path: " + name);
+            require(MODULE.matcher(name).matches() && !List.of(name.split("/")).contains(".."), "invalid Maven module path: " + name);
             Path child = pom.getParent().resolve(name).resolve("pom.xml").normalize();
             require(child.startsWith(root), "Maven module escaped repository: " + name);
             visitPom(root, child, version, active, visited);
@@ -372,7 +372,7 @@ class MavenReleaseMetadataAlignmentTest {
         return result;
     }
 
-    private static void checkNoSymbolicPath(Path path) {
+    static void checkNoSymbolicPath(Path path) {
         Path absolute = path.toAbsolutePath().normalize();
         for (Path parent = absolute; parent != null; parent = parent.getParent()) {
             require(!Files.isSymbolicLink(parent), "symlink in metadata path: " + parent);
