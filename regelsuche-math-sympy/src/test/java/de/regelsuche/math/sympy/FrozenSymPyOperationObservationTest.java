@@ -76,4 +76,98 @@ class FrozenSymPyOperationObservationTest {
         object.putObject("stages").put("projection.root-source-hash-code-units", 3);
         assertThrows(IllegalArgumentException.class, () -> receive(object));
     }
+
+    @Test
+    void completedObservationsRequireAResultWithoutUnaccountedCalls() {
+        ObjectNode root = receipt();
+        root.put("status", "OBSERVED");
+        root.putObject("result").put("verified", true);
+        root.putNull("reason");
+
+        var accepted = receive(root);
+        assertEquals(FrozenSymPyOperationObservation.Status.OBSERVED, accepted.status());
+        assertEquals(3, accepted.work().totalWorkUnits());
+        assertEquals(root.toString(), accepted.receipt());
+
+        ObjectNode opaque = root.deepCopy();
+        opaque.putArray("opaqueCalls").add("hidden.factor");
+        assertThrows(IllegalArgumentException.class, () -> receive(opaque));
+
+        ObjectNode callback = root.deepCopy();
+        callback.putObject("foreignCallbacks").put("unmetered", 1);
+        assertThrows(IllegalArgumentException.class, () -> receive(callback));
+
+        ObjectNode absentResult = root.deepCopy();
+        absentResult.putNull("result");
+        assertThrows(IllegalArgumentException.class, () -> receive(absentResult));
+
+        ObjectNode spuriousReason = root.deepCopy();
+        spuriousReason.put("reason", "unexpected");
+        assertThrows(IllegalArgumentException.class, () -> receive(spuriousReason));
+    }
+
+    @Test
+    void unmeasuredFullWorkAndUnderBudgetExhaustionRemainDistinct() {
+        ObjectNode full = receipt();
+        full.put("coverageGoal", FrozenSymPyOperationObservation.Coverage.COMPLETE_BACKEND_WORK.name());
+        full.put("status", "UNMEASURED");
+        full.putObject("boundaryGaps").put("transport.json.loads", 1);
+        var observation = FrozenSymPyOperationObservation.decode(full.toString(), hash, hash, 3,
+            FrozenSymPyOperationObservation.Coverage.COMPLETE_BACKEND_WORK);
+        assertEquals(FrozenSymPyOperationObservation.Status.UNMEASURED, observation.status());
+
+        ObjectNode underBudget = receipt();
+        underBudget.put("workLimit", 4);
+        assertThrows(IllegalArgumentException.class,
+            () -> FrozenSymPyOperationObservation.decode(underBudget.toString(), hash, hash, 4,
+                FrozenSymPyOperationObservation.Coverage.DECLARED_OPERATIONS));
+
+        ObjectNode blankReason = receipt();
+        blankReason.put("status", "UNMEASURED");
+        blankReason.put("reason", "  ");
+        assertThrows(IllegalArgumentException.class, () -> receive(blankReason));
+
+        ObjectNode interruptedResult = receipt();
+        interruptedResult.put("status", "UNMEASURED");
+        interruptedResult.putObject("result").put("unverified", true);
+        assertThrows(IllegalArgumentException.class, () -> receive(interruptedResult));
+    }
+
+    @Test
+    void malformedReceiptsAndUnmeteredStageValuesFailClosed() {
+        assertThrows(IllegalArgumentException.class,
+            () -> FrozenSymPyOperationObservation.decode("[]", hash, hash, 3,
+                FrozenSymPyOperationObservation.Coverage.DECLARED_OPERATIONS));
+        assertThrows(IllegalArgumentException.class,
+            () -> FrozenSymPyOperationObservation.decode(receipt() + " trailing", hash, hash, 3,
+                FrozenSymPyOperationObservation.Coverage.DECLARED_OPERATIONS));
+
+        ObjectNode badIdentity = receipt();
+        badIdentity.put("strictNative", false);
+        assertThrows(IllegalArgumentException.class, () -> receive(badIdentity));
+
+        ObjectNode noInventory = receipt();
+        noInventory.putNull("boundaryGaps");
+        assertThrows(IllegalArgumentException.class, () -> receive(noInventory));
+
+        ObjectNode zeroUnits = receipt();
+        zeroUnits.putObject("stages").put("sympy.polys.example.add", 0);
+        assertThrows(IllegalArgumentException.class, () -> receive(zeroUnits));
+
+        ObjectNode fractionalUnits = receipt();
+        fractionalUnits.putObject("stages").put("sympy.polys.example.add", 3.5);
+        assertThrows(IllegalArgumentException.class, () -> receive(fractionalUnits));
+
+        ObjectNode negativeUnits = receipt();
+        negativeUnits.putObject("stages").put("sympy.polys.example.add", -1);
+        assertThrows(IllegalArgumentException.class, () -> receive(negativeUnits));
+
+        ObjectNode missingOperation = receipt();
+        missingOperation.putNull("stages");
+        assertThrows(IllegalArgumentException.class, () -> receive(missingOperation));
+
+        ObjectNode unknownStatus = receipt();
+        unknownStatus.put("status", "SUCCESS");
+        assertThrows(IllegalArgumentException.class, () -> receive(unknownStatus));
+    }
 }
