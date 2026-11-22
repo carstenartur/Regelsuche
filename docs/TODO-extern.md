@@ -4,6 +4,15 @@ Diese Liste enthält offene Arbeit, die eine Person, einen unabhängigen Dritten
 
 Ist ein Beitrag verfügbar, im zugehörigen Eintrag den freigegebenen Beleg oder die öffentliche Referenz ergänzen und den nächsten ausführbaren Schritt verknüpfen. Keine Kontaktdaten, Schlüssel, unveröffentlichten Kandidaten, Gutachten oder versiegelten Testdaten in öffentliche Issues oder dieses Dokument kopieren.
 
+## Unabhängige Code-Review vor geschütztem Merge
+
+**Herkunft:** [#748](https://github.com/carstenartur/Regelsuche/issues/748) (technisch ausführbare Polynomqualifikation), konkret [PR #1353](https://github.com/carstenartur/Regelsuche/pull/1353).
+
+- [ ] Eine **andere berechtigte Person mit Schreibrechten** prüft die konkrete, zum Entscheidungszeitpunkt aktuelle PR-Revision und erteilt die von der Branchschutzregel verlangte unabhängige Freigabe. Eine Selbstfreigabe, Bot-Ersatzfreigabe oder Umgehung des Branchschutzes ist kein Ersatz.
+- [ ] Erst nach der unabhängigen Freigabe die anwendbaren **Head-SHA-gebundenen** CI-Prüfungen, mögliche zwischenzeitliche Änderungen und die nachgewiesenen fachlichen Abnahmekriterien erneut abgleichen. Eine grüne CI allein stellt weder eine Code-Review noch die vollständige wissenschaftliche Qualifikation dar.
+
+**Technische Restarbeit bleibt in #748:** Öffentliche Kandidaten-Freeze-/Diagnosebelege, korrekte Implementierung und Reproduktion sind eigenständig umsetzbar. Die unabhängige Review ist eine externe Zuständigkeit und keine offene Programmieraufgabe. Diese Dokumentation beauftragt keine externe Person und autorisiert keine Studie oder Veröffentlichung.
+
 ## Freigabe von Software-Releases und Maven Central
 
 **Herkunft:** [#749](https://github.com/carstenartur/Regelsuche/issues/749) (Maven-/Build-Vertrag), [#1020](https://github.com/carstenartur/Regelsuche/issues/1020) (Release-/Public-Evidence-Komposition); technischer SDK-Publishing-Pfad: [PR #1290](https://github.com/carstenartur/Regelsuche/pull/1290).
