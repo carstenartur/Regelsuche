@@ -45,5 +45,24 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>verify-workbench-report</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <test>MavenBuildContractTest#checkoutReportRequiresExecutedWorkbenchImageTests</test>
+              <failIfNoTests>true</failIfNoTests>
+              <failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+              <systemPropertyVariables>
+                <regelsuche.tests.requireWorkbenchImageReport>true</regelsuche.tests.requireWorkbenchImageReport>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 </project>
