@@ -13,6 +13,18 @@ integration. New source methods do not retroactively become part of a release.
 
 ## Exact finite certificates in current source
 
+`positivity.SosSynthesisSdk.search` and `verify` expose bounded rational Gram
+synthesis with polynomial equality/inequality premises and polynomial potential
+synthesis for a supplied simultaneous transition. The independent checks bind
+the full coefficient identity and every domain assumption. A termination claim
+requires the caller's explicit transition/domain contract. See [SOS and potentials](../docs/research/sos-synthesis.md).
+
+`algebra.BilinearProgramSdk.search`, `verify` and `evaluate` find shared products
+for a multioutput rational tensor from finite input-form dictionaries. The
+verifier checks every tensor coefficient; reported costs include additions,
+constant factors and temporary slots. See [search limits and executable example](../docs/research/bilinear-program-search.md).
+Both APIs belong to this source checkout and are absent from the released 0.5.3 binary.
+
 `positivity.PolynomialPositivitySdk` exposes rational polynomial `bounds` and
 `verifyBounds`, subdivision `prove` and `verify`, exact `checkMatrix`, and
 `verifyPolynomial` for a supplied Gram identity. A PSD matrix proves a
