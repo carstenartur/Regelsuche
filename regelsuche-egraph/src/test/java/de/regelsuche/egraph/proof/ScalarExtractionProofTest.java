@@ -46,4 +46,23 @@ class ScalarExtractionProofTest {
         var falseAc = new ScalarExtractionProof.Lemma(ScalarExtractionProof.AC, parser.parseTerm("b/a"), parser.parseTerm("a/b"));
         assertFalse(ScalarExtractionProof.check(source,target,context,new ScalarExtractionProof.Bundle(context,List.of(falseAc),certificate.dag()),ProofLimits.defaults()));
     }
+
+    @Test void metersBothAnAcceptedProofAndARejectedScalarWitness() {
+        var rules = AstRewriteTransformationEngine.allBuiltInRules();
+        var context = ScalarExtractionProof.Context.create(rules, List.of(), "a".repeat(40));
+        var source = parser.parseTerm("x+0");
+        var target = parser.parseTerm("x");
+        var admitted = new ScalarExtractionProof.Lemma("ast_add_zero_right", source, target);
+        var work = new java.util.concurrent.atomic.AtomicLong();
+        var observed = ScalarExtractionProof.buildObserved(source, target, context, List.of(admitted),
+                ProofLimits.defaults(), work::addAndGet);
+        assertEquals(ScalarExtractionProof.build(source, target, context, List.of(admitted), ProofLimits.defaults()), observed);
+        assertTrue(observed.isPresent());
+        assertTrue(work.get() > 0);
+
+        work.set(0);
+        var refused = new ScalarExtractionProof.Lemma("ast_add_zero_right", parser.parseTerm("x+1"), target);
+        assertFalse(ScalarExtractionProof.admitsObserved(context, refused, work::addAndGet));
+        assertTrue(work.get() > 1);
+    }
 }

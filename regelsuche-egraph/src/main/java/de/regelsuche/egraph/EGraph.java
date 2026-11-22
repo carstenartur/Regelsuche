@@ -56,7 +56,7 @@ import java.util.Set;
  */
 public final class EGraph {
 
-    private final UnionFind unionFind = new UnionFind();
+    private final UnionFind unionFind;
     /** Map id → e-class. Stale ids (post-union) point to the merged class. */
     private final Map<EClassId, EClass> classes = new HashMap<>();
     /** Assumption signature associated with each canonical e-class. */
@@ -79,9 +79,14 @@ public final class EGraph {
     private final EGraphProofCapture proofCapture;
 
     private final boolean arithmeticAc;
+    private final boolean observeNativeWork;
+    private long observedStructureWork;
+    private long observedExtractionWork;
 
     /** Exact scalar addition and multiplication, with n-ary AC identity (profile v1). */
-    public static EGraph exactScalarAcV1() { return new EGraph(null, true); }
+    public static EGraph exactScalarAcV1() { return exactScalarAcV1(false); }
+
+    static EGraph exactScalarAcV1(boolean observeWork) { return new EGraph(null, true, observeWork); }
 
     public EGraph() { this(null); }
 
@@ -89,8 +94,22 @@ public final class EGraph {
     EGraph(EGraphProofCapture proofCapture) { this(proofCapture, false); }
 
     private EGraph(EGraphProofCapture proofCapture, boolean arithmeticAc) {
+        this(proofCapture, arithmeticAc, false);
+    }
+
+    private EGraph(EGraphProofCapture proofCapture, boolean arithmeticAc, boolean observeNativeWork) {
         this.proofCapture = proofCapture;
         this.arithmeticAc = arithmeticAc;
+        this.observeNativeWork = observeNativeWork;
+        this.unionFind = new UnionFind(observeNativeWork);
+    }
+
+    long observedStructureWork() { return observedStructureWork; }
+    long observedRepresentativeWork() { return unionFind.observedWork(); }
+    long observedExtractionWork() { return observedExtractionWork; }
+
+    private void chargeStructure(long units) {
+        if (observeNativeWork) observedStructureWork += units;
     }
 
     boolean usesArithmeticAc() { return arithmeticAc; }
@@ -104,8 +123,10 @@ public final class EGraph {
         pending.push(new Frame(root, arena.describe(root)));
         while (!pending.isEmpty()) {
             Frame frame = pending.peek();
+            chargeStructure(1);
             if (resolved.containsKey(frame.id())) { pending.pop(); continue; }
             var operands = frame.node().operands();
+            chargeStructure(operands.size());
             long arity = operands.stream().mapToLong(ExprValueArena.Operand::multiplicity).sum();
             if (arity > maxOperands) throw new IllegalArgumentException("e-node operand limit exceeded");
             boolean complete = true;
@@ -116,6 +137,7 @@ public final class EGraph {
                 }
             }
             if (!complete) continue;
+            chargeStructure(arity);
             var children = new ArrayList<EClassId>((int) arity);
             for (var operand : operands) children.addAll(Collections.nCopies(operand.multiplicity(), resolved.get(operand.value())));
             String symbol = switch (frame.node().kind()) {
@@ -150,6 +172,7 @@ public final class EGraph {
      */
     public EClassId add(ENode node) {
         Objects.requireNonNull(node, "node");
+        chargeStructure(1L + node.children().size());
         if (arithmeticAc ? isBinaryAcSymbol(node.symbol()) : ENode.isArithmeticAcSymbol(node.symbol())) {
             throw new IllegalArgumentException("Node operator is incompatible with this graph profile: " + node.symbol());
         }
@@ -268,6 +291,7 @@ public final class EGraph {
      * closure afterward. Returns the surviving canonical id.
      */
     public EClassId union(EClassId a, EClassId b) {
+        chargeStructure(1);
         EClassId rootA = unionFind.find(a);
         EClassId rootB = unionFind.find(b);
         if (rootA.equals(rootB)) {
@@ -296,11 +320,13 @@ public final class EGraph {
      * twice in a row is a no-op the second time.
      */
     public void rebuild() {
+        chargeStructure(1);
         while (!worklist.isEmpty()) {
             // De-duplicate by canonical id — multiple unions may target
             // the same class.
             LinkedHashSet<EClassId> todo = new LinkedHashSet<>();
             while (!worklist.isEmpty()) {
+                chargeStructure(1);
                 todo.add(unionFind.find(worklist.pop()));
             }
             for (EClassId id : todo) {
@@ -311,6 +337,7 @@ public final class EGraph {
 
     /** Snapshot of every <em>canonical</em> e-class. */
     public Collection<EClass> classes() {
+        chargeStructure(1L + classes.size());
         LinkedHashSet<EClassId> seen = new LinkedHashSet<>();
         List<EClass> result = new ArrayList<>();
         for (EClassId raw : classes.keySet()) {
@@ -334,6 +361,7 @@ public final class EGraph {
 
     /** Signature index lookup for candidate selection in pattern matching. */
     public Collection<EClassId> classesWith(ENodeSignature signature) {
+        chargeStructure(1);
         Objects.requireNonNull(signature, "signature");
         LinkedHashSet<EClassId> indexed = signatureIndex.get(signature);
         if (indexed == null || indexed.isEmpty()) {
@@ -344,6 +372,7 @@ public final class EGraph {
 
     /** Prefix lookup (e.g. {@code num:*}) for pattern candidate selection. */
     public Collection<EClassId> classesWithSymbolPrefix(String symbolPrefix, int arity) {
+        chargeStructure(1L + signatureIndex.size());
         Objects.requireNonNull(symbolPrefix, "symbolPrefix");
         LinkedHashSet<EClassId> hits = new LinkedHashSet<>();
         for (Map.Entry<ENodeSignature, LinkedHashSet<EClassId>> entry : signatureIndex.entrySet()) {
@@ -370,6 +399,7 @@ public final class EGraph {
      */
     public Collection<EClassId> affectedClassesChangedAfter(long versionExclusive) {
         LinkedHashSet<EClassId> changed = new LinkedHashSet<>();
+        chargeStructure(1L + classChangeVersions.size());
         for (Map.Entry<EClassId, Long> entry : classChangeVersions.entrySet()) {
             if (entry.getValue() > versionExclusive) {
                 changed.add(unionFind.find(entry.getKey()));
@@ -384,7 +414,9 @@ public final class EGraph {
         while (!queue.isEmpty()) {
             EClassId id = queue.removeFirst();
             EClass eclass = classOf(id);
-            for (ENode parent : eclass.parents()) {
+            var parents = eclass.parents();
+            chargeStructure(1L + parents.size());
+            for (ENode parent : parents) {
                 // Backlinks use the current hash-cons key even before rebuild.
                 EClassId owner = unionFind.find(hashCons.get(parent));
                 if (affected.add(owner)) {
@@ -528,11 +560,13 @@ public final class EGraph {
 
     private void chargeExtraction(long units) {
         if (proofCapture != null) proofCapture.charge(units);
+        if (observeNativeWork) observedExtractionWork += units;
     }
 
     // --- internal -----------------------------------------------------------
 
     private EClass classOf(EClassId id) {
+        chargeStructure(1);
         EClass eclass = classes.get(unionFind.find(id));
         if (eclass == null) {
             throw new IllegalStateException("Unknown e-class " + id);
@@ -556,6 +590,7 @@ public final class EGraph {
         eclass = classOf(id);
         LinkedHashSet<ENode> dedup = new LinkedHashSet<>();
         for (ENode node : eclass.nodes()) {
+            chargeStructure(1L + node.children().size());
             ENode canonical = node.canonicalize(unionFind);
             dedup.add(canonical);
             EClassId owner = hashCons.get(canonical);
@@ -573,6 +608,7 @@ public final class EGraph {
     }
 
     private void repairParent(ENode parent) {
+        chargeStructure(1L + parent.children().size());
         ENode canonical = parent.canonicalize(unionFind);
         EClassId owner = hashCons.get(parent);
         if (parent.equals(canonical)) {
@@ -598,6 +634,7 @@ public final class EGraph {
     }
 
     private Expr nodeToExpr(ENode node, Map<EClassId, ENode> bestNode) {
+        if (observeNativeWork) observedExtractionWork += 1L + node.children().size();
         String symbol = node.symbol();
         if (symbol.startsWith("num:")) {
             return new NumberExpr(de.regelsuche.scalar.ExactRational.fromCanonicalText(symbol.substring(4)));
@@ -669,6 +706,9 @@ public final class EGraph {
             throw new IllegalStateException("Unknown merge classes: " + survivor + " / " + merged);
         }
         if (survivorClass != mergedClass) {
+            if (observeNativeWork) {
+                observedStructureWork += 1L + mergedClass.nodes().size() + mergedClass.parents().size();
+            }
             survivorClass.absorb(mergedClass);
         }
         classes.put(merged, survivorClass);
@@ -683,6 +723,7 @@ public final class EGraph {
     }
 
     private void removeHashCons(ENode node, EClassId owner) {
+        chargeStructure(1L + node.children().size());
         hashCons.remove(node);
         removeSignatureMembership(node, owner);
         for (EClassId child : node.children()) {
@@ -691,6 +732,7 @@ public final class EGraph {
     }
 
     private void putHashCons(ENode node, EClassId owner) {
+        chargeStructure(1L + node.children().size());
         hashCons.put(node, owner);
         addSignatureMembership(node, owner);
         for (EClassId child : node.children()) {
@@ -718,6 +760,7 @@ public final class EGraph {
     }
 
     private Collection<EClassId> dedupeCanonical(Collection<EClassId> ids) {
+        chargeStructure(1L + ids.size());
         LinkedHashSet<EClassId> canonical = new LinkedHashSet<>();
         for (EClassId id : ids) {
             canonical.add(unionFind.find(id));

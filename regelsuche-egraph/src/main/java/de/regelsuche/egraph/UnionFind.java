@@ -15,11 +15,24 @@ public final class UnionFind {
 
     private final List<Integer> parent = new ArrayList<>();
     private final List<Integer> rank = new ArrayList<>();
+    private final boolean observeWork;
+    private long observedWork;
+
+    public UnionFind() { this(false); }
+
+    UnionFind(boolean observeWork) { this.observeWork = observeWork; }
+
+    long observedWork() { return observedWork; }
+
+    private void charge() {
+        if (observeWork) observedWork++;
+    }
 
     /**
      * Add a fresh singleton set and return its (initial) representative.
      */
     public EClassId makeSet() {
+        charge();
         int id = parent.size();
         parent.add(id);
         rank.add(0);
@@ -33,6 +46,7 @@ public final class UnionFind {
 
     /** Canonical representative of {@code id}'s set. */
     public EClassId find(EClassId id) {
+        charge();
         int x = id.value();
         if (x >= parent.size()) {
             throw new IllegalArgumentException("Unknown EClassId: " + id);
@@ -40,10 +54,12 @@ public final class UnionFind {
         // iterative path compression — avoid recursion for deep chains.
         int root = x;
         while (parent.get(root) != root) {
+            charge();
             root = parent.get(root);
         }
         int cursor = x;
         while (parent.get(cursor) != root) {
+            charge();
             int next = parent.get(cursor);
             parent.set(cursor, root);
             cursor = next;
@@ -56,6 +72,7 @@ public final class UnionFind {
      * that survived the merge; the other root is now an alias for it.
      */
     public EClassId union(EClassId a, EClassId b) {
+        charge();
         int rootA = find(a).value();
         int rootB = find(b).value();
         if (rootA == rootB) {

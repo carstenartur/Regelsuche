@@ -1,0 +1,114 @@
+name: Prospective representation source-only replay
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/prospective-source-replay.yml'
+      - 'docs/research/prospective-history-20261120/formation-history.bundle'
+      - 'docs/research/prospective-history-20261120/manifest.json'
+      - 'docs/research/prospective-history-20261120/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: bash
+    env:
+      HISTORY: docs/research/prospective-history-20261120
+      STUDY: docs/research/prospective-representation-20261120
+      FREEZE_TIP: 37283d9b74a73ccca65c8eb89014b3d094463be4
+      EXPECTED_ROOT: sha256:262b2808c1f8b00d8472e1258c8c5e286c5a5e044ebe8b495d1514e303d0dcb2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+      - name: Restore the original public history and validate its identities
+        run: |
+          root="$RUNNER_TEMP/prospective-750"
+          mkdir -p "$root/evidence"
+          exec > >(tee "$root/evidence/import.log") 2>&1
+          echo "REPLAY_ROOT=$root" >> "$GITHUB_ENV"
+          cp "$HISTORY/manifest.json" "$root/evidence/preservation.json"
+          metadata="$root/evidence/preservation.json"
+          bundle="$GITHUB_WORKSPACE/$HISTORY/formation-history.bundle"
+          jq -e --arg tip "$FREEZE_TIP" --arg root "$EXPECTED_ROOT" \
+            '.freezeCommit == $tip and .canonicalMathematicsRoot == $root and .rows == 224 and .totalWork == "UNMATCHED"' "$metadata"
+          echo "$(jq -er .bundleSha256 "$metadata")  $bundle" | sha256sum --check
+          test "$(wc -c < "$bundle")" -eq "$(jq -er .bundleBytes "$metadata")"
+          base=$(jq -er .prerequisite "$metadata")
+          ref=refs/heads/prospective-formation-20261120
+          git init --bare "$root/origin.git"
+          git -C "$root/origin.git" fetch --no-tags "$GITHUB_WORKSPACE" "$base:refs/heads/public-base"
+          git -C "$root/origin.git" bundle verify "$bundle"
+          git -C "$root/origin.git" fetch --no-tags "$bundle" "$ref:$ref"
+          test "$(git -C "$root/origin.git" rev-parse "$ref")" = "$FREEZE_TIP"
+          test "$(git -C "$root/origin.git" rev-parse "$ref^{tree}")" = "$(jq -er .freezeTree "$metadata")"
+          git -C "$root/origin.git" fsck --full --no-dangling
+          git -C "$root/origin.git" symbolic-ref HEAD "$ref"
+          git -C "$root/origin.git" show "$FREEZE_TIP:scripts/replay-prospective-representation.sh" > "$root/replay.sh"
+      - name: Build and verify two independent source-only checkouts
+        run: |
+          bash "$REPLAY_ROOT/replay.sh" "$REPLAY_ROOT/origin.git" "$FREEZE_TIP" "$REPLAY_ROOT/runs" \
+            2>&1 | tee "$REPLAY_ROOT/evidence/clean-replay.log"
+      - name: Build the historical container from a third normal checkout
+        run: |
+          exec > >(tee "$REPLAY_ROOT/evidence/container-build.log") 2>&1
+          git clone --no-local --no-hardlinks --single-branch --branch prospective-formation-20261120 \
+            "$REPLAY_ROOT/origin.git" "$REPLAY_ROOT/container-checkout"
+          cd "$REPLAY_ROOT/container-checkout"
+          git checkout --detach "$FREEZE_TIP"
+          test -d .git
+          test -z "$(git status --porcelain)"
+          docker build --iidfile "$REPLAY_ROOT/evidence/image.id" -f Dockerfile.prospective-representation .
+      - name: Run the frozen entrypoint with networking disabled
+        run: |
+          image=$(cat "$REPLAY_ROOT/evidence/image.id")
+          test "$(docker image inspect --format '{{.Id}}' "$image")" = "$image"
+          mkdir -p "$REPLAY_ROOT/container-output"
+          docker run --rm --network none --mount "type=bind,src=$REPLAY_ROOT/container-output,dst=/out" "$image" \
+            2>&1 | tee "$REPLAY_ROOT/evidence/container-run.log"
+      - name: Verify all three matrices against the committed canonical root
+        run: |
+          cd "$REPLAY_ROOT/runs/clean-1"
+          original="$PWD/$STUDY/freeze"
+          first="$REPLAY_ROOT/runs/clean-1-freeze"
+          second="$REPLAY_ROOT/runs/clean-2-freeze"
+          container="$REPLAY_ROOT/container-output/freeze"
+          scripts/run-prospective-representation.sh compare "$PWD" "$original" "$first" "$second" "$container" \
+            2>&1 | tee "$REPLAY_ROOT/evidence/comparison.log"
+          jq -en --slurpfile original "$original/manifest.json" --slurpfile first "$first/manifest.json" \
+            --slurpfile second "$second/manifest.json" --slurpfile container "$container/manifest.json" \
+            --slurpfile preservation "$REPLAY_ROOT/evidence/preservation.json" --arg expected "$EXPECTED_ROOT" '
+            [$original[0], $first[0], $second[0], $container[0]] as $matrices |
+            if all($matrices[]; .canonicalMathematicsRoot == $expected and .sourceCount == 14 and
+              .rowCount == 224 and (.rows | length) == 224 and .qualificationDisclosure == "NOT_DISCLOSED") and
+              $original[0].manifestHash == $preservation[0].historicalFreezeManifestHash then
+              {sourceOnly: true, totalWork: "UNMATCHED", rowsPerMatrix: 224,
+               originalRoot: $original[0].canonicalMathematicsRoot, clean1Root: $first[0].canonicalMathematicsRoot,
+               clean2Root: $second[0].canonicalMathematicsRoot, containerRoot: $container[0].canonicalMathematicsRoot}
+            else error("frozen source-only matrix identity mismatch") end' | tee "$REPLAY_ROOT/evidence/roots.json"
+      - name: Retain source-only outputs and diagnostics
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: prospective-source-only-replay
+          path: |
+            ${{ runner.temp }}/prospective-750/evidence/**
+            ${{ runner.temp }}/prospective-750/runs/*.log
+            ${{ runner.temp }}/prospective-750/runs/clean-1-freeze/**
+            ${{ runner.temp }}/prospective-750/runs/clean-2-freeze/**
+            ${{ runner.temp }}/prospective-750/container-output/freeze/**
+          if-no-files-found: error
