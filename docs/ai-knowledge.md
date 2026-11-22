@@ -172,6 +172,26 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after Maven and proof-authority integration (2026-11-22)
+
+The current reference is the original extractor 0.1.10 projection of accepted main
+`98a60e30629f65bc12bb573e9beb46b04053e66c`, tree
+`e62f351b3aa4c9a7901d0737b85db8443c50505b`.
+[Main CI 45008332052](https://github.com/carstenartur/Regelsuche/actions/runs/45008332052)
+passed eleven mandatory source authorities, the aggregate gate and report
+publication. All 293 indexed files in its original quality artifact matched their
+reported lengths and SHA-256 checksums. The native check passed against the
+previous 847,010-unit reference: **855,205 context units**, an increase of **8,195**
+within the unchanged **15,000** allowance. Concept radius increased from 117 to 118.
+
+The [accepted-main provenance](../ai-knowledge/baseline-history/2026-11-22-main-98a60e30/provenance.json)
+binds the source, original CI, artifact digest, unchanged policies and retained
+native reports. The [projected snapshot](../ai-knowledge/baseline-history/2026-11-22-main-98a60e30/metrics-snapshot.json)
+is the active reference. Pending feature branches supply no baseline values and
+still require their own complete acceptance. Thresholds, selectors and exceptions
+retain their existing definitions.
+
+
 ### Accepted main after witness/induction integration (2026-11-21)
 
 [Main CI 44852121730](https://github.com/carstenartur/Regelsuche/actions/runs/44852121730)
