@@ -34,16 +34,16 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain&lt;Scop
         private final ScopedProofDag dag;
         private final String kernel, rebuild;
         private final Path kernelDirectory, rebuildDirectory;
-<span class="nc" id="L37">        private Certificate(ScopedProofDag dag, ScopedProofExecutor.VerifiedReplay receipt) {</span>
-<span class="nc" id="L38">            this.dag = dag; this.kernel = receipt.kernelHash(); rebuild = receipt.rebuildHash();</span>
-<span class="nc" id="L39">            kernelDirectory = receipt.kernelDirectory(); rebuildDirectory = receipt.rebuildDirectory();</span>
-<span class="nc" id="L40">        }</span>
+<span class="fc" id="L37">        private Certificate(ScopedProofDag dag, ScopedProofExecutor.VerifiedReplay receipt) {</span>
+<span class="fc" id="L38">            this.dag = dag; this.kernel = receipt.kernelHash(); rebuild = receipt.rebuildHash();</span>
+<span class="fc" id="L39">            kernelDirectory = receipt.kernelDirectory(); rebuildDirectory = receipt.rebuildDirectory();</span>
+<span class="fc" id="L40">        }</span>
 <span class="nc" id="L41">        public ScopedProofDag dag() { return dag; }</span>
-<span class="nc" id="L42">        public String kernelHash() { return kernel; }</span>
-<span class="nc" id="L43">        public String rebuildHash() { return rebuild; }</span>
+<span class="fc" id="L42">        public String kernelHash() { return kernel; }</span>
+<span class="fc" id="L43">        public String rebuildHash() { return rebuild; }</span>
 <span class="nc" id="L44">        public Path kernelDirectory() { return kernelDirectory; }</span>
 <span class="nc" id="L45">        public Path rebuildDirectory() { return rebuildDirectory; }</span>
-<span class="nc" id="L46">        String canonical() { return dag.canonical() + kernel + &quot;\n&quot; + rebuild; }</span>
+<span class="fc" id="L46">        String canonical() { return dag.canonical() + kernel + &quot;\n&quot; + rebuild; }</span>
     }
 
     private final ScopedProofExecutor verifier;
@@ -148,10 +148,10 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain&lt;Scop
 <span class="fc" id="L148">            var evidence = Map.of(&quot;proposal&quot;, dag.hash(), &quot;kernelStatus&quot;, checked.status().name());</span>
 <span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (checked.status() == ResultStatus.UNSUPPORTED)</span>
 <span class="nc" id="L150">                return Evaluation.unsupported(checked.message(), evidence);</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (checked.status() != ResultStatus.CONFIRMED)</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (checked.status() != ResultStatus.CONFIRMED)</span>
 <span class="fc" id="L152">                return Evaluation.inconclusive(checked.message(), evidence);</span>
-<span class="nc" id="L153">            var certificate = new Certificate(dag, checked);</span>
-<span class="nc" id="L154">            return Evaluation.confirmed(certificate, &quot;Scoped theorem checked in both pinned projects&quot;, evidence);</span>
+<span class="fc" id="L153">            var certificate = new Certificate(dag, checked);</span>
+<span class="fc" id="L154">            return Evaluation.confirmed(certificate, &quot;Scoped theorem checked in both pinned projects&quot;, evidence);</span>
 <span class="nc" id="L155">        } catch (RuntimeException refusal) {</span>
 <span class="nc" id="L156">            return Evaluation.inconclusive(&quot;Checked proof receiver failed: &quot; + refusal,</span>
 <span class="nc" id="L157">                Map.of(&quot;proposal&quot;, dag.hash()));</span>
@@ -160,7 +160,7 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain&lt;Scop
     @Override public CertificateRenderer&lt;Certificate&gt; certificateRenderer() {
 <span class="fc" id="L161">        return new CertificateRenderer&lt;&gt;() {</span>
 <span class="fc" id="L162">            public String id() { return &quot;scoped-proof-receipt/v1&quot;; }</span>
-<span class="nc" id="L163">            public CertificateRendering render(Certificate c) { return new CertificateRendering(certificateType(),&quot;text&quot;,c.canonical()); }</span>
+<span class="fc" id="L163">            public CertificateRendering render(Certificate c) { return new CertificateRendering(certificateType(),&quot;text&quot;,c.canonical()); }</span>
         };
     }
     @Override public EvidenceAdapter&lt;State,ScopedProofDag,Certificate&gt; evidenceAdapter() {

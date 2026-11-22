@@ -192,7 +192,7 @@ import java.util.Objects;
 <span class="nc" id="L192">            return evaluate(nested.program(), inputExpression, context, budget);</span>
         }
         List&lt;Transformation&gt; emitted;
-<span class="pc bpc" id="L195" title="1 of 4 branches missed.">        if (budget != null &amp;&amp; source.engine() instanceof MeasuredTransformationEngine measured) {</span>
+<span class="fc bfc" id="L195" title="All 4 branches covered.">        if (budget != null &amp;&amp; source.engine() instanceof MeasuredTransformationEngine measured) {</span>
 <span class="fc" id="L196">            var batch = measured.transformMeasured(inputExpression);</span>
 <span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!batch.workMetrics().candidateWork().equals(ExecutionWork.ZERO)) {</span>
 <span class="nc" id="L198">                throw new IllegalArgumentException(&quot;nested mathematical batches require retained execution observations&quot;);</span>
@@ -360,7 +360,7 @@ import java.util.Objects;
 <span class="fc" id="L360">        List&lt;RewriteCandidate&gt; endpoints = new ArrayList&lt;&gt;();</span>
 <span class="fc" id="L361">        boolean complete = true;</span>
 
-<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        for (int iteration = 1; iteration &lt;= repeat.maxIterations(); iteration++) {</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (int iteration = 1; iteration &lt;= repeat.maxIterations(); iteration++) {</span>
 <span class="fc" id="L364">            context.repeatIteration();</span>
 <span class="fc" id="L365">            List&lt;RewriteCandidate&gt; next = new ArrayList&lt;&gt;();</span>
 <span class="fc bfc" id="L366" title="All 2 branches covered.">            if (iteration == 1) {</span>
@@ -482,7 +482,7 @@ import java.util.Objects;
     }
 
     private static PathBudget remaining(PathBudget budget, RewriteCandidate prefix) {
-<span class="pc bpc" id="L485" title="1 of 2 branches missed.">        return budget == null ? null : budget.after(prefix.executionWork());</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">        return budget == null ? null : budget.after(prefix.executionWork());</span>
     }
 
     private static void rejectBudgetedSources(RewriteProgram program, boolean allowWorkAware) {

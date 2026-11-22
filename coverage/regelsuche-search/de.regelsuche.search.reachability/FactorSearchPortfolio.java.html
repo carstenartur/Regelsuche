@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FactorSearchPortfolio.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">FactorSearchPortfolio.java</span></div><h1>FactorSearchPortfolio.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.search.reachability.ReversibleFactorSearch.*;
+import java.util.*;
+import java.util.concurrent.*;
+
+/** Each declared lane owns its allowance; a full barrier precedes deterministic witness selection. */
+public final class FactorSearchPortfolio {
+    public static final String REVISION=&quot;regelsuche.factor-search-portfolio/v1&quot;;
+    private FactorSearchPortfolio() { }
+    public record Lane(String id,Mode mode,int callLimit) {
+<span class="fc" id="L13">        public Lane {</span>
+<span class="pc bpc" id="L14" title="5 of 10 branches missed.">            if (id==null || !id.matches(&quot;[a-z][a-z0-9-]{0,63}&quot;) || mode==null || callLimit&lt;0 || callLimit&gt;100_000)</span>
+<span class="nc" id="L15">                throw new IllegalArgumentException(&quot;portfolio lane&quot;);</span>
+<span class="fc" id="L16">        }</span>
+    }
+<span class="fc" id="L18">    public record LaneResult(Lane lane,Result result) { }</span>
+    public record Portfolio(String revision,List&lt;LaneResult&gt; lanes,Optional&lt;Result&gt; selected,int totalCalls) {
+<span class="fc" id="L20">        public Portfolio { lanes=List.copyOf(lanes); }</span>
+    }
+    public static Portfolio run(String source,String target,AssumptionSignature context,int depth,List&lt;Lane&gt; lanes,int workers) {
+<span class="fc" id="L23">        lanes=List.copyOf(lanes);</span>
+<span class="pc bpc" id="L24" title="6 of 12 branches missed.">        if (depth&lt;0 || depth&gt;10 || lanes.isEmpty() || lanes.size()&gt;8 || workers&lt;1 || workers&gt;Math.min(8,lanes.size())</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">                || lanes.stream().map(Lane::id).distinct().count()!=lanes.size()) throw new IllegalArgumentException(&quot;portfolio limits or duplicate IDs&quot;);</span>
+<span class="fc" id="L26">        var outputs=new ArrayList&lt;LaneResult&gt;();</span>
+<span class="fc" id="L27">        try (var pool=Executors.newFixedThreadPool(workers)) {</span>
+<span class="fc" id="L28">            var pending=new ArrayList&lt;Future&lt;LaneResult&gt;&gt;();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            for (Lane lane:lanes) pending.add(pool.submit(()-&gt;new LaneResult(lane,new ReversibleFactorSearch()</span>
+<span class="fc" id="L30">                .search(source,target,context,depth,lane.callLimit(),lane.mode()))));</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (var future:pending) outputs.add(future.get());</span>
+<span class="nc" id="L32">        } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L33">            Thread.currentThread().interrupt();throw new IllegalStateException(&quot;portfolio interrupted before barrier&quot;,interrupted);</span>
+<span class="pc" id="L34">        } catch (ExecutionException failed) { throw new IllegalStateException(&quot;portfolio lane failed before barrier&quot;,failed.getCause()); }</span>
+<span class="fc" id="L35">        int total=0;</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (var row:outputs) {</span>
+<span class="fc" id="L37">            int spent=row.result().work().totalCalls();</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            if (spent&gt;row.lane().callLimit()) throw new IllegalStateException(&quot;lane exceeded its frozen allocation&quot;);</span>
+<span class="fc" id="L39">            total=Math.addExact(total,spent);</span>
+<span class="fc" id="L40">        }</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        var selected=outputs.stream().filter(r-&gt;r.result().status()==Status.REACHED)</span>
+<span class="fc" id="L42">            .min(Comparator.comparingInt((LaneResult r)-&gt;r.result().witness().size()).thenComparing(r-&gt;r.lane().id()))</span>
+<span class="fc" id="L43">            .map(LaneResult::result);</span>
+<span class="fc" id="L44">        return new Portfolio(REVISION,outputs,selected,total);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,64 @@
+# Endliches Suchwissen mit korrigierter Aufwandserfassung
+
+Der aktuelle Launcher schreibt `regelsuche.finite-search-knowledge-comparison/v2`
+und kennzeichnet den Controller als `regelsuche.guided-factor-deepening/v2`.
+Als Eingaben gelten weiterhin die öffentliche Matrix mit 16 Fällen und zehn
+Verfahren, das reversible Vier-Regel-Inventar und die Budgets des
+[ursprünglichen Plans](../finite-search-knowledge-v1/plan.json).
+
+- Eine erschöpfte Tabellenabfrage unterscheidet ein fehlendes Ziel
+  (`NOT_IN_TABLE`) von einem gespeicherten Ziel ohne gefundenen Pfad innerhalb
+  der Abfragetiefe (`NO_PATH_IN_TABLE_WITHIN_QUERY_DEPTH`). Eine durch
+  Budgetende unterbrochene Abfrage meldet `WORK_EXHAUSTED`.
+- Erzeugung und Wiederladen verwenden dieselbe Obergrenze von 4 MiB für
+  den kanonischen UTF-8-Umschlag. Eine abgewiesene Erzeugung meldet die bereits
+  eingesetzten Aufrufe und die Zahl erzeugter Kandidaten.
+- Der geführte Suchcontroller verbucht Hinweise für einen weiteren
+  Tiefendurchlauf nur, wenn ein solcher Durchlauf zulässig bleibt.
+
+Der [eingefrorene v1-Bericht](../finite-search-knowledge-v1/README.md) bleibt
+an den ursprünglichen Quellstand gebunden. Die geänderten Status- und
+Arbeitsfelder machen v2 zu einem eigenen Ausgabeformat. Ein qualifizierter v2-Versuchsbericht mit **vollständiger mechanischer
+Arbeitserfassung** steht noch aus. Die technische Dreifach-Reproduktion ist
+davon zu unterscheiden; sie beweist weder eine 1.000-fache Beschleunigung noch
+die Gleichheit aller Arbeitsmaße.
+
+Zum technischen Reproduzieren der aktuellen Ausgabe im Repository-Stamm mit
+Java 25 und Maven ausführen.
+
+```bash
+mvn -pl regelsuche-experiments -am -DskipTests -DincludeScope=runtime \
+  -Dmdep.outputFile=target/finite-search-classpath.txt package dependency:build-classpath
+module=regelsuche-experiments/target
+output="$module/finite-search-v2"
+java -Xmx512m -cp "$module/classes:$(cat "$module/finite-search-classpath.txt")" \
+  de.regelsuche.benchmark.FiniteSearchKnowledgeComparison \
+  "$output/comparison.json" "$output/runtime.json"
+```
+
+## Reproduktion des veröffentlichten v2-Produzenten
+
+Der [Reproduktionsplan](../../superpowers/plans/2026-11-21-finite-search-v2-reproduction.md) bindet den unveränderten Produzenten `6dce1fae5bf84cbb588129993830c41be45a8bda`. Das [historische Workflow-Rezept](source-replay-workflow.yml) dokumentiert den ursprünglichen Lauf mit drei frischen Checkouts mit getrennten Maven-Repositories. Zwei laufen auf demselben Host, der dritte in einem digest-gepinnten JDK-Image. Der Java-Messlauf im Container hat keinen Netzwerkzugriff. Das unveränderte Rezept wird hier ausschließlich als Quellartefakt aufbewahrt; es ist **kein** weiterer aktiver GitHub-Workflow und wird nicht erneut als Studie gestartet.
+
+Das Artefakt enthält je Umgebung den vollständigen Vergleich mit allen 160 Zeilen und den erzeugten Quelltabellen sowie die einzelnen Zeit- und Allokationsbeobachtungen. Die Prüfung verlangt bytegleiche kanonische Vergleiche und bindet die Laufzeitdateien separat. Die öffentliche Matrix und die v1-Befunde bleiben an ihre ursprünglichen Quellen gebunden. Ein reproduzierter v2-Befund erfordert den abgeschlossenen Lauf und die Prüfung seines Artefakts.
+
+### Historischer öffentlicher Reproduktionsbeleg (keine neue Studie)
+
+[GitHub-Lauf 44879420814](https://github.com/carstenartur/Regelsuche/actions/runs/44879420814)
+dokumentiert bereits zwei frische Quell-Checkouts und einen digest-gepinnten,
+netzwerkfreien Containerlauf des zuvor eingefrorenen Produzenten. Jede der drei
+Ausführungen lieferte die 160 vorregistrierten Ergebniszeilen; die kanonischen
+Vergleichsdateien waren byteidentisch (SHA-256
+`f2d2831971f7e1509b3160879085f98f733a9bedd393ac560806860804d3d3fe`).
+Die Laufzeitbeobachtungen wurden getrennt je Umgebung aufbewahrt. Das
+verzeichnete öffentliche Ergebnisarchiv trägt die SHA-256-Prüfsumme
+`09a5081e908d5561390a0e53f593c3eacb0b88c6f40c0b278aa3a875e990199b`.
+
+Diese Prüfung ist **nur** eine Reproduktion der begrenzten öffentlichen
+Vergleichsmatrix. Ihr ausgewiesener Geltungsbereich lautet
+`NATIVE_CALLS_ONLY_FULL_MECHANICAL_WORK_UNMATCHED`: Weder vollständige
+mechanische Arbeitsparität noch der angestrebte Faktor 1.000 sind damit
+nachgewiesen. Das Quellrezept wird hier nur zur Nachvollziehbarkeit aufbewahrt,
+nicht erneut ausgeführt. Geschützte Qualifikationsdaten und externe Studien
+sind ausdrücklich nicht Bestandteil dieses Belegs.
+

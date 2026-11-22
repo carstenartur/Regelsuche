@@ -113,26 +113,27 @@ final class NativeScalarRules {
 <span class="fc" id="L113">                work.tuples++;</span>
 <span class="pc bpc" id="L114" title="1 of 2 branches missed.">                if (!run.graph.find(product.children().get(i)).equals(denominator)) continue;</span>
 <span class="fc" id="L115">                var factor = run.syntax(denominator);</span>
-<span class="fc" id="L116">                var truth = run.facts.get(denominator).evaluate(ScalarGuardFacts.Predicate.NONZERO);</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (truth != ScalarGuardFacts.Truth.TRUE) {</span>
-<span class="fc" id="L118">                    work.rejected++;</span>
-<span class="fc" id="L119">                    run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),false));</span>
-<span class="fc" id="L120">                    break;</span>
+<span class="fc" id="L116">                run.chargeGuard();</span>
+<span class="fc" id="L117">                var truth = run.facts.get(denominator).evaluate(ScalarGuardFacts.Predicate.NONZERO);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (truth != ScalarGuardFacts.Truth.TRUE) {</span>
+<span class="fc" id="L119">                    work.rejected++;</span>
+<span class="fc" id="L120">                    run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),false));</span>
+<span class="fc" id="L121">                    break;</span>
                 }
-<span class="fc" id="L122">                var rest = new ArrayList&lt;&gt;(product.children()); rest.remove(i);</span>
-<span class="fc" id="L123">                Expr before = new BinaryExpr(productSyntax(run,product.children(),BinaryOperator.MUL),BinaryOperator.DIV,factor);</span>
-<span class="fc" id="L124">                int previous = work.unions;</span>
-<span class="fc" id="L125">                run.apply(rule,root,group(run,rest,BinaryOperator.MUL),before,productSyntax(run,rest,BinaryOperator.MUL),work);</span>
-<span class="fc bfc" id="L126" title="All 2 branches covered.">                run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),work.unions&gt;previous));</span>
-<span class="fc" id="L127">                break;</span>
+<span class="fc" id="L123">                var rest = new ArrayList&lt;&gt;(product.children()); rest.remove(i);</span>
+<span class="fc" id="L124">                Expr before = new BinaryExpr(productSyntax(run,product.children(),BinaryOperator.MUL),BinaryOperator.DIV,factor);</span>
+<span class="fc" id="L125">                int previous = work.unions;</span>
+<span class="fc" id="L126">                run.apply(rule,root,group(run,rest,BinaryOperator.MUL),before,productSyntax(run,rest,BinaryOperator.MUL),work);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                run.guards.add(new NativeScalarSaturation.Guard(rule,factor,truth.name(),work.unions&gt;previous));</span>
+<span class="fc" id="L128">                break;</span>
             }
-<span class="fc" id="L129">        }</span>
-<span class="fc" id="L130">    }</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">    }</span>
     private static EClassId group(NativeScalarSaturation run,List&lt;EClassId&gt; ids,BinaryOperator op) {
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        return ids.size()==1 ? run.graph.find(ids.getFirst()) : run.graph.add(new ENode(&quot;ac:&quot;+op,ids));</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        return ids.size()==1 ? run.graph.find(ids.getFirst()) : run.graph.add(new ENode(&quot;ac:&quot;+op,ids));</span>
     }
     private static Expr productSyntax(NativeScalarSaturation run,List&lt;EClassId&gt; ids,BinaryOperator op) {
-<span class="fc" id="L135">        return ScalarExtractionProof.join(ids.stream().map(run::syntax).toList(),op);</span>
+<span class="fc" id="L136">        return ScalarExtractionProof.join(ids.stream().map(run::syntax).toList(),op);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

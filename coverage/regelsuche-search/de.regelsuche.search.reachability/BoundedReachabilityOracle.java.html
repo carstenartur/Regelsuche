@@ -636,14 +636,14 @@ import java.util.TreeSet;
 <span class="fc" id="L636">            List&lt;Node&gt; labels = labelsByKey.computeIfAbsent(</span>
 <span class="fc" id="L637">                proposed.mathematicalKey(),</span>
 <span class="fc" id="L638">                ignored -&gt; new ArrayList&lt;&gt;());</span>
-<span class="pc bpc" id="L639" title="1 of 2 branches missed.">            if (isDominated(proposed, labels)) {</span>
-<span class="nc" id="L640">                dominatedTransitions++;</span>
-<span class="nc" id="L641">                retainEdge(</span>
+<span class="fc bfc" id="L639" title="All 2 branches covered.">            if (isDominated(proposed, labels)) {</span>
+<span class="fc" id="L640">                dominatedTransitions++;</span>
+<span class="fc" id="L641">                retainEdge(</span>
                     current,
                     proposed,
-<span class="nc" id="L644">                    candidate.transformation(),</span>
+<span class="fc" id="L644">                    candidate.transformation(),</span>
                     EdgeDisposition.DOMINATED_BY_EXISTING_LABEL);
-<span class="nc" id="L646">                return null;</span>
+<span class="fc" id="L646">                return null;</span>
             }
 <span class="fc bfc" id="L648" title="All 2 branches covered.">            if (statesById.size() &gt;= budget.maxVisitedStates()) {</span>
 <span class="fc" id="L649">                visitedStateLimitTransitions++;</span>
@@ -676,7 +676,7 @@ import java.util.TreeSet;
 <span class="fc" id="L676">            return labels.stream().anyMatch(existing -&gt;</span>
 <span class="pc bpc" id="L677" title="1 of 2 branches missed.">                existing.depth() &lt;= proposed.depth()</span>
 <span class="fc" id="L678">                    &amp;&amp; existing.primitivePathWork()</span>
-<span class="pc bpc" id="L679" title="1 of 2 branches missed.">                        &lt;= proposed.primitivePathWork());</span>
+<span class="fc bfc" id="L679" title="All 2 branches covered.">                        &lt;= proposed.primitivePathWork());</span>
         }
 
         private void removeDominatedLabels(

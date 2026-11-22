@@ -216,7 +216,7 @@ public final class ExtractionProofChecker {
 <span class="fc" id="L216">            s.work(1);</span>
 <span class="fc" id="L217">            var p = premise(checked, r.childProofs().get(k));</span>
 <span class="fc" id="L218">            require(</span>
-<span class="pc bpc" id="L219" title="1 of 4 branches missed.">                    p.left == a.children().get(k) &amp;&amp; p.right == b.children().get(k),</span>
+<span class="fc bfc" id="L219" title="All 4 branches covered.">                    p.left == a.children().get(k) &amp;&amp; p.right == b.children().get(k),</span>
                     &quot;congruence child endpoints&quot;);
         }
 <span class="fc" id="L222">        return new Equality(r.left(), r.right());</span>

@@ -128,7 +128,7 @@ final class DomainExportWorkspaceActions {
 <span class="fc" id="L128">            result.set(&quot;evidence&quot;, json.readTree(replayed.toCanonicalJson()));</span>
 <span class="fc" id="L129">            exchange.getResponseHeaders().set(&quot;X-Regelsuche-Run-Id&quot;, workspace.runId());</span>
 <span class="fc" id="L130">            send(exchange, 200, json.writeValueAsString(result));</span>
-<span class="pc" id="L131">        } catch (IllegalStateException exception) { error(exchange, 409, &quot;REPLAY_NOT_REPRODUCED&quot;, exception.getMessage()); }</span>
+<span class="fc" id="L131">        } catch (IllegalStateException exception) { error(exchange, 409, &quot;REPLAY_NOT_REPRODUCED&quot;, exception.getMessage()); }</span>
 <span class="fc" id="L132">    }</span>
 
     private static void sendReceipt(HttpExchange exchange, String runId,

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>GuidedFactorSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">GuidedFactorSearch.java</span></div><h1>GuidedFactorSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.search.reachability.ReversibleFactorFragment.*;
+import de.regelsuche.search.reachability.ReversibleFactorSearch.*;
+import java.util.*;
+
+/** Iterative deepening with bounded exact adjacency reuse and prior-pass ordering, never prior-pass pruning. */
+public final class GuidedFactorSearch {
+    public static final String REVISION=&quot;regelsuche.guided-factor-deepening/v2&quot;;
+    /** Candidate discovery precedes the separately budgeted receiver; it is not verified reachability. */
+<span class="fc" id="L12">    public record Pass(int depth,int generationCalls,long generated,int cacheHits,long lookupOperations,boolean candidateFound) { }</span>
+    public record Guided(String revision,Result result,List&lt;Pass&gt; passes,int cacheHits,int replacements,
+                         long lookupOperations,long lookupLimit,String terminalReason) {
+<span class="fc" id="L15">        public Guided { passes=List.copyOf(passes); }</span>
+    }
+<span class="fc" id="L17">    private record Cached(List&lt;Arc&gt; arcs,int horizon,int generation) { }</span>
+<span class="fc" id="L18">    private final ReversibleFactorFragment fragment=new ReversibleFactorFragment();</span>
+    private final State source,target;
+    private final int maximumDepth,capacity;
+    private final long lookupLimit;
+    private final Counter forward,replay;
+<span class="fc" id="L23">    private final Map&lt;State,Cached&gt; table=new HashMap&lt;&gt;();</span>
+<span class="fc" id="L24">    private final Map&lt;State,State&gt; principal=new HashMap&lt;&gt;();</span>
+<span class="fc" id="L25">    private final List&lt;Pass&gt; passes=new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L26">    private List&lt;Step&gt; deepest=List.of();</span>
+    private int generation,hits,replacements;
+    private long lookups;
+<span class="fc" id="L29">    private String terminalReason=&quot;COMPLETE&quot;;</span>
+    private boolean touchedLimit;
+<span class="fc" id="L31">    private GuidedFactorSearch(String source,String target,AssumptionSignature assumptions,int depth,int callLimit,int capacity,long lookupLimit) {</span>
+<span class="pc bpc" id="L32" title="8 of 16 branches missed.">        if (depth&lt;0 || depth&gt;10 || capacity&lt;1 || capacity&gt;4096 || callLimit&lt;0 || callLimit&gt;100_000</span>
+                || lookupLimit&lt;0 || lookupLimit&gt;10_000_000)
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;guided finite search bounds&quot;);</span>
+<span class="fc" id="L35">        var context=BoundedReachabilityOracle.normalizeSignature(assumptions);</span>
+<span class="fc" id="L36">        this.source=new State(fragment.endpoint(source),context);this.target=new State(fragment.endpoint(target),context);</span>
+<span class="fc" id="L37">        maximumDepth=depth;this.capacity=capacity;</span>
+<span class="fc" id="L38">        this.lookupLimit=lookupLimit;</span>
+<span class="fc" id="L39">        var allowance=new Allowance(callLimit);forward=new Counter(allowance);replay=new Counter(allowance);</span>
+<span class="fc" id="L40">    }</span>
+    public static Guided search(String source,String target,AssumptionSignature assumptions,int depth,int callLimit,int tableCapacity) {
+<span class="fc" id="L42">        return search(source,target,assumptions,depth,callLimit,tableCapacity,Math.max(0,Math.min(1_000_000,64L*callLimit)));</span>
+    }
+    public static Guided search(String source,String target,AssumptionSignature assumptions,int depth,int callLimit,int tableCapacity,long lookupLimit) {
+<span class="fc" id="L45">        return new GuidedFactorSearch(source,target,assumptions,depth,callLimit,tableCapacity,lookupLimit).run();</span>
+    }
+    private Guided run() {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (source.equals(target)) return finish(Status.REACHED,List.of());</span>
+        try {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            for (int limit=1;limit&lt;=maximumDepth;limit++) {</span>
+<span class="fc" id="L51">                generation=limit;touchedLimit=false;deepest=List.of();</span>
+<span class="fc" id="L52">                var before=forward.snapshot();int beforeHits=hits;long beforeLookups=lookups;</span>
+                List&lt;Step&gt; found;
+<span class="fc" id="L54">                try { found=visit(source,limit,new HashSet&lt;&gt;(Set.of(source)),new ArrayList&lt;&gt;()); }</span>
+<span class="fc" id="L55">                catch (BoundedReachabilityOracle.EngineWorkExhausted | LookupLimit cut) {</span>
+<span class="fc" id="L56">                    retainPass(limit,before,beforeHits,beforeLookups,false);throw cut;</span>
+<span class="fc" id="L57">                }</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                retainPass(limit,before,beforeHits,beforeLookups,found!=null);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                if (found!=null) return checked(found);</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">                if (!touchedLimit || limit == maximumDepth) break;</span>
+<span class="fc" id="L61">                principal.clear();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                for (Step step:deepest) { charge(1);principal.put(step.from(),step.to()); }</span>
+            }
+<span class="fc" id="L64">            return finish(Status.NO_PATH_WITHIN_DEPTH,List.of());</span>
+<span class="fc" id="L65">        } catch (BoundedReachabilityOracle.EngineWorkExhausted cut) {</span>
+<span class="fc" id="L66">            terminalReason=&quot;PRIMITIVE_ENGINE_CALL_LIMIT_REACHED&quot;;return finish(Status.WORK_EXHAUSTED,List.of());</span>
+<span class="fc" id="L67">        } catch (LookupLimit cut) {</span>
+<span class="fc" id="L68">            terminalReason=&quot;LOOKUP_LIMIT_REACHED&quot;;return finish(Status.WORK_EXHAUSTED,List.of());</span>
+        }
+    }
+    private void retainPass(int depth,Count before,int beforeHits,long beforeLookups,boolean reached) {
+<span class="fc" id="L72">        var now=forward.snapshot();</span>
+<span class="fc" id="L73">        passes.add(new Pass(depth,now.calls()-before.calls(),now.generated()-before.generated(),hits-beforeHits,lookups-beforeLookups,reached));</span>
+<span class="fc" id="L74">    }</span>
+    private List&lt;Step&gt; visit(State current,int remaining,Set&lt;State&gt; ancestors,List&lt;Step&gt; path) {
+<span class="fc" id="L76">        charge(1);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (current.equals(target)) return List.copyOf(path);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (remaining==0) {</span>
+<span class="fc" id="L79">            touchedLimit=true;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (path.size()&gt;deepest.size()) deepest=List.copyOf(path);</span>
+<span class="fc" id="L81">            return null;</span>
+        }
+<span class="fc" id="L83">        var arcs=new ArrayList&lt;&gt;(neighbors(current,remaining));</span>
+<span class="fc" id="L84">        charge(1);State preferred=principal.get(current);</span>
+        // All admitted arcs remain present; the stable hint changes only traversal order.
+<span class="fc" id="L86">        arcs.sort(Comparator.comparingInt((Arc a)-&gt; {</span>
+<span class="fc" id="L87">            charge(1);</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">            return preferred!=null &amp;&amp; preferred.expression().equals(a.outgoing().transformedExpression())?0:1;</span>
+<span class="pc" id="L89">        }).thenComparing(a-&gt;a.outgoing().transformedExpression()).thenComparing(a-&gt;a.outgoing().rule()));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Arc arc:arcs) {</span>
+<span class="fc" id="L91">            charge(1);var next=new State(arc.outgoing().transformedExpression(),source.assumptions());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!ancestors.add(next)) continue;</span>
+<span class="fc" id="L93">            path.add(new Step(current,next,arc.outgoing()));</span>
+<span class="fc" id="L94">            var found=visit(next,remaining-1,ancestors,path);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (found!=null) return found;</span>
+<span class="fc" id="L96">            path.removeLast();ancestors.remove(next);</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        return null;</span>
+    }
+    private List&lt;Arc&gt; neighbors(State state,int horizon) {
+<span class="fc" id="L101">        charge(1);var cached=table.get(state);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (cached!=null) {</span>
+<span class="fc" id="L103">            hits++;table.put(state,new Cached(cached.arcs(),Math.max(cached.horizon(),horizon),generation));</span>
+<span class="fc" id="L104">            return cached.arcs();</span>
+        }
+<span class="fc" id="L106">        var arcs=List.copyOf(fragment.neighbors(state.expression(),forward));</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (table.size()&gt;=capacity) {</span>
+<span class="fc" id="L108">            charge(table.size());</span>
+<span class="fc" id="L109">            var victim=table.entrySet().stream().min(Comparator</span>
+<span class="fc" id="L110">                .comparingInt((Map.Entry&lt;State,Cached&gt; e)-&gt;e.getValue().generation())</span>
+<span class="pc" id="L111">                .thenComparingInt(e-&gt;e.getValue().horizon()).thenComparing(e-&gt;e.getKey().expression())).orElseThrow();</span>
+<span class="fc" id="L112">            table.remove(victim.getKey());replacements++;</span>
+        }
+<span class="fc" id="L114">        table.put(state,new Cached(arcs,horizon,generation));return arcs;</span>
+    }
+    private Guided checked(List&lt;Step&gt; path) {
+<span class="fc" id="L117">        var independent=new ReversibleFactorFragment();State cursor=source;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (Step step:path) {</span>
+<span class="fc" id="L119">            charge(1);</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">            if (!cursor.equals(step.from()) || !source.assumptions().equals(step.to().assumptions())</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                    || !step.to().expression().equals(step.primitive().transformedExpression())</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                    || independent.neighbors(cursor.expression(),replay).stream().noneMatch(a-&gt;a.outgoing().equals(step.primitive())))</span>
+<span class="fc" id="L123">                throw new IllegalStateException(&quot;independent guided witness rejection&quot;);</span>
+<span class="fc" id="L124">            cursor=step.to();</span>
+<span class="fc" id="L125">        }</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!cursor.equals(target)) throw new IllegalStateException(&quot;guided target differs&quot;);</span>
+<span class="fc" id="L127">        return finish(Status.REACHED,path);</span>
+    }
+    private Guided finish(Status status,List&lt;Step&gt; witness) {
+<span class="fc" id="L130">        var result=new Result(status,witness,new Work(forward.snapshot(),new Count(0,0),replay.snapshot()));</span>
+<span class="fc" id="L131">        return new Guided(REVISION,result,passes,hits,replacements,lookups,lookupLimit,terminalReason);</span>
+    }
+    private void charge(long count) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if(count&gt;lookupLimit-lookups) throw new LookupLimit();</span>
+<span class="fc" id="L135">        lookups+=count;</span>
+<span class="fc" id="L136">    }</span>
+    private static final class LookupLimit extends RuntimeException { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

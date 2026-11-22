@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LocalNeutralClosure.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">LocalNeutralClosure.java</span></div><h1>LocalNeutralClosure.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/** A source-only, strictly decreasing primitive pack executed by the existing typed interpreter. */
+public final class LocalNeutralClosure {
+    public static final String REVISION = &quot;regelsuche.local-neutral-closure/v1&quot;;
+<span class="fc" id="L22">    private static final Set&lt;String&gt; IDS = Set.of(&quot;ast_add_zero_right&quot;,&quot;ast_add_zero_left&quot;,</span>
+        &quot;ast_multiply_one_right&quot;,&quot;ast_multiply_one_left&quot;,&quot;ast_subtract_zero&quot;,&quot;ast_divide_one&quot;);
+<span class="fc" id="L24">    private static final List&lt;RewriteRule&gt; RULES = AstRewriteTransformationEngine.allBuiltInRules().stream()</span>
+<span class="fc" id="L25">        .filter(r -&gt; IDS.contains(r.id())).toList();</span>
+    public record Limits(int primitiveDepth, int sourceCalls) {
+<span class="fc" id="L27">        public Limits {</span>
+<span class="pc bpc" id="L28" title="3 of 8 branches missed.">            if (primitiveDepth&lt;1 || primitiveDepth&gt;8 || sourceCalls&lt;0 || sourceCalls&gt;4096)</span>
+<span class="fc" id="L29">                throw new IllegalArgumentException(&quot;local closure bounds&quot;);</span>
+<span class="fc" id="L30">        }</span>
+    }
+<span class="fc" id="L32">    public enum Status { COMPLETE_BOUNDED, SOURCE_CALL_LIMIT }</span>
+    public record SourceCall(String source, List&lt;Transformation&gt; generated) {
+<span class="fc" id="L34">        public SourceCall { generated=List.copyOf(generated); }</span>
+    }
+    public record Result(Status status, Limits limits, List&lt;SourceCall&gt; sourceCalls,
+                         Optional&lt;RewriteExecution&gt; execution) {
+<span class="fc" id="L38">        public Result { sourceCalls=List.copyOf(sourceCalls); }</span>
+<span class="fc" id="L39">        public int nativeCalls() { return sourceCalls.size(); }</span>
+<span class="fc" id="L40">        public long generatedCandidates() { return sourceCalls.stream().mapToLong(c -&gt; c.generated().size()).sum(); }</span>
+    }
+    private LocalNeutralClosure() { }
+<span class="fc" id="L43">    public static List&lt;RewriteRule&gt; inventory() { return RULES; }</span>
+<span class="fc" id="L44">    public static String inventoryHash() { return RuleInventoryFingerprint.contentHash(RULES); }</span>
+
+    /** Complete only within the declared pack and primitive depth; the input is never a hidden target. */
+    public static Result execute(String source, Limits limits) {
+<span class="fc" id="L48">        Objects.requireNonNull(limits);</span>
+<span class="pc bpc" id="L49" title="3 of 6 branches missed.">        if (source==null || source.isBlank() || source.length()&gt;2048) throw new IllegalArgumentException(&quot;closure input size&quot;);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (rawSize(source)&gt;63) throw new IllegalArgumentException(&quot;closure AST limit&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (RULES.size()!=IDS.size()) throw new IllegalStateException(&quot;closure inventory changed&quot;);</span>
+<span class="fc" id="L52">        var calls=new ArrayList&lt;SourceCall&gt;();</span>
+<span class="fc" id="L53">        var engine=new AstRewriteTransformationEngine(RULES,0,Integer.MAX_VALUE);</span>
+<span class="fc" id="L54">        TransformationEngine bounded = input -&gt; {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            if (calls.size()&gt;=limits.sourceCalls()) throw new CallLimit();</span>
+<span class="fc" id="L56">            var generated=engine.transform(input);</span>
+<span class="fc" id="L57">            calls.add(new SourceCall(input,generated));</span>
+<span class="fc" id="L58">            int before=rawSize(input);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for(var step:generated) {</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">                if (!IDS.contains(step.rule()) || !step.assumptions().isEmpty()</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">                        || !step.equivalencePreservingByConstruction() || step.primitiveStepCount()!=1</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">                        || step.exactTheoryStepCount()!=0 || rawSize(step.transformedExpression())&gt;=before)</span>
+<span class="nc" id="L63">                    throw new IllegalStateException(&quot;closure step exceeds its declared decreasing primitive pack: &quot;</span>
+<span class="nc" id="L64">                        + step.rule()+&quot; &quot;+input+&quot; -&gt; &quot;+step.transformedExpression()+&quot; nodes=&quot;+before+&quot;/&quot;</span>
+<span class="nc" id="L65">                        + rawSize(step.transformedExpression())+&quot; assumptions=&quot;+step.assumptions());</span>
+<span class="fc" id="L66">            }</span>
+<span class="fc" id="L67">            return generated;</span>
+        };
+<span class="fc" id="L69">        var program=RewritePrograms.repeat(limits.primitiveDepth(),RewritePrograms.source(bounded)).named(REVISION);</span>
+        try {
+<span class="fc" id="L71">            var execution=new RewriteProgramInterpreter().executeWithWorkBudget(program,source,</span>
+<span class="fc" id="L72">                new BudgetedRewriteProgramExecution.PathBudget(limits.primitiveDepth(),0));</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (!execution.complete()) throw new IllegalStateException(&quot;unexpected incomplete neutral closure&quot;);</span>
+<span class="fc" id="L74">            return new Result(Status.COMPLETE_BOUNDED,limits,calls,Optional.of(execution));</span>
+<span class="fc" id="L75">        } catch(CallLimit limit) {</span>
+<span class="fc" id="L76">            return new Result(Status.SOURCE_CALL_LIMIT,limits,calls,Optional.empty());</span>
+        }
+    }
+    private static int rawSize(String source) {
+<span class="fc" id="L80">        var pending=new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L81">        pending.add(new ExpressionParser().parseTerm(source));</span>
+<span class="fc" id="L82">        int count=0;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        while(!pending.isEmpty()) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (++count&gt;63) return count;</span>
+<span class="pc bpc" id="L85" title="1 of 3 branches missed.">            switch(pending.removeFirst()) {</span>
+<span class="fc" id="L86">                case BinaryExpr binary -&gt; { pending.add(binary.left()); pending.add(binary.right()); }</span>
+<span class="nc" id="L87">                case FunctionExpr function -&gt; pending.addAll(function.arguments());</span>
+<span class="fc" id="L88">                default -&gt; { }</span>
+            }
+        }
+<span class="fc" id="L91">        return count;</span>
+    }
+    private static final class CallLimit extends RuntimeException { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

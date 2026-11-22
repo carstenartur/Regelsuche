@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteFactorKnowledge.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.reachability</a> &gt; <span class="el_source">FiniteFactorKnowledge.java</span></div><h1>FiniteFactorKnowledge.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.reachability;
+
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.search.reachability.ReversibleFactorSearch.*;
+import de.regelsuche.search.reachability.ReversibleFactorFragment.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.*;
+
+/** Source-generated finite table; a miss says nothing about the surrounding rewrite system. */
+public final class FiniteFactorKnowledge {
+    public static final String SCHEMA = &quot;regelsuche.finite-factor-knowledge/v1&quot;;
+    private static final int MAX_ARTIFACT_BYTES = 4_194_304;
+<span class="fc" id="L19">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L20">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L21">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L22">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L23">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L24">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L25">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES).build();</span>
+<span class="fc" id="L26">    private static final Set&lt;String&gt; RULES = Set.of(&quot;ast_factor_common_left&quot;, &quot;ast_factor_common_right&quot;,</span>
+        &quot;ast_distribute_left_add&quot;, &quot;ast_distribute_right_add&quot;);
+
+    public record Plan(List&lt;String&gt; seeds, AssumptionSignature assumptions, int depth, int maxStates, int maxCalls) {
+<span class="fc" id="L30">        public Plan {</span>
+<span class="fc" id="L31">            assumptions = BoundedReachabilityOracle.normalizeSignature(assumptions);</span>
+<span class="pc bpc" id="L32" title="9 of 18 branches missed.">            if (seeds == null || seeds.isEmpty() || seeds.size() &gt; 16 || depth &lt; 0 || depth &gt; 10</span>
+                    || maxStates &lt; 1 || maxStates &gt; 4096 || maxCalls &lt; 0 || maxCalls &gt; 100_000)
+<span class="nc" id="L34">                throw new IllegalArgumentException(&quot;finite table plan limits&quot;);</span>
+<span class="fc" id="L35">            var fragment = new ReversibleFactorFragment();</span>
+<span class="fc" id="L36">            seeds = seeds.stream().map(s -&gt; {</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">                if (s == null || s.length() &gt; 2048) throw new IllegalArgumentException(&quot;seed length&quot;);</span>
+<span class="fc" id="L38">                return fragment.endpoint(s);</span>
+<span class="fc" id="L39">            }).distinct().sorted().toList();</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            if (seeds.size() &gt; maxStates) throw new IllegalArgumentException(&quot;seeds exceed state budget&quot;);</span>
+<span class="fc" id="L41">        }</span>
+    }
+    public record QueryBudget(int depth, long lookupOperations, int replayCalls) {
+<span class="fc" id="L44">        public QueryBudget {</span>
+<span class="pc bpc" id="L45" title="5 of 10 branches missed.">            if (depth &lt; 0 || depth &gt; 10 || lookupOperations &lt; 0 || replayCalls &lt; 0 || replayCalls &gt; 100_000)</span>
+<span class="nc" id="L46">                throw new IllegalArgumentException(&quot;finite lookup limits&quot;);</span>
+<span class="fc" id="L47">        }</span>
+    }
+<span class="fc" id="L49">    public enum Status {</span>
+<span class="fc" id="L50">        REACHED, NOT_IN_TABLE, NO_PATH_IN_TABLE_WITHIN_QUERY_DEPTH,</span>
+<span class="fc" id="L51">        OUTSIDE_LANGUAGE, CONTEXT_MISMATCH, WORK_EXHAUSTED</span>
+    }
+    public record Query(Status status, List&lt;Step&gt; witness, long lookupWork, Count replayWork) {
+<span class="fc" id="L54">        public Query { witness = List.copyOf(witness); }</span>
+    }
+    public static final class GenerationFailure extends IllegalArgumentException {
+        private final Count work;
+<span class="fc" id="L58">        private GenerationFailure(String message, Count work) { super(message); this.work = work; }</span>
+<span class="fc" id="L59">        public Count work() { return work; }</span>
+    }
+<span class="fc" id="L61">    private record Edge(String from, String to, String rule, String application) { }</span>
+<span class="fc" id="L62">    private record Data(String schema, String inventoryHash, Plan plan, List&lt;String&gt; language,</span>
+                        Map&lt;String,Integer&gt; distanceFromSeeds, List&lt;Edge&gt; edges, Count acquisition) { }
+<span class="fc" id="L64">    private record Envelope(Data content, String contentHash) { }</span>
+<span class="fc" id="L65">    private record Visit(String expression, int depth) { }</span>
+    private final Envelope artifact;
+    private final Map&lt;String,List&lt;Step&gt;&gt; graph;
+    private final Count restoration;
+
+<span class="fc" id="L70">    private FiniteFactorKnowledge(Envelope artifact, Map&lt;String,List&lt;Step&gt;&gt; graph, Count restoration) {</span>
+<span class="fc" id="L71">        this.artifact = artifact; this.graph = Map.copyOf(graph); this.restoration = restoration;</span>
+<span class="fc" id="L72">    }</span>
+<span class="fc" id="L73">    public Count acquisition() { return artifact.content().acquisition(); }</span>
+<span class="fc" id="L74">    public Count restoration() { return restoration; }</span>
+<span class="nc" id="L75">    public String contentHash() { return artifact.contentHash(); }</span>
+<span class="fc" id="L76">    public String toCanonicalJson() { return json(artifact); }</span>
+<span class="fc" id="L77">    public List&lt;String&gt; language() { return artifact.content().language(); }</span>
+<span class="fc" id="L78">    public Map&lt;String,Integer&gt; distanceFromSeeds() { return artifact.content().distanceFromSeeds(); }</span>
+
+    /** Complete source-defined expansion to the declared depth, or an explicit failure carrying spent calls. */
+    public static FiniteFactorKnowledge generate(Plan plan) {
+<span class="fc" id="L82">        return generate(plan, MAX_ARTIFACT_BYTES);</span>
+    }
+
+    static FiniteFactorKnowledge generate(Plan plan, int maxArtifactBytes) {
+<span class="fc" id="L86">        Objects.requireNonNull(plan);</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">        if (maxArtifactBytes &lt; 1 || maxArtifactBytes &gt; MAX_ARTIFACT_BYTES)</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;invalid table byte limit&quot;);</span>
+<span class="fc" id="L89">        var fragment = new ReversibleFactorFragment();</span>
+<span class="fc" id="L90">        var work = new Counter(new Allowance(plan.maxCalls()));</span>
+<span class="fc" id="L91">        var depths = new LinkedHashMap&lt;String,Integer&gt;();</span>
+<span class="fc" id="L92">        var frontier = new ArrayDeque&lt;Visit&gt;();</span>
+<span class="fc" id="L93">        plan.seeds().forEach(s -&gt; { depths.put(s,0); frontier.add(new Visit(s,0)); });</span>
+<span class="fc" id="L94">        var graph = new TreeMap&lt;String,List&lt;Step&gt;&gt;();</span>
+        try {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            while (!frontier.isEmpty()) {</span>
+<span class="fc" id="L97">                var current = frontier.removeFirst();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (current.depth() &gt;= plan.depth()) { graph.putIfAbsent(current.expression(),List.of()); continue; }</span>
+<span class="fc" id="L99">                var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                for (var arc : fragment.neighbors(current.expression(),work)) {</span>
+<span class="fc" id="L101">                    String output = arc.outgoing().transformedExpression();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                    if (!depths.containsKey(output)) {</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                        if (depths.size() &gt;= plan.maxStates()) throw new GenerationFailure(&quot;state limit before complete table&quot;,work.snapshot());</span>
+<span class="fc" id="L104">                        depths.put(output,current.depth()+1); frontier.addLast(new Visit(output,current.depth()+1));</span>
+                    }
+<span class="fc" id="L106">                    steps.add(new Step(new State(current.expression(),plan.assumptions()),new State(output,plan.assumptions()),arc.outgoing()));</span>
+<span class="fc" id="L107">                }</span>
+<span class="fc" id="L108">                graph.put(current.expression(),steps.stream().distinct().sorted(stepOrder()).toList());</span>
+<span class="fc" id="L109">            }</span>
+<span class="fc" id="L110">        } catch (BoundedReachabilityOracle.EngineWorkExhausted limit) {</span>
+<span class="fc" id="L111">            throw new GenerationFailure(&quot;primitive call limit before complete table&quot;,work.snapshot());</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        List&lt;Edge&gt; edges = graph.values().stream().flatMap(Collection::stream)</span>
+<span class="fc" id="L114">            .map(s -&gt; new Edge(s.from().expression(),s.to().expression(),s.primitive().rule(),s.primitive().applicationKey())).toList();</span>
+<span class="fc" id="L115">        String inventory = RuleInventoryFingerprint.contentHash(AstRewriteTransformationEngine.allBuiltInRules().stream()</span>
+<span class="fc" id="L116">            .filter(r -&gt; RULES.contains(r.id())).toList());</span>
+<span class="fc" id="L117">        var data = new Data(SCHEMA,inventory,plan,depths.keySet().stream().sorted().toList(),</span>
+<span class="fc" id="L118">            Map.copyOf(depths),edges,work.snapshot());</span>
+<span class="fc" id="L119">        var artifact = new Envelope(data,hash(json(data)));</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!fitsByteLimit(json(artifact), maxArtifactBytes))</span>
+<span class="fc" id="L121">            throw new GenerationFailure(&quot;canonical table exceeds byte limit&quot;, data.acquisition());</span>
+<span class="fc" id="L122">        return new FiniteFactorKnowledge(artifact,graph,new Count(0,0));</span>
+    }
+
+    /** A stored success flag or rehashed forged edge cannot authorize execution: the whole source plan reruns. */
+    public static FiniteFactorKnowledge restore(String canonical) {
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        if (canonical == null || !fitsByteLimit(canonical, MAX_ARTIFACT_BYTES))</span>
+<span class="nc" id="L128">            throw new IllegalArgumentException(&quot;table byte limit&quot;);</span>
+        try {
+<span class="fc" id="L130">            var supplied = JSON.readValue(canonical,Envelope.class);</span>
+<span class="pc bpc" id="L131" title="3 of 8 branches missed.">            if (supplied == null || supplied.content()==null || !SCHEMA.equals(supplied.content().schema()) || !canonical.equals(json(supplied))</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                    || !hash(json(supplied.content())).equals(supplied.contentHash())) throw new IllegalArgumentException(&quot;table binding differs&quot;);</span>
+<span class="fc" id="L133">            var rebuilt = generate(supplied.content().plan());</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (!canonical.equals(rebuilt.toCanonicalJson())) throw new IllegalArgumentException(&quot;independent table reconstruction differs&quot;);</span>
+<span class="fc" id="L135">            return new FiniteFactorKnowledge(rebuilt.artifact,rebuilt.graph,rebuilt.acquisition());</span>
+<span class="nc" id="L136">        } catch (java.io.IOException malformed) { throw new IllegalArgumentException(&quot;invalid table&quot;,malformed); }</span>
+    }
+
+    public Query lookup(String source, String target, AssumptionSignature assumptions, QueryBudget budget) {
+<span class="fc" id="L140">        Objects.requireNonNull(budget);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (!artifact.content().plan().assumptions().equals(BoundedReachabilityOracle.normalizeSignature(assumptions)))</span>
+<span class="fc" id="L142">            return query(Status.CONTEXT_MISMATCH,List.of(),0,new Count(0,0));</span>
+<span class="fc" id="L143">        var fragment = new ReversibleFactorFragment();</span>
+<span class="fc" id="L144">        String start = fragment.endpoint(source), goal = fragment.endpoint(target);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (!graph.containsKey(start)) return query(Status.OUTSIDE_LANGUAGE,List.of(),0,new Count(0,0));</span>
+<span class="fc" id="L146">        var lookup = new Lookup(start,goal,budget);</span>
+<span class="fc" id="L147">        try { return lookup.execute(fragment); }</span>
+<span class="fc" id="L148">        catch (LookupLimit | BoundedReachabilityOracle.EngineWorkExhausted limit) {</span>
+<span class="fc" id="L149">            return query(Status.WORK_EXHAUSTED,List.of(),lookup.work,lookup.replay.snapshot());</span>
+        }
+    }
+    private final class Lookup {
+        final String start, goal;
+        final QueryBudget budget;
+<span class="fc" id="L155">        final Map&lt;String,Step&gt; parent = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L156">        final Set&lt;String&gt; seen = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L157">        final ArrayDeque&lt;Visit&gt; frontier = new ArrayDeque&lt;&gt;();</span>
+        final Counter replay;
+        long work;
+<span class="fc" id="L160">        Lookup(String start,String goal,QueryBudget budget) {</span>
+<span class="fc" id="L161">            this.start=start;this.goal=goal;this.budget=budget;replay=new Counter(new Allowance(budget.replayCalls()));</span>
+<span class="fc" id="L162">            seen.add(start);frontier.add(new Visit(start,0));</span>
+<span class="fc" id="L163">        }</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        void charge() { if (work &gt;= budget.lookupOperations()) throw new LookupLimit(); work++; }</span>
+        Query execute(ReversibleFactorFragment fragment) {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            while (!frontier.isEmpty()) {</span>
+<span class="fc" id="L167">                charge();var current=frontier.removeFirst();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                if (current.expression().equals(goal)) return checked(fragment);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                if (current.depth() &gt;= budget.depth()) continue;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                for (Step step:graph.getOrDefault(current.expression(),List.of())) {</span>
+<span class="fc" id="L171">                    charge();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                    if (seen.add(step.to().expression())) {</span>
+<span class="fc" id="L173">                        parent.put(step.to().expression(),step);frontier.addLast(new Visit(step.to().expression(),current.depth()+1));</span>
+                    }
+<span class="fc" id="L175">                }</span>
+<span class="fc" id="L176">            }</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            var status = graph.containsKey(goal) ? Status.NO_PATH_IN_TABLE_WITHIN_QUERY_DEPTH : Status.NOT_IN_TABLE;</span>
+<span class="fc" id="L178">            return query(status,List.of(),work,replay.snapshot());</span>
+        }
+        Query checked(ReversibleFactorFragment fragment) {
+<span class="fc" id="L181">            var path=new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            for (String cursor=goal;!cursor.equals(start);) {</span>
+<span class="fc" id="L183">                charge();var step=Objects.requireNonNull(parent.get(cursor));path.add(step);cursor=step.from().expression();</span>
+<span class="fc" id="L184">            }</span>
+<span class="fc" id="L185">            Collections.reverse(path);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            for (Step step:path) {</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                if (fragment.neighbors(step.from().expression(),replay).stream().noneMatch(a-&gt;a.outgoing().equals(step.primitive())))</span>
+<span class="nc" id="L188">                    throw new IllegalStateException(&quot;table path no longer replays&quot;);</span>
+<span class="fc" id="L189">            }</span>
+<span class="fc" id="L190">            return query(Status.REACHED,path,work,replay.snapshot());</span>
+        }
+    }
+    private static final class LookupLimit extends RuntimeException { }
+<span class="fc" id="L194">    private static Query query(Status status,List&lt;Step&gt; path,long work,Count replay) { return new Query(status,path,work,replay); }</span>
+    private static Comparator&lt;Step&gt; stepOrder() {
+<span class="pc" id="L196">        return Comparator.comparing((Step s)-&gt;s.to().expression()).thenComparing(s-&gt;s.primitive().rule()).thenComparing(s-&gt;s.primitive().applicationKey());</span>
+    }
+    private static boolean fitsByteLimit(String canonical, int maxArtifactBytes) {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        return canonical.length() &lt;= maxArtifactBytes</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            &amp;&amp; canonical.getBytes(StandardCharsets.UTF_8).length &lt;= maxArtifactBytes;</span>
+    }
+    private static String json(Object value) {
+<span class="fc" id="L203">        try { return JSON.writeValueAsString(value); }</span>
+<span class="nc" id="L204">        catch (java.io.IOException failure) { throw new IllegalArgumentException(&quot;cannot encode table&quot;,failure); }</span>
+    }
+    private static String hash(String value) {
+<span class="fc" id="L207">        try { return &quot;sha256:&quot;+HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8))); }</span>
+<span class="nc" id="L208">        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

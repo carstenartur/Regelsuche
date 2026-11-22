@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NativeScalarDiagnostics.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">NativeScalarDiagnostics.java</span></div><h1>NativeScalarDiagnostics.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sun.management.ThreadMXBean;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.egraph.EqualitySaturation;
+import de.regelsuche.egraph.NativeScalarSaturation.Budget;
+import de.regelsuche.egraph.NativeScalarSaturation.Result;
+import de.regelsuche.egraph.NativeScalarSaturation.RuleWork;
+import de.regelsuche.egraph.NativeScalarSaturation.Schedule;
+import de.regelsuche.egraph.proof.ExtractionCertificate;
+import de.regelsuche.egraph.proof.ProofLimits;
+import de.regelsuche.egraph.proof.ScalarCertificateCodec;
+import de.regelsuche.egraph.proof.ScalarExtractionProof;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.util.AtomicJsonFile;
+import de.regelsuche.value.ExprValueArena;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.stream.IntStream;
+
+final class NativeScalarDiagnostics {
+<span class="fc" id="L38">    private static final JsonMapper JSON = new JsonMapper();</span>
+<span class="fc" id="L39">    private static final long TIME_LIMIT_NANOS = Duration.ofMillis(50).toNanos();</span>
+    private static final String SCOPE = &quot;Saturation, producer proof and graph observation on one thread. &quot;
+            + &quot;A fixed-time row credits only a checked result available within the deadline.&quot;;
+    private static final String WORK_SCOPE = &quot;Structural producer work = matching fuel + class analysis evaluations &quot;
+            + &quot;+ source, scheduler, graph, representative, extraction, guard and proof production counters. &quot;
+            + &quot;Separate artifact replay, timing, and per-instruction machine costs are outside this sum.&quot;;
+
+    private NativeScalarDiagnostics() {}
+
+    static void write(String revision, Path output) throws IOException {
+<span class="fc" id="L49">        byte[] panel = NativeScalarComparison.readPanel();</span>
+<span class="fc" id="L50">        var report = JSON.createObjectNode()</span>
+<span class="fc" id="L51">                .put(&quot;schema&quot;, &quot;regelsuche.native-scalar-diagnostics/v1&quot;)</span>
+<span class="fc" id="L52">                .put(&quot;sourceRevision&quot;, revision)</span>
+<span class="fc" id="L53">                .put(&quot;panelHash&quot;, ScalarCertificateCodec.hash(panel))</span>
+<span class="fc" id="L54">                .put(&quot;timeLimitNanos&quot;, TIME_LIMIT_NANOS)</span>
+<span class="fc" id="L55">                .put(&quot;timedScope&quot;, SCOPE)</span>
+<span class="fc" id="L56">                .put(&quot;workScope&quot;, WORK_SCOPE);</span>
+<span class="fc" id="L57">        var runtime = Runtime.getRuntime();</span>
+<span class="fc" id="L58">        var allocation = ManagementFactory.getPlatformMXBean(ThreadMXBean.class);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        boolean measureAllocation = allocation != null</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">                &amp;&amp; allocation.isThreadAllocatedMemorySupported() &amp;&amp; allocation.isThreadAllocatedMemoryEnabled();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        ThreadMXBean allocationMeter = measureAllocation ? allocation : null;</span>
+<span class="fc" id="L62">        report.putObject(&quot;environment&quot;)</span>
+<span class="fc" id="L63">                .put(&quot;javaVersion&quot;, System.getProperty(&quot;java.runtime.version&quot;))</span>
+<span class="fc" id="L64">                .put(&quot;vm&quot;, System.getProperty(&quot;java.vm.name&quot;))</span>
+<span class="fc" id="L65">                .put(&quot;os&quot;, System.getProperty(&quot;os.name&quot;) + &quot; &quot; + System.getProperty(&quot;os.version&quot;))</span>
+<span class="fc" id="L66">                .put(&quot;architecture&quot;, System.getProperty(&quot;os.arch&quot;))</span>
+<span class="fc" id="L67">                .put(&quot;processors&quot;, runtime.availableProcessors())</span>
+<span class="fc" id="L68">                .put(&quot;maxHeapBytes&quot;, runtime.maxMemory())</span>
+<span class="fc" id="L69">                .put(&quot;ociImageId&quot;, System.getenv(&quot;REGELSUCHE_SCALAR_DIAGNOSTICS_OCI_ID&quot;))</span>
+<span class="fc" id="L70">                .put(&quot;threadAllocationMetered&quot;, measureAllocation);</span>
+<span class="fc" id="L71">        var rules = AstRewriteTransformationEngine.allBuiltInRules();</span>
+<span class="fc" id="L72">        var engine = new EqualitySaturation(rules);</span>
+<span class="fc" id="L73">        var parser = new ExpressionParser();</span>
+<span class="fc" id="L74">        var rows = report.putArray(&quot;rows&quot;);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var row : JSON.readTree(panel)) {</span>
+<span class="fc" id="L76">            var input = parser.parseTerm(row.required(&quot;source&quot;).asText());</span>
+<span class="fc" id="L77">            var target = parser.parseTerm(row.required(&quot;target&quot;).asText());</span>
+<span class="fc" id="L78">            var premises = new ArrayList&lt;Assumption&gt;();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (JsonNode premise : row.required(&quot;assumptions&quot;)) {</span>
+<span class="fc" id="L80">                String text = premise.asText();</span>
+<span class="fc" id="L81">                premises.add(Assumption.nonZero(text.substring(0, text.length() - &quot; != 0&quot;.length())));</span>
+<span class="fc" id="L82">            }</span>
+<span class="fc" id="L83">            var context = ScalarExtractionProof.Context.create(rules, premises, revision);</span>
+<span class="fc" id="L84">            String id = row.required(&quot;id&quot;).asText();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (var schedule : Schedule.values()) {</span>
+<span class="fc" id="L86">                var budget = NativeScalarComparison.budget(schedule);</span>
+<span class="fc" id="L87">                engine.saturateExactScalars(input, context, budget);</span>
+<span class="fc" id="L88">                var workRow = rows.addObject();</span>
+<span class="fc" id="L89">                var timeRow = rows.addObject();</span>
+<span class="fc" id="L90">                observe(workRow, id, input, target, context, budget, engine, allocationMeter, false);</span>
+<span class="fc" id="L91">                observe(timeRow, id, input, target, context, budget, engine, allocationMeter, true);</span>
+<span class="fc" id="L92">                recordFirstCheckedRounds(workRow, timeRow, input, target, context, budget, engine);</span>
+            }
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">        Files.createDirectories(output.toAbsolutePath().getParent());</span>
+<span class="fc" id="L96">        AtomicJsonFile.writeUtf8(output, report.toString() + &quot;\n&quot;);</span>
+<span class="fc" id="L97">    }</span>
+
+    private static void observe(ObjectNode row, String id, Expr input, Expr target,
+            ScalarExtractionProof.Context context, Budget budget, EqualitySaturation engine,
+            ThreadMXBean allocation, boolean fixedTime) {
+<span class="fc" id="L102">        long startBytes = allocatedBytes(allocation);</span>
+<span class="fc" id="L103">        long started = System.nanoTime();</span>
+<span class="fc" id="L104">        var observation = engine.observeExactScalars(input, context, budget);</span>
+<span class="fc" id="L105">        long elapsed = System.nanoTime() - started;</span>
+<span class="fc" id="L106">        long endBytes = allocatedBytes(allocation);</span>
+<span class="fc" id="L107">        var run = observation.result();</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        boolean withinBudget = !fixedTime || elapsed &lt;= TIME_LIMIT_NANOS;</span>
+<span class="fc" id="L109">        row.put(&quot;case&quot;, id)</span>
+<span class="fc" id="L110">                .put(&quot;schedule&quot;, budget.schedule().name())</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                .put(&quot;regime&quot;, fixedTime ? &quot;FIXED_TIME&quot; : &quot;FIXED_WORK&quot;)</span>
+<span class="fc" id="L112">                .put(&quot;contextHash&quot;, ScalarCertificateCodec.contextHash(context))</span>
+<span class="fc" id="L113">                .put(&quot;elapsedNanos&quot;, elapsed)</span>
+<span class="fc" id="L114">                .put(&quot;withinBudget&quot;, withinBudget)</span>
+<span class="fc" id="L115">                .put(&quot;rounds&quot;, run.rounds())</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                .put(&quot;terminal&quot;, withinBudget ? run.terminal() : &quot;TIME_BUDGET_INCONCLUSIVE&quot;);</span>
+<span class="fc" id="L117">        row.set(&quot;budget&quot;, JSON.valueToTree(budget));</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (startBytes &lt; 0 || endBytes &lt; startBytes) {</span>
+<span class="nc" id="L119">            row.putNull(&quot;threadAllocatedBytes&quot;);</span>
+        } else {
+<span class="fc" id="L121">            row.put(&quot;threadAllocatedBytes&quot;, endBytes - startBytes);</span>
+        }
+<span class="fc" id="L123">        var graph = row.putObject(&quot;graph&quot;).put(&quot;nodeCount&quot;, run.graphNodes()).put(&quot;classCount&quot;, run.analyses().size());</span>
+<span class="fc" id="L124">        graph.set(&quot;nodesByKind&quot;, JSON.valueToTree(observation.nodesByKind()));</span>
+<span class="fc" id="L125">        graph.set(&quot;classesContainingKind&quot;, JSON.valueToTree(observation.classesContainingKind()));</span>
+<span class="fc" id="L126">        var ac = acOccurrences(input, null);</span>
+<span class="fc" id="L127">        var compression = row.putObject(&quot;inputAcCompression&quot;)</span>
+<span class="fc" id="L128">                .put(&quot;binaryOperatorOccurrences&quot;, ac.binary())</span>
+<span class="fc" id="L129">                .put(&quot;flattenedOperatorOccurrences&quot;, ac.flattened());</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (ac.flattened() == 0) {</span>
+<span class="nc" id="L131">            compression.putNull(&quot;ratio&quot;);</span>
+        } else {
+<span class="fc" id="L133">            compression.put(&quot;ratio&quot;, (double) ac.binary() / ac.flattened());</span>
+        }
+<span class="fc" id="L135">        row.set(&quot;ruleLedger&quot;, JSON.valueToTree(run.ledger()));</span>
+<span class="fc" id="L136">        row.set(&quot;guards&quot;, JSON.valueToTree(run.guards().stream()</span>
+<span class="fc" id="L137">                .map(guard -&gt; JSON.createObjectNode().put(&quot;rule&quot;, guard.rule())</span>
+<span class="fc" id="L138">                        .put(&quot;factor&quot;, ExpressionFormatter.format(guard.factor()))</span>
+<span class="fc" id="L139">                        .put(&quot;truth&quot;, guard.result()).put(&quot;applied&quot;, guard.applied())).toList()));</span>
+<span class="fc" id="L140">        long replay = proofs(row, input, context, run);</span>
+<span class="fc" id="L141">        var work = run.ledger().values();</span>
+<span class="fc" id="L142">        long matching = work.stream().mapToLong(RuleWork::fuelSpent).sum();</span>
+<span class="fc" id="L143">        logWork(row, observation.producerStages(), work, matching, run.analysisEvaluations(), replay);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (withinBudget) {</span>
+<span class="fc" id="L145">            row.put(&quot;reached&quot;, reached(run, target));</span>
+        } else {
+<span class="nc" id="L147">            row.putNull(&quot;reached&quot;);</span>
+        }
+<span class="fc" id="L149">    }</span>
+
+    private static void logWork(ObjectNode row, Map&lt;String,Long&gt; stages, Collection&lt;RuleWork&gt; work,
+            long matching, long analysis, long replay) {
+<span class="fc" id="L153">        var workReport = row.putObject(&quot;work&quot;)</span>
+<span class="fc" id="L154">                .put(&quot;matchedRuleApplications&quot;, work.stream().mapToLong(RuleWork::matches).sum())</span>
+<span class="fc" id="L155">                .put(&quot;ruleMerges&quot;, work.stream().mapToLong(RuleWork::unions).sum())</span>
+<span class="fc" id="L156">                .put(&quot;matchingFuel&quot;, matching)</span>
+<span class="fc" id="L157">                .put(&quot;analysisEvaluations&quot;, analysis)</span>
+<span class="fc" id="L158">                .put(&quot;proofReplayWork&quot;, replay)</span>
+<span class="fc" id="L159">                .put(&quot;totalMechanicalUnits&quot;, matching + analysis + stages.values().stream().mapToLong(Long::longValue).sum());</span>
+<span class="fc" id="L160">        workReport.set(&quot;producerStages&quot;, JSON.valueToTree(new TreeMap&lt;&gt;(stages)));</span>
+<span class="fc" id="L161">    }</span>
+
+    private static void recordFirstCheckedRounds(ObjectNode workRow, ObjectNode timeRow, Expr input, Expr target,
+            ScalarExtractionProof.Context context, Budget budget, EqualitySaturation engine) {
+<span class="fc" id="L165">        int terminalRound = workRow.required(&quot;rounds&quot;).asInt();</span>
+<span class="fc" id="L166">        int firstWorkRound = 0;</span>
+<span class="fc" id="L167">        int firstTimedRound = 0;</span>
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">        for (int round = 1; round &lt; terminalRound &amp;&amp; (firstWorkRound == 0 || firstTimedRound == 0); round++) {</span>
+<span class="fc" id="L169">            var prefixBudget = new Budget(round, budget.nodes(), budget.perRuleFuel(), budget.schedule());</span>
+<span class="fc" id="L170">            long started = System.nanoTime();</span>
+<span class="fc" id="L171">            var prefix = engine.observeExactScalars(input, context, prefixBudget).result();</span>
+<span class="fc" id="L172">            long elapsed = System.nanoTime() - started;</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (reached(prefix, target)) {</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                if (firstWorkRound == 0) {</span>
+<span class="fc" id="L175">                    firstWorkRound = round;</span>
+                }
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">                if (firstTimedRound == 0 &amp;&amp; elapsed &lt;= TIME_LIMIT_NANOS) {</span>
+<span class="fc" id="L178">                    firstTimedRound = round;</span>
+                }
+            }
+        }
+<span class="fc" id="L182">        putFirstRound(workRow, firstWorkRound);</span>
+<span class="fc" id="L183">        putFirstRound(timeRow, firstTimedRound);</span>
+<span class="fc" id="L184">    }</span>
+
+    private static void putFirstRound(ObjectNode row, int prefixRound) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (prefixRound &gt; 0) {</span>
+<span class="fc" id="L188">            row.put(&quot;firstCheckedRound&quot;, prefixRound);</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        } else if (row.required(&quot;reached&quot;).asBoolean()) {</span>
+<span class="nc" id="L190">            row.put(&quot;firstCheckedRound&quot;, row.required(&quot;rounds&quot;).asInt());</span>
+        } else {
+<span class="fc" id="L192">            row.putNull(&quot;firstCheckedRound&quot;);</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    private static boolean reached(Result run, Expr target) {
+<span class="fc" id="L197">        var chosen = run.extractions().getFirst();</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (chosen.proof().isEmpty()) {</span>
+<span class="nc" id="L199">            return false;</span>
+        }
+<span class="fc" id="L201">        try (var arena = new ExprValueArena(4096)) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            return arena.intern(target) == arena.intern(chosen.expression());</span>
+        }
+    }
+
+    private static long proofs(ObjectNode row, Expr input, ScalarExtractionProof.Context context,
+            Result run) {
+<span class="fc" id="L208">        var extractions = row.putArray(&quot;extractions&quot;);</span>
+<span class="fc" id="L209">        long total = 0;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (var extraction : run.extractions()) {</span>
+<span class="fc" id="L211">            var entry = extractions.addObject().put(&quot;objective&quot;, extraction.objective())</span>
+<span class="fc" id="L212">                    .put(&quot;authorized&quot;, ExpressionFormatter.format(extraction.expression()))</span>
+<span class="fc" id="L213">                    .put(&quot;status&quot;, extraction.status())</span>
+<span class="fc" id="L214">                    .put(&quot;proofSteps&quot;, extraction.proofSteps());</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (extraction.proof().isEmpty()) {</span>
+<span class="nc" id="L216">                entry.putNull(&quot;proofPremiseEdges&quot;).putNull(&quot;proofDepth&quot;)</span>
+<span class="nc" id="L217">                        .putNull(&quot;termNodes&quot;).putNull(&quot;termEdges&quot;).putNull(&quot;detachedReplayWork&quot;);</span>
+<span class="nc" id="L218">                continue;</span>
+            }
+<span class="fc" id="L220">            var proof = extraction.proof().orElseThrow();</span>
+<span class="fc" id="L221">            var dag = proof.dag();</span>
+<span class="fc" id="L222">            long replay = ScalarExtractionProof.detachedReplayWork(input, extraction.expression(),</span>
+<span class="fc" id="L223">                    context, proof, ProofLimits.defaults()).orElseThrow();</span>
+<span class="fc" id="L224">            total += replay;</span>
+<span class="fc" id="L225">            entry.put(&quot;proofPremiseEdges&quot;, dag.steps().stream().mapToLong(step -&gt; premises(step).count()).sum())</span>
+<span class="fc" id="L226">                    .put(&quot;proofDepth&quot;, proofDepth(dag))</span>
+<span class="fc" id="L227">                    .put(&quot;termNodes&quot;, dag.terms().size())</span>
+<span class="fc" id="L228">                    .put(&quot;termEdges&quot;, dag.terms().stream().mapToInt(term -&gt; term.children().size()).sum())</span>
+<span class="fc" id="L229">                    .put(&quot;detachedReplayWork&quot;, replay);</span>
+<span class="fc" id="L230">        }</span>
+<span class="fc" id="L231">        return total;</span>
+    }
+
+    private static int proofDepth(ExtractionCertificate dag) {
+<span class="fc" id="L235">        var depths = new int[dag.steps().size()];</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (int i = 0; i &lt; depths.length; i++) {</span>
+<span class="fc" id="L237">            depths[i] = 1 + premises(dag.steps().get(i)).map(parent -&gt; depths[parent]).max().orElse(0);</span>
+        }
+<span class="fc" id="L239">        return depths[dag.conclusion()];</span>
+    }
+
+    private static IntStream premises(ExtractionCertificate.Step step) {
+<span class="fc bfc" id="L243" title="All 5 branches covered.">        return switch (step) {</span>
+<span class="fc" id="L244">            case ExtractionCertificate.Symmetry symmetry -&gt; IntStream.of(symmetry.premise());</span>
+<span class="fc" id="L245">            case ExtractionCertificate.Transitivity transitivity -&gt; IntStream.of(transitivity.first(), transitivity.second());</span>
+<span class="fc" id="L246">            case ExtractionCertificate.Congruence congruence -&gt; congruence.childProofs().stream().mapToInt(Integer::intValue);</span>
+<span class="fc" id="L247">            case ExtractionCertificate.Reflexivity ignored -&gt; IntStream.empty();</span>
+<span class="fc" id="L248">            case ExtractionCertificate.PatternInstance ignored -&gt; IntStream.empty();</span>
+        };
+    }
+
+<span class="fc" id="L252">    private record AcOccurrences(int binary, int flattened) {</span>
+        AcOccurrences plus(AcOccurrences other) {
+<span class="fc" id="L254">            return new AcOccurrences(binary + other.binary, flattened + other.flattened);</span>
+        }
+    }
+
+    private static AcOccurrences acOccurrences(Expr expression, BinaryOperator parent) {
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L260">            var operator = binary.operator();</span>
+<span class="fc bfc" id="L261" title="All 4 branches covered.">            boolean ac = operator == BinaryOperator.ADD || operator == BinaryOperator.MUL;</span>
+<span class="fc" id="L262">            var children = acOccurrences(binary.left(), operator).plus(acOccurrences(binary.right(), operator));</span>
+<span class="pc bpc" id="L263" title="1 of 6 branches missed.">            return children.plus(new AcOccurrences(ac ? 1 : 0, ac &amp;&amp; operator != parent ? 1 : 0));</span>
+        }
+<span class="fc" id="L265">        var occurrences = new AcOccurrences(0, 0);</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            for (Expr argument : function.arguments()) {</span>
+<span class="nc" id="L268">                occurrences = occurrences.plus(acOccurrences(argument, null));</span>
+<span class="nc" id="L269">            }</span>
+        }
+<span class="fc" id="L271">        return occurrences;</span>
+    }
+
+    private static long allocatedBytes(ThreadMXBean allocation) {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        return allocation == null ? -1 : allocation.getThreadAllocatedBytes(Thread.currentThread().threadId());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

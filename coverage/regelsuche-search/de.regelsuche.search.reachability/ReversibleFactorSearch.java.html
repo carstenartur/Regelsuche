@@ -68,7 +68,7 @@ import java.util.Objects;
 <span class="pc bpc" id="L68" title="1 of 2 branches missed.">        while (start.contains(sentinel)) sentinel += &quot;X&quot;;</span>
 <span class="fc" id="L69">        var counter = new Counter(new Allowance(callLimit));</span>
 <span class="fc" id="L70">        var oracle = new BoundedReachabilityOracle().analyze(start, sentinel, assumptions,</span>
-<span class="nc" id="L71">            expr -&gt; fragment.neighbors(expr, counter).stream().map(ReversibleFactorFragment.Arc::outgoing).toList(), limits);</span>
+<span class="fc" id="L71">            expr -&gt; fragment.neighbors(expr, counter).stream().map(ReversibleFactorFragment.Arc::outgoing).toList(), limits);</span>
 <span class="fc" id="L72">        return new Closure(oracle, counter.snapshot());</span>
     }
 

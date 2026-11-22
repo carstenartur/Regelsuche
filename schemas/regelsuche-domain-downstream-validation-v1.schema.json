@@ -92,7 +92,8 @@
         "domainId": {
           "enum": [
             "integer-sequence-finite-difference",
-            "integer-sequence-linear-recurrence"
+            "integer-sequence-linear-recurrence",
+            "scoped-logic"
           ]
         },
         "domainRevision": {
@@ -636,6 +637,104 @@
           "verifiedRenderedCertificateHash": {
             "type": "string",
             "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "$comment": "Scoped exports retain source assertions only: no independent proof receiver is configured.",
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "domainId": {
+                "const": "scoped-logic"
+              }
+            },
+            "required": [
+              "domainId"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "UNSUPPORTED"
+          },
+          "detail": {
+            "const": "SCOPED_PROOF_REPLAY_NOT_CONFIGURED"
+          },
+          "failureClass": {
+            "const": ""
+          },
+          "replay": {
+            "properties": {
+              "status": {
+                "const": "NOT_EVALUATED"
+              },
+              "admission": {
+                "properties": {
+                  "executed": {
+                    "const": 0
+                  },
+                  "skipped": {
+                    "const": 0
+                  }
+                }
+              },
+              "actualEvidenceHash": {
+                "type": "null"
+              },
+              "resources": {
+                "type": "null"
+              },
+              "resourceObservation": {
+                "const": "UNAVAILABLE"
+              }
+            }
+          },
+          "check": {
+            "type": "null"
+          },
+          "verifiedCandidateHash": {
+            "type": "null"
+          },
+          "verifiedCertificateObjectHash": {
+            "type": "null"
+          },
+          "verifiedRenderedCertificateHash": {
+            "type": "null"
+          },
+          "evaluationStatus": {
+            "const": "NOT_EVALUATED"
+          },
+          "counterexampleStatus": {
+            "const": "NOT_EVALUATED"
+          },
+          "artifacts": {
+            "items": {
+              "if": {
+                "properties": {
+                  "role": {
+                    "enum": [
+                      "VALIDATION_EVIDENCE",
+                      "FINITE_COUNTEREXAMPLE_CHECK"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "status": {
+                    "const": "NOT_EVALUATED"
+                  }
+                }
+              }
+            }
           }
         }
       }
