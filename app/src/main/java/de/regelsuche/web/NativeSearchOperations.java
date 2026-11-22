@@ -166,7 +166,10 @@ final class NativeSearchOperations implements AutoCloseable {
     synchronized NativeSearchOperation await(String id,long timeout,TimeUnit unit) throws Exception {
         long deadline=System.nanoTime()+unit.toNanos(timeout);
         var current=find(id).orElseThrow();
-        while (!current.terminal()) {
+        // A terminal record is durable before execute() releases its workspace lease.
+        // Do not return to the owning caller until that lease is released: an immediate
+        // next operation must not fail solely because terminal persistence won the race.
+        while (!current.terminal() || (lease != null && active != null && active.operationId().equals(id))) {
             long remaining=deadline-System.nanoTime();
             if (remaining<=0) throw new TimeoutException();
             TimeUnit.NANOSECONDS.timedWait(this,remaining);
