@@ -72,28 +72,7 @@ public final class EnergyGame {
                 credits[v] = BigInteger.ZERO;
             }
             for (int i = 0; i < graph.edges().size(); i++) { work.charge(1); outgoing.get(graph.edges().get(i).from()).add(i); }
-            boolean changed;
-            do {
-                changed = false;
-                for (int v = 0; v < n; v++) {
-                    work.charge(1);
-                    if (credits[v] == null) continue;
-                    boolean max = graph.owners().get(v) == Owner.MAX;
-                    BigInteger next = max ? null : BigInteger.ZERO;
-                    for (int id : outgoing.get(v)) {
-                        work.charge(1);
-                        Edge edge = graph.edges().get(id);
-                        BigInteger required = need(credits[edge.to()], edge.weight(), request.maximumCredit(), work);
-                        if (max) {
-                            if (required != null && (next == null || required.compareTo(next) < 0)) next = required;
-                        } else {
-                            if (required == null) { next = null; break; }
-                            if (required.compareTo(next) > 0) next = required;
-                        }
-                    }
-                    if (!Objects.equals(next, credits[v])) { credits[v] = next; changed = true; }
-                }
-            } while (changed);
+            liftCredits(request, outgoing, credits, work);
             if (credits[graph.start()] == null) {
                 work.charge(0);
                 return new Result(Status.NO_CERTIFICATE_WITHIN_BOUND, Optional.empty(), "CREDIT_BOUND", work.used());
@@ -130,6 +109,38 @@ public final class EnergyGame {
         } catch (CertificateWork.Stop stop) {
             return new Result(Status.UNAVAILABLE, Optional.empty(), stop.getMessage(), work.used());
         }
+    }
+
+    private static void liftCredits(Request request, List<List<Integer>> outgoing,
+            BigInteger[] credits, CertificateWork work) {
+        boolean changed;
+        do {
+            changed = false;
+            for (int v = 0; v < credits.length; v++) {
+                work.charge(1);
+                if (credits[v] == null) continue;
+                BigInteger next = liftedCredit(request, v, outgoing.get(v), credits, work);
+                if (!Objects.equals(next, credits[v])) { credits[v] = next; changed = true; }
+            }
+        } while (changed);
+    }
+
+    private static BigInteger liftedCredit(Request request, int v, List<Integer> outgoing,
+            BigInteger[] credits, CertificateWork work) {
+        boolean max = request.graph().owners().get(v) == Owner.MAX;
+        BigInteger next = max ? null : BigInteger.ZERO;
+        for (int id : outgoing) {
+            work.charge(1);
+            Edge edge = request.graph().edges().get(id);
+            BigInteger required = need(credits[edge.to()], edge.weight(), request.maximumCredit(), work);
+            if (max) {
+                if (required != null && (next == null || required.compareTo(next) < 0)) next = required;
+            } else {
+                if (required == null) { next = null; break; }
+                if (required.compareTo(next) > 0) next = required;
+            }
+        }
+        return next;
     }
 
     private static BigInteger need(BigInteger successor, BigInteger weight, BigInteger bound, CertificateWork work) {

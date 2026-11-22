@@ -1,0 +1,86 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_ONLY",
+  "sourceCommit": "98a60e30629f65bc12bb573e9beb46b04053e66c",
+  "sourceTree": "e62f351b3aa4c9a7901d0737b85db8443c50505b",
+  "sourceArchive": {
+    "format": "git archive --format=tar",
+    "sha256": "6095ca4ff2d07922fc05d4e60a3e1ec7de20b6344829930dac4829dd203f8aa7",
+    "bytes": 107970560
+  },
+  "originalMainCI": {
+    "runId": 45008332052,
+    "runURL": "https://github.com/carstenartur/Regelsuche/actions/runs/45008332052",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "runAttempt": 1,
+    "successfulMandatoryJobs": 11,
+    "aggregateCiCheck": "success",
+    "reportPublication": "success",
+    "originalGradleJobId": 137164808351
+  },
+  "originalQualityEvidence": {
+    "artifactId": 14755921937,
+    "artifactName": "quality-acceptance-evidence",
+    "downloadedZipSha256": "6bc84919a8f91a2421aed5f94794ca76bf7c2d9b96c7cefb190b295b593d8657",
+    "zipIndexSha256": "9439e48c94fc40712f10ed09f0e8be1ce33272ee0979b149e0ce1cf2271a89a9",
+    "indexCheckoutRevision": "98a60e30629f65bc12bb573e9beb46b04053e66c",
+    "indexCheckoutTree": "e62f351b3aa4c9a7901d0737b85db8443c50505b",
+    "indexTrackedChangesPresent": false,
+    "indexedFilesVerified": 293,
+    "indexedFileFailures": 0,
+    "originalCheckJson": {
+      "bytes": 10186,
+      "sha256": "2b71120221d151e376049534b8ead5a15b4209bd73865f3936b60bf6affee0ec",
+      "passed": true,
+      "trendPassed": true,
+      "trendViolationCount": 0,
+      "claimFailureCount": 0
+    },
+    "originalComplexityJson": {
+      "bytes": 20799,
+      "sha256": "6abc88843d2d26138c0ac82d4bda005b0e366738f28492042a700821c307708b"
+    },
+    "sourceBindings": [
+      {
+        "path": "ai-knowledge/complexity-baseline.json",
+        "bytes": 333,
+        "sha256": "d10cf0bf28364c63a7d8a2a6817f0fc86448069597e4cb3db2e73fce76bf6fba"
+      },
+      {
+        "path": "config/quality/complexity-hotspots.json",
+        "bytes": 7741,
+        "sha256": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4"
+      },
+      {
+        "path": "config/quality/coverage-policy.json",
+        "bytes": 2419,
+        "sha256": "4591f7817ba3db5830b345511a8b0c6ab8ad821e0ba87bc1d69be6cf13f84f6c"
+      },
+      {
+        "path": ".github/workflows/gradle.yml",
+        "bytes": 41329,
+        "sha256": "2bc4ddda078ef3e66595f31eacae7a2757373bb9bf96443650a9687613166f46"
+      }
+    ]
+  },
+  "snapshot": {
+    "projection": "Released extractor v0.1.10 TrendAnalyzer.snapshot numerical fields and contextFootprint schema version",
+    "sha256": "a4f543b5b823d52500cd13adb8ace8dc36f9a85084ac2a755fd1baa44b620ca0",
+    "bytes": 334
+  },
+  "comparator": {
+    "previousAcceptedMain": "16a345b3d8b2cb71c50e3ad9025ea30fb8dbc4e3",
+    "previousBaselineSha256": "d10cf0bf28364c63a7d8a2a6817f0fc86448069597e4cb3db2e73fce76bf6fba",
+    "previousReferenceEstimatedTokens": 847010,
+    "measuredAcceptedMainEstimatedTokens": 855205,
+    "delta": 8195,
+    "unchangedMaxIncrease": 15000,
+    "measuredConceptRadius": 118,
+    "previousConceptRadius": 117,
+    "unchangedMaxConceptRadiusIncrease": 3,
+    "sourceExtractorVersion": "0.1.10"
+  },
+  "boundary": "Only the independently successful predecessor main supplies reference values. The original source tree, CI results, ZIP digest, all 293 indexed paths, sizes and hashes, and unchanged source policy bindings were checked. The feature must independently pass all existing CI gates against this reference. No failing feature measurement, threshold change, exclusion or exception supplies acceptance."
+}
