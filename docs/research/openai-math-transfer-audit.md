@@ -87,6 +87,17 @@ Quotientenrechnung. Erreichte Nulltests und Inverse können einen quadratfreien
 Modul aufteilen. Ein Zertifikat deckt den ganzen Modul ab und weist auch
 undefinierte Komponenten aus. [Dynamische Auswertung](dynamic-algebra-evaluation.md)
 
+Die [lokale Constraint-Zählung](finite-constraint-counting.md) ergänzt nun
+exakte gewichtete boolesche Faktoren, bedingte Anzahlen und eine unabhängig
+geprüfte Eliminationsspur. Die Umsetzung nutzt gewöhnliche begrenzte
+Variablenelimination; ihre Korrektheit hängt nicht von der allgemeinen
+Komplexitätsbehauptung aus Familie 378 ab.
+
+Für Familie 104 wurde der [endliche Energie-/Kreditnachweis](energy-game-certificates.md)
+übertragen. Lokale Ungleichungen an ausgewählten Max- und allen Min-Kanten
+begründen die Garantie auf zyklischen Pfaden. Die beschränkte Suche ist kein
+Port des vollständigen quasipolynomiellen Mean-Payoff-Verfahrens.
+
 | Möglichkeit | Abgrenzung zum vorhandenen Code |
 | --- | --- |
 | Weitere Varianten aus Familie 116 | Der Katalog enthält auch Trefferlisten für Formeln mit Inversen und Trefferpunkte in positiver Charakteristik. Der ältere Identitätsprüfer arbeitet mit divisionsfreien Formeln über rationalen Koeffizienten. Der neue Typ `RationalFormula` unterstützt Inverse und die Prüfung einer gegebenen rationalen Matrixbelegung. Die Konstruktion einer allgemeinen Trefferliste und der allgemeine Identitätstest für rationale Formeln bleiben offen. Die [Lean-Beschreibung](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/lean/docs/116.md) trennt die beiden formalisierten Formelklassen. |

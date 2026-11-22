@@ -29,6 +29,8 @@ Ein eigener Build dieses Checkouts ist für die neuen APIs erforderlich.
 | Rationale nichtkommutative Formeln auf gegebenen Matrizen | `RationalFormulaRealization`, `RationalFormulaVerifier` | `RationalFormulaSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
 | Dynamische Auswertung über quadratfreien Primkörperquotienten | `DynamicAlgebraEvaluation`, `DynamicAlgebraVerifier` | `DynamicAlgebraSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
 | Quellengebundener endlicher Beweis-DAG | `FiniteProofDag` | `FiniteProofDagSdk`, `FiniteProofDagJson` | nein | versionierter JSON-Transport; Java-/SDK-Beispiele |
+| Exakte gewichtete lokale Constraint-Zählung | `FiniteConstraintCounter`, `FiniteConstraintVerifier` | `FiniteConstraintSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Zyklische Energie-/Kreditzertifikate | `EnergyGame`, `EnergyGameVerifier` | `EnergyGameSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
 direkte Gegenrechnung nun um eine tatsächlich ausgeführte Reduktion über
@@ -37,6 +39,9 @@ Arbeitsmenge des quadratischen Referenzverfahrens; dieser große Referenzlauf
 wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleitet.
 
 ## Verträge und Reproduktion
+
+- [Exakte lokale Constraint-Zählung](research/finite-constraint-counting.md),
+  [zyklische Energiespiel-Zertifikate](research/energy-game-certificates.md).
 
 - [Kongruenzüberdeckung](research/congruence-coverage.md),
   [Hunter und endliche Beweis-DAGs](research/hunter-finite-proofs.md),

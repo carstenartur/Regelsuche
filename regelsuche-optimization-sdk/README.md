@@ -13,6 +13,18 @@ integration. New source methods do not retroactively become part of a release.
 
 ## Exact finite certificates in current source
 
+`combinatorics.FiniteConstraintSdk.count` and `verify` provide exact weighted
+Boolean model counts, conditional counts through source-bound fixed variables,
+an elimination trace and a positive-weight witness. The verifier independently
+replays each local sum. See [factor tables and counting limits](../docs/research/finite-constraint-counting.md).
+
+`combinatorics.EnergyGameSdk.solve` and `verify` expose bounded cyclic
+Min/Max credit synthesis and local invariant checking. Every Min edge and the
+chosen Max edge must preserve the certified nonnegative credits inside the
+region. See [energy-game contracts and example](../docs/research/energy-game-certificates.md).
+Resource exhaustion in either API carries no mathematical result. Both are
+source APIs introduced after the published 0.5.3 release.
+
 `positivity.SosSynthesisSdk.search` and `verify` expose bounded rational Gram
 synthesis with polynomial equality/inequality premises and polynomial potential
 synthesis for a supplied simultaneous transition. The independent checks bind
