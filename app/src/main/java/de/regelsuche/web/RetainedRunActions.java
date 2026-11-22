@@ -28,7 +28,6 @@ final class RetainedRunActions {
     private RetainedRunActions() { }
 
     static void handle(HttpExchange exchange, Path directory, String suffix, int maxBytes) throws IOException {
-        byte[] requestBody = exchange.getRequestMethod().equals("POST") ? read(exchange, maxBytes) : null;
         String[] path = suffix.split("/", -1);
         if (path.length != 2 || !path[0].matches("[0-9a-f]{64}")) {
             error(exchange, 400, "INVALID_RUN_DIGEST", "run path must contain a lowercase SHA-256 digest");
@@ -38,6 +37,7 @@ final class RetainedRunActions {
         if (found.isEmpty()) { error(exchange, 404, "RUN_NOT_FOUND", "representation-discovery run not found"); return; }
         var run = found.get();
         try {
+            byte[] requestBody = exchange.getRequestMethod().equals("POST") ? read(exchange, maxBytes) : null;
             if (path[1].equals("duplicate")) {
                 duplicate(exchange, directory, run, requestBody);
             } else {
