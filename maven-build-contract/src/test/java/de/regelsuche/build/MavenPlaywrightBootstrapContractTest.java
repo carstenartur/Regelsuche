@@ -60,11 +60,11 @@ class MavenPlaywrightBootstrapContractTest {
     assertTrue(mavenBootstrap.contains("<argument>chromium</argument>"));
     assertFalse(mavenBootstrap.contains("<modules>"),
         "the Maven bootstrap must not configure or compile the main reactor");
-    assertEquals(2, occurrences(workflow, "-f playwright-bootstrap/pom.xml"),
-        "both checkout and Maven authorities must use the independent Maven bootstrap");
-    assertEquals(2, occurrences(workflow,
+    assertEquals(3, occurrences(workflow, "-f playwright-bootstrap/pom.xml"),
+        "the Gradle, checkout Maven and Git-free Maven authorities must use the independent Maven bootstrap");
+    assertEquals(3, occurrences(workflow,
         "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"),
-        "both checkout and Maven authorities must run the pinned Maven CLI");
+        "the Gradle, checkout Maven and Git-free Maven authorities must run the pinned Maven CLI");
     assertFalse(workflow.contains(
         "./gradlew --no-daemon -p playwright-bootstrap "
             + "installPlaywrightHostDependencies --console=plain"),
