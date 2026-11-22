@@ -32,3 +32,82 @@ Die Beobachtung betrifft diese fünf Quellen. Matching-Fuel, Nutzerzustände der
 `scripts/reproduce-native-scalar-saturation.sh <neues-Verzeichnis> --host-only` extrahiert zwei unabhängige Git-Archive des aktuellen Commits. Jeder Archivlauf baut seinen Benchmark-Launcher im **Maven-Reaktor**, ermittelt die Laufzeitabhängigkeiten aus dem jeweiligen Maven-Build und vergleicht anschließend sämtliche Bericht-, SymPy- und Zertifikatbytes. Für diesen manuellen Modus muss der Aufrufende eine passende SymPy-1.14.0-/mpmath-1.3.0-Referenzumgebung über `REGELSUCHE_SYMPY_PYTHON` bereitstellen.
 
 `--with-container` baut zuerst das bestehende Vergleichsimage und verwendet für **jede** externe SymPy-Anfrage ausschließlich dessen tatsächliche OCI-SHA-256-Image-ID. Der externe Interpreter läuft in einem schreibgeschützten Container ohne Netzwerk und ohne Python-/pip-Installation auf dem Host; der zweite und dritte Vergleichslauf bleiben unabhängig quellgebunden. Auch das Image führt das Panel beim Build aus. Zusätzliche Optionen nach dem Modus werden an Maven übergeben, nicht an Gradle. Ein erfolgreicher lokaler Vergleich ersetzt weder die vollständige CI-Abnahme noch einen unabhängig verdeckten Forschungsdatensatz.
+
+## Arbeits- und Laufzeitdiagnostik
+
+Die beiden nativen Zeitpläne laufen auf denselben fünf Fällen mit höchstens
+8 Runden, 256 E-Knoten und 4.000 Matching-Einheiten je freigegebener Regel. Die
+20 Zeilen des separaten Berichts `diagnostics/*.json` umfassen beide Zeitpläne
+unter gleichem Arbeitsbudget und je einen weiteren Durchlauf mit einer
+50-ms-Frist für die Zielerreichung. Ein geprüfter Zielausdruck zählt
+innerhalb dieser Frist. Ein späterer Abschluss erhält
+`TIME_BUDGET_INCONCLUSIVE` und einen leeren Trefferwert. Die schon
+arbeitsbegrenzte Berechnung läuft für Diagnosezwecke bis zu ihrem Abschluss.
+Die Frist misst die Sättigung einschließlich der Erstellung und Prüfung
+des Belegs sowie die Zählung im fertigen Graphen. Ein Aufwärmlauf geht jeder
+Kombination aus Fall und Zeitplan voraus. Unabhängige Wiederholungen mit
+Rundengrenzen von eins bis zur Abschlussrunde bestimmen die erste Runde
+mit geprüftem Ziel (`firstCheckedRound`). Im Zeitvergleich muss die jeweilige
+Wiederholung selbst innerhalb der Frist liegen. Die anschließende
+Auswertung vergleicht den geprüften Ausdruck mit dem Ziel. Die Präfixmessung
+bleibt außerhalb der Laufzeit und Arbeitsbilanz der vollständigen Zeile.
+
+Der Bericht zählt E-Knoten nach Operatorart. Eine E-Klasse zählt einmal pro
+enthaltener Art. Die AC-Kompression der Eingabe ist der Quotient aus binären
+Additions- und Multiplikationsvorkommen und maximalen gleichartigen
+AC-Teilbäumen nach deren Abflachung. Der Quotient erfasst ausschließlich
+die Eingabesyntax. Mehrfach vorkommende Operanden bleiben erhalten.
+
+Das Regelbuch zählt Kandidatenwurzeln, Scans, Tupel, Treffer, Duplikate,
+abgelehnte Guards, Cache-Wiederverwendungen, direkte Regelvereinigungen
+und verbrauchten Brennstoff. Für beide Extraktionsziele führt der Bericht
+Termknoten und -kanten, Beweisschritte und Prämissenkanten sowie die
+Arbeitszählung der abgelösten DAG-Prüfung. Die Beweistiefe zählt die Schritte
+auf dem längsten Prämissenpfad zur Schlussfolgerung einschließlich seiner Enden.
+Das Strukturmodell `totalMechanicalUnits` addiert Matching-Brennstoff
+und Klassenanalysen zu den sieben Zählern in `producerStages`:
+
+| Zähler | Einheit |
+|---|---|
+| `sourcePreparation` | Ein Quellprojektionsvorgang, gebundene Inventar-/Prämisseneinträge und die gemessene Vorprüfung des Quellausdrucks. |
+| `scheduler` | Runden, Regelaufrufe einschließlich übersprungener Regeln, ausgewählte Klassen und tatsächlich ausgeführte Produktivitätsvergleiche. |
+| `graphStructure` | Graphzugriffe und die dabei betrachteten Klassen, Knoten und Operanden beim Aufbau, bei der Indexpflege, beim Umbau und beim Nachziehen betroffener Vorgänger. |
+| `representativeForest` | Anlagen, Vereinigungen und Repräsentantensuchen, einschließlich der tatsächlich durchlaufenen Elternverweise. |
+| `extraction` | Kostentabellen- und Knotenauswertungen sowie Ausgabeaufbau mit ihren Operanden. |
+| `guardChecks` | Jeder ausgeführte Guard-Test, auch bei Ablehnung oder anschließender Budgeterschöpfung. |
+| `proofProduction` | Prüfung der Regelzeugen, strukturelle Vorprüfung, Aufbau und interne abgelöste Prüfung der erzeugten DAGs, einschließlich der verbrauchten Prüfarbeit bei einem abgebrochenen Versuch. |
+
+Die Einheiten sind strukturelle Vorgänge im nativen Produzenten. Ein exakt
+ausgewertetes Lemma zählt als ein Prüfvorgang zuzüglich der gemessenen
+strukturellen Vorprüfung. Einzelne JVM-Operationen, Bitkosten exakter
+Arithmetik und Bibliotheksinterna werden in Laufzeit und Allokation sichtbar.
+Der beobachtete Produzent beginnt mit dem geparsten Ausdruck und dem
+aufgebauten Annahmekontext, und endet mit den geprüften Extraktionen.
+`proofReplayWork` zählt die anschließende unabhängige Diagnosewiederholung.
+Sie bleibt neben der Summe sichtbar. Gleiches gilt für die Zeilenauswertung,
+die Präfixmessungen und den separaten SymPy- und Solver-IR-Vergleich.
+Matchversuche, direkte Regelvereinigungen und Guard-Ausgänge bleiben
+als primitive Ergebnisse im Regelbuch verfügbar.
+
+Jede Umgebung hält ihre eigenen Laufzeiten und die vom JVM-Zähler
+verfügbaren Allokationsbytes des ausführenden Threads fest, zusammen mit
+JVM-Version, Betriebssystem, Architektur, CPU-Anzahl, Heap-Grenze und
+gegebenenfalls der OCI-Image-ID. Die Einzelmessungen dienen der Diagnose.
+Die CI aktiviert die Erhebung für beide Quellarchive und das OCI-Image.
+Lokal aktiviert `REGELSUCHE_RUN_SCALAR_DIAGNOSTICS=1` dieselbe Erhebung
+beim Aufruf des Reproduktionsskripts.
+Die kanonischen Vergleichsdateien und Zertifikate werden weiterhin separat
+auf Bytegleichheit geprüft.
+
+Der SymPy-Arm erhält den aufgabenspezifischen Operationsnamen und dieselbe
+deklarierte Voraussetzung. Der Adapter überträgt `^` nach `**` und bewertet
+das Ergebnis in der gemeinsamen Teilmenge aus exakten Skalartermen und
+Addition/Multiplikation modulo AC. Geordnete AST-Positionen, das native
+Regelinventar und native Beweisobjekte werden dabei nicht übertragen.
+Ohne belegte Nichtnullbedingung meldet der SymPy-Adapter einen offenen
+Guard. SymPy gibt den Ergebnistext zurück. BestFirst verwendet gerichtete
+primitive Übergänge, deren Erreichbarkeit und Zustandszahl der Bericht
+erfasst. Die native Sättigung hält einen empfängerprüfbaren DAG fest.
+Der [Track E2](https://github.com/carstenartur/Regelsuche/issues/235)
+dokumentiert die komplementäre Übersetzungs- und Beweisobjektprüfung im
+gemeinsamen unbedingten Polynomfragment.

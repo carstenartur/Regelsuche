@@ -1,0 +1,148 @@
+{
+  "schema": "regelsuche.prospective-post-freeze-aggregate/v1",
+  "issue": 750,
+  "originalCodeCommit": "4d932cb351e0926446821364bdc58477d4ab3cf2",
+  "trainingLockCommit": "a68946394b5360a14f6a3b905fc5f130d5b384d6",
+  "acceptedTrainSchemas": 0,
+  "originalFreezeCommit": "37283d9b74a73ccca65c8eb89014b3d094463be4",
+  "originalFreezeTree": "3a7ea1e2381f172e9a8927766b978e20d843fbfb",
+  "originalFreezeManifestHash": "sha256:12cabeebe687bca3341c3fa16cde03109fed1cc094d7515c1d911968d20c4dbb",
+  "canonicalSourceOnlyRoot": "sha256:262b2808c1f8b00d8472e1258c8c5e286c5a5e044ebe8b495d1514e303d0dcb2",
+  "sourceOnlyReplay": {
+    "hostedRun": 44871073533,
+    "hostedJob": 136745518729,
+    "hostedHead": "a02378c6004b62c150ac9e34f28e92055014bd00",
+    "artifactSha256": "sha256:28112931e3e30195f915deeeb5066e366bafd0746cb80dafb566762b9def0d15",
+    "replays": [
+      {
+        "environment": "runs/clean-1-freeze",
+        "rowCount": 224,
+        "manifestHash": "sha256:aa94051aba6153d796448254cf953378c3863a89aa5f41bac26d7b6269df2239",
+        "runtimeReceiptHash": "sha256:f66821f9bd7b4e26d51098516678206de4059c9be2e0de49f55b12b2fa45df68",
+        "canonicalSourceOnlyRoot": "sha256:262b2808c1f8b00d8472e1258c8c5e286c5a5e044ebe8b495d1514e303d0dcb2"
+      },
+      {
+        "environment": "runs/clean-2-freeze",
+        "rowCount": 224,
+        "manifestHash": "sha256:c4a7502d0972c014a1cca54b4f20b917a5604c6df3297603e1736afbd1af0ef0",
+        "runtimeReceiptHash": "sha256:5dccdd095401351d34ea0d6b7332ef9dcba698981f43f3ab615977ea260613c6",
+        "canonicalSourceOnlyRoot": "sha256:262b2808c1f8b00d8472e1258c8c5e286c5a5e044ebe8b495d1514e303d0dcb2"
+      },
+      {
+        "environment": "container-output/freeze",
+        "rowCount": 224,
+        "manifestHash": "sha256:b638b9adc5a00a564679c645ee217056c0788d4ec9550e613fa381acf3ebb3c7",
+        "runtimeReceiptHash": "sha256:062e365d3c6cfd474d9431106a49ee960c3ba9e7c2b67f748068e5e676a3bf0c",
+        "canonicalSourceOnlyRoot": "sha256:262b2808c1f8b00d8472e1258c8c5e286c5a5e044ebe8b495d1514e303d0dcb2"
+      }
+    ],
+    "offlineContainerImageId": "sha256:b0c0434a42961ec80864262513b7fe216d51b842b257a319d77bb4334ab7eb80",
+    "offlineContainerCompleted": true,
+    "retainedPathLabelsPerRun": 2688,
+    "nullRowsPerRun": 36
+  },
+  "qualificationInputCommitment": {
+    "byteLength": 89085,
+    "sha256": "sha256:7baeb11a1034901543a4c25346826fb7bc5011ac26f30446b3c8d381a087cc2a"
+  },
+  "completedHostQualification": {
+    "runs": [
+      {
+        "qualificationRun": 1,
+        "sourceWorktreeClean": true,
+        "gitAlternatesPresent": false,
+        "rows": 224,
+        "distinctSources": 14,
+        "configurations": 16,
+        "resultRoot": "sha256:d48f044ff4705ce9d08ca7d1c8f1262438fdf80c1394d8c4cb71ed61de3e8d67",
+        "resultManifestFileSha256": "sha256:5fbb144ba9deaebcd296d255d2a56877a95350a4f7aa73d4e4d9965f560e22c1",
+        "summaryFileSha256": "sha256:8ca542cea877e0a2ce6e375386b9913039d411a4e93dfa1fe4f0ccdf6d2eb304",
+        "receiverReceiptFileSha256": "sha256:73bf5e3e447db3beb3340bd8925dec2bff2513bb6b26441a52abbdc15d9637b3"
+      },
+      {
+        "qualificationRun": 2,
+        "sourceWorktreeClean": true,
+        "gitAlternatesPresent": false,
+        "rows": 224,
+        "distinctSources": 14,
+        "configurations": 16,
+        "resultRoot": "sha256:d48f044ff4705ce9d08ca7d1c8f1262438fdf80c1394d8c4cb71ed61de3e8d67",
+        "resultManifestFileSha256": "sha256:5fbb144ba9deaebcd296d255d2a56877a95350a4f7aa73d4e4d9965f560e22c1",
+        "summaryFileSha256": "sha256:8ca542cea877e0a2ce6e375386b9913039d411a4e93dfa1fe4f0ccdf6d2eb304",
+        "receiverReceiptFileSha256": "sha256:73bf5e3e447db3beb3340bd8925dec2bff2513bb6b26441a52abbdc15d9637b3"
+      }
+    ],
+    "normalClones": 2,
+    "separateGitObjectsAndProductionBuilds": true,
+    "buildJavaMajor": 25,
+    "buildMavenVersion": "3.9.16",
+    "sourceOnlyVerificationBeforeInputReadInEachRun": true,
+    "canonicalResultRoot": "sha256:d48f044ff4705ce9d08ca7d1c8f1262438fdf80c1394d8c4cb71ed61de3e8d67",
+    "byteIdenticalResultFiles": 227,
+    "compiledClassCountPerBuild": 4389,
+    "compiledClassTreeSha256": "f3c1df54036b8ebcc09c98b73530e118f699598cee0026e29cfefff703ae4288",
+    "runtimeArchivesWithIdenticalEntryContents": 16,
+    "runtimeArchivesWithDifferentArchiveBytes": 10
+  },
+  "measurementUnits": {
+    "distinctSources": 14,
+    "policiesPerSource": 8,
+    "catalogSettingsPerPolicy": 2,
+    "configurationsPerSource": 16,
+    "sourceConfigurationRowsPerRun": 224,
+    "positiveSourceConfigurationRowsPerRun": 160,
+    "controlSourceConfigurationRowsPerRun": 64,
+    "interpretation": "Counts aggregate repeated source observations across configurations within one matrix. Replicate runs share the same matrix and are counted once."
+  },
+  "qualifiedMatrix": {
+    "multiStepRediscoveryAmongPositiveRows": {
+      "numerator": 122,
+      "denominator": 160
+    },
+    "recognizedPositiveRowsRankedInTop5": {
+      "numerator": 108,
+      "denominator": 122
+    },
+    "positiveRowsRankedInTop5": {
+      "numerator": 108,
+      "denominator": 160
+    },
+    "falsePositiveMultiStepRediscoveriesAmongControlRows": {
+      "numerator": 0,
+      "denominator": 64
+    },
+    "rowsWithMaterialCompression": {
+      "numerator": 140,
+      "denominator": 224
+    },
+    "rowsWithMaterialExactSharing": {
+      "numerator": 0,
+      "denominator": 224
+    },
+    "rowsWithUsefulLongerIntermediate": {
+      "numerator": 56,
+      "denominator": 224
+    },
+    "rowsWithOccurrenceLocalBridge": {
+      "numerator": 136,
+      "denominator": 224
+    },
+    "rowsWithCheckedBridgeReuse": {
+      "numerator": 0,
+      "denominator": 224
+    },
+    "rowsWithUsefulCheckedBridgeReuse": {
+      "numerator": 0,
+      "denominator": 224
+    }
+  },
+  "pinnedOciQualification": {
+    "status": "PENDING",
+    "required": true,
+    "reason": "A private OCI runtime with authorized read-only access to the committed input is required."
+  },
+  "totalWorkComparability": "UNMATCHED",
+  "policySuperiority": "NOT_ESTABLISHED",
+  "externalNovelty": "NOT_EVALUATED",
+  "productionPromotion": false
+}
