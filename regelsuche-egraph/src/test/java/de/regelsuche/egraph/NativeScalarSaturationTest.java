@@ -57,6 +57,23 @@ class NativeScalarSaturationTest {
         }
     }
 
+    @Test void nativeWorkObservationPreservesTheResultAfterAnInsertionRefusal() {
+        var rules = de.regelsuche.transform.AstRewriteTransformationEngine.allBuiltInRules();
+        var context = de.regelsuche.egraph.proof.ScalarExtractionProof.Context.create(rules,
+                java.util.List.of(), "a".repeat(40));
+        var input = parser.parseTerm("a*x+a*y");
+        var engine = new EqualitySaturation(rules);
+        var budget = new NativeScalarSaturation.Budget(8, 7, 4000, NativeScalarSaturation.Schedule.ROUND_ROBIN);
+        var result = engine.saturateExactScalars(input, context, budget);
+        var observed = engine.observeExactScalars(input, context, budget);
+        assertEquals("NODE_BUDGET", result.terminal());
+        assertEquals(result, observed.result());
+        for (String stage : java.util.List.of("graphStructure", "representativeForest", "extraction", "proofProduction")) {
+            assertTrue(observed.producerStages().get(stage) > 0, stage);
+        }
+        assertEquals(observed.producerStages(), engine.observeExactScalars(input, context, budget).producerStages());
+    }
+
     @Test void analysisMaintainsExactConstantConflictsAndDefinedness() {
         var graph=EGraph.exactScalarAcV1(); var two=graph.addExpression(parser.parseTerm("2"));
         var three=graph.addExpression(parser.parseTerm("3"));

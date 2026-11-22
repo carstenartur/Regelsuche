@@ -20,14 +20,15 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 ## Native bedingte Skalarsättigung
 
 - **Hypothese.** Native AC-Multimengen und bestätigte Nichtnullbedingungen können in einem endlichen rationalen Fragment Darstellungen erschließen, die eine geordnete Pfadsuche aus derselben Quelle verfehlt.
-- **Umsetzungsstand.** Ein gemeinsamer E-Graph hält n-stellige Operatoren und monotone Klassenfakten, begrenzt die Sucharbeit je Regel und extrahiert zwei Ziele mit unabhängig geprüften Beweis-DAGs. Die Annahmenprüfung trennt die exakte, symbolgebundene Prämissenerkennung von der Faktenvereinigung. Die Quelle und die Ergebnisse lassen sich mit der Produkt-CLI erneut prüfen.
+- **Umsetzungsstand.** Ein gemeinsamer E-Graph hält n-stellige Operatoren und monotone Klassenfakten, begrenzt die Sucharbeit je Regel und extrahiert zwei Ziele mit unabhängig geprüften Beweis-DAGs. Die Annahmenprüfung trennt die exakte, symbolgebundene Prämissenerkennung von der Faktenvereinigung. Die Quelle und die Ergebnisse lassen sich mit der Produkt-CLI erneut prüfen. Das Fünf-Fälle-Panel zählt die strukturelle Arbeit beider Zeitpläne von der Quellvorprüfung bis zur geprüften Extraktion. Zeit- und Allokationsdiagnostik sowie die anschließende Belegwiederholung bleiben separat.
 - **Befund.** Beide historischen #620-Faktoren erreichten alle drei Verfahren. Beim Kontrollausdruck mit entgegengesetzten Faktorrollen fand BestFirst innerhalb des deklarierten Budgets keine Faktorisierung, während die native Sättigung und SymPy 1.14.0 sie erreichten. Ohne Nichtnullbeleg gab kein Arm die Kürzung frei. Kontrollen prüfen alle elf zugelassenen Prämissenformen, veränderte Aussagen und Symbolbereiche sowie die reihenfolgeunabhängige Erkennung widersprüchlicher Fakten.
 - **Folgerung.** Die zusätzliche Erreichbarkeit betrifft den geprüften Join. Matching-Fuel, Zustandszahl, DAG-Schritte und SymPy-Operationszahl erlauben keine gemeinsame Effizienzaussage.
 
 [Protokoll und Befunde](native-scalar-saturation.md)
 
-- [`NativeScalarSaturation.java`](../../regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java#L12) <!-- strategy-code: regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java | public final class NativeScalarSaturation { -->
+- [`NativeScalarSaturation.java`](../../regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java#L13) <!-- strategy-code: regelsuche-egraph/src/main/java/de/regelsuche/egraph/NativeScalarSaturation.java | public final class NativeScalarSaturation { -->
 - [`NativeScalarComparison.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java#L25) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarComparison.java | final class NativeScalarComparison { -->
+- [`NativeScalarDiagnostics.java`](../../regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarDiagnostics.java#L37) <!-- strategy-code: regelsuche-benchmarks/src/main/java/de/regelsuche/benchmarks/NativeScalarDiagnostics.java | final class NativeScalarDiagnostics { -->
 - [`ScalarGuardFactsTest.java`](../../regelsuche-egraph/src/test/java/de/regelsuche/egraph/proof/ScalarGuardFactsTest.java#L11) <!-- strategy-code: regelsuche-egraph/src/test/java/de/regelsuche/egraph/proof/ScalarGuardFactsTest.java | class ScalarGuardFactsTest { -->
 
 

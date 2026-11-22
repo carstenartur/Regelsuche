@@ -58,6 +58,12 @@ public final class EqualitySaturation {
         return NativeScalarSaturation.run(input, rules, context, budget);
     }
 
+    /** Runs the same scalar authority and observes the final graph for the bounded comparison. */
+    public NativeScalarSaturation.Observation observeExactScalars(Expr input,
+            de.regelsuche.egraph.proof.ScalarExtractionProof.Context context, NativeScalarSaturation.Budget budget) {
+        return NativeScalarSaturation.observe(input, rules, context, budget);
+    }
+
     /** Exact extraction for additive, non-negative per-node costs. */
     public Result saturate(EGraph graph, EClassId root, ToIntFunction<ENode> costOfNode) {
         Objects.requireNonNull(graph, "graph");
