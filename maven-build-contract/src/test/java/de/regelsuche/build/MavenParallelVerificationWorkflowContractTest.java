@@ -49,7 +49,7 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
       "maven-product-verification", "external-polynomial-comparison",
       "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
-      "maven-polynomial-qualification", "maven-student-sdk-archive-qualification");
+      "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-student-sdk-archive-qualification");
   private static final Pattern FAILURE_TERM =
       Pattern.compile("needs\\.([A-Za-z][A-Za-z0-9_-]*)\\.result != 'success'");
   private static final String ROUTINE_FAILURE_GROUP = " || (github.event_name != 'create' && (";

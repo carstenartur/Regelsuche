@@ -214,6 +214,7 @@
     function show(view) {
         selected = view;
         const source = view.evidence;
+        const scopedLogic = view.domainId === 'scoped-logic' && view.domainRevision === 'v1';
         const sequence = view.domainRevision === 'v1' &&
             ['integer-sequence-finite-difference', 'integer-sequence-linear-recurrence'].includes(view.domainId);
         detail.append(node('h2', `${source.campaignId} · ${source.outcome}`));
@@ -224,7 +225,10 @@
             ['Quellenangabe', source.seed.sourceReference], ['Eingabe-Hash', view.inputHash]
         ]) identity.append(node('dt', label), node('dd', value));
         detail.append(identity, node('h3', sequence
-            ? 'Beobachtete Folge und zurückgehaltene Prüfdaten' : 'Formel und Umschreibungsnachweis'));
+            ? 'Beobachtete Folge und zurückgehaltene Prüfdaten' : scopedLogic
+                ? 'Logischer Kontext und gespeicherte Belegangaben' : 'Formel und Umschreibungsnachweis'));
+        if (scopedLogic) detail.append(node('p', 'Kontext, Ergebnisstatus und Zertifikate sind gespeicherte Angaben der Quelle. '
+            + 'Der Import prüft ihre Quellenbindung und führt keinen Beweisprüfer aus.'));
         detail.append(table(['Gespeichertes Feld', 'Wert'], source.domainEvidence.properties.map(item => [item.key, item.value])));
         detail.append(node('h3', 'Gespeicherte Arbeit je Dimension'));
         detail.append(table(['Ressource', 'Budget', 'Ausgeführt', 'Übersprungen', 'Verbleibend'],
@@ -264,9 +268,10 @@
         element('retainedDomainReplay').hidden = false;
         element('replayDomainExport').disabled = !view.replaySupported;
         replayStatus.textContent = view.replaySupported ? 'Noch kein Replay für diese Auswahl ausgeführt.'
+            : scopedLogic ? 'Für diesen logischen Export ist im Arbeitsbereich kein unabhängiger Beweisprüfer für Replay eingerichtet. Die gespeicherten Daten bleiben lesbar.'
             : 'Die Quelle überschreitet das begrenzte Replay-Budget. Die gespeicherten Daten bleiben lesbar.';
-        element('domainAssessment').hidden = false;
-        element('assessDomainExport').disabled = false;
+        element('domainAssessment').hidden = scopedLogic;
+        element('assessDomainExport').disabled = scopedLogic;
         validationPanel.hidden = !sequence;
         validateButton.disabled = !sequence;
         proofPanel.hidden = !sequence;
@@ -355,7 +360,7 @@
     });
     element('assessDomainExport').addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
-        if (!view) return;
+        if (!view || (view.domainId === 'scoped-logic' && view.domainRevision === 'v1')) return;
         const button = element('assessDomainExport'), message = element('domainAssessmentStatus');
         const result = element('domainAssessmentResult'), link = element('downloadDomainAssessment');
         const path = `${base}/${view.runId.slice(7)}/assessment`;
@@ -400,12 +405,12 @@
         } catch (error) {
             if (ticket === selectionEpoch) message.textContent = `Prüfung fehlgeschlagen: ${error.message}`;
         } finally {
-            if (ticket === selectionEpoch) button.disabled = false;
+            if (ticket === selectionEpoch) button.disabled = view.domainId === 'scoped-logic' && view.domainRevision === 'v1';
         }
     });
     validateButton.addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
-        if (!view) return;
+        if (!view || (view.domainId === 'scoped-logic' && view.domainRevision === 'v1')) return;
         const actionPath = `${base}/${view.runId.slice(7)}/validate`;
         validateButton.disabled = true;
         clearValidation('Gespeicherte Folgenglieder werden geprüft …');
@@ -601,7 +606,7 @@
     }
     proofButton.addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
-        if (!view) return;
+        if (!view || (view.domainId === 'scoped-logic' && view.domainRevision === 'v1')) return;
         const actionPath = `${base}/${view.runId.slice(7)}/model-proof`;
         proofButton.disabled = true;
         clearProof('Quelle, endliche Daten und Modellgesetz werden geprüft …');

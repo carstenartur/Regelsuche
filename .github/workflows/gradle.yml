@@ -393,6 +393,32 @@ jobs:
             regelsuche-learning/target/surefire-reports/**
           if-no-files-found: error
 
+  maven-native-polynomial-study:
+    name: Maven pinned native polynomial study
+    if: github.event_name != 'create'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0, ref: "${{ github.event.pull_request.head.sha || github.sha }}" }
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+      - name: Run full affected test suites and verify all 675 native study rows
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Pnative-polynomial-comparison -pl regelsuche-release -am
+          -Dregelsuche.skipPolynomialClasspath=false verify
+      - name: Retain native study rows, worker logs and module receipts
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: maven-native-polynomial-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            regelsuche-release/target/reports/native-polynomial-comparison/**
+            regelsuche-release/target/failsafe-reports/**
+            regelsuche-learning/target/surefire-reports/**
+            regelsuche-search/target/surefire-reports/**
+          if-no-files-found: error
+
   typed-external-polynomial-comparison:
     name: Typed source-only learning comparison
     if: github.event_name != 'create'
@@ -477,7 +503,7 @@ jobs:
 
   verification:
     name: ${{ github.event_name == 'create' && 'Showcase train-freeze authority v1' || 'Checkout-local ciCheck' }}
-    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs, native-scalar-reproduction, maven-polynomial-qualification, maven-student-sdk-archive-qualification]
+    needs: [gradle-verification, jmh-verification, sympy-runtime-verification, maven-product-verification, external-polynomial-comparison, typed-external-polynomial-comparison, checked-proofs, native-scalar-reproduction, maven-polynomial-qualification, maven-native-polynomial-study, maven-student-sdk-archive-qualification]
     if: >-
       ${{ always() && (github.event_name != 'create' || (github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1')) }}
     runs-on: ubuntu-22.04
@@ -485,7 +511,7 @@ jobs:
     steps:
       - name: Reject incomplete verification authority
         if: >-
-          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success' || needs.native-scalar-reproduction.result != 'success' || needs.maven-polynomial-qualification.result != 'success' || needs.maven-student-sdk-archive-qualification.result != 'success')) }}
+          ${{ needs.gradle-verification.result != 'success' || needs.jmh-verification.result != 'success' || needs.sympy-runtime-verification.result != 'success' || (github.event_name != 'create' && (needs.maven-product-verification.result != 'success' || needs.external-polynomial-comparison.result != 'success' || needs.typed-external-polynomial-comparison.result != 'success' || needs.checked-proofs.result != 'success' || needs.native-scalar-reproduction.result != 'success' || needs.maven-polynomial-qualification.result != 'success' || needs.maven-native-polynomial-study.result != 'success' || needs.maven-student-sdk-archive-qualification.result != 'success')) }}
         run: exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
@@ -536,7 +562,7 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
       - name: Record complete verification authority
-        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} TypedPolynomial=${{ needs.typed-external-polynomial-comparison.result }} MavenPolynomial=${{ needs.maven-polynomial-qualification.result }} MavenStudentSdkArchive=${{ needs.maven-student-sdk-archive-qualification.result }} Coverage=success"
+        run: echo "Gradle=${{ needs.gradle-verification.result }} JMH=${{ needs.jmh-verification.result }} SymPy=${{ needs.sympy-runtime-verification.result }} Maven=${{ needs.maven-product-verification.result }} Polynomial=${{ needs.external-polynomial-comparison.result }} TypedPolynomial=${{ needs.typed-external-polynomial-comparison.result }} MavenPolynomial=${{ needs.maven-polynomial-qualification.result }} MavenNativePolynomial=${{ needs.maven-native-polynomial-study.result }} MavenStudentSdkArchive=${{ needs.maven-student-sdk-archive-qualification.result }} Coverage=success"
 
   publish-pages:
     name: Publish generated reports

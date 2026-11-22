@@ -30,6 +30,7 @@
       "enum": [
         "IDENTICAL_CANONICAL_EVIDENCE",
         "OUTSIDE_REPLAY_BUDGET",
+        "REPLAY_NOT_CONFIGURED",
         "REPLAY_MISMATCH"
       ]
     },
@@ -640,7 +641,8 @@
           "enum": [
             "integer-sequence-finite-difference",
             "integer-sequence-linear-recurrence",
-            "expression-rewrite"
+            "expression-rewrite",
+            "scoped-logic"
           ]
         },
         "domainRevision": {
@@ -1126,6 +1128,109 @@
               "required": [
                 "subject"
               ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "$comment": "Scoped exports retain source assertions only: no independent proof receiver is configured.",
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "domainId": {
+                "const": "scoped-logic"
+              }
+            },
+            "required": [
+              "domainId"
+            ]
+          }
+        },
+        "required": [
+          "source"
+        ]
+      },
+      "then": {
+        "properties": {
+          "replayStatus": {
+            "const": "REPLAY_NOT_CONFIGURED"
+          },
+          "resources": false,
+          "certificate": false,
+          "actualEvidenceHash": false,
+          "validation": {
+            "properties": {
+              "contract": {},
+              "status": {
+                "const": "NOT_EVALUATED"
+              }
+            },
+            "additionalProperties": false
+          },
+          "counterexamples": {
+            "properties": {
+              "contract": {},
+              "status": {
+                "const": "NOT_EVALUATED"
+              }
+            },
+            "additionalProperties": false
+          },
+          "proof": {
+            "properties": {
+              "contract": {},
+              "status": {
+                "const": "NOT_EVALUATED"
+              }
+            },
+            "additionalProperties": false
+          },
+          "ablation": {
+            "properties": {
+              "contract": {},
+              "status": {
+                "const": "NOT_EVALUATED"
+              }
+            },
+            "additionalProperties": false
+          },
+          "externalNovelty": {
+            "properties": {
+              "contract": {},
+              "status": {
+                "const": "NO_VERIFIED_SUBJECT"
+              }
+            },
+            "additionalProperties": false
+          },
+          "lifecycle": {
+            "properties": {
+              "status": {
+                "const": "SOURCE_NOT_REPRODUCED"
+              }
+            }
+          },
+          "release": {
+            "properties": {
+              "status": {
+                "const": "BLOCKED"
+              }
+            }
+          },
+          "promotion": {
+            "properties": {
+              "status": {
+                "const": "BLOCKED"
+              }
+            }
+          },
+          "publicEvidence": {
+            "properties": {
+              "status": {
+                "const": "BLOCKED"
+              }
             }
           }
         }
