@@ -57,6 +57,37 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final String REJECTION_STEP = "Reject incomplete verification authority";
 
   @Test
+  void onlyObsoletePullRequestsCancelRunningVerification() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    assertEquals("${{ github.event_name == 'pull_request' }}",
+        workflow.path("concurrency").path("cancel-in-progress").asText(),
+        "main and manually repeated ancestor runs must complete their acceptance evidence");
+  }
+
+  @Test
+  void reportPublicationRequiresCurrentMainAndSuccessfulRemoteLookup() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    List<JsonNode> steps = workflow.path("jobs").path("publish-pages")
+        .path("steps").valueStream().toList();
+    JsonNode publish = steps.getLast();
+    assertTrue(publish.path("uses").asText().startsWith("peaceiris/actions-gh-pages@"));
+    assertEquals("${{ steps.current-main.outputs.current == 'true' }}",
+        publish.path("if").asText(), "a superseded main run must not publish stale reports");
+    JsonNode guard = steps.get(steps.size() - 2);
+    assertEquals("current-main", guard.path("id").asText());
+    assertFalse(guard.has("continue-on-error"));
+    String script = guard.path("run").asText();
+    assertTrue(script.startsWith("set -euo pipefail\n"),
+        "failed remote lookup must stop publication, not reuse a stale local ref");
+    assertTrue(script.contains("git ls-remote --exit-code origin refs/heads/main"));
+    assertTrue(script.contains("if [[ \"$remote_sha\" == \"$GITHUB_SHA\" ]]; then"));
+    assertTrue(script.contains("echo \"current=true\" >> \"$GITHUB_OUTPUT\""));
+    assertTrue(script.contains("echo \"current=false\" >> \"$GITHUB_OUTPUT\""));
+  }
+
+  @Test
   void independentAuthoritiesRunInParallelAndConvergeFailClosed()
       throws IOException {
     Path root = repositoryRoot();

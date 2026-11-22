@@ -11,8 +11,10 @@ on:
 concurrency:
   group: >-
     ${{ github.event_name == 'create' && github.event.ref_type == 'branch' && github.event.ref == 'showcase/train-freeze-authority-v1' && format('showcase-train-freeze-{0}', github.repository) || format('ci-{0}-{1}', github.repository, github.ref) }}
-  cancel-in-progress: >-
-    ${{ github.event_name != 'create' || github.event.ref_type != 'branch' || github.event.ref != 'showcase/train-freeze-authority-v1' }}
+  # Finish running main verification; keep only the latest not-yet-started revision.
+  # New PR revisions may still cancel obsolete PR work.
+  queue: single
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions: { actions: read, contents: read, packages: read }
 jobs:
   gradle-verification:
@@ -655,7 +657,20 @@ jobs:
           if [ -f app/build/reports/benchmark/benchmark-report.md ]; then cp app/build/reports/benchmark/benchmark-report.md build/pages-site/; fi
           if [ -f app/build/reports/benchmark/benchmark-summary.json ]; then mkdir -p build/pages-site/assets; cp app/build/reports/benchmark/benchmark-summary.json build/pages-site/assets/; fi
           touch build/pages-site/.nojekyll
+      - name: Check whether this revision is still current main
+        id: current-main
+        run: |
+          set -euo pipefail
+          remote_main="$(git ls-remote --exit-code origin refs/heads/main)"
+          remote_sha="${remote_main%%[[:space:]]*}"
+          if [[ "$remote_sha" == "$GITHUB_SHA" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping reports for superseded main revision $GITHUB_SHA"
+          fi
       - name: Publish generated reports to gh-pages
+        if: ${{ steps.current-main.outputs.current == 'true' }}
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

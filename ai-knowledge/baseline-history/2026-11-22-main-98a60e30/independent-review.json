@@ -1,0 +1,159 @@
+{
+  "schema": "regelsuche.ai-knowledge-baseline-independent-review/v1",
+  "reviewedAtUtc": "2026-11-22T14:25:53.130609+00:00",
+  "decision": "QUALIFIED_ACCEPTED_MAIN_REFERENCE",
+  "scope": "The baseline payload is an exact projection of previously successful main. This review does not accept pending feature branches or replace their required CI.",
+  "source": {
+    "commit": "98a60e30629f65bc12bb573e9beb46b04053e66c",
+    "tree": "e62f351b3aa4c9a7901d0737b85db8443c50505b",
+    "gitCommitObjectHashVerified": true,
+    "gitArchiveBytes": 107970560,
+    "gitArchiveSha256": "6095ca4ff2d07922fc05d4e60a3e1ec7de20b6344829930dac4829dd203f8aa7"
+  },
+  "originalCI": {
+    "runId": 45008332052,
+    "event": "push",
+    "branch": "main",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "mandatorySourceJobsSuccessful": 11,
+    "aggregateJobId": 137201379765,
+    "aggregateConclusion": "success",
+    "publicationJobId": 137222878778,
+    "publicationConclusion": "success",
+    "nativeGradleJobId": 137164808351,
+    "nativeAiKnowledgeCheckExecuted": true,
+    "coverageControlTestsPassed": 8,
+    "finalGradleCiCheckSuccessful": true
+  },
+  "originalArtifact": {
+    "artifactId": 14755921937,
+    "bytes": 29210920,
+    "sha256": "6bc84919a8f91a2421aed5f94794ca76bf7c2d9b96c7cefb190b295b593d8657",
+    "liveGitHubDigestMatched": true,
+    "indexSha256": "9439e48c94fc40712f10ed09f0e8be1ce33272ee0979b149e0ce1cf2271a89a9",
+    "indexedFiles": 293,
+    "uniqueIndexedPaths": 293,
+    "verifiedLengthsAndHashes": 293,
+    "failures": 0,
+    "unindexedEntries": [
+      "index.json",
+      "index.md"
+    ],
+    "trackedChangesPresent": false
+  },
+  "originalReports": {
+    "retainedCheckByteIdentical": true,
+    "retainedComplexityByteIdentical": true,
+    "passed": true,
+    "trendPassed": true,
+    "trendViolationCount": 0,
+    "claimFailureCount": 0,
+    "hotspotStatus": "PASSED",
+    "hotspotCount": 17,
+    "activeHotspotExceptions": 0
+  },
+  "sourcePolicyBindings": {
+    "allIndexedPolicyPathsVerifiedAgainstAcceptedCommit": 14,
+    "allNonBaselinePoliciesByteIdenticalInCandidate": true,
+    "unchangedAdditionalControlsSha256": {
+      "ai-knowledge-verification/build.gradle": "d98aab126212c0a594a46faf9b94fc01b3adcbb98c491d6b2aeb5549792b891b",
+      "gradle.properties": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+      "settings.gradle": "384b73ba3908d2eb055a8f81a127d1691068a59f746816355f1f1a1f5b0fc229",
+      "gradle/quality-gates.gradle": "2bdeae0cfa30bad464022f7adf2827ef92d1b62ac476648ef9943418305b55ab"
+    }
+  },
+  "projection": {
+    "extractorVersion": "0.1.10",
+    "tagTree": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "projectorPath": "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java",
+    "projectorGitBlobSha1": "7964f1ecf2ad7fe9ab18c393a39c9112b92d28dd",
+    "projectorSha256": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae",
+    "localSourceDifference": "One additional trailing newline only; tagged source Git blob hash matched after removing that newline.",
+    "allSnapshotFieldsVerified": true,
+    "activeAndRetainedSnapshotByteIdentical": true,
+    "snapshotSha256": "a4f543b5b823d52500cd13adb8ace8dc36f9a85084ac2a755fd1baa44b620ca0",
+    "snapshotBytes": 334,
+    "featureMeasurementUsed": false
+  },
+  "predecessorComparison": {
+    "previousAcceptedMain": "16a345b3d8b2cb71c50e3ad9025ea30fb8dbc4e3",
+    "previousBaselineSha256": "d10cf0bf28364c63a7d8a2a6817f0fc86448069597e4cb3db2e73fce76bf6fba",
+    "previousContextUnits": 847010,
+    "acceptedMainContextUnits": 855205,
+    "contextIncrease": 8195,
+    "unchangedContextAllowance": 15000,
+    "previousConceptRadius": 117,
+    "acceptedMainConceptRadius": 118,
+    "unchangedConceptAllowance": 3,
+    "previousContextDebt": 13.72,
+    "acceptedMainContextDebt": 13.67,
+    "unchangedContextDebtIncreaseAllowance": 10.0
+  },
+  "checksPerformed": [
+    {
+      "command": "GitHub GET /repos/carstenartur/Regelsuche/actions/runs/45008332052; workflow jobs and artifact metadata reads",
+      "result": "Exact accepted main commit/tree, push/main attempt1, all eleven authorities plus aggregate/publication successful, and live artifact digest matched."
+    },
+    {
+      "command": "Python zipfile/hashlib/json assertions over original ZIP index and every indexed member",
+      "result": "293 unique safe indexed paths; complete member set; zero missing, length or SHA-256 mismatches."
+    },
+    {
+      "command": "git cat-file commit 98a60e30629f65bc12bb573e9beb46b04053e66c; git show <accepted-commit>:<policy-path>; git archive --format=tar <accepted-commit>",
+      "result": "Commit object hash, tree, source policy bytes and original archive digest/size matched."
+    },
+    {
+      "command": "GitHub GET ai-knowledge-extractor git tree v0.1.10; Python Git-blob hashing and snapshot field projection",
+      "result": "Released projector source matched; all numerical/schema/model fields derive solely from original accepted complexity report."
+    },
+    {
+      "command": "Python byte comparisons for original reports, predecessor snapshot, active reference and retained metrics snapshot; git diff --check",
+      "result": "All comparisons and whitespace check passed."
+    }
+  ],
+  "reviewedFiles": [
+    {
+      "path": "ai-knowledge/complexity-baseline.json",
+      "bytes": 334,
+      "sha256": "a4f543b5b823d52500cd13adb8ace8dc36f9a85084ac2a755fd1baa44b620ca0"
+    },
+    {
+      "path": "docs/ai-knowledge.md",
+      "bytes": 45291,
+      "sha256": "477f2a169d3902cb7bc95c4a535a82d220d21d1fba8c9fac8f25f9a5f59c14af"
+    },
+    {
+      "path": "ai-knowledge/baseline-history/2026-11-22-main-98a60e30/README.md",
+      "bytes": 1873,
+      "sha256": "be8bbac4f1efb5ce7bb8c4c421b5b609ea7dde719220f28ab4240e753d994605"
+    },
+    {
+      "path": "ai-knowledge/baseline-history/2026-11-22-main-98a60e30/accepted-check.json",
+      "bytes": 10186,
+      "sha256": "2b71120221d151e376049534b8ead5a15b4209bd73865f3936b60bf6affee0ec"
+    },
+    {
+      "path": "ai-knowledge/baseline-history/2026-11-22-main-98a60e30/accepted-complexity.json",
+      "bytes": 20799,
+      "sha256": "6abc88843d2d26138c0ac82d4bda005b0e366738f28492042a700821c307708b"
+    },
+    {
+      "path": "ai-knowledge/baseline-history/2026-11-22-main-98a60e30/metrics-snapshot.json",
+      "bytes": 334,
+      "sha256": "a4f543b5b823d52500cd13adb8ace8dc36f9a85084ac2a755fd1baa44b620ca0"
+    },
+    {
+      "path": "ai-knowledge/baseline-history/2026-11-22-main-98a60e30/previous-baseline.json",
+      "bytes": 333,
+      "sha256": "d10cf0bf28364c63a7d8a2a6817f0fc86448069597e4cb3db2e73fce76bf6fba"
+    },
+    {
+      "path": "ai-knowledge/baseline-history/2026-11-22-main-98a60e30/provenance.json",
+      "bytes": 3631,
+      "sha256": "2077f7067dae702bba567abd3d9c506b29218747dba95ded58f048905d656556"
+    }
+  ],
+  "limits": "This is a recorded independent evidence review, not a digital signature. Original CI execution was inspected; no new full extractor or feature CI run was claimed."
+}

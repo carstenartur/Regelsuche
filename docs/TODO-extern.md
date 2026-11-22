@@ -4,6 +4,14 @@ Diese Liste enthält offene Arbeit, die eine Person, einen unabhängigen Dritten
 
 Ist ein Beitrag verfügbar, im zugehörigen Eintrag den freigegebenen Beleg oder die öffentliche Referenz ergänzen und den nächsten ausführbaren Schritt verknüpfen. Keine Kontaktdaten, Schlüssel, unveröffentlichten Kandidaten, Gutachten oder versiegelten Testdaten in öffentliche Issues oder dieses Dokument kopieren.
 
+## Aktuelle Hauptzweigbasis vor dem Merge erzwingen
+
+**Stand 22.11.2026:** Das aktive [Mainprotection-Regelwerk](https://github.com/carstenartur/Regelsuche/rules/18191159) verlangt `Checkout-local ciCheck`, hat aber `strict_required_status_checks_policy=false`. Der gewünschte [Repository-Vertrag](../config/github-merge-governance-policy.json) verlangt bereits `strictUpToDate=true`. Daher kann ein grüner PR noch auf einer überholten Hauptzweigbasis beruhen.
+
+- [ ] Ein Repository-Administrator aktiviert beim bestehenden Pflichtcheck **Require branches to be up to date before merging**. Der verbundene GitHub-Zugang kann das Regelwerk lesen, bietet hier aber keine Administrationsaktion zum Ändern an.
+
+Bis dahin Änderungen einzeln gegen die aktuelle Hauptzweigbasis integrieren, den kombinierten Stand vollständig prüfen und unmittelbar vor dem regulären Merge beide Referenzen erneut abgleichen. Die Kopf-SHA-Sicherung eines PR-Merges allein sperrt die Hauptzweigreferenz nicht. Keine Schutzregel umgehen.
+
 ## Freigabe von Software-Releases und Maven Central
 
 **Herkunft:** [#749](https://github.com/carstenartur/Regelsuche/issues/749) (Maven-/Build-Vertrag), [#1020](https://github.com/carstenartur/Regelsuche/issues/1020) (Release-/Public-Evidence-Komposition); technischer SDK-Publishing-Pfad: [PR #1290](https://github.com/carstenartur/Regelsuche/pull/1290).

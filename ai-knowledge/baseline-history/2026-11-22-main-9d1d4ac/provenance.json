@@ -1,0 +1,164 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_EXACT_TREE_CI",
+  "sourceCommit": "9d1d4ac0ece4fd056cf9f952795772feba6baa82",
+  "sourceTree": "eb8e739a8084b063c5f480837fc1da2f78cbcd48",
+  "originalMainCI": {
+    "runId": 45049711682,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45049711682",
+    "event": "push",
+    "conclusion": "cancelled"
+  },
+  "qualifyingExactTreeCI": {
+    "pullRequest": 1361,
+    "runId": 45030696246,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45030696246",
+    "event": "pull_request",
+    "runAttempt": 1,
+    "head": "b93d46f366f360104ac48d6160f895bdda22872b",
+    "base": "98a60e30629f65bc12bb573e9beb46b04053e66c",
+    "checkoutRevision": "28c7446500ab435f4fca30f093b5a2509f3387be",
+    "checkoutTree": "eb8e739a8084b063c5f480837fc1da2f78cbcd48",
+    "conclusion": "success",
+    "successfulMandatoryJobs": 11,
+    "gradleJobId": 137234313928,
+    "aggregateCiCheckJobId": 137274308227,
+    "aggregateCiCheck": "success",
+    "codeQL": "success",
+    "reportPublication": "skipped"
+  },
+  "originalQualityEvidence": {
+    "artifactId": 14764099341,
+    "artifactName": "quality-acceptance-evidence",
+    "downloadedZipSha256": "5b8a2de9506725f2299d44d2c070c15f600d929d483506a1cd803c88a64bf2a9",
+    "zipIndexSha256": "c01809abd42a071ea8f28092bae7860096fb3dee870ce9814024aac301e70727",
+    "indexCheckoutRevision": "28c7446500ab435f4fca30f093b5a2509f3387be",
+    "indexCheckoutTree": "eb8e739a8084b063c5f480837fc1da2f78cbcd48",
+    "indexTrackedChangesPresent": false,
+    "indexedFilesVerified": 293,
+    "indexedFileFailures": 0,
+    "nativeCheck": {
+      "path": "accepted-check.json",
+      "bytes": 10186,
+      "sha256": "48aeb24486447663f2af0d6e49668587297ac5b7930bb41863b0a0ee3594d906",
+      "passed": true,
+      "trendPassed": true,
+      "trendViolationCount": 0,
+      "claimFailureCount": 0
+    },
+    "nativeComplexity": {
+      "path": "accepted-complexity.json",
+      "bytes": 20799,
+      "sha256": "8d3e59f53f855d8febf80c584c7cbff679b73db538804ee599e98f0149e8c032"
+    },
+    "sourceBindings": [
+      {
+        "sourcePath": ".github/workflows/gradle.yml",
+        "path": "files/.github/workflows/gradle.yml",
+        "bytes": 41329,
+        "sha256": "sha256:2bc4ddda078ef3e66595f31eacae7a2757373bb9bf96443650a9687613166f46"
+      },
+      {
+        "sourcePath": "ai-knowledge/complexity-baseline.json",
+        "path": "files/ai-knowledge/complexity-baseline.json",
+        "bytes": 333,
+        "sha256": "sha256:d10cf0bf28364c63a7d8a2a6817f0fc86448069597e4cb3db2e73fce76bf6fba"
+      },
+      {
+        "sourcePath": "config/quality/complexity-hotspots.json",
+        "path": "files/config/quality/complexity-hotspots.json",
+        "bytes": 7741,
+        "sha256": "sha256:67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4"
+      },
+      {
+        "sourcePath": "config/quality/coverage-policy.json",
+        "path": "files/config/quality/coverage-policy.json",
+        "bytes": 2419,
+        "sha256": "sha256:4591f7817ba3db5830b345511a8b0c6ab8ad821e0ba87bc1d69be6cf13f84f6c"
+      }
+    ]
+  },
+  "snapshot": {
+    "extractorRelease": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "projection": "TrendAnalyzer.snapshot and StableIo.writeJson on the original accepted complexity report",
+    "path": "metrics-snapshot.json",
+    "bytes": 341,
+    "sha256": "951b3f9624a9fa16136e0b7803cd6d20b8e1ddd75f70f2bd4629d02810c4ba23",
+    "qualifiedAgainstHistoricalReference": {
+      "estimatedContextTokens": 847010,
+      "conceptRadius": 117,
+      "bytes": 333,
+      "sha256": "d10cf0bf28364c63a7d8a2a6817f0fc86448069597e4cb3db2e73fce76bf6fba"
+    },
+    "replacedReference": {
+      "path": "previous-baseline.json",
+      "bytes": 334,
+      "sha256": "a4f543b5b823d52500cd13adb8ace8dc36f9a85084ac2a755fd1baa44b620ca0"
+    }
+  },
+  "rejectedMainEvidence": {
+    "sourceCommit": "d599e2d2040e6ce31f924f344eb37040fcc3dc26",
+    "sourceTree": "84f68af6b9a2229092a9910d6628b393f163ead6",
+    "runId": 45062927268,
+    "runAttempt": 1,
+    "jobId": 137334067341,
+    "jobConclusion": "failure",
+    "runConclusion": "cancelled",
+    "artifactId": 14769574615,
+    "artifactName": "repository-verification",
+    "downloadedZipSha256": "9ba97e413d814dad54d4104751263f8940f02bbf073216029a0a9bbe86ea1bb0",
+    "artifactSourceBinding": "GitHub Actions run artifact metadata workflow_run.head_sha",
+    "reports": [
+      {
+        "path": "rejected-main-check.json",
+        "bytes": 10203,
+        "sha256": "6963868619cd009115c408addecbae704d7ca070392e64d38402ed85f37c0b56"
+      },
+      {
+        "path": "rejected-main-complexity.json",
+        "bytes": 20793,
+        "sha256": "a71d67e433ade2f2c399a1717cec79592080c504b78ba6561a39f5a9a6941d06"
+      },
+      {
+        "path": "rejected-main-trend.json",
+        "bytes": 2157,
+        "sha256": "7b4e7ce5356a6c7fb129d6a95ccfedbe4ec9cf2c655e79c2d60c3cb642c42e16"
+      }
+    ]
+  },
+  "unchangedTrendReplay": {
+    "inputs": "Original native complexity reports with the pinned extractor v0.1.10 trend implementation",
+    "thresholds": {
+      "maxCognitiveDebtIncrease": 10.0,
+      "maxConceptRadiusIncrease": 3.0,
+      "maxContextTokenIncrease": 15000.0,
+      "failOnWarnings": false
+    },
+    "oldBaseline": {
+      "estimatedContextTokens": 855205,
+      "conceptRadius": 118,
+      "aiContextDebt": 13.67
+    },
+    "acceptedBaseline": {
+      "estimatedContextTokens": 861185,
+      "conceptRadius": 119,
+      "aiContextDebt": 13.65
+    },
+    "currentMeasurement": {
+      "estimatedContextTokens": 873185,
+      "conceptRadius": 121,
+      "aiContextDebt": 13.54
+    },
+    "oldBaselineResult": {
+      "passed": false,
+      "estimatedContextTokenIncrease": 17980,
+      "conceptRadiusIncrease": 3
+    },
+    "acceptedBaselineResult": {
+      "passed": true,
+      "estimatedContextTokenIncrease": 12000,
+      "conceptRadiusIncrease": 2
+    }
+  }
+}
