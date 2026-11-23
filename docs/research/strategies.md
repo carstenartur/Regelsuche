@@ -230,12 +230,14 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 ## Quellenbindung der zurückgehaltenen Darstellungsmatrix
 
 - **Hypothese.** Eine geprüfte Bindung an den Versuchsplan und die eingefrorenen Kandidaten verhindert, dass drei bytegleiche Kopien eine fachlich falsch zugeordnete Auswertung bestätigen.
-- **Umsetzungsstand.** Der Matrixläufer prüft die Bindung vor der Qualifikation. Der Reproduktionsprüfer gleicht den Plan mit der Präregistrierung und jede Auswertung mit dem eingefrorenen Lauf ab.
-- **Befund.** Im bestehenden Panel mit 144 Zeilen weist der Prüfer neu gehashte Kopien mit veränderter Formation, einem fremden Arbeitsnachweis oder einem abweichenden Kandidatenausdruck ab. [Daten, Prüfgrenzen und Reproduktion](../target-free-held-out-container-reproduction.md)
-- **Folgerung.** Den Prüfpfad bei weiteren Vergleichsläufen wiederverwenden. Für die historische Kalibrierung fehlen weiterhin eingefrorene Nachweise für Archiv- und Rangstufen.
+- **Umsetzungsstand.** Der Matrixläufer prüft die Bindung vor der Qualifikation. Der Reproduktionsprüfer gleicht den Plan mit der Präregistrierung und jede Auswertung mit dem eingefrorenen Lauf ab. Der Archivleser prüft die Bindung der sechs eingefrorenen Rangfolgen und ihrer Auswahl an den bestehenden Run-Workspace.
+- **Befund.** Im Panel mit 144 Zeilen weist der Reproduktionsprüfer neu gehashte Kopien mit veränderter Formation, einem fremden Arbeitsnachweis oder einem abweichenden Kandidatenausdruck ab. Der Archivleser hat die 224 historischen Workspaces mit 2.688 Kandidaten und 36 leeren Konfigurationen verifiziert. [Reproduktionsprüfung](../target-free-held-out-container-reproduction.md) · [Historisches Archiv und Prüfkommando](prospective-history-20261120/README.md#read-the-archived-runs-from-the-current-checkout)
+- **Folgerung.** Den Prüfpfad bei weiteren Vergleichsläufen wiederverwenden. Aus der Quellenbindung folgt eine überprüfbare Zuordnung des Rangbelegs zum Lauf. Ein Vergleich bei vollständig erfasster Gesamtarbeit und der dritte Qualifikationslauf stehen aus.
 
 - [`TargetFreeHeldOutMatrixRunner.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeHeldOutMatrixRunner.java#L44) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/TargetFreeHeldOutMatrixRunner.java | public final class TargetFreeHeldOutMatrixRunner { -->
 - [`TargetFreeHeldOutContainerReproductionVerifierTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeHeldOutContainerReproductionVerifierTest.java#L20) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/TargetFreeHeldOutContainerReproductionVerifierTest.java | class TargetFreeHeldOutContainerReproductionVerifierTest { -->
+- [`ProspectiveFormationArchive.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/ProspectiveFormationArchive.java#L27) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/ProspectiveFormationArchive.java | public final class ProspectiveFormationArchive { -->
+- [`ProspectiveFormationArchiveTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/ProspectiveFormationArchiveTest.java#L27) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/ProspectiveFormationArchiveTest.java | class ProspectiveFormationArchiveTest { -->
 
 ## Gelernte Brücke zur Faktorisierung
 
