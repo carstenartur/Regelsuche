@@ -128,9 +128,17 @@ class SolverIrMavenEvidenceTest {
                 "raw translation violates its Draft 2020-12 schema: " + prefix);
             assertTrue(executionSchema.validate(read(output.resolve(prefix + "-execution.json"))).isEmpty(),
                 "raw execution violates its Draft 2020-12 schema: " + prefix);
+            String translationJson = Files.readString(
+                output.resolve(prefix + "-translation.json"), StandardCharsets.UTF_8);
+            if (index < 2) {
+                int left = translationJson.indexOf("\"goal.left\"");
+                int right = translationJson.indexOf("\"goal.right\"");
+                assertTrue(left >= 0 && right > left,
+                    "solver translation term mapping must have stable sorted keys: " + prefix);
+            }
             var execution = codec.readEvidenceChain(
                 source,
-                Files.readString(output.resolve(prefix + "-translation.json"), StandardCharsets.UTF_8),
+                translationJson,
                 Files.readString(output.resolve(prefix + "-result.json"), StandardCharsets.UTF_8),
                 Files.readString(output.resolve(prefix + "-execution.json"), StandardCharsets.UTF_8));
             assertEquals(manifest.path(manifestKeys[index]).asText(), execution.contentHash(),
