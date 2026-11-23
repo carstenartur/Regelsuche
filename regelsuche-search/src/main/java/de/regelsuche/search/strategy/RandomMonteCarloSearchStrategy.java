@@ -14,9 +14,20 @@ import java.util.Set;
 
 public class RandomMonteCarloSearchStrategy implements SearchStrategy {
     private final long seed;
+    private final boolean historicalAssumptionIdentity;
 
     public RandomMonteCarloSearchStrategy(long seed) {
+        this(seed, false);
+    }
+
+    private RandomMonteCarloSearchStrategy(long seed, boolean historicalAssumptionIdentity) {
         this.seed = seed;
+        this.historicalAssumptionIdentity = historicalAssumptionIdentity;
+    }
+
+    /** Retains the hash-based visited identity of the frozen randomized comparison. */
+    public static RandomMonteCarloSearchStrategy withHistoricalAssumptionIdentity(long seed) {
+        return new RandomMonteCarloSearchStrategy(seed, true);
     }
 
     @Override
@@ -42,18 +53,14 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
             0
         );
         List<SearchState> explored = new ArrayList<>();
-        Set<String> visited = new HashSet<>();
+        var visited = historicalAssumptionIdentity
+            ? RunVisitedStates.withHistoricalAssumptionIdentity(problem.memory())
+            : new RunVisitedStates(problem.memory());
         List<SearchState> frontier = new ArrayList<>();
         frontier.add(rootState);
         while (!frontier.isEmpty() && explored.size() < problem.heuristic().maxVisitedExpressions()) {
             SearchState current = frontier.remove(random.nextInt(frontier.size()));
-            if (!visited.add(stateKey(current))) {
-                continue;
-            }
-            if (current.depth() > 0
-                && TranspositionGate.evaluate(problem.memory(), current,
-                    current.canonicalHash() + "#" + current.depth())
-                == TranspositionGate.Verdict.PRUNE) {
+            if (!visited.admit(current)) {
                 continue;
             }
             explored.add(current);
@@ -120,7 +127,7 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
                     assumptions,
                     SearchState.extendedPath(current, transformation)
                 );
-                if (!visited.contains(stateKey(nextState))) {
+                if (!visited.contains(nextState)) {
                     frontier.add(nextState);
                     generated++;
                 }
@@ -129,10 +136,4 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
         return explored;
     }
 
-    private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":"
-            + state.assumptionFingerprint() + ":"
-            + String.join(",", state.appliedRuleApplications().stream()
-                .sorted().toList());
-    }
 }

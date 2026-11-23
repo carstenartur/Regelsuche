@@ -35,7 +35,7 @@ final class NativeScalarRules {
     }
     private static void doubles(NativeScalarSaturation run, String rule, List<EClassId> roots, NativeScalarSaturation.Account work) {
         int left = run.budget.perRuleFuel()-work.spent;
-        var matched = DOUBLE.matchRoots(run.graph, roots,left);
+        var matched = DOUBLE.matchRoots(run.graph, roots, left, run.matcher.allowsRemainder);
         work.spend(matched.work(),run.budget.perRuleFuel());
         work.capped |= !matched.complete();
         work.roots += matched.candidateRoots();
@@ -43,12 +43,20 @@ final class NativeScalarRules {
         work.tuples += matched.tupleAttempts();
         work.duplicates += matched.duplicateBindings();
         for (var match : matched.matches()) {
-            var subject = match.bindings().get("term");
+            var subject = match.match().bindings().get("term");
             var two = run.graph.add(ENode.leaf("num:2"));
-            var target = run.graph.add(new ENode("ac:MUL",List.of(two,subject)));
+            var doubled = run.graph.add(new ENode("ac:MUL",List.of(two,subject)));
             Expr term = run.syntax(subject);
-            run.apply(rule,match.root(),target,new BinaryExpr(term,BinaryOperator.ADD,term),
-                new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,term),work);
+            var witness = new ScalarExtractionProof.Lemma(rule, new BinaryExpr(term,BinaryOperator.ADD,term),
+                new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,term));
+            var remainder = match.remainder();
+            EClassId target = doubled;
+            if (!remainder.isEmpty()) {
+                var rewritten = new ArrayList<>(remainder);
+                rewritten.add(doubled);
+                target = group(run, rewritten, BinaryOperator.ADD);
+            }
+            run.applyWithinSum(match.match().root(), target, remainder.stream().map(run::syntax).toList(), witness, work);
         }
     }
     private static void neutral(NativeScalarSaturation run,String rule,EClassId root,ENode node,BinaryOperator op,int literal,

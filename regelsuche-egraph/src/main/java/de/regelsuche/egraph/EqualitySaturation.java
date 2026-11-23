@@ -55,7 +55,14 @@ public final class EqualitySaturation {
     /** Executes only independently admitted scalar rules on one native AC graph under a fixed premise context. */
     public NativeScalarSaturation.Result saturateExactScalars(Expr input,
             de.regelsuche.egraph.proof.ScalarExtractionProof.Context context, NativeScalarSaturation.Budget budget) {
-        return NativeScalarSaturation.run(input, rules, context, budget);
+        return saturateExactScalars(input, context, budget, NativeScalarSaturation.Matcher.CONTEXTUAL);
+    }
+
+    /** Selects the matcher bound to a retained scalar report. */
+    public NativeScalarSaturation.Result saturateExactScalars(Expr input,
+            de.regelsuche.egraph.proof.ScalarExtractionProof.Context context, NativeScalarSaturation.Budget budget,
+            NativeScalarSaturation.Matcher matcher) {
+        return NativeScalarSaturation.run(input, rules, context, budget, matcher);
     }
 
     /** Runs the same scalar authority and observes the final graph for the bounded comparison. */

@@ -24,6 +24,21 @@ import java.util.Set;
  * implementation.</p>
  */
 public final class StructuralDiversitySearchStrategy implements SearchStrategy {
+    private final boolean historicalCanonicalIdentity;
+
+    public StructuralDiversitySearchStrategy() {
+        this(false);
+    }
+
+    private StructuralDiversitySearchStrategy(boolean historicalCanonicalIdentity) {
+        this.historicalCanonicalIdentity = historicalCanonicalIdentity;
+    }
+
+    /** Reproduces the visited identity of the frozen historical intrinsic calibration. */
+    public static StructuralDiversitySearchStrategy withHistoricalCanonicalIdentity() {
+        return new StructuralDiversitySearchStrategy(true);
+    }
+
     @Override
     public List<SearchState> search(SearchProblem problem) {
         Objects.requireNonNull(problem, "problem");
@@ -31,7 +46,9 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
         SearchState rootState = rootState(problem, root);
         List<SearchState> explored = new ArrayList<>();
         List<SearchState> frontier = List.of(rootState);
-        Set<String> visited = new HashSet<>();
+        var visited = historicalCanonicalIdentity
+            ? RunVisitedStates.withHistoricalCanonicalIdentity(problem.memory())
+            : new RunVisitedStates(problem.memory());
         int rootAstSize = problem.canonicalizer().astNodeCount(root);
 
         for (int depth = 0;
@@ -42,15 +59,7 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
                 if (explored.size() >= problem.heuristic().maxVisitedExpressions()) {
                     return List.copyOf(explored);
                 }
-                if (!visited.add(stateKey(current))) {
-                    continue;
-                }
-                if (current.depth() > 0
-                        && TranspositionGate.evaluate(
-                            problem.memory(),
-                            current,
-                            current.canonicalHash() + "#" + current.depth())
-                        == TranspositionGate.Verdict.PRUNE) {
+                if (!visited.admit(current)) {
                     continue;
                 }
                 explored.add(current);
@@ -88,7 +97,7 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
         SearchProblem problem,
         SearchState current,
         Map<StructuralCell, SearchState> nextElites,
-        Set<String> visited
+        RunVisitedStates visited
     ) {
         List<Transformation> transformations = new ArrayList<>(
             problem.transformations(current.expression()));
@@ -122,7 +131,7 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
                 transformation,
                 nextExpression,
                 expandedSteps);
-            if (visited.contains(stateKey(next))) {
+            if (visited.contains(next)) {
                 continue;
             }
             StructuralCell cell = StructuralCell.of(problem, next);
@@ -214,12 +223,6 @@ public final class StructuralDiversitySearchStrategy implements SearchStrategy {
         return SearchPriority.bestFirst(state, problem);
     }
 
-    private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":"
-            + String.join(",", state.appliedRuleApplications().stream()
-                .sorted()
-                .toList());
-    }
 
     private static String normalize(String expression) {
         return Objects.requireNonNull(expression, "expression")

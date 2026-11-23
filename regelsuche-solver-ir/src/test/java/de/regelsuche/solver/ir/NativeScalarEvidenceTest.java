@@ -33,4 +33,26 @@ class NativeScalarEvidenceTest {
         Files.write(certificate,new byte[]{1});
         assertThrows(IllegalArgumentException.class,() -> NativeScalarEvidence.verify(directory,reportHash,source,premises,revision,budget));
     }
+
+    @Test
+    void verifiesWholeNodeReportAndCertificateFromTheOriginalMatcher() throws Exception {
+        String source = "f((a*b) + c + (a*b) + (a*b))";
+        String revision = "a".repeat(40);
+        var budget = new NativeScalarSaturation.Budget(12, 1024, 16000, NativeScalarSaturation.Schedule.ROUND_ROBIN);
+        // Original CLI output from eecb84737daf3201cef41c484640420c15f5b6a3.
+        String archivedReportHash = "sha256:bc5f706d10b61e5ec6213b27f6d3dfc3d2fda700f9a920f7ef4b8a81ff66eaac";
+        String archivedProofHash = "sha256:44474d86216c7a5d95b1f5113394e1a50b622490cf5638de4ec5565fcb6ace54";
+        var archived = NativeScalarEvidence.run(source, List.of(), revision, budget,
+            NativeScalarSaturation.Matcher.WHOLE_NODE);
+        assertEquals(archivedReportHash, ScalarCertificateCodec.hash(archived.report().getBytes(StandardCharsets.UTF_8)));
+        assertNotEquals(archivedReportHash, ScalarCertificateCodec.hash(
+            NativeScalarEvidence.run(source, List.of(), revision, budget).report().getBytes(StandardCharsets.UTF_8)));
+        archived.write(directory);
+
+        NativeScalarEvidence.verify(directory, archivedReportHash, source, List.of(), revision, budget);
+        NativeScalarEvidence.checkCertificate(directory.resolve(archivedProofHash.substring(7) + ".rsproof"),
+            archivedProofHash, source, "f(c + b * a + b * a + b * a)", List.of(), revision);
+        assertThrows(IllegalArgumentException.class, () -> NativeScalarEvidence.verify(directory, archivedReportHash,
+            "f((a*b) + d + (a*b) + (a*b))", List.of(), revision, budget));
+    }
 }

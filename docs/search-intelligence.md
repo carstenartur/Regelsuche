@@ -56,11 +56,27 @@ The durable summary does not contain the application history, rule inventory,
 profile or remaining budget needed to certify that a continuation is reusable.
 Observations from another run therefore cannot justify such a cutoff.
 
-BestFirst records no transposition-pruning decisions or events, and its
-`transpositionPrunes` metric remains zero. Other strategies that directly use
-`TranspositionGate` retain their existing pruning behavior. Their decisions
-remain exposed at `/api/memory/pruning`; the durable schema and gate API are
-unchanged.
+Beam, structural diversity and seeded random search also keep a visited set
+owned by the current run. Its key uses exact expression syntax, normalized
+assumptions, the set of rule applications, depth, expansion count, last rewrite
+kind and whether the retained path is marked equivalence-preserving. Exact
+syntax keeps rule applicability and structural cells distinct for different
+notations of the same canonical value. The typed application set avoids
+ambiguity from delimiters in application identifiers.
+
+The frozen historical intrinsic calibration explicitly selects its original
+canonical-hash identity to reproduce the published candidate set. The frozen
+comparative benchmark selects the original Beam and randomized visited
+identities. The randomized control also retains its case seed and assumption
+fingerprint.
+
+These strategies record durable observations when they visit a state. Beam
+and seeded random search can also report a duplicate removed from their
+frontier as `ALREADY_KNOWN_EQUAL` at `/api/memory/pruning`. An earlier run's
+observations cannot cause that decision. BestFirst reports its duplicate
+cutoffs through search telemetry, and its `transpositionPrunes` metric remains
+zero. Direct callers of the legacy `TranspositionGate.evaluate` API can still
+request its score-based summary verdict.
 
 ### Continuation regression and limits
 
@@ -85,11 +101,15 @@ syntax-exact paths.
 The observed loss concerns a reduced syntax and better expression score: the
 value canonicalizer already recognizes their equivalence. The restricted
 production inventory isolates this failure; it is not a full-default-inventory
-performance comparison. Memory-enabled BestFirst may now explore more states
-and use more of its budgets. No general completeness or scaling result follows,
-and this change does not qualify the other strategies' durable pruning.
-Issue #696 remains open for the broader search-scaling and reusable-knowledge
-criteria.
+performance comparison. The
+[`HeuristicMemoryContinuationTest`](../regelsuche-search/src/test/java/de/regelsuche/search/strategy/HeuristicMemoryContinuationTest.java)
+also compares Beam and seeded random search with and without fresh memory on
+that exact reduction. All three heuristic strategies preserve the full
+explored state sequence on `x + 0` with observations recorded by a shallower
+search under another controller and after repeating the same search. Structural
+diversity's existing one-elite-per-cell selection can independently limit
+which continuations it explores. Issues #661 and #696 still require a broader
+quotient and coverage, work and memory comparisons under declared budgets.
 
 ## Structural diversity
 

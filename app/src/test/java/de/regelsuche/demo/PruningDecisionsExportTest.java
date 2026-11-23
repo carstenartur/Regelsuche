@@ -26,6 +26,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.AfterEach;
@@ -60,16 +61,17 @@ class PruningDecisionsExportTest {
         var engine = new AstRewriteTransformationEngine(
             AstRewriteTransformationEngine.defaultRules().stream()
                 .filter(rule -> rule.id().equals("ast_add_zero_right")).toList());
-        var problem = new SearchProblem("x + 0", engine, new ExpressionScorer(),
+        var problem = new SearchProblem("x + 0", expression -> {
+            var proposals = engine.transform(expression);
+            return Stream.concat(proposals.stream(), proposals.stream()).toList();
+        }, new ExpressionScorer(),
             new ExpressionCanonicalizer(), SearchProfile.TEACHING.heuristic()).withMemory(memory);
         var strategy = SearchProfile.TEACHING.newStrategy();
 
-        var first = strategy.search(problem);
-        var repeated = strategy.search(problem);
+        var states = strategy.search(problem);
 
-        assertEquals(List.of("x + 0", "x"), first.stream().map(SearchState::expression).toList());
-        assertEquals(List.of("x + 0"), repeated.stream().map(SearchState::expression).toList(),
-            "Beam must genuinely prune the previously observed reduction");
+        assertEquals(List.of("x + 0", "x"), states.stream().map(SearchState::expression).toList(),
+            "Beam keeps one of the two identical proposals in the current run");
         assertEquals(1, memory.decisions().size());
         var decision = memory.decisions().getFirst();
         assertEquals(PruningReason.ALREADY_KNOWN_EQUAL, decision.reason());
@@ -80,7 +82,7 @@ class PruningDecisionsExportTest {
         assertEquals(1, pruning.path("decisions").size());
         JsonNode exported = pruning.path("decisions").get(0);
         assertEquals("x", exported.path("expression").asText());
-        assertEquals(first.getLast().canonicalHash(), exported.path("canonicalHash").asText());
+        assertEquals(states.getLast().canonicalHash(), exported.path("canonicalHash").asText());
         assertEquals(decision.reason().name(), exported.path("reason").asText());
         assertEquals(decision.explanation(), exported.path("explanation").asText());
         assertEquals(JSON.readTree(getBytes("/api/memory/pruning")), pruning);
