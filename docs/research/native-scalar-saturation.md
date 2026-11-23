@@ -18,6 +18,8 @@ Das native Fragment enthält neutrale Elemente, geordnete Division durch eins od
 
 Der Matcher `exact-scalar-flat-ac/contextual/v1` bindet zwei gleiche Operanden auch in größeren Summen. Er zählt die verbleibenden Klassen und Vorkommen gegen denselben Regelbrennstoff. Der Beleg verwendet die vorhandene Gleichheit für das Operandenpaar, AC-Umgruppierung und Kongruenz im unveränderten Summenkontext. Beide Zeitpläne prüfen dies an `f(a*b + c + a*b + a*b)`. Der geprüfte Ausdruck enthält einen verdoppelten Produktterm und das dritte Produktvorkommen. Bei fehlendem dritten Vorkommen weist der Empfänger den Beleg ab.
 
+`scalar-saturation verify` reproduziert auch archivierte Berichte des ursprünglichen Matchers `exact-scalar-flat-ac/v1`. Die übergebene Prüfsumme bindet den nachgerechneten Bericht und seine Belegdateien an Eingabe, Revision, Prämissen und Budget. Ältere `.rsproof`-Dateien lassen sich weiterhin direkt prüfen.
+
 ## Öffentlicher Vergleich
 
 Das feste Panel enthält die beiden historischen #620-Fälle `factor-common-left` und `factor-common-right`, einen Rollentausch, eine gemischte bedingte Kürzung und eine Negativkontrolle. Alle drei Ausführungen erhalten Quelle, eigene unterstützte Regeln und erklärte Voraussetzungen. Die Auswertung prüft den Zielterm danach modulo der beiden Skalar-AC-Gesetze. SymPy 1.14.0 und mpmath 1.3.0 werden tatsächlich als externer Prozess aufgerufen. Der externe Pfad bewahrt den Operationsnamen, Eingabe, Ausgabe und `count_ops`. Er bestätigt keinen fremden Beweis.

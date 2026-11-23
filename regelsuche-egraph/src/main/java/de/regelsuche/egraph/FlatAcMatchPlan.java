@@ -72,17 +72,13 @@ public final class FlatAcMatchPlan {
     }
 
     Result matchRoots(EGraph graph, Collection<EClassId> roots, int limit) {
-        var result = scan(graph, roots, limit, false);
+        var result = matchRoots(graph, roots, limit, false);
         return new Result(result.matches().stream().map(ContextMatch::match).toList(), result.work(),
             result.complete(), result.candidateRoots(), result.nodesScanned(), result.tupleAttempts(),
             result.duplicateBindings());
     }
 
-    ContextResult matchRootsWithRemainder(EGraph graph, Collection<EClassId> roots, int limit) {
-        return scan(graph, roots, limit, true);
-    }
-
-    private ContextResult scan(EGraph graph, Collection<EClassId> roots, int limit, boolean allowRemainder) {
+    ContextResult matchRoots(EGraph graph, Collection<EClassId> roots, int limit, boolean allowRemainder) {
         if (!graph.usesArithmeticAc() || limit < 0 || limit > MAX_WORK) throw new IllegalArgumentException("invalid native AC plan scope");
         return new Scan(graph, limit, allowRemainder).run(roots);
     }

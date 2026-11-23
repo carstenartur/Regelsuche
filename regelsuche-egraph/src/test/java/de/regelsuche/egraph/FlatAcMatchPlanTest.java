@@ -93,16 +93,16 @@ class FlatAcMatchPlanTest {
         var roots = List.of(root);
         assertTrue(plan.matchRoots(graph, roots, 100).matches().isEmpty());
 
-        var partial = plan.matchRootsWithRemainder(graph, roots, 7);
+        var partial = plan.matchRoots(graph, roots, 7, true);
         assertFalse(partial.complete());
         assertEquals(7, partial.work());
         assertTrue(partial.matches().isEmpty());
 
-        var complete = plan.matchRootsWithRemainder(graph, roots, 100);
+        var complete = plan.matchRoots(graph, roots, 100, true);
         assertTrue(complete.complete());
         assertEquals(List.of(new FlatAcMatchPlan.ContextMatch(
             new EGraphPatternMatcher.Match(root, Map.of("X", aId)), List.of(aId, bId))), complete.matches());
-        assertEquals(complete, plan.matchRootsWithRemainder(graph, roots, complete.work()));
+        assertEquals(complete, plan.matchRoots(graph, roots, complete.work(), true));
     }
 
     @Test

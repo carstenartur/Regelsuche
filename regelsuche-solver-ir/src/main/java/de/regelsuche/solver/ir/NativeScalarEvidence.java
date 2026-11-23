@@ -43,12 +43,17 @@ public final class NativeScalarEvidence {
         }
     }
     public static Archive run(String source,List<Assumption> assumptions,String revision,NativeScalarSaturation.Budget budget) {
+        return run(source, assumptions, revision, budget, NativeScalarSaturation.Matcher.CONTEXTUAL);
+    }
+
+    static Archive run(String source, List<Assumption> assumptions, String revision,
+                       NativeScalarSaturation.Budget budget, NativeScalarSaturation.Matcher matcher) {
         var rules=AstRewriteTransformationEngine.allBuiltInRules();
         var context=ScalarExtractionProof.Context.create(rules,assumptions,revision);
         Expr input=new ExpressionParser().parseTerm(source);
-        var run=new EqualitySaturation(rules).saturateExactScalars(input,context,budget);
+        var run=new EqualitySaturation(rules).saturateExactScalars(input,context,budget,matcher);
         var report=JSON.createObjectNode().put("schema",SCHEMA).put("source",source).put("contextHash",ScalarCertificateCodec.contextHash(context))
-            .put("matcher",FlatAcMatchPlan.CONTEXTUAL_VERSION).put("orientation","native-matched-source-to-directed-target/v1")
+            .put("matcher",matcher.identifier()).put("orientation","native-matched-source-to-directed-target/v1")
             .put("scheduler",budget.schedule().name().toLowerCase(Locale.ROOT)+"/v1").put("terminal",run.terminal()).put("rounds",run.rounds())
             .put("graphNodes",run.graphNodes()).put("analysisEvaluations",run.analysisEvaluations());
         report.set("context",JSON.valueToTree(context));
@@ -96,10 +101,21 @@ public final class NativeScalarEvidence {
 
     public static void verify(Path directory,String expectedHash,String source,List<Assumption> assumptions,String revision,
                               NativeScalarSaturation.Budget budget) throws IOException {
-        var expected=run(source,assumptions,revision,budget);
-        var data=expected.report().getBytes(StandardCharsets.UTF_8);
+        // Select by reproducing the caller's digest, before reading any retained report bytes.
+        for (var matcher : List.of(NativeScalarSaturation.Matcher.CONTEXTUAL, NativeScalarSaturation.Matcher.WHOLE_NODE)) {
+            var expected = run(source, assumptions, revision, budget, matcher);
+            var data = expected.report().getBytes(StandardCharsets.UTF_8);
+            if (ScalarCertificateCodec.hash(data).equals(expectedHash)) {
+                verifyFiles(directory, expected, data);
+                return;
+            }
+        }
+        throw new IllegalArgumentException("saturation report did not reproduce");
+    }
+
+    private static void verifyFiles(Path directory, Archive expected, byte[] data) throws IOException {
         Path report=directory.resolve("saturation.json");
-        if (!ScalarCertificateCodec.hash(data).equals(expectedHash) || Files.size(report)!=data.length
+        if (Files.size(report)!=data.length
                 || !Arrays.equals(data,Files.readAllBytes(report))) throw new IllegalArgumentException("saturation report did not reproduce");
         for (var entry:expected.certificates().entrySet()) {
             var file=directory.resolve(entry.getKey());

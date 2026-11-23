@@ -35,7 +35,7 @@ final class NativeScalarRules {
     }
     private static void doubles(NativeScalarSaturation run, String rule, List<EClassId> roots, NativeScalarSaturation.Account work) {
         int left = run.budget.perRuleFuel()-work.spent;
-        var matched = DOUBLE.matchRootsWithRemainder(run.graph, roots,left);
+        var matched = DOUBLE.matchRoots(run.graph, roots, left, run.matcher.allowsRemainder);
         work.spend(matched.work(),run.budget.perRuleFuel());
         work.capped |= !matched.complete();
         work.roots += matched.candidateRoots();

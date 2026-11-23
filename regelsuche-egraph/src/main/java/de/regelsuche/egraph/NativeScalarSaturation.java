@@ -12,6 +12,23 @@ import java.util.function.ToIntFunction;
 /** Bounded native scalar execution over EGraph, with a separate receiver check on each claimed extraction. */
 public final class NativeScalarSaturation {
     public enum Schedule { ROUND_ROBIN, PRODUCTIVITY }
+    public enum Matcher {
+        WHOLE_NODE(FlatAcMatchPlan.VERSION, false),
+        CONTEXTUAL(FlatAcMatchPlan.CONTEXTUAL_VERSION, true);
+
+        private final String identifier;
+        final boolean allowsRemainder;
+
+        Matcher(String identifier, boolean allowsRemainder) {
+            this.identifier = identifier;
+            this.allowsRemainder = allowsRemainder;
+        }
+
+        public String identifier() {
+            return identifier;
+        }
+    }
+
     public record Budget(int rounds, int nodes, int perRuleFuel, Schedule schedule) {
         public Budget {
             Objects.requireNonNull(schedule);
@@ -43,6 +60,7 @@ public final class NativeScalarSaturation {
 
     final EGraph graph;
     final Budget budget;
+    final Matcher matcher;
     final ScalarExtractionProof.Context context;
     final ScalarClassAnalysis facts;
     final List<Guard> guards = new ArrayList<>();
@@ -58,8 +76,10 @@ public final class NativeScalarSaturation {
     private long proofWork;
     private int rounds;
     private String terminal = "ROUND_BUDGET";
-    private NativeScalarSaturation(Expr input, ScalarExtractionProof.Context context, Budget budget, boolean observeWork) {
+    private NativeScalarSaturation(Expr input, ScalarExtractionProof.Context context, Budget budget,
+                                   Matcher matcher, boolean observeWork) {
         this.input = input; this.context = context; this.budget = budget;
+        this.matcher = Objects.requireNonNull(matcher, "matcher");
         this.graph = EGraph.exactScalarAcV1(observeWork);
         this.facts = new ScalarClassAnalysis(graph,context.assumptions());
         var sourceCheck = new ExtractionProofBuilder(List.of(), ProofLimits.defaults());
@@ -75,13 +95,14 @@ public final class NativeScalarSaturation {
         recordAc(input,graph.extract(root,node -> 1));
     }
 
-    static Result run(Expr input, Collection<? extends RewriteRule> rules, ScalarExtractionProof.Context context, Budget budget) {
-        return prepare(input, rules, context, budget, false).execute();
+    static Result run(Expr input, Collection<? extends RewriteRule> rules, ScalarExtractionProof.Context context,
+                      Budget budget, Matcher matcher) {
+        return prepare(input, rules, context, budget, matcher, false).execute();
     }
 
     static Observation observe(Expr input, Collection<? extends RewriteRule> rules,
             ScalarExtractionProof.Context context, Budget budget) {
-        var run = prepare(input, rules, context, budget, true);
+        var run = prepare(input, rules, context, budget, Matcher.CONTEXTUAL, true);
         var result = run.execute();
         var producerStages = run.producerStages();
         var nodes = new TreeMap<String,Integer>();
@@ -108,11 +129,11 @@ public final class NativeScalarSaturation {
     }
 
     private static NativeScalarSaturation prepare(Expr input, Collection<? extends RewriteRule> rules,
-            ScalarExtractionProof.Context context, Budget budget, boolean observeWork) {
+            ScalarExtractionProof.Context context, Budget budget, Matcher matcher, boolean observeWork) {
         if (!ScalarExtractionProof.Context.create(rules, context.assumptions(), context.sourceRevision()).equals(context)) {
             throw new IllegalArgumentException("receiver's scalar law or rule inventory differs");
         }
-        return new NativeScalarSaturation(input, context, budget, observeWork);
+        return new NativeScalarSaturation(input, context, budget, matcher, observeWork);
     }
 
     private Result execute() {
