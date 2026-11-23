@@ -10,6 +10,21 @@ import java.util.List;
 import java.util.Set;
 
 public class BeamSearchStrategy implements SearchStrategy {
+    private final boolean historicalCanonicalIdentity;
+
+    public BeamSearchStrategy() {
+        this(false);
+    }
+
+    private BeamSearchStrategy(boolean historicalCanonicalIdentity) {
+        this.historicalCanonicalIdentity = historicalCanonicalIdentity;
+    }
+
+    /** Retains the canonical visited identity of the frozen comparative beam baseline. */
+    public static BeamSearchStrategy withHistoricalCanonicalIdentity() {
+        return new BeamSearchStrategy(true);
+    }
+
     @Override
     public List<SearchState> search(SearchProblem problem) {
         String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
@@ -32,7 +47,9 @@ public class BeamSearchStrategy implements SearchStrategy {
         );
         List<SearchState> explored = new ArrayList<>();
         List<SearchState> beam = List.of(rootState);
-        var visited = new RunVisitedStates(problem.memory());
+        var visited = historicalCanonicalIdentity
+            ? RunVisitedStates.withHistoricalCanonicalIdentity(problem.memory())
+            : new RunVisitedStates(problem.memory());
 
         for (int depth = 0; depth <= problem.heuristic().maxDepth() && !beam.isEmpty(); depth++) {
             List<SearchState> next = new ArrayList<>();

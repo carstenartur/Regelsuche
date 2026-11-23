@@ -14,9 +14,20 @@ import java.util.Set;
 
 public class RandomMonteCarloSearchStrategy implements SearchStrategy {
     private final long seed;
+    private final boolean historicalAssumptionIdentity;
 
     public RandomMonteCarloSearchStrategy(long seed) {
+        this(seed, false);
+    }
+
+    private RandomMonteCarloSearchStrategy(long seed, boolean historicalAssumptionIdentity) {
         this.seed = seed;
+        this.historicalAssumptionIdentity = historicalAssumptionIdentity;
+    }
+
+    /** Retains the hash-based visited identity of the frozen randomized comparison. */
+    public static RandomMonteCarloSearchStrategy withHistoricalAssumptionIdentity(long seed) {
+        return new RandomMonteCarloSearchStrategy(seed, true);
     }
 
     @Override
@@ -42,7 +53,9 @@ public class RandomMonteCarloSearchStrategy implements SearchStrategy {
             0
         );
         List<SearchState> explored = new ArrayList<>();
-        var visited = new RunVisitedStates(problem.memory());
+        var visited = historicalAssumptionIdentity
+            ? RunVisitedStates.withHistoricalAssumptionIdentity(problem.memory())
+            : new RunVisitedStates(problem.memory());
         List<SearchState> frontier = new ArrayList<>();
         frontier.add(rootState);
         while (!frontier.isEmpty() && explored.size() < problem.heuristic().maxVisitedExpressions()) {

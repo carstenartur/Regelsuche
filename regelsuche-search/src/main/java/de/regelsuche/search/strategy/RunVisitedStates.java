@@ -29,7 +29,16 @@ final class RunVisitedStates {
 
     static RunVisitedStates withHistoricalCanonicalIdentity(SearchMemory memory) {
         return new RunVisitedStates(memory, state -> state.canonicalHash() + ":"
-            + String.join(",", state.appliedRuleApplications().stream().sorted().toList()));
+            + historicalApplicationKey(state));
+    }
+
+    static RunVisitedStates withHistoricalAssumptionIdentity(SearchMemory memory) {
+        return new RunVisitedStates(memory, state -> state.canonicalHash() + ":"
+            + state.assumptionFingerprint() + ":" + historicalApplicationKey(state));
+    }
+
+    private static String historicalApplicationKey(SearchState state) {
+        return String.join(",", state.appliedRuleApplications().stream().sorted().toList());
     }
 
     boolean contains(SearchState state) {

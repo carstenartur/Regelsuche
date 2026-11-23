@@ -65,7 +65,10 @@ notations of the same canonical value. The typed application set avoids
 ambiguity from delimiters in application identifiers.
 
 The frozen historical intrinsic calibration explicitly selects its original
-canonical-hash identity to reproduce the published candidate set.
+canonical-hash identity to reproduce the published candidate set. The frozen
+comparative benchmark selects the original Beam and randomized visited
+identities. The randomized control also retains its case seed and assumption
+fingerprint.
 
 These strategies record durable observations when they visit a state. Beam
 and seeded random search can also report a duplicate removed from their

@@ -8,12 +8,10 @@ import java.util.List;
 /**
  * Seeded randomized-valid rewrite control with per-case state reset.
  *
- * <p>The production {@link RandomMonteCarloSearchStrategy} owns mutable random
- * state. Reusing one instance across benchmark cases or repeated bundle runs
- * would therefore make the retained result depend on invocation history. This
- * adapter derives one deterministic case seed from the frozen base seed and the
- * first 64 bits of the source's stable canonical SHA-256 hash, then creates a
- * fresh delegate for every execution.</p>
+ * <p>The adapter derives one deterministic case seed from the frozen base
+ * seed and the first 64 bits of the source's stable canonical SHA-256 hash.
+ * Each execution uses the visited identity of the retained comparative
+ * benchmark.</p>
  */
 final class DeterministicRandomValidRewriteStrategy
         implements ComparativeBenchmarkSystems.BenchmarkIdentifiedSearchStrategy {
@@ -42,7 +40,7 @@ final class DeterministicRandomValidRewriteStrategy
         long sourceSalt = Long.parseUnsignedLong(
             sourceHash.substring(0, 16), 16);
         long caseSeed = baseSeed ^ sourceSalt;
-        return new RandomMonteCarloSearchStrategy(caseSeed).search(problem);
+        return RandomMonteCarloSearchStrategy.withHistoricalAssumptionIdentity(caseSeed).search(problem);
     }
 
     @Override
