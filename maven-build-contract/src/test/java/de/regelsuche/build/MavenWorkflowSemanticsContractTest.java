@@ -113,7 +113,7 @@ class MavenWorkflowSemanticsContractTest {
         "(?<![A-Za-z0-9_.-])"
             + "(?:python(?:[23](?:\\.\\d+)?)?|pypy(?:[23](?:\\.\\d+)?)?"
             + "|pip(?:[23](?:\\.\\d+)?)?|pipx|uvx?|node(?:js)?|npm|npx|pnpm|yarn|corepack|deno|bunx?"
-            + "|perl|ruby|pwsh|powershell)(?=\\s+|$|[;&|<>])"
+            + "|perl|ruby|pwsh|powershell)(?=\\s+|$|[;&|<>]|\\\\$)"
     );
 
     // These four folded YAML commands are retained only until their Maven
@@ -472,6 +472,25 @@ class MavenWorkflowSemanticsContractTest {
         }
         assertNoViolation(validWorkflow()
             + "\n      - run: echo python3-helper\n",
+            governance, "undeclared-host-runtime");
+    }
+
+    @Test
+    void shellLineContinuationsCannotHideHostRuntimeCommands() {
+        MergeGovernance governance = validGovernance();
+        // Bash removes the backslash-newline pair before interpreting
+        // the space on the following physical line: this runs python3.
+        String continued = "      - run: |\n"
+            + "          python3\\\n"
+            + "           --version\n";
+        assertViolation(validWorkflow() + "\n" + continued,
+            governance, "undeclared-host-runtime");
+        String release = "jobs:\n  release:\n    steps:\n" + continued;
+        assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml", release),
+            "undeclared-host-runtime"));
+        // An escaped ordinary character does not end the executable name.
+        assertNoViolation(validWorkflow()
+            + "\n      - run: echo python3\\suffix\n",
             governance, "undeclared-host-runtime");
     }
 
