@@ -205,6 +205,33 @@ Der Workflow `Solver IR`:
 
 Die Workflows `Autopilot Evidence` und `Release Readiness` validieren zusätzlich Proof Report v2, Production Lifecycle v3 sowie die exakte Hashverkettung von Obligation, Resultat, Proof und Campaign.
 
+### Gebundener Maven/JUnit-Raw-Replay (Migration #749)
+
+Zusätzlich zu den bisherigen Gradle-/Python-Prüfungen rekonstruiert
+`SolverIrMavenEvidenceTest` die drei öffentlich erzeugten Ausführungsketten
+direkt in Java: jeweils **Original-Obligation, Übersetzung, Resultat und
+Execution-Receipt**. `SolverIrJsonCodec.readEvidenceChain(...)` prüft die
+kanonischen Bytes und deren SHA-256-Invarianten, Ziel- und Annahmenbindung,
+Backend/Version, Übersetzungsbefund sowie die interne und äußere
+Hashverkettung. Der Test gleicht außerdem die drei Ausführungs-Hashes mit
+`manifest.json` ab. Positive Replays und Negativkontrollen mit gültigem,
+aber fremdem Ursprungsbeleg, gemischten Backendartefakten, veränderten
+Resultaten, verfälschten Receipt-Feldern und zusätzlicher nicht deklarierter
+Autorität sind in Maven/JUnit ausführbar.
+
+Ein isolierter Aufruf für das Solver-IR-Modul (JDK 25, Maven):
+
+```bash
+mvn --batch-mode --no-transfer-progress -pl regelsuche-solver-ir -am \
+  -Dtest=SolverIrMavenEvidenceTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Dieser Replay belegt **Artefaktidentität und die geprüfte Kette**, nicht
+die mathematische Korrektheit eines Backends, einen unabhängigen Formalbeweis,
+eine externe Studie oder Maven-only-Parität des gesamten Projekts.
+Die bestehenden Verifikationspfade werden erst nach vollständiger
+Rohdaten-, Negativ- und Clean-Checkout-Parität ersetzt.
+
 ## Bewusste Grenzen des ersten Slices
 
 - Der Ausdrucksvertrag ist auf den vorhandenen algebraischen Core-AST begrenzt.

@@ -4,6 +4,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,7 +43,8 @@ public record SolverTranslation(
                 ordered.put(key, value);
             });
         }
-        termMapping = Map.copyOf(ordered);
+        // Map.copyOf does not preserve sorted iteration order across JVM processes.
+        termMapping = Collections.unmodifiableMap(ordered);
         if (status == TranslationStatus.REJECTED && issues.isEmpty()) {
             throw new IllegalArgumentException(
                 "rejected translation requires visible issues");

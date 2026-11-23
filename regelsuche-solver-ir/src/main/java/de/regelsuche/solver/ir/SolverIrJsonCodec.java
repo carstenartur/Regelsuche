@@ -101,6 +101,72 @@ public final class SolverIrJsonCodec {
             text(root, "contentHash"));
     }
 
+    /**
+     * Re-read all four independently retained Solver IR v1 JSON artifacts as one
+     * source-bound execution. Hash-valid individual results are not sufficient:
+     * the goal, assumptions, backend, translation and outer receipt must agree.
+     *
+     * <p>This verifies artifact integrity and binding, not mathematical truth or
+     * an independently checked backend certificate.
+     */
+    public SolverExecution readEvidenceChain(
+        String obligationJson,
+        String translationJson,
+        String resultJson,
+        String executionJson
+    ) {
+        Obligation obligation = readObligation(obligationJson);
+        SolverTranslation translation = readTranslation(translationJson);
+        SolverResult result = readResult(resultJson);
+        if (!obligationJson.equals(obligation.toCanonicalJson())
+                || !translationJson.equals(translation.toCanonicalJson())
+                || !resultJson.equals(result.toCanonicalJson())) {
+            throw new IllegalArgumentException("noncanonical solver IR evidence artifact");
+        }
+        if (!obligation.contentHash().equals(translation.obligationHash())
+                || !obligation.contentHash().equals(result.obligationHash())
+                || !obligation.goalHash().equals(result.goalHash())
+                || !obligation.assumptionsHash().equals(result.assumptionsHash())) {
+            throw new IllegalArgumentException("solver evidence is not bound to the given obligation");
+        }
+        JsonNode executionNode = parse(executionJson);
+        SolverExecution execution = new SolverExecution(
+            text(executionNode, "schema"),
+            text(executionNode, "obligationHash"),
+            translation, result, text(executionNode, "contentHash"));
+        if (!execution.obligationHash().equals(obligation.contentHash())
+                || !executionJson.equals(execution.toCanonicalJson())) {
+            throw new IllegalArgumentException("solver execution summary differs from its evidence");
+        }
+        return execution;
+    }
+
+    private SolverTranslation readTranslation(String json) {
+        JsonNode root = parse(json);
+        JsonNode mappingNode = required(root, "termMapping");
+        if (!mappingNode.isObject()) {
+            throw new IllegalArgumentException("termMapping must be an object");
+        }
+        Map<String, String> mapping = new TreeMap<>();
+        Iterator<Map.Entry<String, JsonNode>> fields = mappingNode.fields();
+        while (fields.hasNext()) {
+            Map.Entry<String, JsonNode> field = fields.next();
+            if (!field.getValue().isTextual()) {
+                throw new IllegalArgumentException("termMapping values must be strings");
+            }
+            mapping.put(field.getKey(), field.getValue().asText());
+        }
+        return new SolverTranslation(
+            text(root, "schema"),
+            text(root, "obligationHash"),
+            text(root, "backendId"),
+            text(root, "backendVersion"),
+            TranslationStatus.valueOf(text(root, "status")),
+            strings(array(root, "issues")),
+            mapping,
+            text(root, "contentHash"));
+    }
+
     private Expression readExpression(JsonNode node) {
         return switch (text(node, "kind")) {
             case "BOUND" -> {

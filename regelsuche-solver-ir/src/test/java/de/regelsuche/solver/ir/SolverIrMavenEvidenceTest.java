@@ -104,6 +104,85 @@ class SolverIrMavenEvidenceTest {
             () -> checkOutcomes(obligation, assumed, search, polynomial, promoted, manifest));
     }
 
+    @Test
+    void sourceBoundRawExecutionChainsRejectRebindingAndCanonicalTampering() throws Exception {
+        Path output = temporary.resolve("raw-executions");
+        SolverIrExampleMain.main(new String[] {output.toString()});
+        var codec = new SolverIrJsonCodec();
+        String obligation = Files.readString(output.resolve("obligation.json"), StandardCharsets.UTF_8);
+        String assumed = Files.readString(output.resolve("assumption-obligation.json"), StandardCharsets.UTF_8);
+        var manifest = read(output.resolve("manifest.json"));
+        var registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12, builder -> builder
+            .schemaLoader(loader -> loader.fetchRemoteResources(false))
+            .schemaRegistryConfig(SchemaRegistryConfig.builder()
+                .typeLoose(false).formatAssertionsEnabled(false).build()));
+        var translationSchema = schema(registry, "regelsuche-solver-translation-v1.schema.json");
+        var executionSchema = schema(registry, "regelsuche-solver-execution-v1.schema.json");
+
+        String[] prefixes = {"regelsuche-search", "polynomial-normal-form", "unsupported"};
+        String[] manifestKeys = {"searchExecutionHash", "polynomialExecutionHash", "unsupportedExecutionHash"};
+        for (int index = 0; index < prefixes.length; index++) {
+            String prefix = prefixes[index];
+            String source = "unsupported".equals(prefix) ? assumed : obligation;
+            assertTrue(translationSchema.validate(read(output.resolve(prefix + "-translation.json"))).isEmpty(),
+                "raw translation violates its Draft 2020-12 schema: " + prefix);
+            assertTrue(executionSchema.validate(read(output.resolve(prefix + "-execution.json"))).isEmpty(),
+                "raw execution violates its Draft 2020-12 schema: " + prefix);
+            String translationJson = Files.readString(
+                output.resolve(prefix + "-translation.json"), StandardCharsets.UTF_8);
+            if (index < 2) {
+                int left = translationJson.indexOf("\"goal.left\"");
+                int right = translationJson.indexOf("\"goal.right\"");
+                assertTrue(left >= 0 && right > left,
+                    "solver translation term mapping must have stable sorted keys: " + prefix);
+            }
+            var execution = codec.readEvidenceChain(
+                source,
+                translationJson,
+                Files.readString(output.resolve(prefix + "-result.json"), StandardCharsets.UTF_8),
+                Files.readString(output.resolve(prefix + "-execution.json"), StandardCharsets.UTF_8));
+            assertEquals(manifest.path(manifestKeys[index]).asText(), execution.contentHash(),
+                "manifest is not bound to raw execution: " + prefix);
+            assertEquals(codec.readObligation(source).goalHash(), execution.result().goalHash());
+            assertEquals(codec.readObligation(source).assumptionsHash(),
+                execution.result().assumptionsHash());
+        }
+
+        String translation = Files.readString(
+            output.resolve("regelsuche-search-translation.json"), StandardCharsets.UTF_8);
+        String result = Files.readString(
+            output.resolve("regelsuche-search-result.json"), StandardCharsets.UTF_8);
+        String execution = Files.readString(
+            output.resolve("regelsuche-search-execution.json"), StandardCharsets.UTF_8);
+        String polynomialTranslation = Files.readString(
+            output.resolve("polynomial-normal-form-translation.json"), StandardCharsets.UTF_8);
+
+        // Every input is syntactically valid JSON, and the incorrect source is itself a
+        // valid, separately hashed obligation. Neither may silently authorize a result.
+        assertThrows(IllegalArgumentException.class,
+            () -> codec.readEvidenceChain(assumed, translation, result, execution));
+        assertThrows(IllegalArgumentException.class,
+            () -> codec.readEvidenceChain(obligation, polynomialTranslation, result, execution));
+
+        var changedResult = read(output.resolve("regelsuche-search-result.json"));
+        changedResult.put("message", changedResult.path("message").asText() + " altered");
+        assertThrows(IllegalArgumentException.class,
+            () -> codec.readEvidenceChain(obligation, translation, changedResult.toString(), execution));
+
+        var changedExecution = read(output.resolve("regelsuche-search-execution.json"));
+        changedExecution.put("resultHash", manifest.path("polynomialExecutionHash").asText());
+        assertThrows(IllegalArgumentException.class,
+            () -> codec.readEvidenceChain(obligation, translation, result, changedExecution.toString()));
+
+        var extraField = read(output.resolve("regelsuche-search-result.json"));
+        extraField.put("unauthorizedAuthority", true);
+        assertThrows(IllegalArgumentException.class,
+            () -> codec.readEvidenceChain(obligation, translation, extraField.toString(), execution));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> codec.readEvidenceChain(" " + obligation, translation, result, execution));
+    }
+
     private static void checkOutcomes(ObjectNode obligation, ObjectNode assumed,
             ObjectNode search, ObjectNode polynomial, ObjectNode unsupported, ObjectNode manifest) {
         for (var confirmed : List.of(search, polynomial)) {
