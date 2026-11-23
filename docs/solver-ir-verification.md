@@ -14,7 +14,7 @@ result. Nothing in these synthetic controls claims an external formal proof.
 Run with JDK 25 and Maven:
 
 ```sh
-mvn -B -ntp -pl regelsuche-solver-ir -am \\
+mvn -B -ntp -pl regelsuche-solver-ir -am \
   -Dtest=SolverIrMavenEvidenceTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
