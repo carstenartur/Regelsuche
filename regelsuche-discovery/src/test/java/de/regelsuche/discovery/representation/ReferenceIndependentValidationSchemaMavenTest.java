@@ -86,8 +86,8 @@ class ReferenceIndependentValidationSchemaMavenTest {
         String original = publicNoOracleCompanion().toCanonicalJson();
         assertThrows(IllegalArgumentException.class, () ->
             ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(" " + original));
-        String duplicate = original.replaceFirst(
-            "\\"contentHash\\":", "\\"contentHash\\":\\"sha256:" + "0".repeat(64) + "\\",\\"contentHash\\":");
+        String duplicate = original.replace(
+            "\"contentHash\":", "\"contentHash\":\"sha256:" + "0".repeat(64) + "\",\"contentHash\":");
         assertFalse(duplicate.equals(original), "duplicate-member negative must mutate the source");
         assertThrows(IllegalArgumentException.class, () ->
             ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(duplicate));
@@ -105,7 +105,7 @@ class ReferenceIndependentValidationSchemaMavenTest {
     private static ObjectNode firstOutcome(ObjectNode document) {
         for (JsonNode row : document.path("content").path("rows")) {
             var outcomes = row.path("outcomes");
-            if (!outcomes.isEmpty()) {
+            if (outcomes.size() > 0) {
                 return (ObjectNode) outcomes.get(0);
             }
         }
