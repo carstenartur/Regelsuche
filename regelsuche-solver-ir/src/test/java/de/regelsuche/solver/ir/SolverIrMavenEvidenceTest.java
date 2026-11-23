@@ -112,12 +112,22 @@ class SolverIrMavenEvidenceTest {
         String obligation = Files.readString(output.resolve("obligation.json"), StandardCharsets.UTF_8);
         String assumed = Files.readString(output.resolve("assumption-obligation.json"), StandardCharsets.UTF_8);
         var manifest = read(output.resolve("manifest.json"));
+        var registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12, builder -> builder
+            .schemaLoader(loader -> loader.fetchRemoteResources(false))
+            .schemaRegistryConfig(SchemaRegistryConfig.builder()
+                .typeLoose(false).formatAssertionsEnabled(false).build()));
+        var translationSchema = schema(registry, "regelsuche-solver-translation-v1.schema.json");
+        var executionSchema = schema(registry, "regelsuche-solver-execution-v1.schema.json");
 
         String[] prefixes = {"regelsuche-search", "polynomial-normal-form", "unsupported"};
         String[] manifestKeys = {"searchExecutionHash", "polynomialExecutionHash", "unsupportedExecutionHash"};
         for (int index = 0; index < prefixes.length; index++) {
             String prefix = prefixes[index];
             String source = "unsupported".equals(prefix) ? assumed : obligation;
+            assertTrue(translationSchema.validate(read(output.resolve(prefix + "-translation.json"))).isEmpty(),
+                "raw translation violates its Draft 2020-12 schema: " + prefix);
+            assertTrue(executionSchema.validate(read(output.resolve(prefix + "-execution.json"))).isEmpty(),
+                "raw execution violates its Draft 2020-12 schema: " + prefix);
             var execution = codec.readEvidenceChain(
                 source,
                 Files.readString(output.resolve(prefix + "-translation.json"), StandardCharsets.UTF_8),
