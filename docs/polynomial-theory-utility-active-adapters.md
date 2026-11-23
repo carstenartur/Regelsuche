@@ -126,6 +126,37 @@ Studienplans. Für diesen Plan sind GraalPy 25.1.3, SymPy 1.14.0 und mpmath
 meldet dafür zusätzlich `EXTERNAL_RUNTIME_LOCK_MISMATCH`. Diese Prüfung liest
 nur den Lock und startet keine Engine.
 
+### Öffentlicher Profilvergleich bei eingefrorenen Budgets
+
+Die [TSV-Auswertung](research/polynomial-theory-runtime/public-profile-comparison.tsv)
+vergleicht die vier ausführbaren Profile an denselben 20 öffentlichen
+Formationsfällen und sechs Checkpoints. Die Reproduktion öffnet für jeden
+Checkpoint einen frischen Lauf pro Profil, prüft die identischen Fallbudgets
+und prüft jede Messung gegen ihre Originalzeile. Der Cache-Verlauf beginnt pro
+Lauf leer und wird aus den Messereignissen neu geprüft. Der SHA-256 pro
+Profil und Checkpoint bindet zeilenweise die tabulatorgetrennten
+Eingabe-, Ergebnis- und Messidentitäten in Formationsreihenfolge.
+
+Keines der drei Faktorisierungsprofile erzeugte eine verifizierte Transition
+in den 360 ausgeführten Faktorisierungszeilen. Das direkte Profil erreichte
+118 Budgetgrenzen und zwei nicht unterstützte Fälle. Der Cache erreichte
+120 Budgetgrenzen mit zwei Misses und ohne Einfügung oder Replay. Die
+Spezialkontrolle verzeichnete 109 Budgetabbrüche, fünf nicht unterstützte
+Fälle, fünf gemischte Zeilen und eine Zeile ohne Übergang. Die 120 externen
+Zeilen sind im Bericht als blockiert ausgewiesen. Die 120 Baseline-Zeilen
+liefen mit deaktivierter Faktorisierung.
+
+Die Befunde gelten für die öffentliche Formation und ihre festgelegten
+Budgets. Die verbrauchte Arbeit lässt sich in diesen Ergebnissen vergleichen.
+Eine Aussage über Cache-Amortisation oder die Nutzwirkung eines Profils
+erfordert beobachtete verifizierte Übergänge. Die geschützte Qualifikation
+und der vollständige Kandidaten-Freeze bleiben getrennt.
+
+```sh
+mvn -B -ntp -pl regelsuche-experiments -am \
+  -Dtest=PolynomialTheoryUtilityPublicProfileComparisonTest test
+```
+
 ### Eingefrorene Laufzeit an einem öffentlichen Entwicklungseingang
 
 Die ursprünglichen Laufzeitkomponenten sind verfügbar. Maven löst die
