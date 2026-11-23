@@ -31,4 +31,15 @@ class ScopedProofDagTest {
         var dag = ScopedProofDag.create(request, List.of(Node.of(ZERO), Node.of(NORMALIZE), decrease, Node.of(STRONG_INDUCTION,2)));
         assertEquals(dag, ScopedProofDag.read(request, dag.canonical()));
     }
+
+    @Test void existentialLocalsAreOnlyAvailableInTheContinuation() {
+        var request = NaturalInductionTest.request(NaturalInductionTest.goal, NaturalInductionTest.base);
+        var valid = ScopedProofDag.create(request, List.of(Node.premise(0), Node.local(1), Node.local(0),
+            Node.of(APPLY, 1, 2), Node.of(EXISTS_ELIM, 0, 3)));
+        assertEquals(valid, ScopedProofDag.read(request, valid.canonical()));
+        assertThrows(IllegalArgumentException.class, () -> ScopedProofDag.create(request,
+            List.of(Node.local(0), Node.local(1), Node.of(EXISTS_ELIM, 0, 1))));
+        assertThrows(IllegalArgumentException.class, () -> ScopedProofDag.create(request,
+            List.of(Node.premise(0), Node.local(2), Node.of(EXISTS_ELIM, 0, 1))));
+    }
 }

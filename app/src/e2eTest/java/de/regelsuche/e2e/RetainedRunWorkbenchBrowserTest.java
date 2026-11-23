@@ -205,6 +205,39 @@ class RetainedRunWorkbenchBrowserTest {
         assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
     }
 
+    @Test void keepsAnUnsupportedPolynomialProofOpenAndBoundToTheSelectedCandidate() throws Exception {
+        page.navigate(url("/#runs"));
+        page.locator("[data-tab='runs']").click();
+        page.locator("#nativeSearchSource").fill("sin(x) + 0");
+        page.locator("#startNativeSearch").click();
+        page.waitForSelector("#nativeSearchStatus[data-state='COMPLETED']");
+        page.locator("#openNativeResult").click();
+        page.waitForSelector("#candidateDossierDetail");
+        String candidate = page.locator("#candidateDossierDetail").getAttribute("data-candidate-id");
+        page.locator("[data-review-role='PROOF_OBLIGATIONS']").focus();
+        page.keyboard().press("Enter");
+        var review = page.locator("#candidateOccurrenceReview");
+        review.locator("[data-verification-status='OUTSIDE_BOUNDED_POLYNOMIAL_FRAGMENT']").waitFor();
+        assertTrue(review.textContent().contains("Gleichheitsverpflichtung bleibt offen"));
+        assertEquals(candidate, page.locator("#candidateDossierDetail").getAttribute("data-candidate-id"));
+        var receiptLink = review.locator("a[href*='/candidate-evidence/']");
+        try (var client = HttpClient.newHttpClient()) {
+            var response = client.send(HttpRequest.newBuilder(URI.create(url(receiptLink.getAttribute("href")))).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, response.statusCode(), response.body());
+            var receipt = new com.fasterxml.jackson.databind.json.JsonMapper().readTree(response.body());
+            assertEquals(candidate, receipt.path("candidateId").asText());
+            assertTrue(receipt.path("obligation").isObject());
+            assertFalse(receipt.has("verification"));
+            assertFalse(receipt.has("solverResult"));
+        }
+        String boundUrl = page.url();
+        page.reload();
+        review.locator("[data-verification-status='OUTSIDE_BOUNDED_POLYNOMIAL_FRAGMENT']").waitFor();
+        assertEquals(boundUrl, page.url());
+        assertEquals(candidate, page.locator("#candidateDossierDetail").getAttribute("data-candidate-id"));
+    }
+
     @Test void comparesExactLongSeedsAndRemainsUsableOnNarrowViewports() throws Exception {
         retain(first); retain(second);
         page.navigate(url("/static/index.html#run=" + digest(first)));

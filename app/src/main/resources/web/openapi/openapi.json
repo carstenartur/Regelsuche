@@ -372,6 +372,268 @@
         }
       }
     },
+    "/api/discovery-domains/exports/{runDigest}/scoped-check": {
+      "post": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "checkScopedWorkspaceCandidate",
+        "summary": "Einen gespeicherten logischen Kandidaten rekonstruieren und erneut prüfen",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expectedWorkspaceHash",
+                  "expectedEvidenceHash",
+                  "candidateHash"
+                ],
+                "properties": {
+                  "expectedWorkspaceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "expectedEvidenceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  },
+                  "candidateHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Quellengebundene Gegenbeispielprüfung und gegebenenfalls eine neue, unabhängige Lean-Prüfung",
+            "headers": {
+              "X-Regelsuche-Run-Id": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema",
+                    "source",
+                    "obligationHash",
+                    "proposalHash",
+                    "counterexample",
+                    "retainedWitness",
+                    "proof"
+                  ],
+                  "properties": {
+                    "schema": {
+                      "type": "string",
+                      "const": "regelsuche.scoped-workspace-candidate-check/v1"
+                    },
+                    "source": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "runId",
+                        "workspaceHash",
+                        "evidenceHash",
+                        "seedHash",
+                        "candidateHash",
+                        "stateHash"
+                      ],
+                      "properties": {
+                        "runId": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "workspaceHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "evidenceHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "seedHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "candidateHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "stateHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      }
+                    },
+                    "obligationHash": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    },
+                    "proposalHash": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    },
+                    "counterexample": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "status",
+                        "attempts",
+                        "witness",
+                        "metrics"
+                      ],
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "FOUND",
+                            "NONE_FOUND",
+                            "INCONCLUSIVE",
+                            "UNSUPPORTED"
+                          ]
+                        },
+                        "attempts": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 256
+                        },
+                        "witness": {
+                          "type": "string"
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "retainedWitness": {
+                      "type": "string",
+                      "enum": [
+                        "NOT_RECORDED",
+                        "REPRODUCED",
+                        "DIFFERS"
+                      ]
+                    },
+                    "proof": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "backendConfigured",
+                        "status"
+                      ],
+                      "properties": {
+                        "backendConfigured": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "NOT_RUN",
+                            "CONFIRMED",
+                            "REFUTED",
+                            "INCONCLUSIVE",
+                            "UNSUPPORTED"
+                          ]
+                        },
+                        "kernelHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        },
+                        "rebuildHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[0-9a-f]{64}$"
+                        }
+                      },
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "const": "CONFIRMED"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "kernelHash",
+                          "rebuildHash"
+                        ],
+                        "properties": {
+                          "backendConfigured": {
+                            "const": true
+                          }
+                        }
+                      },
+                      "else": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "kernelHash"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "rebuildHash"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Gespeicherter Export fehlt"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "description": "Die übermittelte Quellenbindung ist unzutreffend"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "description": "Ein anderer logischer Kandidat wird gerade geprüft"
+          },
+          "500": {
+            "description": "Technischer Fehler bei der Kandidatenprüfung (SCOPED_CHECK_FAILED) oder beim Quellenzugriff (DOMAIN_EXPORT_REPOSITORY_FAILURE)"
+          }
+        }
+      }
+    },
     "/api/discovery-domains/exports/{runDigest}/validate": {
       "post": {
         "tags": [
