@@ -456,8 +456,8 @@ public final class SolverIr {
                 backendId, backendVersion, status, translationStatus,
                 usedCapabilities, translationIssues, invocationHash, message,
                 counterexample, certificateHash);
-<span class="pc bpc" id="L459" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L460">                throw new IllegalArgumentException(&quot;solver result hash does not match canonical fields&quot;);</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L460">                throw new IllegalArgumentException(&quot;solver result hash does not match canonical fields&quot;);</span>
             }
 <span class="fc" id="L462">        }</span>
 

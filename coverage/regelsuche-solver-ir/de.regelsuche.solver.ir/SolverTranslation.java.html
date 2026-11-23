@@ -4,6 +4,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,45 +24,46 @@ public record SolverTranslation(
     public static final String SCOPED_SCHEMA = &quot;regelsuche.solver-translation/v2&quot;;
     public static final String SCHEMA = &quot;regelsuche.solver-translation/v1&quot;;
 
-<span class="fc" id="L26">    public SolverTranslation {</span>
-<span class="pc bpc" id="L27" title="3 of 4 branches missed.">        if (!SCHEMA.equals(schema) &amp;&amp; !SCOPED_SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;unsupported solver translation schema&quot;);</span>
+<span class="fc" id="L27">    public SolverTranslation {</span>
+<span class="pc bpc" id="L28" title="3 of 4 branches missed.">        if (!SCHEMA.equals(schema) &amp;&amp; !SCOPED_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;unsupported solver translation schema&quot;);</span>
         }
-<span class="fc" id="L30">        requireSha(obligationHash, &quot;obligationHash&quot;);</span>
-<span class="fc" id="L31">        requireText(backendId, &quot;backendId&quot;);</span>
-<span class="fc" id="L32">        requireText(backendVersion, &quot;backendVersion&quot;);</span>
-<span class="fc" id="L33">        Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        issues = issues == null ? List.of() : issues.stream()</span>
-<span class="pc bpc" id="L35" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
-<span class="fc" id="L36">            .distinct().sorted().toList();</span>
-<span class="fc" id="L37">        TreeMap&lt;String, String&gt; ordered = new TreeMap&lt;&gt;();</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (termMapping != null) {</span>
-<span class="fc" id="L39">            termMapping.forEach((key, value) -&gt; {</span>
-<span class="fc" id="L40">                requireText(key, &quot;termMapping key&quot;);</span>
-<span class="fc" id="L41">                requireText(value, &quot;termMapping value&quot;);</span>
-<span class="fc" id="L42">                ordered.put(key, value);</span>
-<span class="fc" id="L43">            });</span>
+<span class="fc" id="L31">        requireSha(obligationHash, &quot;obligationHash&quot;);</span>
+<span class="fc" id="L32">        requireText(backendId, &quot;backendId&quot;);</span>
+<span class="fc" id="L33">        requireText(backendVersion, &quot;backendVersion&quot;);</span>
+<span class="fc" id="L34">        Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        issues = issues == null ? List.of() : issues.stream()</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L37">            .distinct().sorted().toList();</span>
+<span class="fc" id="L38">        TreeMap&lt;String, String&gt; ordered = new TreeMap&lt;&gt;();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (termMapping != null) {</span>
+<span class="fc" id="L40">            termMapping.forEach((key, value) -&gt; {</span>
+<span class="fc" id="L41">                requireText(key, &quot;termMapping key&quot;);</span>
+<span class="fc" id="L42">                requireText(value, &quot;termMapping value&quot;);</span>
+<span class="fc" id="L43">                ordered.put(key, value);</span>
+<span class="fc" id="L44">            });</span>
         }
-<span class="fc" id="L45">        termMapping = Map.copyOf(ordered);</span>
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        if (status == TranslationStatus.REJECTED &amp;&amp; issues.isEmpty()) {</span>
-<span class="nc" id="L47">            throw new IllegalArgumentException(</span>
+        // Map.copyOf does not preserve sorted iteration order across JVM processes.
+<span class="fc" id="L47">        termMapping = Collections.unmodifiableMap(ordered);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (status == TranslationStatus.REJECTED &amp;&amp; issues.isEmpty()) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
                 &quot;rejected translation requires visible issues&quot;);
         }
-<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (status == TranslationStatus.LOSSLESS</span>
-<span class="pc bpc" id="L51" title="3 of 4 branches missed.">                &amp;&amp; !(SCOPED_SCHEMA.equals(schema) &amp;&amp; termMapping.containsKey(&quot;goal.proposition&quot;))</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                &amp;&amp; (!termMapping.containsKey(&quot;goal.left&quot;)</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                    || !termMapping.containsKey(&quot;goal.right&quot;))) {</span>
-<span class="nc" id="L54">            throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (status == TranslationStatus.LOSSLESS</span>
+<span class="pc bpc" id="L53" title="3 of 4 branches missed.">                &amp;&amp; !(SCOPED_SCHEMA.equals(schema) &amp;&amp; termMapping.containsKey(&quot;goal.proposition&quot;))</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                &amp;&amp; (!termMapping.containsKey(&quot;goal.left&quot;)</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    || !termMapping.containsKey(&quot;goal.right&quot;))) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
                 &quot;lossless translation requires both goal term mappings&quot;);
         }
-<span class="fc" id="L57">        requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L58">        String expected = hash(</span>
+<span class="fc" id="L59">        requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L60">        String expected = hash(</span>
             schema, obligationHash, backendId, backendVersion, status, issues, termMapping);
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
                 &quot;solver translation hash does not match canonical fields&quot;);
         }
-<span class="fc" id="L64">    }</span>
+<span class="fc" id="L66">    }</span>
 
     public static SolverTranslation create(
         Obligation obligation,
@@ -70,30 +72,30 @@ public record SolverTranslation(
         List&lt;String&gt; issues,
         Map&lt;String, String&gt; termMapping
     ) {
-<span class="fc" id="L73">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
-<span class="fc" id="L74">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        List&lt;String&gt; orderedIssues = issues == null ? List.of() : issues.stream()</span>
-<span class="pc bpc" id="L76" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
-<span class="fc" id="L77">            .distinct().sorted().toList();</span>
-<span class="fc" id="L78">        TreeMap&lt;String, String&gt; orderedTerms = new TreeMap&lt;&gt;();</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (termMapping != null) {</span>
-<span class="fc" id="L80">            termMapping.forEach(orderedTerms::put);</span>
+<span class="fc" id="L75">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L76">        Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        List&lt;String&gt; orderedIssues = issues == null ? List.of() : issues.stream()</span>
+<span class="pc bpc" id="L78" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L79">            .distinct().sorted().toList();</span>
+<span class="fc" id="L80">        TreeMap&lt;String, String&gt; orderedTerms = new TreeMap&lt;&gt;();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (termMapping != null) {</span>
+<span class="fc" id="L82">            termMapping.forEach(orderedTerms::put);</span>
         }
-<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        String schema = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()) ? SCOPED_SCHEMA : SCHEMA;</span>
-<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        if (status == TranslationStatus.LOSSLESS &amp;&amp; obligation.goal().relation() == SolverIr.Relation.HOLDS</span>
-<span class="nc bnc" id="L84" title="All 2 branches missed.">                &amp;&amp; !orderedTerms.containsKey(&quot;goal.proposition&quot;))</span>
-<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;a proposition requires its exact term mapping&quot;);</span>
-<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        if (status == TranslationStatus.LOSSLESS &amp;&amp; obligation.goal().relation() != SolverIr.Relation.HOLDS</span>
-<span class="pc bpc" id="L87" title="2 of 4 branches missed.">                &amp;&amp; (!orderedTerms.containsKey(&quot;goal.left&quot;) || !orderedTerms.containsKey(&quot;goal.right&quot;)))</span>
-<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;a binary relation requires both term mappings&quot;);</span>
-<span class="fc" id="L89">        String contentHash = hash(</span>
-<span class="fc" id="L90">            schema, obligation.contentHash(), descriptor.backendId(),</span>
-<span class="fc" id="L91">            descriptor.backendVersion(), status, orderedIssues, orderedTerms);</span>
-<span class="fc" id="L92">        return new SolverTranslation(</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        String schema = SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()) ? SCOPED_SCHEMA : SCHEMA;</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">        if (status == TranslationStatus.LOSSLESS &amp;&amp; obligation.goal().relation() == SolverIr.Relation.HOLDS</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                &amp;&amp; !orderedTerms.containsKey(&quot;goal.proposition&quot;))</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(&quot;a proposition requires its exact term mapping&quot;);</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        if (status == TranslationStatus.LOSSLESS &amp;&amp; obligation.goal().relation() != SolverIr.Relation.HOLDS</span>
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">                &amp;&amp; (!orderedTerms.containsKey(&quot;goal.left&quot;) || !orderedTerms.containsKey(&quot;goal.right&quot;)))</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(&quot;a binary relation requires both term mappings&quot;);</span>
+<span class="fc" id="L91">        String contentHash = hash(</span>
+<span class="fc" id="L92">            schema, obligation.contentHash(), descriptor.backendId(),</span>
+<span class="fc" id="L93">            descriptor.backendVersion(), status, orderedIssues, orderedTerms);</span>
+<span class="fc" id="L94">        return new SolverTranslation(</span>
             schema,
-<span class="fc" id="L94">            obligation.contentHash(),</span>
-<span class="fc" id="L95">            descriptor.backendId(),</span>
-<span class="fc" id="L96">            descriptor.backendVersion(),</span>
+<span class="fc" id="L96">            obligation.contentHash(),</span>
+<span class="fc" id="L97">            descriptor.backendId(),</span>
+<span class="fc" id="L98">            descriptor.backendVersion(),</span>
             status,
             orderedIssues,
             orderedTerms,
@@ -101,17 +103,17 @@ public record SolverTranslation(
     }
 
     public String toCanonicalJson() {
-<span class="fc" id="L104">        return new JsonWriter().beginObject()</span>
-<span class="fc" id="L105">            .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L106">            .property(&quot;obligationHash&quot;, obligationHash)</span>
-<span class="fc" id="L107">            .property(&quot;backendId&quot;, backendId)</span>
-<span class="fc" id="L108">            .property(&quot;backendVersion&quot;, backendVersion)</span>
-<span class="fc" id="L109">            .property(&quot;status&quot;, status.name())</span>
-<span class="fc" id="L110">            .stringArray(&quot;issues&quot;, issues)</span>
-<span class="fc" id="L111">            .object(&quot;termMapping&quot;, object -&gt; termMapping.forEach(object::property))</span>
-<span class="fc" id="L112">            .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L113">            .endObject()</span>
-<span class="fc" id="L114">            .toString();</span>
+<span class="fc" id="L106">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L107">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L108">            .property(&quot;obligationHash&quot;, obligationHash)</span>
+<span class="fc" id="L109">            .property(&quot;backendId&quot;, backendId)</span>
+<span class="fc" id="L110">            .property(&quot;backendVersion&quot;, backendVersion)</span>
+<span class="fc" id="L111">            .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L112">            .stringArray(&quot;issues&quot;, issues)</span>
+<span class="fc" id="L113">            .object(&quot;termMapping&quot;, object -&gt; termMapping.forEach(object::property))</span>
+<span class="fc" id="L114">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L115">            .endObject()</span>
+<span class="fc" id="L116">            .toString();</span>
     }
 
     private static String hash(
@@ -122,25 +124,25 @@ public record SolverTranslation(
         List&lt;String&gt; issues,
         Map&lt;String, String&gt; termMapping
     ) {
-<span class="fc" id="L125">        return SolverIr.sha256(</span>
+<span class="fc" id="L127">        return SolverIr.sha256(</span>
             schema
                 + &quot;\nobligation=&quot; + obligationHash
                 + &quot;\nbackend=&quot; + backendId + '@' + backendVersion
-<span class="fc" id="L129">                + &quot;\nstatus=&quot; + status.name()</span>
+<span class="fc" id="L131">                + &quot;\nstatus=&quot; + status.name()</span>
                 + &quot;\nissues=&quot; + issues
                 + &quot;\nterms=&quot; + new TreeMap&lt;&gt;(termMapping));
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L136">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L137" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L138">    }</span>
+<span class="fc" id="L140">    }</span>
 
     private static void requireSha(String value, String name) {
-<span class="pc bpc" id="L141" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L142">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L144">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L144">    }</span>
+<span class="fc" id="L146">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

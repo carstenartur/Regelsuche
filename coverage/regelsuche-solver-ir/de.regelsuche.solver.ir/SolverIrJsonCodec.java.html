@@ -101,78 +101,144 @@ import java.util.TreeMap;
 <span class="fc" id="L101">            text(root, &quot;contentHash&quot;));</span>
     }
 
-    private Expression readExpression(JsonNode node) {
-<span class="pc bpc" id="L105" title="1 of 7 branches missed.">        return switch (text(node, &quot;kind&quot;)) {</span>
-            case &quot;BOUND&quot; -&gt; {
-<span class="fc" id="L107">                JsonNode index = required(node, &quot;index&quot;);</span>
-<span class="pc bpc" id="L108" title="2 of 4 branches missed.">                if (!index.isIntegralNumber() || !index.canConvertToInt()) throw new IllegalArgumentException(&quot;invalid bound index&quot;);</span>
-<span class="fc" id="L109">                yield new SolverIr.Bound(index.intValue());</span>
+    /**
+     * Re-read all four independently retained Solver IR v1 JSON artifacts as one
+     * source-bound execution. Hash-valid individual results are not sufficient:
+     * the goal, assumptions, backend, translation and outer receipt must agree.
+     *
+     * &lt;p&gt;This verifies artifact integrity and binding, not mathematical truth or
+     * an independently checked backend certificate.
+     */
+    public SolverExecution readEvidenceChain(
+        String obligationJson,
+        String translationJson,
+        String resultJson,
+        String executionJson
+    ) {
+<span class="fc" id="L118">        Obligation obligation = readObligation(obligationJson);</span>
+<span class="fc" id="L119">        SolverTranslation translation = readTranslation(translationJson);</span>
+<span class="fc" id="L120">        SolverResult result = readResult(resultJson);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!obligationJson.equals(obligation.toCanonicalJson())</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                || !translationJson.equals(translation.toCanonicalJson())</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                || !resultJson.equals(result.toCanonicalJson())) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(&quot;noncanonical solver IR evidence artifact&quot;);</span>
+        }
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!obligation.contentHash().equals(translation.obligationHash())</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || !obligation.contentHash().equals(result.obligationHash())</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                || !obligation.goalHash().equals(result.goalHash())</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                || !obligation.assumptionsHash().equals(result.assumptionsHash())) {</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(&quot;solver evidence is not bound to the given obligation&quot;);</span>
+        }
+<span class="fc" id="L132">        JsonNode executionNode = parse(executionJson);</span>
+<span class="fc" id="L133">        SolverExecution execution = new SolverExecution(</span>
+<span class="fc" id="L134">            text(executionNode, &quot;schema&quot;),</span>
+<span class="fc" id="L135">            text(executionNode, &quot;obligationHash&quot;),</span>
+<span class="fc" id="L136">            translation, result, text(executionNode, &quot;contentHash&quot;));</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (!execution.obligationHash().equals(obligation.contentHash())</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                || !executionJson.equals(execution.toCanonicalJson())) {</span>
+<span class="fc" id="L139">            throw new IllegalArgumentException(&quot;solver execution summary differs from its evidence&quot;);</span>
+        }
+<span class="fc" id="L141">        return execution;</span>
+    }
+
+    private SolverTranslation readTranslation(String json) {
+<span class="fc" id="L145">        JsonNode root = parse(json);</span>
+<span class="fc" id="L146">        JsonNode mappingNode = required(root, &quot;termMapping&quot;);</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (!mappingNode.isObject()) {</span>
+<span class="nc" id="L148">            throw new IllegalArgumentException(&quot;termMapping must be an object&quot;);</span>
+        }
+<span class="fc" id="L150">        Map&lt;String, String&gt; mapping = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L151">        Iterator&lt;Map.Entry&lt;String, JsonNode&gt;&gt; fields = mappingNode.fields();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        while (fields.hasNext()) {</span>
+<span class="fc" id="L153">            Map.Entry&lt;String, JsonNode&gt; field = fields.next();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (!field.getValue().isTextual()) {</span>
+<span class="nc" id="L155">                throw new IllegalArgumentException(&quot;termMapping values must be strings&quot;);</span>
             }
-<span class="fc" id="L111">            case &quot;BINDER&quot; -&gt; new SolverIr.Binder(SolverIr.BinderKind.valueOf(text(node, &quot;binder&quot;)),</span>
-<span class="fc" id="L112">                Sort.valueOf(text(node, &quot;domain&quot;)), readExpression(required(node, &quot;body&quot;)));</span>
-<span class="fc" id="L113">            case &quot;LITERAL&quot; -&gt; new Literal(text(node, &quot;value&quot;));</span>
-<span class="fc" id="L114">            case &quot;SYMBOL&quot; -&gt; new Symbol(text(node, &quot;name&quot;));</span>
-<span class="fc" id="L115">            case &quot;BINARY&quot; -&gt; new Binary(</span>
-<span class="fc" id="L116">                BinaryOperator.valueOf(text(node, &quot;operator&quot;)),</span>
-<span class="fc" id="L117">                readExpression(required(node, &quot;left&quot;)),</span>
-<span class="fc" id="L118">                readExpression(required(node, &quot;right&quot;)));</span>
-<span class="fc" id="L119">            case &quot;CALL&quot; -&gt; new Call(</span>
-<span class="fc" id="L120">                text(node, &quot;function&quot;),</span>
-<span class="fc" id="L121">                expressions(array(node, &quot;arguments&quot;)));</span>
-<span class="nc" id="L122">            default -&gt; throw new IllegalArgumentException(</span>
-<span class="nc" id="L123">                &quot;unsupported solver expression kind: &quot; + node.path(&quot;kind&quot;).asText());</span>
+<span class="fc" id="L157">            mapping.put(field.getKey(), field.getValue().asText());</span>
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        return new SolverTranslation(</span>
+<span class="fc" id="L160">            text(root, &quot;schema&quot;),</span>
+<span class="fc" id="L161">            text(root, &quot;obligationHash&quot;),</span>
+<span class="fc" id="L162">            text(root, &quot;backendId&quot;),</span>
+<span class="fc" id="L163">            text(root, &quot;backendVersion&quot;),</span>
+<span class="fc" id="L164">            TranslationStatus.valueOf(text(root, &quot;status&quot;)),</span>
+<span class="fc" id="L165">            strings(array(root, &quot;issues&quot;)),</span>
+            mapping,
+<span class="fc" id="L167">            text(root, &quot;contentHash&quot;));</span>
+    }
+
+    private Expression readExpression(JsonNode node) {
+<span class="pc bpc" id="L171" title="1 of 7 branches missed.">        return switch (text(node, &quot;kind&quot;)) {</span>
+            case &quot;BOUND&quot; -&gt; {
+<span class="fc" id="L173">                JsonNode index = required(node, &quot;index&quot;);</span>
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">                if (!index.isIntegralNumber() || !index.canConvertToInt()) throw new IllegalArgumentException(&quot;invalid bound index&quot;);</span>
+<span class="fc" id="L175">                yield new SolverIr.Bound(index.intValue());</span>
+            }
+<span class="fc" id="L177">            case &quot;BINDER&quot; -&gt; new SolverIr.Binder(SolverIr.BinderKind.valueOf(text(node, &quot;binder&quot;)),</span>
+<span class="fc" id="L178">                Sort.valueOf(text(node, &quot;domain&quot;)), readExpression(required(node, &quot;body&quot;)));</span>
+<span class="fc" id="L179">            case &quot;LITERAL&quot; -&gt; new Literal(text(node, &quot;value&quot;));</span>
+<span class="fc" id="L180">            case &quot;SYMBOL&quot; -&gt; new Symbol(text(node, &quot;name&quot;));</span>
+<span class="fc" id="L181">            case &quot;BINARY&quot; -&gt; new Binary(</span>
+<span class="fc" id="L182">                BinaryOperator.valueOf(text(node, &quot;operator&quot;)),</span>
+<span class="fc" id="L183">                readExpression(required(node, &quot;left&quot;)),</span>
+<span class="fc" id="L184">                readExpression(required(node, &quot;right&quot;)));</span>
+<span class="fc" id="L185">            case &quot;CALL&quot; -&gt; new Call(</span>
+<span class="fc" id="L186">                text(node, &quot;function&quot;),</span>
+<span class="fc" id="L187">                expressions(array(node, &quot;arguments&quot;)));</span>
+<span class="nc" id="L188">            default -&gt; throw new IllegalArgumentException(</span>
+<span class="nc" id="L189">                &quot;unsupported solver expression kind: &quot; + node.path(&quot;kind&quot;).asText());</span>
         };
     }
 
     private List&lt;Expression&gt; expressions(JsonNode values) {
-<span class="fc" id="L128">        List&lt;Expression&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L129">        values.forEach(value -&gt; result.add(readExpression(value)));</span>
-<span class="fc" id="L130">        return List.copyOf(result);</span>
+<span class="fc" id="L194">        List&lt;Expression&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L195">        values.forEach(value -&gt; result.add(readExpression(value)));</span>
+<span class="fc" id="L196">        return List.copyOf(result);</span>
     }
 
     private static List&lt;String&gt; strings(JsonNode values) {
-<span class="fc" id="L134">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L135">        values.forEach(value -&gt; result.add(value.asText()));</span>
-<span class="fc" id="L136">        return List.copyOf(result);</span>
+<span class="fc" id="L200">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L201">        values.forEach(value -&gt; result.add(value.asText()));</span>
+<span class="fc" id="L202">        return List.copyOf(result);</span>
     }
 
     private JsonNode parse(String json) {
-<span class="pc bpc" id="L140" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
-<span class="nc" id="L141">            throw new IllegalArgumentException(&quot;JSON must not be blank&quot;);</span>
+<span class="pc bpc" id="L206" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(&quot;JSON must not be blank&quot;);</span>
         }
         try {
-<span class="fc" id="L144">            JsonNode root = mapper.readTree(json);</span>
-<span class="pc bpc" id="L145" title="2 of 4 branches missed.">            if (root == null || !root.isObject()) {</span>
-<span class="nc" id="L146">                throw new IllegalArgumentException(&quot;solver IR JSON must be an object&quot;);</span>
+<span class="fc" id="L210">            JsonNode root = mapper.readTree(json);</span>
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">            if (root == null || !root.isObject()) {</span>
+<span class="nc" id="L212">                throw new IllegalArgumentException(&quot;solver IR JSON must be an object&quot;);</span>
             }
-<span class="fc" id="L148">            return root;</span>
-<span class="nc" id="L149">        } catch (JsonProcessingException exception) {</span>
-<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;invalid solver IR JSON&quot;, exception);</span>
+<span class="fc" id="L214">            return root;</span>
+<span class="nc" id="L215">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(&quot;invalid solver IR JSON&quot;, exception);</span>
         }
     }
 
     private static JsonNode array(JsonNode node, String field) {
-<span class="fc" id="L155">        JsonNode value = required(node, field);</span>
-<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (!value.isArray()) {</span>
-<span class="nc" id="L157">            throw new IllegalArgumentException(field + &quot; must be an array&quot;);</span>
+<span class="fc" id="L221">        JsonNode value = required(node, field);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (!value.isArray()) {</span>
+<span class="nc" id="L223">            throw new IllegalArgumentException(field + &quot; must be an array&quot;);</span>
         }
-<span class="fc" id="L159">        return value;</span>
+<span class="fc" id="L225">        return value;</span>
     }
 
     private static JsonNode required(JsonNode node, String field) {
-<span class="fc" id="L163">        JsonNode value = node.get(field);</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (value == null) {</span>
-<span class="fc" id="L165">            throw new IllegalArgumentException(&quot;missing required field: &quot; + field);</span>
+<span class="fc" id="L229">        JsonNode value = node.get(field);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L231">            throw new IllegalArgumentException(&quot;missing required field: &quot; + field);</span>
         }
-<span class="fc" id="L167">        return value;</span>
+<span class="fc" id="L233">        return value;</span>
     }
 
     private static String text(JsonNode node, String field) {
-<span class="fc" id="L171">        JsonNode value = required(node, field);</span>
-<span class="pc bpc" id="L172" title="2 of 4 branches missed.">        if (!value.isTextual() || value.asText().isBlank()) {</span>
-<span class="nc" id="L173">            throw new IllegalArgumentException(field + &quot; must be non-blank text&quot;);</span>
+<span class="fc" id="L237">        JsonNode value = required(node, field);</span>
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">        if (!value.isTextual() || value.asText().isBlank()) {</span>
+<span class="nc" id="L239">            throw new IllegalArgumentException(field + &quot; must be non-blank text&quot;);</span>
         }
-<span class="fc" id="L175">        return value.asText();</span>
+<span class="fc" id="L241">        return value.asText();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
