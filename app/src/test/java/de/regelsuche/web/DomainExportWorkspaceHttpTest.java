@@ -11,6 +11,7 @@ import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.*;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -181,8 +182,21 @@ class DomainExportWorkspaceHttpTest {
         String rebuildSetting = "regelsuche.lean.rebuild.project";
         String originalSetting = System.setProperty(rebuildSetting, "");
         try {
-            var response = request("POST", scopedPath, bound.toString());
+            String boundJson = bound.toString();
+            String exactBody = boundJson + " ".repeat(4096 - boundJson.length());
+            var response = request("POST", scopedPath, exactBody);
             assertEquals(200, response.statusCode(), response.body());
+            var exactChunked = requestWithBody("POST", scopedPath, chunkedBody(exactBody));
+            assertEquals(200, exactChunked.statusCode(), exactChunked.body());
+            assertEquals(response.body(), exactChunked.body());
+            String oversizedBody = exactBody + " ";
+            for (var publisher : List.of(HttpRequest.BodyPublishers.ofString(oversizedBody), chunkedBody(oversizedBody))) {
+                var oversized = requestWithBody("POST", scopedPath, publisher);
+                assertEquals(413, oversized.statusCode(), oversized.body());
+                var rejection = json.readTree(oversized.body());
+                assertEquals("PAYLOAD_TOO_LARGE", rejection.path("code").asText());
+                assertEquals(4096, rejection.path("limitBytes").asInt());
+            }
             var report = json.readTree(response.body());
             assertEquals("regelsuche.scoped-workspace-candidate-check/v1", report.path("schema").asText());
             assertEquals(runId, response.headers().firstValue("X-Regelsuche-Run-Id").orElseThrow());
@@ -444,7 +458,14 @@ class DomainExportWorkspaceHttpTest {
         return json.writeValueAsString(Map.of("expectedWorkspaceHash", workspaceHash, "expectedEvidenceHash", evidenceHash));
     }
     private HttpResponse<String> request(String method, String suffix, String body) throws Exception {
+        return requestWithBody(method, suffix, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+    }
+    private HttpResponse<String> requestWithBody(String method, String suffix, HttpRequest.BodyPublisher body) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.boundPort() + "/api/discovery-domains/exports" + suffix))
-            .header("Content-Type", "application/json").method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+            .header("Content-Type", "application/json").method(method, body).build(), HttpResponse.BodyHandlers.ofString());
+    }
+    private static HttpRequest.BodyPublisher chunkedBody(String body) {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        return HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(bytes));
     }
 }

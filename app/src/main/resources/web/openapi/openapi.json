@@ -379,6 +379,7 @@
         ],
         "operationId": "checkScopedWorkspaceCandidate",
         "summary": "Einen gespeicherten logischen Kandidaten rekonstruieren und erneut prüfen",
+        "description": "Der JSON-Request darf höchstens 4096 Bytes und höchstens so viele Bytes wie das konfigurierte Serverlimit umfassen.",
         "x-regelsuche-context": "/api/discovery-domains",
         "parameters": [
           {
