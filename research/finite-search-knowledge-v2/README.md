@@ -62,3 +62,89 @@ nachgewiesen. Das Quellrezept wird hier nur zur Nachvollziehbarkeit aufbewahrt,
 nicht erneut ausgeführt. Geschützte Qualifikationsdaten und externe Studien
 sind ausdrücklich nicht Bestandteil dieses Belegs.
 
+## Engpassanalyse
+
+Die v2-Ausführung liefert für die einseitige und die bidirektionale Suche sowie für alle drei
+Tabellenarme dieselben sechs bestätigten Ziele. Der tiefste Fall
+`independent-factor-sites-7` hat im vollständigen Referenzabschluss eine
+Mindesttiefe von sieben Primitivschritten. [Archiv der unveränderten Ausführung](https://github.com/carstenartur/Regelsuche/actions/runs/44879420814/artifacts/14697253542)
+
+| Verfahren am Siebenstellenfall | Bestätigte Tiefe | Native Suche | Erwerb oder Wiederherstellung | Native Pfadprüfung | Native Summe | Controller- oder Tabellenoperationen |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Einseitig | 7 | 968 | 0 | 56 | 1.024 | nicht erfasst |
+| Bidirektional | 7 | 472 | 0 | 56 | 528 | nicht erfasst |
+| Iterativ | ohne Pfad | 4.096 | 0 | 0 | 4.096 | nicht erfasst |
+| Geführt, ein Cache-Eintrag | ohne Pfad | 4.096 | 0 | 0 | 4.096 | 21.382 |
+| Geführt, 128 Cache-Einträge | ohne Pfad | 960 | 0 | 0 | 960 | 262.144 |
+| Kalte bzw. wiederhergestellte Tabelle, je Arm | 7 | 0 | 1.016 | 56 | 1.072 | 1.024 |
+| Warme Tabelle | 7 | 0 | 0 | 56 | 56 | 1.024 |
+
+- **Suche und Pfadprüfung.** Die bidirektionale Suche senkt die Zahl der
+  Suchaufrufe bei gleicher bestätigter Tiefe. Die warme Tabelle ersetzt die
+  native Suche durch 1.024 Tabellenoperationen und benötigt weiterhin 56
+  native Prüfaufrufe. Der Prüfer erzeugt zu jedem Pfadschritt die reversiblen
+  Nachbarn frisch. Das Verhältnis von 1.024 zu 56 ist mit 18,29 der größte
+  beobachtete Faktor bei nativen Aufrufen der warmen Tabelle gegenüber der
+  einseitigen Suche auf den sechs gemeinsam bestätigten Zielen.
+- **Controller.** Der 128-Einträge-Cache erreicht trotz 6.319 Cache-Treffern
+  und null Ersetzungen seine getrennte Controllergrenze bei 262.144
+  Operationen. Traversierung, Ordnung und Cachezugriffe teilen diese Grenze.
+  Der Ein-Eintrag-Cache und die ungeführte Vertiefung stoßen dagegen an die
+  native Aufrufgrenze. Die geführten Verfahren bestätigen in diesem Panel
+  höchstens Tiefe fünf.
+- **Erwerb und Wiederherstellung.** Die kalte und die wiederhergestellte
+  Tabelle verbrauchen je 1.016 native Aufrufe vor der Pfadprüfung. Ihre
+  Gesamtsumme liegt damit am Siebenstellenfall über jener der einseitigen Suche.
+- **Laufzeit und Allokation.** Die drei archivierten Einzelbeobachtungen am
+  Siebenstellenfall liegen für die einseitige Suche bei 223,9–232,5 ms und
+  919,0–922,3 MB Thread-Allokation. Für die warme Tabelle liegen sie bei
+  12,2–13,6 ms und 50,8–51,0 MB. Die MB-Werte summieren Allokationen im
+  messenden Thread. Das Dreierportfolio verbraucht wie das Einerportfolio
+  2.917 native Aufrufe, bei 328,6–381,1 ms gegenüber 648,7–669,2 ms.
+  Die Messung isoliert weder den Kerneldurchsatz noch die Kosten der einzelnen
+  Parser-, Matcher- und Identitätsoperationen.
+
+Der Faktor 1.000 bleibt im öffentlichen Panel unerreicht. Der warme Zugriff
+spart native Sucharbeit, während Pfadprüfung und Tabellenabfrage verbleiben.
+Der geführte Arm stößt bei größerem Cache zuerst an die Controllergrenze.
+Für tiefere Fälle mit vollständig vergleichbarer Arbeit gibt es hier keine
+Messung.
+
+Die Zahlen lassen sich ohne erneuten Suchlauf anhand des bereits erzeugten
+ZIP-Archivs prüfen. Dazu den Pfad zum heruntergeladenen Archiv einsetzen und
+im Repository-Stamm ausführen.
+
+```sh
+archive=/path/to/finite-search-v2-reproduction-44879420814-1.zip
+printf '%s  %s\n' 09a5081e908d5561390a0e53f593c3eacb0b88c6f40c0b278aa3a875e990199b "$archive" | sha256sum -c -
+out=$(mktemp -d)
+unzip -q "$archive" -d "$out"
+python3 docs/research/finite-search-knowledge-v2/verify_reproduction.py . "$out"
+python3 - "$out" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+case = "independent-factor-sites-7"
+report = json.loads((root / "host-1/comparison.json").read_bytes())
+rows = {(row["caseId"], row["arm"]): row for row in report["rows"]}
+for (case_id, arm), row in rows.items():
+    if case_id == case:
+        fields = ("pathLength", "searchCalls", "acquisitionCalls", "restorationCalls",
+                  "replayCalls", "totalNativeCalls", "lookupOperations", "cacheHits", "replacements")
+        print(arm, *(row[field] for field in fields))
+for (case_id, arm), row in rows.items():
+    if arm == "ONE_SIDED" and row["pathLength"] >= 0:
+        warm = rows[case_id, "TABLE_WARM"]
+        assert row["pathLength"] == warm["pathLength"] == row["referenceMinimumDepth"]
+        print(case_id, "native call ratio", row["totalNativeCalls"] / warm["totalNativeCalls"])
+for environment in ("host-1", "host-2", "container"):
+    runtime = json.loads((root / environment / "runtime.json").read_bytes())
+    for row in runtime["samples"]:
+        if row["caseId"] == case:
+            allocated = row["currentThreadAllocatedBytes"]
+            print(environment, row["arm"], row["wallNanos"] / 1e6, allocated / 1e6 if allocated >= 0 else None)
+PY
+```
+

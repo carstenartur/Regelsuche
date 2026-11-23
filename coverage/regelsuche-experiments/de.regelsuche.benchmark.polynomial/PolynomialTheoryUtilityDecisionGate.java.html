@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialTheoryUtilityDecisionGate.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.polynomial</a> &gt; <span class="el_source">PolynomialTheoryUtilityDecisionGate.java</span></div><h1>PolynomialTheoryUtilityDecisionGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.polynomial;
+
+import de.regelsuche.json.JsonWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.interfaces.EdECPublicKey;
+import java.security.spec.NamedParameterSpec;
+import java.util.Objects;
+
+/** Verifies detached authorizations from the external custodian and study reviewer. */
+public final class PolynomialTheoryUtilityDecisionGate {
+    public static final String RELEASE_SCHEMA = &quot;regelsuche.polynomial-theory-utility-qualification-release/v1&quot;;
+    public static final String DECISION_SCHEMA = &quot;regelsuche.polynomial-theory-utility-decision/v1&quot;;
+
+<span class="fc" id="L17">    private static final String ALGORITHM = NamedParameterSpec.ED25519.getName();</span>
+    private static final int SIGNATURE_BYTES = 64;
+
+    private final EdECPublicKey custodian;
+    private final EdECPublicKey reviewer;
+
+    /** Both trust anchors must be provisioned independently of the submitted evidence. */
+<span class="fc" id="L24">    public PolynomialTheoryUtilityDecisionGate(PublicKey custodian, PublicKey reviewer) {</span>
+<span class="fc" id="L25">        this.custodian = requireEd25519(custodian);</span>
+<span class="fc" id="L26">        this.reviewer = requireEd25519(reviewer);</span>
+<span class="fc" id="L27">        var custodianPoint = this.custodian.getPoint();</span>
+<span class="fc" id="L28">        var reviewerPoint = this.reviewer.getPoint();</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (custodianPoint.getY().equals(reviewerPoint.getY())</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">                &amp;&amp; custodianPoint.isXOdd() == reviewerPoint.isXOdd()) {</span>
+<span class="fc" id="L31">            throw new IllegalArgumentException(&quot;custody and review require distinct trust anchors&quot;);</span>
+        }
+<span class="fc" id="L33">    }</span>
+
+    /** The custodian signs this payload to release the pinned qualification for the exact candidate freeze. */
+    public static byte[] releasePayload(PolynomialTheoryUtilityCandidateFreeze freeze) {
+<span class="fc" id="L37">        Objects.requireNonNull(freeze, &quot;freeze&quot;);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (!PolynomialTheoryUtilityCandidateFreeze.OBSERVED_SCHEMA.equals(freeze.schema())) {</span>
+<span class="fc" id="L39">            throw new IllegalArgumentException(&quot;qualification release requires an observed candidate freeze&quot;);</span>
+        }
+<span class="fc" id="L41">        return canonicalBytes(new JsonWriter().beginObject()</span>
+<span class="fc" id="L42">            .property(&quot;schema&quot;, RELEASE_SCHEMA)</span>
+<span class="fc" id="L43">            .property(&quot;studyId&quot;, freeze.studyId())</span>
+<span class="fc" id="L44">            .property(&quot;preregistrationHash&quot;, PolynomialTheoryUtilityPreregistration.CONTENT_HASH)</span>
+<span class="fc" id="L45">            .property(&quot;candidateFreezeSchema&quot;, freeze.schema())</span>
+<span class="fc" id="L46">            .property(&quot;candidateFreezeHash&quot;, freeze.contentHash())</span>
+<span class="fc" id="L47">            .property(&quot;candidateFreezeLength&quot;, freeze.byteLength())</span>
+<span class="fc" id="L48">            .property(&quot;qualificationPath&quot;, PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_FILE_NAME)</span>
+<span class="fc" id="L49">            .property(&quot;qualificationHash&quot;, PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_CONTENT_HASH)</span>
+<span class="fc" id="L50">            .property(&quot;qualificationLength&quot;, PolynomialTheoryUtilityCaseCorpus.QUALIFICATION_BYTE_LENGTH));</span>
+    }
+
+    /** Verifies the exact authorized freeze and sealed corpus identity without accessing the corpus. */
+    public void requireReleased(PolynomialTheoryUtilityCandidateFreeze freeze, byte[] releaseSignature) {
+<span class="fc" id="L55">        requireSignature(custodian, releasePayload(freeze), releaseSignature, &quot;qualification release&quot;);</span>
+<span class="fc" id="L56">    }</span>
+
+    /** The reviewer signs the preregistered outcome for the exact release and comparison evidence. */
+    public static byte[] decisionPayload(PolynomialTheoryUtilityCandidateFreeze freeze, byte[] releaseSignature,
+            String outcome, byte[] comparisonEvidence) {
+<span class="fc bfc" id="L61" title="All 4 branches covered.">        if (outcome == null || !PolynomialTheoryUtilityPreregistration.DECISION_OUTCOMES.contains(outcome)) {</span>
+<span class="fc" id="L62">            throw new IllegalArgumentException(&quot;decision outcome is not preregistered&quot;);</span>
+        }
+<span class="fc bfc" id="L64" title="All 4 branches covered.">        if (comparisonEvidence == null || comparisonEvidence.length == 0) {</span>
+<span class="fc" id="L65">            throw new IllegalArgumentException(&quot;comparison evidence is required&quot;);</span>
+        }
+<span class="fc" id="L67">        return canonicalBytes(new JsonWriter().beginObject()</span>
+<span class="fc" id="L68">            .property(&quot;schema&quot;, DECISION_SCHEMA)</span>
+<span class="fc" id="L69">            .property(&quot;releasePayloadHash&quot;, PolynomialTheoryUtilityExecutionIdentity.sha256(releasePayload(freeze)))</span>
+<span class="fc" id="L70">            .property(&quot;releaseSignatureHash&quot;, PolynomialTheoryUtilityExecutionIdentity.sha256(</span>
+<span class="fc" id="L71">                requireSignatureLength(releaseSignature)))</span>
+<span class="fc" id="L72">            .property(&quot;comparisonHash&quot;, PolynomialTheoryUtilityExecutionIdentity.sha256(comparisonEvidence))</span>
+<span class="fc" id="L73">            .property(&quot;comparisonLength&quot;, comparisonEvidence.length)</span>
+<span class="fc" id="L74">            .property(&quot;outcome&quot;, outcome));</span>
+    }
+
+    /** Returns the outcome only after both independent signatures have been verified. */
+    public String requireAuthorized(PolynomialTheoryUtilityCandidateFreeze freeze, byte[] releaseSignature,
+            String outcome, byte[] comparisonEvidence, byte[] decisionSignature) {
+<span class="fc" id="L80">        byte[] release = requireSignatureLength(releaseSignature).clone();</span>
+<span class="fc" id="L81">        requireReleased(freeze, release);</span>
+<span class="fc" id="L82">        byte[] decision = decisionPayload(freeze, release, outcome, comparisonEvidence);</span>
+<span class="fc" id="L83">        requireSignature(reviewer, decision, decisionSignature, &quot;study decision&quot;);</span>
+<span class="fc" id="L84">        return outcome;</span>
+    }
+
+    private static byte[] canonicalBytes(JsonWriter json) {
+<span class="fc" id="L88">        return (json.endObject() + &quot;\n&quot;).getBytes(StandardCharsets.UTF_8);</span>
+    }
+
+    private static EdECPublicKey requireEd25519(PublicKey key) {
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (key instanceof EdECPublicKey edwards &amp;&amp; ALGORITHM.equals(edwards.getParams().getName())) {</span>
+<span class="fc" id="L93">            return edwards;</span>
+        }
+<span class="fc" id="L95">        throw new IllegalArgumentException(&quot;an Ed25519 trust anchor is required&quot;);</span>
+    }
+
+    private static byte[] requireSignatureLength(byte[] signature) {
+<span class="fc bfc" id="L99" title="All 4 branches covered.">        if (signature == null || signature.length != SIGNATURE_BYTES) {</span>
+<span class="fc" id="L100">            throw new IllegalArgumentException(&quot;an Ed25519 signature must contain 64 bytes&quot;);</span>
+        }
+<span class="fc" id="L102">        return signature;</span>
+    }
+
+    private static void requireSignature(PublicKey key, byte[] payload, byte[] signature, String purpose) {
+        try {
+<span class="fc" id="L107">            Signature verifier = Signature.getInstance(ALGORITHM);</span>
+<span class="fc" id="L108">            verifier.initVerify(key);</span>
+<span class="fc" id="L109">            verifier.update(payload);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (!verifier.verify(requireSignatureLength(signature))) {</span>
+<span class="fc" id="L111">                throw new IllegalArgumentException(&quot;invalid signature for &quot; + purpose);</span>
+            }
+<span class="nc" id="L113">        } catch (GeneralSecurityException cause) {</span>
+<span class="nc" id="L114">            throw new IllegalArgumentException(&quot;could not verify signature for &quot; + purpose, cause);</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

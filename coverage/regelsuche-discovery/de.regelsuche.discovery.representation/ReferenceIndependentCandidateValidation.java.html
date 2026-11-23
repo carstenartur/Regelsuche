@@ -217,8 +217,8 @@ public final class ReferenceIndependentCandidateValidation {
 <span class="fc" id="L217">        public Artifact {</span>
 <span class="fc" id="L218">            Objects.requireNonNull(content, &quot;content&quot;);</span>
 <span class="fc" id="L219">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="pc bpc" id="L220" title="1 of 2 branches missed.">            if (!hash(content).equals(contentHash)) {</span>
-<span class="nc" id="L221">                throw new IllegalArgumentException(&quot;companion content hash mismatch&quot;);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (!hash(content).equals(contentHash)) {</span>
+<span class="fc" id="L221">                throw new IllegalArgumentException(&quot;companion content hash mismatch&quot;);</span>
             }
 <span class="fc" id="L223">        }</span>
 
@@ -233,12 +233,12 @@ public final class ReferenceIndependentCandidateValidation {
         public static Artifact fromCanonicalJson(String source) {
             try {
 <span class="fc" id="L235">                Artifact value = JSON.readValue(source, Artifact.class);</span>
-<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                if (!value.toCanonicalJson().equals(source)) {</span>
-<span class="nc" id="L237">                    throw new IllegalArgumentException(&quot;companion JSON is not canonical&quot;);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                if (!value.toCanonicalJson().equals(source)) {</span>
+<span class="fc" id="L237">                    throw new IllegalArgumentException(&quot;companion JSON is not canonical&quot;);</span>
                 }
 <span class="fc" id="L239">                return value;</span>
-<span class="nc" id="L240">            } catch (JsonProcessingException exception) {</span>
-<span class="nc" id="L241">                throw new IllegalArgumentException(&quot;invalid companion JSON&quot;, exception);</span>
+<span class="fc" id="L240">            } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L241">                throw new IllegalArgumentException(&quot;invalid companion JSON&quot;, exception);</span>
             }
         }
     }

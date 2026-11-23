@@ -12,43 +12,61 @@ import java.util.function.ToIntFunction;
 /** Bounded native scalar execution over EGraph, with a separate receiver check on each claimed extraction. */
 public final class NativeScalarSaturation {
 <span class="fc" id="L14">    public enum Schedule { ROUND_ROBIN, PRODUCTIVITY }</span>
-    public record Budget(int rounds, int nodes, int perRuleFuel, Schedule schedule) {
-<span class="fc" id="L16">        public Budget {</span>
-<span class="fc" id="L17">            Objects.requireNonNull(schedule);</span>
-<span class="pc bpc" id="L18" title="6 of 12 branches missed.">            if (rounds&lt;1 || rounds&gt;64 || nodes&lt;1 || nodes&gt;4096 || perRuleFuel&lt;1 || perRuleFuel&gt;100_000)</span>
-<span class="nc" id="L19">                throw new IllegalArgumentException(&quot;invalid native saturation budget&quot;);</span>
-<span class="fc" id="L20">        }</span>
+<span class="fc" id="L15">    public enum Matcher {</span>
+<span class="fc" id="L16">        WHOLE_NODE(FlatAcMatchPlan.VERSION, false),</span>
+<span class="fc" id="L17">        CONTEXTUAL(FlatAcMatchPlan.CONTEXTUAL_VERSION, true);</span>
+
+        private final String identifier;
+        final boolean allowsRemainder;
+
+<span class="fc" id="L22">        Matcher(String identifier, boolean allowsRemainder) {</span>
+<span class="fc" id="L23">            this.identifier = identifier;</span>
+<span class="fc" id="L24">            this.allowsRemainder = allowsRemainder;</span>
+<span class="fc" id="L25">        }</span>
+
+        public String identifier() {
+<span class="nc" id="L28">            return identifier;</span>
+        }
     }
-<span class="fc" id="L22">    public record RuleWork(int roots, int nodes, int tuples, int matches, int duplicates, int rejectedGuards,</span>
+
+    public record Budget(int rounds, int nodes, int perRuleFuel, Schedule schedule) {
+<span class="fc" id="L33">        public Budget {</span>
+<span class="fc" id="L34">            Objects.requireNonNull(schedule);</span>
+<span class="pc bpc" id="L35" title="6 of 12 branches missed.">            if (rounds&lt;1 || rounds&gt;64 || nodes&lt;1 || nodes&gt;4096 || perRuleFuel&lt;1 || perRuleFuel&gt;100_000)</span>
+<span class="nc" id="L36">                throw new IllegalArgumentException(&quot;invalid native saturation budget&quot;);</span>
+<span class="fc" id="L37">        }</span>
+    }
+<span class="fc" id="L39">    public record RuleWork(int roots, int nodes, int tuples, int matches, int duplicates, int rejectedGuards,</span>
                            int cacheReuse, int unions, int fuelSpent) { }
-<span class="fc" id="L24">    public record Guard(String rule, Expr factor, String result, boolean applied) { }</span>
-<span class="fc" id="L25">    public record Analysis(int eclass, ScalarGuardFacts conditions, ScalarShapeFacts shape) { }</span>
-<span class="fc" id="L26">    public record Extraction(String objective, Expr proposal, Expr expression, String status, int rawNodes, int proofSteps, Optional&lt;ScalarExtractionProof.Bundle&gt; proof) { }</span>
-<span class="fc" id="L27">    public record Result(ScalarExtractionProof.Context context, Budget budget, String terminal, int rounds, int graphNodes,</span>
+<span class="fc" id="L41">    public record Guard(String rule, Expr factor, String result, boolean applied) { }</span>
+<span class="fc" id="L42">    public record Analysis(int eclass, ScalarGuardFacts conditions, ScalarShapeFacts shape) { }</span>
+<span class="fc" id="L43">    public record Extraction(String objective, Expr proposal, Expr expression, String status, int rawNodes, int proofSteps, Optional&lt;ScalarExtractionProof.Bundle&gt; proof) { }</span>
+<span class="fc" id="L44">    public record Result(ScalarExtractionProof.Context context, Budget budget, String terminal, int rounds, int graphNodes,</span>
                          long analysisEvaluations, List&lt;Analysis&gt; analyses, Map&lt;String,RuleWork&gt; ledger, List&lt;Guard&gt; guards,
                          List&lt;ScalarExtractionProof.Lemma&gt; unionEvidence, List&lt;Extraction&gt; extractions) { }
-<span class="fc" id="L30">    public record Observation(Result result, Map&lt;String,Integer&gt; nodesByKind,</span>
+<span class="fc" id="L47">    public record Observation(Result result, Map&lt;String,Integer&gt; nodesByKind,</span>
                               Map&lt;String,Integer&gt; classesContainingKind, Map&lt;String,Long&gt; producerStages) { }
 
-<span class="fc" id="L33">    static final class Account {</span>
+<span class="fc" id="L50">    static final class Account {</span>
         int roots,nodes,tuples,matches,duplicates,rejected,reuse,unions,spent;
         boolean capped;
         boolean spend(int count, int limit) {
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (count &gt; limit-spent) { capped = true; return false; }</span>
-<span class="fc" id="L38">            spent += count;</span>
-<span class="fc" id="L39">            return true;</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (count &gt; limit-spent) { capped = true; return false; }</span>
+<span class="fc" id="L55">            spent += count;</span>
+<span class="fc" id="L56">            return true;</span>
         }
-<span class="fc" id="L41">        RuleWork freeze() { return new RuleWork(roots,nodes,tuples,matches,duplicates,rejected,reuse,unions,spent); }</span>
+<span class="fc" id="L58">        RuleWork freeze() { return new RuleWork(roots,nodes,tuples,matches,duplicates,rejected,reuse,unions,spent); }</span>
     }
 
     final EGraph graph;
     final Budget budget;
+    final Matcher matcher;
     final ScalarExtractionProof.Context context;
     final ScalarClassAnalysis facts;
-<span class="fc" id="L48">    final List&lt;Guard&gt; guards = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L49">    final LinkedHashSet&lt;ScalarExtractionProof.Lemma&gt; unionEvidence = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L50">    private final Map&lt;String,Account&gt; accounts = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L51">    private final Map&lt;String,Long&gt; scanned = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L66">    final List&lt;Guard&gt; guards = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L67">    final LinkedHashSet&lt;ScalarExtractionProof.Lemma&gt; unionEvidence = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L68">    private final Map&lt;String,Account&gt; accounts = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L69">    private final Map&lt;String,Long&gt; scanned = new HashMap&lt;&gt;();</span>
     private final EClassId root;
     private final Expr input;
     private final LongConsumer proofMeter;
@@ -57,152 +75,169 @@ public final class NativeScalarSaturation {
     private long guardWork;
     private long proofWork;
     private int rounds;
-<span class="fc" id="L60">    private String terminal = &quot;ROUND_BUDGET&quot;;</span>
-<span class="fc" id="L61">    private NativeScalarSaturation(Expr input, ScalarExtractionProof.Context context, Budget budget, boolean observeWork) {</span>
-<span class="fc" id="L62">        this.input = input; this.context = context; this.budget = budget;</span>
-<span class="fc" id="L63">        this.graph = EGraph.exactScalarAcV1(observeWork);</span>
-<span class="fc" id="L64">        this.facts = new ScalarClassAnalysis(graph,context.assumptions());</span>
-<span class="fc" id="L65">        var sourceCheck = new ExtractionProofBuilder(List.of(), ProofLimits.defaults());</span>
-<span class="fc" id="L66">        sourceCheck.addExpression(input);</span>
-<span class="fc bfc" id="L67" title="All 2 branches covered.">        this.proofMeter = observeWork ? units -&gt; proofWork += units : null;</span>
-<span class="fc bfc" id="L68" title="All 2 branches covered.">        this.sourcePreparationWork = observeWork</span>
-<span class="fc" id="L69">                ? 1L + sourceCheck.workUsed() + context.inventory().size() + context.assumptions().size() : 0;</span>
-<span class="fc" id="L70">        graph.setInsertionLimit(budget.nodes());</span>
-<span class="fc" id="L71">        try (var arena = new ExprValueArena(budget.nodes())) {</span>
-<span class="fc" id="L72">            root = graph.addArenaValue(arena,arena.intern(input),FlatAcMatchPlan.MAX_ARITY);</span>
+<span class="fc" id="L78">    private String terminal = &quot;ROUND_BUDGET&quot;;</span>
+    private NativeScalarSaturation(Expr input, ScalarExtractionProof.Context context, Budget budget,
+<span class="fc" id="L80">                                   Matcher matcher, boolean observeWork) {</span>
+<span class="fc" id="L81">        this.input = input; this.context = context; this.budget = budget;</span>
+<span class="fc" id="L82">        this.matcher = Objects.requireNonNull(matcher, &quot;matcher&quot;);</span>
+<span class="fc" id="L83">        this.graph = EGraph.exactScalarAcV1(observeWork);</span>
+<span class="fc" id="L84">        this.facts = new ScalarClassAnalysis(graph,context.assumptions());</span>
+<span class="fc" id="L85">        var sourceCheck = new ExtractionProofBuilder(List.of(), ProofLimits.defaults());</span>
+<span class="fc" id="L86">        sourceCheck.addExpression(input);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        this.proofMeter = observeWork ? units -&gt; proofWork += units : null;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        this.sourcePreparationWork = observeWork</span>
+<span class="fc" id="L89">                ? 1L + sourceCheck.workUsed() + context.inventory().size() + context.assumptions().size() : 0;</span>
+<span class="fc" id="L90">        graph.setInsertionLimit(budget.nodes());</span>
+<span class="fc" id="L91">        try (var arena = new ExprValueArena(budget.nodes())) {</span>
+<span class="fc" id="L92">            root = graph.addArenaValue(arena,arena.intern(input),FlatAcMatchPlan.MAX_ARITY);</span>
         }
-<span class="fc" id="L74">        context.inventory().stream().filter(e -&gt; context.enables(e.id())).forEach(e -&gt; accounts.put(e.id(),new Account()));</span>
-<span class="fc" id="L75">        recordAc(input,graph.extract(root,node -&gt; 1));</span>
-<span class="fc" id="L76">    }</span>
+<span class="fc" id="L94">        context.inventory().stream().filter(e -&gt; context.enables(e.id())).forEach(e -&gt; accounts.put(e.id(),new Account()));</span>
+<span class="fc" id="L95">        recordAc(input,graph.extract(root,node -&gt; 1));</span>
+<span class="fc" id="L96">    }</span>
 
-    static Result run(Expr input, Collection&lt;? extends RewriteRule&gt; rules, ScalarExtractionProof.Context context, Budget budget) {
-<span class="fc" id="L79">        return prepare(input, rules, context, budget, false).execute();</span>
+    static Result run(Expr input, Collection&lt;? extends RewriteRule&gt; rules, ScalarExtractionProof.Context context,
+                      Budget budget, Matcher matcher) {
+<span class="fc" id="L100">        return prepare(input, rules, context, budget, matcher, false).execute();</span>
     }
 
     static Observation observe(Expr input, Collection&lt;? extends RewriteRule&gt; rules,
             ScalarExtractionProof.Context context, Budget budget) {
-<span class="fc" id="L84">        var run = prepare(input, rules, context, budget, true);</span>
-<span class="fc" id="L85">        var result = run.execute();</span>
-<span class="fc" id="L86">        var producerStages = run.producerStages();</span>
-<span class="fc" id="L87">        var nodes = new TreeMap&lt;String,Integer&gt;();</span>
-<span class="fc" id="L88">        var classes = new TreeMap&lt;String,Integer&gt;();</span>
-<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (var eclass : run.graph.classes()) {</span>
-<span class="fc" id="L90">            var kinds = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (var node : eclass.nodes()) {</span>
-<span class="fc" id="L92">                String symbol = node.symbol();</span>
-<span class="pc bpc" id="L93" title="1 of 4 branches missed.">                String kind = symbol.startsWith(&quot;ac:&quot;) || symbol.startsWith(&quot;op:&quot;)</span>
-<span class="fc" id="L94">                        ? symbol : symbol.substring(0, symbol.indexOf(':'));</span>
-<span class="fc" id="L95">                nodes.merge(kind, 1, Integer::sum);</span>
-<span class="fc" id="L96">                kinds.add(kind);</span>
-<span class="fc" id="L97">            }</span>
-<span class="fc" id="L98">            kinds.forEach(kind -&gt; classes.merge(kind, 1, Integer::sum));</span>
-<span class="fc" id="L99">        }</span>
-<span class="fc" id="L100">        return new Observation(result, Collections.unmodifiableMap(nodes), Collections.unmodifiableMap(classes),</span>
+<span class="fc" id="L105">        var run = prepare(input, rules, context, budget, Matcher.CONTEXTUAL, true);</span>
+<span class="fc" id="L106">        var result = run.execute();</span>
+<span class="fc" id="L107">        var producerStages = run.producerStages();</span>
+<span class="fc" id="L108">        var nodes = new TreeMap&lt;String,Integer&gt;();</span>
+<span class="fc" id="L109">        var classes = new TreeMap&lt;String,Integer&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (var eclass : run.graph.classes()) {</span>
+<span class="fc" id="L111">            var kinds = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (var node : eclass.nodes()) {</span>
+<span class="fc" id="L113">                String symbol = node.symbol();</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">                String kind = symbol.startsWith(&quot;ac:&quot;) || symbol.startsWith(&quot;op:&quot;)</span>
+<span class="fc" id="L115">                        ? symbol : symbol.substring(0, symbol.indexOf(':'));</span>
+<span class="fc" id="L116">                nodes.merge(kind, 1, Integer::sum);</span>
+<span class="fc" id="L117">                kinds.add(kind);</span>
+<span class="fc" id="L118">            }</span>
+<span class="fc" id="L119">            kinds.forEach(kind -&gt; classes.merge(kind, 1, Integer::sum));</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        return new Observation(result, Collections.unmodifiableMap(nodes), Collections.unmodifiableMap(classes),</span>
                 producerStages);
     }
 
     private Map&lt;String,Long&gt; producerStages() {
-<span class="fc" id="L105">        return Map.of(&quot;sourcePreparation&quot;, sourcePreparationWork, &quot;scheduler&quot;, schedulerWork,</span>
-<span class="fc" id="L106">                &quot;graphStructure&quot;, graph.observedStructureWork(), &quot;representativeForest&quot;, graph.observedRepresentativeWork(),</span>
-<span class="fc" id="L107">                &quot;extraction&quot;, graph.observedExtractionWork(), &quot;guardChecks&quot;, guardWork, &quot;proofProduction&quot;, proofWork);</span>
+<span class="fc" id="L126">        return Map.of(&quot;sourcePreparation&quot;, sourcePreparationWork, &quot;scheduler&quot;, schedulerWork,</span>
+<span class="fc" id="L127">                &quot;graphStructure&quot;, graph.observedStructureWork(), &quot;representativeForest&quot;, graph.observedRepresentativeWork(),</span>
+<span class="fc" id="L128">                &quot;extraction&quot;, graph.observedExtractionWork(), &quot;guardChecks&quot;, guardWork, &quot;proofProduction&quot;, proofWork);</span>
     }
 
     private static NativeScalarSaturation prepare(Expr input, Collection&lt;? extends RewriteRule&gt; rules,
-            ScalarExtractionProof.Context context, Budget budget, boolean observeWork) {
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!ScalarExtractionProof.Context.create(rules, context.assumptions(), context.sourceRevision()).equals(context)) {</span>
-<span class="nc" id="L113">            throw new IllegalArgumentException(&quot;receiver's scalar law or rule inventory differs&quot;);</span>
+            ScalarExtractionProof.Context context, Budget budget, Matcher matcher, boolean observeWork) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (!ScalarExtractionProof.Context.create(rules, context.assumptions(), context.sourceRevision()).equals(context)) {</span>
+<span class="nc" id="L134">            throw new IllegalArgumentException(&quot;receiver's scalar law or rule inventory differs&quot;);</span>
         }
-<span class="fc" id="L115">        return new NativeScalarSaturation(input, context, budget, observeWork);</span>
+<span class="fc" id="L136">        return new NativeScalarSaturation(input, context, budget, matcher, observeWork);</span>
     }
 
     private Result execute() {
-<span class="fc" id="L119">        long previous = -1;</span>
+<span class="fc" id="L140">        long previous = -1;</span>
         try {
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            for (int turn=0;turn&lt;budget.rounds();turn++) {</span>
-<span class="fc" id="L122">                long entering = graph.version();</span>
-<span class="fc" id="L123">                rounds++;</span>
-<span class="fc" id="L124">                chargeScheduler(1);</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">                var dirty = previous &lt; 0 ? graph.classes().stream().map(EClass::id).toList() : graph.affectedClassesChangedAfter(previous);</span>
-<span class="fc" id="L126">                facts.update(dirty);</span>
-<span class="fc" id="L127">                var keys = new ArrayList&lt;&gt;(accounts.keySet());</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (budget.schedule() == Schedule.PRODUCTIVITY) keys.sort(this::compareProductivity);</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">                for (String id : keys) {</span>
-<span class="fc" id="L130">                    chargeScheduler(1);</span>
-<span class="fc" id="L131">                    Account work = accounts.get(id);</span>
-<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                    if (work.capped) continue;</span>
-<span class="fc" id="L133">                    Long last = scanned.get(id);</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">                    var roots = last == null ? graph.classes().stream().map(EClass::id).sorted().toList()</span>
-<span class="fc" id="L135">                        : graph.affectedClassesChangedAfter(last).stream().map(graph::find).distinct().sorted().toList();</span>
-<span class="fc" id="L136">                    chargeScheduler(roots.size());</span>
-<span class="fc" id="L137">                    work.reuse += Math.max(0,graph.classCount()-roots.size());</span>
-<span class="fc" id="L138">                    scanned.put(id,graph.version());</span>
-<span class="fc" id="L139">                    NativeScalarRules.apply(this,id,roots,work);</span>
-<span class="fc" id="L140">                    graph.rebuild();</span>
-<span class="fc" id="L141">                }</span>
-<span class="fc" id="L142">                previous = entering;</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">                if (entering==graph.version()) {</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                    terminal = accounts.values().stream().anyMatch(a -&gt; a.capped) ? &quot;RULE_FUEL_BUDGET&quot; : &quot;NATIVE_FRAGMENT_FIXPOINT&quot;;</span>
-<span class="fc" id="L145">                    break;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            for (int turn=0;turn&lt;budget.rounds();turn++) {</span>
+<span class="fc" id="L143">                long entering = graph.version();</span>
+<span class="fc" id="L144">                rounds++;</span>
+<span class="fc" id="L145">                chargeScheduler(1);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                var dirty = previous &lt; 0 ? graph.classes().stream().map(EClass::id).toList() : graph.affectedClassesChangedAfter(previous);</span>
+<span class="fc" id="L147">                facts.update(dirty);</span>
+<span class="fc" id="L148">                var keys = new ArrayList&lt;&gt;(accounts.keySet());</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (budget.schedule() == Schedule.PRODUCTIVITY) keys.sort(this::compareProductivity);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                for (String id : keys) {</span>
+<span class="fc" id="L151">                    chargeScheduler(1);</span>
+<span class="fc" id="L152">                    Account work = accounts.get(id);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    if (work.capped) continue;</span>
+<span class="fc" id="L154">                    Long last = scanned.get(id);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                    var roots = last == null ? graph.classes().stream().map(EClass::id).sorted().toList()</span>
+<span class="fc" id="L156">                        : graph.affectedClassesChangedAfter(last).stream().map(graph::find).distinct().sorted().toList();</span>
+<span class="fc" id="L157">                    chargeScheduler(roots.size());</span>
+<span class="fc" id="L158">                    work.reuse += Math.max(0,graph.classCount()-roots.size());</span>
+<span class="fc" id="L159">                    scanned.put(id,graph.version());</span>
+<span class="fc" id="L160">                    NativeScalarRules.apply(this,id,roots,work);</span>
+<span class="fc" id="L161">                    graph.rebuild();</span>
+<span class="fc" id="L162">                }</span>
+<span class="fc" id="L163">                previous = entering;</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                if (entering==graph.version()) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                    terminal = accounts.values().stream().anyMatch(a -&gt; a.capped) ? &quot;RULE_FUEL_BUDGET&quot; : &quot;NATIVE_FRAGMENT_FIXPOINT&quot;;</span>
+<span class="fc" id="L166">                    break;</span>
                 }
             }
-<span class="fc" id="L148">        } catch (EGraph.NodeBudgetExceeded exhausted) { terminal = &quot;NODE_BUDGET&quot;; }</span>
-<span class="fc" id="L149">        var ledger = new TreeMap&lt;String,RuleWork&gt;();</span>
-<span class="fc" id="L150">        accounts.forEach((id,account) -&gt; ledger.put(id,account.freeze()));</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">        var outputs = List.of(extract(&quot;NODE_COUNT&quot;, node -&gt; 1), extract(&quot;DIVISION_PENALTY&quot;, node -&gt; &quot;op:DIV&quot;.equals(node.symbol())?16:1));</span>
-<span class="fc" id="L152">        facts.update(graph.affectedClassesChangedAfter(previous));</span>
-<span class="fc" id="L153">        return new Result(context,budget,terminal,rounds,graph.nodeCount(),facts.evaluations(),facts.snapshot(),Collections.unmodifiableMap(ledger),</span>
-<span class="fc" id="L154">            List.copyOf(guards),List.copyOf(unionEvidence),outputs);</span>
+<span class="fc" id="L169">        } catch (EGraph.NodeBudgetExceeded exhausted) { terminal = &quot;NODE_BUDGET&quot;; }</span>
+<span class="fc" id="L170">        var ledger = new TreeMap&lt;String,RuleWork&gt;();</span>
+<span class="fc" id="L171">        accounts.forEach((id,account) -&gt; ledger.put(id,account.freeze()));</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        var outputs = List.of(extract(&quot;NODE_COUNT&quot;, node -&gt; 1), extract(&quot;DIVISION_PENALTY&quot;, node -&gt; &quot;op:DIV&quot;.equals(node.symbol())?16:1));</span>
+<span class="fc" id="L173">        facts.update(graph.affectedClassesChangedAfter(previous));</span>
+<span class="fc" id="L174">        return new Result(context,budget,terminal,rounds,graph.nodeCount(),facts.evaluations(),facts.snapshot(),Collections.unmodifiableMap(ledger),</span>
+<span class="fc" id="L175">            List.copyOf(guards),List.copyOf(unionEvidence),outputs);</span>
     }
 
     private void chargeScheduler(long units) {
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (proofMeter != null) schedulerWork += units;</span>
-<span class="fc" id="L159">    }</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (proofMeter != null) schedulerWork += units;</span>
+<span class="fc" id="L180">    }</span>
 
     private int compareProductivity(String left, String right) {
-<span class="fc" id="L162">        chargeScheduler(1);</span>
-<span class="fc" id="L163">        int ordered = Integer.compare(accounts.get(right).unions, accounts.get(left).unions);</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        return ordered == 0 ? left.compareTo(right) : ordered;</span>
+<span class="fc" id="L183">        chargeScheduler(1);</span>
+<span class="fc" id="L184">        int ordered = Integer.compare(accounts.get(right).unions, accounts.get(left).unions);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        return ordered == 0 ? left.compareTo(right) : ordered;</span>
     }
 
     void chargeGuard() {
-<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (proofMeter != null) guardWork++;</span>
-<span class="fc" id="L169">    }</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (proofMeter != null) guardWork++;</span>
+<span class="fc" id="L190">    }</span>
 
     private Extraction extract(String label, ToIntFunction&lt;ENode&gt; cost) {
-<span class="fc" id="L172">        Expr selected = graph.extract(root,cost);</span>
+<span class="fc" id="L193">        Expr selected = graph.extract(root,cost);</span>
         Optional&lt;ScalarExtractionProof.Bundle&gt; proof;
-<span class="fc" id="L174">        try { proof = ScalarExtractionProof.buildObserved(input, selected, context, List.copyOf(unionEvidence),</span>
-<span class="fc" id="L175">                ProofLimits.defaults(), proofMeter); }</span>
-<span class="nc" id="L176">        catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
-<span class="nc" id="L177">            return new Extraction(label,selected,input,&quot;PROOF_BUDGET&quot;,nodes(input),0,Optional.empty());</span>
-<span class="fc" id="L178">        }</span>
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        Expr authorized = proof.isPresent() ? selected : input;</span>
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        return new Extraction(label,selected,authorized,proof.isPresent() ? &quot;CHECKED_EQUALITY&quot; : &quot;DERIVATION_UNAVAILABLE&quot;,nodes(authorized),proof.map(b -&gt; b.dag().steps().size()).orElse(0),proof);</span>
+<span class="fc" id="L195">        try { proof = ScalarExtractionProof.buildObserved(input, selected, context, List.copyOf(unionEvidence),</span>
+<span class="fc" id="L196">                ProofLimits.defaults(), proofMeter); }</span>
+<span class="nc" id="L197">        catch (ExtractionProofBuilder.LimitExceeded exhausted) {</span>
+<span class="nc" id="L198">            return new Extraction(label,selected,input,&quot;PROOF_BUDGET&quot;,nodes(input),0,Optional.empty());</span>
+<span class="fc" id="L199">        }</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        Expr authorized = proof.isPresent() ? selected : input;</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        return new Extraction(label,selected,authorized,proof.isPresent() ? &quot;CHECKED_EQUALITY&quot; : &quot;DERIVATION_UNAVAILABLE&quot;,nodes(authorized),proof.map(b -&gt; b.dag().steps().size()).orElse(0),proof);</span>
     }
     private static int nodes(Expr expr) {
-<span class="fc bfc" id="L183" title="All 3 branches covered.">        return switch(expr) {</span>
-<span class="fc" id="L184">            case BinaryExpr b -&gt; 1 + nodes(b.left()) + nodes(b.right());</span>
-<span class="fc" id="L185">            case FunctionExpr f -&gt; 1 + f.arguments().stream().mapToInt(NativeScalarSaturation::nodes).sum();</span>
-<span class="fc" id="L186">            default -&gt; 1;</span>
+<span class="fc bfc" id="L204" title="All 3 branches covered.">        return switch(expr) {</span>
+<span class="fc" id="L205">            case BinaryExpr b -&gt; 1 + nodes(b.left()) + nodes(b.right());</span>
+<span class="fc" id="L206">            case FunctionExpr f -&gt; 1 + f.arguments().stream().mapToInt(NativeScalarSaturation::nodes).sum();</span>
+<span class="fc" id="L207">            default -&gt; 1;</span>
         };
     }
     void recordAc(Expr a, Expr b) {
-<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (!a.equals(b)) {</span>
-<span class="fc" id="L191">            var law = new ScalarExtractionProof.Lemma(ScalarExtractionProof.AC,a,b);</span>
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (ScalarExtractionProof.admitsObserved(context, law, proofMeter)) unionEvidence.add(law);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (!a.equals(b)) {</span>
+<span class="fc" id="L212">            var law = new ScalarExtractionProof.Lemma(ScalarExtractionProof.AC,a,b);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            if (ScalarExtractionProof.admitsObserved(context, law, proofMeter)) unionEvidence.add(law);</span>
         }
-<span class="fc" id="L194">    }</span>
+<span class="fc" id="L215">    }</span>
     void apply(String rule, EClassId left, EClassId right, Expr before, Expr after, Account account) {
-<span class="fc" id="L196">        account.matches++;</span>
-<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (graph.areEquivalent(left,right)) { account.duplicates++; return; }</span>
-<span class="fc" id="L198">        var proposal = new ScalarExtractionProof.Lemma(rule,before,after);</span>
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (!ScalarExtractionProof.admitsObserved(context, proposal, proofMeter)) { account.rejected++; return; }</span>
-<span class="fc" id="L200">        recordAc(graph.extract(left,n -&gt; 1),before);</span>
-<span class="fc" id="L201">        recordAc(graph.extract(right,n -&gt; 1),after);</span>
-<span class="fc" id="L202">        unionEvidence.add(proposal);</span>
-<span class="fc" id="L203">        graph.union(left,right);</span>
-<span class="fc" id="L204">        account.unions++;</span>
-<span class="fc" id="L205">    }</span>
-<span class="fc" id="L206">    Expr syntax(EClassId id) { return graph.extract(id,node -&gt; 1); }</span>
+<span class="fc" id="L217">        apply(left, right, before, after, new ScalarExtractionProof.Lemma(rule, before, after), account);</span>
+<span class="fc" id="L218">    }</span>
+    void applyWithinSum(EClassId left, EClassId right, List&lt;Expr&gt; remainder,
+                        ScalarExtractionProof.Lemma witness, Account account) {
+<span class="fc" id="L221">        Expr before = witness.before();</span>
+<span class="fc" id="L222">        Expr after = witness.after();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (!remainder.isEmpty()) {</span>
+<span class="fc" id="L224">            Expr unchanged = ScalarExtractionProof.join(remainder, BinaryOperator.ADD);</span>
+<span class="fc" id="L225">            before = new BinaryExpr(unchanged, BinaryOperator.ADD, before);</span>
+<span class="fc" id="L226">            after = new BinaryExpr(unchanged, BinaryOperator.ADD, after);</span>
+        }
+<span class="fc" id="L228">        apply(left, right, before, after, witness, account);</span>
+<span class="fc" id="L229">    }</span>
+    private void apply(EClassId left, EClassId right, Expr before, Expr after,
+                       ScalarExtractionProof.Lemma proposal, Account account) {
+<span class="fc" id="L232">        account.matches++;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (graph.areEquivalent(left,right)) { account.duplicates++; return; }</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (!ScalarExtractionProof.admitsObserved(context, proposal, proofMeter)) { account.rejected++; return; }</span>
+<span class="fc" id="L235">        recordAc(graph.extract(left,n -&gt; 1),before);</span>
+<span class="fc" id="L236">        recordAc(graph.extract(right,n -&gt; 1),after);</span>
+<span class="fc" id="L237">        unionEvidence.add(proposal);</span>
+<span class="fc" id="L238">        graph.union(left,right);</span>
+<span class="fc" id="L239">        account.unions++;</span>
+<span class="fc" id="L240">    }</span>
+<span class="fc" id="L241">    Expr syntax(EClassId id) { return graph.extract(id,node -&gt; 1); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

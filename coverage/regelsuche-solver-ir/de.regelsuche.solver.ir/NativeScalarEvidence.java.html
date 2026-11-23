@@ -43,69 +43,85 @@ public final class NativeScalarEvidence {
 <span class="fc" id="L43">        }</span>
     }
     public static Archive run(String source,List&lt;Assumption&gt; assumptions,String revision,NativeScalarSaturation.Budget budget) {
-<span class="fc" id="L46">        var rules=AstRewriteTransformationEngine.allBuiltInRules();</span>
-<span class="fc" id="L47">        var context=ScalarExtractionProof.Context.create(rules,assumptions,revision);</span>
-<span class="fc" id="L48">        Expr input=new ExpressionParser().parseTerm(source);</span>
-<span class="fc" id="L49">        var run=new EqualitySaturation(rules).saturateExactScalars(input,context,budget);</span>
-<span class="fc" id="L50">        var report=JSON.createObjectNode().put(&quot;schema&quot;,SCHEMA).put(&quot;source&quot;,source).put(&quot;contextHash&quot;,ScalarCertificateCodec.contextHash(context))</span>
-<span class="fc" id="L51">            .put(&quot;matcher&quot;,FlatAcMatchPlan.VERSION).put(&quot;orientation&quot;,&quot;native-matched-source-to-directed-target/v1&quot;)</span>
-<span class="fc" id="L52">            .put(&quot;scheduler&quot;,budget.schedule().name().toLowerCase(Locale.ROOT)+&quot;/v1&quot;).put(&quot;terminal&quot;,run.terminal()).put(&quot;rounds&quot;,run.rounds())</span>
-<span class="fc" id="L53">            .put(&quot;graphNodes&quot;,run.graphNodes()).put(&quot;analysisEvaluations&quot;,run.analysisEvaluations());</span>
-<span class="fc" id="L54">        report.set(&quot;context&quot;,JSON.valueToTree(context));</span>
-<span class="fc" id="L55">        report.set(&quot;budget&quot;,JSON.valueToTree(budget));</span>
-<span class="fc" id="L56">        report.set(&quot;classes&quot;,JSON.valueToTree(run.analyses()));</span>
-<span class="fc" id="L57">        report.set(&quot;ledger&quot;,JSON.valueToTree(run.ledger()));</span>
-<span class="fc" id="L58">        var guards=report.putArray(&quot;guards&quot;);</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var guard : run.guards()) guards.addObject().put(&quot;rule&quot;,guard.rule()).put(&quot;factor&quot;,ExpressionFormatter.format(guard.factor()))</span>
-<span class="fc" id="L60">            .put(&quot;truth&quot;,guard.result()).put(&quot;applied&quot;,guard.applied());</span>
-<span class="fc" id="L61">        var journal=report.putArray(&quot;nativeUnionWitnesses&quot;);</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (var step : run.unionEvidence()) journal.addObject().put(&quot;rule&quot;,step.ruleId()).put(&quot;before&quot;,ExpressionFormatter.format(step.before()))</span>
-<span class="fc" id="L63">            .put(&quot;after&quot;,ExpressionFormatter.format(step.after()));</span>
-<span class="fc" id="L64">        var files=new TreeMap&lt;String,byte[]&gt;();</span>
-<span class="fc" id="L65">        var extractions=report.putArray(&quot;extractions&quot;);</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (var selection : run.extractions()) {</span>
-<span class="fc" id="L67">            var record=extractions.addObject().put(&quot;objective&quot;,selection.objective()).put(&quot;proposed&quot;,ExpressionFormatter.format(selection.proposal()))</span>
-<span class="fc" id="L68">                .put(&quot;authorized&quot;,ExpressionFormatter.format(selection.expression())).put(&quot;status&quot;,selection.status())</span>
-<span class="fc" id="L69">                .put(&quot;expressionNodes&quot;,selection.rawNodes()).put(&quot;proofSteps&quot;,selection.proofSteps());</span>
-<span class="fc" id="L70">            selection.proof().ifPresent(bundle -&gt; attach(record,&quot;derivation&quot;,files,bundle));</span>
-<span class="fc" id="L71">        }</span>
-<span class="fc" id="L72">        var selected=run.extractions().getFirst();</span>
-<span class="fc" id="L73">        var backend=new ScalarPolynomialProofWitness();</span>
-<span class="fc" id="L74">        backend.execute(context,input,selected.expression()).ifPresent(receipt -&gt; {</span>
-<span class="nc" id="L75">            var lemma=new ScalarExtractionProof.Lemma(ScalarExtractionProof.BACKEND,input,selected.expression(),receipt);</span>
-<span class="nc" id="L76">            ScalarExtractionProof.build(input,selected.expression(),context,List.of(lemma),LIMITS,backend)</span>
-<span class="nc" id="L77">                .ifPresent(bundle -&gt; attach(report,&quot;independentPolynomialCheck&quot;,files,bundle));</span>
-<span class="nc" id="L78">        });</span>
-<span class="fc" id="L79">        return new Archive(report.toString()+&quot;\n&quot;,files);</span>
+<span class="fc" id="L46">        return run(source, assumptions, revision, budget, NativeScalarSaturation.Matcher.CONTEXTUAL);</span>
+    }
+
+    static Archive run(String source, List&lt;Assumption&gt; assumptions, String revision,
+                       NativeScalarSaturation.Budget budget, NativeScalarSaturation.Matcher matcher) {
+<span class="fc" id="L51">        var rules=AstRewriteTransformationEngine.allBuiltInRules();</span>
+<span class="fc" id="L52">        var context=ScalarExtractionProof.Context.create(rules,assumptions,revision);</span>
+<span class="fc" id="L53">        Expr input=new ExpressionParser().parseTerm(source);</span>
+<span class="fc" id="L54">        var run=new EqualitySaturation(rules).saturateExactScalars(input,context,budget,matcher);</span>
+<span class="fc" id="L55">        var report=JSON.createObjectNode().put(&quot;schema&quot;,SCHEMA).put(&quot;source&quot;,source).put(&quot;contextHash&quot;,ScalarCertificateCodec.contextHash(context))</span>
+<span class="fc" id="L56">            .put(&quot;matcher&quot;,matcher.identifier()).put(&quot;orientation&quot;,&quot;native-matched-source-to-directed-target/v1&quot;)</span>
+<span class="fc" id="L57">            .put(&quot;scheduler&quot;,budget.schedule().name().toLowerCase(Locale.ROOT)+&quot;/v1&quot;).put(&quot;terminal&quot;,run.terminal()).put(&quot;rounds&quot;,run.rounds())</span>
+<span class="fc" id="L58">            .put(&quot;graphNodes&quot;,run.graphNodes()).put(&quot;analysisEvaluations&quot;,run.analysisEvaluations());</span>
+<span class="fc" id="L59">        report.set(&quot;context&quot;,JSON.valueToTree(context));</span>
+<span class="fc" id="L60">        report.set(&quot;budget&quot;,JSON.valueToTree(budget));</span>
+<span class="fc" id="L61">        report.set(&quot;classes&quot;,JSON.valueToTree(run.analyses()));</span>
+<span class="fc" id="L62">        report.set(&quot;ledger&quot;,JSON.valueToTree(run.ledger()));</span>
+<span class="fc" id="L63">        var guards=report.putArray(&quot;guards&quot;);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (var guard : run.guards()) guards.addObject().put(&quot;rule&quot;,guard.rule()).put(&quot;factor&quot;,ExpressionFormatter.format(guard.factor()))</span>
+<span class="fc" id="L65">            .put(&quot;truth&quot;,guard.result()).put(&quot;applied&quot;,guard.applied());</span>
+<span class="fc" id="L66">        var journal=report.putArray(&quot;nativeUnionWitnesses&quot;);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (var step : run.unionEvidence()) journal.addObject().put(&quot;rule&quot;,step.ruleId()).put(&quot;before&quot;,ExpressionFormatter.format(step.before()))</span>
+<span class="fc" id="L68">            .put(&quot;after&quot;,ExpressionFormatter.format(step.after()));</span>
+<span class="fc" id="L69">        var files=new TreeMap&lt;String,byte[]&gt;();</span>
+<span class="fc" id="L70">        var extractions=report.putArray(&quot;extractions&quot;);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var selection : run.extractions()) {</span>
+<span class="fc" id="L72">            var record=extractions.addObject().put(&quot;objective&quot;,selection.objective()).put(&quot;proposed&quot;,ExpressionFormatter.format(selection.proposal()))</span>
+<span class="fc" id="L73">                .put(&quot;authorized&quot;,ExpressionFormatter.format(selection.expression())).put(&quot;status&quot;,selection.status())</span>
+<span class="fc" id="L74">                .put(&quot;expressionNodes&quot;,selection.rawNodes()).put(&quot;proofSteps&quot;,selection.proofSteps());</span>
+<span class="fc" id="L75">            selection.proof().ifPresent(bundle -&gt; attach(record,&quot;derivation&quot;,files,bundle));</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        var selected=run.extractions().getFirst();</span>
+<span class="fc" id="L78">        var backend=new ScalarPolynomialProofWitness();</span>
+<span class="fc" id="L79">        backend.execute(context,input,selected.expression()).ifPresent(receipt -&gt; {</span>
+<span class="nc" id="L80">            var lemma=new ScalarExtractionProof.Lemma(ScalarExtractionProof.BACKEND,input,selected.expression(),receipt);</span>
+<span class="nc" id="L81">            ScalarExtractionProof.build(input,selected.expression(),context,List.of(lemma),LIMITS,backend)</span>
+<span class="nc" id="L82">                .ifPresent(bundle -&gt; attach(report,&quot;independentPolynomialCheck&quot;,files,bundle));</span>
+<span class="nc" id="L83">        });</span>
+<span class="fc" id="L84">        return new Archive(report.toString()+&quot;\n&quot;,files);</span>
     }
     private static void attach(ObjectNode record,String field,Map&lt;String,byte[]&gt; files,ScalarExtractionProof.Bundle bundle) {
-<span class="fc" id="L82">        byte[] bytes=ScalarCertificateCodec.encode(bundle,LIMITS);</span>
-<span class="fc" id="L83">        String digest=ScalarCertificateCodec.hash(bytes);</span>
-<span class="fc" id="L84">        files.put(digest.substring(7)+&quot;.rsproof&quot;,bytes);</span>
-<span class="fc" id="L85">        record.put(field,digest);</span>
-<span class="fc" id="L86">    }</span>
+<span class="fc" id="L87">        byte[] bytes=ScalarCertificateCodec.encode(bundle,LIMITS);</span>
+<span class="fc" id="L88">        String digest=ScalarCertificateCodec.hash(bytes);</span>
+<span class="fc" id="L89">        files.put(digest.substring(7)+&quot;.rsproof&quot;,bytes);</span>
+<span class="fc" id="L90">        record.put(field,digest);</span>
+<span class="fc" id="L91">    }</span>
 
     public static void checkCertificate(Path path,String digest,String source,String target,List&lt;Assumption&gt; assumptions,String revision) throws IOException {
-<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        if (!Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS) || Files.size(path)&gt;ScalarCertificateCodec.MAX_BYTES) throw new IOException(&quot;invalid certificate file&quot;);</span>
-<span class="fc" id="L90">        var receiver=ScalarExtractionProof.Context.create(AstRewriteTransformationEngine.allBuiltInRules(),assumptions,revision);</span>
-<span class="fc" id="L91">        var proof=ScalarCertificateCodec.read(Files.readAllBytes(path),digest,receiver,LIMITS);</span>
-<span class="fc" id="L92">        var parser=new ExpressionParser();</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!ScalarExtractionProof.check(parser.parseTerm(source),parser.parseTerm(target),receiver,proof,LIMITS,new ScalarPolynomialProofWitness()))</span>
-<span class="nc" id="L94">            throw new IllegalArgumentException(&quot;detached scalar proof rejected&quot;);</span>
-<span class="fc" id="L95">    }</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (!Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS) || Files.size(path)&gt;ScalarCertificateCodec.MAX_BYTES) throw new IOException(&quot;invalid certificate file&quot;);</span>
+<span class="fc" id="L95">        var receiver=ScalarExtractionProof.Context.create(AstRewriteTransformationEngine.allBuiltInRules(),assumptions,revision);</span>
+<span class="fc" id="L96">        var proof=ScalarCertificateCodec.read(Files.readAllBytes(path),digest,receiver,LIMITS);</span>
+<span class="fc" id="L97">        var parser=new ExpressionParser();</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (!ScalarExtractionProof.check(parser.parseTerm(source),parser.parseTerm(target),receiver,proof,LIMITS,new ScalarPolynomialProofWitness()))</span>
+<span class="nc" id="L99">            throw new IllegalArgumentException(&quot;detached scalar proof rejected&quot;);</span>
+<span class="fc" id="L100">    }</span>
 
     public static void verify(Path directory,String expectedHash,String source,List&lt;Assumption&gt; assumptions,String revision,
                               NativeScalarSaturation.Budget budget) throws IOException {
-<span class="fc" id="L99">        var expected=run(source,assumptions,revision,budget);</span>
-<span class="fc" id="L100">        var data=expected.report().getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L101">        Path report=directory.resolve(&quot;saturation.json&quot;);</span>
-<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (!ScalarCertificateCodec.hash(data).equals(expectedHash) || Files.size(report)!=data.length</span>
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                || !Arrays.equals(data,Files.readAllBytes(report))) throw new IllegalArgumentException(&quot;saturation report did not reproduce&quot;);</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (var entry:expected.certificates().entrySet()) {</span>
-<span class="fc" id="L105">            var file=directory.resolve(entry.getKey());</span>
-<span class="pc bpc" id="L106" title="1 of 4 branches missed.">            if (Files.size(file)!=entry.getValue().length || !Arrays.equals(Files.readAllBytes(file),entry.getValue()))</span>
-<span class="fc" id="L107">                throw new IllegalArgumentException(&quot;retained extraction certificate did not reproduce&quot;);</span>
-<span class="fc" id="L108">        }</span>
-<span class="fc" id="L109">    }</span>
+        // Select by reproducing the caller's digest, before reading any retained report bytes.
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (var matcher : List.of(NativeScalarSaturation.Matcher.CONTEXTUAL, NativeScalarSaturation.Matcher.WHOLE_NODE)) {</span>
+<span class="fc" id="L106">            var expected = run(source, assumptions, revision, budget, matcher);</span>
+<span class="fc" id="L107">            var data = expected.report().getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (ScalarCertificateCodec.hash(data).equals(expectedHash)) {</span>
+<span class="fc" id="L109">                verifyFiles(directory, expected, data);</span>
+<span class="fc" id="L110">                return;</span>
+            }
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        throw new IllegalArgumentException(&quot;saturation report did not reproduce&quot;);</span>
+    }
+
+    private static void verifyFiles(Path directory, Archive expected, byte[] data) throws IOException {
+<span class="fc" id="L117">        Path report=directory.resolve(&quot;saturation.json&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (Files.size(report)!=data.length</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                || !Arrays.equals(data,Files.readAllBytes(report))) throw new IllegalArgumentException(&quot;saturation report did not reproduce&quot;);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (var entry:expected.certificates().entrySet()) {</span>
+<span class="fc" id="L121">            var file=directory.resolve(entry.getKey());</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">            if (Files.size(file)!=entry.getValue().length || !Arrays.equals(Files.readAllBytes(file),entry.getValue()))</span>
+<span class="fc" id="L123">                throw new IllegalArgumentException(&quot;retained extraction certificate did not reproduce&quot;);</span>
+<span class="fc" id="L124">        }</span>
+<span class="fc" id="L125">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

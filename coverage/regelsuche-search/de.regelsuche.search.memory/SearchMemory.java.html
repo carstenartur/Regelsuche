@@ -14,9 +14,9 @@ import java.util.List;
  *
  * &lt;p&gt;When a {@link de.regelsuche.search.strategy.SearchProblem} carries
  * {@code null} as its memory, strategies use their run-local visited checks
- * without durable observations or memory decisions. BestFirst records durable
- * observations without using them to suppress current-run continuations;
- * other strategies may consult the table for pruning. Memory is wired in by
+ * without durable observations or memory decisions. Search strategies use
+ * their run-local visited checks for continuations and record durable value
+ * observations independently. Memory is wired in by
  * {@link de.regelsuche.search.SearchProfile#DISCOVERY_PLUS} and tests that
  * explicitly opt in.&lt;/p&gt;
  */

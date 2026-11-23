@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RunVisitedStates.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">RunVisitedStates.java</span></div><h1>RunVisitedStates.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.search.memory.PruningDecision;
+import de.regelsuche.search.memory.PruningReason;
+import de.regelsuche.search.memory.SearchMemory;
+import de.regelsuche.transform.RewriteKind;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
+
+/**
+ * Duplicate admission for a single heuristic search run. Durably stored value
+ * observations cannot authorize a cutoff in this controller's frontier.
+ */
+final class RunVisitedStates {
+<span class="fc" id="L17">    private final Set&lt;Object&gt; visited = new HashSet&lt;&gt;();</span>
+    private final SearchMemory memory;
+    private final Function&lt;SearchState, ?&gt; identity;
+
+    RunVisitedStates(SearchMemory memory) {
+<span class="fc" id="L22">        this(memory, VisitKey::of);</span>
+<span class="fc" id="L23">    }</span>
+
+<span class="fc" id="L25">    private RunVisitedStates(SearchMemory memory, Function&lt;SearchState, ?&gt; identity) {</span>
+<span class="fc" id="L26">        this.memory = memory;</span>
+<span class="fc" id="L27">        this.identity = identity;</span>
+<span class="fc" id="L28">    }</span>
+
+    static RunVisitedStates withHistoricalCanonicalIdentity(SearchMemory memory) {
+<span class="nc" id="L31">        return new RunVisitedStates(memory, state -&gt; state.canonicalHash() + &quot;:&quot;</span>
+<span class="nc" id="L32">            + historicalApplicationKey(state));</span>
+    }
+
+    static RunVisitedStates withHistoricalAssumptionIdentity(SearchMemory memory) {
+<span class="nc" id="L36">        return new RunVisitedStates(memory, state -&gt; state.canonicalHash() + &quot;:&quot;</span>
+<span class="nc" id="L37">            + state.assumptionFingerprint() + &quot;:&quot; + historicalApplicationKey(state));</span>
+    }
+
+    private static String historicalApplicationKey(SearchState state) {
+<span class="nc" id="L41">        return String.join(&quot;,&quot;, state.appliedRuleApplications().stream().sorted().toList());</span>
+    }
+
+    boolean contains(SearchState state) {
+<span class="fc" id="L45">        return visited.contains(identity.apply(state));</span>
+    }
+
+    boolean admit(SearchState state) {
+<span class="fc" id="L49">        boolean admitted = visited.add(identity.apply(state));</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">        if (memory != null &amp;&amp; state.depth() &gt; 0) {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (admitted) {</span>
+<span class="fc" id="L52">                TranspositionGate.observe(memory, state, state.canonicalHash() + &quot;#&quot; + state.depth(), List.of());</span>
+            } else {
+<span class="nc" id="L54">                memory.recordDecision(new PruningDecision(</span>
+<span class="nc" id="L55">                    state.expression(), state.canonicalHash(), PruningReason.ALREADY_KNOWN_EQUAL));</span>
+            }
+        }
+<span class="fc" id="L58">        return admitted;</span>
+    }
+
+<span class="fc" id="L61">    private record VisitKey(</span>
+        String expression,
+        List&lt;String&gt; assumptions,
+        Set&lt;String&gt; applications,
+        int depth,
+        int expandedSteps,
+        RewriteKind lastKind,
+        boolean equivalencePreservingPath
+    ) {
+        private static VisitKey of(SearchState state) {
+<span class="fc" id="L71">            return new VisitKey(state.expression(), state.assumptions(), state.appliedRuleApplications(),</span>
+<span class="fc" id="L72">                state.depth(), state.expandedStepCount(), state.appliedRuleKind(),</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                state.transformations() != null</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                    &amp;&amp; state.equivalencePreservingFlags().stream().allMatch(Boolean::booleanValue));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

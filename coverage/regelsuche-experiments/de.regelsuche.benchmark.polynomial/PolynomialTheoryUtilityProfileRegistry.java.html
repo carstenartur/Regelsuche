@@ -17,7 +17,7 @@ public final class PolynomialTheoryUtilityProfileRegistry {
 
     public static List&lt;Registration&gt; entries() {
 <span class="fc" id="L19">        var adapters = List.of(PolynomialTheoryUtilityProfileAdapter.NoFactorizationAdapter.observed(),</span>
-<span class="pc" id="L20">            PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.observed(value -&gt; { }),</span>
+<span class="fc" id="L20">            PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter.observed(value -&gt; { }),</span>
             new PolynomialTheoryUtilityDerivedCacheAdapter(), new PolynomialTheoryUtilitySpecializedAdapter());
 <span class="fc" id="L22">        return PolynomialTheoryUtilityExecutionPlan.PROFILES.stream().map(profile -&gt; {</span>
 <span class="fc" id="L23">            var adapter = adapters.stream().filter(value -&gt; value.profileId().equals(profile.profileId())).findFirst();</span>

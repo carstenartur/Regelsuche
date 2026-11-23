@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProspectiveFormationArchive.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ProspectiveFormationArchive.java</span></div><h1>ProspectiveFormationArchive.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.requireSha256;
+import static de.regelsuche.discovery.representation.RepresentationDiscoveryRunContractSupport.sha256;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.JSON;
+import static de.regelsuche.discovery.representation.TargetFreeHeldOutMatrixRunner.canonical;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import de.regelsuche.discovery.representation.RepresentationDiscoveryArtifactReference.ArtifactRole;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+
+/** Read-only workspace access to the committed November 2026 source-only formation freeze. */
+public final class ProspectiveFormationArchive {
+    private static final String SCHEMA = &quot;prospective-all-candidate-freeze/v1&quot;;
+    private static final String MANIFEST_FILE_SHA256 =
+        &quot;sha256:2a5878a372c3a3a6c5aedb8f1e3fa033fc6861fb59ba260080ce93e1ab691711&quot;;
+    private static final int ROW_COUNT = 224;
+    private static final int MAX_COMPRESSED_BYTES = 512 * 1024;
+    private static final int MAX_ROW_BYTES = 4 * 1024 * 1024;
+<span class="fc" id="L34">    private static final Pattern ROW_PATH = Pattern.compile(&quot;rows/p750-[0-9a-f]{16}-[A-Z_]+-CATALOG_(BLIND|VISIBLE)\\.json\\.gz&quot;);</span>
+<span class="fc" id="L35">    private static final Map&lt;ArtifactRole, String&gt; ARTIFACT_KEYS = Map.of(</span>
+        ArtifactRole.SEARCH_GRAPH, &quot;searchGraph&quot;,
+        ArtifactRole.REPRESENTATION_CANDIDATES, &quot;candidates&quot;,
+        ArtifactRole.CANDIDATE_DOSSIERS, &quot;dossiers&quot;,
+        ArtifactRole.PATH_REPLAY, &quot;replay&quot;,
+        ArtifactRole.RULE_RADAR, &quot;radar&quot;,
+        ArtifactRole.PROOF_OBLIGATIONS, &quot;obligations&quot;,
+        ArtifactRole.EXPORT_BUNDLE, &quot;dossiers&quot;,
+        ArtifactRole.PROGRESS_LEDGER, &quot;work&quot;
+    );
+<span class="fc" id="L45">    private static final Set&lt;String&gt; RANKINGS = Set.of(</span>
+        &quot;CAPABILITY_ONLY_PUBLIC_VISIBILITY&quot;, &quot;CHECKED_REUSE&quot;, &quot;COMPRESSION_ONLY&quot;,
+        &quot;PARETO_DIVERSITY&quot;, &quot;SCALAR&quot;, &quot;STRUCTURAL_SURPRISE&quot;
+    );
+
+    private final Path root;
+    private final Map&lt;String, Row&gt; rowsByRunId;
+
+    /** Opens the published historical freeze only. Caller-supplied manifests cannot establish authority. */
+    public static ProspectiveFormationArchive open(Path freezeDirectory) throws IOException {
+<span class="nc" id="L55">        return new ProspectiveFormationArchive(freezeDirectory, MANIFEST_FILE_SHA256, ROW_COUNT);</span>
+    }
+
+<span class="fc" id="L58">    ProspectiveFormationArchive(Path freezeDirectory, String expectedHash, int expectedRows) throws IOException {</span>
+<span class="fc" id="L59">        root = freezeDirectory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L60">        byte[] bytes = readBoundedFile(root.resolve(&quot;manifest.json&quot;), MAX_COMPRESSED_BYTES);</span>
+<span class="fc" id="L61">        require(TargetFreeRepresentationEvaluationPlan.sha256(bytes).equals(expectedHash), &quot;unexpected historical manifest bytes&quot;);</span>
+<span class="fc" id="L62">        JsonNode manifest = JSON.readTree(bytes);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        require(SCHEMA.equals(text(manifest, &quot;schemaVersion&quot;)) &amp;&amp; &quot;NOT_DISCLOSED&quot;.equals(text(manifest, &quot;qualificationDisclosure&quot;)),</span>
+            &quot;expected a source-only formation manifest&quot;);
+<span class="fc" id="L65">        Map&lt;String, Row&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L66">        Set&lt;String&gt; paths = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (JsonNode entry : array(manifest.required(&quot;rows&quot;))) {</span>
+<span class="fc" id="L68">            String path = text(entry, &quot;path&quot;);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">            require(ROW_PATH.matcher(path).matches() &amp;&amp; paths.add(path), &quot;invalid or duplicate historical row path&quot;);</span>
+<span class="fc" id="L70">            Row row = new Row(path, digest(entry, &quot;workspaceId&quot;), digest(entry, &quot;sha256&quot;),</span>
+<span class="fc" id="L71">                entry.required(&quot;byteLength&quot;).asInt(-1), digest(entry, &quot;formationHash&quot;),</span>
+<span class="fc" id="L72">                text(entry, &quot;sourceId&quot;), text(entry, &quot;policy&quot;), text(entry, &quot;visibility&quot;));</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            require(row.byteLength() &gt; 0 &amp;&amp; row.byteLength() &lt;= MAX_COMPRESSED_BYTES, &quot;invalid compressed row length&quot;);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            require(bindings.putIfAbsent(row.runId(), row) == null, &quot;duplicate historical Run ID&quot;);</span>
+<span class="fc" id="L75">        }</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">        require(bindings.size() == expectedRows &amp;&amp; manifest.required(&quot;rowCount&quot;).asInt(-1) == expectedRows,</span>
+            &quot;incomplete historical row index&quot;);
+<span class="fc" id="L78">        rowsByRunId = Collections.unmodifiableMap(bindings);</span>
+<span class="fc" id="L79">    }</span>
+
+    public List&lt;String&gt; runIds() {
+<span class="fc" id="L82">        return List.copyOf(rowsByRunId.keySet());</span>
+    }
+
+    /** Reads one committed row and independently checks its workspace artifact and selection bindings. */
+    public ArchivedRun read(String runId) throws IOException {
+<span class="fc" id="L87">        Row binding = rowsByRunId.get(requireSha256(runId, &quot;runId&quot;));</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        require(binding != null, &quot;Run ID is absent from the historical archive&quot;);</span>
+<span class="fc" id="L89">        require(Files.isDirectory(root.resolve(&quot;rows&quot;), LinkOption.NOFOLLOW_LINKS), &quot;historical rows directory is missing&quot;);</span>
+<span class="fc" id="L90">        byte[] compressed = readBoundedFile(root.resolve(binding.path()), binding.byteLength());</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        require(compressed.length == binding.byteLength()</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                &amp;&amp; TargetFreeRepresentationEvaluationPlan.sha256(compressed).equals(binding.sha256()),</span>
+            &quot;historical row bytes differ from the manifest&quot;);
+        byte[] bytes;
+<span class="fc" id="L95">        try (var input = new GZIPInputStream(new ByteArrayInputStream(compressed))) {</span>
+<span class="fc" id="L96">            bytes = input.readNBytes(MAX_ROW_BYTES + 1);</span>
+        }
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        require(bytes.length &lt;= MAX_ROW_BYTES, &quot;historical row exceeds the decoded size limit&quot;);</span>
+<span class="fc" id="L99">        return decode(binding, JSON.readTree(bytes));</span>
+    }
+
+    private static ArchivedRun decode(Row binding, JsonNode bundle) {
+<span class="fc" id="L103">        var workspace = RepresentationDiscoveryRunWorkspace.fromCanonicalJson(canonical(bundle.required(&quot;workspace&quot;)));</span>
+<span class="fc" id="L104">        var formation = bundle.required(&quot;formation&quot;);</span>
+<span class="fc" id="L105">        var artifacts = bundle.required(&quot;artifacts&quot;);</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">        require(workspace.runId().equals(binding.runId()) &amp;&amp; binding.formationHash().equals(digest(formation, &quot;contentHash&quot;))</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">                &amp;&amp; binding.sourceId().equals(text(formation, &quot;sourceId&quot;)) &amp;&amp; binding.policy().equals(text(formation, &quot;policy&quot;))</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                &amp;&amp; binding.visibility().equals(text(formation, &quot;visibility&quot;)),</span>
+            &quot;historical row does not bind its indexed workspace and configuration&quot;);
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        require(&quot;NOT_DISCLOSED&quot;.equals(text(formation, &quot;qualificationDisclosure&quot;))</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                &amp;&amp; formation.required(&quot;qualificationOrReferenceUsed&quot;).isBoolean()</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                &amp;&amp; !formation.required(&quot;qualificationOrReferenceUsed&quot;).booleanValue(),</span>
+            &quot;formation is outside the source-only information boundary&quot;);
+<span class="fc" id="L114">        List&lt;String&gt; assumptions = array(formation.required(&quot;initialAssumptions&quot;)).valueStream()</span>
+<span class="fc" id="L115">            .map(JsonNode::textValue).toList();</span>
+<span class="fc" id="L116">        require(workspace.input().equals(RepresentationDiscoveryRunInput.expression(text(formation, &quot;source&quot;), assumptions)),</span>
+            &quot;historical workspace input differs from the frozen source&quot;);
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (var entry : ARTIFACT_KEYS.entrySet()) {</span>
+<span class="fc" id="L119">            String key = entry.getValue();</span>
+<span class="fc" id="L120">            var reference = workspace.requireArtifact(entry.getKey(), SCHEMA + &quot;/&quot; + key);</span>
+<span class="fc" id="L121">            require(reference.targetContentHash().equals(sha256(canonical(artifacts.required(key)))),</span>
+<span class="fc" id="L122">                &quot;historical workspace artifact hash mismatch for &quot; + entry.getKey());</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        require(artifacts.required(&quot;radar&quot;).required(&quot;rankings&quot;).equals(formation.required(&quot;rankings&quot;)),</span>
+            &quot;archived radar ranks differ from the frozen formation ranks&quot;);
+
+<span class="fc" id="L127">        JsonNode graph = artifacts.required(&quot;searchGraph&quot;);</span>
+<span class="fc" id="L128">        Map&lt;String, JsonNode&gt; states = index(graph.required(&quot;states&quot;), &quot;labelId&quot;);</span>
+<span class="fc" id="L129">        Map&lt;String, JsonNode&gt; edges = index(graph.required(&quot;transitions&quot;), &quot;edgeId&quot;);</span>
+<span class="fc" id="L130">        Map&lt;String, JsonNode&gt; candidates = index(artifacts.required(&quot;candidates&quot;).required(&quot;expressions&quot;), &quot;candidateId&quot;);</span>
+<span class="fc" id="L131">        Map&lt;String, JsonNode&gt; dossiers = index(artifacts.required(&quot;dossiers&quot;), &quot;candidateId&quot;);</span>
+<span class="fc" id="L132">        Map&lt;String, JsonNode&gt; selectionNodes = index(artifacts.required(&quot;selections&quot;), &quot;candidateId&quot;);</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        require(dossiers.keySet().equals(candidates.keySet()) &amp;&amp; selectionNodes.keySet().equals(candidates.keySet()),</span>
+            &quot;archived candidates, dossiers and selections cover different candidate sets&quot;);
+<span class="fc" id="L135">        Map&lt;String, RepresentationDiscoveryRunSelection&gt; selections = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (var entry : dossiers.entrySet()) {</span>
+<span class="fc" id="L137">            String id = entry.getKey();</span>
+<span class="fc" id="L138">            JsonNode dossier = entry.getValue();</span>
+<span class="fc" id="L139">            JsonNode candidate = candidates.get(id);</span>
+<span class="fc" id="L140">            String state = digest(dossier, &quot;stateId&quot;);</span>
+<span class="fc" id="L141">            String edge = digest(dossier, &quot;graphEdgeId&quot;);</span>
+<span class="fc" id="L142">            String proof = digest(dossier, &quot;proofRootHash&quot;);</span>
+<span class="fc" id="L143">            String labelId = digest(candidate, &quot;labelId&quot;);</span>
+<span class="fc" id="L144">            JsonNode graphState = states.get(labelId);</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            require(binding.sourceId().equals(text(dossier, &quot;sourceId&quot;))</span>
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">                    &amp;&amp; state.equals(digest(candidate, &quot;stateId&quot;)) &amp;&amp; edge.equals(digest(candidate, &quot;incomingEdgeId&quot;))</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">                    &amp;&amp; labelId.equals(digest(dossier, &quot;labelId&quot;)) &amp;&amp; graphState != null</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                    &amp;&amp; state.equals(digest(graphState, &quot;stateId&quot;))</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                    &amp;&amp; dossier.required(&quot;assumptions&quot;).equals(candidate.required(&quot;usedAssumptions&quot;))</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                    &amp;&amp; proof.equals(sha256(canonical(dossier.required(&quot;proofRoot&quot;)))),</span>
+                &quot;archived candidate disagrees with its dossier state, edge, premises or proof root&quot;);
+<span class="fc" id="L152">            verifyLineage(candidate, dossier, edges, artifacts.required(&quot;replay&quot;));</span>
+<span class="fc" id="L153">            var selection = workspace.selection(id, state, edge, occurrence(dossier.required(&quot;sourceOccurrence&quot;)), proof);</span>
+<span class="fc" id="L154">            require(selectionNodes.get(id).equals(JSON.valueToTree(selection)),</span>
+                &quot;archived selection disagrees with its workspace or dossier&quot;);
+<span class="fc" id="L156">            selections.put(id, selection);</span>
+<span class="fc" id="L157">        }</span>
+
+<span class="fc" id="L159">        Map&lt;String, List&lt;String&gt;&gt; rankings = verifiedRankings(artifacts.required(&quot;radar&quot;).required(&quot;rankings&quot;), candidates.keySet());</span>
+<span class="fc" id="L160">        return new ArchivedRun(workspace, artifacts, selections, rankings);</span>
+    }
+
+    private static void verifyLineage(JsonNode candidate, JsonNode dossier, Map&lt;String, JsonNode&gt; edges, JsonNode replay) {
+<span class="fc" id="L164">        var lineage = array(dossier.required(&quot;primitiveLineage&quot;));</span>
+<span class="fc" id="L165">        var proof = dossier.required(&quot;proofRoot&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (&quot;CHECKED_EGRAPH_EXTRACTION&quot;.equals(text(candidate, &quot;primitiveProofStatus&quot;))) {</span>
+<span class="nc bnc" id="L167" title="All 4 branches missed.">            require(lineage.isEmpty() &amp;&amp; proof.equals(replay.required(&quot;egraphProof&quot;))</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                    &amp;&amp; digest(dossier, &quot;graphEdgeId&quot;).equals(digest(dossier, &quot;proofRootHash&quot;)),</span>
+                &quot;archived e-graph candidate does not bind its detached proof&quot;);
+<span class="nc" id="L170">            return;</span>
+        }
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">        require(!lineage.isEmpty() &amp;&amp; lineage.equals(proof)</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                &amp;&amp; digest(lineage.get(lineage.size() - 1), &quot;edgeId&quot;).equals(digest(dossier, &quot;graphEdgeId&quot;))</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                &amp;&amp; lineage.get(0).required(&quot;occurrencePath&quot;).equals(dossier.required(&quot;sourceOccurrence&quot;)),</span>
+            &quot;archived candidate does not bind its primitive proof and source occurrence&quot;);
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (JsonNode edge : lineage) {</span>
+<span class="fc" id="L177">            require(edge.equals(edges.get(digest(edge, &quot;edgeId&quot;))), &quot;archived lineage has an edge outside its run graph&quot;);</span>
+<span class="fc" id="L178">        }</span>
+<span class="fc" id="L179">    }</span>
+
+    private static Map&lt;String, List&lt;String&gt;&gt; verifiedRankings(JsonNode ranks, Set&lt;String&gt; candidateIds) {
+<span class="fc" id="L182">        Map&lt;String, List&lt;String&gt;&gt; orderings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L183">        require(ranks.isObject(), &quot;historical ranking map is missing&quot;);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (var entry : ranks.properties()) {</span>
+<span class="fc" id="L185">            List&lt;String&gt; ids = array(entry.getValue()).valueStream()</span>
+<span class="fc" id="L186">                .map(id -&gt; requireSha256(id.textValue(), &quot;ranked candidate id&quot;)).toList();</span>
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">            require(ids.size() == candidateIds.size() &amp;&amp; new HashSet&lt;&gt;(ids).equals(candidateIds),</span>
+                &quot;historical ranking is not a permutation of the retained candidate IDs&quot;);
+<span class="fc" id="L189">            orderings.put(entry.getKey(), ids);</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        require(orderings.keySet().equals(RANKINGS), &quot;historical ranking set is incomplete&quot;);</span>
+<span class="fc" id="L192">        return Map.copyOf(orderings);</span>
+    }
+
+    private static String occurrence(JsonNode path) {
+<span class="fc" id="L196">        var occurrence = new StringJoiner(&quot;/&quot;, &quot;/&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (JsonNode index : array(path)) {</span>
+<span class="pc bpc" id="L198" title="3 of 6 branches missed.">            require(index.isIntegralNumber() &amp;&amp; index.canConvertToInt() &amp;&amp; index.intValue() &gt;= 0, &quot;invalid occurrence index&quot;);</span>
+<span class="fc" id="L199">            occurrence.add(index.asText());</span>
+<span class="fc" id="L200">        }</span>
+<span class="fc" id="L201">        return occurrence.toString();</span>
+    }
+
+    private static Map&lt;String, JsonNode&gt; index(JsonNode values, String key) {
+<span class="fc" id="L205">        Map&lt;String, JsonNode&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (JsonNode value : array(values)) {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            require(result.putIfAbsent(digest(value, key), value) == null, &quot;duplicate historical &quot; + key);</span>
+<span class="fc" id="L208">        }</span>
+<span class="fc" id="L209">        return result;</span>
+    }
+
+    private static byte[] readBoundedFile(Path path, int limit) throws IOException {
+<span class="fc" id="L213">        require(Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS), &quot;historical evidence file is missing: &quot; + path.getFileName());</span>
+<span class="fc" id="L214">        try (var input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L215">            byte[] bytes = input.readNBytes(limit + 1);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            require(bytes.length &lt;= limit, &quot;historical evidence exceeds its size limit: &quot; + path.getFileName());</span>
+<span class="fc" id="L217">            return bytes;</span>
+        }
+    }
+
+    private static ArrayNode array(JsonNode value) {
+<span class="fc" id="L222">        require(value.isArray(), &quot;historical evidence array is missing&quot;);</span>
+<span class="fc" id="L223">        return (ArrayNode) value;</span>
+    }
+
+    private static String digest(JsonNode value, String key) {
+<span class="fc" id="L227">        return requireSha256(text(value, key), key);</span>
+    }
+
+    private static String text(JsonNode value, String key) {
+<span class="fc" id="L231">        JsonNode field = value.required(key);</span>
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">        require(field.isTextual() &amp;&amp; !field.textValue().isBlank(), &quot;invalid historical field &quot; + key);</span>
+<span class="fc" id="L233">        return field.textValue();</span>
+    }
+
+    private static void require(boolean condition, String detail) {
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!condition) {</span>
+<span class="fc" id="L238">            throw new IllegalArgumentException(detail);</span>
+        }
+<span class="fc" id="L240">    }</span>
+
+<span class="fc" id="L242">    private record Row(String path, String runId, String sha256, int byteLength, String formationHash,</span>
+                       String sourceId, String policy, String visibility) {
+    }
+
+    /** A verified run with the original, content-addressed workspace and source-only ranks. */
+    public static final class ArchivedRun {
+        private final RepresentationDiscoveryRunWorkspace workspace;
+        private final JsonNode artifacts;
+        private final Map&lt;String, RepresentationDiscoveryRunSelection&gt; selections;
+        private final Map&lt;String, List&lt;String&gt;&gt; rankings;
+
+        private ArchivedRun(RepresentationDiscoveryRunWorkspace workspace, JsonNode artifacts,
+<span class="fc" id="L254">                            Map&lt;String, RepresentationDiscoveryRunSelection&gt; selections, Map&lt;String, List&lt;String&gt;&gt; rankings) {</span>
+<span class="fc" id="L255">            this.workspace = workspace;</span>
+<span class="fc" id="L256">            this.artifacts = artifacts;</span>
+<span class="fc" id="L257">            this.selections = Map.copyOf(selections);</span>
+<span class="fc" id="L258">            this.rankings = rankings;</span>
+<span class="fc" id="L259">        }</span>
+
+        public RepresentationDiscoveryRunWorkspace workspace() {
+<span class="fc" id="L262">            return workspace;</span>
+        }
+
+        public String artifactJson(ArtifactRole role) {
+<span class="fc" id="L266">            return canonical(artifacts.required(ARTIFACT_KEYS.get(role)));</span>
+        }
+
+        public Map&lt;String, RepresentationDiscoveryRunSelection&gt; selections() {
+<span class="fc" id="L270">            return selections;</span>
+        }
+
+        public Map&lt;String, List&lt;String&gt;&gt; rankings() {
+<span class="fc" id="L274">            return rankings;</span>
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc bnc" id="L279" title="All 4 branches missed.">        if (args.length == 2 &amp;&amp; &quot;verify&quot;.equals(args[0])) {</span>
+<span class="nc" id="L280">            var archive = open(Path.of(args[1]));</span>
+<span class="nc" id="L281">            int candidates = 0;</span>
+<span class="nc" id="L282">            int emptyRows = 0;</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            for (String runId : archive.runIds()) {</span>
+<span class="nc" id="L284">                int retained = archive.read(runId).selections().size();</span>
+<span class="nc" id="L285">                candidates += retained;</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                if (retained == 0) {</span>
+<span class="nc" id="L287">                    emptyRows++;</span>
+                }
+<span class="nc" id="L289">            }</span>
+<span class="nc" id="L290">            System.out.printf(&quot;verifiedWorkspaces=%d retainedCandidates=%d emptyCandidateRows=%d%n&quot;,</span>
+<span class="nc" id="L291">                archive.runIds().size(), candidates, emptyRows);</span>
+<span class="nc bnc" id="L292" title="All 4 branches missed.">        } else if (args.length == 3 &amp;&amp; &quot;ranks&quot;.equals(args[0])) {</span>
+<span class="nc" id="L293">            var run = open(Path.of(args[1])).read(args[2]);</span>
+<span class="nc" id="L294">            var output = JSON.createObjectNode();</span>
+<span class="nc" id="L295">            output.put(&quot;runId&quot;, run.workspace().runId());</span>
+<span class="nc" id="L296">            output.set(&quot;rankings&quot;, JSON.valueToTree(run.rankings()));</span>
+<span class="nc" id="L297">            output.set(&quot;selections&quot;, JSON.valueToTree(run.selections()));</span>
+<span class="nc" id="L298">            System.out.println(canonical(output));</span>
+<span class="nc" id="L299">        } else {</span>
+<span class="nc" id="L300">            throw new IllegalArgumentException(&quot;usage: verify &lt;freeze-directory&gt; | ranks &lt;freeze-directory&gt; &lt;run-id&gt;&quot;);</span>
+        }
+<span class="nc" id="L302">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

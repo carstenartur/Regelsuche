@@ -169,7 +169,7 @@ public final class ScalarExtractionProof {
 <span class="fc bfc" id="L169" title="All 4 branches covered.">        if (lemma.ruleId().equals(AC)) return arena.intern(before) == arena.intern(after);</span>
 <span class="pc bpc" id="L170" title="2 of 4 branches missed.">        if (!context.enables(lemma.ruleId()) || !(before instanceof BinaryExpr binary)) return false;</span>
 <span class="fc" id="L171">        BinaryOperator op = binary.operator();</span>
-<span class="pc bpc" id="L172" title="5 of 8 branches missed.">        return switch (lemma.ruleId()) {</span>
+<span class="pc bpc" id="L172" title="4 of 8 branches missed.">        return switch (lemma.ruleId()) {</span>
 <span class="pc bpc" id="L173" title="1 of 2 branches missed.">            case &quot;ast_add_zero_left&quot;,&quot;ast_add_zero_right&quot; -&gt; op == BinaryOperator.ADD</span>
 <span class="fc bfc" id="L174" title="All 2 branches covered.">                &amp;&amp; remove(arena, before, new NumberExpr(0), after, op);</span>
 <span class="nc bnc" id="L175" title="All 2 branches missed.">            case &quot;ast_multiply_one_left&quot;,&quot;ast_multiply_one_right&quot; -&gt; op == BinaryOperator.MUL</span>
@@ -178,8 +178,8 @@ public final class ScalarExtractionProof {
 <span class="nc bnc" id="L178" title="All 2 branches missed.">                &amp;&amp; arena.intern(binary.left()) == arena.intern(after);</span>
 <span class="nc bnc" id="L179" title="All 4 branches missed.">            case &quot;ast_divide_one&quot; -&gt; op == BinaryOperator.DIV &amp;&amp; binary.right().equals(new NumberExpr(1))</span>
 <span class="nc bnc" id="L180" title="All 2 branches missed.">                &amp;&amp; arena.intern(binary.left()) == arena.intern(after);</span>
-<span class="nc bnc" id="L181" title="All 4 branches missed.">            case &quot;ast_double_term&quot; -&gt; op == BinaryOperator.ADD &amp;&amp; arena.intern(binary.left()) == arena.intern(binary.right())</span>
-<span class="nc bnc" id="L182" title="All 2 branches missed.">                &amp;&amp; arena.intern(after) == arena.intern(new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,binary.left()));</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">            case &quot;ast_double_term&quot; -&gt; op == BinaryOperator.ADD &amp;&amp; arena.intern(binary.left()) == arena.intern(binary.right())</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                &amp;&amp; arena.intern(after) == arena.intern(new BinaryExpr(new NumberExpr(2),BinaryOperator.MUL,binary.left()));</span>
 <span class="pc bpc" id="L183" title="2 of 4 branches missed.">            case &quot;ast_factor_common_left&quot;,&quot;ast_factor_common_right&quot; -&gt; op == BinaryOperator.ADD &amp;&amp; factorization(arena,before,after);</span>
             case &quot;ast_cancel_division_factor&quot; -&gt; op == BinaryOperator.DIV
 <span class="pc bpc" id="L185" title="2 of 4 branches missed.">                &amp;&amp; binary.left() instanceof BinaryExpr product &amp;&amp; product.operator() == BinaryOperator.MUL</span>

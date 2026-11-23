@@ -107,9 +107,9 @@ public class SearchBenchmark {
 <span class="fc" id="L107">                    : canonicalizer.stableHash(expected)</span>
 <span class="fc" id="L108">                        .equals(canonicalizer.stableHash(bestState.expression()));</span>
 <span class="fc" id="L109">                int prunedStates = (int) memory.decisions().stream()</span>
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                    .filter(d -&gt; d.reason() == PruningReason.ALREADY_KNOWN_BETTER</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.ALREADY_KNOWN_EQUAL</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                        || d.reason() == PruningReason.BUDGET_EXCEEDED)</span>
+<span class="pc bnc" id="L110" title="All 2 branches missed.">                    .filter(d -&gt; d.reason() == PruningReason.ALREADY_KNOWN_BETTER</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                        || d.reason() == PruningReason.ALREADY_KNOWN_EQUAL</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                        || d.reason() == PruningReason.BUDGET_EXCEEDED)</span>
 <span class="fc" id="L113">                    .count();</span>
 <span class="fc" id="L114">                results.add(new SearchBenchmarkResult(</span>
 <span class="fc" id="L115">                    strategy.name(), expression, states.size(), bestImprovement,</span>

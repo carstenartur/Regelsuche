@@ -8,12 +8,10 @@ import java.util.List;
 /**
  * Seeded randomized-valid rewrite control with per-case state reset.
  *
- * &lt;p&gt;The production {@link RandomMonteCarloSearchStrategy} owns mutable random
- * state. Reusing one instance across benchmark cases or repeated bundle runs
- * would therefore make the retained result depend on invocation history. This
- * adapter derives one deterministic case seed from the frozen base seed and the
- * first 64 bits of the source's stable canonical SHA-256 hash, then creates a
- * fresh delegate for every execution.&lt;/p&gt;
+ * &lt;p&gt;The adapter derives one deterministic case seed from the frozen base
+ * seed and the first 64 bits of the source's stable canonical SHA-256 hash.
+ * Each execution uses the visited identity of the retained comparative
+ * benchmark.&lt;/p&gt;
  */
 final class DeterministicRandomValidRewriteStrategy
         implements ComparativeBenchmarkSystems.BenchmarkIdentifiedSearchStrategy {
@@ -24,38 +22,38 @@ final class DeterministicRandomValidRewriteStrategy
     private final long baseSeed;
 
     DeterministicRandomValidRewriteStrategy() {
-<span class="fc" id="L27">        this(DEFAULT_BASE_SEED);</span>
-<span class="fc" id="L28">    }</span>
+<span class="fc" id="L25">        this(DEFAULT_BASE_SEED);</span>
+<span class="fc" id="L26">    }</span>
 
-<span class="fc" id="L30">    DeterministicRandomValidRewriteStrategy(long baseSeed) {</span>
-<span class="fc" id="L31">        this.baseSeed = baseSeed;</span>
-<span class="fc" id="L32">    }</span>
+<span class="fc" id="L28">    DeterministicRandomValidRewriteStrategy(long baseSeed) {</span>
+<span class="fc" id="L29">        this.baseSeed = baseSeed;</span>
+<span class="fc" id="L30">    }</span>
 
     @Override
     public List&lt;SearchState&gt; search(SearchProblem problem) {
-<span class="fc" id="L36">        String sourceHash = problem.canonicalizer()</span>
-<span class="fc" id="L37">            .stableHash(problem.rootExpression());</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!sourceHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L39">            throw new IllegalStateException(</span>
+<span class="fc" id="L34">        String sourceHash = problem.canonicalizer()</span>
+<span class="fc" id="L35">            .stableHash(problem.rootExpression());</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!sourceHash.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L37">            throw new IllegalStateException(</span>
                 &quot;stable source hash is not lowercase SHA-256&quot;);
         }
-<span class="fc" id="L42">        long sourceSalt = Long.parseUnsignedLong(</span>
-<span class="fc" id="L43">            sourceHash.substring(0, 16), 16);</span>
-<span class="fc" id="L44">        long caseSeed = baseSeed ^ sourceSalt;</span>
-<span class="fc" id="L45">        return new RandomMonteCarloSearchStrategy(caseSeed).search(problem);</span>
+<span class="fc" id="L40">        long sourceSalt = Long.parseUnsignedLong(</span>
+<span class="fc" id="L41">            sourceHash.substring(0, 16), 16);</span>
+<span class="fc" id="L42">        long caseSeed = baseSeed ^ sourceSalt;</span>
+<span class="fc" id="L43">        return RandomMonteCarloSearchStrategy.withHistoricalAssumptionIdentity(caseSeed).search(problem);</span>
     }
 
     @Override
     public String implementationIdentity() {
-<span class="fc" id="L50">        return getClass().getName()</span>
-<span class="fc" id="L51">            + &quot;\nbaseSeed=&quot; + Long.toUnsignedString(baseSeed)</span>
+<span class="fc" id="L48">        return getClass().getName()</span>
+<span class="fc" id="L49">            + &quot;\nbaseSeed=&quot; + Long.toUnsignedString(baseSeed)</span>
             + &quot;\nseedPolicy=&quot; + SEED_POLICY
-<span class="fc" id="L53">            + &quot;\ndelegate=&quot; + RandomMonteCarloSearchStrategy.class.getName()</span>
+<span class="fc" id="L51">            + &quot;\ndelegate=&quot; + RandomMonteCarloSearchStrategy.class.getName()</span>
             + &quot;\nvalidMoves=production-transformation-engine-only/v1&quot;;
     }
 
     long baseSeed() {
-<span class="nc" id="L58">        return baseSeed;</span>
+<span class="nc" id="L56">        return baseSeed;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

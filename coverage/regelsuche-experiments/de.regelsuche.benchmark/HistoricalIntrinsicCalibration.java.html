@@ -71,7 +71,7 @@ public final class HistoricalIntrinsicCalibration {
 <span class="fc" id="L71">        var problem = new SearchProblem(source, primitives, new ExpressionScorer(), new ExpressionCanonicalizer(), limits);</span>
 <span class="fc bfc" id="L72" title="All 2 branches covered.">        List&lt;SearchState&gt; states = switch (policy) {</span>
 <span class="fc" id="L73">            case SCALAR -&gt; new BestFirstSearchStrategy().searchWithDiagnostics(problem).states();</span>
-<span class="fc" id="L74">            case STRUCTURAL_DIVERSITY -&gt; new StructuralDiversitySearchStrategy().search(problem);</span>
+<span class="fc" id="L74">            case STRUCTURAL_DIVERSITY -&gt; StructuralDiversitySearchStrategy.withHistoricalCanonicalIdentity().search(problem);</span>
         };
 <span class="fc" id="L76">        return states.stream().map(Occurrence::from).toList();</span>
     }

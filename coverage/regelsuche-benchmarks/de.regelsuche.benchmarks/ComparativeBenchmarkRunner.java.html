@@ -72,7 +72,7 @@ public final class ComparativeBenchmarkRunner {
             new SearchSystem(
                 &quot;beam&quot;,
                 &quot;1&quot;,
-                new BeamSearchStrategy(),
+<span class="nc" id="L75">                BeamSearchStrategy.withHistoricalCanonicalIdentity(),</span>
 <span class="nc" id="L76">                List.of(</span>
                     &quot;INTERNAL_REGELSUCHE_SEARCH&quot;,
                     &quot;TARGET_NOT_USED_FOR_FRONTIER_ORDERING&quot;,
