@@ -33,6 +33,39 @@ repo=$(mktemp -d)
 
 The preservation check used a fresh, non-shallow repository without object alternates. The public fetch lacked the freeze tip before import. Git verified the bundle, the imported tree matched the original, and full repository fsck succeeded.
 
+## Read the archived runs from the current checkout
+
+`ProspectiveFormationArchive` opens the restored `freeze` directory from the
+current Java codebase. It accepts the exact original public manifest and verifies
+each compressed row before decoding the existing Run ID and workspace. The
+reader checks the workspace artifact hashes, connects the candidate selections
+to their occurrences, graph and proof roots, and checks that each of the six
+frozen rankings contains every retained expression candidate exactly once. The
+rankings, selections and original artifact JSON are available by Run ID.
+
+In the current checkout, set `freeze` to the absolute path of
+`docs/research/prospective-representation-20261120/freeze` in the restored checkout.
+With Java 25 and Maven, verify the complete public archive:
+
+```bash
+mvn -B -pl regelsuche-discovery -am -DskipTests install
+mvn -B -pl regelsuche-discovery dependency:build-classpath \
+  -Dmdep.outputFile=target/archive-classpath.txt
+classpath="regelsuche-discovery/target/classes:$(cat regelsuche-discovery/target/archive-classpath.txt)"
+java -Xmx512m -cp "$classpath" \
+  de.regelsuche.discovery.representation.ProspectiveFormationArchive verify "$freeze"
+```
+
+The check reports 224 workspaces, 2,688 retained expression candidates and 36
+empty candidate rows. Use `ranks "$freeze" "$runId"` in place of the `verify`
+arguments to retrieve the six orderings and their workspace selections for one
+run. Each selection carries the existing candidate, state, edge, occurrence and
+proof-root identifiers. Detached e-graph proof roots remain distinct from native
+primitive lineage.
+
+The command works exclusively from the frozen source-only artifacts.
+The archived total-work classification is `UNMATCHED`.
+
 ## Source-only reproduction
 
 The restored checkout contains the original protocol, implementation, freeze and production launchers. See `docs/research/prospective-representation-20261120/execution.md` in that checkout. Its replay wrapper builds two new normal clones. The Dockerfile builds a third runtime from the original history. Compare each freeze against the original canonical mathematics root in this directory’s manifest. Runtime measurements are separate. On 21 November 2026, hosted run 44871073533 reproduced the original root in two fresh checkouts and the network-disabled container. Each run retained all 224 configurations and 36 null rows. The independent audit verified the row and runtime bindings in artifact 14693674199. Total work remains `UNMATCHED`. The source-only runs ended before qualification. [Hosted source-only audit](hosted-source-replay-audit.json)
