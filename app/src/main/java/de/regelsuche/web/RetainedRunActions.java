@@ -67,7 +67,8 @@ final class RetainedRunActions {
                 send(exchange, importing ? 201 : 200, body);
             }
         } catch (IllegalArgumentException exception) {
-            error(exchange, 400, path[1].equals("duplicate") ? "INVALID_RUN_CHANGE" : "INVALID_DOSSIER", exception.getMessage());
+            error(exchange, 400, path.length == 2 && path[1].equals("duplicate")
+                ? "INVALID_RUN_CHANGE" : "INVALID_DOSSIER", exception.getMessage());
         }
     }
 
