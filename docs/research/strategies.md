@@ -170,6 +170,15 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - [`PolynomialTheoryUtilityObservedFreezeContractTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityObservedFreezeContractTest.java#L19) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityObservedFreezeContractTest.java | class PolynomialTheoryUtilityObservedFreezeContractTest { -->
 - [`PolynomialTheoryUtilityDerivedCacheAdapterTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityDerivedCacheAdapterTest.java#L12) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityDerivedCacheAdapterTest.java | class PolynomialTheoryUtilityDerivedCacheAdapterTest { -->
 
+## Öffentliche Faktorisierungsprofile unter gleichen Budgets vergleichen
+
+- **Hypothese.** Direkte Faktorisierung, Cache und Quartik-Spezialisierung können bei gleichem Budget andere verifizierte Übergänge erreichen als der Lauf mit deaktivierter Faktorisierung.
+- **Umsetzungsstand.** Die öffentliche Formation läuft mit den vier verfügbaren Adaptern und je sechs Checkpoints. Die Auswertung prüft gleiche Fallbudgets, den Cache-Verlauf sowie die zeilenweise Bindung an das Ergebnis und seine Messung.
+- **Befund.** Die offenen 480 Zeilen enthalten in keinem ausgeführten Profil eine verifizierte Transition. Der Cache erreicht zwei Misses ohne Einfügung oder Replay. Die übrigen 120 Zeilen sind als extern blockiert ausgewiesen. [Befund und Reproduktion](../polynomial-theory-utility-active-adapters.md#öffentlicher-profilvergleich-bei-eingefrorenen-budgets)
+- **Folgerung.** Weitere Untersuchungen müssen erklären, wo die vorhandenen Budgets verbraucht werden, bevor sich unter diesen Bedingungen verifizierte Übergänge vergleichen lassen.
+
+- [`PolynomialTheoryUtilityPublicProfileComparisonTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityPublicProfileComparisonTest.java#L21) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityPublicProfileComparisonTest.java | class PolynomialTheoryUtilityPublicProfileComparisonTest { -->
+
 ## Unabhängige Prüfung nativer Polynom-Beweisobjekte
 
 - **Hypothese.** Ein begrenzter Java-Prüfer kann native Polynomgleichheitsbeweise unabhängig vom externen Solver nachrechnen, wenn er jede Umschreibung exakt prüft und die tatsächlich verwendeten Annahmen erhält.
