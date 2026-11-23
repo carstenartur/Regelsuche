@@ -196,12 +196,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         }
         // Durable values omit application history and the run's inventory and
         // budgets. Only the local visited key can suppress this run's revisits.
-        TranspositionGate.evaluate(
+        TranspositionGate.observe(
             problem.memory(),
             current,
             current.canonicalHash() + "#" + current.depth(),
-            List.of(frame.identity().legacyHash(current.expression())),
-            false);
+            List.of(frame.identity().legacyHash(current.expression())));
     }
 
     private boolean pruneByDepth(SearchProblem problem, SearchState current, SearchFrame frame) {

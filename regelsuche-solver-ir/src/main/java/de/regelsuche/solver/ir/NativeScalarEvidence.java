@@ -48,7 +48,7 @@ public final class NativeScalarEvidence {
         Expr input=new ExpressionParser().parseTerm(source);
         var run=new EqualitySaturation(rules).saturateExactScalars(input,context,budget);
         var report=JSON.createObjectNode().put("schema",SCHEMA).put("source",source).put("contextHash",ScalarCertificateCodec.contextHash(context))
-            .put("matcher",FlatAcMatchPlan.VERSION).put("orientation","native-matched-source-to-directed-target/v1")
+            .put("matcher",FlatAcMatchPlan.CONTEXTUAL_VERSION).put("orientation","native-matched-source-to-directed-target/v1")
             .put("scheduler",budget.schedule().name().toLowerCase(Locale.ROOT)+"/v1").put("terminal",run.terminal()).put("rounds",run.rounds())
             .put("graphNodes",run.graphNodes()).put("analysisEvaluations",run.analysisEvaluations());
         report.set("context",JSON.valueToTree(context));

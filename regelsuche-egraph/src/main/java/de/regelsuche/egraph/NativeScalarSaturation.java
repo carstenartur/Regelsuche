@@ -193,9 +193,23 @@ public final class NativeScalarSaturation {
         }
     }
     void apply(String rule, EClassId left, EClassId right, Expr before, Expr after, Account account) {
+        apply(left, right, before, after, new ScalarExtractionProof.Lemma(rule, before, after), account);
+    }
+    void applyWithinSum(EClassId left, EClassId right, List<Expr> remainder,
+                        ScalarExtractionProof.Lemma witness, Account account) {
+        Expr before = witness.before();
+        Expr after = witness.after();
+        if (!remainder.isEmpty()) {
+            Expr unchanged = ScalarExtractionProof.join(remainder, BinaryOperator.ADD);
+            before = new BinaryExpr(unchanged, BinaryOperator.ADD, before);
+            after = new BinaryExpr(unchanged, BinaryOperator.ADD, after);
+        }
+        apply(left, right, before, after, witness, account);
+    }
+    private void apply(EClassId left, EClassId right, Expr before, Expr after,
+                       ScalarExtractionProof.Lemma proposal, Account account) {
         account.matches++;
         if (graph.areEquivalent(left,right)) { account.duplicates++; return; }
-        var proposal = new ScalarExtractionProof.Lemma(rule,before,after);
         if (!ScalarExtractionProof.admitsObserved(context, proposal, proofMeter)) { account.rejected++; return; }
         recordAc(graph.extract(left,n -> 1),before);
         recordAc(graph.extract(right,n -> 1),after);

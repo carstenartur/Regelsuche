@@ -42,6 +42,32 @@ class NativeScalarSaturationTest {
         assertTrue(out.proof().isPresent());
     }
 
+    @Test void doublesTwoEqualOperandsInsideANarySumAndChecksTheRemainingOccurrences() {
+        var rules = de.regelsuche.transform.AstRewriteTransformationEngine.allBuiltInRules();
+        var context = de.regelsuche.egraph.proof.ScalarExtractionProof.Context.create(rules,
+            java.util.List.of(), "a".repeat(40));
+        var input = parser.parseTerm("f((a*b) + c + (a*b) + (a*b))");
+        var target = parser.parseTerm("f(c + (a*b) + 2*(a*b))");
+        var missingOccurrence = parser.parseTerm("f(c + 2*(a*b))");
+        var engine = new EqualitySaturation(rules);
+        var limits = de.regelsuche.egraph.proof.ProofLimits.defaults();
+
+        for (var schedule : NativeScalarSaturation.Schedule.values()) {
+            var result = engine.saturateExactScalars(input, context,
+                new NativeScalarSaturation.Budget(8, 256, 4000, schedule));
+            var chosen = result.extractions().getFirst();
+            try (var arena = new ExprValueArena(100)) {
+                assertSame(arena.intern(target), arena.intern(chosen.expression()), schedule.name());
+            }
+            var proof = chosen.proof().orElseThrow();
+            assertTrue(de.regelsuche.egraph.proof.ScalarExtractionProof.check(
+                input, chosen.expression(), context, proof, limits));
+            assertFalse(de.regelsuche.egraph.proof.ScalarExtractionProof.check(
+                input, missingOccurrence, context, proof, limits));
+            assertTrue(result.ledger().get("ast_double_term").unions() > 0);
+        }
+    }
+
     @Test void reportsUnknownFalseAndConflictingGuardsWithoutMergingTheirQuotients() {
         var rules=de.regelsuche.transform.AstRewriteTransformationEngine.allBuiltInRules();
         var input=parser.parseTerm("(a*b)/a");

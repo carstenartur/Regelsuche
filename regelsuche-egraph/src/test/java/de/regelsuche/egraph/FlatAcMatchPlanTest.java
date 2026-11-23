@@ -80,6 +80,32 @@ class FlatAcMatchPlanTest {
     }
 
     @Test
+    void contextualMatchChargesForEveryUnmatchedOccurrence() {
+        var graph = EGraph.exactScalarAcV1();
+        var a = new VariableExpr("a");
+        var b = new VariableExpr("b");
+        var aId = graph.addExpression(a);
+        var bId = graph.addExpression(b);
+        var root = graph.addExpression(new BinaryExpr(a, BinaryOperator.ADD,
+            new BinaryExpr(a, BinaryOperator.ADD, new BinaryExpr(a, BinaryOperator.ADD, b))));
+        var x = PatternExpr.var("X");
+        var plan = FlatAcMatchPlan.compile(PatternExpr.op(BinaryOperator.ADD, x, x));
+        var roots = List.of(root);
+        assertTrue(plan.matchRoots(graph, roots, 100).matches().isEmpty());
+
+        var partial = plan.matchRootsWithRemainder(graph, roots, 7);
+        assertFalse(partial.complete());
+        assertEquals(7, partial.work());
+        assertTrue(partial.matches().isEmpty());
+
+        var complete = plan.matchRootsWithRemainder(graph, roots, 100);
+        assertTrue(complete.complete());
+        assertEquals(List.of(new FlatAcMatchPlan.ContextMatch(
+            new EGraphPatternMatcher.Match(root, Map.of("X", aId)), List.of(aId, bId))), complete.matches());
+        assertEquals(complete, plan.matchRootsWithRemainder(graph, roots, complete.work()));
+    }
+
+    @Test
     void fragmentAndLimitsAreExplicit() {
         var x = PatternExpr.var("X");
         var y = PatternExpr.var("Y");

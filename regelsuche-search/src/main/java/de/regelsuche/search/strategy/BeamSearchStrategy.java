@@ -32,7 +32,7 @@ public class BeamSearchStrategy implements SearchStrategy {
         );
         List<SearchState> explored = new ArrayList<>();
         List<SearchState> beam = List.of(rootState);
-        Set<String> visited = new HashSet<>();
+        var visited = new RunVisitedStates(problem.memory());
 
         for (int depth = 0; depth <= problem.heuristic().maxDepth() && !beam.isEmpty(); depth++) {
             List<SearchState> next = new ArrayList<>();
@@ -40,13 +40,7 @@ public class BeamSearchStrategy implements SearchStrategy {
                 if (explored.size() >= problem.heuristic().maxVisitedExpressions()) {
                     return explored;
                 }
-                if (!visited.add(stateKey(current))) {
-                    continue;
-                }
-                if (current.depth() > 0
-                    && TranspositionGate.evaluate(problem.memory(), current,
-                        current.canonicalHash() + "#" + current.depth())
-                    == TranspositionGate.Verdict.PRUNE) {
+                if (!visited.admit(current)) {
                     continue;
                 }
                 explored.add(current);
@@ -108,7 +102,7 @@ public class BeamSearchStrategy implements SearchStrategy {
                         SearchState.accumulatedAssumptions(current, transformation),
                         SearchState.extendedPath(current, transformation)
                     );
-                    if (visited.contains(stateKey(nextState))) {
+                    if (visited.contains(nextState)) {
                         continue;
                     }
                     next.add(nextState);
@@ -132,9 +126,6 @@ public class BeamSearchStrategy implements SearchStrategy {
         return SearchPriority.bestFirst(state, problem);
     }
 
-    private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + String.join(",", sortedValues(state.appliedRuleApplications()));
-    }
 
     private List<String> sortedValues(Set<String> values) {
         return values.stream().sorted().toList();

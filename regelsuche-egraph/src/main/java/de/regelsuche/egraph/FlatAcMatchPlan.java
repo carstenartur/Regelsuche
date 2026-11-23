@@ -3,6 +3,8 @@ package de.regelsuche.egraph;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.transform.PatternExpr;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -11,9 +13,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-/** Exact whole-node matching of individual scalar AC operands, including repeated class bindings. */
+/** Exact matching of scalar AC operands, including repeated class bindings. */
 public final class FlatAcMatchPlan {
     public static final String VERSION = "exact-scalar-flat-ac/v1";
+    public static final String CONTEXTUAL_VERSION = "exact-scalar-flat-ac/contextual/v1";
     public static final int MAX_ARITY = 64;
     public static final int MAX_WORK = 100_000;
     private record Slot(String name, int occurrences) {}
@@ -55,27 +58,47 @@ public final class FlatAcMatchPlan {
         public Result { matches = List.copyOf(matches); }
     }
 
+    record ContextMatch(EGraphPatternMatcher.Match match, List<EClassId> remainder) {
+        ContextMatch { remainder = List.copyOf(remainder); }
+    }
+
+    record ContextResult(List<ContextMatch> matches, int work, boolean complete, int candidateRoots,
+                         int nodesScanned, int tupleAttempts, int duplicateBindings) { }
+
     Result match(EGraph graph, int limit) {
         if (!graph.usesArithmeticAc()) throw new IllegalArgumentException("flat AC plans require the exact scalar AC graph");
         if (limit < 0 || limit > MAX_WORK) throw new IllegalArgumentException("invalid flat AC work limit");
         return matchRoots(graph, graph.classesWith(signature), limit);
     }
 
-    Result matchRoots(EGraph graph, java.util.Collection<EClassId> roots, int limit) {
+    Result matchRoots(EGraph graph, Collection<EClassId> roots, int limit) {
+        var result = scan(graph, roots, limit, false);
+        return new Result(result.matches().stream().map(ContextMatch::match).toList(), result.work(),
+            result.complete(), result.candidateRoots(), result.nodesScanned(), result.tupleAttempts(),
+            result.duplicateBindings());
+    }
+
+    ContextResult matchRootsWithRemainder(EGraph graph, Collection<EClassId> roots, int limit) {
+        return scan(graph, roots, limit, true);
+    }
+
+    private ContextResult scan(EGraph graph, Collection<EClassId> roots, int limit, boolean allowRemainder) {
         if (!graph.usesArithmeticAc() || limit < 0 || limit > MAX_WORK) throw new IllegalArgumentException("invalid native AC plan scope");
-        return new Scan(graph, limit).run(roots);
+        return new Scan(graph, limit, allowRemainder).run(roots);
     }
 
     private final class Scan {
         private final EGraph graph;
         private final int limit;
+        private final boolean allowRemainder;
         private int work, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings;
         private boolean complete = true;
-        private final LinkedHashSet<EGraphPatternMatcher.Match> matches = new LinkedHashSet<>();
+        private final LinkedHashSet<ContextMatch> matches = new LinkedHashSet<>();
 
-        private Scan(EGraph graph, int limit) {
+        private Scan(EGraph graph, int limit, boolean allowRemainder) {
             this.graph = graph;
             this.limit = limit;
+            this.allowRemainder = allowRemainder;
         }
 
         private boolean spend() {
@@ -87,7 +110,7 @@ public final class FlatAcMatchPlan {
             return true;
         }
 
-        private Result run(java.util.Collection<EClassId> roots) {
+        private ContextResult run(Collection<EClassId> roots) {
             for (var candidate : roots) {
                 if (!spend()) break;
                 candidateRoots++;
@@ -95,7 +118,9 @@ public final class FlatAcMatchPlan {
                 for (var node : graph.classOrThrow(root).nodes()) {
                     if (!spend()) break;
                     nodesScanned++;
-                    if (!signature.symbol().equals(node.symbol()) || signature.arity() != node.children().size()) continue;
+                    int remainderSize = node.children().size() - signature.arity();
+                    if (!signature.symbol().equals(node.symbol()) || remainderSize < 0
+                            || (!allowRemainder && remainderSize > 0) || node.children().size() > MAX_ARITY) continue;
                     var counts = new TreeMap<EClassId, Integer>();
                     for (var child : node.children()) {
                         if (!spend()) break;
@@ -104,19 +129,19 @@ public final class FlatAcMatchPlan {
                     if (complete) {
                         var ids = List.copyOf(counts.keySet());
                         int[] remaining = counts.values().stream().mapToInt(Integer::intValue).toArray();
-                        bind(root, ids, remaining, 0, new LinkedHashMap<>());
+                        bind(root, ids, remaining, 0, new LinkedHashMap<>(), remainderSize);
                     }
                     if (!complete) break;
                 }
                 if (!complete) break;
             }
-            return new Result(List.copyOf(matches), work, complete, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings);
+            return new ContextResult(List.copyOf(matches), work, complete, candidateRoots, nodesScanned, tupleAttempts, duplicateBindings);
         }
 
         private void bind(EClassId root, List<EClassId> ids, int[] remaining,
-                          int depth, Map<String, EClassId> bindings) {
+                          int depth, Map<String, EClassId> bindings, int remainderSize) {
             if (depth == slots.size()) {
-                if (!matches.add(new EGraphPatternMatcher.Match(root, bindings))) duplicateBindings++;
+                retain(root, ids, remaining, bindings, remainderSize);
                 return;
             }
             var slot = slots.get(depth);
@@ -126,10 +151,28 @@ public final class FlatAcMatchPlan {
                 if (remaining[i] < slot.occurrences()) continue;
                 remaining[i] -= slot.occurrences();
                 bindings.put(slot.name(), ids.get(i));
-                bind(root, ids, remaining, depth + 1, bindings);
+                bind(root, ids, remaining, depth + 1, bindings, remainderSize);
                 bindings.remove(slot.name());
                 remaining[i] += slot.occurrences();
                 if (!complete) return;
+            }
+        }
+
+        private void retain(EClassId root, List<EClassId> ids, int[] remaining,
+                            Map<String, EClassId> bindings, int remainderSize) {
+            List<EClassId> remainder = List.of();
+            if (remainderSize > 0) {
+                remainder = new ArrayList<>(remainderSize);
+                for (int i = 0; i < ids.size(); i++) {
+                    if (!spend()) return;
+                    for (int occurrence = 0; occurrence < remaining[i]; occurrence++) {
+                        if (!spend()) return;
+                        remainder.add(ids.get(i));
+                    }
+                }
+            }
+            if (!matches.add(new ContextMatch(new EGraphPatternMatcher.Match(root, bindings), remainder))) {
+                duplicateBindings++;
             }
         }
     }
