@@ -23,6 +23,8 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.23.0'
 
     testImplementation project(':regelsuche-solver-portfolio')
+    // Transitional Gradle parity; Maven owns the same pinned Draft 2020-12 validator.
+    testImplementation 'com.networknt:json-schema-validator:3.0.9'
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

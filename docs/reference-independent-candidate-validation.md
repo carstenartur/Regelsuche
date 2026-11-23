@@ -150,10 +150,24 @@ ReferenceIndependentValidationHistoricalComparison
 ```
 
 These commands use the discovery module runtime classpath. `verify` performs
-binding verification and full oracle re-execution. The separate schema checker
-uses the repository's existing pinned verification Python environment. It owns
-only the exchange schema and content-root check; Java owns candidate and work
-semantics and oracle replay.
+binding verification and full oracle re-execution. The retained Gradle verification still runs the Python exchange-schema checker.
+An additive Maven/JUnit counterpart checks the same Draft 2020-12 schema directly
+against all 144 public frozen rows and 4,316 retained candidate outcomes without
+opening the historical qualification or invoking an oracle:
+
+```sh
+mvn -B -ntp -pl regelsuche-discovery -am \
+  -Dtest=ReferenceIndependentValidationSchemaMavenTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+The JUnit gate checks the positive exchange shape, separately rejects forbidden
+reference labels, forged formal-proof claims, invalid budgets and false freshness,
+and verifies that strict Java content-root parsing rejects a forged hash, duplicate
+JSON members and noncanonical bytes. It is a bounded **Maven migration slice for
+#749**, not raw-output parity with the 4,316-call historical Python/Gradle job and
+not a reason to retire that job yet. Java continues to own candidate/work semantics
+and oracle replay; unavailable infrastructure is not mathematical evidence.
 
 ## Observed bounded result and remaining work
 
