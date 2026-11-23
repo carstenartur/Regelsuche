@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.charset.MalformedInputException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,7 +25,7 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** JUnit owns assertions; Python is only the existing production build adapter. */
+/** Standalone SDK archive and transitional public API checks. */
 class MavenOptimizationSdkPackagingContractTest {
     @TempDir
     Path temporary;
@@ -70,10 +72,8 @@ class MavenOptimizationSdkPackagingContractTest {
 
         Path a = temporary.resolve("a.jar");
         Path b = temporary.resolve("b.jar");
-        ProcessResult firstRun = shade(a, first, second);
-        ProcessResult reversed = shade(b, second, first);
-        assertEquals(0, firstRun.exitCode(), firstRun.output());
-        assertEquals(0, reversed.exitCode(), reversed.output());
+        OptimizationSdkArchive.writeZip(a, OptimizationSdkArchive.shade(List.of(first, second)));
+        OptimizationSdkArchive.writeZip(b, OptimizationSdkArchive.shade(List.of(second, first)));
         assertArrayEquals(Files.readAllBytes(a), Files.readAllBytes(b));
         try (ZipFile archive = new ZipFile(a.toFile())) {
             assertEquals("example.First\nexample.Second\n", new String(
@@ -84,24 +84,32 @@ class MavenOptimizationSdkPackagingContractTest {
 
         secondEntries.put("example/First.class", "conflicting bytecode");
         writeJar(second, secondEntries);
-        ProcessResult conflicting = shade(temporary.resolve("conflicting.jar"), first, second);
-        assertNotEquals(0, conflicting.exitCode());
-        assertTrue(conflicting.output().contains("duplicate class with different bytecode"),
-            conflicting.output());
+        IOException conflict = assertThrows(IOException.class, () -> OptimizationSdkArchive.shade(List.of(first, second)));
+        assertTrue(conflict.getMessage().contains("duplicate class with different bytecode"), conflict.getMessage());
     }
 
-    private ProcessResult shade(Path output, Path... jars) throws Exception {
-        String invoke = """
-            import runpy, sys
-            from pathlib import Path
-            adapter = runpy.run_path(sys.argv[1])
-            entries = adapter['shade']([Path(value) for value in sys.argv[3:]])
-            adapter['write_zip'](Path(sys.argv[2]), entries)
-            """;
-        List<String> arguments = new ArrayList<>();
-        arguments.add(output.toString());
-        for (Path jar : jars) arguments.add(jar.toString());
-        return runAdapter("package-optimization-sdk.py", invoke, arguments.toArray(String[]::new));
+    @Test
+    void shadingRejectsUnsafeMembersAndApplicationDependencies() throws IOException {
+        Path input = temporary.resolve("input.jar");
+        writeJar(input, Map.of("../outside", "entry"));
+        assertTrue(assertThrows(IOException.class, () -> OptimizationSdkArchive.shade(List.of(input)))
+            .getMessage().contains("unsafe archive entry"));
+        writeJar(input, Map.of("org/eclipse/Unsafe.class", "entry"));
+        assertTrue(assertThrows(IOException.class, () -> OptimizationSdkArchive.shade(List.of(input)))
+            .getMessage().contains("forbidden SDK runtime dependency"));
+        writeJar(input, Map.of("META-INF/versions/25/org/eclipse/Unsafe.class", "entry"));
+        assertTrue(assertThrows(IOException.class, () -> OptimizationSdkArchive.shade(List.of(input)))
+            .getMessage().contains("forbidden SDK runtime dependency"));
+    }
+
+    @Test
+    void shadingRejectsInvalidUtf8ServiceDescriptors() throws IOException {
+        Path input = temporary.resolve("input.jar");
+        try (var zip = new ZipOutputStream(Files.newOutputStream(input))) {
+            zip.putNextEntry(new ZipEntry("META-INF/services/example.Service"));
+            zip.write(new byte[] {(byte) 0xc3});
+        }
+        assertThrows(MalformedInputException.class, () -> OptimizationSdkArchive.shade(List.of(input)));
     }
 
     private ProcessResult runAdapter(String script, String invocation, String... arguments)

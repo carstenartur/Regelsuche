@@ -39,6 +39,8 @@ jobs:
           problem-matcher: true
           verify-signature: true
           cache: maven
+          # This job bootstraps Playwright but never fills the full Maven reactor cache.
+          cache-dependency-path: playwright-bootstrap/pom.xml
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
       - name: Install checkout prerequisites
@@ -173,6 +175,10 @@ jobs:
           problem-matcher: true
           verify-signature: true
           cache: maven
+          # Keep complete-reactor entries separate from short Maven jobs.
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
       - name: Install independent Maven checkout prerequisites
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
@@ -266,6 +272,9 @@ jobs:
           problem-matcher: true
           verify-signature: true
           cache: maven
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
       - name: Install independent Maven checkout prerequisites
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.

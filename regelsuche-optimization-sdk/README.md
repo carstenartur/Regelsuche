@@ -267,14 +267,18 @@ From a clean committed checkout, build with Java 25:
 
 ```sh
 SDK_SOURCE_EPOCH=$(git show -s --format=%ct HEAD)
+SDK_REPOSITORY=$(mktemp -d)
 mvn -B -Psdk-release -pl regelsuche-optimization-sdk -am clean install \
-  -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH"
+  -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH" -Dmaven.repo.local="$SDK_REPOSITORY"
 mvn -B -pl regelsuche-optimization-sdk dependency:copy-dependencies \
   -DincludeScope=runtime -DexcludeGroupIds=io.github.carstenartur \
-  -DoutputDirectory=/absolute/external-runtime
-python3 scripts/package-optimization-sdk.py \
-  --external-dependencies /absolute/external-runtime \
-  --output /absolute/distribution --java-home "$JAVA_HOME"
+  -Dmaven.repo.local="$SDK_REPOSITORY" -DoutputDirectory=/absolute/external-runtime
+mvn -B -pl maven-build-contract -am \
+  -Dtest=MavenOptimizationSdkDistributionTest#packageConfiguredDistribution \
+  -Dregelsuche.sdk.packageOptimization=true \
+  -Dregelsuche.sdk.optimizationRepository="$SDK_REPOSITORY" \
+  -Dregelsuche.sdk.optimizationDependencies=/absolute/external-runtime \
+  -Dregelsuche.sdk.optimizationOutput=/absolute/distribution test
 ```
 
 The commit timestamp fixes Maven input-JAR timestamps as well as the deterministic
@@ -283,8 +287,8 @@ the provenance includes raw input-JAR hashes, not only their class entries.
 The packager refuses dirty sources, conflicting class bytes and forbidden
 application dependencies. It merges service entries and keeps dependency
 notices. Repeat the same build and packaging command, then compare every
-artifact hash. JUnit owns packaging regressions; Python is only the production
-build adapter. The normal API, publication, coverage and `ciCheck` authorities
+artifact hash. The standalone packager and isolated consumer checks run through
+Maven/JUnit. The normal API, publication, coverage and `ciCheck` authorities
 include this module. See the [current qualification and integration status](../docs/superpowers/plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27).
 The [October 4 reconstruction report](../docs/java-optimization-sdk-qualification.md)
 is historical evidence for its recorded revision, not the current distribution.

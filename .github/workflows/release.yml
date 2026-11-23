@@ -591,9 +591,22 @@ jobs:
               -pl regelsuche-optimization-sdk dependency:copy-dependencies \
               -DincludeScope=runtime -DexcludeGroupIds=io.github.carstenartur \
               -DoutputDirectory="$SDK_DEPENDENCIES"
-            python3 -B scripts/package-optimization-sdk.py \
-              --external-dependencies "$SDK_DEPENDENCIES" \
-              --output "$SDK_STANDALONE" --java-home "$JAVA_HOME"
+            if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/OptimizationSdkArchive.java ]]; then
+              mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+                -Dtest=MavenOptimizationSdkDistributionTest#packageConfiguredDistribution \
+                -Dregelsuche.sdk.packageOptimization=true \
+                "-Dregelsuche.sdk.optimizationRepository=$SDK_REPOSITORY" \
+                "-Dregelsuche.sdk.optimizationDependencies=$SDK_DEPENDENCIES" \
+                "-Dregelsuche.sdk.optimizationOutput=$SDK_STANDALONE" test
+            elif [[ "$EXISTING_TAG" == 'true' ]]; then
+              # Replay only existing tags that predate the Java optimizer archive.
+              python3 -B scripts/package-optimization-sdk.py \
+                --external-dependencies "$SDK_DEPENDENCIES" \
+                --output "$SDK_STANDALONE" --java-home "$JAVA_HOME"
+            else
+              echo "::error::Missing Maven optimizer SDK archive producer in a new release" >&2
+              exit 1
+            fi
             source_revision=$(git rev-parse HEAD)
             standalone_version="${VERSION}-issue1657-${source_revision:0:12}"
             cp "$SDK_STANDALONE/regelsuche-optimization-sdk-${standalone_version}.zip" \
