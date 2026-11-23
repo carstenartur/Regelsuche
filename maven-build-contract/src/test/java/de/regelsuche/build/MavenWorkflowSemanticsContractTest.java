@@ -113,7 +113,7 @@ class MavenWorkflowSemanticsContractTest {
         "(?<![A-Za-z0-9_.-])"
             + "(?:python(?:[23](?:\\.\\d+)?)?|pypy(?:[23](?:\\.\\d+)?)?"
             + "|pip(?:[23](?:\\.\\d+)?)?|pipx|uvx?|node(?:js)?|npm|npx|pnpm|yarn|corepack|deno|bunx?"
-            + "|perl|ruby|pwsh|powershell)(?=\\s+|$|[;&|<>]|\\\\$)"
+            + "|perl|ruby|pwsh|powershell)(?=\\s+|$|[;&|<>]|\\$|\\\\$)"
     );
 
     // These four folded YAML commands are retained only until their Maven
@@ -449,10 +449,11 @@ class MavenWorkflowSemanticsContractTest {
     }
 
     @Test
-    void shellControlOperatorsCannotBypassTheHostRuntimeInventory() {
+    void shellOperatorsAndEmptyExpansionsCannotBypassHostRuntimeInventory() {
         MergeGovernance governance = validGovernance();
         // A shell does not require whitespace before operators or redirects.
         // Earlier inventory checks accepted these undeclared host commands.
+        // Empty shell substitutions can also retain the exact executable name.
         for (String invocation : List.of(
                 "python3<<'PY'",
                 "node<<<'console.log(1)'",
@@ -461,6 +462,8 @@ class MavenWorkflowSemanticsContractTest {
                 "python3||echo failed",
                 "python3|cat",
                 "/usr/bin/python3>/tmp/result",
+                "python3$(true) --version",
+                "python3${NO_SUCH_VAR:-} --version",
                 "nodejs<test.js",
                 "pip3.13<<<'list'")) {
             assertViolation(validWorkflow() + "\n      - run: "
