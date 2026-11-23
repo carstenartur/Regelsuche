@@ -34,7 +34,10 @@ or mathematical validation.
 The retained budget commitment and configured work must match the scenario's
 recorded search budget. Required nested identities, provenance text, evidence
 statuses and recorded counts are checked before persistence; missing or malformed
-fields return `400 INVALID_DOSSIER`. This contract check does not supply any of
+fields return `400 INVALID_DOSSIER`. An unsupported `Content-Type` on dossier
+imports also returns `400 INVALID_DOSSIER`; duplicate-run POSTs return
+`400 INVALID_RUN_CHANGE`. Both reject before retaining state rather than
+reporting an unrelated run-workspace error. This contract check does not supply any of
 the proof or guard evidence that the source artifact does not retain.
 
 The dossier shows the selected retained state hash and expression together with:

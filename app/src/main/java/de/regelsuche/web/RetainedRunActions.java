@@ -28,16 +28,18 @@ final class RetainedRunActions {
     private RetainedRunActions() { }
 
     static void handle(HttpExchange exchange, Path directory, String suffix, int maxBytes) throws IOException {
-        byte[] requestBody = exchange.getRequestMethod().equals("POST") ? read(exchange, maxBytes) : null;
         String[] path = suffix.split("/", -1);
-        if (path.length != 2 || !path[0].matches("[0-9a-f]{64}")) {
-            error(exchange, 400, "INVALID_RUN_DIGEST", "run path must contain a lowercase SHA-256 digest");
-            return;
-        }
-        var found = RepresentationDiscoveryRunWorkspace.findRetained(directory, "sha256:" + path[0]);
-        if (found.isEmpty()) { error(exchange, 404, "RUN_NOT_FOUND", "representation-discovery run not found"); return; }
-        var run = found.get();
         try {
+            // Enforce the common 413 boundary before resolving even an invalid run path.
+            // Keep media-type errors inside this action-specific catch.
+            byte[] requestBody = exchange.getRequestMethod().equals("POST") ? read(exchange, maxBytes) : null;
+            if (path.length != 2 || !path[0].matches("[0-9a-f]{64}")) {
+                error(exchange, 400, "INVALID_RUN_DIGEST", "run path must contain a lowercase SHA-256 digest");
+                return;
+            }
+            var found = RepresentationDiscoveryRunWorkspace.findRetained(directory, "sha256:" + path[0]);
+            if (found.isEmpty()) { error(exchange, 404, "RUN_NOT_FOUND", "representation-discovery run not found"); return; }
+            var run = found.get();
             if (path[1].equals("duplicate")) {
                 duplicate(exchange, directory, run, requestBody);
             } else {
@@ -65,7 +67,8 @@ final class RetainedRunActions {
                 send(exchange, importing ? 201 : 200, body);
             }
         } catch (IllegalArgumentException exception) {
-            error(exchange, 400, path[1].equals("duplicate") ? "INVALID_RUN_CHANGE" : "INVALID_DOSSIER", exception.getMessage());
+            error(exchange, 400, path.length == 2 && path[1].equals("duplicate")
+                ? "INVALID_RUN_CHANGE" : "INVALID_DOSSIER", exception.getMessage());
         }
     }
 

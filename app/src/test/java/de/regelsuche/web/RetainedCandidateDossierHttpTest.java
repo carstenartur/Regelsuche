@@ -51,6 +51,22 @@ class RetainedCandidateDossierHttpTest {
         else System.setProperty("regelsuche.discovery.runs.directory", previousDirectory);
     }
 
+    @Test void rejectsInvalidArtifactMediaTypesWithActionSpecificErrors() throws Exception {
+        for (String action : new String[]{"dossier", "duplicate"}) {
+            var request = HttpRequest.newBuilder(URI.create(
+                    "http://127.0.0.1:" + server.boundPort() + "/api/discovery-runs" + path(action)))
+                .header("Content-Type", "text/plain")
+                .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                .build();
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertEquals(400, response.statusCode(), response.body());
+            assertTrue(response.body().contains(action.equals("duplicate")
+                ? "INVALID_RUN_CHANGE" : "INVALID_DOSSIER"), response.body());
+            assertFalse(response.body().contains("INVALID_RUN_WORKSPACE"), response.body());
+        }
+        assertEquals(404, request("GET", path("dossier"), null).statusCode());
+    }
+
     @Test void retainsExactBoundEvidenceAndRevalidatesItOnEveryRead() throws Exception {
         var missing = request("GET", path("dossier"), null);
         assertEquals(404, missing.statusCode());
