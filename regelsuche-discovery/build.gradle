@@ -330,10 +330,6 @@ def intrinsicComparison = layout.buildDirectory.file(intrinsicRevision.map {
 })
 def intrinsicSchema = repositoryRootDirectory.file(
     'docs/schemas/regelsuche-reference-independent-candidate-validation-v1.schema.json')
-def intrinsicSchemaVerifier = repositoryRootDirectory.file(
-    'scripts/verify-reference-independent-validation-schema.py')
-def intrinsicSchemaTests = repositoryRootDirectory.file(
-    'scripts/test-reference-independent-validation-schema.py')
 def intrinsicRunnerClass =
     'de.regelsuche.discovery.representation.ReferenceIndependentCandidateValidationRunner'
 
@@ -402,35 +398,20 @@ def compareIntrinsicHistory = tasks.register('compareReferenceIndependentValidat
     } as CommandLineArgumentProvider)
 }
 
-def checkIntrinsicSchema = tasks.register('verifyReferenceIndependentValidationSchema', Exec) {
+def checkIntrinsicSchema = tasks.register('verifyReferenceIndependentValidationSchema', JavaExec) {
     group = 'verification'
-    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'), generateIntrinsicCompanion
-    workingDir repositoryRootDirectory
-    inputs.files(intrinsicSchema, intrinsicSchemaVerifier, intrinsicReport)
-    doFirst {
-        commandLine verificationPython.get().absolutePath, intrinsicSchemaVerifier.asFile.absolutePath,
-            '--schema', intrinsicSchema.asFile.absolutePath,
-            '--companion', intrinsicReport.get().asFile.absolutePath
-    }
-}
-
-def checkIntrinsicSchemaControls = tasks.register('testReferenceIndependentValidationSchema', Exec) {
-    group = 'verification'
-    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'), intrinsicControls
-    workingDir repositoryRootDirectory
-    inputs.files(intrinsicSchema, intrinsicSchemaVerifier, intrinsicSchemaTests)
-    inputs.file(layout.buildDirectory.file(
-        'reports/reference-independent-candidate-validation/test/reference-independent-candidate-validation.json'))
-    environment 'PYTHONDONTWRITEBYTECODE', '1'
-    doFirst {
-        commandLine verificationPython.get().absolutePath, intrinsicSchemaTests.asFile.absolutePath
-    }
+    dependsOn tasks.named('testClasses'), generateIntrinsicCompanion
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'de.regelsuche.discovery.representation.ReferenceIndependentValidationSchema'
+    systemProperty 'regelsuche.repositoryRoot', repositoryRootDirectory.asFile.absolutePath
+    inputs.files(intrinsicSchema, intrinsicReport)
+    argumentProviders.add({ [intrinsicReport.get().asFile.absolutePath] } as CommandLineArgumentProvider)
 }
 
 def verifyIntrinsicCompanion = tasks.register('verifyReferenceIndependentCandidateValidation') {
     group = 'verification'
     description = 'Verifies the complete archived-matrix companion, oracle replay, schema and controls.'
-    dependsOn compareIntrinsicHistory, checkIntrinsicSchema, checkIntrinsicSchemaControls
+    dependsOn compareIntrinsicHistory, checkIntrinsicSchema, intrinsicControls
 }
 tasks.named('check') { dependsOn verifyIntrinsicCompanion }
 rootProject.tasks.named('check') { dependsOn verifyIntrinsicCompanion }

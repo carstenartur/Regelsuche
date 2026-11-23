@@ -42,6 +42,7 @@ class ReferenceIndependentCandidateValidationIntegrationTest {
         });
         String json = Files.readString(result);
         var artifact = ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(json);
+        assertEquals(artifact.contentHash(), ReferenceIndependentValidationSchema.verify(json));
         assertEquals(4316, artifact.content().summary().oracleCalls());
         assertEquals(144, artifact.content().summary().rows());
         var comparison = ReferenceIndependentValidationHistoricalComparison.compare(

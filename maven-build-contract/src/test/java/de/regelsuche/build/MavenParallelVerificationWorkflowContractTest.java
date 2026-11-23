@@ -226,6 +226,10 @@ class MavenParallelVerificationWorkflowContractTest {
 
     JsonNode jobs = YAML.readTree(workflow).required("jobs");
     assertRequiredAuthorities(jobs);
+    assertEquals("playwright-bootstrap/pom.xml", mavenCacheInputs(jobs.required("gradle-verification")));
+    String fullCacheInputs = "**/pom.xml\n.mvn/maven.config";
+    assertEquals(fullCacheInputs, mavenCacheInputs(jobs.required("maven-product-verification")));
+    assertEquals(fullCacheInputs, mavenCacheInputs(jobs.required(GIT_FREE_AUTHORITY)));
 
     int rejection = convergence.indexOf(
         "- name: Reject incomplete verification authority");
@@ -437,6 +441,14 @@ class MavenParallelVerificationWorkflowContractTest {
     while (!"checked-proofs".equals(needs.get(proofIndex).asText())) proofIndex++;
     needs.remove(proofIndex);
     assertThrows(AssertionError.class, () -> assertRequiredAuthorities(jobs));
+  }
+
+  private static String mavenCacheInputs(JsonNode job) {
+    var setup = job.required("steps").valueStream()
+        .filter(step -> step.path("uses").asText().startsWith("actions/setup-java@"))
+        .findFirst().orElseThrow().required("with");
+    assertEquals("maven", setup.required("cache").asText());
+    return setup.required("cache-dependency-path").asText().strip();
   }
 
   private static void assertRequiredAuthorities(JsonNode jobs) {

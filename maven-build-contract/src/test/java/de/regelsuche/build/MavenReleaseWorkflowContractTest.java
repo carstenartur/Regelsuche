@@ -40,9 +40,22 @@ class MavenReleaseWorkflowContractTest {
         int oldTag = sdkStep.indexOf("elif [[ \"$EXISTING_TAG\" == 'true' ]]; then", packageSdk);
         int oldProducer = sdkStep.indexOf("python3 -B scripts/package-student-sdk.py", packageSdk);
         int missingProducer = sdkStep.indexOf("Missing Maven Student SDK archive producer in a new release", oldProducer);
-        int optimization = sdkStep.indexOf("python3 -B scripts/package-optimization-sdk.py", missingProducer);
-        assertTrue(oldTag > packageSdk && oldProducer > oldTag && missingProducer > oldProducer
-            && optimization > missingProducer, "only an existing historical tag may use the old Student SDK producer");
+        assertTrue(oldTag > packageSdk && oldProducer > oldTag && missingProducer > oldProducer,
+            "only an existing historical tag may use the old Student SDK producer");
+        int prepareOptimization = sdkStep.indexOf("dependency:copy-dependencies", missingProducer);
+        int packageOptimization = sdkStep.indexOf(
+            "-Dtest=MavenOptimizationSdkDistributionTest#packageConfiguredDistribution", prepareOptimization);
+        int oldOptimizationTag = sdkStep.indexOf("elif [[ \"$EXISTING_TAG\" == 'true' ]]; then", packageOptimization);
+        int oldOptimizationProducer = sdkStep.indexOf("python3 -B scripts/package-optimization-sdk.py", missingProducer);
+        int missingOptimization = sdkStep.indexOf("Missing Maven optimizer SDK archive producer in a new release",
+            oldOptimizationProducer);
+        assertTrue(prepareOptimization > missingProducer && packageOptimization > prepareOptimization
+            && oldOptimizationTag > packageOptimization && oldOptimizationProducer > oldOptimizationTag
+            && missingOptimization > oldOptimizationProducer,
+            "fresh releases must use the staged Maven optimizer producer and fail when it is absent");
+        assertTrue(sdkStep.substring(packageOptimization, oldOptimizationTag)
+            .contains("-Dregelsuche.sdk.optimizationRepository=$SDK_REPOSITORY"),
+            "the Maven producer must receive the isolated repository used to stage SDK artifacts");
     }
 
     @Test

@@ -9,28 +9,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.networknt.schema.Schema;
-import com.networknt.schema.SchemaLocation;
-import com.networknt.schema.SchemaRegistry;
-import com.networknt.schema.SchemaRegistryConfig;
-import com.networknt.schema.SpecificationVersion;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Additive Maven/JUnit authority for the public reference-independent validation
- * companion exchange schema. The original historical qualification is never opened.
- * The legacy Python/Gradle gate remains until raw-artifact parity is established.
+ * Exchange-schema controls over the archived companion without access to the
+ * historical qualification or to an oracle.
  */
 class ReferenceIndependentValidationSchemaMavenTest {
     private static final JsonMapper JSON = new JsonMapper();
-    private static final String DIALECT = "https://json-schema.org/draft/2020-12/schema";
-
     @Test
     void completePublicFreezeHasAValidCompanionWithoutCallingAnOracle() throws Exception {
         var artifact = publicNoOracleCompanion();
@@ -41,14 +30,14 @@ class ReferenceIndependentValidationSchemaMavenTest {
         String canonical = artifact.toCanonicalJson();
         assertEquals(artifact,
             ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(canonical));
-        assertTrue(schema().validate(JSON.readTree(canonical)).isEmpty(),
-            "complete public-frozen companion violates Draft 2020-12");
+        assertEquals(artifact.contentHash(),
+            ReferenceIndependentValidationSchema.verify(canonical));
     }
 
     @Test
     void schemaSeparatelyRejectsReferenceClaimsProofPromotionAndInvalidBudgets() throws Exception {
         ObjectNode source = parse(publicNoOracleCompanion().toCanonicalJson());
-        Schema contract = schema();
+        var contract = ReferenceIndependentValidationSchema.CONTRACT;
 
         var leakedLabel = source.deepCopy();
         firstOutcome(leakedLabel).put("referenceMatched", true);
@@ -76,21 +65,23 @@ class ReferenceIndependentValidationSchemaMavenTest {
         forgedHash.put("contentHash", "sha256:" + "0".repeat(64));
         assertTrue(contract.validate(forgedHash).isEmpty(),
             "shape validation is not a replacement for content-hash verification");
+        var canonicalForgery = TargetFreeHeldOutMatrixRunner.canonical(
+            ReferenceIndependentCandidateValidation.JSON.readTree(forgedHash.toString()));
         assertThrows(IllegalArgumentException.class, () ->
-            ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(
-                forgedHash.toString()), "the Java owner must reject a forged content root");
+            ReferenceIndependentValidationSchema.verify(canonicalForgery),
+            "the Java owner must reject a forged content root even on canonical bytes");
     }
 
     @Test
     void strictJavaOwnerRejectsDuplicateAndNonCanonicalInputBytes() {
         String original = publicNoOracleCompanion().toCanonicalJson();
         assertThrows(IllegalArgumentException.class, () ->
-            ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(" " + original));
+            ReferenceIndependentValidationSchema.verify(" " + original));
         String duplicate = original.replace(
             "\"contentHash\":", "\"contentHash\":\"sha256:" + "0".repeat(64) + "\",\"contentHash\":");
         assertFalse(duplicate.equals(original), "duplicate-member negative must mutate the source");
         assertThrows(IllegalArgumentException.class, () ->
-            ReferenceIndependentCandidateValidation.Artifact.fromCanonicalJson(duplicate));
+            ReferenceIndependentValidationSchema.verify(duplicate));
     }
 
     private static ReferenceIndependentCandidateValidation.Artifact publicNoOracleCompanion() {
@@ -116,23 +107,4 @@ class ReferenceIndependentValidationSchemaMavenTest {
         return (ObjectNode) JSON.readTree(canonical);
     }
 
-    private static Schema schema() throws Exception {
-        Path path = Path.of("docs", "schemas",
-            "regelsuche-reference-independent-candidate-validation-v1.schema.json");
-        if (!Files.isRegularFile(path)) {
-            path = Path.of("..", "docs", "schemas",
-                "regelsuche-reference-independent-candidate-validation-v1.schema.json");
-        }
-        var source = JSON.readTree(Files.readString(path, StandardCharsets.UTF_8));
-        assertEquals(DIALECT, source.path("$schema").asText());
-        var registry = SchemaRegistry.withDefaultDialect(
-            SpecificationVersion.DRAFT_2020_12, builder -> builder
-                .schemaLoader(loader -> loader.fetchRemoteResources(false))
-                .schemaRegistryConfig(SchemaRegistryConfig.builder()
-                    .typeLoose(false).formatAssertionsEnabled(false).build()));
-        assertTrue(registry.getSchema(SchemaLocation.of(DIALECT)).validate(source).isEmpty(),
-            "exchange schema is not a valid Draft 2020-12 schema");
-        return registry.getSchema(
-            SchemaLocation.of("https://regelsuche.invalid/reference-independent-v1/"), source);
-    }
 }

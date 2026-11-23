@@ -21,13 +21,24 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.junit.jupiter.api.io.TempDir;
 
 /** Real builds and consumers belong to Maven/JUnit, not workflow shell assertions. */
-@EnabledIfSystemProperty(named = "regelsuche.sdk.distribution", matches = "true")
 class MavenOptimizationSdkDistributionTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Test
+    @EnabledIfSystemProperty(named = "regelsuche.sdk.packageOptimization", matches = "true")
+    void packageConfiguredDistribution(@TempDir Path scratch) throws Exception {
+        Path output = Path.of(System.getProperty("regelsuche.sdk.optimizationOutput")).toAbsolutePath();
+        Path dependencies = Path.of(System.getProperty("regelsuche.sdk.optimizationDependencies")).toAbsolutePath();
+        Path repository = Path.of(System.getProperty("regelsuche.sdk.optimizationRepository")).toAbsolutePath();
+        var result = OptimizationSdkArchive.create(repositoryRoot(), repository, dependencies, output, scratch);
+        verifyDistribution(result, output, result.revision());
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "regelsuche.sdk.distribution", matches = "true")
     void twoCleanBuildsAndFreshConsumersProduceIdenticalSourceBoundDistributions() throws Exception {
         Path root = repositoryRoot();
         Path reports = root.resolve("maven-build-contract/target/surefire-reports");
@@ -41,7 +52,7 @@ class MavenOptimizationSdkDistributionTest {
         assertTrue(epoch.matches("[0-9]+"), epoch);
         String javaHome = System.getProperty("java.home");
         String maven = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows") ? "mvn.cmd" : "mvn";
-        String python = maven.endsWith(".cmd") ? "python" : "python3";
+        Path repository = Path.of(System.getProperty("regelsuche.mavenLocalRepository")).toAbsolutePath();
         run(root, evidence.resolve("java-version.txt"), Path.of(javaHome, "bin", "java").toString(), "-version");
         run(root, evidence.resolve("maven-version.txt"), maven, "--version");
         long expectedTests = -1;
@@ -52,17 +63,18 @@ class MavenOptimizationSdkDistributionTest {
             // This reactor does not contain maven-build-contract: no recursive invocation of this test.
             run(root, evidence.resolve(attempt + "-maven.log"), maven, "--batch-mode", "--no-transfer-progress",
                 "-Psdk-release", "-pl", "regelsuche-optimization-sdk", "-am", "clean", "install",
-                "-Dproject.build.outputTimestamp=" + epoch);
+                "-Dproject.build.outputTimestamp=" + epoch, "-Dmaven.repo.local=" + repository);
             long tests = verifyTestReports(root, evidence.resolve(attempt + "-test-reports"));
             if (expectedTests < 0) expectedTests = tests;
             else assertEquals(expectedTests, tests, "Both clean builds must execute the same SDK test count");
             run(root, evidence.resolve(attempt + "-dependencies.log"), maven, "--batch-mode", "--no-transfer-progress",
                 "-pl", "regelsuche-optimization-sdk", "dependency:copy-dependencies", "-DincludeScope=runtime",
-                "-DexcludeGroupIds=io.github.carstenartur", "-DoutputDirectory=" + dependencies);
-            String result = run(root, evidence.resolve(attempt + "-consumer.json"), python, "-B",
-                root.resolve("scripts/package-optimization-sdk.py").toString(),
-                "--external-dependencies", dependencies.toString(), "--output", output.toString(), "--java-home", javaHome);
-            verifyDistribution(JSON.readTree(result), output, revision);
+                "-DexcludeGroupIds=io.github.carstenartur", "-DoutputDirectory=" + dependencies,
+                "-Dmaven.repo.local=" + repository);
+            var result = OptimizationSdkArchive.create(root, repository, dependencies, output, evidence);
+            verifyDistribution(result, output, revision);
+            JSON.writerWithDefaultPrettyPrinter().writeValue(evidence.resolve(attempt + "-consumer.json").toFile(),
+                result);
             distributions.add(output);
         }
         List<Path> entries = relativeFiles(distributions.getFirst());
@@ -83,14 +95,16 @@ class MavenOptimizationSdkDistributionTest {
         JSON.writerWithDefaultPrettyPrinter().writeValue(evidence.resolve("reproducibility.json").toFile(), receipt);
     }
 
-    private static void verifyDistribution(JsonNode result, Path output, String revision) throws Exception {
-        assertEquals(revision, result.path("revision").asText());
-        Path jar = Path.of(result.path("jar").asText()).toAbsolutePath().normalize();
+    private static void verifyDistribution(OptimizationSdkArchive.Result result, Path output, String revision)
+            throws Exception {
+        assertEquals(revision, result.revision());
+        assertTrue(Files.isRegularFile(result.archive()), "Missing final optimizer ZIP");
+        Path jar = result.jar().toAbsolutePath().normalize();
         assertTrue(jar.startsWith(output.toAbsolutePath().normalize()), "Packager must return its own output");
         assertTrue(Files.isRegularFile(jar), jar.toString());
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar)));
-        assertEquals(hash, result.path("sha256").asText());
-        Path qualification = output.resolve("regelsuche-optimization-sdk-" + result.path("version").asText() + "-qualification.json");
+        assertEquals(hash, result.sha256());
+        Path qualification = output.resolve("regelsuche-optimization-sdk-" + result.version() + "-qualification.json");
         JsonNode proof = JSON.readTree(Files.readString(qualification));
         assertEquals("regelsuche.optimization-distribution/v1", proof.path("schema").asText());
         assertEquals(revision, proof.path("sourceRevision").asText());
@@ -106,6 +120,10 @@ class MavenOptimizationSdkDistributionTest {
         try (JarFile binary = new JarFile(jar.toFile())) {
             assertEquals(revision, binary.getManifest().getMainAttributes().getValue("Source-Revision"));
         }
+        var members = OptimizationSdkArchive.readZip(result.archive());
+        String jarName = output.relativize(jar).toString().replace(java.io.File.separatorChar, '/');
+        assertEquals(hash, StudentSdkArchive.sha256(members.get(jarName)));
+        assertEquals(hash + "\n", new String(members.get(jarName + ".sha256"), java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private static long verifyTestReports(Path root, Path retained) throws Exception {
