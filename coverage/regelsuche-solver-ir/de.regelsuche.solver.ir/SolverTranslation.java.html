@@ -101,17 +101,17 @@ public record SolverTranslation(
     }
 
     public String toCanonicalJson() {
-<span class="nc" id="L104">        return new JsonWriter().beginObject()</span>
-<span class="nc" id="L105">            .property(&quot;schema&quot;, schema)</span>
-<span class="nc" id="L106">            .property(&quot;obligationHash&quot;, obligationHash)</span>
-<span class="nc" id="L107">            .property(&quot;backendId&quot;, backendId)</span>
-<span class="nc" id="L108">            .property(&quot;backendVersion&quot;, backendVersion)</span>
-<span class="nc" id="L109">            .property(&quot;status&quot;, status.name())</span>
-<span class="nc" id="L110">            .stringArray(&quot;issues&quot;, issues)</span>
-<span class="nc" id="L111">            .object(&quot;termMapping&quot;, object -&gt; termMapping.forEach(object::property))</span>
-<span class="nc" id="L112">            .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="nc" id="L113">            .endObject()</span>
-<span class="nc" id="L114">            .toString();</span>
+<span class="fc" id="L104">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L105">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L106">            .property(&quot;obligationHash&quot;, obligationHash)</span>
+<span class="fc" id="L107">            .property(&quot;backendId&quot;, backendId)</span>
+<span class="fc" id="L108">            .property(&quot;backendVersion&quot;, backendVersion)</span>
+<span class="fc" id="L109">            .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L110">            .stringArray(&quot;issues&quot;, issues)</span>
+<span class="fc" id="L111">            .object(&quot;termMapping&quot;, object -&gt; termMapping.forEach(object::property))</span>
+<span class="fc" id="L112">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L113">            .endObject()</span>
+<span class="fc" id="L114">            .toString();</span>
     }
 
     private static String hash(
