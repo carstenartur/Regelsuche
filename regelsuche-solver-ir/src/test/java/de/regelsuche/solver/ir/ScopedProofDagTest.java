@@ -50,7 +50,7 @@ class ScopedProofDagTest {
         assertEquals(dag, ScopedProofDag.read(request, dag.canonical()));
         assertEquals(dag.hashCode(), ScopedProofDag.read(request, dag.canonical()).hashCode());
         assertNotEquals(dag, ScopedProofDag.create(request, List.of(Node.premise(0), Node.of(AND_RIGHT, 0))));
-        assertNotEquals(dag, null);
+        assertFalse(dag.equals(null));
         var header = ScopedProofDag.SCHEMA + "\n" + request.contentHash() + "\n";
         for (String invalid : List.of("", header, header + "PREMISE\n", header + "PREMISE -1\n",
                 header + "PREMISE 1\n", header + "PREMISE 0\nAND_LEFT -1 -1\n",
@@ -68,14 +68,14 @@ class ScopedProofDagTest {
         var let = ScopedProofDag.create(request, List.of(Node.of(ZERO), Node.local(0),
             Node.indexed(UNFOLD, 0, 1), Node.of(LET, 0, 2)));
         assertEquals(List.of(ScopedProofDag.Local.DEFINITION),
-            let.fold((node, scope, children) -> node.rule() == LET ? children.getLast() : scope));
+            let.<List<ScopedProofDag.Local>>fold((node, scope, children) -> node.rule() == LET ? children.getLast() : scope));
         assertThrows(IllegalArgumentException.class, () -> ScopedProofDag.create(request,
             List.of(Node.local(0), Node.of(ZERO), Node.of(LET, 0, 1))));
         assertThrows(IllegalArgumentException.class, () -> ScopedProofDag.create(request,
             List.of(Node.local(0), Node.indexed(UNFOLD, 0, 0), Node.of(INTRO, 1))));
         var cases = ScopedProofDag.create(request, List.of(Node.premise(0), Node.local(0),
             Node.of(CASES, 0, 1, 1)));
-        assertEquals(List.of(0, 1, 1), cases.fold((node, scope, children) ->
+        assertEquals(List.of(0, 1, 1), cases.<List<Integer>>fold((node, scope, children) ->
             node.rule() == CASES ? children.stream().map(List::getFirst).toList() : List.of(scope.size())));
         assertThrows(IllegalArgumentException.class, () -> ScopedProofDag.create(request,
             List.of(Node.local(0), Node.of(ZERO), Node.of(CASES, 0, 1, 1))));
