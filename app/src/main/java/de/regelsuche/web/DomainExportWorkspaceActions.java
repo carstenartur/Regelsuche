@@ -1,16 +1,32 @@
 package de.regelsuche.web;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpExchange;
 import de.regelsuche.discovery.domain.*;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.solver.ir.ScopedProofDag;
+import de.regelsuche.solver.ir.ScopedProofExecutor;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.portfolio.CheckedLeanScopedProofExecutor;
+import de.regelsuche.solver.portfolio.LeanEvidenceRebuilder;
+import de.regelsuche.solver.portfolio.LeanSolverBackend;
+import de.regelsuche.solver.portfolio.LeanSourceRenderer;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 
 /** Schema-dispatched retained exports under the existing domain API context. */
 final class DomainExportWorkspaceActions {
     static final String BASE = "/api/discovery-domains/exports";
+    private static final String SCOPED_CHECK = "scoped-check";
+    private static final Set<String> BOUND_ACTIONS = Set.of("replay", "validate", "model-proof", "assessment", SCOPED_CHECK);
+    private static final Set<String> SOURCE_FIELDS = Set.of("expectedWorkspaceHash", "expectedEvidenceHash");
+    private static final Set<String> SCOPED_SOURCE_FIELDS = Set.of("expectedWorkspaceHash", "expectedEvidenceHash", "candidateHash");
+    private static final Semaphore SCOPED_CHECK_SLOT = new Semaphore(1);
+    private static final JsonMapper JSON = new JsonMapper();
     private DomainExportWorkspaceActions() { }
 
     static void handle(HttpExchange exchange, Path directory, int maxBytes) throws IOException {
@@ -18,8 +34,10 @@ final class DomainExportWorkspaceActions {
         if (suffix.endsWith("/")) suffix = suffix.substring(0, suffix.length() - 1);
         try {
             boolean post = exchange.getRequestMethod().equals("POST");
-            var boundRequest = post && (suffix.endsWith("/replay") || suffix.endsWith("/validate") || suffix.endsWith("/model-proof") || suffix.endsWith("/assessment"))
-                ? readBoundRequest(exchange, maxBytes) : Map.<String, Object>of();
+            String action = suffix.substring(suffix.lastIndexOf('/') + 1);
+            var boundRequest = post && BOUND_ACTIONS.contains(action)
+                ? readBoundRequest(exchange, maxBytes, SCOPED_CHECK.equals(action) ? SCOPED_SOURCE_FIELDS : SOURCE_FIELDS)
+                : Map.<String, Object>of();
             var repository = new DomainExportWorkspaceRepository(directory);
             if (suffix.isEmpty()) {
                 handleIndex(exchange, repository, post, maxBytes);
@@ -35,7 +53,7 @@ final class DomainExportWorkspaceActions {
             if (found.isEmpty()) { error(exchange, 404, "DOMAIN_EXPORT_NOT_FOUND", "retained export not found"); return; }
             var workspace = found.get();
             if (path.length == 1) sendWorkspace(exchange, 200, workspace);
-            else if (path.length == 2 && Set.of("replay", "validate", "model-proof", "assessment").contains(path[1])) {
+            else if (path.length == 2 && BOUND_ACTIONS.contains(path[1])) {
                 handleBoundAction(exchange, repository, directory, workspace, boundRequest, path[1]);
             } else if (path.length == 3 && path[1].equals("files")) {
                 sendOriginalFile(exchange, workspace, path[2]);
@@ -95,6 +113,10 @@ final class DomainExportWorkspaceActions {
                 || !workspace.evidence().contentHash().equals(boundRequest.get("expectedEvidenceHash"))) {
             error(exchange, 409, "SOURCE_BINDING_MISMATCH", "request belongs to another source view"); return;
         }
+        if (action.equals(SCOPED_CHECK)) {
+            checkScopedCandidate(exchange, workspace, (String) boundRequest.get("candidateHash"));
+            return;
+        }
         if (action.equals("assessment")) {
             var receipt = DomainSnapshotAssessment.assess(workspace);
             new DomainSnapshotAssessmentRepository(directory).retain(workspace, receipt);
@@ -121,14 +143,80 @@ final class DomainExportWorkspaceActions {
         }
         try {
             var replayed = workspace.replay();
-            var json = new com.fasterxml.jackson.databind.json.JsonMapper();
-            var result = json.createObjectNode().put("schema", DomainExportWorkspace.REPLAY_SCHEMA)
+            var result = JSON.createObjectNode().put("schema", DomainExportWorkspace.REPLAY_SCHEMA)
                 .put("runId", workspace.runId()).put("workspaceContentHash", workspace.contentHash())
                 .put("sourceEvidenceHash", workspace.evidence().contentHash()).put("status", "IDENTICAL_CANONICAL_EVIDENCE");
-            result.set("evidence", json.readTree(replayed.toCanonicalJson()));
+            result.set("evidence", JSON.readTree(replayed.toCanonicalJson()));
             exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", workspace.runId());
-            send(exchange, 200, json.writeValueAsString(result));
+            send(exchange, 200, JSON.writeValueAsString(result));
         } catch (IllegalStateException exception) { error(exchange, 409, "REPLAY_NOT_REPRODUCED", exception.getMessage()); }
+    }
+
+    private static void checkScopedCandidate(HttpExchange exchange, DomainExportWorkspace workspace, String candidateHash) throws IOException {
+        if (!SCOPED_CHECK_SLOT.tryAcquire()) {
+            error(exchange, 429, "SCOPED_CHECK_BUSY", "another scoped candidate check is running");
+            return;
+        }
+        try {
+            Thread.startVirtualThread(() -> finishScopedCheck(exchange, workspace, candidateHash));
+        } catch (RuntimeException | Error failure) {
+            SCOPED_CHECK_SLOT.release();
+            throw failure;
+        }
+    }
+
+    private static void finishScopedCheck(HttpExchange exchange, DomainExportWorkspace workspace, String candidateHash) {
+        try {
+            try {
+                ObjectNode result;
+                try { result = scopedCheck(workspace, candidateHash); }
+                finally { SCOPED_CHECK_SLOT.release(); }
+                exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", workspace.runId());
+                send(exchange, 200, JSON.writeValueAsString(result));
+            } catch (IllegalArgumentException invalid) {
+                error(exchange, 400, "INVALID_DOMAIN_EXPORT", invalid.getMessage());
+            } catch (RuntimeException failure) {
+                error(exchange, 500, "SCOPED_CHECK_FAILED", "scoped candidate check could not complete");
+            }
+        } catch (IOException disconnected) {
+            exchange.close();
+        }
+    }
+
+    private static ObjectNode scopedCheck(DomainExportWorkspace workspace, String candidateHash) {
+        String project = System.getProperty("regelsuche.lean.project", System.getenv().getOrDefault("REGELSUCHE_LEAN_PROJECT", ""));
+        String rebuild = System.getProperty("regelsuche.lean.rebuild.project", System.getenv().getOrDefault("REGELSUCHE_LEAN_REBUILD_PROJECT", ""));
+        boolean configured = !project.isBlank() && !rebuild.isBlank();
+        ScopedProofExecutor receiver;
+        if (configured) {
+            Path root = Path.of(System.getProperty("regelsuche.proof.evidence", "proof-evidence"));
+            receiver = new CheckedLeanScopedProofExecutor(new LeanSolverBackend(Path.of(project), root),
+                new LeanEvidenceRebuilder(Path.of(rebuild), root));
+        } else {
+            receiver = new ScopedProofExecutor() {
+                @Override public boolean supports(SolverIr.Obligation obligation) {
+                    return new LeanSourceRenderer().render(obligation).supported();
+                }
+                @Override public VerifiedReplay verify(ScopedProofDag dag) {
+                    return new VerifiedReplay(dag.hash(), SolverIr.ResultStatus.UNSUPPORTED, "", "", null, "", null);
+                }
+            };
+        }
+        var checked = ScopedLogicWorkspaceCheck.check(workspace, candidateHash, receiver);
+        var result = JSON.createObjectNode().put("schema", "regelsuche.scoped-workspace-candidate-check/v1");
+        result.set("source", JSON.valueToTree(checked.source()));
+        result.put("obligationHash", checked.proposal().obligation().contentHash()).put("proposalHash", checked.proposal().hash());
+        result.set("counterexample", JSON.valueToTree(checked.counterexample()));
+        result.put("retainedWitness", checked.retainedWitness().name());
+        var proof = result.putObject("proof").put("backendConfigured", configured).put("status", "NOT_RUN");
+        checked.freshProof().ifPresent(evaluation -> {
+            proof.put("status", evaluation.status().name());
+            if (evaluation.certificate() != null) {
+                proof.put("kernelHash", evaluation.certificate().kernelHash());
+                proof.put("rebuildHash", evaluation.certificate().rebuildHash());
+            }
+        });
+        return result;
     }
 
     private static void sendReceipt(HttpExchange exchange, String runId,
@@ -171,12 +259,12 @@ final class DomainExportWorkspaceActions {
         }
     }
 
-    private static Map<String, Object> readBoundRequest(HttpExchange exchange, int maxBytes) throws IOException {
+    private static Map<String, Object> readBoundRequest(HttpExchange exchange, int maxBytes, Set<String> fields) throws IOException {
         requireJson(exchange);
         var request = new StreamingJsonRequestBody(Math.min(maxBytes, 4096)).readObject(exchange);
-        if (!request.keySet().equals(Set.of("expectedWorkspaceHash", "expectedEvidenceHash"))
+        if (!request.keySet().equals(fields)
                 || request.values().stream().anyMatch(value -> !(value instanceof String hash) || !hash.matches("sha256:[0-9a-f]{64}"))) {
-            throw new IllegalArgumentException("action requires exact workspace and source evidence identities");
+            throw new IllegalArgumentException("action requires exact bound SHA-256 identities: " + fields.stream().sorted().toList());
         }
         return request;
     }

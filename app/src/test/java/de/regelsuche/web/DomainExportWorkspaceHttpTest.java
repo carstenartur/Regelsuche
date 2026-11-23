@@ -11,6 +11,7 @@ import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.*;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
@@ -114,14 +115,17 @@ class DomainExportWorkspaceHttpTest {
     @Test void retainsLogicalExportThroughHttpWithoutIssuingProofOrReplayAuthority() throws Exception {
         var domain = new ScopedLogicDiscoveryDomain(proposal -> {
             throw new AssertionError("retained workspace must not call a proof receiver");
-        }, 0);
+        }, 1024);
         var proposition = new Symbol("p");
-        var context = Obligation.create("http-logical-source", List.of(new SymbolDeclaration("p", Sort.PROPOSITION)),
-            List.of(Theory.SCOPED_ANALYSIS), List.of(Predicate.holds("given", proposition)), Goal.holds(proposition),
+        var consequence = new Symbol("q");
+        var context = Obligation.create("http-logical-source",
+            List.of(new SymbolDeclaration("p", Sort.PROPOSITION), new SymbolDeclaration("q", Sort.PROPOSITION)),
+            List.of(Theory.SCOPED_ANALYSIS), List.of(Predicate.holds("given", proposition),
+                Predicate.holds("implies", new Call("implies", List.of(proposition, consequence)))), Goal.holds(proposition),
             RequestedEvidence.FORMAL_PROOF, new SourceProvenance("public-control", "http", SolverIr.sha256("public context")));
         evidence = new DomainDiscoveryRunner().run("http-logical-export", domain,
             DiscoverySeed.create("context", domain.domainId(), context.toCanonicalJson(), "public HTTP control"),
-            new DiscoveryBudget(0, 4, 4, 4, 4, 4)).evidence();
+            new DiscoveryBudget(2, 4, 4, 4, 4, 4)).evidence();
         Path source = temporary.resolve("logical-source");
         runId = new DomainDiscoveryExport().write(source, evidence).contentHash();
         Path manifest = source.resolve("export-manifest.json");
@@ -145,6 +149,7 @@ class DomainExportWorkspaceHttpTest {
         var replay = request("POST", path() + "/replay", bound);
         assertEquals(409, replay.statusCode(), replay.body());
         assertEquals("REPLAY_NOT_REPRODUCED", json.readTree(replay.body()).path("code").asText());
+        verifyScopedCandidateCheck(view.path("contentHash").asText());
         var assessment = request("POST", path() + "/assessment", bound);
         assertEquals(200, assessment.statusCode(), assessment.body());
         var assessed = json.readTree(assessment.body());
@@ -167,6 +172,54 @@ class DomainExportWorkspaceHttpTest {
             assertEquals(response.body(), retained.body());
         }
         assertEquals(imported.body(), request("GET", path(), null).body());
+    }
+
+    private void verifyScopedCandidateCheck(String workspaceHash) throws Exception {
+        String candidate = evidence.candidateAttempts().getFirst().candidateHash();
+        String scopedPath = path() + "/scoped-check";
+        ObjectNode bound = json.createObjectNode().put("expectedWorkspaceHash", workspaceHash)
+            .put("expectedEvidenceHash", evidence.contentHash()).put("candidateHash", candidate);
+        String rebuildSetting = "regelsuche.lean.rebuild.project";
+        String originalSetting = System.setProperty(rebuildSetting, "");
+        try {
+            String boundJson = bound.toString();
+            String exactBody = boundJson + " ".repeat(4096 - boundJson.length());
+            var response = request("POST", scopedPath, exactBody);
+            assertEquals(200, response.statusCode(), response.body());
+            var exactChunked = requestWithBody("POST", scopedPath, chunkedBody(exactBody));
+            assertEquals(200, exactChunked.statusCode(), exactChunked.body());
+            assertEquals(response.body(), exactChunked.body());
+            String oversizedBody = exactBody + " ";
+            for (var publisher : List.of(HttpRequest.BodyPublishers.ofString(oversizedBody), chunkedBody(oversizedBody))) {
+                var oversized = requestWithBody("POST", scopedPath, publisher);
+                assertEquals(413, oversized.statusCode(), oversized.body());
+                var rejection = json.readTree(oversized.body());
+                assertEquals("PAYLOAD_TOO_LARGE", rejection.path("code").asText());
+                assertEquals(4096, rejection.path("limitBytes").asInt());
+            }
+            var report = json.readTree(response.body());
+            assertEquals("regelsuche.scoped-workspace-candidate-check/v1", report.path("schema").asText());
+            assertEquals(runId, response.headers().firstValue("X-Regelsuche-Run-Id").orElseThrow());
+            assertEquals(runId, report.at("/source/runId").asText());
+            assertEquals(workspaceHash, report.at("/source/workspaceHash").asText());
+            assertEquals(evidence.contentHash(), report.at("/source/evidenceHash").asText());
+            assertEquals(evidence.seed().contentHash(), report.at("/source/seedHash").asText());
+            assertEquals(candidate, report.at("/source/candidateHash").asText());
+            assertEquals(evidence.states().getLast().stateHash(), report.at("/source/stateHash").asText());
+            assertEquals("NONE_FOUND", report.at("/counterexample/status").asText());
+            assertEquals(4, report.at("/counterexample/attempts").asInt());
+            assertEquals("UNSUPPORTED", report.at("/proof/status").asText());
+            assertFalse(report.at("/proof/backendConfigured").asBoolean());
+            assertFalse(report.path("proof").has("kernelHash"));
+            assertEquals(400, request("POST", scopedPath, bound.deepCopy().put("candidateHash", "sha256:" + "f".repeat(64)).toString()).statusCode());
+            assertEquals(409, request("POST", scopedPath, bound.deepCopy().put("expectedWorkspaceHash", evidence.contentHash()).toString()).statusCode());
+            bound.remove("candidateHash");
+            assertEquals(400, request("POST", scopedPath, bound.toString()).statusCode());
+            assertEquals(405, request("GET", scopedPath, null).statusCode());
+        } finally {
+            if (originalSetting == null) System.clearProperty(rebuildSetting);
+            else System.setProperty(rebuildSetting, originalSetting);
+        }
     }
 
     @Test void preservesFirstExactBytesWhenManifestIdentityIsReused() throws Exception {
@@ -405,7 +458,14 @@ class DomainExportWorkspaceHttpTest {
         return json.writeValueAsString(Map.of("expectedWorkspaceHash", workspaceHash, "expectedEvidenceHash", evidenceHash));
     }
     private HttpResponse<String> request(String method, String suffix, String body) throws Exception {
+        return requestWithBody(method, suffix, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+    }
+    private HttpResponse<String> requestWithBody(String method, String suffix, HttpRequest.BodyPublisher body) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + server.boundPort() + "/api/discovery-domains/exports" + suffix))
-            .header("Content-Type", "application/json").method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+            .header("Content-Type", "application/json").method(method, body).build(), HttpResponse.BodyHandlers.ofString());
+    }
+    private static HttpRequest.BodyPublisher chunkedBody(String body) {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        return HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(bytes));
     }
 }

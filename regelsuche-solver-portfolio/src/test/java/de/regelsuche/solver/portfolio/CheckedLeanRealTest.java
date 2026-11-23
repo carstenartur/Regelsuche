@@ -84,6 +84,26 @@ class CheckedLeanRealTest {
         assertEquals(ResultStatus.UNSUPPORTED, backend().using(wrong).execute(eliminations().obligation()).result().status());
     }
 
+    @Test void checksSourceDerivedExistentialEliminationInBothProjects() throws Exception {
+        var conclusion = ScopedLeanContractTest.witnessIndependentConclusion();
+        var witnessAtZero = app("at", ScopedLeanContractTest.f, app("nat", ScopedLeanContractTest.zero));
+        var source = ScopedLeanContractTest.existentialEliminationSource(witnessAtZero, conclusion);
+        var dag = ScopedProofSearch.discover(source, 1_024).proposals().stream()
+            .filter(p -> p.dag().obligation().goal().left().equals(conclusion)).findFirst().orElseThrow().dag();
+        var rebuild = new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")), root());
+        var attempt = backend().using(dag).executeWithEvidence(dag.obligation());
+        var result = attempt.execution().result();
+        assertEquals(ResultStatus.CONFIRMED, result.status(), diagnostics(attempt.directory()));
+        var receipt = rebuild.rebuild(dag.obligation(), result.certificateHash(), attempt.directory());
+        assertEquals(dag.canonical(), Files.readString(receipt.directory().resolve(LeanDagPlan.FILE)));
+
+        assertThrows(IOException.class, () -> rebuild.rebuild(source, result.certificateHash(), attempt.directory()));
+        var rebound = ScopedProofDag.create(source, dag.nodes());
+        var rejected = backend().using(rebound).execute(source).result();
+        assertEquals(ResultStatus.UNKNOWN, rejected.status());
+        assertTrue(rejected.certificateHash().isEmpty());
+    }
+
     static ScopedProofDag eliminations() {
         var p = new Symbol("p"); var q = new Symbol("q");
         var zero = app("nat", new Literal("0"));

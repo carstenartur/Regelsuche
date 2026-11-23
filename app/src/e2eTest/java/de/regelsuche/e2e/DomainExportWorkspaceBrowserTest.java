@@ -145,14 +145,17 @@ class DomainExportWorkspaceBrowserTest {
     @Test void importsLogicalSourceKeepsOriginalBytesAndExplainsUnavailableReplay() throws Exception {
         var domain = new ScopedLogicDiscoveryDomain(proposal -> {
             throw new AssertionError("source display must not call a proof receiver");
-        }, 0);
+        }, 1024);
         var proposition = new Symbol("p");
-        var context = Obligation.create("browser-logical-source", List.of(new SymbolDeclaration("p", Sort.PROPOSITION)),
-            List.of(Theory.SCOPED_ANALYSIS), List.of(Predicate.holds("given", proposition)), Goal.holds(proposition),
+        var consequence = new Symbol("q");
+        var context = Obligation.create("browser-logical-source",
+            List.of(new SymbolDeclaration("p", Sort.PROPOSITION), new SymbolDeclaration("q", Sort.PROPOSITION)),
+            List.of(Theory.SCOPED_ANALYSIS), List.of(Predicate.holds("given", proposition),
+                Predicate.holds("implies", new Call("implies", List.of(proposition, consequence)))), Goal.holds(proposition),
             RequestedEvidence.FORMAL_PROOF, new SourceProvenance("public-control", "browser", SolverIr.sha256("public context")));
         var evidence = new DomainDiscoveryRunner().run("logical-source-browser", domain,
             DiscoverySeed.create("context", domain.domainId(), context.toCanonicalJson(), "public browser control"),
-            new DiscoveryBudget(0, 4, 4, 4, 4, 4)).evidence();
+            new DiscoveryBudget(2, 4, 4, 4, 4, 4)).evidence();
         Path source = temporary.resolve("logical");
         firstId = new DomainDiscoveryExport().write(source, evidence).contentHash();
         int index = 0;
@@ -180,10 +183,27 @@ class DomainExportWorkspaceBrowserTest {
                 return calls;
             }
             """), "unavailable controls must not start an action even through a dispatched event");
+        String rebuildSetting = "regelsuche.lean.rebuild.project";
+        String originalSetting = System.setProperty(rebuildSetting, "");
+        try {
+            String candidateHash = evidence.candidateAttempts().getFirst().candidateHash();
+            var check = page.locator("[data-scoped-candidate='" + candidateHash + "']");
+            check.focus();
+            page.keyboard().press("Enter");
+            page.waitForSelector("#retainedDomainExportDetail [data-status='UNSUPPORTED']");
+            assertTrue(page.locator("#retainedDomainExportDetail [role='status']").textContent().contains("zwei Lean-Projekte"));
+            assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("Versuche: 4."));
+            page.getByText("Neuer Prüfbeleg mit Quellenbindung").click();
+            assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("\"candidateHash\": \"" + candidateHash + "\""));
+        } finally {
+            if (originalSetting == null) System.clearProperty(rebuildSetting);
+            else System.setProperty(rebuildSetting, originalSetting);
+        }
         var download = page.waitForDownload(() -> page.locator("[data-original-file='evidence.json']").click());
         assertArrayEquals(evidence.toCanonicalJson().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(download.path()));
         page.reload(); waitFor(firstId);
         assertTrue(page.locator("#replayDomainExport").isDisabled());
+        assertEquals(0, page.locator("#retainedDomainExportDetail [data-status='UNSUPPORTED']").count());
         page.setViewportSize(390, 844);
         assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
         Path screenshot = Path.of("build/reports/domain-export-ui/logical-narrow.png");

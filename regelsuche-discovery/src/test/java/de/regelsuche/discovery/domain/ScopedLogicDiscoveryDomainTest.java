@@ -54,11 +54,12 @@ class ScopedLogicDiscoveryDomainTest {
     }
     @Test
     @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="REGELSUCHE_REAL_LEAN",matches="true")
-    void sourceOnlyDiscoveryRunnerReturnsARealIndependentlyRebuiltProof() {
+    void sourceOnlyDiscoveryRunnerReturnsARealIndependentlyRebuiltProof(@TempDir Path export) throws Exception {
         var root=Path.of("target","checked-proof").toAbsolutePath();
-        var domain=new ScopedLogicDiscoveryDomain(new CheckedLeanScopedProofExecutor(
+        var receiver=new CheckedLeanScopedProofExecutor(
             new LeanSolverBackend(Path.of(System.getenv("REGELSUCHE_LEAN_PROJECT")),root),
-            new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")),root)),1024);
+            new LeanEvidenceRebuilder(Path.of(System.getenv("REGELSUCHE_LEAN_REBUILD_PROJECT")),root));
+        var domain=new ScopedLogicDiscoveryDomain(receiver,1024);
         var seed=DiscoveryDomain.DiscoverySeed.create("scope",domain.domainId(),context(P).toCanonicalJson(),"public-propositions");
         var result=new DomainDiscoveryRunner().run("real-kernel-domain",domain,seed,new DiscoveryDomain.DiscoveryBudget(2,16,16,16,4,8));
         assertEquals(DomainDiscoveryEvidence.Outcome.CONFIRMED,result.evidence().outcome(),result.evidence().toString());
@@ -66,6 +67,18 @@ class ScopedLogicDiscoveryDomainTest {
         assertTrue(java.nio.file.Files.isRegularFile(receipt.kernelDirectory().resolve("proof.olean")));
         assertTrue(java.nio.file.Files.isRegularFile(receipt.rebuildDirectory().resolve("rebuild.txt")));
         assertEquals(result.selectedCandidate().orElseThrow().hash(),receipt.dag().hash());
+
+        new DomainDiscoveryExport().write(export, result.evidence());
+        var workspace = DomainExportWorkspace.fromVerified(new DomainDiscoveryExportVerifier().requireVerified(export));
+        var checked = ScopedLogicWorkspaceCheck.check(workspace, result.evidence().selectedCandidateHash(), receiver);
+        assertEquals(result.selectedCandidate().orElseThrow(), checked.proposal());
+        assertEquals(result.evidence().contentHash(), checked.source().evidenceHash());
+        var evaluation = checked.freshProof().orElseThrow();
+        assertEquals(DiscoveryDomain.EvaluationStatus.CONFIRMED, evaluation.status(), evaluation.summary());
+        assertNotEquals(receipt.kernelDirectory(), evaluation.certificate().kernelDirectory());
+        assertNotEquals(receipt.rebuildDirectory(), evaluation.certificate().rebuildDirectory());
+        assertTrue(java.nio.file.Files.isRegularFile(evaluation.certificate().kernelDirectory().resolve("proof.olean")));
+        assertTrue(java.nio.file.Files.isRegularFile(evaluation.certificate().rebuildDirectory().resolve("rebuild.txt")));
     }
 
     @Test void finiteCountermodelIsAnActualSatisfyingAssignmentForThePremises() {

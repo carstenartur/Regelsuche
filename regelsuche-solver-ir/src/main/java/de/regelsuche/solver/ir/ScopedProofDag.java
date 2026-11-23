@@ -11,7 +11,8 @@ public final class ScopedProofDag {
     public enum Rule {
         DECLARATION(0), PREMISE(0), LOCAL(0), ZERO(0), SUCC(1),
         INTRO(1), APPLY(2), SPECIALIZE(2), HAVE(2), LET(2), UNFOLD(1),
-        PAIR(2), WITNESS(2), CASES(3), BY_CONTRADICTION(2), REWRITE(2),
+        PAIR(2), AND_LEFT(1), AND_RIGHT(1), WITNESS(2), EXISTS_ELIM(2),
+        CASES(3), BY_CONTRADICTION(2), REWRITE(2),
         INDUCTION(2), STRONG_INDUCTION(1), DECREASE(2), NORMALIZE(0), SOLVE_LEAF(0);
         private final int arity;
         Rule(int arity) { this.arity = arity; }
@@ -93,6 +94,8 @@ public final class ScopedProofDag {
         return switch (rule) {
             case INTRO, BY_CONTRADICTION -> extend(scope, Local.VARIABLE);
             case HAVE, CASES -> child == 0 ? scope : extend(scope, Local.VARIABLE);
+            // The continuation has the witness property at index 0 and the witness at index 1.
+            case EXISTS_ELIM -> child == 0 ? scope : extend(extend(scope, Local.VARIABLE), Local.VARIABLE);
             case LET -> child == 0 ? scope : extend(scope, Local.DEFINITION);
             case STRONG_INDUCTION -> extend(extend(scope, Local.VARIABLE), Local.SMALLER_CASES);
             default -> scope;
