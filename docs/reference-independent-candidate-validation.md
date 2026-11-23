@@ -156,8 +156,8 @@ against all 144 public frozen rows and 4,316 retained candidate outcomes without
 opening the historical qualification or invoking an oracle:
 
 ```sh
-mvn -B -ntp -pl regelsuche-discovery -am \\
-  -Dtest=ReferenceIndependentValidationSchemaMavenTest \\
+mvn -B -ntp -pl regelsuche-discovery -am \
+  -Dtest=ReferenceIndependentValidationSchemaMavenTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
