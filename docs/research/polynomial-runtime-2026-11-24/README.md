@@ -27,6 +27,7 @@ SymPy 1.14.0 und mpmath 1.3.0.
 | `927b8b4` | `2966834debd69fb1f6a027979f12ff0276da26f8` | Gemeinsamer Stand mit verkürzter Prüfung historischer Konstruktionsnachweise |
 | `7b02c35` | `ce7d078e186c16417258cd7446fabf356a2989b5` | Explizite Brüche im direkten Profil |
 | `42ec3e6` | `c0c176f5fbb30a9f108cbd2c077bdf1581a14dad` | Abbruch der direkten Kandidatensuche bei erreichter und nachgewiesener Untergrenze der Operationskosten |
+| `22d252a` | `27d3df2f0626a78273bde933df33ad70759d8809` | Zweite Messreihe nach der Umstrukturierung der Prüfdaten-Ausgabe und der Suchsitzung |
 
 ## Polynomvereinfachung
 
@@ -170,6 +171,9 @@ Gegenüber SymPy benötigen drei Ausgaben weniger Operationen und 69 gleich viel
 | `42ec3e6` | Native Basis | 4,880 | 13,456 | 234,1 |
 | `42ec3e6` | Direktes Polynomprofil | 1,795 | 4,156 | 175,2 |
 | `42ec3e6` | SymPy-Portfolio | 1,911 | 1,879 | 47,3 |
+| `22d252a` | Native Basis | 5,882 | 17,400 | 235,6 |
+| `22d252a` | Direktes Polynomprofil | 2,323 | 5,108 | 176,9 |
+| `22d252a` | SymPy-Portfolio | 2,395 | 2,389 | 47,2 |
 
 Auf `42ec3e6` enden alle 675 Prüfungen mit denselben Qualitätsstatus wie auf
 `7b02c35`. Der Abbruch bei erreichter Kostenuntergrenze senkt die erfasste
@@ -180,13 +184,22 @@ das SymPy-Portfolio (1,795 gegen 1,911 s, 2,079 gegen 1,714 s und 1,445 gegen
 2,166 s). CPU und Spitzenspeicher liegen in jeder Wiederholung höher. Die drei
 Wandzeitpaare zeigen die Streuung dieses öffentlichen Vergleichs.
 
+Auf `22d252a` liefen die drei Profile erneut in rotierter Reihenfolge mit
+frischen Prozessen. Alle 675 Status- und Kostenergebnisse stimmen mit
+`42ec3e6` überein. Pro Folge fallen im direkten Profil erneut 553.141
+logische Arbeitseinheiten an. Die gepaarten Wandzeiten für das direkte
+Profil und SymPy betragen 1,268 und 2,125 s, 2,323 und 2,780 s sowie
+2,472 und 2,395 s. Damit erreicht Java in beiden Messreihen einen leicht
+niedrigeren Median und in jeweils zwei von drei Paaren die kürzere Wandzeit.
+SymPy benötigt in beiden Reihen weniger CPU-Zeit und Spitzenspeicher.
+
 ## Reproduktion
 
 Die Tabelle nennt die tatsächlich gemessenen Entwicklungscommits und ihre
 Git-Bäume. Die veröffentlichten PR-Commits fassen mehrere Entwicklungsschritte
 zusammen. Für die exakte Wiederholung enthält das [Git-Objektpaket](source-checkpoints.pack)
 die Zwischenstände. Es ergänzt die versionierten Dateien dieses PR in einem
-vollständigen Klon. So lässt sich beispielsweise der letzte direkte Vergleich
+vollständigen Klon. So lässt sich beispielsweise die erste Messreihe mit Kostenuntergrenze
 mit seinem ursprünglichen Git-Baum auschecken.
 
 ```sh

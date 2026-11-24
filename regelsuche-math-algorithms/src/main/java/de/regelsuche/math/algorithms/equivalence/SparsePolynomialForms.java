@@ -49,24 +49,7 @@ public final class SparsePolynomialForms {
     private static int surfaceLowerBound(Map<Monomial, Rational> terms, List<String> variables, LongConsumer work) {
         int count = variables.size();
         if (count == 0) return 0;
-        if (count == 1) {
-            // A single operation on leaves yields a monomial, or x+c / c-x with linear coefficient ±1.
-            String variable = variables.getFirst();
-            if (terms.size() > 2) return 2;
-            for (var term : terms.entrySet()) {
-                work.accept(1);
-                int exponent = term.getKey().exponentOf(variable);
-                var coefficient = term.getValue();
-                if (exponent == 0) continue;
-                if (terms.size() == 1) {
-                    if (exponent == 1) return coefficient.isOne() ? 0 : 1;
-                    return coefficient.isOne() ? 1 : 2;
-                }
-                return exponent == 1 && (coefficient.isOne() || coefficient.isNegativeOne())
-                    && terms.containsKey(Monomial.constant()) ? 1 : 2;
-            }
-            return 0;
-        }
+        if (count == 1) return univariateSurfaceBound(terms, variables.getFirst(), work);
         // With exactly count-1 binary nodes every leaf must be a different essential variable.
         // A polynomial in that read-once tree can only use +, -, *: an exponent or a
         // divisor in the admitted grammar must be constant. Its expansion has no constant,
@@ -79,6 +62,26 @@ public final class SparsePolynomialForms {
                     || powers.values().stream().anyMatch(exponent -> exponent > 1)) return count;
         }
         return count - 1;
+    }
+
+    private static int univariateSurfaceBound(Map<Monomial, Rational> terms, String variable, LongConsumer work) {
+        // An expression with one operation is either a monomial or an affine form with slope ±1.
+        if (terms.size() > 2) return 2;
+        for (var term : terms.entrySet()) {
+            work.accept(1);
+            int exponent = term.getKey().exponentOf(variable);
+            if (exponent != 0) return nonconstantTermBound(terms, exponent, term.getValue());
+        }
+        return 0;
+    }
+
+    private static int nonconstantTermBound(Map<Monomial, Rational> terms, int exponent, Rational coefficient) {
+        if (terms.size() == 1) {
+            int powerCost = exponent == 1 ? 0 : 1;
+            return coefficient.isOne() ? powerCost : powerCost + 1;
+        }
+        boolean unitSlope = exponent == 1 && (coefficient.isOne() || coefficient.isNegativeOne());
+        return unitSlope && terms.containsKey(Monomial.constant()) ? 1 : 2;
     }
 
     private static final class Generator {

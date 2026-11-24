@@ -215,8 +215,11 @@ feste SymPy-Portfolio und bei drei eine kleinere. Beide nativen Profile
 erreichen dieselbe Ergebnisqualität. In drei rotierten Wiederholungen auf vier
 CPUs lag die mediane Wandzeit pro Folge bei 1,80 Sekunden für das direkte
 Profil, 4,88 Sekunden für die native Basis und 1,91 Sekunden für SymPy.
-Das direkte Profil benötigte 4,16 CPU-Sekunden und 175 MiB Spitzenspeicher,
-das Referenzportfolio 1,88 CPU-Sekunden und 47 MiB. Der
+Eine zweite Messreihe ergab 2,32 Sekunden für das direkte Profil und 2,40
+für SymPy. In beiden Reihen war Java in zwei von drei gepaarten Läufen
+schneller. Das direkte Profil benötigte 4,16 bis 5,11 CPU-Sekunden und
+175 bis 177 MiB Spitzenspeicher, das Referenzportfolio 1,88 bis 2,39
+CPU-Sekunden und rund 47 MiB. Der
 [frühere Vergleich](docs/research/native-polynomial-parity-2026-11-06.md)
 dokumentiert die Ausgangsmessung.
 
