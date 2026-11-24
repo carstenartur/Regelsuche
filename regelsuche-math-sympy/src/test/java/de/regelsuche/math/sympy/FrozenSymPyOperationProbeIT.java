@@ -2,6 +2,7 @@ package de.regelsuche.math.sympy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.polynomial.BigIntegerDomain;
@@ -21,6 +22,14 @@ import org.junit.jupiter.api.Test;
 class FrozenSymPyOperationProbeIT {
     @Test
     void originalGraalPyReceivesTheJavaCodecAndReturnsTheExactAdmittedPrefix() throws Exception {
+        var properties = List.of("frozen.checkout", "frozen.graalpy", "frozen.packages");
+        assumeTrue(properties.stream().anyMatch(name -> System.getProperty(name) != null),
+            "Historical probe not requested; supply frozen.checkout, frozen.graalpy and frozen.packages");
+        for (String name : properties) {
+            String value = System.getProperty(name);
+            assertTrue(value != null && !value.isBlank(),
+                () -> "Explicit historical probe requires nonblank system property " + name);
+        }
         var probe = new FrozenSymPyOperationProbe(Path.of(System.getProperty("frozen.checkout")),
             Path.of(System.getProperty("frozen.graalpy")), Path.of(System.getProperty("frozen.packages")),
             new SymPyFactorizationPolicy("1.14.0", Duration.ofMinutes(4), 16384, 262144, 16, 64, 64, 1024));
