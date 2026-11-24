@@ -133,6 +133,49 @@ Summand kann einen weiteren Platz beanspruchen. Eine Operation darf einen
 verbrauchten Platz überschreiben. Der Wert beschreibt das skalare Programm,
 nicht den JVM-Heap oder die Suchkosten.
 
+## Ausführungspläne für ganzzahlige Operanden
+
+`BilinearProgramSdk.selectInteger` vergleicht mehrere Zerlegungen eines ganzzahligen
+Quelltensors. Der Aufrufer gibt für jede linke und rechte Eingabe eine Betragsbreite
+$b$ mit $|x|<2^b$ an. Der direkte Vergleichsplan berechnet jedes benötigte
+Koordinatenprodukt einmal für alle Ausgaben. Er nimmt teil, sofern die Produktgrenze
+ihn zulässt. Wer eine Optimierung gegen den ursprünglichen Rechenweg abwägen möchte,
+sollte diese Grenze entsprechend wählen.
+
+Die Suche untersucht über den rationalen Zahlen unabhängige Produktmengen aus dem
+erzeugten Formenkatalog. Sie teilt ganzzahlige Zeilen und Spalten durch ihren
+vorzeichenbehafteten größten gemeinsamen Teiler. So bleibt etwa die Richtung
+$(2,3)$ ohne Division in der Ausführung darstellbar. Die Ausgabegewichte werden
+für diese Formen neu bestimmt und müssen ebenfalls ganzzahlig sein.
+Zerlegungen mit abhängigen Zusatzprodukten oder exakten Divisionen können außerhalb
+dieser Suche liegen. Für jeden aufgenommenen Kandidaten
+prüft sie die Identität am Quelltensor und erzeugt einen ausführbaren Plan. Dieser
+kombiniert schmale Terme zuerst, führt Vorzeichen bis zur nächsten Addition,
+Subtraktion oder Ausgabe mit und verwendet identische Zwischenergebnisse mehrfach.
+Auch ein Fund aus `discover`, `search` oder `reuseProducts` lässt sich über
+`scheduleInteger` gegen seinen Auftrag prüfen und in dieser Form ausführen.
+`evaluateInteger` kontrolliert die Betragsgrenzen vor der Auswertung.
+
+Das Kostenmodell schätzt arithmetische Arbeit und Schreibaufwand in 32-Bit-Wörtern.
+Für Multiplikationen verwendet es das Produkt der Operandenlängen in Wörtern.
+Es zählt die Ergebnisobjekte und die Wörter ihrer Magnituden getrennt.
+JIT-Optimierung, unterschiedliche Multiplikationsverfahren im JDK und die anschließende
+Reduktion modulo $p$ gehen in die JVM-Messung ein, soweit der Verbraucher sie ausführt.
+Der Aufrufer kann anhand der Modellwerte zwischen zwei Zielen wählen.
+
+| SDK-Ergebnis | Wahl unter den geprüften Kandidaten |
+| --- | --- |
+| `selected()` | Geringste geschätzte Wortarbeit. Bei Gleichstand entscheiden Ergebniswörter, Ergebnisobjekte und schließlich variable Produkte. |
+| `preferredWithoutAllocationIncrease()` | Geringste geschätzte Wortarbeit unter den Kandidaten, deren Ergebniswörter **und** Ergebnisobjekte jeweils höchstens den Wert des direkten Plans erreichen. Ohne zulässigen Direktvergleich bleibt das Ergebnis leer. |
+
+Beide Entscheidungen sind an das angegebene Profil gebunden. Der Teilmengengrenzwert
+und `budget.maximumCandidates()` begrenzen die Auswahl. Bei Erreichen einer
+solchen Grenze kann die Suche den besten bisher geprüften Plan mit `complete() == false`
+liefern. Ein Abbruchsignal oder eine harte Arbeits-, Zell- oder Zeitgrenze ergibt
+`INCONCLUSIVE` ohne Plan. Auch `complete() == true` gilt nur für die unterstützte
+Suche im endlichen Katalog. Den [Vergleich von Modell, JMH und gemessener Allokation](../../research/benchmarks/bilinear-integer-selection/)
+gibt es für Ganzzahlfaltung und die 381-Bit-Feldrechnung aus Bouncy Castle.
+
 ## Ausführbares SDK-Beispiel
 
 Eine vollständige Java-Datei ist [BilinearSearch.java](../../examples/external-consumers/checked-math-java25/src/main/java/example/BilinearSearch.java).
@@ -190,6 +233,6 @@ Dimensionen, Abbruch und Ressourcenüberschreitung.
 
 ```sh
 mvn -pl regelsuche-optimization-sdk -am \
-  -Dtest=BilinearProgramSearchTest,BilinearFormDiscoveryTest,BilinearRankBoundTest,BilinearProductLearningTest,BilinearProgramSdkTest,BilinearPairCandidatesTest,CertificateWorkTest \
+  -Dtest=BilinearProgramSearchTest,BilinearFormDiscoveryTest,BilinearRankBoundTest,BilinearProductLearningTest,BilinearInteger*Test,BilinearProgramSdkTest,BilinearPairCandidatesTest,CertificateWorkTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```

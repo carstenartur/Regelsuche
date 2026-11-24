@@ -43,10 +43,14 @@ Run that Java command inside this project. Windows uses `;` instead of `:`.
 | `FiniteConstraintCount` | Counts `5`, `1`, `4` for all, true-conditioned and false-conditioned assignments. On a 20-leaf star, minimum degree verifies `1,048,577` within the same budget at which ascending order hits the table limit. |
 | `EnergyCredits` | Credits `(2,0)` and selected Max edge `0` |
 | `SosPotential` | `V=x²`, minimum decrease `1` on the supplied active domain `x>=1` |
-| `BilinearSearch` | Search with supplied forms and discovery from coefficients alone. Joint replay of the lower and upper bounds proves three rational bilinear products suffice and are necessary. Evaluating the discovered plan gives `[8,22,15]`. |
+| `BilinearSearch` | Search with supplied forms and discovery from coefficients alone. Joint replay of the lower and upper bounds proves three rational bilinear products suffice and are necessary. Evaluating the discovered plan gives `[8,22,15]`. The example also selects and executes integer schedules for operands bounded by 8 and 2,048 magnitude bits. Each schedule reports predicted limb work, allocated words and objects. The bounded portfolios select four and three variable products respectively. Both executions agree with direct `BigInteger` convolution, including a signed 2,048-bit input. |
 | `RationalMatrixFormula` | Original inverse remains undefined on singular `X`; defined value `[2,1,0,3]` |
 | `DynamicQuotient` | Undefined modulo `T-1`, value `2` modulo `T+1`, with checked factor coverage |
 
 The SDK verifies each source-bound certificate within its explicit budgets.
 These finite results have the assumptions in the supplied requests. A stopped
 search is not a mathematical refutation. The programs do not rewrite Java source.
+
+### Integer bilinear schedules
+
+The public `BilinearProgramSdk.selectInteger` call takes the tensor, an upper bound on products, a bound on examined subsets, explicit left and right operand magnitude limits and a search budget. In the example the product cap is four, so the direct coordinate product plan can compete with plans using fewer products. The selected straight-line schedule carries a static estimate for the supplied profile. The example executes that schedule through `BilinearProgramSdk.evaluateInteger` and checks all three coefficients against their independent, direct formulas. A client can reuse the returned plan with other inputs satisfying the same bounds. Product-count optimality over the rationals, the cheapest integer schedule encountered under one profile, and measured JVM performance are separate results.

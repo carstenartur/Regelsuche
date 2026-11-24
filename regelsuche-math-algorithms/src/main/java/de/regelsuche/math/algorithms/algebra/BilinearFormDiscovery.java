@@ -7,6 +7,7 @@ import de.regelsuche.math.algorithms.algebra.BilinearProgram.Witness;
 import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -55,9 +56,13 @@ public final class BilinearFormDiscovery {
             return new Discovery(request, new Witness(program, cost), bound);
         }
 
-        var request = new Forms(tensor, sourceCells + bound.retainedCells(), work).request(maximumProducts);
+        var request = generatedRequest(tensor, maximumProducts, sourceCells + bound.retainedCells(), false, work);
         var witness = BilinearProgramSearch.find(request, bound.lowerBound(), extra, work);
         return new Discovery(request, witness, bound);
+    }
+
+    static Request generatedRequest(Tensor tensor, int maximumProducts, long retained, boolean integral, CertificateWork work) {
+        return new Forms(tensor, retained, integral, work).request(maximumProducts);
     }
 
     // Exact rank factorization for a single matrix: each nonzero pivot removes one rank-one outer product.
@@ -105,12 +110,14 @@ public final class BilinearFormDiscovery {
     private static final class Forms {
         private final Tensor tensor;
         private final CertificateWork work;
+        private final boolean integral;
         private final List<List<ExactRational>> left = new ArrayList<>();
         private final List<List<ExactRational>> right = new ArrayList<>();
         private long retained;
 
-        Forms(Tensor tensor, long sourceCells, CertificateWork work) {
+        Forms(Tensor tensor, long sourceCells, boolean integral, CertificateWork work) {
             this.tensor = tensor;
+            this.integral = integral;
             this.retained = sourceCells;
             this.work = work;
         }
@@ -129,7 +136,7 @@ public final class BilinearFormDiscovery {
             return new Request(tensor, left, right, maximumProducts);
         }
 
-        /** Normalize each nonzero row/column by its first nonzero rational coefficient. */
+        /** Rational forms have leading coefficient one; integer forms are signed primitive vectors. */
         private void addFiber(List<List<ExactRational>> forms, List<ExactRational> output,
                               int start, int stride, int size) {
             var first = ExactRational.ZERO;
@@ -138,9 +145,20 @@ public final class BilinearFormDiscovery {
                 first = output.get(start + k * stride);
             }
             if (first.isZero()) return;
+            var divisor = first;
+            if (integral && !first.numerator().abs().equals(BigInteger.ONE)) {
+                var content = first.numerator().abs();
+                for (int k = 0; k < size && !content.equals(BigInteger.ONE); k++) {
+                    var coefficient = output.get(start + k * stride).numerator();
+                    work.check(coefficient);
+                    work.check(content);
+                    content = work.check(content.gcd(coefficient));
+                }
+                divisor = ExactRational.integer(first.numerator().signum() < 0 ? content.negate() : content);
+            }
             work.cells(retained + size + 1L);
             var vector = new ArrayList<ExactRational>(size);
-            for (int k = 0; k < size; k++) vector.add(work.div(output.get(start + k * stride), first));
+            for (int k = 0; k < size; k++) vector.add(work.div(output.get(start + k * stride), divisor));
             addDistinct(forms, vector);
         }
 

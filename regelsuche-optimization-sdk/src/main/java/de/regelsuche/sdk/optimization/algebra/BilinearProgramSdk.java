@@ -1,6 +1,8 @@
 package de.regelsuche.sdk.optimization.algebra;
 
 import de.regelsuche.math.algorithms.algebra.BilinearFormDiscovery;
+import de.regelsuche.math.algorithms.algebra.BilinearIntegerPortfolio;
+import de.regelsuche.math.algorithms.algebra.BilinearIntegerSchedule;
 import de.regelsuche.math.algorithms.algebra.BilinearProductLearning;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram;
 import de.regelsuche.math.algorithms.algebra.BilinearRankBound;
@@ -10,11 +12,20 @@ import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
+import java.math.BigInteger;
 import java.util.List;
 
 /** SDK entry points for bounded rational tensor-program search, checking and execution. */
 public final class BilinearProgramSdk {
     private BilinearProgramSdk() {}
+
+    /** Compare verified integer programs at specified operand widths, retaining the directly computed baseline. */
+    public static BilinearProgram.Result<BilinearIntegerPortfolio.Selection> selectInteger(
+            BilinearProgram.Tensor tensor, int maximumProducts, int maximumSubsets, BilinearIntegerSchedule.Profile profile,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearIntegerPortfolio.select(tensor, maximumProducts, maximumSubsets, budget.maximumCandidates(),
+            profile, limits(budget), cancellation::isCancelled);
+    }
 
     public static BilinearProgram.Result<BilinearProductLearning.Basis> trainProducts(String sourceId,
             BilinearProgram.Tensor tensor, int maximumProducts, OptimizationBudget budget,
@@ -65,6 +76,20 @@ public final class BilinearProgramSdk {
             BilinearProgram program, List<ExactRational> x, List<ExactRational> y,
             OptimizationBudget budget, CancellationToken cancellation) {
         return BilinearProgramVerifier.evaluate(request, program, x, y, limits(budget), cancellation::isCancelled);
+    }
+
+    /** Check an existing witness against its source and lower it for signed integers of the given widths. */
+    public static BilinearProgram.Result<BilinearIntegerSchedule.Plan> scheduleInteger(
+            BilinearProgram.Request request, BilinearProgram program, BilinearIntegerSchedule.Profile profile,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearProgramVerifier.scheduleInteger(request, program, profile, limits(budget),
+            cancellation::isCancelled);
+    }
+
+    /** Execute the selected instructions on values within the schedule's input profile. */
+    public static BilinearProgram.Result<List<BigInteger>> evaluateInteger(BilinearIntegerSchedule.Plan plan,
+            List<BigInteger> x, List<BigInteger> y, OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearIntegerSchedule.evaluate(plan, x, y, limits(budget), cancellation::isCancelled);
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {

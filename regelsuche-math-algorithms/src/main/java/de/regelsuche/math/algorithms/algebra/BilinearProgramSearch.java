@@ -44,7 +44,7 @@ public final class BilinearProgramSearch {
         throw new CertificateWork.Stop("DICTIONARY_EXHAUSTED");
     }
 
-    private static boolean nextSubset(long[] subset, long pairs, CertificateWork work) {
+    static boolean nextSubset(long[] subset, long pairs, CertificateWork work) {
         for (int i = subset.length - 1; i >= 0; i--) {
             work.charge(1);
             if (subset[i] < pairs - subset.length + i) {
@@ -59,7 +59,7 @@ public final class BilinearProgramSearch {
         return false;
     }
 
-    private static BilinearProgram solve(Request request, long[] subset, long sourceCells, CertificateWork work) {
+    static BilinearProgram solve(Request request, long[] subset, long sourceCells, CertificateWork work) {
         int rank = subset.length;
         work.cells(sourceCells + 3L * rank);
         var left = new ArrayList<List<ExactRational>>(rank);
