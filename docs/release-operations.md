@@ -6,8 +6,9 @@ verwechseln: `release-readiness.md` begrenzt wissenschaftliche Claims und
 Evidence Profiles; diese Seite beschreibt Versionierung, Prüfung, Paketierung,
 Publikation und Nachkontrolle.
 
-Die konkreten Beispiele gelten für die Vorbereitung von **0.4.0** mit der
-anschließenden Entwicklungslinie **0.5.0-SNAPSHOT**. Maßgeblich bleibt immer die
+Die Beispiele für **0.4.0** mit der anschließenden Entwicklungslinie
+**0.5.0-SNAPSHOT** sind historisch. Der [aktuelle Artefaktvertrag](#aktueller-artefaktvertrag)
+beschreibt die sieben Dateien des 0.5.4-Kandidaten. Maßgeblich bleibt immer die
 im jeweiligen Checkout deklarierte Version; ein Beispiel ist weder ein
 Release-Auftrag noch der Nachweis einer bereits erfolgten Veröffentlichung.
 Die [Release Notes für 0.4.0](releases/0.4.0.md) beschreiben den vorgesehenen
@@ -288,8 +289,8 @@ Ein Trockenlauf gilt nur dann als erfolgreich, wenn:
 - der Checkout nach den Prüfungen unverändert ist;
 - `docs/releases/0.4.0.md` geprüft und im Manifest per SHA-256 gebunden ist;
 - das Workflow-Artefakt `regelsuche-0.4.0-artifacts` vorhanden ist;
-- ZIP, TAR und JAR sowie `RELEASE-MANIFEST.txt` und `SHA256SUMS.txt` enthalten
-  sind;
+- der zur Version gehörende vollständige [Asset-Satz](#release-assets)
+  einschließlich Manifest und Prüfsummen enthalten ist;
 - Manifest-Version, Tag, Quell-Commit, Release-Commit und Notes-Hash dem
   beabsichtigten Kandidaten entsprechen;
 - keine Warnung eine übersprungene oder abgeschwächte Prüfung anzeigt;
@@ -315,11 +316,11 @@ Der Workflow:
    POMs gemeinsam auf `0.4.0` stehen;
 4. baut JAR, ZIP und TAR mit Maven;
 5. erzeugt ein Herkunftsmanifest einschließlich Notes-Hash und die
-   SHA-256-Summen der fünf Assets;
+   SHA-256-Summen dieses Manifests und der Binärdateien;
 6. erstellt und pusht den annotierten Tag `v0.4.0`;
 7. aktualisiert `maintenance/0.4.x` auf den getaggten Release-Commit;
 8. erstellt den GitHub Release mit `docs/releases/0.4.0.md` als Body und lädt
-   genau die fünf vereinbarten Assets hoch;
+   genau den zur Version gehörenden Asset-Satz hoch;
 9. prüft Body, Asset-Liste, Draft- und Pre-Release-Status;
 10. stellt den autoritativen Stand von `main` wieder her;
 11. öffnet bei Bedarf einen Pull Request für `0.5.0-SNAPSHOT` einschließlich
@@ -331,7 +332,7 @@ Version sein. Freie Eingaben werden getrimmt und strikt gegen das Format
 
 ## Release-Assets
 
-Der veröffentlichte GitHub Release enthält exakt fünf Dateien:
+Der historische GitHub Release **0.4.0** enthält exakt fünf Dateien:
 
 - `regelsuche-0.4.0.jar`;
 - `regelsuche-0.4.0.zip`;
@@ -339,9 +340,37 @@ Der veröffentlichte GitHub Release enthält exakt fünf Dateien:
 - `RELEASE-MANIFEST.txt`;
 - `SHA256SUMS.txt`.
 
-Die kuratierten Release Notes sind keine sechste Binärdatei. Sie liegen im
+Die kuratierten Release Notes sind keine zusätzliche Binärdatei. Sie liegen im
 getaggten Quellbaum, sind als GitHub-Release-Body veröffentlicht und werden
 über `release_notes_file` sowie `release_notes_sha256` im Manifest gebunden.
+
+### Aktueller Artefaktvertrag
+
+Für **0.5.4** erzeugt der bestehende Workflow zusätzlich die beiden SDK-Archive.
+Der vollständige Satz umfasst deshalb sieben Dateien:
+
+- `regelsuche-0.5.4.jar`;
+- `regelsuche-0.5.4.zip`;
+- `regelsuche-0.5.4.tar`;
+- `regelsuche-sdk-0.5.4.zip`;
+- `regelsuche-optimization-sdk-0.5.4.zip`;
+- `RELEASE-MANIFEST.txt`;
+- `SHA256SUMS.txt`.
+
+`RELEASE-MANIFEST.txt` nennt Version, Tag, Build-System, Quell-Commit und
+Release-Commit. Es bindet die kuratierten Notes, `release.properties`, OpenAPI
+und den Root-POM durch SHA-256. `SHA256SUMS.txt` enthält sechs Einträge: den
+Hash dieses Manifests und die Hashes der fünf Binärdateien. Die Prüfsummendatei
+enthält keinen Hash ihrer selbst. Der Trockenlauf und die öffentliche
+Nachkontrolle müssen diesen vollständigen versionsgebundenen Satz prüfen.
+
+Die Maven-Module samt Parent und BOM werden über den gesonderten
+Central-Publikationsschritt veröffentlicht. Ihre einzelnen Koordinaten und
+Artefaktbytes sind nicht im äußeren `RELEASE-MANIFEST.txt` aufgezählt; ihre
+Veröffentlichung und Verbraucherqualifikation werden gesondert nachgewiesen.
+Die beschriebenen sieben GitHub-Dateien belegen allein keine erfolgreiche
+Central-Veröffentlichung.
+
 ## Maven Central
 
 Aktiviere im bestehenden Release-Workflow `publish_maven_central` oder nutze
@@ -366,6 +395,11 @@ der Spring-Boot-JAR ist im Profil ausgeschlossen. Für den Upload ergänze
 `-Dcentral.skipUpload=false -Dcentral.autoPublish=true -Dcentral.waitUntil=published`
 und konfiguriere in den Maven-Settings den Central-Portal-Token unter dem
 Servernamen `central`.
+
+Die [bestehende Central-Consumer-Qualifikation](released-sdk-maven-qualification.md)
+ist an die veröffentlichten Koordinaten und JAR-Hashes von **0.5.3** gebunden.
+Sie ist kein Nachweis für **0.5.4**. Dessen Nachqualifikation muss die tatsächlich
+veröffentlichten 0.5.4-Koordinaten und Artefaktbytes verwenden.
 
 ## Zenodo
 
@@ -401,8 +435,10 @@ Nach dem echten Lauf sind folgende Produktpunkte zu prüfen:
 
 - Tag `v0.4.0` existiert und zeigt auf den Release-Metadaten-Commit;
 - der öffentliche Body entspricht `docs/releases/0.4.0.md`;
-- der GitHub Release enthält JAR, ZIP, TAR, Manifest und Prüfsummen;
-- die fünf Asset-Hashes und der im Manifest angegebene Notes-Hash stimmen;
+- der GitHub Release enthält den vollständigen [Asset-Satz](#release-assets)
+  der veröffentlichten Version;
+- alle in `SHA256SUMS.txt` aufgeführten Datei-Hashes und der im Manifest
+  angegebene Notes-Hash stimmen;
 - `maintenance/0.4.x` zeigt auf denselben getaggten Commit;
 - der Folge-PR enthält ausschließlich die koordinierten Änderungen für
   `0.5.0-SNAPSHOT` in `release.properties`, `CITATION.cff`, `CITATION.md`,

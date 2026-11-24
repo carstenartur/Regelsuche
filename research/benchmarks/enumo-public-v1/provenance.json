@@ -51,7 +51,8 @@
     "rustBridgeFailures": 0,
     "matrixRows": 333,
     "verifiedCandidates": 54,
-    "unsupportedRows": 279
+    "unsupportedRows": 279,
+    "scope": "focused checks accompanying the recorded final application panel"
   },
   "history": {
     "sourceBundleSha256": "64c229a3b56215301c388ca47bef41365cc3d99771fb15791b86869218a7d205",
@@ -68,5 +69,23 @@
     "shared native exact polynomial kernel in runtime and archive judge",
     "512 MiB JVM heap is not an equal RSS cap",
     "elapsed times observed under concurrent development"
-  ]
+  ],
+  "archiveHardeningVerification": {
+    "scope": "later archive-only consistency correction; no new optimizer execution or timing",
+    "javaTests": 28,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "newFailingRegressionAssertionsBeforeCorrection": 5,
+    "acceptedRetainedCandidates": 54,
+    "consistentTimeoutControlAcceptedCandidates": 48,
+    "sourceSha256": {
+      "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoRecordedAudit.java": "7d3049183a2b61ac1aae4cdca45e16f01d83e97decb4ce15c422d3be8a7ec737",
+      "regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/EnumoRecordedAuditTest.java": "d4c4420ec7fa10b687997189c7148088812086171aef73bc18d44b1233272f9d"
+    },
+    "redLog": "evidence/enumo-second-review-red.log.gz",
+    "greenLog": "evidence/enumo-second-review-green.log.gz",
+    "archiveLog": "evidence/enumo-second-review-archive.log.gz",
+    "historicalMeasurementFilesUnchanged": true
+  }
 }

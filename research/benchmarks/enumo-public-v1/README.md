@@ -198,10 +198,31 @@ previous final run remains under `evidence/development-pre-review-final`; it is
 not silently replaced in the development history. The supported inventory and
 54 verified candidates remain unchanged.
 
-The focused final Java run passed 22 tests without failures, errors or skips.
-The two Rust bridge tests passed. A successful archive audit confirms the
-retained response contract; it does not authenticate historical execution from
-an untrusted author or replay the original synthesizer.
+The focused Java run accompanying the final application panel passed 22 tests
+without failures, errors or skips. The two Rust bridge tests passed.
+
+A second independent archive review found three remaining consistency gaps:
+a missing raw response could be called blocked before any worker failure;
+replacement rules could retain their line count while contradicting the
+acquisition provenance; and a false native budget flag could hide a fully
+accounted candidate below the frozen limit. Five new regression assertions
+failed before the archive-only correction. The auditor now follows worker
+closure separately for each profile and repetition, checks timeout duration
+and subsequent blocked rows, binds the actual acquired rules to the provenance,
+and derives the budget decision in both directions from the retained work and
+cursor accounting. A consistent timeout remains accepted with all later
+supported queries blocked; the auditor does not require 54 successes.
+
+The resulting focused suite passes 28 tests without failures, errors or skips.
+Its [failing regression run](evidence/enumo-second-review-red.log.gz),
+[passing full focused run](evidence/enumo-second-review-green.log.gz), and
+[fresh archive check](evidence/enumo-second-review-archive.log.gz) are retained.
+These changes affect only the archive checker and its tests. The final matrix,
+raw responses, measured code history, resource receipts and earlier development
+logs remain byte-for-byte unchanged; no new optimizer timing is claimed.
+A successful archive audit confirms the retained response contract; it does
+not authenticate historical execution from an untrusted author or replay the
+original synthesizer.
 
 ## Reproduction
 
@@ -270,8 +291,11 @@ git fetch research/benchmarks/enumo-public-v1/source-history.bundle \
   refs/heads/codex/remediation-integration-20261124:refs/heads/reproduce-enumo-public
 ```
 
-The bundle includes the reviewed shared-grammar check and archive auditor used
-for the final recorded panel. Product optimizer code remains the recorded base.
+The bundle includes the shared-grammar check and the archive auditor present
+when the final panel was recorded. The second archive-only review correction
+is in the public repository history after that measured source; it is not
+retroactively inserted into the measurement bundle. Product optimizer code
+remains the recorded base.
 [artifact-sha256.json](artifact-sha256.json) binds all retained files. The
 acquisition and application receipts, including exact commands and resource
 scope, are in [evidence/](evidence/).

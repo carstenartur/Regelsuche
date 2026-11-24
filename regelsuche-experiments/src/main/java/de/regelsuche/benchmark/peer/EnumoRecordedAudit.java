@@ -54,6 +54,7 @@ public final class EnumoRecordedAudit {
         var seen = new HashSet<String>();
         int index = 0, verified = 0;
         for (int repetition = 1; repetition <= 3; repetition++) for (String profile : PROFILES) {
+            boolean workerUnavailable = false;
             for (var entry : entries) {
                 JsonNode row = report.path("rows").get(index++);
                 require(row.path("profile").asText().equals(profile) && row.path("repetition").asInt() == repetition
@@ -65,16 +66,42 @@ public final class EnumoRecordedAudit {
                     require(row.path("status").asText().equals("UNSUPPORTED_INPUT")
                         && row.path("detail").asText().equals(entry.detail()) && response == null, "unsupported input was hidden or relabelled");
                 } else {
-                    require(OUTCOMES.contains(row.path("status").asText()), "unknown outcome");
-                    if (response == null) require(Set.of("TIMEOUT", "TECHNICAL_FAILURE", "BLOCKED_WORKER_UNAVAILABLE")
-                        .contains(row.path("status").asText()), "derived outcome without raw evidence");
-                    else verifyResponse(row, response, entry.source(), profile, setups.get(profile + ":" + repetition));
+                    workerUnavailable = verifySupportedRow(row, response, entry.source(), profile,
+                        setups.get(profile + ":" + repetition), workerUnavailable);
                     if (row.path("status").asText().equals("VERIFIED")) verified++;
                 }
             }
         }
         require(seen.containsAll(responses.keySet()), "unexpected raw response");
         return verified;
+    }
+
+    private static boolean verifySupportedRow(JsonNode row, JsonNode response, String source, String profile,
+            JsonNode setup, boolean workerUnavailable) throws Exception {
+        String outcome = row.path("status").asText();
+        require(OUTCOMES.contains(outcome), "unknown outcome");
+        if (workerUnavailable) {
+            require(outcome.equals("BLOCKED_WORKER_UNAVAILABLE") && response == null
+                && !row.has("requestAndJudgeNanos"), "response after worker closure");
+            requireNoCandidate(row);
+            return true;
+        }
+        if (response != null) {
+            verifyResponse(row, response, source, profile, setup);
+            return false;
+        }
+        require(outcome.equals("TIMEOUT") || outcome.equals("TECHNICAL_FAILURE"), "derived outcome without raw evidence");
+        requireNoCandidate(row);
+        long elapsed = nonnegative(row, "requestAndJudgeNanos");
+        require(elapsed > 0, "failed request interval");
+        if (outcome.equals("TIMEOUT")) require(elapsed >= 2_000_000_000L, "timeout before request allowance");
+        else require(!row.path("detail").asText().isBlank(), "missing technical failure detail");
+        return true;
+    }
+
+    private static void requireNoCandidate(JsonNode row) {
+        for (String field : List.of("output", "inputCost", "outputCost", "nativeWork"))
+            require(!row.has(field), "candidate data on an unanswered request");
     }
 
     private static void verifyResponse(JsonNode row, JsonNode retained, String source, String profile, JsonNode setup) throws Exception {
@@ -127,8 +154,26 @@ public final class EnumoRecordedAudit {
             nonnegative(response, "selectedReplayWork"));
         require(total == nonnegative(response, "totalWork") && total == nonnegative(row, "nativeWork"), "native total work sum");
         require(response.path("internalWorkWithinBudget").isBoolean(), "native budget decision");
-        require(!response.path("internalWorkWithinBudget").asBoolean()
-            || total <= nonnegative(setup.path("settings"), "workBudget"), "native work budget");
+        boolean withinBudget = accountingComplete(search) && total <= nonnegative(setup.path("settings"), "workBudget");
+        require(response.path("internalWorkWithinBudget").asBoolean() == withinBudget, "native work budget");
+    }
+
+    private static boolean accountingComplete(JsonNode search) {
+        JsonNode staged = search.path("stagedIncrementalExecution");
+        if (staged.isMissingNode() || staged.isNull()) return true;
+        require(staged.isObject() && staged.path("expansions").isArray(), "staged execution ledger");
+        boolean complete = true;
+        for (JsonNode expansion : staged.path("expansions")) {
+            require(expansion.isObject() && expansion.path("lanes").isArray(), "staged expansion ledger");
+            for (JsonNode lane : expansion.path("lanes")) {
+                require(lane.isObject() && lane.has("cursor"), "staged lane ledger");
+                JsonNode cursor = lane.path("cursor");
+                if (cursor.isNull()) continue;
+                require(cursor.isObject() && cursor.path("accountingComplete").isBoolean(), "staged cursor accounting");
+                complete &= cursor.path("accountingComplete").booleanValue();
+            }
+        }
+        return complete;
     }
 
     private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules) throws Exception {
@@ -144,6 +189,8 @@ public final class EnumoRecordedAudit {
         require(report.path("nativeWorkerClassSha256").asText().matches("[a-f0-9]{64}")
             && report.path("nativeWorkerClassSha256").equals(provenance.path("native").path("workerClassSha256")), "native executable binding");
         require(acquisition.equals(provenance.path("acquisition").path("receipt")), "acquisition provenance binding");
+        require(report.path("acquiredRulesSha256").equals(provenance.path("acquisition").path("rulesSha256")),
+            "acquired rules provenance binding");
     }
 
     private static Map<String, JsonNode> responses(byte[] raw) throws Exception {

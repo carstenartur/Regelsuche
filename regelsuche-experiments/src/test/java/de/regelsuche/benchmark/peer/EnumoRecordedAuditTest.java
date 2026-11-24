@@ -105,6 +105,88 @@ class EnumoRecordedAuditTest {
         assertRawMutationRejected(ignored -> { }, report -> report.put("nativeWorkerClassSha256", "invalid"));
     }
 
+    @Test
+    void refusesABlockedRowBeforeAnyWorkerFailure() throws Exception {
+        assertMissingRawRejected(row -> {
+            discardCandidate(row);
+            row.remove("requestAndJudgeNanos");
+            row.put("status", "BLOCKED_WORKER_UNAVAILABLE");
+        });
+    }
+
+    @Test
+    void refusesATimeoutShorterThanTheRequestAllowance() throws Exception {
+        assertMissingRawRejected(row -> {
+            discardCandidate(row);
+            row.put("status", "TIMEOUT").put("requestAndJudgeNanos", 1);
+        });
+    }
+
+    @Test
+    void refusesLaterResponsesFromAWorkerAlreadyClosedByTimeout() throws Exception {
+        assertMissingRawRejected(row -> {
+            discardCandidate(row);
+            row.put("status", "TIMEOUT").put("requestAndJudgeNanos", 2_000_000_000L);
+        });
+    }
+
+    @Test
+    void acceptsAConsistentTimeoutAndRetainsItsBlockedSuccessors() throws Exception {
+        ObjectNode report = report();
+        boolean first = true;
+        for (JsonNode node : report.path("rows")) {
+            if (!node.path("profile").asText().equals("REGELSUCHE_BASE") || node.path("repetition").asInt() != 1
+                    || node.path("status").asText().equals("UNSUPPORTED_INPUT")) continue;
+            ObjectNode row = (ObjectNode) node;
+            discardCandidate(row);
+            if (first) row.put("status", "TIMEOUT").put("requestAndJudgeNanos", 2_000_000_000L);
+            else { row.put("status", "BLOCKED_WORKER_UNAVAILABLE"); row.remove("requestAndJudgeNanos"); }
+            first = false;
+        }
+        var retained = new StringBuilder();
+        for (String line : new String(raw(), StandardCharsets.UTF_8).lines().toList()) {
+            JsonNode node = JSON.readTree(line).path("row");
+            if (!(node.path("profile").asText().equals("REGELSUCHE_BASE") && node.path("repetition").asInt() == 1))
+                retained.append(line).append('\n');
+        }
+        byte[] changed = retained.toString().getBytes(StandardCharsets.UTF_8);
+        report.put("rawResponsesSha256", hash(changed));
+        assertEquals(48, EnumoRecordedAudit.verify(ROOT, report, changed, rules()));
+    }
+
+    @Test
+    void bindsActualRulesToTheAcquisitionProvenance() throws Exception {
+        ObjectNode report = report();
+        String[] lines = new String(rules(), StandardCharsets.UTF_8).split("\n");
+        lines[0] = "(* ?a ?b) ==> 0";
+        byte[] changed = (String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8);
+        report.put("acquiredRulesSha256", hash(changed));
+        assertThrows(IllegalArgumentException.class, () -> EnumoRecordedAudit.verify(ROOT, report, raw(), changed));
+    }
+
+    @Test
+    void derivesTheBudgetDecisionInBothDirections() throws Exception {
+        assertRawMutationRejected(recorded -> {
+            ((ObjectNode) recorded.get("response")).put("internalWorkWithinBudget", false);
+            ((ObjectNode) recorded.get("row")).put("status", "NATIVE_BUDGET_REJECTED");
+        }, ignored -> { });
+    }
+
+    private static void discardCandidate(ObjectNode row) {
+        for (String field : java.util.List.of("output", "inputCost", "outputCost", "nativeWork")) row.remove(field);
+    }
+
+    private static void assertMissingRawRejected(java.util.function.Consumer<ObjectNode> changeRow) throws Exception {
+        ObjectNode report = report();
+        String[] lines = new String(raw(), StandardCharsets.UTF_8).split("\n");
+        JsonNode removed = JSON.readTree(lines[0]).get("row");
+        for (JsonNode row : report.path("rows")) if (sameKey(row, removed)) changeRow.accept((ObjectNode) row);
+        byte[] changed = (String.join("\n", java.util.Arrays.copyOfRange(lines, 1, lines.length)) + "\n")
+            .getBytes(StandardCharsets.UTF_8);
+        report.put("rawResponsesSha256", hash(changed));
+        assertThrows(IllegalArgumentException.class, () -> EnumoRecordedAudit.verify(ROOT, report, changed, rules()));
+    }
+
     private static void assertRawMutationRejected(java.util.function.Consumer<ObjectNode> changeRaw,
             java.util.function.Consumer<ObjectNode> changeReport) throws Exception {
         ObjectNode report = report();
