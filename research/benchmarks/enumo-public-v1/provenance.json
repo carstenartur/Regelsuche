@@ -1,0 +1,110 @@
+{
+  "schema": "regelsuche.enumo-build-provenance/v1",
+  "date": "2026-11-24",
+  "upstream": {
+    "repository": "https://github.com/uwplse/ruler",
+    "commit": "7ed456de94df26fdddc0c15417a987d101dc57b5",
+    "buildChange": "documented dynamic Z3 link only; no algorithm/domain source changes",
+    "cargoPatchSha256": "a6b5b0d74a1aadfb549418b364749bacbcd46c620d601a2dace8069a275a13fa",
+    "bridgeSha256": "b0a3df07c248a6fec8645aae8b895116063e3e5952f39aefbbf50cb2ddab02b2",
+    "cargoLockSha256": "9fe28f9cfc3b72ead8b245caee075cadda78be869eeccb7162673eacdcc26df6",
+    "binarySha256": "f7b0aa98c27d00937a3f16a296fc60dcf8aea55c4c9e4213f45fb77727b2b0ca"
+  },
+  "runtime": {
+    "rustc": "rustc 1.100.0 (0ef1bc386 2026-11-09)",
+    "z3Version": "4.13.3.0",
+    "z3HeaderCommit": "54d30f26f72ce62f5dcb5a5258f632f84858714f",
+    "z3SharedObjectSha256": "7accc397d4ac387468b09489bdaff9d82bfac4ca6a7e339b8fbb2167edf9c1c0",
+    "java": "25.0.2+10-LTS",
+    "architecture": "Linux amd64",
+    "availableProcessors": 9
+  },
+  "native": {
+    "productSourceCommit": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+    "benchmarkSourceCommit": "5f016d7001f43f9d9c0c6b5ac42eeae178f64853",
+    "workerClassSha256": "06a6bd48414fd7fec909d800ff736b63d0843c97a101d2431d044b5bb79810a0",
+    "meaning": "product source unchanged from the base; comparison/bridge source preserved in the local source-history bundle"
+  },
+  "freeze": {
+    "localCommit": "15a905a",
+    "protocolSha256": "5ed4b7a7fff5dcd023dfd31d1bddcff92cad7392b4a6eca4ce4272929a6e3137",
+    "corpusSha256": "17caef3eb6065513600918f56f294a5c2401cf5593026d30aefe1bf4e62db09f",
+    "externalPreregistration": false
+  },
+  "acquisition": {
+    "rulesSha256": "c4568d83c8bb177c4635246331945a8319de96f4c0e31f51561e462aa1469d91",
+    "receipt": {
+      "status": "ACQUIRED",
+      "recipe": "original::rational_best::best_enumo_recipe",
+      "rules": 128,
+      "bidirectionalRules": 71,
+      "acquisitionNanos": 13131527272
+    },
+    "processReceipt": "evidence/acquisition-resources.json"
+  },
+  "verification": {
+    "javaTests": 22,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "rustBridgeTests": 2,
+    "rustBridgeFailures": 0,
+    "matrixRows": 333,
+    "verifiedCandidates": 54,
+    "unsupportedRows": 279,
+    "scope": "focused checks accompanying the recorded final application panel"
+  },
+  "history": {
+    "sourceBundleSha256": "64c229a3b56215301c388ca47bef41365cc3d99771fb15791b86869218a7d205",
+    "failedAdapterRun": "evidence/development-panel",
+    "correctedFirstRun": "evidence/development-panel-corrected",
+    "finalRun": "evidence/results.json.gz",
+    "ruleAcquisitionReusedAcrossApplicationRuns": true,
+    "preReviewRun": "evidence/development-pre-review-final"
+  },
+  "limits": [
+    "public development panel, no unseen holdout",
+    "shared exact-rational projection, not original IEEE semantics",
+    "unmatched acquisition grammars, no general learner comparison",
+    "shared native exact polynomial kernel in runtime and archive judge",
+    "512 MiB JVM heap is not an equal RSS cap",
+    "elapsed times observed under concurrent development"
+  ],
+  "archiveHardeningVerification": {
+    "scope": "later archive-only consistency correction; no new optimizer execution or timing",
+    "javaTests": 28,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "newFailingRegressionAssertionsBeforeCorrection": 5,
+    "acceptedRetainedCandidates": 54,
+    "consistentTimeoutControlAcceptedCandidates": 48,
+    "sourceSha256": {
+      "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoRecordedAudit.java": "7d3049183a2b61ac1aae4cdca45e16f01d83e97decb4ce15c422d3be8a7ec737",
+      "regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/EnumoRecordedAuditTest.java": "d4c4420ec7fa10b687997189c7148088812086171aef73bc18d44b1233272f9d"
+    },
+    "redLog": "evidence/enumo-second-review-red.log.gz",
+    "greenLog": "evidence/enumo-second-review-green.log.gz",
+    "archiveLog": "evidence/enumo-second-review-archive.log.gz",
+    "historicalMeasurementFilesUnchanged": true,
+    "publicSourceCommit": "ace8e0d99158691e973ba55b91e4f8bb79a028c6"
+  },
+  "sourceBindingFailureVerification": {
+    "scope": "later archive-only writer/auditor consistency correction; no new optimizer execution or timing",
+    "javaTests": 30,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "newUnexpectedExceptionsBeforeCorrection": 2,
+    "acceptedRetainedCandidates": 54,
+    "consistentRejectedSourceControlAcceptedCandidates": 53,
+    "sourceSha256": {
+      "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoRecordedAudit.java": "49d964b3c29fdfcc75427683274b4ef509c616f70d863bbfe6c4e2ec7eb92415",
+      "regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/EnumoRecordedAuditTest.java": "79952549a85a9a82c9ef4526bf9c58120089d526a23d844d12aa708c5c31234b"
+    },
+    "redLog": "evidence/enumo-source-rejection-red.log.gz",
+    "greenLog": "evidence/enumo-source-rejection-green.log.gz",
+    "archiveLog": "evidence/enumo-source-rejection-archive.log.gz",
+    "historicalMeasurementFilesUnchanged": true
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java",
+    "-Xmx512m",
+    "-cp",
+    "/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-core/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-solver-portfolio/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-learning/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-math-algorithms/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-remediation/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar",
+    "de.regelsuche.benchmark.peer.EnumoPublicComparison",
+    "/workspace/scratch/9d9b08d5e080/regelsuche-remediation",
+    "/var/tmp/regelsuche-9d9b08d5e080/ruler-target/release/regelsuche_peer",
+    "/var/tmp/regelsuche-9d9b08d5e080/enumo-public-run/learned.rules",
+    "/var/tmp/regelsuche-9d9b08d5e080/enumo-public-run/panel-reviewed"
+  ],
+  "exitCode": 0,
+  "wallNanos": 11450574981,
+  "userCpuSeconds": 23.829335,
+  "systemCpuSeconds": 1.671134,
+  "childPeakRssKiB": 203744,
+  "scope": "full comparison process including fresh worker setup, request/judge, native initialization and report serialization; excludes original Enumo acquisition and all builds",
+  "sourceCommit": "5f016d7001f43f9d9c0c6b5ac42eeae178f64853"
+}
