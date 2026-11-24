@@ -2,6 +2,9 @@ package de.regelsuche.benchmark.peer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,7 +22,6 @@ public final class EnumoRecordedAudit {
     private static final ObjectMapper JSON = new ObjectMapper()
         .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
         .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-    private static final List<String> PROFILES = List.of("REGELSUCHE_BASE", "REGELSUCHE_LEARNED_RANKED", "ENUMO_LEARNED");
     private static final Set<String> OUTCOMES = Set.of("VERIFIED", "INVALID", "OUTSIDE_SHARED_GRAMMAR",
         "WORKER_ERROR", "SOURCE_BINDING_REJECTED", "NATIVE_BUDGET_REJECTED", "TIMEOUT", "TECHNICAL_FAILURE",
         "TIMEOUT_AFTER_JUDGE", "BLOCKED_WORKER_UNAVAILABLE");
@@ -35,25 +37,29 @@ public final class EnumoRecordedAudit {
     }
 
     static int verify(Path checkout, JsonNode report, byte[] raw, byte[] rules) throws Exception {
-        Path corpus = checkout.resolve("research/benchmarks/enumo-public-v1/rosa.fpcore");
-        require(hash(Files.readAllBytes(corpus)).equals(EnumoPublicComparison.CORPUS_SHA), "foreign corpus changed");
-        Path protocol = checkout.resolve("research/benchmarks/enumo-public-v1/protocol.json");
-        require(hash(Files.readAllBytes(protocol)).equals(EnumoPublicComparison.PROTOCOL_SHA), "protocol changed");
-        require(report.path("schema").asText().equals("regelsuche.enumo-public-result/v1"), "report schema");
+        String schema = report.path("schema").asText();
+        boolean transfer = schema.equals(EnumoPublicComparison.HORNER_TRANSFER);
+        boolean horner = transfer || schema.equals(EnumoPublicComparison.HORNER_V2);
+        require(horner || schema.equals(EnumoPublicComparison.V1), "report schema");
+        String protocolHash = transfer ? EnumoPublicComparison.TRANSFER_PROTOCOL_SHA
+            : horner ? EnumoPublicComparison.HORNER_PROTOCOL_SHA : EnumoPublicComparison.PROTOCOL_SHA;
+        String corpusHash = transfer ? EnumoPublicComparison.TRANSFER_CORPUS_SHA : EnumoPublicComparison.CORPUS_SHA;
         require(report.path("semantics").asText().equals("EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE"), "semantics changed");
-        require(report.path("corpusSha256").asText().equals(EnumoPublicComparison.CORPUS_SHA), "corpus binding");
-        require(report.path("protocolSha256").asText().equals(EnumoPublicComparison.PROTOCOL_SHA), "protocol binding");
+        require(report.path("corpusSha256").asText().equals(corpusHash), "corpus binding");
+        require(report.path("protocolSha256").asText().equals(protocolHash), "protocol binding");
         require(hash(raw).equals(report.path("rawResponsesSha256").asText()), "raw response hash");
         require(hash(rules).equals(report.path("acquiredRulesSha256").asText()), "acquired rule hash");
-        verifyProvenance(checkout, report, rules);
-        var entries = FpcorePolynomialCorpus.read(Files.readString(corpus));
-        require(entries.size() == 37 && JSON.valueToTree(entries).equals(report.path("inventory")), "foreign inventory binding");
-        require(report.path("rows").isArray() && report.path("rows").size() == 333, "complete comparison matrix");
+        verifyProvenance(checkout, report, rules, horner);
+        var entries = EnumoPublicComparison.inventory(checkout, horner, transfer);
+        require(JSON.valueToTree(entries).equals(report.path("inventory")), "foreign inventory binding");
+        var profiles = EnumoPublicComparison.profiles(horner).stream().map(Enum::name).toList();
+        require(report.path("rows").isArray() && report.path("rows").size() == 3 * entries.size() * profiles.size(),
+            "complete comparison matrix");
         Map<String, JsonNode> responses = responses(raw);
-        Map<String, JsonNode> setups = verifySetups(report.path("setups"), report.path("acquisition"));
+        Map<String, JsonNode> setups = verifySetups(report.path("setups"), report.path("acquisition"), profiles);
         var seen = new HashSet<String>();
         int index = 0, verified = 0;
-        for (int repetition = 1; repetition <= 3; repetition++) for (String profile : PROFILES) {
+        for (int repetition = 1; repetition <= 3; repetition++) for (String profile : profiles) {
             boolean workerUnavailable = false;
             for (var entry : entries) {
                 JsonNode row = report.path("rows").get(index++);
@@ -109,7 +115,7 @@ public final class EnumoRecordedAudit {
         boolean peer = profile.equals("ENUMO_LEARNED");
         JsonNode request = retained.path("request"), response = retained.path("response");
         String wire = peer ? FpcorePolynomialCorpus.toPrefix(source) : source;
-        String nativeProfile = profile.equals("REGELSUCHE_BASE") ? "BASE" : "LEARNED_RANKED";
+        String nativeProfile = EnumoPublicComparison.Profile.valueOf(profile).nativeProfile;
         require(request.size() == (peer ? 2 : 3) && request.path("op").asText().equals("run")
             && request.path("source").asText().equals(wire), "source-only request binding");
         require(peer || request.path("profile").asText().equals(nativeProfile), "native request profile");
@@ -167,6 +173,47 @@ public final class EnumoRecordedAudit {
         require(response.path("internalWorkWithinBudget").isBoolean(), "native budget decision");
         boolean withinBudget = accountingComplete(search) && total <= nonnegative(setup.path("settings"), "workBudget");
         require(response.path("internalWorkWithinBudget").asBoolean() == withinBudget, "native work budget");
+        if (profile.equals("POLYNOMIAL_HORNER_V1")) verifyHornerPath(response, setup);
+    }
+
+    private static void verifyHornerPath(JsonNode response, JsonNode setup) throws Exception {
+        String current = response.path("typedInput").asText();
+        var codec = new CompiledAstReplayCodec();
+        var expression = new ExpressionParser().parseTerm(response.path("input").asText());
+        require(codec.encodeExpression(expression).equals(current), "Horner typed input binding");
+        JsonNode witness = response.path("witness");
+        require(witness.isArray(), "Horner witness shape");
+        long replay = 0, theory = 0;
+        for (JsonNode edge : witness) {
+            JsonNode move = edge.path("move"), checked = edge.path("verification");
+            String target = edge.path("target").asText();
+            require(edge.path("source").asText().equals(current) && !target.isBlank()
+                && move.path("transformation").path("transformedExpression").asText().equals(target), "Horner witness path binding");
+            JsonNode binding = move.path("provenance").path("evidence").path("binding");
+            if (move.path("ruleId").asText().equals("regelsuche.structural-construction/v1:POLYNOMIAL_HORNER")) {
+                require(binding.isObject() && binding.path("sourceExpression").asText().equals(current)
+                    && binding.path("transformedExpression").asText().equals(target), "Horner theory binding");
+                String data = binding.path("canonicalEvidenceJson").asText();
+                require(binding.path("evidenceHash").asText().equals("sha256:" + hash(data.getBytes(StandardCharsets.UTF_8))),
+                    "Horner evidence hash");
+                long evidenceWork = nonnegative(binding, "canonicalWorkUnits");
+                JsonNode proof = JSON.readTree(data);
+                require(proof != null && proof.isObject() && evidenceWork > 0 && proof.path("source").asText().equals(current)
+                    && proof.path("target").asText().equals(target)
+                    && proof.path("procedure").equals(move.path("ruleId"))
+                    && nonnegative(proof, "work") == evidenceWork, "Horner evidence body");
+                theory = Math.addExact(theory, evidenceWork);
+            } else require(binding.isMissingNode(), "undeclared Horner theory step");
+            require(checked.path("accepted").isBoolean() && checked.path("accepted").asBoolean()
+                && checked.path("receipts").isArray() && !checked.path("receipts").isEmpty(), "Horner checked witness");
+            replay = Math.addExact(replay, nonnegative(checked, "work"));
+            current = target;
+        }
+        require(response.path("typedOutput").asText().equals(current)
+            && ExpressionFormatter.format(codec.decodeExpression(current)).equals(response.path("output").asText()),
+            "Horner typed output binding");
+        require(replay == nonnegative(response, "selectedReplayWork"), "Horner final replay ledger");
+        require(theory <= nonnegative(setup.path("settings"), "maxTheoryWork"), "Horner theory path budget");
     }
 
     private static boolean accountingComplete(JsonNode search) {
@@ -187,14 +234,15 @@ public final class EnumoRecordedAudit {
         return complete;
     }
 
-    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules) throws Exception {
+    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules, boolean horner) throws Exception {
         JsonNode acquisition = report.path("acquisition");
         long ruleCount = new String(rules, StandardCharsets.UTF_8).lines().filter(line -> !line.isBlank()).count();
         require(acquisition.path("status").asText().equals("ACQUIRED") && ruleCount > 0
             && acquisition.path("rules").asLong() == ruleCount, "actual acquisition receipt");
         require(acquisition.path("recipe").asText().equals("original::rational_best::best_enumo_recipe")
             && nonnegative(acquisition, "acquisitionNanos") > 0, "original acquisition identity");
-        JsonNode provenance = JSON.readTree(Files.readString(checkout.resolve("research/benchmarks/enumo-public-v1/provenance.json")));
+        Path artifacts = checkout.resolve(horner ? EnumoPublicComparison.HORNER_ARTIFACTS : "research/benchmarks/enumo-public-v1");
+        JsonNode provenance = JSON.readTree(Files.readString(artifacts.resolve("provenance.json")));
         require(report.path("enumoBinarySha256").asText().matches("[a-f0-9]{64}")
             && report.path("enumoBinarySha256").equals(provenance.path("upstream").path("binarySha256")), "original executable binding");
         require(report.path("nativeWorkerClassSha256").asText().matches("[a-f0-9]{64}")
@@ -216,14 +264,14 @@ public final class EnumoRecordedAudit {
         return result;
     }
 
-    private static Map<String, JsonNode> verifySetups(JsonNode setups, JsonNode acquisition) throws Exception {
-        require(setups.isArray() && setups.size() == 9, "complete setup inventory");
+    private static Map<String, JsonNode> verifySetups(JsonNode setups, JsonNode acquisition, List<String> profiles) throws Exception {
+        require(setups.isArray() && setups.size() == 3 * profiles.size(), "complete setup inventory");
         var identities = new HashMap<String, JsonNode>();
         for (JsonNode setup : setups) {
             String profile = setup.path("profile").asText();
             int repetition = setup.path("repetition").asInt();
             JsonNode initialized = setup.path("initialization");
-            require(PROFILES.contains(profile) && repetition >= 1 && repetition <= 3
+            require(profiles.contains(profile) && repetition >= 1 && repetition <= 3
                 && identities.putIfAbsent(profile + ":" + repetition, initialized) == null, "setup identity");
             long elapsed = setup.path("startupAndInitializationNanos").asLong(-1);
             require(elapsed > 0 && elapsed <= 60_000_000_000L, "startup and initialization budget");
@@ -236,15 +284,21 @@ public final class EnumoRecordedAudit {
     }
 
     private static void verifyNativeSetup(JsonNode initialized, String profile, long elapsed) throws Exception {
-        String expected = profile.equals("REGELSUCHE_BASE") ? "BASE" : "LEARNED_RANKED";
+        String expected = EnumoPublicComparison.Profile.valueOf(profile).nativeProfile;
         require(initialized.path("profile").asText().equals(expected), "native setup profile");
         String model = initialized.path("model").asText();
         require(initialized.path("modelHash").asText().equals("sha256:" + hash(model.getBytes(StandardCharsets.UTF_8))), "native setup model hash");
         JsonNode parsed = JSON.readTree(model);
         require(parsed != null && parsed.path("schema").asText().equals("regelsuche.typed-external-frozen-profile/v1")
             && parsed.path("profile").asText().equals(expected), "native frozen model identity");
-        JsonNode settings = JSON.valueToTree(Map.of("workBudget", 16384, "primitiveDepth", 9,
+        var limits = new HashMap<>(Map.of("workBudget", 16384, "primitiveDepth", 9,
             "searchDepth", 9, "maxStates", 256, "complexityDebt", 24));
+        if (profile.equals("REGELSUCHE_POLYNOMIAL_HORNER")) {
+            limits.put("maxTheoryWork", 16384);
+            require(parsed.path("constructionProfile").asText().equals(expected), "native construction profile");
+            require(parsed.path("objective").asText().equals("SHARED_EXACT_ARITHMETIC_SURFACE"), "native shared surface objective");
+        }
+        JsonNode settings = JSON.valueToTree(limits);
         require(settings.equals(initialized.path("settings")) && settings.equals(parsed.path("settings")), "native frozen limits");
         require(nonnegative(initialized, "nativeWallNanos") <= elapsed, "native initialization interval");
         long training = 0;

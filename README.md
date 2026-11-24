@@ -218,6 +218,21 @@ Basis benötigt rund 9,2 Sekunden, das Referenzportfolio rund 2,1 Sekunden pro
 vollständiger Aufgabenfolge. Das gelernte Profil erzielt hier keine zusätzliche
 Qualitäts- oder Gesamtkostenverbesserung gegenüber der nativen Basis.
 
+Das zusätzliche Horner-Verfahren konstruiert Darstellungen dünn besetzter
+Polynome und prüft ihre exakte Gleichheit mit der Eingabe. Auf den sechs
+gemeinsam auswertbaren Programmen der 37 Rosa-Programme sinkt die Summe der
+arithmetischen Operationen von 67 auf 41. Das originale Enumo erreicht 61.
+Auf zwei weiteren vollständigen Korpusdateien liegen drei von 46 Programmen
+im gemeinsamen Fragment. Hier erreicht das neue Verfahren auf einem Programm
+eine kleinere Form und auf zwei dieselbe Operationszahl wie Enumo.
+[Quellen, Einzelwerte und Laufzeiten](research/benchmarks/enumo-horner-v2/README.md)
+
+Das SDK wertet affine Summen und Maxima über typisierte Indexbereiche aus.
+Bei sechs von sieben unveränderten Alpha-Programmen stimmen alle 4.416
+Ausgabewerte mit der exakten Referenz und dem vom Originalcompiler erzeugten
+C-Code überein. Das frühere Profil konnte ein Programm gemeinsam prüfen.
+[SDK-Einstieg und vollständiger Alpha-Vergleich](docs/research/external-polyhedral-affine-v2.md)
+
 ### Einen gelernten Pfad untersuchen
 
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen

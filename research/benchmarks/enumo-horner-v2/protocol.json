@@ -1,0 +1,19 @@
+{
+  "schema": "regelsuche.enumo-public-comparison/v2-horner",
+  "priorProtocolSha256": "5ed4b7a7fff5dcd023dfd31d1bddcff92cad7392b4a6eca4ce4272929a6e3137",
+  "corpusSha256": "17caef3eb6065513600918f56f294a5c2401cf5593026d30aefe1bf4e62db09f",
+  "profiles": [
+    "REGELSUCHE_BASE",
+    "REGELSUCHE_LEARNED_RANKED",
+    "REGELSUCHE_POLYNOMIAL_HORNER",
+    "ENUMO_LEARNED"
+  ],
+  "hornerCapability": {
+    "profile": "POLYNOMIAL_HORNER_V1",
+    "generationWorkPerRoot": 4096,
+    "maximumTheoryWorkPerPath": 16384,
+    "totalQueryWork": 16384
+  },
+  "repetitions": 3,
+  "scope": "The source-only grammar, order, limits, peer revision, and result judge of v1 apply unchanged. The original peer is rebuilt and reacquired separately. This public development panel was frozen after the first six inputs had informed the implementation."
+}

@@ -1,0 +1,46 @@
+{
+  "description": "Prior Horner profile before common output grammar was enforced, using original same transfer program. Rows unchanged from that development report. Only the relevant rows are excerpted.",
+  "rows": [
+    {
+      "inputCost": 15,
+      "name": "himmilbeau",
+      "nativeWork": 9103,
+      "ordinal": 18,
+      "output": "(x1 ^ 2 + x2 - 11) ^ 2 + (x1 + x2 * x2 - 7) ^ 2",
+      "outputCost": 9,
+      "profile": "REGELSUCHE_POLYNOMIAL_HORNER",
+      "repetition": 1,
+      "requestAndJudgeNanos": 608914011,
+      "source": "(((((x1*x1)+x2)-11)*(((x1*x1)+x2)-11))+(((x1+(x2*x2))-7)*((x1+(x2*x2))-7)))",
+      "status": "OUTSIDE_SHARED_GRAMMAR"
+    },
+    {
+      "inputCost": 15,
+      "name": "himmilbeau",
+      "nativeWork": 9103,
+      "ordinal": 18,
+      "output": "(x1 ^ 2 + x2 - 11) ^ 2 + (x1 + x2 * x2 - 7) ^ 2",
+      "outputCost": 9,
+      "profile": "REGELSUCHE_POLYNOMIAL_HORNER",
+      "repetition": 2,
+      "requestAndJudgeNanos": 376472623,
+      "source": "(((((x1*x1)+x2)-11)*(((x1*x1)+x2)-11))+(((x1+(x2*x2))-7)*((x1+(x2*x2))-7)))",
+      "status": "OUTSIDE_SHARED_GRAMMAR"
+    },
+    {
+      "inputCost": 15,
+      "name": "himmilbeau",
+      "nativeWork": 9103,
+      "ordinal": 18,
+      "output": "(x1 ^ 2 + x2 - 11) ^ 2 + (x1 + x2 * x2 - 7) ^ 2",
+      "outputCost": 9,
+      "profile": "REGELSUCHE_POLYNOMIAL_HORNER",
+      "repetition": 3,
+      "requestAndJudgeNanos": 445817246,
+      "source": "(((((x1*x1)+x2)-11)*(((x1*x1)+x2)-11))+(((x1+(x2*x2))-7)*((x1+(x2*x2))-7)))",
+      "status": "OUTSIDE_SHARED_GRAMMAR"
+    }
+  ],
+  "sourceResponseArchiveSha256": "78b0fe2ac54222a882401d2ef2d12d47da2936022fc4b6f2fbcba440e009fc4a",
+  "sourceWorkerClassSha256": "ef9536283f1b1d6a5e7dc1872a9a77bb615888bb1fccc1c135d4a91e535dbdd9"
+}

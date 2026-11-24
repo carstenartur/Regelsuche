@@ -25,6 +25,44 @@ class EnumoRecordedAuditTest {
     }
 
     @Test
+    void rechecksTheFourArmRosaAndTransferPanels() throws Exception {
+        var data = ROOT.resolve(EnumoPublicComparison.HORNER_ARTIFACTS).resolve("evidence");
+        for (String panel : java.util.List.of("rosa", "transfer")) {
+            Path directory = data.resolve(panel);
+            JsonNode report = JSON.readTree(gunzip(directory.resolve("results.json.gz")));
+            assertEquals((panel.equals("rosa") ? 37 : 46) * 12, report.path("rows").size());
+            long expected = java.util.stream.StreamSupport.stream(report.path("rows").spliterator(), false)
+                .filter(row -> row.path("status").asText().equals("VERIFIED")).count();
+            assertEquals(panel.equals("rosa") ? 72 : 30, expected);
+            assertEquals(expected, EnumoRecordedAudit.verify(ROOT, report,
+                gunzip(directory.resolve("responses.jsonl.gz")), Files.readAllBytes(directory.resolve("learned.rules"))));
+        }
+    }
+
+    @Test
+    void rejectsAnUnboundHornerWitnessAfterTheRawHashIsRecomputed() throws Exception {
+        var directory = ROOT.resolve(EnumoPublicComparison.HORNER_ARTIFACTS).resolve("evidence/rosa");
+        var report = (ObjectNode) JSON.readTree(gunzip(directory.resolve("results.json.gz")));
+        String[] lines = new String(gunzip(directory.resolve("responses.jsonl.gz")), StandardCharsets.UTF_8).split("\n");
+        boolean edited = false;
+        for (int index = 0; index < lines.length; index++) {
+            JsonNode entry = JSON.readTree(lines[index]);
+            JsonNode witness = entry.path("response").path("witness");
+            if (!entry.path("profile").asText().equals("REGELSUCHE_POLYNOMIAL_HORNER") || witness.isEmpty()) continue;
+            ((ObjectNode) witness.get(0)).put("source", "unbound");
+            lines[index] = JSON.writeValueAsString(entry);
+            edited = true;
+            break;
+        }
+        assertTrue(edited);
+        byte[] forged = (String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8);
+        report.put("rawResponsesSha256", hash(forged));
+        var rejected = assertThrows(IllegalArgumentException.class, () -> EnumoRecordedAudit.verify(ROOT, report,
+            forged, Files.readAllBytes(directory.resolve("learned.rules"))));
+        assertEquals("Horner witness path binding", rejected.getMessage());
+    }
+
+    @Test
     void refusesOmissionOfAnUnsupportedProgram() throws Exception {
         ObjectNode report = report();
         ((ArrayNode) report.get("rows")).remove(0);
@@ -240,7 +278,10 @@ class EnumoRecordedAuditTest {
     private static byte[] raw() throws Exception { return gunzip("responses.jsonl.gz"); }
     private static byte[] rules() throws Exception { return Files.readAllBytes(DATA.resolve("learned.rules")); }
     private static byte[] gunzip(String name) throws Exception {
-        try (var input = new GZIPInputStream(Files.newInputStream(DATA.resolve(name)))) { return input.readAllBytes(); }
+        return gunzip(DATA.resolve(name));
+    }
+    private static byte[] gunzip(Path file) throws Exception {
+        try (var input = new GZIPInputStream(Files.newInputStream(file))) { return input.readAllBytes(); }
     }
     private static String hash(byte[] bytes) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
