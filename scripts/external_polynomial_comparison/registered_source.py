@@ -69,3 +69,28 @@ def portable_source_provenance(repository):
             for key in ('revision', 'tree')):
         raise ValueError('native worker received invalid registered source identity')
     return {'sourceRevision': identity['revision'], 'sourceTreeHash': 'git:' + identity['tree']}
+
+
+def portable_schema_provenance(repository, freeze, protocol_hash):
+    """Admit Schema only after the Java verifier checks source, ancestry and blob."""
+    key = 'REGELSUCHE_NATIVE_SOURCE_VERIFIER_CLASSPATH'
+    root = Path(repository).resolve()
+    receipts = [root / 'build/authority-evidence' / name
+                for name in ('quality-source-tree.json', 'polynomial-source.json')]
+    if key not in os.environ and not any(path.exists() or path.is_symlink() for path in receipts):
+        return None
+    verifier = os.environ.get(key)
+    if not verifier or not all(path.is_file() for path in receipts):
+        raise ValueError('schema worker requires a verifier classpath, source registration and ancestry witness')
+    checked = subprocess.run(
+        ['java', '--enable-native-access=ALL-UNNAMED', '-cp', verifier,
+         'de.regelsuche.release.PolynomialArchiveProvenanceMain', 'schema-freeze', str(root)],
+        check=True, capture_output=True, timeout=180)
+    proof = json.loads(checked.stdout)
+    if not isinstance(proof, dict) or proof.get('trackedChangesPresent') is not False or any(
+            not isinstance(proof.get(name), str) or not re.fullmatch(r'[0-9a-f]{40}', proof[name])
+            for name in ('revision', 'tree')) or not isinstance(proof.get('ancestors'), dict) \
+            or proof['ancestors'].get(freeze) is not True or proof.get('registeredProtocolSha256') != protocol_hash:
+        raise ValueError('schema worker received invalid source or historical protocol proof')
+    return {'sourceRevision': proof['revision'], 'sourceTreeHash': 'git:' + proof['tree'],
+            'freezeCommit': freeze, 'freezeProtocolHash': proof['registeredProtocolSha256']}
