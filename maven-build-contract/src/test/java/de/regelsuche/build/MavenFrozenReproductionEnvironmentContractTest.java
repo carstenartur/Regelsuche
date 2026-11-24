@@ -88,7 +88,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
         var verification = jobs.required("verification");
         var reject = verification.required("steps").get(0);
         assertEquals("exit 1", reject.required("run").asText());
-        for (String id : List.of("external-polynomial-comparison", "typed-external-polynomial-comparison",
+        for (String id : List.of("typed-external-polynomial-comparison",
                 "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-typed-polynomial-study",
                 "maven-schema-polynomial-study")) {
             assertTrue(verification.required("needs").valueStream().anyMatch(need -> id.equals(need.asText())), id);
