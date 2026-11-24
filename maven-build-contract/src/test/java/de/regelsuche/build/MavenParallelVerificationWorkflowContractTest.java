@@ -48,7 +48,7 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final Set<String> SHOWCASE_AUTHORITIES = Set.of(
       "gradle-verification", "jmh-verification", "sympy-runtime-verification");
   private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
-      "maven-product-verification", GIT_FREE_AUTHORITY, "external-polynomial-comparison",
+      "maven-product-verification", GIT_FREE_AUTHORITY,
       "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
       "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-typed-polynomial-study",
       "maven-schema-polynomial-study", "maven-student-sdk-archive-qualification");
@@ -523,8 +523,11 @@ class MavenParallelVerificationWorkflowContractTest {
     var pilot = jobs.required("maven-polynomial-qualification");
     var steps = pilot.required("steps");
     var checkout = steps.required(0).required("with");
-    var legacyCheckout = jobs.required("external-polynomial-comparison").required("steps").required(0).required("with");
-    assertEquals(legacyCheckout.required("ref"), checkout.required("ref"));
+    assertFalse(jobs.has("external-polynomial-comparison"),
+        "the retired duplicate host pilot must not become a required job again");
+    assertTrue(Files.notExists(repositoryRoot().resolve("gradle/run-external-polynomial-comparison.sh")),
+        "the frozen pilot is now executed only by Maven/Testcontainers");
+    assertEquals("${{ github.event.pull_request.head.sha || github.sha }}", checkout.required("ref").asText());
     assertEquals(0, checkout.required("fetch-depth").intValue(), "proof of freeze ancestry needs the actual Git history");
     var producer = steps.valueStream().filter(step -> step.has("run")).findFirst().orElseThrow();
     assertEquals("mvn --batch-mode --no-transfer-progress -Ppolynomial-comparison -pl regelsuche-release -am "

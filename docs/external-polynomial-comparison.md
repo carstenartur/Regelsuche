@@ -85,9 +85,11 @@ diagnostics. `canonical-rows.json` removes clock fields;
 deadline outcomes may still differ across machines and are not falsely required to
 be byte-identical. CI adds no relative-speed acceptance threshold.
 
-## Reproduction
+## Historical host reproduction (not routine CI authority)
 
-Use the supported Java 25 environment and the repository's normal build prerequisites:
+The original checkout-owned Gradle/host invocation is retained here for historical
+reproduction. The current required path is the Maven qualification below. Use the
+historical source revision, Java 25 and its original build prerequisites:
 
 ```sh
 python3 -m venv build/external-polynomial-venv
@@ -104,14 +106,10 @@ PYTHONPATH=scripts build/external-polynomial-venv/bin/python \
 ```
 
 An existing result directory is never overwritten. Use a new directory for another
-run. The isolated `External polynomial comparison` job in the existing CI workflow
-retains raw rows, metadata, setup/TRAIN/warmup evidence, stderr, a complete matrix
-summary and a manifest. It runs on every CI pull request, main push and manual run,
-so changes to core parsing, math algorithms and all build/dependency inputs rerun
-the pilot. `gradle/run-external-polynomial-comparison.sh` owns its complete local
-execution, and the aggregate CI check requires its success alongside the existing
-Java 25 Gradle, Maven/product/Docker, SymPy and JMH checks. The dedicated showcase
-branch-creation authority keeps its existing scope.
+run. The historical `External polynomial comparison` job retained raw rows, metadata,
+setup/TRAIN/warmup evidence, stderr, a complete matrix summary and a manifest.
+Its last integrated host driver is available at [the paired comparison revision](https://github.com/carstenartur/Regelsuche/blob/6bf44b7bfc1474f52cb19e85941130f62f366c3d/gradle/run-external-polynomial-comparison.sh).
+The dedicated showcase branch-creation authority keeps its existing scope.
 A passing harness test verifies the harness. Measured quality and resource
 conclusions require an executed protocol and its retained evidence.
 
@@ -135,9 +133,24 @@ raw output tarball and the verified source admission in
 handshakes, original protocol bytes and complete result matrix are required.
 The source proof rejects modified tracked files before either the checkout or
 the registered archive can supply a verified receipt to the worker.
-The native pilot and both existing polynomial authorities must succeed before
-`ciCheck` can pass. The existing lanes stay required while the hosted
-comparison qualifies the new producer and its independent replay.
+The pinned Maven pilot must succeed before `ciCheck` can pass. It executes the
+reference controls, the pilot controls, the original worker and its independent
+archive verifier; the raw evidence is retained even on failure. The unrelated
+typed/native host comparisons and their Maven replacements remain required.
+The duplicate original pilot host job and driver are retired without changing
+any frozen protocol, budget, threshold or mathematical verifier.
+
+The paired [main CI run 45448386547](https://github.com/carstenartur/Regelsuche/actions/runs/45448386547)
+on `6bf44b7bfc1474f52cb19e85941130f62f366c3d` produced both the
+[legacy host archive](https://github.com/carstenartur/Regelsuche/actions/runs/45448386547/artifacts/14948190559)
+and the [Maven archive](https://github.com/carstenartur/Regelsuche/actions/runs/45448386547/artifacts/14945509313).
+The original verifier passed on both archives after independently checking the nine
+manifest entries in each. All 648 canonical rows were byte-identical (SHA-256
+`cba1bbdd1d378b75e6122db6bb2dd472e454b869a8613ef2e59ac3bd259543a9`).
+The protocol and report were byte-identical, and differences in raw rows, setup,
+warmup, summary and paired comparisons were timing/runtime diagnostics only.
+The unmodified originals are retained; this is not wall-clock or memory parity,
+independent study evidence or a claim that all of #749 is complete.
 
 A same-run comparison at the earlier source `8a38b6ff` retained 648 matching
 canonical rows from the Maven pilot and the existing lane. Timing observations

@@ -28,16 +28,6 @@ class MavenGradleHostRuntimeInventoryContractTest {
   // Exact lines from the authoritative gradle/*.sh scripts on main bc05c85c8976287f82b4a2eb99bcfdf38ebb6863.
   // No glob or wildcard may silently authorize new executions.
   private static final Map<String, List<String>> RETAINED_LEGACY_LINES = Map.ofEntries(
-      Map.entry("run-external-polynomial-comparison.sh", List.of(
-          "python3 -m venv build/external-polynomial-venv",
-          "pilot_python=build/external-polynomial-venv/bin/python",
-          "\"$pilot_python\" -m pip install sympy==1.14.0 mpmath==1.3.0",
-          "\"$pilot_python\" -m unittest discover -s scripts/sympy_rule_reference -p 'test_*.py' -v",
-          "\"$pilot_python\" -m unittest discover -s scripts/external_polynomial_comparison -p 'test_*.py' -v",
-          "env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2 \\",
-          "\"$pilot_python\" -m external_polynomial_comparison.run \\",
-          "\"$pilot_python\" -m external_polynomial_comparison.run \\"
-      )),
       Map.entry("run-historical-sympy-comparison.sh", List.of(
           "python3 -m venv build/historical-sympy-venv",
           "pilot_python=build/historical-sympy-venv/bin/python",
