@@ -201,173 +201,180 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
 
     static Occurrence executeOccurrence(ExactParsedTerm parsed, List&lt;Integer&gt; path,
             PolynomialTheoryUtilityWorkAuthority authority, Supplier&lt;FactorizationEngine&lt;ExactRational&gt;&gt; engine) {
-<span class="fc" id="L204">        var before = authority.work();</span>
-<span class="fc" id="L205">        ExactNestedFactorizationTransformationPipeline.Result nested = null;</span>
+<span class="fc" id="L204">        return executeOccurrence(parsed, path, authority, engine, false);</span>
+    }
+
+    static Occurrence executeOccurrence(ExactParsedTerm parsed, List&lt;Integer&gt; path,
+            PolynomialTheoryUtilityWorkAuthority authority, Supplier&lt;FactorizationEngine&lt;ExactRational&gt;&gt; engine,
+            boolean reuseParserRoot) {
+<span class="fc" id="L210">        var before = authority.work();</span>
+<span class="fc" id="L211">        ExactNestedFactorizationTransformationPipeline.Result nested = null;</span>
         try {
-<span class="fc bfc" id="L207" title="All 4 branches covered.">            if (parsed == null || authority.remainingPrimitiveWork() &lt; PRIMITIVE_EXPANSION_LENGTH) {</span>
-<span class="fc" id="L208">                throw new PolynomialWorkAuthority.LimitReached();</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">            if (parsed == null || authority.remainingPrimitiveWork() &lt; PRIMITIVE_EXPANSION_LENGTH) {</span>
+<span class="fc" id="L214">                throw new PolynomialWorkAuthority.LimitReached();</span>
             }
-<span class="fc" id="L210">            authority.consume(&quot;study.evidence.occurrence-records&quot;, 1);</span>
-<span class="fc" id="L211">            authority.consume(&quot;projection.study-path-navigation&quot;, path.size() + 1L);</span>
-<span class="fc" id="L212">            var selected = new TreePosition(path, &quot;pending&quot;).subtreeAt(parsed.expression()).orElseThrow();</span>
-<span class="fc" id="L213">            var position = new TreePosition(path, ExpressionFormatter.formatMeasured(selected,</span>
-<span class="fc" id="L214">                units -&gt; authority.consume(&quot;projection.study-position-format-code-units&quot;, units)));</span>
-<span class="fc" id="L215">            nested = new ExactNestedFactorizationTransformationPipeline(authority).transform(parsed, position,</span>
-<span class="fc" id="L216">                engine.get(), 0);</span>
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">            if (nested.transformed()) {</span>
-<span class="nc" id="L218">                var expansion = VerifiedTransition.from(nested.transformation().orElseThrow()).primitiveExpansion();</span>
-<span class="nc bnc" id="L219" title="All 2 branches missed.">                if (expansion.size() != PRIMITIVE_EXPANSION_LENGTH) {</span>
-<span class="nc" id="L220">                    throw new IllegalStateException(&quot;shared primitive expansion changed before study execution&quot;);</span>
+<span class="fc" id="L216">            authority.consume(&quot;study.evidence.occurrence-records&quot;, 1);</span>
+<span class="fc" id="L217">            authority.consume(&quot;projection.study-path-navigation&quot;, path.size() + 1L);</span>
+<span class="fc" id="L218">            var selected = new TreePosition(path, &quot;pending&quot;).subtreeAt(parsed.expression()).orElseThrow();</span>
+<span class="fc" id="L219">            var position = new TreePosition(path, ExpressionFormatter.formatMeasured(selected,</span>
+<span class="fc" id="L220">                units -&gt; authority.consume(&quot;projection.study-position-format-code-units&quot;, units)));</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            var pipeline = reuseParserRoot ? ExactNestedFactorizationTransformationPipeline.withParserRootReuse(authority)</span>
+<span class="fc" id="L222">                : new ExactNestedFactorizationTransformationPipeline(authority);</span>
+<span class="fc" id="L223">            nested = pipeline.transform(parsed, position, engine.get(), 0);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if (nested.transformed()) {</span>
+<span class="fc" id="L225">                var expansion = VerifiedTransition.from(nested.transformation().orElseThrow()).primitiveExpansion();</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                if (expansion.size() != PRIMITIVE_EXPANSION_LENGTH) {</span>
+<span class="nc" id="L227">                    throw new IllegalStateException(&quot;shared primitive expansion changed before study execution&quot;);</span>
                 }
-<span class="nc" id="L222">                var range = nested.projection().orElseThrow().selectedRange().orElseThrow();</span>
-<span class="nc" id="L223">                long replacementLength = nested.transformation().orElseThrow()</span>
-<span class="nc" id="L224">                    .transformedExpression().orElseThrow().length();</span>
-<span class="nc bnc" id="L225" title="All 2 branches missed.">                long outputLength = path.isEmpty() ? replacementLength</span>
-<span class="nc" id="L226">                    : parsed.source().length() - (range.endExclusive() - range.startInclusive())</span>
-<span class="nc" id="L227">                        + replacementLength + 2L;</span>
-<span class="nc" id="L228">                authority.consume(new PolynomialWorkLedger(java.util.Map.of(</span>
-<span class="nc" id="L229">                    &quot;nested.rewritten-exact-source-code-units&quot;, outputLength,</span>
-<span class="nc" id="L230">                    &quot;study.evidence.transition-outcome-records&quot;, 1L,</span>
-<span class="nc" id="L231">                    &quot;study.evidence.transition-trace-records&quot;, 1L,</span>
-<span class="nc" id="L232">                    &quot;study.evidence.primitive-step-records&quot;, (long) expansion.size())));</span>
-<span class="nc" id="L233">                authority.consumePrimitive(expansion.size());</span>
+<span class="fc" id="L229">                var range = nested.projection().orElseThrow().selectedRange().orElseThrow();</span>
+<span class="fc" id="L230">                long replacementLength = nested.transformation().orElseThrow()</span>
+<span class="fc" id="L231">                    .transformedExpression().orElseThrow().length();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                long outputLength = path.isEmpty() ? replacementLength</span>
+<span class="fc" id="L233">                    : parsed.source().length() - (range.endExclusive() - range.startInclusive())</span>
+<span class="fc" id="L234">                        + replacementLength + 2L;</span>
+<span class="fc" id="L235">                authority.consume(new PolynomialWorkLedger(java.util.Map.of(</span>
+<span class="fc" id="L236">                    &quot;nested.rewritten-exact-source-code-units&quot;, outputLength,</span>
+<span class="fc" id="L237">                    &quot;study.evidence.transition-outcome-records&quot;, 1L,</span>
+<span class="fc" id="L238">                    &quot;study.evidence.transition-trace-records&quot;, 1L,</span>
+<span class="fc" id="L239">                    &quot;study.evidence.primitive-step-records&quot;, (long) expansion.size())));</span>
+<span class="fc" id="L240">                authority.consumePrimitive(expansion.size());</span>
             }
-<span class="fc" id="L235">            return new Occurrence(path, nested.status().name(), nested.detailCode(), nested,</span>
-<span class="fc" id="L236">                difference(authority.work(), before));</span>
-<span class="fc" id="L237">        } catch (PolynomialWorkAuthority.LimitReached exhausted) {</span>
-<span class="fc" id="L238">            return new Occurrence(path, &quot;BUDGET_INCONCLUSIVE&quot;, exhausted.getMessage(), nested,</span>
-<span class="fc" id="L239">                difference(authority.work(), before));</span>
+<span class="fc" id="L242">            return new Occurrence(path, nested.status().name(), nested.detailCode(), nested,</span>
+<span class="fc" id="L243">                difference(authority.work(), before));</span>
+<span class="fc" id="L244">        } catch (PolynomialWorkAuthority.LimitReached exhausted) {</span>
+<span class="fc" id="L245">            return new Occurrence(path, &quot;BUDGET_INCONCLUSIVE&quot;, exhausted.getMessage(), nested,</span>
+<span class="fc" id="L246">                difference(authority.work(), before));</span>
         }
     }
 
     static PolynomialTheoryUtilityTransitionOutcome transition(
             PolynomialTheoryUtilityExecutionInput input,
             PolynomialTheoryUtilityCaseCorpus.FormationCase formation, Occurrence occurrence, int index) {
-<span class="fc" id="L246">        var nested = occurrence.pipeline();</span>
-<span class="fc" id="L247">        var primitive = nested.transformation().orElseThrow();</span>
-<span class="fc" id="L248">        var range = nested.projection().orElseThrow().selectedRange().orElseThrow();</span>
-<span class="fc" id="L249">        String replacement = primitive.transformedExpression().orElseThrow();</span>
-<span class="fc bfc" id="L250" title="All 2 branches covered.">        String transformedRoot = occurrence.path().isEmpty() ? replacement</span>
-<span class="fc" id="L251">            : formation.sourceExpression().substring(0, range.startInclusive()) + &quot;(&quot; + replacement + &quot;)&quot;</span>
-<span class="fc" id="L252">                + formation.sourceExpression().substring(range.endExclusive());</span>
-<span class="fc" id="L253">        return PolynomialTheoryUtilityTransitionOutcome.create(index, input.inputId(), occurrence.path(),</span>
-<span class="fc" id="L254">            primitive.occurrence().sourceText(), replacement, formation.sourceExpression(), transformedRoot,</span>
-<span class="fc" id="L255">            PolynomialTheoryUtilityExecutionPlan.TRANSFORMATION_ID, nested.factorization().orElseThrow().engineId(),</span>
-<span class="fc" id="L256">            primitive.occurrence().sourceEvidenceHash(), nested.certificateHash(), CacheDisposition.CACHE_DISABLED,</span>
-<span class="fc" id="L257">            &quot;NONE&quot;, &quot;NONE&quot;, &quot;NONE&quot;, occurrence.work());</span>
+<span class="fc" id="L253">        var nested = occurrence.pipeline();</span>
+<span class="fc" id="L254">        var primitive = nested.transformation().orElseThrow();</span>
+<span class="fc" id="L255">        var range = nested.projection().orElseThrow().selectedRange().orElseThrow();</span>
+<span class="fc" id="L256">        String replacement = primitive.transformedExpression().orElseThrow();</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        String transformedRoot = occurrence.path().isEmpty() ? replacement</span>
+<span class="fc" id="L258">            : formation.sourceExpression().substring(0, range.startInclusive()) + &quot;(&quot; + replacement + &quot;)&quot;</span>
+<span class="fc" id="L259">                + formation.sourceExpression().substring(range.endExclusive());</span>
+<span class="fc" id="L260">        return PolynomialTheoryUtilityTransitionOutcome.create(index, input.inputId(), occurrence.path(),</span>
+<span class="fc" id="L261">            primitive.occurrence().sourceText(), replacement, formation.sourceExpression(), transformedRoot,</span>
+<span class="fc" id="L262">            PolynomialTheoryUtilityExecutionPlan.TRANSFORMATION_ID, nested.factorization().orElseThrow().engineId(),</span>
+<span class="fc" id="L263">            primitive.occurrence().sourceEvidenceHash(), nested.certificateHash(), CacheDisposition.CACHE_DISABLED,</span>
+<span class="fc" id="L264">            &quot;NONE&quot;, &quot;NONE&quot;, &quot;NONE&quot;, occurrence.work());</span>
     }
 
     static PolynomialTheoryUtilityTransitionTrace trace(PolynomialTheoryUtilityTransitionOutcome transition,
             ExactNestedFactorizationTransformationPipeline.Result nested) {
-<span class="fc" id="L262">        var expansion = VerifiedTransition.from(nested.transformation().orElseThrow()).primitiveExpansion();</span>
-<span class="fc" id="L263">        var steps = new ArrayList&lt;PrimitiveStep&gt;();</span>
-<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (var step : expansion) {</span>
-<span class="fc" id="L265">            steps.add(PrimitiveStep.create(transition, steps.size(), 0, step.stageId(), step.evidenceHash()));</span>
-<span class="fc" id="L266">        }</span>
-<span class="fc" id="L267">        return PolynomialTheoryUtilityTransitionTrace.create(transition, 1, steps, List.of());</span>
+<span class="fc" id="L269">        var expansion = VerifiedTransition.from(nested.transformation().orElseThrow()).primitiveExpansion();</span>
+<span class="fc" id="L270">        var steps = new ArrayList&lt;PrimitiveStep&gt;();</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        for (var step : expansion) {</span>
+<span class="fc" id="L272">            steps.add(PrimitiveStep.create(transition, steps.size(), 0, step.stageId(), step.evidenceHash()));</span>
+<span class="fc" id="L273">        }</span>
+<span class="fc" id="L274">        return PolynomialTheoryUtilityTransitionTrace.create(transition, 1, steps, List.of());</span>
     }
 
     static PolynomialTheoryUtilityFactorizationAttempt attempt(PolynomialTheoryUtilityExecutionInput input,
             ExactNestedFactorizationTransformationPipeline.Result nested,
             PolynomialTheoryUtilityTransitionOutcome transition, int index) {
-<span class="fc" id="L273">        var factorization = nested.factorization().orElse(null);</span>
-<span class="fc bfc" id="L274" title="All 4 branches covered.">        if (factorization == null || factorization.request().isEmpty()) return null;</span>
-<span class="fc" id="L275">        var request = factorization.request().orElseThrow();</span>
-<span class="fc" id="L276">        var report = factorization.report().orElseThrow();</span>
-<span class="fc" id="L277">        String selected = nested.transformation().map(value -&gt; value.candidateCertificateHash())</span>
-<span class="fc bfc" id="L278" title="All 2 branches covered.">            .filter(value -&gt; !value.isEmpty()).orElse(&quot;NONE&quot;);</span>
-<span class="fc" id="L279">        return PolynomialTheoryUtilityFactorizationAttempt.create(index, input.inputId(), factorization.engineId(),</span>
-<span class="fc" id="L280">            hash(request.canonicalMaterial()), factorization.certificateHash(), report.candidates().stream()</span>
-<span class="fc" id="L281">                .map(value -&gt; value.verificationCertificateHash()).toList(), selected,</span>
-<span class="fc bfc" id="L282" title="All 2 branches covered.">            transition == null ? &quot;NONE&quot; : transition.transitionId(),</span>
-<span class="fc bfc" id="L283" title="All 2 branches covered.">            selected.equals(&quot;NONE&quot;) ? report.status().name() : &quot;VERIFIED&quot;, report.verificationHash());</span>
+<span class="fc" id="L280">        var factorization = nested.factorization().orElse(null);</span>
+<span class="fc bfc" id="L281" title="All 4 branches covered.">        if (factorization == null || factorization.request().isEmpty()) return null;</span>
+<span class="fc" id="L282">        var request = factorization.request().orElseThrow();</span>
+<span class="fc" id="L283">        var report = factorization.report().orElseThrow();</span>
+<span class="fc" id="L284">        String selected = nested.transformation().map(value -&gt; value.candidateCertificateHash())</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            .filter(value -&gt; !value.isEmpty()).orElse(&quot;NONE&quot;);</span>
+<span class="fc" id="L286">        return PolynomialTheoryUtilityFactorizationAttempt.create(index, input.inputId(), factorization.engineId(),</span>
+<span class="fc" id="L287">            hash(request.canonicalMaterial()), factorization.certificateHash(), report.candidates().stream()</span>
+<span class="fc" id="L288">                .map(value -&gt; value.verificationCertificateHash()).toList(), selected,</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            transition == null ? &quot;NONE&quot; : transition.transitionId(),</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            selected.equals(&quot;NONE&quot;) ? report.status().name() : &quot;VERIFIED&quot;, report.verificationHash());</span>
     }
 
     private static PolynomialTheoryUtilityFactorizationAttempt attempt(PolynomialTheoryUtilityExecutionInput input,
             ExactNestedFactorizationTransformationPipeline.Result nested,
             PolynomialTheoryUtilityTransitionOutcome transition, int index, int occurrenceIndex, boolean observed) {
-<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (nested == null) return null;</span>
-<span class="fc" id="L290">        var retained = attempt(input, nested, transition, index);</span>
-<span class="fc bfc" id="L291" title="All 4 branches covered.">        if (!observed || retained == null) return retained;</span>
-<span class="fc" id="L292">        return PolynomialTheoryUtilityFactorizationAttempt.createObserved(index, input.inputId(), occurrenceIndex,</span>
-<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            nested, transition == null ? &quot;NONE&quot; : transition.transitionId());</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (nested == null) return null;</span>
+<span class="fc" id="L297">        var retained = attempt(input, nested, transition, index);</span>
+<span class="fc bfc" id="L298" title="All 4 branches covered.">        if (!observed || retained == null) return retained;</span>
+<span class="fc" id="L299">        return PolynomialTheoryUtilityFactorizationAttempt.createObserved(index, input.inputId(), occurrenceIndex,</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            nested, transition == null ? &quot;NONE&quot; : transition.transitionId());</span>
     }
 
     private static TerminalStatus terminal(List&lt;Occurrence&gt; observations) {
-<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (observations.stream().allMatch(value -&gt; value.status().equals(&quot;TRANSFORMED&quot;))) {</span>
-<span class="nc" id="L298">            return TerminalStatus.VALIDATED_TRANSITION;</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (observations.stream().allMatch(value -&gt; value.status().equals(&quot;TRANSFORMED&quot;))) {</span>
+<span class="nc" id="L305">            return TerminalStatus.VALIDATED_TRANSITION;</span>
         }
-<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (observations.stream().anyMatch(value -&gt; List.of(&quot;TECHNICAL_FAILURE&quot;, &quot;SOURCE_EVIDENCE_MISMATCH&quot;,</span>
-<span class="pc" id="L301">                &quot;POSITION_NOT_PRESENT&quot;, &quot;POSITION_STALE&quot;).contains(value.status()))) return TerminalStatus.TECHNICAL_FAILURE;</span>
-<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (observations.stream().anyMatch(value -&gt; value.status().equals(&quot;BUDGET_INCONCLUSIVE&quot;))) {</span>
-<span class="fc" id="L303">            return TerminalStatus.BUDGET_INCONCLUSIVE;</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">        if (observations.stream().anyMatch(value -&gt; List.of(&quot;TECHNICAL_FAILURE&quot;, &quot;SOURCE_EVIDENCE_MISMATCH&quot;,</span>
+<span class="pc" id="L308">                &quot;POSITION_NOT_PRESENT&quot;, &quot;POSITION_STALE&quot;).contains(value.status()))) return TerminalStatus.TECHNICAL_FAILURE;</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (observations.stream().anyMatch(value -&gt; value.status().equals(&quot;BUDGET_INCONCLUSIVE&quot;))) {</span>
+<span class="fc" id="L310">            return TerminalStatus.BUDGET_INCONCLUSIVE;</span>
         }
-<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (observations.stream().anyMatch(value -&gt; value.status().equals(&quot;UNSUPPORTED&quot;))) return TerminalStatus.UNSUPPORTED;</span>
-<span class="nc" id="L306">        return TerminalStatus.NO_TRANSITION;</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (observations.stream().anyMatch(value -&gt; value.status().equals(&quot;UNSUPPORTED&quot;))) return TerminalStatus.UNSUPPORTED;</span>
+<span class="nc" id="L313">        return TerminalStatus.NO_TRANSITION;</span>
     }
 
     static List&lt;List&lt;Integer&gt;&gt; paths(PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
-<span class="pc bpc" id="L310" title="1 of 5 branches missed.">        return switch (formation.occurrenceLayout()) {</span>
-<span class="fc" id="L311">            case &quot;ROOT&quot; -&gt; List.of(List.of());</span>
-<span class="fc" id="L312">            case &quot;NESTED_RIGHT&quot; -&gt; List.of(List.of(1));</span>
-<span class="fc" id="L313">            case &quot;TWO_IDENTICAL_SIBLINGS&quot; -&gt; List.of(List.of(0), List.of(1));</span>
-<span class="fc" id="L314">            case &quot;FOUR_IDENTICAL_LEAVES&quot; -&gt; List.of(List.of(0, 0), List.of(0, 1), List.of(1, 0), List.of(1, 1));</span>
-<span class="nc" id="L315">            default -&gt; throw new IllegalArgumentException(&quot;unknown frozen occurrence layout&quot;);</span>
+<span class="pc bpc" id="L317" title="1 of 5 branches missed.">        return switch (formation.occurrenceLayout()) {</span>
+<span class="fc" id="L318">            case &quot;ROOT&quot; -&gt; List.of(List.of());</span>
+<span class="fc" id="L319">            case &quot;NESTED_RIGHT&quot; -&gt; List.of(List.of(1));</span>
+<span class="fc" id="L320">            case &quot;TWO_IDENTICAL_SIBLINGS&quot; -&gt; List.of(List.of(0), List.of(1));</span>
+<span class="fc" id="L321">            case &quot;FOUR_IDENTICAL_LEAVES&quot; -&gt; List.of(List.of(0, 0), List.of(0, 1), List.of(1, 0), List.of(1, 1));</span>
+<span class="nc" id="L322">            default -&gt; throw new IllegalArgumentException(&quot;unknown frozen occurrence layout&quot;);</span>
         };
     }
 
     private static void requireFormation(PolynomialTheoryUtilityExecutionInput input,
             PolynomialTheoryUtilityCaseCorpus.FormationCase formation) {
-<span class="pc bpc" id="L321" title="2 of 4 branches missed.">        if (!PROFILE_ID.equals(input.profileId()) || !ADAPTER_ID.equals(input.adapterId())</span>
-<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                || !input.caseId().equals(formation.caseId())</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityExecutionInputs.freeze().inputs().contains(input)</span>
-<span class="pc bpc" id="L324" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityCaseCorpus.load().cases().contains(formation)) {</span>
-<span class="nc" id="L325">            throw new IllegalArgumentException(&quot;substituted native input or formation&quot;);</span>
+<span class="pc bpc" id="L328" title="2 of 4 branches missed.">        if (!PROFILE_ID.equals(input.profileId()) || !ADAPTER_ID.equals(input.adapterId())</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                || !input.caseId().equals(formation.caseId())</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityExecutionInputs.freeze().inputs().contains(input)</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                || !PolynomialTheoryUtilityCaseCorpus.load().cases().contains(formation)) {</span>
+<span class="nc" id="L332">            throw new IllegalArgumentException(&quot;substituted native input or formation&quot;);</span>
         }
-<span class="fc" id="L327">    }</span>
+<span class="fc" id="L334">    }</span>
 
     private static PolynomialTheoryUtilityWorkBreakdown difference(PolynomialTheoryUtilityWorkBreakdown a,
             PolynomialTheoryUtilityWorkBreakdown b) {
-<span class="fc" id="L331">        return new PolynomialTheoryUtilityWorkBreakdown(a.primitiveWork() - b.primitiveWork(),</span>
-<span class="fc" id="L332">            a.matchingWork() - b.matchingWork(), a.sourceValidationWork() - b.sourceValidationWork(),</span>
-<span class="fc" id="L333">            a.factorizationWork() - b.factorizationWork(), a.verificationWork() - b.verificationWork(),</span>
-<span class="fc" id="L334">            a.renderingWork() - b.renderingWork(), a.reparseWork() - b.reparseWork(),</span>
-<span class="fc" id="L335">            a.reconstructionWork() - b.reconstructionWork(), a.occurrenceReplacementWork() - b.occurrenceReplacementWork(),</span>
-<span class="fc" id="L336">            0, 0, 0, 0, a.evidenceConstructionWork() - b.evidenceConstructionWork());</span>
+<span class="fc" id="L338">        return new PolynomialTheoryUtilityWorkBreakdown(a.primitiveWork() - b.primitiveWork(),</span>
+<span class="fc" id="L339">            a.matchingWork() - b.matchingWork(), a.sourceValidationWork() - b.sourceValidationWork(),</span>
+<span class="fc" id="L340">            a.factorizationWork() - b.factorizationWork(), a.verificationWork() - b.verificationWork(),</span>
+<span class="fc" id="L341">            a.renderingWork() - b.renderingWork(), a.reparseWork() - b.reparseWork(),</span>
+<span class="fc" id="L342">            a.reconstructionWork() - b.reconstructionWork(), a.occurrenceReplacementWork() - b.occurrenceReplacementWork(),</span>
+<span class="fc" id="L343">            0, 0, 0, 0, a.evidenceConstructionWork() - b.evidenceConstructionWork());</span>
     }
 
     private static void append(StringBuilder target, String value) {
-<span class="fc" id="L340">        target.append(value.getBytes(StandardCharsets.UTF_8).length).append(':').append(value);</span>
-<span class="fc" id="L341">    }</span>
+<span class="fc" id="L347">        target.append(value.getBytes(StandardCharsets.UTF_8).length).append(':').append(value);</span>
+<span class="fc" id="L348">    }</span>
 
     private static String executionHash(PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection,
             List&lt;Occurrence&gt; observations) {
-<span class="fc" id="L345">        StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L346">        append(material, projection.projectionId());</span>
-<span class="fc" id="L347">        observations.forEach(value -&gt; append(material, value.identityMaterial()));</span>
-<span class="fc" id="L348">        return hash(material.toString());</span>
+<span class="fc" id="L352">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L353">        append(material, projection.projectionId());</span>
+<span class="fc" id="L354">        observations.forEach(value -&gt; append(material, value.identityMaterial()));</span>
+<span class="fc" id="L355">        return hash(material.toString());</span>
     }
 
     private static String hash(String material) {
-<span class="fc" id="L352">        return PolynomialTheoryUtilityExecutionIdentity.sha256(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L359">        return PolynomialTheoryUtilityExecutionIdentity.sha256(material.getBytes(StandardCharsets.UTF_8));</span>
     }
 
     public record Occurrence(List&lt;Integer&gt; path, String status, String detailCode,
             ExactNestedFactorizationTransformationPipeline.Result pipeline, PolynomialTheoryUtilityWorkBreakdown work) {
-<span class="fc" id="L357">        public Occurrence {</span>
-<span class="fc" id="L358">            path = List.copyOf(path);</span>
-<span class="fc" id="L359">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L360">            Objects.requireNonNull(detailCode, &quot;detailCode&quot;);</span>
-<span class="fc" id="L361">            Objects.requireNonNull(work, &quot;work&quot;);</span>
-<span class="fc" id="L362">        }</span>
+<span class="fc" id="L364">        public Occurrence {</span>
+<span class="fc" id="L365">            path = List.copyOf(path);</span>
+<span class="fc" id="L366">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L367">            Objects.requireNonNull(detailCode, &quot;detailCode&quot;);</span>
+<span class="fc" id="L368">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc" id="L369">        }</span>
         String identityMaterial() {
-<span class="fc" id="L364">            StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L365">            append(material, path.toString());</span>
-<span class="fc" id="L366">            append(material, status);</span>
-<span class="fc" id="L367">            append(material, detailCode);</span>
-<span class="fc bfc" id="L368" title="All 2 branches covered.">            append(material, pipeline == null ? &quot;NOT_INVOKED&quot; : pipeline.canonicalMaterial());</span>
-<span class="fc" id="L369">            work.appendIdentityMaterial(material);</span>
-<span class="fc" id="L370">            return material.toString();</span>
+<span class="fc" id="L371">            StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L372">            append(material, path.toString());</span>
+<span class="fc" id="L373">            append(material, status);</span>
+<span class="fc" id="L374">            append(material, detailCode);</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            append(material, pipeline == null ? &quot;NOT_INVOKED&quot; : pipeline.canonicalMaterial());</span>
+<span class="fc" id="L376">            work.appendIdentityMaterial(material);</span>
+<span class="fc" id="L377">            return material.toString();</span>
         }
     }
 
@@ -380,76 +387,76 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
 
         private UnrepresentableExecution(List&lt;Occurrence&gt; occurrences, PolynomialWorkLedger rawWork,
                 PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection) {
-<span class="nc" id="L383">            super(&quot;FROZEN_RESULT_CONTRACT_CANNOT_RETAIN_PARTIAL_OCCURRENCE_SUCCESS&quot;);</span>
-<span class="nc" id="L384">            this.occurrences = List.copyOf(occurrences);</span>
-<span class="nc" id="L385">            this.rawWork = rawWork;</span>
-<span class="nc" id="L386">            this.projection = projection;</span>
-<span class="nc" id="L387">        }</span>
+<span class="nc" id="L390">            super(&quot;FROZEN_RESULT_CONTRACT_CANNOT_RETAIN_PARTIAL_OCCURRENCE_SUCCESS&quot;);</span>
+<span class="nc" id="L391">            this.occurrences = List.copyOf(occurrences);</span>
+<span class="nc" id="L392">            this.rawWork = rawWork;</span>
+<span class="nc" id="L393">            this.projection = projection;</span>
+<span class="nc" id="L394">        }</span>
 
-<span class="nc" id="L389">        public List&lt;Occurrence&gt; occurrences() { return occurrences; }</span>
-<span class="nc" id="L390">        public PolynomialWorkLedger rawWork() { return rawWork; }</span>
-<span class="nc" id="L391">        public PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection() { return projection; }</span>
+<span class="nc" id="L396">        public List&lt;Occurrence&gt; occurrences() { return occurrences; }</span>
+<span class="nc" id="L397">        public PolynomialWorkLedger rawWork() { return rawWork; }</span>
+<span class="nc" id="L398">        public PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection() { return projection; }</span>
     }
 
     public record Execution(PolynomialTheoryUtilityMeasuredCandidate measured, PolynomialWorkLedger rawWork,
             PolynomialTheoryUtilityCanonicalWorkProjection.Projection projection,
             List&lt;Occurrence&gt; occurrences, String evidenceHash) {
-<span class="fc" id="L397">        public Execution {</span>
-<span class="fc" id="L398">            Objects.requireNonNull(measured, &quot;measured&quot;);</span>
-<span class="fc" id="L399">            Objects.requireNonNull(rawWork, &quot;rawWork&quot;);</span>
-<span class="fc" id="L400">            Objects.requireNonNull(projection, &quot;projection&quot;);</span>
-<span class="fc" id="L401">            occurrences = List.copyOf(occurrences);</span>
-<span class="fc" id="L402">            var result = measured.result();</span>
-<span class="fc" id="L403">            var expected = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),</span>
-<span class="fc" id="L404">                PolynomialTheoryUtilityCanonicalWorkProjection.partition(result.work().primitiveWork(), rawWork));</span>
-<span class="pc bpc" id="L405" title="1 of 4 branches missed.">            if (!projection.equals(expected) || !result.work().equals(projection.work())</span>
-<span class="fc bfc" id="L406" title="All 2 branches covered.">                    || !executionHash(projection, occurrences).equals(evidenceHash)</span>
-<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                    || !result.detailCode().equals(&quot;NATIVE_SHARED_CANONICAL_AUTHORITY:&quot; + evidenceHash)) {</span>
-<span class="fc" id="L408">                throw new IllegalArgumentException(&quot;native execution evidence differs from its measured result&quot;);</span>
+<span class="fc" id="L404">        public Execution {</span>
+<span class="fc" id="L405">            Objects.requireNonNull(measured, &quot;measured&quot;);</span>
+<span class="fc" id="L406">            Objects.requireNonNull(rawWork, &quot;rawWork&quot;);</span>
+<span class="fc" id="L407">            Objects.requireNonNull(projection, &quot;projection&quot;);</span>
+<span class="fc" id="L408">            occurrences = List.copyOf(occurrences);</span>
+<span class="fc" id="L409">            var result = measured.result();</span>
+<span class="fc" id="L410">            var expected = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),</span>
+<span class="fc" id="L411">                PolynomialTheoryUtilityCanonicalWorkProjection.partition(result.work().primitiveWork(), rawWork));</span>
+<span class="pc bpc" id="L412" title="1 of 4 branches missed.">            if (!projection.equals(expected) || !result.work().equals(projection.work())</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                    || !executionHash(projection, occurrences).equals(evidenceHash)</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                    || !result.detailCode().equals(&quot;NATIVE_SHARED_CANONICAL_AUTHORITY:&quot; + evidenceHash)) {</span>
+<span class="fc" id="L415">                throw new IllegalArgumentException(&quot;native execution evidence differs from its measured result&quot;);</span>
             }
-<span class="fc" id="L410">            var required = new java.util.LinkedHashMap&lt;String, Long&gt;();</span>
-<span class="fc bfc" id="L411" title="All 2 branches covered.">            for (var occurrence : occurrences) {</span>
-<span class="fc bfc" id="L412" title="All 2 branches covered.">                if (occurrence.pipeline() != null) {</span>
-<span class="fc" id="L413">                    occurrence.pipeline().totalWork().stages().forEach((stage, units) -&gt;</span>
-<span class="fc" id="L414">                        required.merge(stage, units, Math::addExact));</span>
+<span class="fc" id="L417">            var required = new java.util.LinkedHashMap&lt;String, Long&gt;();</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            for (var occurrence : occurrences) {</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                if (occurrence.pipeline() != null) {</span>
+<span class="fc" id="L420">                    occurrence.pipeline().totalWork().stages().forEach((stage, units) -&gt;</span>
+<span class="fc" id="L421">                        required.merge(stage, units, Math::addExact));</span>
                 }
-<span class="fc" id="L416">            }</span>
-<span class="pc bpc" id="L417" title="2 of 4 branches missed.">            if (required.entrySet().stream().anyMatch(entry -&gt; rawWork.units(entry.getKey()) &lt; entry.getValue())) {</span>
-<span class="nc" id="L418">                throw new IllegalArgumentException(&quot;native execution omitted consumed pipeline work&quot;);</span>
+<span class="fc" id="L423">            }</span>
+<span class="pc bpc" id="L424" title="2 of 4 branches missed.">            if (required.entrySet().stream().anyMatch(entry -&gt; rawWork.units(entry.getKey()) &lt; entry.getValue())) {</span>
+<span class="nc" id="L425">                throw new IllegalArgumentException(&quot;native execution omitted consumed pipeline work&quot;);</span>
             }
-<span class="fc bfc" id="L420" title="All 2 branches covered.">            if (result.observations() != null) {</span>
-<span class="fc" id="L421">                var retained = result.observations();</span>
-<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                if (!retained.rawWork().totalMechanicalWork().equals(rawWork)</span>
-<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                        || retained.occurrences().size() != occurrences.size()) {</span>
-<span class="nc" id="L424">                    throw new IllegalArgumentException(&quot;native observed result differs from its raw execution&quot;);</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">            if (result.observations() != null) {</span>
+<span class="fc" id="L428">                var retained = result.observations();</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">                if (!retained.rawWork().totalMechanicalWork().equals(rawWork)</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                        || retained.occurrences().size() != occurrences.size()) {</span>
+<span class="nc" id="L431">                    throw new IllegalArgumentException(&quot;native observed result differs from its raw execution&quot;);</span>
                 }
-<span class="fc" id="L426">                var cumulative = retained.preparationWork();</span>
-<span class="fc" id="L427">                long primitive = 0;</span>
-<span class="fc bfc" id="L428" title="All 2 branches covered.">                for (int index = 0; index &lt; occurrences.size(); index++) {</span>
-<span class="fc" id="L429">                    var actual = occurrences.get(index);</span>
-<span class="fc" id="L430">                    var recorded = retained.occurrences().get(index);</span>
-<span class="fc" id="L431">                    var before = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),</span>
-<span class="fc" id="L432">                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();</span>
-<span class="fc" id="L433">                    cumulative = PolynomialTheoryUtilityExecutionObservations.plus(cumulative, recorded.rawWork());</span>
-<span class="fc" id="L434">                    primitive = Math.addExact(primitive, recorded.primitiveWork());</span>
-<span class="fc" id="L435">                    var after = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),</span>
-<span class="fc" id="L436">                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();</span>
-<span class="fc bfc" id="L437" title="All 2 branches covered.">                    if (!PolynomialTheoryUtilityExecutionObservations.difference(after, before).equals(actual.work())) {</span>
-<span class="fc" id="L438">                        throw new IllegalArgumentException(&quot;native occurrence work differs from its consumed prefix&quot;);</span>
+<span class="fc" id="L433">                var cumulative = retained.preparationWork();</span>
+<span class="fc" id="L434">                long primitive = 0;</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">                for (int index = 0; index &lt; occurrences.size(); index++) {</span>
+<span class="fc" id="L436">                    var actual = occurrences.get(index);</span>
+<span class="fc" id="L437">                    var recorded = retained.occurrences().get(index);</span>
+<span class="fc" id="L438">                    var before = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),</span>
+<span class="fc" id="L439">                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();</span>
+<span class="fc" id="L440">                    cumulative = PolynomialTheoryUtilityExecutionObservations.plus(cumulative, recorded.rawWork());</span>
+<span class="fc" id="L441">                    primitive = Math.addExact(primitive, recorded.primitiveWork());</span>
+<span class="fc" id="L442">                    var after = PolynomialTheoryUtilityCanonicalWorkProjection.project(result.input(),</span>
+<span class="fc" id="L443">                        PolynomialTheoryUtilityCanonicalWorkProjection.partition(primitive, cumulative)).work();</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">                    if (!PolynomialTheoryUtilityExecutionObservations.difference(after, before).equals(actual.work())) {</span>
+<span class="fc" id="L445">                        throw new IllegalArgumentException(&quot;native occurrence work differs from its consumed prefix&quot;);</span>
                     }
-<span class="fc" id="L440">                    var pipeline = actual.pipeline();</span>
-<span class="pc bpc" id="L441" title="1 of 2 branches missed.">                    if (!actual.path().equals(recorded.path())</span>
-<span class="pc bpc" id="L442" title="1 of 2 branches missed.">                            || terminal(List.of(actual)) != recorded.terminalStatus()</span>
-<span class="pc bpc" id="L443" title="1 of 2 branches missed.">                            || !actual.detailCode().equals(recorded.detailCode())</span>
-<span class="pc bpc" id="L444" title="1 of 6 branches missed.">                            || !Objects.equals(pipeline == null ? &quot;NONE&quot; : pipeline.certificateHash(),</span>
-<span class="fc" id="L445">                                recorded.pipelineEvidenceHash())</span>
-<span class="fc" id="L446">                            || (pipeline != null &amp;&amp; pipeline.totalWork().stages().entrySet().stream()</span>
-<span class="pc bpc" id="L447" title="2 of 4 branches missed.">                                .anyMatch(entry -&gt; recorded.rawWork().units(entry.getKey()) &lt; entry.getValue()))) {</span>
-<span class="nc" id="L448">                        throw new IllegalArgumentException(&quot;native occurrence omitted its actual outcome or pipeline work&quot;);</span>
+<span class="fc" id="L447">                    var pipeline = actual.pipeline();</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">                    if (!actual.path().equals(recorded.path())</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">                            || terminal(List.of(actual)) != recorded.terminalStatus()</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">                            || !actual.detailCode().equals(recorded.detailCode())</span>
+<span class="pc bpc" id="L451" title="1 of 6 branches missed.">                            || !Objects.equals(pipeline == null ? &quot;NONE&quot; : pipeline.certificateHash(),</span>
+<span class="fc" id="L452">                                recorded.pipelineEvidenceHash())</span>
+<span class="fc" id="L453">                            || (pipeline != null &amp;&amp; pipeline.totalWork().stages().entrySet().stream()</span>
+<span class="pc bpc" id="L454" title="2 of 4 branches missed.">                                .anyMatch(entry -&gt; recorded.rawWork().units(entry.getKey()) &lt; entry.getValue()))) {</span>
+<span class="nc" id="L455">                        throw new IllegalArgumentException(&quot;native occurrence omitted its actual outcome or pipeline work&quot;);</span>
                     }
                 }
             }
-<span class="fc" id="L452">        }</span>
+<span class="fc" id="L459">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

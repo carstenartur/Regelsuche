@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineReductionReference.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">AffineReductionReference.java</span></div><h1>AffineReductionReference.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.AffineReduction;
+import de.regelsuche.ast.iteration.AffineReduction.Operator;
+import de.regelsuche.math.algorithms.iteration.AffineDomains.Clause;
+import de.regelsuche.math.algorithms.iteration.AffineReductionPlan.Evaluation;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+
+/** Direct, unscheduled evaluation of all source-domain reduction points. */
+public final class AffineReductionReference {
+    private AffineReductionReference() {}
+
+    public static Evaluation evaluate(AffineReduction source, int parameter, List&lt;BigInteger&gt; input,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L20">        var work = new Work(limits, cancellation, 1);</span>
+        try {
+<span class="fc" id="L22">            var shape = AffineReductionPlan.shape(source, parameter, work);</span>
+<span class="fc" id="L23">            var data = AffineReductionPlan.checkedInput(input, shape, work);</span>
+<span class="fc" id="L24">            var values = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            for (var coordinate : shape.outputCoordinates()) {</span>
+<span class="fc" id="L26">                var domain = fixOutput(source, parameter, coordinate, work);</span>
+<span class="fc" id="L27">                values.add(evaluateDomain(source, domain, data, work));</span>
+<span class="fc" id="L28">            }</span>
+<span class="fc" id="L29">            return new Evaluation(shape, values, work.used());</span>
+<span class="nc" id="L30">        } catch (Unavailable failure) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(failure.getMessage(), failure);</span>
+        }
+    }
+
+    private static List&lt;Clause&gt; fixOutput(AffineReduction source, int parameter, List&lt;Integer&gt; output, Work work) {
+<span class="fc" id="L36">        var result = new ArrayList&lt;Clause&gt;();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (var form : source.reductions()) {</span>
+<span class="fc" id="L38">            work.charge(1L + output.size());</span>
+<span class="fc" id="L39">            long constant = form.constant() + (long) form.parameter() * parameter;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            for (int axis = 0; axis &lt; output.size(); axis++)</span>
+<span class="fc" id="L41">                constant += (long) form.coordinates().get(axis) * output.get(axis);</span>
+<span class="fc" id="L42">            result.add(new Clause(constant, form.coordinates().get(output.size()),</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                source.reductionRank() == 2 ? form.coordinates().getLast() : 0));</span>
+<span class="fc" id="L44">        }</span>
+<span class="fc" id="L45">        return result;</span>
+    }
+
+    private static BigInteger evaluateDomain(AffineReduction source, List&lt;Clause&gt; domain, List&lt;BigInteger&gt; data, Work work) {
+<span class="fc" id="L49">        var first = AffineDomains.firstRange(domain, work);</span>
+<span class="fc" id="L50">        BigInteger result = null;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (int i = first.lower(); i &lt;= first.upper(); i++) {</span>
+<span class="fc" id="L52">            work.charge(1);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (source.reductionRank() == 1) result = accumulate(result, data, i, source.operator(), work);</span>
+            else {
+<span class="fc" id="L55">                var second = AffineDomains.secondRange(domain, i, work);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                for (int j = second.lower(); j &lt;= second.upper(); j++) {</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                    int index = source.inputIndex() == 0 ? i : j;</span>
+<span class="fc" id="L58">                    result = accumulate(result, data, index, source.operator(), work);</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (result == null) throw new IllegalArgumentException(&quot;UNDEFINED_EMPTY_AFFINE_REDUCTION&quot;);</span>
+<span class="fc" id="L63">        return result;</span>
+    }
+
+    private static BigInteger accumulate(BigInteger result, List&lt;BigInteger&gt; input, int index, Operator operator, Work work) {
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= input.size()) throw new IllegalArgumentException(&quot;AFFINE_ACCESS_OUTSIDE_INPUT&quot;);</span>
+<span class="fc" id="L68">        var value = input.get(index);</span>
+<span class="fc" id="L69">        work.runtimeInteger(value);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (result == null) return value;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (operator == Operator.MAX) return result.max(value);</span>
+<span class="fc" id="L72">        var sum = result.add(value);</span>
+<span class="fc" id="L73">        work.runtimeInteger(sum);</span>
+<span class="fc" id="L74">        return sum;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineReductionPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">AffineReductionPlan.java</span></div><h1>AffineReductionPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.AffineReduction;
+import de.regelsuche.ast.iteration.AffineReduction.Form;
+import de.regelsuche.ast.iteration.AffineReduction.Operator;
+import de.regelsuche.math.algorithms.iteration.AffineDomains.Clause;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Unavailable;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Exact range aggregation plans for bounded affine integer array reductions. */
+public final class AffineReductionPlan {
+    private AffineReductionPlan() {}
+
+    public record Shape(int inputSize, List&lt;List&lt;Integer&gt;&gt; outputCoordinates) {
+<span class="fc" id="L20">        public Shape {</span>
+<span class="fc" id="L21">            outputCoordinates = outputCoordinates.stream().map(List::copyOf).toList();</span>
+<span class="fc" id="L22">        }</span>
+    }
+
+<span class="fc" id="L25">    public record Preparation(Verified plan, long work) {}</span>
+
+<span class="nc" id="L27">    public record ShapePreparation(Shape shape, long work) {}</span>
+
+    public record Evaluation(Shape shape, List&lt;BigInteger&gt; values, long work) {
+<span class="fc" id="L30">        public Evaluation {</span>
+<span class="fc" id="L31">            values = List.copyOf(values);</span>
+<span class="fc" id="L32">        }</span>
+    }
+
+    /** A plan can only be created by checking the source's affine constraints. */
+    public static final class Verified {
+        private final AffineReduction source;
+        private final List&lt;Form&gt; accessBounds;
+        private final Form eliminatedLower;
+        private final Form eliminatedUpper;
+
+<span class="fc" id="L42">        private Verified(AffineReduction source, List&lt;Form&gt; accessBounds, Form eliminatedLower, Form eliminatedUpper) {</span>
+<span class="fc" id="L43">            this.source = source;</span>
+<span class="fc" id="L44">            this.accessBounds = List.copyOf(accessBounds);</span>
+<span class="fc" id="L45">            this.eliminatedLower = eliminatedLower;</span>
+<span class="fc" id="L46">            this.eliminatedUpper = eliminatedUpper;</span>
+<span class="fc" id="L47">        }</span>
+
+        public Evaluation evaluate(int parameter, List&lt;BigInteger&gt; input, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L50">            var work = new Work(limits, cancellation, 1);</span>
+            try {
+<span class="fc" id="L52">                var shape = shape(source, parameter, work);</span>
+<span class="fc" id="L53">                var data = checkedInput(input, shape, work);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                if (shape.outputCoordinates().isEmpty()) return new Evaluation(shape, List.of(), work.used());</span>
+<span class="fc" id="L55">                var windows = new ArrayList&lt;Window&gt;();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                for (var position : shape.outputCoordinates()) windows.add(window(position, parameter, shape.inputSize(), work));</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                var values = source.operator() == Operator.SUM</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                    ? AffineRangeAggregates.sums(data, windows, eliminatedLower != null, work)</span>
+<span class="fc" id="L59">                    : AffineRangeAggregates.maxima(data, windows, work);</span>
+<span class="fc" id="L60">                return new Evaluation(shape, values, work.used());</span>
+<span class="fc" id="L61">            } catch (Unavailable failure) {</span>
+<span class="fc" id="L62">                throw new IllegalArgumentException(failure.getMessage(), failure);</span>
+            }
+        }
+
+        private Window window(List&lt;Integer&gt; position, int parameter, int inputSize, Work work) {
+<span class="fc" id="L67">            int selectedAxis = source.outputRank() + source.inputIndex();</span>
+<span class="fc" id="L68">            var bounds = new ArrayList&lt;Clause&gt;();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (var form : accessBounds) bounds.add(prepareClause(form, position, parameter, selectedAxis, work));</span>
+<span class="fc" id="L70">            long weightConstant = 1;</span>
+<span class="fc" id="L71">            long weightSlope = 0;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (eliminatedLower != null) {</span>
+<span class="fc" id="L73">                var lower = prepareClause(eliminatedLower, position, parameter, selectedAxis, work);</span>
+<span class="fc" id="L74">                var upper = prepareClause(eliminatedUpper, position, parameter, selectedAxis, work);</span>
+                // Exactly upper - lower + 1 integer secondary binders exist when the count is positive.
+<span class="fc" id="L76">                weightConstant += upper.constant() + lower.constant();</span>
+<span class="fc" id="L77">                weightSlope = upper.first() + lower.first();</span>
+<span class="fc" id="L78">                bounds.add(new Clause(weightConstant - 1, weightSlope, 0));</span>
+            }
+<span class="fc" id="L80">            var range = AffineDomains.firstRange(bounds, work);</span>
+<span class="fc" id="L81">            requireReadableRange(range, inputSize);</span>
+<span class="fc" id="L82">            return new Window(range.lower(), range.upper(), weightConstant, weightSlope);</span>
+        }
+    }
+
+<span class="fc" id="L86">    record Window(int lower, int upper, long weightConstant, long weightSlope) {}</span>
+
+    public static Preparation prepare(AffineReduction source, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L89">        var work = new Work(limits, cancellation, 1);</span>
+        try {
+<span class="fc" id="L91">            work.charge(1);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (source.reductions().size() &gt; limits.maximumTerms())</span>
+<span class="nc" id="L93">                throw new IllegalArgumentException(&quot;AFFINE_CONSTRAINT_LIMIT&quot;);</span>
+<span class="fc" id="L94">            var bounds = new ArrayList&lt;Form&gt;();</span>
+<span class="fc" id="L95">            Form lower = null;</span>
+<span class="fc" id="L96">            Form upper = null;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (var form : source.reductions()) {</span>
+<span class="fc" id="L98">                work.charge(1);</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">                switch (eliminatedCoefficient(source, form)) {</span>
+<span class="fc" id="L100">                    case 0 -&gt; bounds.add(form);</span>
+<span class="fc" id="L101">                    case 1 -&gt; lower = uniqueBound(lower, form);</span>
+<span class="fc" id="L102">                    case -1 -&gt; upper = uniqueBound(upper, form);</span>
+<span class="nc" id="L103">                    default -&gt; throw new IllegalArgumentException(&quot;NON_UNIT_ELIMINATION_BOUND&quot;);</span>
+                }
+<span class="fc" id="L105">            }</span>
+<span class="pc bpc" id="L106" title="3 of 8 branches missed.">            if (source.reductionRank() == 2 &amp;&amp; (source.operator() != Operator.SUM || lower == null || upper == null))</span>
+<span class="nc" id="L107">                throw new IllegalArgumentException(&quot;UNSUPPORTED_AFFINE_ELIMINATION&quot;);</span>
+<span class="fc" id="L108">            return new Preparation(new Verified(source, bounds, lower, upper), work.used());</span>
+<span class="fc" id="L109">        } catch (Unavailable failure) {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(failure.getMessage(), failure);</span>
+        }
+    }
+
+    private static int eliminatedCoefficient(AffineReduction source, Form form) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        return source.reductionRank() == 1 ? 0</span>
+<span class="fc" id="L116">            : form.coordinates().get(source.outputRank() + (1 - source.inputIndex()));</span>
+    }
+
+    private static Form uniqueBound(Form old, Form next) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (old != null) throw new IllegalArgumentException(&quot;COMPETING_ELIMINATION_BOUNDS&quot;);</span>
+<span class="fc" id="L121">        return next;</span>
+    }
+
+    public static ShapePreparation prepareShape(AffineReduction source, int parameter, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="nc" id="L126">        var work = new Work(limits, cancellation, 1);</span>
+        try {
+<span class="nc" id="L128">            return new ShapePreparation(shape(source, parameter, work), work.used());</span>
+<span class="nc" id="L129">        } catch (Unavailable failure) {</span>
+<span class="nc" id="L130">            throw new IllegalArgumentException(failure.getMessage(), failure);</span>
+        }
+    }
+
+    static Shape shape(AffineReduction source, int parameter, Work work) {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (Math.abs((long) parameter) &gt; AffineDomains.MAX_COORDINATE)</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(&quot;AFFINE_PARAMETER_LIMIT&quot;);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (var form : source.parameters()) {</span>
+<span class="fc" id="L138">            work.charge(1);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (form.evaluate(parameter) &lt; 0) throw new IllegalArgumentException(&quot;OUTSIDE_AFFINE_PARAMETER_DOMAIN&quot;);</span>
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">        var input = AffineDomains.firstRange(AffineDomains.instantiate(source.inputs(), 1, parameter), work);</span>
+<span class="pc bpc" id="L142" title="2 of 4 branches missed.">        if (input.lower() != 0 || input.isEmpty()) throw new IllegalArgumentException(&quot;NON_ZERO_BASED_AFFINE_INPUT&quot;);</span>
+<span class="fc" id="L143">        var domain = AffineDomains.instantiate(source.outputs(), source.outputRank(), parameter);</span>
+<span class="fc" id="L144">        var first = AffineDomains.firstRange(domain, work);</span>
+<span class="fc" id="L145">        var coordinates = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int i = first.lower(); i &lt;= first.upper(); i++) {</span>
+<span class="fc" id="L147">            work.charge(1);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (source.outputRank() == 1) append(coordinates, List.of(i), work);</span>
+            else {
+<span class="fc" id="L150">                var second = AffineDomains.secondRange(domain, i, work);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                for (int j = second.lower(); j &lt;= second.upper(); j++)</span>
+<span class="fc" id="L152">                    append(coordinates, List.of(i, j), work);</span>
+            }
+        }
+<span class="fc" id="L155">        return new Shape(input.upper() + 1, coordinates);</span>
+    }
+
+    private static void append(List&lt;List&lt;Integer&gt;&gt; coordinates, List&lt;Integer&gt; point, Work work) {
+<span class="fc" id="L159">        work.charge(1);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (coordinates.size() == AffineDomains.MAX_COORDINATE + 1)</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(&quot;AFFINE_OUTPUT_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L162">        coordinates.add(point);</span>
+<span class="fc" id="L163">    }</span>
+
+    static List&lt;BigInteger&gt; checkedInput(List&lt;BigInteger&gt; input, Shape shape, Work work) {
+<span class="fc" id="L166">        int size = shape.inputSize();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (input.size() != size) throw new IllegalArgumentException(&quot;AFFINE_INPUT_LENGTH&quot;);</span>
+<span class="fc" id="L168">        var data = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc" id="L169">        var values = input.iterator();</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (int index = 0; index &lt; size; index++) {</span>
+<span class="fc" id="L171">            work.charge(1);</span>
+<span class="fc" id="L172">            var value = Objects.requireNonNull(values.next());</span>
+<span class="fc" id="L173">            work.runtimeInteger(value, 0); // The fixed read unit was paid before accessing the element.</span>
+<span class="fc" id="L174">            data.add(value);</span>
+        }
+<span class="fc" id="L176">        return data;</span>
+    }
+
+    private static Clause prepareClause(Form form, List&lt;Integer&gt; position, int parameter, int index, Work work) {
+<span class="fc" id="L180">        work.charge(1L + position.size());</span>
+<span class="fc" id="L181">        long constant = form.constant() + (long) form.parameter() * parameter;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int axis = 0; axis &lt; position.size(); axis++)</span>
+<span class="fc" id="L183">            constant += (long) form.coordinates().get(axis) * position.get(axis);</span>
+<span class="fc" id="L184">        return new Clause(constant, form.coordinates().get(index), 0);</span>
+    }
+
+    static void requireReadableRange(AffineDomains.Range range, int inputSize) {
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (range.isEmpty()) throw new IllegalArgumentException(&quot;UNDEFINED_EMPTY_AFFINE_REDUCTION&quot;);</span>
+<span class="pc bpc" id="L189" title="1 of 4 branches missed.">        if (range.lower() &lt; 0 || range.upper() &gt;= inputSize)</span>
+<span class="fc" id="L190">            throw new IllegalArgumentException(&quot;AFFINE_ACCESS_OUTSIDE_INPUT&quot;);</span>
+<span class="fc" id="L191">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

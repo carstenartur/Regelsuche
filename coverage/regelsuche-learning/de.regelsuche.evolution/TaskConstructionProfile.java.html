@@ -16,47 +16,58 @@
     /** Also permits deferred expansion as a bridge for other structural goals. */
 <span class="fc" id="L17">    STRUCTURAL_EXPANSION_BRIDGE_V1,</span>
     /** Exact rational-polynomial simplification through the shared typed frontier. */
-<span class="fc" id="L19">    POLYNOMIAL_SIMPLIFICATION_V1;</span>
+<span class="fc" id="L19">    POLYNOMIAL_SIMPLIFICATION_V1,</span>
+    /** Cost-selected sparse Horner representation with independently replayed polynomial equivalence. */
+<span class="fc" id="L21">    POLYNOMIAL_HORNER_V1,</span>
+    /** Metered bottom-up exact polynomial proposals with a checked frontier and final replay. */
+<span class="fc" id="L23">    POLYNOMIAL_DIRECT_V1,</span>
+    /** One improving, independently checked Horner proposal using the shared exact arithmetic grammar. */
+<span class="fc" id="L25">    POLYNOMIAL_HORNER_ROOT_V1;</span>
 
     boolean requiresExactPolynomialSteps() {
-<span class="fc bfc" id="L22" title="All 8 branches covered.">        return this == STRUCTURAL_SQUARE_V1 || this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1</span>
-            || this == POLYNOMIAL_SIMPLIFICATION_V1;
+<span class="pc bpc" id="L28" title="3 of 14 branches missed.">        return this == STRUCTURAL_SQUARE_V1 || this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1</span>
+            || this == POLYNOMIAL_SIMPLIFICATION_V1 || this == POLYNOMIAL_HORNER_V1 || this == POLYNOMIAL_DIRECT_V1
+            || this == POLYNOMIAL_HORNER_ROOT_V1;
     }
 
     CheckedSchemaTaskSolver attach(CheckedSchemaTaskSolver solver) {
-<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (this == NONE) return solver;</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (this == POLYNOMIAL_SIMPLIFICATION_V1) return solver.withConstructions(java.util.List.of(</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (this == NONE) return solver;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (this == POLYNOMIAL_HORNER_ROOT_V1) return solver.withRootHorner();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (this == POLYNOMIAL_DIRECT_V1) return solver.withDirectPolynomial(false);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (this == POLYNOMIAL_HORNER_V1) return solver.withConstructions(java.util.List.of(</span>
+<span class="fc" id="L38">            StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER), false).withExactPolynomialSteps();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (this == POLYNOMIAL_SIMPLIFICATION_V1) return solver.withConstructions(java.util.List.of(</span>
             StructuralConstructionPrograms.Operation.POLYNOMIAL_CANONICAL,
             StructuralConstructionPrograms.Operation.POLYNOMIAL_EXPANDED,
             StructuralConstructionPrograms.Operation.POLYNOMIAL_COMMON_FACTOR,
-<span class="fc" id="L32">            StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR), false).withExactPolynomialSteps();</span>
-<span class="fc bfc" id="L33" title="All 4 branches covered.">        boolean expansion = this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1;</span>
-<span class="fc bfc" id="L34" title="All 4 branches covered.">        boolean square = this == STRUCTURAL_SQUARE_V1 || expansion;</span>
-<span class="fc bfc" id="L35" title="All 4 branches covered.">        boolean auxiliary = this == STRUCTURAL_AUX_V1 || square;</span>
-<span class="fc" id="L36">        var operations = new java.util.ArrayList&lt;&gt;(java.util.List.of(</span>
+<span class="fc" id="L43">            StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR), false).withExactPolynomialSteps();</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">        boolean expansion = this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1;</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">        boolean square = this == STRUCTURAL_SQUARE_V1 || expansion;</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">        boolean auxiliary = this == STRUCTURAL_AUX_V1 || square;</span>
+<span class="fc" id="L47">        var operations = new java.util.ArrayList&lt;&gt;(java.util.List.of(</span>
             StructuralConstructionPrograms.Operation.EXPOSE_SQUARE,
             StructuralConstructionPrograms.Operation.COMPLETE_SQUARE,
             StructuralConstructionPrograms.Operation.FACTOR_DIFFERENCE,
             StructuralConstructionPrograms.Operation.FACTOR_PARTITION,
             StructuralConstructionPrograms.Operation.RESIDUAL_BALANCE));
-<span class="fc bfc" id="L42" title="All 4 branches covered.">        if (this == STRUCTURAL_V2 || auxiliary) {</span>
-<span class="fc" id="L43">            operations.add(StructuralConstructionPrograms.Operation.BINARY_QUARTIC);</span>
-<span class="fc" id="L44">            operations.add(StructuralConstructionPrograms.Operation.RESIDUAL_EXPANDED);</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (this == STRUCTURAL_V2 || auxiliary) {</span>
+<span class="fc" id="L54">            operations.add(StructuralConstructionPrograms.Operation.BINARY_QUARTIC);</span>
+<span class="fc" id="L55">            operations.add(StructuralConstructionPrograms.Operation.RESIDUAL_EXPANDED);</span>
         }
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (auxiliary) {</span>
-<span class="fc" id="L47">            operations.add(StructuralConstructionPrograms.Operation.AUXILIARY_COMPLEMENT);</span>
-<span class="fc" id="L48">            operations.add(StructuralConstructionPrograms.Operation.AUXILIARY_FACTOR);</span>
-<span class="fc bfc" id="L49" title="All 2 branches covered.">            operations.add(square</span>
-<span class="fc" id="L50">                ? StructuralConstructionPrograms.Operation.RECOGNIZE_METERED_SQUARE</span>
-<span class="fc" id="L51">                : StructuralConstructionPrograms.Operation.RECOGNIZE_SQUARE);</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (square) {</span>
-<span class="fc" id="L53">                operations.add(StructuralConstructionPrograms.Operation.RECOGNIZE_RATIONAL_SQUARE);</span>
-<span class="fc" id="L54">                operations.add(StructuralConstructionPrograms.Operation.RATIONAL_EXPOSE_SQUARE);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (auxiliary) {</span>
+<span class="fc" id="L58">            operations.add(StructuralConstructionPrograms.Operation.AUXILIARY_COMPLEMENT);</span>
+<span class="fc" id="L59">            operations.add(StructuralConstructionPrograms.Operation.AUXILIARY_FACTOR);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            operations.add(square</span>
+<span class="fc" id="L61">                ? StructuralConstructionPrograms.Operation.RECOGNIZE_METERED_SQUARE</span>
+<span class="fc" id="L62">                : StructuralConstructionPrograms.Operation.RECOGNIZE_SQUARE);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (square) {</span>
+<span class="fc" id="L64">                operations.add(StructuralConstructionPrograms.Operation.RECOGNIZE_RATIONAL_SQUARE);</span>
+<span class="fc" id="L65">                operations.add(StructuralConstructionPrograms.Operation.RATIONAL_EXPOSE_SQUARE);</span>
             }
         }
-<span class="fc" id="L57">        var extended = solver.withConstructions(operations, auxiliary);</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (square) extended = extended.withExactPolynomialSteps();</span>
-<span class="fc bfc" id="L59" title="All 4 branches covered.">        return expansion ? extended.withExpansionRules(this == STRUCTURAL_EXPANSION_BRIDGE_V1) : extended;</span>
+<span class="fc" id="L68">        var extended = solver.withConstructions(operations, auxiliary);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (square) extended = extended.withExactPolynomialSteps();</span>
+<span class="fc bfc" id="L70" title="All 4 branches covered.">        return expansion ? extended.withExpansionRules(this == STRUCTURAL_EXPANSION_BRIDGE_V1) : extended;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

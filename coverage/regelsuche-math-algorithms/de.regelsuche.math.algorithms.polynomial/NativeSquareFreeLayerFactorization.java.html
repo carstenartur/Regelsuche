@@ -53,10 +53,10 @@ final class NativeSquareFreeLayerFactorization {
 <span class="fc" id="L53">                policy.suitablePrimePolicy(),</span>
                 work);
 <span class="fc" id="L55">        certificates.add(selection.certificateHash());</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!selection.completed()) {</span>
-<span class="nc" id="L57">            return Result.failure(</span>
-<span class="nc" id="L58">                map(selection.status()),</span>
-<span class="nc" id="L59">                selection.detailCode(),</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!selection.completed()) {</span>
+<span class="fc" id="L57">            return Result.failure(</span>
+<span class="fc" id="L58">                map(selection.status()),</span>
+<span class="fc" id="L59">                selection.detailCode(),</span>
                 certificates);
         }
 
@@ -118,7 +118,7 @@ final class NativeSquareFreeLayerFactorization {
     private static FactorizationEngine.Outcome map(
         SuitablePrimeSelectionResult.Status status
     ) {
-<span class="nc bnc" id="L121" title="All 5 branches missed.">        return switch (status) {</span>
+<span class="pc bpc" id="L121" title="4 of 5 branches missed.">        return switch (status) {</span>
 <span class="nc" id="L122">            case COMPLETED -&gt; throw new IllegalArgumentException(</span>
                 &quot;completed status cannot map to failure&quot;);
             case UNSUPPORTED_DOMAIN -&gt;
@@ -126,7 +126,7 @@ final class NativeSquareFreeLayerFactorization {
             case UNSUPPORTED_SHAPE -&gt;
 <span class="nc" id="L127">                FactorizationEngine.Outcome.UNSUPPORTED_REQUEST;</span>
             case BUDGET_INCONCLUSIVE -&gt;
-<span class="nc" id="L129">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
+<span class="fc" id="L129">                FactorizationEngine.Outcome.BUDGET_INCONCLUSIVE;</span>
             case TECHNICAL_FAILURE -&gt;
 <span class="nc" id="L131">                FactorizationEngine.Outcome.TECHNICAL_FAILURE;</span>
         };

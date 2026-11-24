@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineDomains.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">AffineDomains.java</span></div><h1>AffineDomains.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.AffineReduction.Form;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import java.util.ArrayList;
+import java.util.List;
+
+final class AffineDomains {
+    static final int MAX_COORDINATE = 1_048_575;
+
+    private AffineDomains() {}
+
+    /** An integer inequality in at most two axes after fixing the size parameter. */
+<span class="fc" id="L14">    record Clause(long constant, long first, long second) {</span>
+        long afterFirst(int value) {
+<span class="fc" id="L16">            return constant + first * value;</span>
+        }
+    }
+
+<span class="fc" id="L20">    record Range(int lower, int upper) {</span>
+        boolean isEmpty() {
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            return lower &gt; upper;</span>
+        }
+    }
+
+    static List&lt;Clause&gt; instantiate(List&lt;Form&gt; forms, int rank, int parameter) {
+<span class="fc" id="L27">        return forms.stream().map(form -&gt; new Clause(form.constant() + (long) form.parameter() * parameter,</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            form.coordinates().getFirst(), rank == 2 ? form.coordinates().getLast() : 0)).toList();</span>
+    }
+
+    /** Fourier–Motzkin projection gives an outer range; second-axis integer rounding then filters it exactly. */
+    static Range firstRange(List&lt;Clause&gt; source, Work work) {
+<span class="fc" id="L33">        var projected = new ArrayList&lt;Clause&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (var clause : source) {</span>
+<span class="fc" id="L35">            work.charge(1);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">            if (clause.second() == 0) {</span>
+<span class="fc" id="L37">                projected.add(clause);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            } else if (clause.second() &gt; 0) {</span>
+<span class="fc" id="L39">                addProjected(clause, source, projected, work);</span>
+            }
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        return range(projected, 0, false, work);</span>
+    }
+
+    private static void addProjected(Clause lower, List&lt;Clause&gt; source, List&lt;Clause&gt; result, Work work) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (var upper : source) {</span>
+<span class="fc" id="L47">            work.charge(1);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (upper.second() &lt; 0) {</span>
+<span class="fc" id="L49">                long p = lower.second(), q = -upper.second();</span>
+<span class="fc" id="L50">                result.add(new Clause(q * lower.constant() + p * upper.constant(),</span>
+<span class="fc" id="L51">                    q * lower.first() + p * upper.first(), 0));</span>
+            }
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">    }</span>
+
+    static Range secondRange(List&lt;Clause&gt; source, int first, Work work) {
+<span class="fc" id="L57">        return range(source, first, true, work);</span>
+    }
+
+    private static Range range(List&lt;Clause&gt; source, int first, boolean second, Work work) {
+<span class="fc" id="L61">        long lower = Long.MIN_VALUE;</span>
+<span class="fc" id="L62">        long upper = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (var clause : source) {</span>
+<span class="fc" id="L64">            work.charge(1);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            long constant = second ? clause.afterFirst(first) : clause.constant();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            long slope = second ? clause.second() : clause.first();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (slope &gt; 0) lower = Math.max(lower, -Math.floorDiv(constant, slope));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            else if (slope &lt; 0) upper = Math.min(upper, Math.floorDiv(constant, -slope));</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            else if (constant &lt; 0) return new Range(0, -1);</span>
+<span class="fc" id="L70">        }</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (lower &gt; upper) return new Range(0, -1);</span>
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if (lower &lt; -MAX_COORDINATE || upper &gt; MAX_COORDINATE)</span>
+<span class="fc" id="L73">            throw new IllegalArgumentException(&quot;UNBOUNDED_OR_LARGE_AFFINE_DOMAIN&quot;);</span>
+<span class="fc" id="L74">        return new Range((int) lower, (int) upper);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DirectPolynomialPortfolio.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">DirectPolynomialPortfolio.java</span></div><h1>DirectPolynomialPortfolio.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.canonical.PolynomialNormalizer;
+import de.regelsuche.math.algorithms.equivalence.SparsePolynomialHorner;
+import de.regelsuche.math.algorithms.equivalence.SparsePolynomialForms;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.scalar.ExactRational;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+/** Bounded, typed endpoint proposal. The structural provider admits it only after whole-source verification. */
+final class DirectPolynomialPortfolio {
+    private static final int MAX_ROUNDS = 6;
+    private static final long MAX_FACTOR_WORK = 3_000;
+    private static final long MAX_PROPOSAL_WORK = 12_288;
+<span class="fc" id="L24">    private static final NumberExpr ZERO = new NumberExpr(0);</span>
+<span class="fc" id="L25">    private static final CheckedLearnedSchemaModel.Bounds DOMAIN = CheckedLearnedSchemaModel.Bounds.defaults();</span>
+<span class="fc" id="L26">    private static final Candidate OUTSIDE_DOMAIN = new Candidate(null, 0, 0);</span>
+<span class="fc" id="L27">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L28">    private final HashMap&lt;Expr, Expr&gt; results = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L29">    private final IdentityHashMap&lt;Expr, TypedSourceOnlySearch.Score&gt; scores = new IdentityHashMap&lt;&gt;();</span>
+<span class="fc" id="L30">    private final IdentityHashMap&lt;Expr, Candidate&gt; candidates = new IdentityHashMap&lt;&gt;();</span>
+    private final long limit;
+    private final boolean sharedArithmetic;
+    private long work;
+    private Expr incumbent;
+    private int lowerBound;
+
+<span class="fc" id="L37">    record Result(Expr expression, long work) {}</span>
+
+<span class="fc" id="L39">    private DirectPolynomialPortfolio(Expr source, long limit, boolean sharedArithmetic) {</span>
+<span class="fc" id="L40">        incumbent = source;</span>
+<span class="fc" id="L41">        this.limit = Math.min(limit, MAX_PROPOSAL_WORK);</span>
+<span class="fc" id="L42">        this.sharedArithmetic = sharedArithmetic;</span>
+<span class="fc" id="L43">    }</span>
+
+    static Result propose(Expr source, long limit, boolean sharedArithmetic) {
+<span class="fc" id="L46">        var portfolio = new DirectPolynomialPortfolio(source, limit, sharedArithmetic);</span>
+        try {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            for (int round = 0; round &lt; MAX_ROUNDS; round++) {</span>
+<span class="fc" id="L49">                var before = portfolio.incumbent;</span>
+<span class="fc" id="L50">                portfolio.considerSparseRoot(before);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                if (portfolio.score(portfolio.incumbent).value() &lt;= portfolio.lowerBound) break;</span>
+<span class="fc" id="L52">                portfolio.rewrite(before, true);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                if (portfolio.incumbent == before) break;</span>
+            }
+<span class="fc" id="L55">        } catch (Exhausted | Optimum exhausted) {</span>
+            // A completed root proposal can still be checked against the original source.
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        return new Result(portfolio.incumbent, portfolio.work);</span>
+    }
+
+    private void considerSparseRoot(Expr source) {
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (!(source instanceof BinaryExpr) || score(source).value() &lt;= 1) return;</span>
+<span class="fc" id="L63">        long end = work + Math.min(3_300L, remaining());</span>
+<span class="fc" id="L64">        java.util.function.LongConsumer local = units -&gt; {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (units &gt; end - work) throw new SparseLimit();</span>
+<span class="fc" id="L66">            charge(units);</span>
+<span class="fc" id="L67">        };</span>
+        try {
+<span class="fc" id="L69">            lowerBound = SparsePolynomialForms.proposeWithSurfaceBound(source, sharedArithmetic, local,</span>
+<span class="fc" id="L70">                candidate -&gt; select(incumbent, candidate, true));</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (score(incumbent).value() &lt;= lowerBound) return;</span>
+<span class="pc bpc" id="L72" title="1 of 6 branches missed.">            if (score(incumbent).value() &gt; 1 &amp;&amp; (incumbent == source || sharedArithmetic)) {</span>
+<span class="fc" id="L73">                SparsePolynomialHorner.propose(source, local).ifPresent(candidate -&gt; select(incumbent, candidate, true));</span>
+            }
+<span class="fc" id="L75">        } catch (SparseLimit | IllegalArgumentException unsupported) {</span>
+            // Retain completed candidates and try the other typed proposals.
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">    }</span>
+
+    private Expr rewrite(Expr source, boolean atRoot) {
+<span class="fc" id="L81">        charge(1);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!(source instanceof BinaryExpr binary)) return source;</span>
+        // Structurally equal source fragments can reuse an already paid proposal.
+<span class="fc" id="L84">        charge(score(source).work());</span>
+<span class="fc" id="L85">        var known = results.get(source);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (known != null) return select(source, known, atRoot);</span>
+<span class="fc" id="L87">        var left = rewrite(binary.left(), false);</span>
+<span class="fc" id="L88">        var right = rewrite(binary.right(), false);</span>
+<span class="fc" id="L89">        charge(1);</span>
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        Expr rebuilt = left == binary.left() &amp;&amp; right == binary.right() ? binary</span>
+<span class="fc" id="L91">            : new BinaryExpr(left, binary.operator(), right);</span>
+<span class="fc" id="L92">        Expr best = improve(source, rebuilt, atRoot);</span>
+<span class="fc" id="L93">        charge(score(source).work());</span>
+<span class="fc" id="L94">        results.put(source, best);</span>
+<span class="fc" id="L95">        return best;</span>
+    }
+
+    private Expr improve(Expr source, Expr rebuilt, boolean atRoot) {
+<span class="fc" id="L99">        Expr folded = elementary((BinaryExpr) rebuilt);</span>
+<span class="fc" id="L100">        Expr best = select(source, folded, atRoot);</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if (!(folded instanceof BinaryExpr binary) || score(folded).value() &lt;= 1) return best;</span>
+<span class="fc bfc" id="L102" title="All 4 branches covered.">        if (binary.operator() == BinaryOperator.ADD || binary.operator() == BinaryOperator.SUB) {</span>
+<span class="fc" id="L103">            best = grouping(best, folded, atRoot);</span>
+<span class="fc" id="L104">            best = horner(best, folded, atRoot);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (score(best).value() &lt;= 1) return best;</span>
+<span class="fc" id="L106">            best = expanded(best, folded, atRoot);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (score(best).value() &gt;= 3 &amp;&amp; remaining() &gt;= 384) best = factored(best, folded, atRoot);</span>
+        }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (score(best).value() &gt; 1) {</span>
+<span class="fc" id="L110">            var canonical = observed(() -&gt; canonicalizer.canonicalize(folded), 1_800);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (canonical.isPresent()) {</span>
+<span class="fc" id="L112">                best = select(best, canonical.orElseThrow(), atRoot);</span>
+<span class="fc" id="L113">                best = compact(best, canonical.orElseThrow(), atRoot);</span>
+<span class="fc" id="L114">                var combined = equalIntegralPowers(canonical.orElseThrow());</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                if (combined.isPresent()) best = select(best, combined.orElseThrow(), atRoot);</span>
+            }
+        }
+<span class="fc" id="L118">        return best;</span>
+    }
+
+    private Expr grouping(Expr best, Expr source, boolean atRoot) {
+<span class="fc" id="L122">        var grouped = observed(() -&gt; PolynomialFactorGrouping.candidates(source), 2_200);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (grouped.isEmpty()) return best;</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        for (Expr candidate : grouped.orElseThrow()) {</span>
+<span class="nc" id="L125">            best = select(best, candidate, atRoot);</span>
+<span class="nc" id="L126">            var canonical = observed(() -&gt; canonicalizer.canonicalize(candidate), 1_400);</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (canonical.isPresent()) best = compact(best, canonical.orElseThrow(), atRoot);</span>
+<span class="nc" id="L128">        }</span>
+<span class="fc" id="L129">        return best;</span>
+    }
+
+    private Expr horner(Expr best, Expr source, boolean atRoot) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (score(best).value() &lt;= 1) return best;</span>
+        try {
+<span class="fc" id="L135">            var candidate = SparsePolynomialHorner.propose(source, this::charge);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            return candidate.isPresent() ? select(best, candidate.orElseThrow(), atRoot) : best;</span>
+<span class="nc" id="L137">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="nc" id="L138">            return best;</span>
+        }
+    }
+
+    private Expr expanded(Expr best, Expr source, boolean atRoot) {
+<span class="fc" id="L143">        var expanded = observed(() -&gt; new PolynomialNormalizer().normalize(source), 2_000).flatMap(value -&gt; value);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        return expanded.isPresent() ? compact(best, expanded.orElseThrow(), atRoot) : best;</span>
+    }
+
+    private Expr compact(Expr best, Expr source, boolean atRoot) {
+<span class="fc" id="L148">        return observed(() -&gt; PolynomialSimplificationPrograms.compact(source), 512)</span>
+<span class="fc" id="L149">            .map(candidate -&gt; select(best, candidate, atRoot)).orElse(best);</span>
+    }
+
+    private Expr factored(Expr best, Expr source, boolean atRoot) {
+        try {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            for (var candidate : PolynomialSimplificationPrograms.factorRoot(source,</span>
+<span class="pc" id="L155">                    Math.min(MAX_FACTOR_WORK, remaining()), this::charge)) best = select(best, candidate, atRoot);</span>
+<span class="nc" id="L156">        } catch (PolynomialWorkAuthority.LimitReached localLimit) {</span>
+            // The next proposal may still fit after this bounded factor attempt.
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        return best;</span>
+    }
+
+    private Expr elementary(BinaryExpr source) {
+<span class="fc" id="L163">        Expr left = source.left(), right = source.right();</span>
+<span class="fc" id="L164">        charge(1);</span>
+<span class="pc bpc" id="L165" title="1 of 4 branches missed.">        if (source.operator() == BinaryOperator.ADD &amp;&amp; is(left, ExactRational.ZERO)) return right;</span>
+<span class="fc bfc" id="L166" title="All 4 branches covered.">        if ((source.operator() == BinaryOperator.ADD || source.operator() == BinaryOperator.SUB)</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                &amp;&amp; is(right, ExactRational.ZERO)) return left;</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        if (source.operator() == BinaryOperator.SUB &amp;&amp; left == right) return ZERO;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (source.operator() == BinaryOperator.MUL) {</span>
+<span class="pc bpc" id="L170" title="2 of 4 branches missed.">            if (is(left, ExactRational.ZERO) || is(right, ExactRational.ZERO)) return ZERO;</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (is(left, ExactRational.ONE)) return right;</span>
+        }
+<span class="fc bfc" id="L173" title="All 4 branches covered.">        if ((source.operator() == BinaryOperator.MUL || source.operator() == BinaryOperator.DIV</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">                || source.operator() == BinaryOperator.POW) &amp;&amp; is(right, ExactRational.ONE)) return left;</span>
+<span class="fc bfc" id="L175" title="All 4 branches covered.">        if (left instanceof NumberExpr &amp;&amp; right instanceof NumberExpr) {</span>
+<span class="fc" id="L176">            return observed(() -&gt; canonicalizer.canonicalize(source), 512).orElse(source);</span>
+        }
+<span class="fc" id="L178">        return source;</span>
+    }
+
+    private static boolean is(Expr operand, ExactRational exact) {
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">        return operand instanceof NumberExpr number &amp;&amp; number.value().equals(exact);</span>
+    }
+
+    private Optional&lt;Expr&gt; equalIntegralPowers(Expr canonical) {
+<span class="fc" id="L186">        charge(1);</span>
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">        if (canonical instanceof BinaryExpr product &amp;&amp; product.operator() == BinaryOperator.MUL</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">                &amp;&amp; product.left() instanceof BinaryExpr left &amp;&amp; left.operator() == BinaryOperator.POW</span>
+<span class="nc bnc" id="L189" title="All 4 branches missed.">                &amp;&amp; product.right() instanceof BinaryExpr right &amp;&amp; right.operator() == BinaryOperator.POW</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">                &amp;&amp; left.right() instanceof NumberExpr exponent &amp;&amp; exponent.value().isInteger()</span>
+<span class="nc bnc" id="L191" title="All 4 branches missed.">                &amp;&amp; exponent.value().signum() &gt; 0 &amp;&amp; exponent.value().numerator().bitLength() &lt;= 4</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                &amp;&amp; exponent.equals(right.right())) {</span>
+<span class="nc" id="L193">            charge(2);</span>
+<span class="nc" id="L194">            return Optional.of(new BinaryExpr(new BinaryExpr(left.left(), BinaryOperator.MUL, right.left()),</span>
+                BinaryOperator.POW, exponent));
+        }
+<span class="fc" id="L197">        return Optional.empty();</span>
+    }
+
+    private Expr select(Expr first, Expr second, boolean atRoot) {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (first == second) return first;</span>
+<span class="fc" id="L202">        var candidate = candidate(second);</span>
+<span class="fc bfc" id="L203" title="All 4 branches covered.">        if (candidate == OUTSIDE_DOMAIN || score(candidate.expression()).value() &gt;= score(first).value()) return first;</span>
+<span class="fc bfc" id="L204" title="All 4 branches covered.">        if (atRoot &amp;&amp; score(candidate.expression()).value() &lt; score(incumbent).value()) {</span>
+<span class="fc" id="L205">            incumbent = candidate.expression();</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (score(incumbent).value() &lt;= lowerBound) throw new Optimum();</span>
+        }
+<span class="fc" id="L208">        return candidate.expression();</span>
+    }
+
+<span class="fc" id="L211">    private record Candidate(Expr expression, int nodes, int depth) {}</span>
+
+    private Candidate candidate(Expr source) {
+<span class="fc" id="L214">        charge(1);</span>
+<span class="fc" id="L215">        var cached = candidates.get(source);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (cached != null) return cached;</span>
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        var result = switch (source) {</span>
+<span class="fc" id="L218">            case NumberExpr number -&gt; literal(number);</span>
+<span class="fc" id="L219">            case BinaryExpr binary -&gt; binary(binary);</span>
+<span class="fc" id="L220">            case de.regelsuche.ast.VariableExpr variable -&gt; new Candidate(variable, 1, 0);</span>
+<span class="nc" id="L221">            default -&gt; OUTSIDE_DOMAIN;</span>
+<span class="fc" id="L222">        };</span>
+<span class="fc" id="L223">        candidates.put(source, result);</span>
+<span class="fc" id="L224">        return result;</span>
+    }
+
+    private Candidate literal(NumberExpr number) {
+<span class="fc" id="L228">        var value = number.value();</span>
+<span class="fc" id="L229">        charge(1);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (value.numerator().abs().bitLength() &gt; DOMAIN.maximumCoefficientBits()</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                || value.denominator().bitLength() &gt; DOMAIN.maximumCoefficientBits()) return OUTSIDE_DOMAIN;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (value.isInteger()) return new Candidate(number, 1, 0);</span>
+        // The ordinary exact replay wire uses explicit integer ratios, including terminating decimals.
+<span class="fc" id="L234">        charge(3);</span>
+<span class="fc" id="L235">        return new Candidate(new BinaryExpr(new NumberExpr(ExactRational.integer(value.numerator())),</span>
+<span class="fc" id="L236">            BinaryOperator.DIV, new NumberExpr(ExactRational.integer(value.denominator()))), 3, 1);</span>
+    }
+
+    private Candidate binary(BinaryExpr source) {
+<span class="fc" id="L240">        var left = candidate(source.left());</span>
+<span class="fc" id="L241">        var right = candidate(source.right());</span>
+<span class="pc bpc" id="L242" title="1 of 4 branches missed.">        if (left == OUTSIDE_DOMAIN || right == OUTSIDE_DOMAIN) return OUTSIDE_DOMAIN;</span>
+<span class="pc bpc" id="L243" title="1 of 4 branches missed.">        if (source.operator() == BinaryOperator.POW &amp;&amp; !admissibleExponent(right.expression())) return OUTSIDE_DOMAIN;</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (source.operator() == BinaryOperator.DIV) {</span>
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">            if (source.right() instanceof NumberExpr denominator &amp;&amp; !denominator.value().isInteger()) {</span>
+<span class="nc" id="L246">                return divideByRatio(left, denominator.value());</span>
+            }
+<span class="pc bpc" id="L248" title="2 of 4 branches missed.">            if (!(right.expression() instanceof NumberExpr denominator) || denominator.value().isZero())</span>
+<span class="nc" id="L249">                return OUTSIDE_DOMAIN;</span>
+        }
+<span class="fc" id="L251">        return joined(source, left, source.operator(), right);</span>
+    }
+
+    private static boolean admissibleExponent(Expr expression) {
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">        return expression instanceof NumberExpr number &amp;&amp; number.value().isInteger() &amp;&amp; number.value().signum() &gt;= 0</span>
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">            &amp;&amp; number.value().numerator().compareTo(java.math.BigInteger.valueOf(DOMAIN.maximumExponent())) &lt;= 0;</span>
+    }
+
+    private Candidate divideByRatio(Candidate left, ExactRational divisor) {
+<span class="nc" id="L260">        charge(2);</span>
+<span class="nc" id="L261">        var numerator = new Candidate(new NumberExpr(ExactRational.integer(divisor.numerator())), 1, 0);</span>
+<span class="nc" id="L262">        var denominator = new Candidate(new NumberExpr(ExactRational.integer(divisor.denominator())), 1, 0);</span>
+<span class="nc" id="L263">        var scaled = joined(null, left, BinaryOperator.MUL, denominator);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        return scaled == OUTSIDE_DOMAIN ? scaled : joined(null, scaled, BinaryOperator.DIV, numerator);</span>
+    }
+
+    private Candidate joined(BinaryExpr original, Candidate left, BinaryOperator operator, Candidate right) {
+<span class="fc" id="L268">        int nodes = 1 + left.nodes() + right.nodes();</span>
+<span class="fc" id="L269">        int depth = 1 + Math.max(left.depth(), right.depth());</span>
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">        if (nodes &gt; DOMAIN.maximumExpressionNodes() || depth &gt; DOMAIN.maximumDepth()) return OUTSIDE_DOMAIN;</span>
+<span class="pc bpc" id="L271" title="1 of 6 branches missed.">        if (original != null &amp;&amp; left.expression() == original.left() &amp;&amp; right.expression() == original.right())</span>
+<span class="fc" id="L272">            return new Candidate(original, nodes, depth);</span>
+<span class="fc" id="L273">        charge(1);</span>
+<span class="fc" id="L274">        return new Candidate(new BinaryExpr(left.expression(), operator, right.expression()), nodes, depth);</span>
+    }
+
+    private TypedSourceOnlySearch.Score score(Expr candidate) {
+<span class="fc" id="L278">        charge(1);</span>
+<span class="fc" id="L279">        return scores.computeIfAbsent(candidate, expression -&gt; {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            var score = sharedArithmetic ? TypedPolynomialSurfaceCost.evaluateSharedArithmetic(expression)</span>
+<span class="fc" id="L281">                : TypedPolynomialSurfaceCost.evaluate(expression);</span>
+<span class="fc" id="L282">            charge(score.work());</span>
+<span class="fc" id="L283">            return score;</span>
+        });
+    }
+
+    private &lt;T&gt; Optional&lt;T&gt; observed(Supplier&lt;T&gt; procedure, long localLimit) {
+<span class="fc" id="L288">        long allowance = Math.min(localLimit, remaining());</span>
+<span class="fc" id="L289">        var report = StructuralExpansionRules.observe(procedure, allowance);</span>
+<span class="fc" id="L290">        charge(Math.min(report.work(), allowance));</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        return report.exhausted() ? Optional.empty() : Optional.of(report.value());</span>
+    }
+
+<span class="fc" id="L294">    private long remaining() { return limit - work; }</span>
+
+    private void charge(long units) {
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">        if (units &gt; remaining() || Thread.currentThread().isInterrupted()) throw new Exhausted();</span>
+<span class="fc" id="L298">        work += units;</span>
+<span class="fc" id="L299">    }</span>
+
+    private static final class Exhausted extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class Optimum extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class SparseLimit extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

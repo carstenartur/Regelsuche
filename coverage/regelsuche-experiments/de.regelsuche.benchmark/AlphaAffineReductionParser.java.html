@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AlphaAffineReductionParser.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">AlphaAffineReductionParser.java</span></div><h1>AlphaAffineReductionParser.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.ast.iteration.AffineReduction;
+import de.regelsuche.ast.iteration.AffineReduction.Form;
+import de.regelsuche.ast.iteration.AffineReduction.Operator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/** Source-only importer for a single affine reduction over a one-dimensional input. */
+final class AlphaAffineReductionParser {
+    private static final int SOURCE_LIMIT = 16_384;
+<span class="fc" id="L14">    private static final Set&lt;String&gt; KEYWORDS = Set.of(&quot;affine&quot;, &quot;inputs&quot;, &quot;outputs&quot;, &quot;let&quot;, &quot;reduce&quot;, &quot;max&quot;, &quot;and&quot;);</span>
+<span class="fc" id="L15">    private static final Pattern TOKEN = Pattern.compile(&quot;\\G(?:\\s+|//[^\\r\\n]*|&quot;</span>
+        + &quot;([A-Za-z_][A-Za-z_0-9]*|[0-9]+|-&gt;|&lt;=|&gt;=|[-+*&lt;&gt;=\\[\\]{}(),.:;]))&quot;);
+
+<span class="fc" id="L18">    record Imported(String name, AffineReduction source) {}</span>
+
+<span class="fc" id="L20">    private record ArrayDeclaration(String name, List&lt;String&gt; coordinates, List&lt;Form&gt; domain) {}</span>
+
+<span class="fc" id="L22">    private record Reduction(Operator operator, int rank, List&lt;Form&gt; domain, int inputIndex) {}</span>
+
+    private final List&lt;String&gt; tokens;
+    private int cursor;
+
+<span class="fc" id="L27">    private AlphaAffineReductionParser(List&lt;String&gt; tokens) {</span>
+<span class="fc" id="L28">        this.tokens = tokens;</span>
+<span class="fc" id="L29">    }</span>
+
+    static Imported parse(String source) {
+        try {
+<span class="fc" id="L33">            return new AlphaAffineReductionParser(tokenize(source)).program();</span>
+<span class="fc" id="L34">        } catch (ArithmeticException | NumberFormatException overflow) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(&quot;ALPHA_AFFINE_COEFFICIENT_LIMIT&quot;, overflow);</span>
+        }
+    }
+
+    private Imported program() {
+<span class="fc" id="L40">        expect(&quot;affine&quot;);</span>
+<span class="fc" id="L41">        String name = identifier();</span>
+<span class="fc" id="L42">        String parameter = coordinates(1, List.of()).getFirst();</span>
+<span class="fc" id="L43">        expect(&quot;-&gt;&quot;);</span>
+<span class="fc" id="L44">        expect(&quot;{&quot;);</span>
+<span class="fc" id="L45">        expect(&quot;:&quot;);</span>
+<span class="fc" id="L46">        List&lt;Form&gt; parameters = domain(parameter, List.of(), &quot;}&quot;);</span>
+<span class="fc" id="L47">        expect(&quot;inputs&quot;);</span>
+<span class="fc" id="L48">        ArrayDeclaration input = array(parameter, 1, List.of(parameter));</span>
+<span class="fc" id="L49">        expect(&quot;outputs&quot;);</span>
+<span class="fc" id="L50">        ArrayDeclaration output = array(parameter, 2, List.of(parameter, input.name()));</span>
+<span class="fc" id="L51">        expect(&quot;let&quot;);</span>
+<span class="fc" id="L52">        expect(output.name());</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (!coordinates(2, List.of(parameter, input.name(), output.name())).equals(output.coordinates())) {</span>
+<span class="fc" id="L54">            throw new IllegalArgumentException(&quot;ALPHA_OUTPUT_INDEX_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L56">        expect(&quot;=&quot;);</span>
+<span class="fc" id="L57">        Reduction reduction = reduction(parameter, input, output);</span>
+<span class="fc" id="L58">        expect(&quot;;&quot;);</span>
+<span class="fc" id="L59">        expect(&quot;.&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (cursor != tokens.size()) throw new IllegalArgumentException(&quot;ALPHA_TRAILING_PROGRAM&quot;);</span>
+<span class="fc" id="L61">        return new Imported(name, new AffineReduction(reduction.operator(), parameters, input.domain(),</span>
+<span class="fc" id="L62">            output.coordinates().size(), output.domain(), reduction.rank(), reduction.domain(), reduction.inputIndex()));</span>
+    }
+
+    private ArrayDeclaration array(String parameter, int maxRank, List&lt;String&gt; taken) {
+<span class="fc" id="L66">        String name = identifier();</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (taken.contains(name)) throw new IllegalArgumentException(&quot;ALPHA_DUPLICATE_IDENTIFIER&quot;);</span>
+<span class="fc" id="L68">        expect(&quot;:&quot;);</span>
+<span class="fc" id="L69">        expect(&quot;{&quot;);</span>
+<span class="fc" id="L70">        var bound = new ArrayList&lt;&gt;(taken);</span>
+<span class="fc" id="L71">        bound.add(name);</span>
+<span class="fc" id="L72">        List&lt;String&gt; variables = coordinates(maxRank, bound);</span>
+<span class="fc" id="L73">        expect(&quot;:&quot;);</span>
+<span class="fc" id="L74">        return new ArrayDeclaration(name, variables, domain(parameter, variables, &quot;}&quot;));</span>
+    }
+
+    private Reduction reduction(String parameter, ArrayDeclaration input, ArrayDeclaration output) {
+<span class="fc" id="L78">        expect(&quot;reduce&quot;);</span>
+<span class="fc" id="L79">        expect(&quot;(&quot;);</span>
+        Operator operator;
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (accept(&quot;+&quot;)) operator = Operator.SUM;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        else if (accept(&quot;max&quot;)) operator = Operator.MAX;</span>
+<span class="nc" id="L83">        else throw new IllegalArgumentException(&quot;ALPHA_REDUCTION_OPERATOR&quot;);</span>
+<span class="fc" id="L84">        expect(&quot;,&quot;);</span>
+<span class="fc" id="L85">        var taken = new ArrayList&lt;&gt;(output.coordinates());</span>
+<span class="fc" id="L86">        taken.addAll(List.of(parameter, input.name(), output.name()));</span>
+<span class="fc" id="L87">        List&lt;String&gt; reduced = coordinates(2, taken);</span>
+<span class="fc" id="L88">        expect(&quot;,&quot;);</span>
+<span class="fc" id="L89">        expect(&quot;{&quot;);</span>
+<span class="fc" id="L90">        expect(&quot;:&quot;);</span>
+<span class="fc" id="L91">        var variables = new ArrayList&lt;&gt;(output.coordinates());</span>
+<span class="fc" id="L92">        variables.addAll(reduced);</span>
+<span class="fc" id="L93">        List&lt;Form&gt; domain = domain(parameter, variables, &quot;}&quot;);</span>
+<span class="fc" id="L94">        expect(&quot;:&quot;);</span>
+<span class="fc" id="L95">        expect(input.name());</span>
+<span class="fc" id="L96">        expect(&quot;[&quot;);</span>
+<span class="fc" id="L97">        int inputIndex = reduced.indexOf(identifier());</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (inputIndex &lt; 0) throw new IllegalArgumentException(&quot;ALPHA_UNSUPPORTED_INPUT_ACCESS&quot;);</span>
+<span class="fc" id="L99">        expect(&quot;]&quot;);</span>
+<span class="fc" id="L100">        expect(&quot;)&quot;);</span>
+<span class="fc" id="L101">        return new Reduction(operator, reduced.size(), domain, inputIndex);</span>
+    }
+
+    private List&lt;String&gt; coordinates(int limit, List&lt;String&gt; taken) {
+<span class="fc" id="L105">        expect(&quot;[&quot;);</span>
+<span class="fc" id="L106">        var names = new ArrayList&lt;String&gt;();</span>
+        do {
+<span class="fc" id="L108">            String name = identifier();</span>
+<span class="fc bfc" id="L109" title="All 4 branches covered.">            if (taken.contains(name) || names.contains(name)) {</span>
+<span class="fc" id="L110">                throw new IllegalArgumentException(&quot;ALPHA_DUPLICATE_IDENTIFIER&quot;);</span>
+            }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (names.size() &gt;= limit) throw new IllegalArgumentException(&quot;ALPHA_COORDINATE_LIMIT&quot;);</span>
+<span class="fc" id="L113">            names.add(name);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        } while (accept(&quot;,&quot;));</span>
+<span class="fc" id="L115">        expect(&quot;]&quot;);</span>
+<span class="fc" id="L116">        return List.copyOf(names);</span>
+    }
+
+    private List&lt;Form&gt; domain(String parameter, List&lt;String&gt; variables, String terminator) {
+<span class="fc" id="L120">        var constraints = new ArrayList&lt;Form&gt;();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (accept(terminator)) return List.of();</span>
+        do {
+<span class="fc" id="L123">            int[] left = expression(parameter, variables);</span>
+            do {
+<span class="fc" id="L125">                String relation = peek();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                if (!isRelation(relation)) throw new IllegalArgumentException(&quot;ALPHA_EXPECTED_AFFINE_RELATION&quot;);</span>
+<span class="fc" id="L127">                cursor++;</span>
+<span class="fc" id="L128">                int[] right = expression(parameter, variables);</span>
+<span class="fc" id="L129">                appendConstraint(constraints, relation, left, right);</span>
+<span class="fc" id="L130">                left = right;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            } while (isRelation(peek()));</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        } while (accept(&quot;and&quot;));</span>
+<span class="fc" id="L133">        expect(terminator);</span>
+<span class="fc" id="L134">        return List.copyOf(constraints);</span>
+    }
+
+    private static boolean isRelation(String symbol) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        return switch (symbol) {</span>
+<span class="fc" id="L139">            case &quot;&lt;&quot;, &quot;&lt;=&quot;, &quot;&gt;&quot;, &quot;&gt;=&quot;, &quot;=&quot; -&gt; true;</span>
+<span class="fc" id="L140">            default -&gt; false;</span>
+        };
+    }
+
+    private static void appendConstraint(List&lt;Form&gt; constraints, String relation, int[] left, int[] right) {
+<span class="pc bpc" id="L145" title="2 of 6 branches missed.">        switch (relation) {</span>
+<span class="fc" id="L146">            case &quot;&lt;&quot; -&gt; constraints.add(difference(right, left, 1));</span>
+<span class="fc" id="L147">            case &quot;&lt;=&quot; -&gt; constraints.add(difference(right, left, 0));</span>
+<span class="nc" id="L148">            case &quot;&gt;&quot; -&gt; constraints.add(difference(left, right, 1));</span>
+<span class="fc" id="L149">            case &quot;&gt;=&quot; -&gt; constraints.add(difference(left, right, 0));</span>
+            case &quot;=&quot; -&gt; {
+<span class="fc" id="L151">                constraints.add(difference(right, left, 0));</span>
+<span class="fc" id="L152">                constraints.add(difference(left, right, 0));</span>
+<span class="fc" id="L153">            }</span>
+<span class="nc" id="L154">            default -&gt; throw new IllegalArgumentException(&quot;ALPHA_EXPECTED_AFFINE_RELATION&quot;);</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+    private static Form difference(int[] positive, int[] negative, int strict) {
+<span class="fc" id="L159">        var coefficients = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (int i = 2; i &lt; positive.length; i++) {</span>
+<span class="fc" id="L161">            coefficients.add(Math.subtractExact(positive[i], negative[i]));</span>
+        }
+        // A comparison is stored as constant + parameter term + coordinate terms &gt;= 0.
+<span class="fc" id="L164">        int constant = Math.toIntExact((long) positive[0] - negative[0] - strict);</span>
+<span class="fc" id="L165">        return new Form(constant, Math.subtractExact(positive[1], negative[1]), coefficients);</span>
+    }
+
+    private int[] expression(String parameter, List&lt;String&gt; variables) {
+<span class="fc" id="L169">        var result = new int[variables.size() + 2];</span>
+<span class="fc" id="L170">        atom(result, parameter, variables, sign());</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">        while (&quot;+&quot;.equals(peek()) || &quot;-&quot;.equals(peek())) atom(result, parameter, variables, sign());</span>
+<span class="fc" id="L172">        return result;</span>
+    }
+
+    private int sign() {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (accept(&quot;-&quot;)) return -1;</span>
+<span class="fc" id="L177">        accept(&quot;+&quot;);</span>
+<span class="fc" id="L178">        return 1;</span>
+    }
+
+    private void atom(int[] coefficients, String parameter, List&lt;String&gt; variables, int sign) {
+<span class="fc" id="L182">        String token = peek();</span>
+<span class="fc" id="L183">        int multiplier = sign;</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        if (!token.isEmpty() &amp;&amp; Character.isDigit(token.charAt(0))) {</span>
+<span class="fc" id="L185">            cursor++;</span>
+<span class="fc" id="L186">            multiplier = Math.toIntExact(Math.multiplyExact(Long.parseLong(token), sign));</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">            if (!accept(&quot;*&quot;) &amp;&amp; !isIdentifier(peek())) {</span>
+<span class="fc" id="L188">                coefficients[0] = Math.addExact(coefficients[0], multiplier);</span>
+<span class="fc" id="L189">                return;</span>
+            }
+        }
+<span class="fc" id="L192">        String variable = identifier();</span>
+<span class="fc" id="L193">        int index = 1;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (!variable.equals(parameter)) {</span>
+<span class="fc" id="L195">            int coordinate = variables.indexOf(variable);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            if (coordinate &lt; 0) throw new IllegalArgumentException(&quot;ALPHA_UNDECLARED_INDEX&quot;);</span>
+<span class="fc" id="L197">            index = coordinate + 2;</span>
+        }
+<span class="fc" id="L199">        coefficients[index] = Math.addExact(coefficients[index], multiplier);</span>
+<span class="fc" id="L200">    }</span>
+
+    private static List&lt;String&gt; tokenize(String source) {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (source.length() &gt; SOURCE_LIMIT) throw new IllegalArgumentException(&quot;ALPHA_SOURCE_LIMIT&quot;);</span>
+<span class="fc" id="L204">        var tokens = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L205">        var matcher = TOKEN.matcher(source);</span>
+<span class="fc" id="L206">        int consumed = 0;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (matcher.group(1) != null) tokens.add(matcher.group(1));</span>
+<span class="fc" id="L209">            consumed = matcher.end();</span>
+        }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (consumed != source.length()) throw new IllegalArgumentException(&quot;ALPHA_UNSUPPORTED_TOKEN&quot;);</span>
+<span class="fc" id="L212">        return tokens;</span>
+    }
+
+    private String identifier() {
+<span class="fc" id="L216">        String token = peek();</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (!isIdentifier(token)) throw new IllegalArgumentException(&quot;ALPHA_EXPECTED_IDENTIFIER&quot;);</span>
+<span class="fc" id="L218">        cursor++;</span>
+<span class="fc" id="L219">        return token;</span>
+    }
+
+    private static boolean isIdentifier(String token) {
+<span class="pc bpc" id="L223" title="2 of 6 branches missed.">        return !token.isEmpty() &amp;&amp; (Character.isLetter(token.charAt(0)) || token.charAt(0) == '_')</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            &amp;&amp; !KEYWORDS.contains(token);</span>
+    }
+
+    private String peek() {
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        return cursor &lt; tokens.size() ? tokens.get(cursor) : &quot;&quot;;</span>
+    }
+
+    private boolean accept(String token) {
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (!token.equals(peek())) return false;</span>
+<span class="fc" id="L233">        cursor++;</span>
+<span class="fc" id="L234">        return true;</span>
+    }
+
+    private void expect(String token) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (!accept(token)) throw new IllegalArgumentException(&quot;ALPHA_EXPECTED_TOKEN: &quot; + token);</span>
+<span class="fc" id="L239">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

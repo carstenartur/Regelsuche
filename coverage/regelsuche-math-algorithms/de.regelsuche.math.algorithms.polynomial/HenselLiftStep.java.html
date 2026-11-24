@@ -6,11 +6,12 @@ import java.util.Objects;
 
 /** Issuer-owned verified transition from p^e to p^(e + 1). */
 public final class HenselLiftStep {
+<span class="fc" id="L9">    private static final java.util.regex.Pattern HASH = java.util.regex.Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
     private final State state;
 
-<span class="fc" id="L11">    private HenselLiftStep(State state) {</span>
-<span class="fc" id="L12">        this.state = state;</span>
-<span class="fc" id="L13">    }</span>
+<span class="fc" id="L12">    private HenselLiftStep(State state) {</span>
+<span class="fc" id="L13">        this.state = state;</span>
+<span class="fc" id="L14">    }</span>
 
     static HenselLiftStep issue(
         int fromExponent,
@@ -22,25 +23,25 @@ public final class HenselLiftStep {
         String liftedProductHash,
         long workUnits
     ) {
-<span class="fc" id="L25">        List&lt;String&gt; corrections = List.copyOf(</span>
+<span class="fc" id="L26">        List&lt;String&gt; corrections = List.copyOf(</span>
             correctionPolynomialHashes);
-<span class="fc" id="L27">        StringBuilder material = new StringBuilder(</span>
+<span class="fc" id="L28">        StringBuilder material = new StringBuilder(</span>
             HenselLifting.METHOD_ID);
-<span class="fc" id="L29">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L30">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L31">            Integer.toString(fromExponent));</span>
-<span class="fc" id="L32">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L32">            Integer.toString(fromExponent));</span>
+<span class="fc" id="L33">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L34">            Integer.toString(toExponent));</span>
-<span class="fc" id="L35">        AlgorithmEvidence.append(material, fromModulus.toString());</span>
-<span class="fc" id="L36">        AlgorithmEvidence.append(material, toModulus.toString());</span>
-<span class="fc" id="L37">        AlgorithmEvidence.append(material, errorPolynomialHash);</span>
-<span class="fc" id="L38">        corrections.forEach(hash -&gt; AlgorithmEvidence.append(</span>
+<span class="fc" id="L35">            Integer.toString(toExponent));</span>
+<span class="fc" id="L36">        AlgorithmEvidence.append(material, fromModulus.toString());</span>
+<span class="fc" id="L37">        AlgorithmEvidence.append(material, toModulus.toString());</span>
+<span class="fc" id="L38">        AlgorithmEvidence.append(material, errorPolynomialHash);</span>
+<span class="fc" id="L39">        corrections.forEach(hash -&gt; AlgorithmEvidence.append(</span>
             material,
             hash));
-<span class="fc" id="L41">        AlgorithmEvidence.append(material, liftedProductHash);</span>
-<span class="fc" id="L42">        AlgorithmEvidence.append(material, Long.toString(workUnits));</span>
-<span class="fc" id="L43">        return new HenselLiftStep(new State(</span>
+<span class="fc" id="L42">        AlgorithmEvidence.append(material, liftedProductHash);</span>
+<span class="fc" id="L43">        AlgorithmEvidence.append(material, Long.toString(workUnits));</span>
+<span class="fc" id="L44">        return new HenselLiftStep(new State(</span>
             fromExponent,
             toExponent,
             fromModulus,
@@ -49,85 +50,85 @@ public final class HenselLiftStep {
             corrections,
             liftedProductHash,
             workUnits,
-<span class="fc" id="L52">            AlgorithmEvidence.sha256(material.toString())));</span>
+<span class="fc" id="L53">            AlgorithmEvidence.sha256(material.toString())));</span>
     }
 
     public int fromExponent() {
-<span class="fc" id="L56">        return state.fromExponent();</span>
+<span class="fc" id="L57">        return state.fromExponent();</span>
     }
 
     public int toExponent() {
-<span class="fc" id="L60">        return state.toExponent();</span>
+<span class="fc" id="L61">        return state.toExponent();</span>
     }
 
     public BigInteger fromModulus() {
-<span class="fc" id="L64">        return state.fromModulus();</span>
+<span class="fc" id="L65">        return state.fromModulus();</span>
     }
 
     public BigInteger toModulus() {
-<span class="fc" id="L68">        return state.toModulus();</span>
+<span class="fc" id="L69">        return state.toModulus();</span>
     }
 
     public String errorPolynomialHash() {
-<span class="fc" id="L72">        return state.errorPolynomialHash();</span>
+<span class="fc" id="L73">        return state.errorPolynomialHash();</span>
     }
 
     public List&lt;String&gt; correctionPolynomialHashes() {
-<span class="fc" id="L76">        return state.correctionPolynomialHashes();</span>
+<span class="fc" id="L77">        return state.correctionPolynomialHashes();</span>
     }
 
     public String liftedProductHash() {
-<span class="fc" id="L80">        return state.liftedProductHash();</span>
+<span class="fc" id="L81">        return state.liftedProductHash();</span>
     }
 
     public long workUnits() {
-<span class="fc" id="L84">        return state.workUnits();</span>
+<span class="fc" id="L85">        return state.workUnits();</span>
     }
 
     public String certificateHash() {
-<span class="fc" id="L88">        return state.certificateHash();</span>
+<span class="fc" id="L89">        return state.certificateHash();</span>
     }
 
     String canonicalMaterial() {
-<span class="fc" id="L92">        StringBuilder material = new StringBuilder();</span>
-<span class="fc" id="L93">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L93">        StringBuilder material = new StringBuilder();</span>
+<span class="fc" id="L94">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L95">            Integer.toString(fromExponent()));</span>
-<span class="fc" id="L96">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L96">            Integer.toString(fromExponent()));</span>
+<span class="fc" id="L97">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L98">            Integer.toString(toExponent()));</span>
-<span class="fc" id="L99">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L99">            Integer.toString(toExponent()));</span>
+<span class="fc" id="L100">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L101">            fromModulus().toString());</span>
-<span class="fc" id="L102">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L102">            fromModulus().toString());</span>
+<span class="fc" id="L103">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L104">            toModulus().toString());</span>
-<span class="fc" id="L105">        AlgorithmEvidence.append(material, errorPolynomialHash());</span>
-<span class="fc" id="L106">        correctionPolynomialHashes().forEach(hash -&gt;</span>
-<span class="fc" id="L107">            AlgorithmEvidence.append(material, hash));</span>
-<span class="fc" id="L108">        AlgorithmEvidence.append(material, liftedProductHash());</span>
-<span class="fc" id="L109">        AlgorithmEvidence.append(</span>
+<span class="fc" id="L105">            toModulus().toString());</span>
+<span class="fc" id="L106">        AlgorithmEvidence.append(material, errorPolynomialHash());</span>
+<span class="fc" id="L107">        correctionPolynomialHashes().forEach(hash -&gt;</span>
+<span class="fc" id="L108">            AlgorithmEvidence.append(material, hash));</span>
+<span class="fc" id="L109">        AlgorithmEvidence.append(material, liftedProductHash());</span>
+<span class="fc" id="L110">        AlgorithmEvidence.append(</span>
             material,
-<span class="fc" id="L111">            Long.toString(workUnits()));</span>
-<span class="fc" id="L112">        AlgorithmEvidence.append(material, certificateHash());</span>
-<span class="fc" id="L113">        return material.toString();</span>
+<span class="fc" id="L112">            Long.toString(workUnits()));</span>
+<span class="fc" id="L113">        AlgorithmEvidence.append(material, certificateHash());</span>
+<span class="fc" id="L114">        return material.toString();</span>
     }
 
     @Override
     public boolean equals(Object other) {
-<span class="fc" id="L118">        return this == other</span>
-<span class="pc bpc" id="L119" title="2 of 4 branches missed.">            || other instanceof HenselLiftStep step</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                &amp;&amp; state.equals(step.state);</span>
+<span class="fc" id="L119">        return this == other</span>
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">            || other instanceof HenselLiftStep step</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                &amp;&amp; state.equals(step.state);</span>
     }
 
     @Override
     public int hashCode() {
-<span class="nc" id="L125">        return state.hashCode();</span>
+<span class="nc" id="L126">        return state.hashCode();</span>
     }
 
     @Override
     public String toString() {
-<span class="fc" id="L130">        return &quot;HenselLiftStep[&quot; + state + ']';</span>
+<span class="fc" id="L131">        return &quot;HenselLiftStep[&quot; + state + ']';</span>
     }
 
     private record State(
@@ -141,36 +142,32 @@ public final class HenselLiftStep {
         long workUnits,
         String certificateHash
     ) {
-<span class="fc" id="L144">        private State {</span>
-<span class="fc" id="L145">            Objects.requireNonNull(fromModulus, &quot;fromModulus&quot;);</span>
-<span class="fc" id="L146">            Objects.requireNonNull(toModulus, &quot;toModulus&quot;);</span>
-<span class="fc" id="L147">            correctionPolynomialHashes = List.copyOf(</span>
+<span class="fc" id="L145">        private State {</span>
+<span class="fc" id="L146">            Objects.requireNonNull(fromModulus, &quot;fromModulus&quot;);</span>
+<span class="fc" id="L147">            Objects.requireNonNull(toModulus, &quot;toModulus&quot;);</span>
+<span class="fc" id="L148">            correctionPolynomialHashes = List.copyOf(</span>
                 correctionPolynomialHashes);
-<span class="pc bpc" id="L149" title="1 of 4 branches missed.">            if (fromExponent &lt; 1</span>
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">            if (fromExponent &lt; 1</span>
                     || toExponent != fromExponent + 1
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                    || fromModulus.signum() &lt;= 0</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                    || toModulus.signum() &lt;= 0</span>
-<span class="pc bpc" id="L153" title="2 of 4 branches missed.">                    || !toModulus.mod(fromModulus).equals(</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                    || fromModulus.signum() &lt;= 0</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    || toModulus.signum() &lt;= 0</span>
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">                    || !toModulus.mod(fromModulus).equals(</span>
                         BigInteger.ZERO)
                     || errorPolynomialHash == null
-<span class="fc bfc" id="L156" title="All 2 branches covered.">                    || !errorPolynomialHash.matches(</span>
-                        &quot;sha256:[0-9a-f]{64}&quot;)
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                    || !HASH.matcher(errorPolynomialHash).matches()</span>
 <span class="pc bpc" id="L158" title="1 of 2 branches missed.">                    || correctionPolynomialHashes.isEmpty()</span>
 <span class="pc bpc" id="L159" title="2 of 4 branches missed.">                    || correctionPolynomialHashes.stream().anyMatch(</span>
 <span class="pc bpc" id="L160" title="1 of 2 branches missed.">                        hash -&gt; hash == null</span>
-<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                            || !hash.matches(</span>
-                                &quot;sha256:[0-9a-f]{64}&quot;))
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                            || !HASH.matcher(hash).matches())</span>
                     || liftedProductHash == null
-<span class="pc bpc" id="L164" title="3 of 6 branches missed.">                    || !liftedProductHash.matches(</span>
-                        &quot;sha256:[0-9a-f]{64}&quot;)
+<span class="pc bpc" id="L163" title="3 of 6 branches missed.">                    || !HASH.matcher(liftedProductHash).matches()</span>
                     || workUnits &lt; 1
                     || certificateHash == null
-<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                    || !certificateHash.matches(</span>
-                        &quot;sha256:[0-9a-f]{64}&quot;)) {
-<span class="fc" id="L170">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                    || !HASH.matcher(certificateHash).matches()) {</span>
+<span class="fc" id="L167">                throw new IllegalArgumentException(</span>
                     &quot;Hensel lift step is invalid&quot;);
             }
-<span class="fc" id="L173">        }</span>
+<span class="fc" id="L170">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

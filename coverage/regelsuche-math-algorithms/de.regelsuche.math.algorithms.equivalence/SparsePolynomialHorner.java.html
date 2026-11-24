@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SparsePolynomialHorner.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">SparsePolynomialHorner.java</span></div><h1>SparsePolynomialHorner.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeMap;
+import java.util.function.LongConsumer;
+
+/** Bounded structural proposals for exact rational polynomials. The receiver checks each endpoint. */
+public final class SparsePolynomialHorner {
+    private static final int MAX_TERMS = 64;
+    private static final int MAX_COEFFICIENT_BITS = 256;
+    private static final int MAX_OPERATIONS = 120;
+<span class="fc" id="L22">    private static final NumberExpr ZERO = new NumberExpr(0);</span>
+
+    private SparsePolynomialHorner() { }
+
+    public static Optional&lt;Expr&gt; propose(Expr source, LongConsumer work) {
+<span class="fc" id="L27">        Polynomial polynomial = new ExactResidualPolynomialArithmetic(work, true).project(source);</span>
+<span class="fc" id="L28">        var variables = polynomial.variables().stream().sorted().toList();</span>
+<span class="fc" id="L29">        var terms = polynomial.terms();</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        if (variables.size() &gt; ExactPolynomialAnalysis.MAX_VARIABLES || terms.size() &gt; MAX_TERMS) {</span>
+<span class="fc" id="L31">            return Optional.empty();</span>
+        }
+<span class="fc" id="L33">        BigInteger commonDenominator = BigInteger.ONE;</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (Rational coefficient : terms.values()) {</span>
+<span class="fc" id="L35">            work.accept(1);</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            if (!fits(coefficient.numerator()) || !fits(coefficient.denominator())) return Optional.empty();</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (fits(commonDenominator)) {</span>
+<span class="fc" id="L38">                BigInteger denominator = coefficient.denominator();</span>
+<span class="fc" id="L39">                commonDenominator = commonDenominator.divide(commonDenominator.gcd(denominator)).multiply(denominator);</span>
+            }
+<span class="fc" id="L41">        }</span>
+
+<span class="fc" id="L43">        var best = new Best();</span>
+<span class="fc" id="L44">        search(variables, new ArrayList&lt;&gt;(), terms, BigInteger.ONE, work, best);</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        if (!commonDenominator.equals(BigInteger.ONE) &amp;&amp; fits(commonDenominator)) {</span>
+<span class="fc" id="L46">            search(variables, new ArrayList&lt;&gt;(), terms, commonDenominator, work, best);</span>
+        }
+<span class="fc" id="L48">        return Optional.ofNullable(best.expression);</span>
+    }
+
+    private static void search(List&lt;String&gt; variables, List&lt;String&gt; order, Map&lt;Monomial, Rational&gt; terms,
+            BigInteger scale, LongConsumer work, Best best) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (order.size() == variables.size()) {</span>
+<span class="fc" id="L54">            work.accept(1);</span>
+<span class="fc" id="L55">            Optional&lt;Part&gt; candidate = horner(new ArrayList&lt;&gt;(terms.entrySet()), order, 0, scale, work);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (candidate.isEmpty()) return;</span>
+<span class="fc" id="L57">            Part part = candidate.orElseThrow();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            if (!scale.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L59">                part = new Part(binary(part.magnitude(), BinaryOperator.DIV, integer(scale), work),</span>
+<span class="fc" id="L60">                    part.operations() + 1, part.negative());</span>
+            }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            int operations = part.operations() + (part.negative() ? 1 : 0);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            if (operations &lt; best.operations) {</span>
+<span class="fc" id="L64">                best.operations = operations;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                best.expression = part.negative() ? binary(ZERO, BinaryOperator.SUB, part.magnitude(), work) : part.magnitude();</span>
+            }
+<span class="fc" id="L67">            return;</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (String variable : variables) {</span>
+<span class="fc" id="L70">            work.accept(1);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (!order.contains(variable)) {</span>
+<span class="fc" id="L72">                order.add(variable);</span>
+<span class="fc" id="L73">                search(variables, order, terms, scale, work, best);</span>
+<span class="fc" id="L74">                order.removeLast();</span>
+            }
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">    }</span>
+
+    private static Optional&lt;Part&gt; horner(List&lt;Map.Entry&lt;Monomial, Rational&gt;&gt; terms, List&lt;String&gt; order,
+            int level, BigInteger scale, LongConsumer work) {
+<span class="fc" id="L81">        work.accept(1);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (terms.isEmpty()) return Optional.of(new Part(ZERO, 0, false));</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (level == order.size()) return coefficient(terms.getFirst().getValue(), scale, work);</span>
+
+<span class="fc" id="L85">        String variable = order.get(level);</span>
+<span class="fc" id="L86">        var groups = new TreeMap&lt;Integer, List&lt;Map.Entry&lt;Monomial, Rational&gt;&gt;&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var term : terms) {</span>
+<span class="fc" id="L88">            work.accept(1);</span>
+<span class="fc" id="L89">            int exponent = term.getKey().powers().getOrDefault(variable, 0);</span>
+<span class="fc" id="L90">            groups.computeIfAbsent(exponent, ignored -&gt; new ArrayList&lt;&gt;()).add(term);</span>
+<span class="fc" id="L91">        }</span>
+
+<span class="fc" id="L93">        Part result = null;</span>
+<span class="fc" id="L94">        int previous = groups.firstKey();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (var group : groups.descendingMap().entrySet()) {</span>
+<span class="fc" id="L96">            int exponent = group.getKey();</span>
+<span class="fc" id="L97">            var coefficient = horner(group.getValue(), order, level + 1, scale, work);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (coefficient.isEmpty()) return Optional.empty();</span>
+<span class="fc" id="L99">            Part term = coefficient.orElseThrow();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            result = result == null ? term : add(shift(result, variable, previous - exponent, work), term, work);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (result.operations() &gt; MAX_OPERATIONS) return Optional.empty();</span>
+<span class="fc" id="L102">            previous = exponent;</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">        return Optional.of(shift(result, variable, previous, work));</span>
+    }
+
+    private static Optional&lt;Part&gt; coefficient(Rational coefficient, BigInteger scale, LongConsumer work) {
+<span class="fc" id="L108">        BigInteger denominator = coefficient.denominator();</span>
+<span class="fc" id="L109">        BigInteger numerator = coefficient.numerator();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (!scale.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L111">            numerator = numerator.multiply(scale.divide(denominator));</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (!fits(numerator)) return Optional.empty();</span>
+<span class="fc" id="L113">            denominator = BigInteger.ONE;</span>
+        }
+<span class="fc" id="L115">        NumberExpr magnitude = integer(numerator.abs());</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">        return Optional.of(denominator.equals(BigInteger.ONE) ? new Part(magnitude, 0, numerator.signum() &lt; 0)</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            : new Part(binary(magnitude, BinaryOperator.DIV, integer(denominator), work), 1, numerator.signum() &lt; 0));</span>
+    }
+
+    private static Part shift(Part value, String variable, int exponent, LongConsumer work) {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (exponent == 0) return value;</span>
+<span class="fc" id="L122">        Expr factor = new VariableExpr(variable);</span>
+<span class="fc" id="L123">        Expr result = value.magnitude();</span>
+<span class="fc" id="L124">        int operations = value.operations();</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">        if (result instanceof NumberExpr number &amp;&amp; number.value().equals(ExactRational.ONE)) {</span>
+<span class="fc" id="L126">            result = factor;</span>
+<span class="fc" id="L127">            exponent--;</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        while (exponent-- &gt; 0) {</span>
+<span class="fc" id="L130">            result = binary(factor, BinaryOperator.MUL, result, work);</span>
+<span class="fc" id="L131">            operations++;</span>
+        }
+<span class="fc" id="L133">        return new Part(result, operations, value.negative());</span>
+    }
+
+    private static Part add(Part left, Part right, LongConsumer work) {
+<span class="fc" id="L137">        int operations = left.operations() + right.operations() + 1;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (left.negative() == right.negative()) {</span>
+<span class="fc" id="L139">            return new Part(binary(left.magnitude(), BinaryOperator.ADD, right.magnitude(), work), operations, left.negative());</span>
+        }
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        Part positive = left.negative() ? right : left;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        Part negative = left.negative() ? left : right;</span>
+<span class="fc" id="L143">        return new Part(binary(positive.magnitude(), BinaryOperator.SUB, negative.magnitude(), work), operations, false);</span>
+    }
+
+    private static BinaryExpr binary(Expr left, BinaryOperator operator, Expr right, LongConsumer work) {
+<span class="fc" id="L147">        work.accept(1);</span>
+<span class="fc" id="L148">        return new BinaryExpr(left, operator, right);</span>
+    }
+
+    private static NumberExpr integer(BigInteger value) {
+<span class="fc" id="L152">        return new NumberExpr(new ExactRational(value, BigInteger.ONE));</span>
+    }
+
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">    private static boolean fits(BigInteger integer) { return integer.abs().bitLength() &lt;= MAX_COEFFICIENT_BITS; }</span>
+
+<span class="fc" id="L157">    private record Part(Expr magnitude, int operations, boolean negative) { }</span>
+
+<span class="fc" id="L159">    private static final class Best {</span>
+<span class="fc" id="L160">        private int operations = MAX_OPERATIONS + 1;</span>
+        private Expr expression;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

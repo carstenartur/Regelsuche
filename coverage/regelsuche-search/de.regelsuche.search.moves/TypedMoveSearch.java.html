@@ -300,12 +300,43 @@ import java.util.function.ToDoubleFunction;
 <span class="fc" id="L300">        return &quot;typed:&quot; + sha256(encodedSource + &quot;\n&quot; + encodedTarget + &quot;\n&quot; + rule);</span>
     }
 
+    /** Only the rule metadata needed to propose a fresh unconditional primitive edge. */
+<span class="nc" id="L304">    public record PrimitiveProposal(String rule, String family, de.regelsuche.transform.RewriteKind kind,</span>
+            boolean expanding, int costDelta, boolean equivalencePreserving, String pack, String license)
+            implements de.regelsuche.retention.RetainedGraph.View {
+        public static java.util.Optional&lt;PrimitiveProposal&gt; from(SearchMove proposal) {
+<span class="nc" id="L308">            var template = proposal.transformation();</span>
+<span class="nc bnc" id="L309" title="All 4 branches missed.">            if (proposal.sourceKind() != SearchMove.SourceKind.PRIMITIVE || !proposal.assumptions().isEmpty()</span>
+<span class="nc bnc" id="L310" title="All 4 branches missed.">                    || !proposal.capabilityDelta().isEmpty() || !template.primitiveRuleIds().equals(List.of(proposal.ruleId()))</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                    || !template.rule().equals(proposal.ruleId())</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                    || !(template.provenance() instanceof de.regelsuche.transform.TransformationProvenance.PrimitiveRewriteSequence)) {</span>
+<span class="nc" id="L313">                return java.util.Optional.empty();</span>
+            }
+<span class="nc" id="L315">            return java.util.Optional.of(new PrimitiveProposal(template.rule(), proposal.ruleFamily(), template.kind(),</span>
+<span class="nc" id="L316">                template.mayIncreaseComplexity(), template.estimatedCostDelta(), template.equivalencePreservingByConstruction(),</span>
+<span class="nc" id="L317">                template.packId(), template.license()));</span>
+        }
+
+        /** Bind a new candidate. A receiving verifier still needs to check the edge. */
+        public SearchMove bind(MoveState source, String target, long generationWork) {
+<span class="nc" id="L322">            var descriptor = new MoveProvider.Descriptor(rule, family, SearchMove.SourceKind.PRIMITIVE,</span>
+<span class="nc" id="L323">                SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, rule);</span>
+<span class="nc" id="L324">            var transformation = new Transformation(rule, target, kind, expanding, costDelta, equivalencePreserving,</span>
+<span class="nc" id="L325">                applicationKey(source.expression(), target, rule), List.of(), pack, license);</span>
+<span class="nc" id="L326">            return SearchMove.from(transformation, descriptor, generationWork);</span>
+        }
+
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) {
+<span class="nc" id="L330">            visitor.reference(rule); visitor.reference(family); visitor.reference(pack); visitor.reference(license);</span>
+<span class="nc" id="L331">        }</span>
+    }
+
     private static String sha256(String value) {
         try {
-<span class="fc" id="L305">            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L306">                .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L307">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L308">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L336">            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L337">                .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L338">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L339">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 }

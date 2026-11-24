@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SparsePolynomialForms.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">SparsePolynomialForms.java</span></div><h1>SparsePolynomialForms.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.LongConsumer;
+
+/** Source-only compact forms of small exact sparse polynomials. Each form still requires a receiver proof. */
+public final class SparsePolynomialForms {
+    private static final int MAX_TERMS = 32;
+    private static final int MAX_COEFFICIENT_BITS = 256;
+
+    private SparsePolynomialForms() {}
+
+    public static void propose(Expr source, boolean sharedArithmetic, LongConsumer work, Consumer&lt;Expr&gt; output) {
+<span class="nc" id="L24">        propose(source, sharedArithmetic, work, output, false);</span>
+<span class="nc" id="L25">    }</span>
+
+    /** Proposes the same forms and returns a lower bound for binary arithmetic tree size. */
+    public static int proposeWithSurfaceBound(Expr source, boolean sharedArithmetic, LongConsumer work, Consumer&lt;Expr&gt; output) {
+<span class="nc" id="L29">        return propose(source, sharedArithmetic, work, output, true);</span>
+    }
+
+    private static int propose(Expr source, boolean sharedArithmetic, LongConsumer work,
+            Consumer&lt;Expr&gt; output, boolean needBound) {
+<span class="nc" id="L34">        var form = new ExactResidualPolynomialArithmetic(work, true).project(source);</span>
+<span class="nc" id="L35">        var variables = form.variables().stream().sorted().toList();</span>
+<span class="nc" id="L36">        var terms = form.terms();</span>
+<span class="nc bnc" id="L37" title="All 4 branches missed.">        if (variables.size() &gt; ExactPolynomialAnalysis.MAX_VARIABLES || terms.size() &gt; MAX_TERMS) return 0;</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">        for (var scalar : terms.values()) {</span>
+<span class="nc" id="L39">            work.accept(1);</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            if (!bounded(scalar)) return 0;</span>
+<span class="nc" id="L41">        }</span>
+<span class="nc" id="L42">        var generator = new Generator(sharedArithmetic, work, output);</span>
+<span class="nc" id="L43">        generator.commonContent(terms);</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (variables.size() == 1) generator.binomialPower(variables.getFirst(), form);</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (terms.size() &gt;= 4) generator.separable(variables, terms);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        return needBound ? surfaceLowerBound(terms, variables, work) : 0;</span>
+    }
+
+    private static int surfaceLowerBound(Map&lt;Monomial, Rational&gt; terms, List&lt;String&gt; variables, LongConsumer work) {
+<span class="nc" id="L50">        int count = variables.size();</span>
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (count == 0) return 0;</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (count == 1) return univariateSurfaceBound(terms, variables.getFirst(), work);</span>
+        // With exactly count-1 binary nodes every leaf must be a different essential variable.
+        // A polynomial in that read-once tree can only use +, -, *: an exponent or a
+        // divisor in the admitted grammar must be constant. Its expansion has no constant,
+        // has only signed unit coefficients, and no variable occurs twice in a monomial.
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        for (var term : terms.entrySet()) {</span>
+<span class="nc" id="L58">            var powers = term.getKey().powers();</span>
+<span class="nc" id="L59">            work.accept(1L + powers.size());</span>
+<span class="nc" id="L60">            var coefficient = term.getValue();</span>
+<span class="nc bnc" id="L61" title="All 6 branches missed.">            if (powers.isEmpty() || !(coefficient.isOne() || coefficient.isNegativeOne())</span>
+<span class="nc bnc" id="L62" title="All 4 branches missed.">                    || powers.values().stream().anyMatch(exponent -&gt; exponent &gt; 1)) return count;</span>
+<span class="nc" id="L63">        }</span>
+<span class="nc" id="L64">        return count - 1;</span>
+    }
+
+    private static int univariateSurfaceBound(Map&lt;Monomial, Rational&gt; terms, String variable, LongConsumer work) {
+        // An expression with one operation is either a monomial or an affine form with slope ±1.
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (terms.size() &gt; 2) return 2;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        for (var term : terms.entrySet()) {</span>
+<span class="nc" id="L71">            work.accept(1);</span>
+<span class="nc" id="L72">            int exponent = term.getKey().exponentOf(variable);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (exponent != 0) return nonconstantTermBound(terms, exponent, term.getValue());</span>
+<span class="nc" id="L74">        }</span>
+<span class="nc" id="L75">        return 0;</span>
+    }
+
+    private static int nonconstantTermBound(Map&lt;Monomial, Rational&gt; terms, int exponent, Rational coefficient) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (terms.size() == 1) {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            int powerCost = exponent == 1 ? 0 : 1;</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">            return coefficient.isOne() ? powerCost : powerCost + 1;</span>
+        }
+<span class="nc bnc" id="L83" title="All 6 branches missed.">        boolean unitSlope = exponent == 1 &amp;&amp; (coefficient.isOne() || coefficient.isNegativeOne());</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        return unitSlope &amp;&amp; terms.containsKey(Monomial.constant()) ? 1 : 2;</span>
+    }
+
+    private static final class Generator {
+        private final boolean sharedArithmetic;
+        private final LongConsumer work;
+        private final Consumer&lt;Expr&gt; output;
+
+<span class="nc" id="L92">        Generator(boolean sharedArithmetic, LongConsumer work, Consumer&lt;Expr&gt; output) {</span>
+<span class="nc" id="L93">            this.sharedArithmetic = sharedArithmetic;</span>
+<span class="nc" id="L94">            this.work = work;</span>
+<span class="nc" id="L95">            this.output = output;</span>
+<span class="nc" id="L96">        }</span>
+
+        void commonContent(Map&lt;Monomial, Rational&gt; terms) {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (terms.size() &lt; 2) return;</span>
+<span class="nc" id="L100">            var common = new LinkedHashMap&lt;&gt;(terms.keySet().iterator().next().powers());</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            for (var monomial : terms.keySet()) {</span>
+<span class="nc" id="L102">                work.accept(1L + common.size());</span>
+<span class="nc" id="L103">                common.replaceAll((variable, exponent) -&gt; Math.min(exponent, monomial.exponentOf(variable)));</span>
+<span class="nc" id="L104">            }</span>
+<span class="nc" id="L105">            var scalar = content(terms.values(), work);</span>
+<span class="nc" id="L106">            var divisor = new Monomial(common);</span>
+<span class="nc bnc" id="L107" title="All 6 branches missed.">            if (!bounded(scalar) || scalar.isOne() &amp;&amp; divisor.powers().isEmpty()) return;</span>
+<span class="nc" id="L108">            var residual = new LinkedHashMap&lt;Monomial, Rational&gt;();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            for (var term : terms.entrySet()) {</span>
+<span class="nc" id="L110">                work.accept(1L + term.getKey().powers().size());</span>
+<span class="nc" id="L111">                var powers = new LinkedHashMap&lt;&gt;(term.getKey().powers());</span>
+<span class="nc" id="L112">                common.forEach((variable, exponent) -&gt; powers.computeIfPresent(variable, (key, old) -&gt; old - exponent));</span>
+<span class="nc" id="L113">                residual.put(new Monomial(powers), term.getValue().divide(scalar));</span>
+<span class="nc" id="L114">            }</span>
+<span class="nc" id="L115">            output.accept(binary(product(divisor, scalar), BinaryOperator.MUL, sum(residual)));</span>
+<span class="nc" id="L116">        }</span>
+
+        void binomialPower(String variable, Polynomial polynomial) {
+<span class="nc" id="L119">            int exponent = polynomial.totalDegree();</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">            if (exponent &lt; 2 || exponent &gt; 8) return;</span>
+<span class="nc" id="L121">            var terms = polynomial.terms();</span>
+<span class="nc" id="L122">            var leading = terms.get(powerOf(variable, exponent));</span>
+<span class="nc" id="L123">            var second = terms.getOrDefault(powerOf(variable, exponent - 1), Rational.ZERO);</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">            if (leading == null || second.isZero()) return;</span>
+<span class="nc" id="L125">            work.accept(3);</span>
+<span class="nc" id="L126">            var shift = second.divide(leading.multiply(Rational.of(exponent)));</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (!bounded(shift)) return;</span>
+<span class="nc" id="L128">            var coefficient = leading;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            for (int power = exponent; power &gt;= 0; power--) {</span>
+<span class="nc" id="L130">                work.accept(4);</span>
+<span class="nc bnc" id="L131" title="All 4 branches missed.">                if (!bounded(coefficient) || !coefficient.equals(terms.getOrDefault(powerOf(variable, power), Rational.ZERO))) return;</span>
+<span class="nc" id="L132">                coefficient = coefficient.multiply(shift).multiply(Rational.of(power)).divide(Rational.of(exponent - power + 1L));</span>
+            }
+<span class="nc" id="L134">            Expr base = append(new VariableExpr(variable), Monomial.constant(), shift);</span>
+<span class="nc" id="L135">            var raised = power(base, exponent);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            output.accept(leading.isOne() ? raised : binary(new NumberExpr(leading.exactValue()), BinaryOperator.MUL, raised));</span>
+<span class="nc" id="L137">        }</span>
+
+        void separable(List&lt;String&gt; variables, Map&lt;Monomial, Rational&gt; terms) {
+<span class="nc" id="L140">            int dimensions = variables.size();</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            for (int mask = 1; mask &lt; (1 &lt;&lt; Math.max(0, dimensions - 1)); mask++) {</span>
+<span class="nc" id="L142">                work.accept(1);</span>
+<span class="nc" id="L143">                var variableSet = new java.util.HashSet&lt;String&gt;();</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">                for (int i = 0; i &lt; dimensions; i++) if ((mask &amp; (1 &lt;&lt; i)) != 0) variableSet.add(variables.get(i));</span>
+<span class="nc" id="L145">                var rows = new LinkedHashMap&lt;Monomial, Map&lt;Monomial, Rational&gt;&gt;();</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                for (var term : terms.entrySet()) {</span>
+<span class="nc" id="L147">                    work.accept(1L + term.getKey().powers().size());</span>
+<span class="nc" id="L148">                    var left = new LinkedHashMap&lt;String, Integer&gt;();</span>
+<span class="nc" id="L149">                    var right = new LinkedHashMap&lt;String, Integer&gt;();</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                    term.getKey().powers().forEach((name, exponent) -&gt; (variableSet.contains(name) ? left : right).put(name, exponent));</span>
+<span class="nc" id="L151">                    rows.computeIfAbsent(new Monomial(left), ignored -&gt; new LinkedHashMap&lt;&gt;())</span>
+<span class="nc" id="L152">                        .put(new Monomial(right), term.getValue());</span>
+<span class="nc" id="L153">                }</span>
+<span class="nc" id="L154">                separableRows(rows, terms.size());</span>
+            }
+<span class="nc" id="L156">        }</span>
+
+        private void separableRows(Map&lt;Monomial, Map&lt;Monomial, Rational&gt;&gt; rows, int terms) {
+<span class="nc" id="L159">            var first = rows.values().iterator().next();</span>
+<span class="nc bnc" id="L160" title="All 6 branches missed.">            if (rows.size() &lt; 2 || first.size() &lt; 2 || rows.size() * first.size() != terms) return;</span>
+<span class="nc" id="L161">            var firstKey = first.keySet().iterator().next();</span>
+<span class="nc" id="L162">            var firstScale = first.get(firstKey);</span>
+<span class="nc" id="L163">            var scale = content(first.values(), work);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (!bounded(scale)) return;</span>
+<span class="nc" id="L165">            var left = new LinkedHashMap&lt;Monomial, Rational&gt;();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            for (var row : rows.entrySet()) {</span>
+<span class="nc" id="L167">                work.accept(1);</span>
+<span class="nc" id="L168">                var pivot = row.getValue().get(firstKey);</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">                if (pivot == null || row.getValue().size() != first.size()) return;</span>
+<span class="nc" id="L170">                var multiple = pivot.divide(firstScale);</span>
+<span class="nc bnc" id="L171" title="All 4 branches missed.">                if (!bounded(multiple) || !matches(first, row.getValue(), multiple)) return;</span>
+<span class="nc" id="L172">                left.put(row.getKey(), multiple);</span>
+<span class="nc" id="L173">            }</span>
+<span class="nc" id="L174">            output.accept(binary(sum(left), BinaryOperator.MUL, sum(first)));</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (scale.isOne()) return;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            for (var entry : left.entrySet()) {</span>
+<span class="nc" id="L177">                work.accept(1);</span>
+<span class="nc" id="L178">                var coefficient = entry.getValue().multiply(scale);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if (!bounded(coefficient)) return;</span>
+<span class="nc" id="L180">                entry.setValue(coefficient);</span>
+<span class="nc" id="L181">            }</span>
+<span class="nc" id="L182">            var right = new LinkedHashMap&lt;Monomial, Rational&gt;();</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            for (var term : first.entrySet()) {</span>
+<span class="nc" id="L184">                work.accept(1);</span>
+<span class="nc" id="L185">                var coefficient = term.getValue().divide(scale);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                if (!bounded(coefficient)) return;</span>
+<span class="nc" id="L187">                right.put(term.getKey(), coefficient);</span>
+<span class="nc" id="L188">            }</span>
+<span class="nc" id="L189">            output.accept(binary(sum(left), BinaryOperator.MUL, sum(right)));</span>
+<span class="nc" id="L190">        }</span>
+
+        private boolean matches(Map&lt;Monomial, Rational&gt; first, Map&lt;Monomial, Rational&gt; row, Rational multiple) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            for (var term : first.entrySet()) {</span>
+<span class="nc" id="L194">                work.accept(2);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                if (!term.getValue().multiply(multiple).equals(row.get(term.getKey()))) return false;</span>
+<span class="nc" id="L196">            }</span>
+<span class="nc" id="L197">            return true;</span>
+        }
+
+        private Expr sum(Map&lt;Monomial, Rational&gt; terms) {
+<span class="nc" id="L201">            var groups = new LinkedHashMap&lt;Rational, List&lt;Monomial&gt;&gt;();</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            for (var term : terms.entrySet()) {</span>
+<span class="nc" id="L203">                work.accept(1);</span>
+<span class="nc" id="L204">                groups.computeIfAbsent(term.getValue(), ignored -&gt; new ArrayList&lt;&gt;()).add(term.getKey());</span>
+<span class="nc" id="L205">            }</span>
+<span class="nc" id="L206">            Expr result = null;</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            for (var group : groups.entrySet()) {</span>
+<span class="nc" id="L208">                result = appendGroup(result, group.getKey(), group.getValue());</span>
+<span class="nc" id="L209">            }</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            return result == null ? new NumberExpr(0) : result;</span>
+        }
+
+        private Expr appendGroup(Expr result, Rational scalar, List&lt;Monomial&gt; monomials) {
+<span class="nc bnc" id="L214" title="All 4 branches missed.">            if (monomials.size() == 1 || scalar.abs().isOne()) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                for (var monomial : monomials) result = append(result, monomial, scalar);</span>
+<span class="nc" id="L216">                return result;</span>
+            }
+<span class="nc" id="L218">            Expr inner = null;</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            for (var monomial : monomials) inner = append(inner, monomial, Rational.ONE);</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            var factor = new NumberExpr((result == null ? scalar : scalar.abs()).exactValue());</span>
+<span class="nc" id="L221">            var scaled = binary(factor, BinaryOperator.MUL, inner);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            if (result == null) return scaled;</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            return binary(result, scalar.numerator().signum() &lt; 0 ? BinaryOperator.SUB : BinaryOperator.ADD, scaled);</span>
+        }
+
+        private Expr append(Expr result, Monomial monomial, Rational coefficient) {
+<span class="nc" id="L227">            work.accept(1);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            if (result == null) return product(monomial, coefficient);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (coefficient.isZero()) return result;</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            return binary(result, coefficient.numerator().signum() &gt; 0 ? BinaryOperator.ADD : BinaryOperator.SUB,</span>
+<span class="nc" id="L231">                product(monomial, coefficient.abs()));</span>
+        }
+
+        private Expr product(Monomial monomial, Rational coefficient) {
+<span class="nc" id="L235">            work.accept(1);</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">            Expr result = coefficient.isOne() &amp;&amp; !monomial.powers().isEmpty() ? null : new NumberExpr(coefficient.exactValue());</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            for (var variable : monomial.powers().entrySet()) {</span>
+<span class="nc" id="L238">                work.accept(1);</span>
+<span class="nc" id="L239">                var item = power(new VariableExpr(variable.getKey()), variable.getValue());</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">                result = result == null ? item : binary(result, BinaryOperator.MUL, item);</span>
+<span class="nc" id="L241">            }</span>
+<span class="nc" id="L242">            return result;</span>
+        }
+
+        private Expr power(Expr base, int exponent) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (exponent == 1) return base;</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (!sharedArithmetic) return binary(base, BinaryOperator.POW, new NumberExpr(exponent));</span>
+<span class="nc" id="L248">            Expr result = base;</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            for (int i = 1; i &lt; exponent; i++) result = binary(result, BinaryOperator.MUL, base);</span>
+<span class="nc" id="L250">            return result;</span>
+        }
+
+        private Expr binary(Expr first, BinaryOperator operator, Expr second) {
+<span class="nc" id="L254">            work.accept(1);</span>
+<span class="nc" id="L255">            return new BinaryExpr(first, operator, second);</span>
+        }
+    }
+
+    private static Monomial powerOf(String variable, int exponent) {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        return exponent == 0 ? Monomial.constant() : new Monomial(Map.of(variable, exponent));</span>
+    }
+
+    private static Rational content(Iterable&lt;Rational&gt; coefficients, LongConsumer work) {
+<span class="nc" id="L264">        BigInteger gcd = BigInteger.ZERO, lcm = BigInteger.ONE;</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        for (var scalar : coefficients) {</span>
+<span class="nc" id="L266">            work.accept(1);</span>
+<span class="nc" id="L267">            gcd = gcd.gcd(scalar.numerator());</span>
+<span class="nc" id="L268">            lcm = lcm.divide(lcm.gcd(scalar.denominator())).multiply(scalar.denominator());</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (lcm.bitLength() &gt; MAX_COEFFICIENT_BITS) return Rational.ONE;</span>
+<span class="nc" id="L270">        }</span>
+<span class="nc" id="L271">        return new Rational(gcd, lcm);</span>
+    }
+
+    private static boolean bounded(Rational scalar) {
+<span class="nc bnc" id="L275" title="All 4 branches missed.">        return scalar.numerator().bitLength() &lt;= MAX_COEFFICIENT_BITS &amp;&amp; scalar.denominator().bitLength() &lt;= MAX_COEFFICIENT_BITS;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

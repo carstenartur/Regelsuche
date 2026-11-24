@@ -55,42 +55,64 @@ public final class ExactRationalDomain implements RetainedGraph.View {
 <span class="fc" id="L55">    }</span>
 
     public Limits limits() {
-<span class="nc" id="L58">        return limits;</span>
+<span class="fc" id="L58">        return limits;</span>
     }
 
     public ExactRationalParseEvidence parse(String literal) {
-<span class="fc" id="L62">        ParsedLiteral parsed = parseLiteral(literal);</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">        return parsed.value() == null</span>
-<span class="fc" id="L64">            ? ExactRationalParseEvidence.failure(parsed.status(), parsed.detailCode(), parsed.source(), limits)</span>
-<span class="fc" id="L65">            : issueEvidence(parsed.source(), parsed.value());</span>
+<span class="pc bpc" id="L62" title="1 of 6 branches missed.">        if (limits.equals(DEFAULT_LIMITS) &amp;&amp; literal != null &amp;&amp; literal.length() == 1) {</span>
+<span class="fc" id="L63">            int digit = literal.charAt(0) - '0';</span>
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">            if (digit &gt;= 0 &amp;&amp; digit &lt;= 9) return DigitEvidence.VALUES[digit];</span>
+        }
+<span class="fc" id="L66">        return parseEvidence(literal);</span>
+    }
+
+    /** Reconstruct evidence for independent replay directly from the spelling and declared limits. */
+    ExactRationalParseEvidence parseEvidence(String literal) {
+<span class="fc" id="L71">        ParsedLiteral parsed = parseLiteral(literal);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        return parsed.value() == null</span>
+<span class="fc" id="L73">            ? ExactRationalParseEvidence.failure(parsed.status(), parsed.detailCode(), parsed.source(), limits)</span>
+<span class="fc" id="L74">            : issueEvidence(parsed.source(), parsed.value());</span>
+    }
+
+    private static final class DigitEvidence {
+<span class="fc" id="L78">        private static final ExactRationalParseEvidence[] VALUES = create();</span>
+
+        private static ExactRationalParseEvidence[] create() {
+<span class="fc" id="L81">            var domain = new ExactRationalDomain();</span>
+<span class="fc" id="L82">            var values = new ExactRationalParseEvidence[10];</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">            for (int digit = 0; digit &lt; values.length; digit++) {</span>
+<span class="fc" id="L84">                values[digit] = domain.parseEvidence(Integer.toString(digit));</span>
+            }
+<span class="fc" id="L86">            return values;</span>
+        }
     }
 
     /** Parses under the identical source policy without constructing unused certificates. */
     public ExactRational parseValue(String literal) {
-<span class="fc" id="L70">        ParsedLiteral parsed = parseLiteral(literal);</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (parsed.value() == null) {</span>
-<span class="fc" id="L72">            throw new IllegalArgumentException(&quot;Invalid exact number: &quot; + parsed.detailCode());</span>
+<span class="fc" id="L92">        ParsedLiteral parsed = parseLiteral(literal);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (parsed.value() == null) {</span>
+<span class="fc" id="L94">            throw new IllegalArgumentException(&quot;Invalid exact number: &quot; + parsed.detailCode());</span>
         }
-<span class="fc" id="L74">        return parsed.value();</span>
+<span class="fc" id="L96">        return parsed.value();</span>
     }
 
     private ParsedLiteral parseLiteral(String literal) {
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        String raw = literal == null ? &quot;&quot; : literal;</span>
-<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (raw.length() &gt; limits.maxLiteralCharacters()) {</span>
-<span class="fc" id="L80">            return failure(</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        String raw = literal == null ? &quot;&quot; : literal;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (raw.length() &gt; limits.maxLiteralCharacters()) {</span>
+<span class="fc" id="L102">            return failure(</span>
                 Status.LIMIT_EXCEEDED,
                 &quot;LITERAL_CHARACTER_LIMIT_EXCEEDED&quot;,
-<span class="fc" id="L83">                boundedSource(raw));</span>
+<span class="fc" id="L105">                boundedSource(raw));</span>
         }
 
-<span class="fc" id="L86">        String source = raw.strip();</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (source.isEmpty()) {</span>
-<span class="fc" id="L88">            return failure(</span>
+<span class="fc" id="L108">        String source = raw.strip();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (source.isEmpty()) {</span>
+<span class="fc" id="L110">            return failure(</span>
                 Status.UNSUPPORTED,
                 &quot;LITERAL_BLANK&quot;,
                 source);
         }
-<span class="fc" id="L93">        return parseBounded(source);</span>
+<span class="fc" id="L115">        return parseBounded(source);</span>
     }
 
     /**
@@ -102,19 +124,19 @@ public final class ExactRationalDomain implements RetainedGraph.View {
      * possess parser-issued literal evidence must use that evidence instead.&lt;/p&gt;
      */
     public static Optional&lt;ExactRational&gt; legacyDecimalValue(double value) {
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (!Double.isFinite(value)) {</span>
-<span class="fc" id="L106">            return Optional.empty();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (!Double.isFinite(value)) {</span>
+<span class="fc" id="L128">            return Optional.empty();</span>
         }
-<span class="fc" id="L108">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
-<span class="fc" id="L109">        BigInteger numerator = decimal.unscaledValue();</span>
-<span class="fc" id="L110">        int scale = decimal.scale();</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (scale &lt; 0) {</span>
-<span class="fc" id="L112">            numerator = numerator.multiply(BigInteger.TEN.pow(-scale));</span>
-<span class="fc" id="L113">            return Optional.of(ExactRational.integer(numerator));</span>
+<span class="fc" id="L130">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
+<span class="fc" id="L131">        BigInteger numerator = decimal.unscaledValue();</span>
+<span class="fc" id="L132">        int scale = decimal.scale();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (scale &lt; 0) {</span>
+<span class="fc" id="L134">            numerator = numerator.multiply(BigInteger.TEN.pow(-scale));</span>
+<span class="fc" id="L135">            return Optional.of(ExactRational.integer(numerator));</span>
         }
-<span class="fc" id="L115">        return Optional.of(new ExactRational(</span>
+<span class="fc" id="L137">        return Optional.of(new ExactRational(</span>
             numerator,
-<span class="fc" id="L117">            BigInteger.TEN.pow(scale)));</span>
+<span class="fc" id="L139">            BigInteger.TEN.pow(scale)));</span>
     }
 
     /**
@@ -129,47 +151,47 @@ public final class ExactRationalDomain implements RetainedGraph.View {
     public static OptionalDouble exactLegacyDecimalDouble(
         ExactRational value
     ) {
-<span class="fc" id="L132">        Objects.requireNonNull(value, &quot;value&quot;);</span>
-<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (value.numerator().abs().bitLength() &gt; MAX_LEGACY_BRIDGE_BITS</span>
-<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                || value.denominator().bitLength() &gt; MAX_LEGACY_BRIDGE_BITS) {</span>
-<span class="fc" id="L135">            return OptionalDouble.empty();</span>
+<span class="fc" id="L154">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (value.numerator().abs().bitLength() &gt; MAX_LEGACY_BRIDGE_BITS</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                || value.denominator().bitLength() &gt; MAX_LEGACY_BRIDGE_BITS) {</span>
+<span class="fc" id="L157">            return OptionalDouble.empty();</span>
         }
         try {
-<span class="fc" id="L138">            BigDecimal decimal = new BigDecimal(value.numerator())</span>
-<span class="fc" id="L139">                .divide(new BigDecimal(value.denominator()));</span>
-<span class="fc" id="L140">            double legacy = decimal.doubleValue();</span>
-<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (!Double.isFinite(legacy)) {</span>
-<span class="nc" id="L142">                return OptionalDouble.empty();</span>
+<span class="fc" id="L160">            BigDecimal decimal = new BigDecimal(value.numerator())</span>
+<span class="fc" id="L161">                .divide(new BigDecimal(value.denominator()));</span>
+<span class="fc" id="L162">            double legacy = decimal.doubleValue();</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (!Double.isFinite(legacy)) {</span>
+<span class="nc" id="L164">                return OptionalDouble.empty();</span>
             }
-<span class="fc" id="L144">            Optional&lt;ExactRational&gt; roundTrip = legacyDecimalValue(legacy);</span>
-<span class="pc bpc" id="L145" title="1 of 4 branches missed.">            return roundTrip.isPresent() &amp;&amp; roundTrip.get().equals(value)</span>
-<span class="fc" id="L146">                ? OptionalDouble.of(legacy)</span>
-<span class="fc" id="L147">                : OptionalDouble.empty();</span>
-<span class="fc" id="L148">        } catch (ArithmeticException nonterminatingDecimal) {</span>
-<span class="fc" id="L149">            return OptionalDouble.empty();</span>
+<span class="fc" id="L166">            Optional&lt;ExactRational&gt; roundTrip = legacyDecimalValue(legacy);</span>
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">            return roundTrip.isPresent() &amp;&amp; roundTrip.get().equals(value)</span>
+<span class="fc" id="L168">                ? OptionalDouble.of(legacy)</span>
+<span class="fc" id="L169">                : OptionalDouble.empty();</span>
+<span class="fc" id="L170">        } catch (ArithmeticException nonterminatingDecimal) {</span>
+<span class="fc" id="L171">            return OptionalDouble.empty();</span>
         }
     }
 
     private ParsedLiteral parseBounded(String source) {
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (INTEGER.matcher(source).matches()) {</span>
-<span class="fc" id="L155">            return parseInteger(source);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (INTEGER.matcher(source).matches()) {</span>
+<span class="fc" id="L177">            return parseInteger(source);</span>
         }
-<span class="fc" id="L157">        Matcher fraction = FRACTION.matcher(source);</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (fraction.matches()) {</span>
-<span class="fc" id="L159">            return parseFraction(</span>
+<span class="fc" id="L179">        Matcher fraction = FRACTION.matcher(source);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (fraction.matches()) {</span>
+<span class="fc" id="L181">            return parseFraction(</span>
                 source,
-<span class="fc" id="L161">                fraction.group(1),</span>
-<span class="fc" id="L162">                fraction.group(2));</span>
+<span class="fc" id="L183">                fraction.group(1),</span>
+<span class="fc" id="L184">                fraction.group(2));</span>
         }
-<span class="fc" id="L164">        Matcher decimal = DECIMAL.matcher(source);</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (decimal.matches()) {</span>
-<span class="fc" id="L166">            return parseDecimal(</span>
+<span class="fc" id="L186">        Matcher decimal = DECIMAL.matcher(source);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (decimal.matches()) {</span>
+<span class="fc" id="L188">            return parseDecimal(</span>
                 source,
-<span class="fc" id="L168">                decimal.group(1),</span>
-<span class="fc" id="L169">                decimal.group(2),</span>
-<span class="fc" id="L170">                decimal.group(3));</span>
+<span class="fc" id="L190">                decimal.group(1),</span>
+<span class="fc" id="L191">                decimal.group(2),</span>
+<span class="fc" id="L192">                decimal.group(3));</span>
         }
-<span class="fc" id="L172">        return failure(</span>
+<span class="fc" id="L194">        return failure(</span>
             Status.UNSUPPORTED,
             &quot;LITERAL_GRAMMAR_UNSUPPORTED&quot;,
             source);
@@ -180,20 +202,20 @@ public final class ExactRationalDomain implements RetainedGraph.View {
         String numeratorText,
         String denominatorText
     ) {
-<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (signedDigitsAreZero(denominatorText)) {</span>
-<span class="fc" id="L184">            return failure(</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (signedDigitsAreZero(denominatorText)) {</span>
+<span class="fc" id="L206">            return failure(</span>
                 Status.ZERO_DENOMINATOR,
                 &quot;RATIONAL_DENOMINATOR_ZERO&quot;,
                 source);
         }
-<span class="fc" id="L189">        if (digitCount(numeratorText) + digitCount(denominatorText)</span>
-<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                &gt; limits.maxDigits()) {</span>
-<span class="nc" id="L191">            return failure(</span>
+<span class="fc" id="L211">        if (digitCount(numeratorText) + digitCount(denominatorText)</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                &gt; limits.maxDigits()) {</span>
+<span class="nc" id="L213">            return failure(</span>
                 Status.LIMIT_EXCEEDED,
                 &quot;RATIONAL_DIGIT_LIMIT_EXCEEDED&quot;,
                 source);
         }
-<span class="fc" id="L196">        return exact(</span>
+<span class="fc" id="L218">        return exact(</span>
             source,
             new ExactRational(
                 new BigInteger(numeratorText),
@@ -201,15 +223,15 @@ public final class ExactRationalDomain implements RetainedGraph.View {
     }
 
     private ParsedLiteral parseInteger(String source) {
-<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (digitCount(source) &gt; limits.maxDigits()) {</span>
-<span class="fc" id="L205">            return failure(</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (digitCount(source) &gt; limits.maxDigits()) {</span>
+<span class="fc" id="L227">            return failure(</span>
                 Status.LIMIT_EXCEEDED,
                 &quot;INTEGER_DIGIT_LIMIT_EXCEEDED&quot;,
                 source);
         }
-<span class="fc" id="L210">        return exact(</span>
+<span class="fc" id="L232">        return exact(</span>
             source,
-<span class="fc" id="L212">            ExactRational.integer(new BigInteger(source)));</span>
+<span class="fc" id="L234">            ExactRational.integer(new BigInteger(source)));</span>
     }
 
     private ParsedLiteral parseDecimal(
@@ -218,43 +240,43 @@ public final class ExactRationalDomain implements RetainedGraph.View {
         String integral,
         String fractional
     ) {
-<span class="fc" id="L221">        if (integral.length() + fractional.length()</span>
-<span class="fc bfc" id="L222" title="All 2 branches covered.">                &gt; limits.maxDigits()) {</span>
-<span class="fc" id="L223">            return failure(</span>
+<span class="fc" id="L243">        if (integral.length() + fractional.length()</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                &gt; limits.maxDigits()) {</span>
+<span class="fc" id="L245">            return failure(</span>
                 Status.LIMIT_EXCEEDED,
                 &quot;DECIMAL_DIGIT_LIMIT_EXCEEDED&quot;,
                 source);
         }
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (fractional.length() &gt; limits.maxDecimalScale()) {</span>
-<span class="fc" id="L229">            return failure(</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (fractional.length() &gt; limits.maxDecimalScale()) {</span>
+<span class="fc" id="L251">            return failure(</span>
                 Status.LIMIT_EXCEEDED,
                 &quot;DECIMAL_SCALE_LIMIT_EXCEEDED&quot;,
                 source);
         }
-<span class="fc" id="L234">        BigInteger unscaled = new BigInteger(</span>
+<span class="fc" id="L256">        BigInteger unscaled = new BigInteger(</span>
             sign + integral + fractional);
-<span class="fc" id="L236">        BigInteger scale = BigInteger.TEN.pow(fractional.length());</span>
-<span class="fc" id="L237">        return exact(</span>
+<span class="fc" id="L258">        BigInteger scale = BigInteger.TEN.pow(fractional.length());</span>
+<span class="fc" id="L259">        return exact(</span>
             source,
             new ExactRational(unscaled, scale));
     }
 
     private static ParsedLiteral exact(String source, ExactRational value) {
-<span class="fc" id="L243">        return new ParsedLiteral(source, Status.EXACT, &quot;EXACT_RATIONAL_LITERAL_ACCEPTED&quot;, value);</span>
+<span class="fc" id="L265">        return new ParsedLiteral(source, Status.EXACT, &quot;EXACT_RATIONAL_LITERAL_ACCEPTED&quot;, value);</span>
     }
 
     private ExactRationalParseEvidence issueEvidence(String source, ExactRational value) {
-<span class="fc" id="L247">        String canonical = value.canonicalText();</span>
-<span class="fc" id="L248">        String valueId = hash(lengthPrefixed(</span>
+<span class="fc" id="L269">        String canonical = value.canonicalText();</span>
+<span class="fc" id="L270">        String valueId = hash(lengthPrefixed(</span>
             DOMAIN_ID + &quot;.value&quot;,
             canonical));
-<span class="fc" id="L251">        String certificate = hash(lengthPrefixed(</span>
+<span class="fc" id="L273">        String certificate = hash(lengthPrefixed(</span>
             DOMAIN_ID + &quot;.parse&quot;,
-<span class="fc" id="L253">            limits.canonicalMaterial(),</span>
+<span class="fc" id="L275">            limits.canonicalMaterial(),</span>
             source,
             canonical,
             valueId));
-<span class="fc" id="L257">        return ExactRationalParseEvidence.exact(</span>
+<span class="fc" id="L279">        return ExactRationalParseEvidence.exact(</span>
             source,
             limits,
             value,
@@ -264,66 +286,66 @@ public final class ExactRationalDomain implements RetainedGraph.View {
     }
 
     private static ParsedLiteral failure(Status status, String detailCode, String source) {
-<span class="fc" id="L267">        return new ParsedLiteral(source, status, detailCode, null);</span>
+<span class="fc" id="L289">        return new ParsedLiteral(source, status, detailCode, null);</span>
     }
 
-<span class="fc" id="L270">    private record ParsedLiteral(String source, Status status, String detailCode, ExactRational value) { }</span>
+<span class="fc" id="L292">    private record ParsedLiteral(String source, Status status, String detailCode, ExactRational value) { }</span>
 
     private String boundedSource(String raw) {
-<span class="fc" id="L273">        return raw.substring(0, limits.maxLiteralCharacters());</span>
+<span class="fc" id="L295">        return raw.substring(0, limits.maxLiteralCharacters());</span>
     }
 
     private static boolean signedDigitsAreZero(String value) {
-<span class="pc bpc" id="L277" title="1 of 4 branches missed.">        int index = value.startsWith(&quot;+&quot;) || value.startsWith(&quot;-&quot;)</span>
-<span class="fc" id="L278">            ? 1</span>
-<span class="fc" id="L279">            : 0;</span>
-<span class="fc bfc" id="L280" title="All 2 branches covered.">        while (index &lt; value.length()) {</span>
-<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (value.charAt(index) != '0') {</span>
-<span class="fc" id="L282">                return false;</span>
+<span class="pc bpc" id="L299" title="1 of 4 branches missed.">        int index = value.startsWith(&quot;+&quot;) || value.startsWith(&quot;-&quot;)</span>
+<span class="fc" id="L300">            ? 1</span>
+<span class="fc" id="L301">            : 0;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        while (index &lt; value.length()) {</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (value.charAt(index) != '0') {</span>
+<span class="fc" id="L304">                return false;</span>
             }
-<span class="fc" id="L284">            index++;</span>
+<span class="fc" id="L306">            index++;</span>
         }
-<span class="fc" id="L286">        return true;</span>
+<span class="fc" id="L308">        return true;</span>
     }
 
     private static int digitCount(String value) {
-<span class="fc" id="L290">        int count = 0;</span>
-<span class="fc bfc" id="L291" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
-<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (Character.isDigit(value.charAt(index))) {</span>
-<span class="fc" id="L293">                count++;</span>
+<span class="fc" id="L312">        int count = 0;</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (Character.isDigit(value.charAt(index))) {</span>
+<span class="fc" id="L315">                count++;</span>
             }
         }
-<span class="fc" id="L296">        return count;</span>
+<span class="fc" id="L318">        return count;</span>
     }
 
     static String lengthPrefixed(String... values) {
-<span class="fc" id="L300">        StringBuilder material = new StringBuilder();</span>
-<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (String value : values) {</span>
-<span class="fc" id="L302">            int byteLength = value.getBytes(StandardCharsets.UTF_8).length;</span>
-<span class="fc" id="L303">            material.append(byteLength)</span>
-<span class="fc" id="L304">                .append(':')</span>
-<span class="fc" id="L305">                .append(value);</span>
+<span class="fc" id="L322">        StringBuilder material = new StringBuilder();</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L324">            int byteLength = value.getBytes(StandardCharsets.UTF_8).length;</span>
+<span class="fc" id="L325">            material.append(byteLength)</span>
+<span class="fc" id="L326">                .append(':')</span>
+<span class="fc" id="L327">                .append(value);</span>
         }
-<span class="fc" id="L307">        return material.toString();</span>
+<span class="fc" id="L329">        return material.toString();</span>
     }
 
     static String hash(String material) {
         try {
-<span class="fc" id="L312">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L313">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L314">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
-<span class="nc" id="L315">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L316">            throw new IllegalStateException(</span>
+<span class="fc" id="L334">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L335">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L336">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L337">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L338">            throw new IllegalStateException(</span>
                 &quot;SHA-256 unavailable&quot;,
                 exception);
         }
     }
 
-<span class="fc" id="L322">    public enum Status {</span>
-<span class="fc" id="L323">        EXACT,</span>
-<span class="fc" id="L324">        UNSUPPORTED,</span>
-<span class="fc" id="L325">        ZERO_DENOMINATOR,</span>
-<span class="fc" id="L326">        LIMIT_EXCEEDED</span>
+<span class="fc" id="L344">    public enum Status {</span>
+<span class="fc" id="L345">        EXACT,</span>
+<span class="fc" id="L346">        UNSUPPORTED,</span>
+<span class="fc" id="L347">        ZERO_DENOMINATOR,</span>
+<span class="fc" id="L348">        LIMIT_EXCEEDED</span>
     }
 
     public record Limits(
@@ -331,23 +353,23 @@ public final class ExactRationalDomain implements RetainedGraph.View {
         int maxDigits,
         int maxDecimalScale
     ) implements RetainedGraph.View {
-<span class="fc" id="L334">    @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L356">    @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
 
-<span class="fc" id="L336">        public Limits {</span>
-<span class="pc bpc" id="L337" title="5 of 14 branches missed.">            if (maxLiteralCharacters &lt; 1</span>
+<span class="fc" id="L358">        public Limits {</span>
+<span class="pc bpc" id="L359" title="5 of 14 branches missed.">            if (maxLiteralCharacters &lt; 1</span>
                     || maxLiteralCharacters &gt; MAX_LITERAL_CHARACTERS
                     || maxDigits &lt; 1
                     || maxDigits &gt; MAX_DIGITS
                     || maxDecimalScale &lt; 0
                     || maxDecimalScale &gt; MAX_DECIMAL_SCALE
                     || maxDecimalScale &gt; maxDigits) {
-<span class="fc" id="L344">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L366">                throw new IllegalArgumentException(</span>
                     &quot;exact rational limits are invalid&quot;);
             }
-<span class="fc" id="L347">        }</span>
+<span class="fc" id="L369">        }</span>
 
         String canonicalMaterial() {
-<span class="fc" id="L350">            return maxLiteralCharacters + &quot;:&quot;</span>
+<span class="fc" id="L372">            return maxLiteralCharacters + &quot;:&quot;</span>
                 + maxDigits + &quot;:&quot;
                 + maxDecimalScale;
         }

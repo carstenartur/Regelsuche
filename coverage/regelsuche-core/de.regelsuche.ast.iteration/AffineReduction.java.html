@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineReduction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.ast.iteration</a> &gt; <span class="el_source">AffineReduction.java</span></div><h1>AffineReduction.java</h1><pre class="source lang-java linenums">package de.regelsuche.ast.iteration;
+
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * A scalar reduction over integer affine domains, reading one element of a
+ * zero-based one-dimensional input at each reduction point.
+ */
+public record AffineReduction(Operator operator, List&lt;Form&gt; parameters, List&lt;Form&gt; inputs,
+        int outputRank, List&lt;Form&gt; outputs, int reductionRank, List&lt;Form&gt; reductions, int inputIndex) {
+    private static final int MAX_CONSTRAINTS = 12;
+    private static final int MAX_COEFFICIENT = 2_048;
+
+<span class="nc" id="L15">    public enum Operator { SUM, MAX }</span>
+
+    /** A term in an inequality of the form value &gt;= 0. */
+    public record Form(int constant, int parameter, List&lt;Integer&gt; coordinates) {
+<span class="nc" id="L19">        public Form {</span>
+<span class="nc bnc" id="L20" title="All 6 branches missed.">            if (coordinates.size() &gt; 4 || !bounded(constant) || !bounded(parameter)</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">                    || !coordinates.stream().allMatch(Form::bounded)) {</span>
+<span class="nc" id="L22">                throw new IllegalArgumentException(&quot;AFFINE_FORM_LIMIT&quot;);</span>
+            }
+<span class="nc" id="L24">            coordinates = List.copyOf(coordinates);</span>
+<span class="nc" id="L25">        }</span>
+
+        private static boolean bounded(int value) {
+<span class="nc bnc" id="L28" title="All 4 branches missed.">            return value &gt;= -MAX_COEFFICIENT &amp;&amp; value &lt;= MAX_COEFFICIENT;</span>
+        }
+
+        public long evaluate(int size, int... axes) {
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            if (axes.length != coordinates.size()) {</span>
+<span class="nc" id="L33">                throw new IllegalArgumentException(&quot;AFFINE_RANK_MISMATCH&quot;);</span>
+            }
+<span class="nc" id="L35">            long value = constant + (long) parameter * size;</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">            for (int axis = 0; axis &lt; axes.length; axis++) {</span>
+<span class="nc" id="L37">                value += (long) coordinates.get(axis) * axes[axis];</span>
+            }
+<span class="nc" id="L39">            return value;</span>
+        }
+    }
+
+<span class="nc" id="L43">    public AffineReduction {</span>
+<span class="nc" id="L44">        Objects.requireNonNull(operator);</span>
+<span class="nc bnc" id="L45" title="All 12 branches missed.">        if (outputRank &lt; 1 || outputRank &gt; 2 || reductionRank &lt; 1 || reductionRank &gt; 2</span>
+                || inputIndex &lt; 0 || inputIndex &gt;= reductionRank) {
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;AFFINE_REDUCTION_RANK&quot;);</span>
+        }
+<span class="nc" id="L49">        parameters = domain(parameters, 0);</span>
+<span class="nc" id="L50">        inputs = domain(inputs, 1);</span>
+<span class="nc" id="L51">        outputs = domain(outputs, outputRank);</span>
+        // The reduction domain lists output axes followed by reduction binders.
+<span class="nc" id="L53">        reductions = domain(reductions, outputRank + reductionRank);</span>
+<span class="nc" id="L54">    }</span>
+
+    private static List&lt;Form&gt; domain(List&lt;Form&gt; forms, int rank) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (forms.size() &gt; MAX_CONSTRAINTS</span>
+<span class="nc bnc" id="L58" title="All 4 branches missed.">                || forms.stream().anyMatch(form -&gt; form.coordinates().size() != rank)) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(&quot;AFFINE_DOMAIN_LIMIT&quot;);</span>
+        }
+<span class="nc" id="L61">        return List.copyOf(forms);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

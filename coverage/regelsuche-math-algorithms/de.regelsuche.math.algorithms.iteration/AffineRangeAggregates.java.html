@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineRangeAggregates.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">AffineRangeAggregates.java</span></div><h1>AffineRangeAggregates.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.math.algorithms.iteration.AffineReductionPlan.Window;
+import de.regelsuche.math.algorithms.iteration.IterationPolynomial.Work;
+import java.math.BigInteger;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+
+final class AffineRangeAggregates {
+    private AffineRangeAggregates() {}
+
+    static List&lt;BigInteger&gt; sums(List&lt;BigInteger&gt; input, List&lt;Window&gt; windows, boolean weighted, Work work) {
+<span class="fc" id="L14">        var prefix = new BigInteger[input.size() + 1];</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        var moments = weighted ? new BigInteger[prefix.length] : null;</span>
+<span class="fc" id="L16">        prefix[0] = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (moments != null) moments[0] = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        for (int i = 0; i &lt; input.size(); i++) {</span>
+<span class="fc" id="L19">            var value = input.get(i);</span>
+<span class="fc" id="L20">            prefix[i + 1] = checked(prefix[i].add(value), work);</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            if (moments != null) {</span>
+<span class="fc" id="L22">                var moment = checked(value.multiply(BigInteger.valueOf(i)), work);</span>
+<span class="fc" id="L23">                moments[i + 1] = checked(moments[i].add(moment), work);</span>
+            }
+        }
+<span class="fc" id="L26">        var values = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (var window : windows) {</span>
+<span class="fc" id="L28">            var value = rangeSum(prefix, window, work);</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            if (moments != null) value = weightedSum(value, moments, window, work);</span>
+<span class="fc" id="L30">            values.add(value);</span>
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        return values;</span>
+    }
+
+    private static BigInteger rangeSum(BigInteger[] summary, Window window, Work work) {
+<span class="fc" id="L36">        return checked(summary[window.upper() + 1].subtract(summary[window.lower()]), work);</span>
+    }
+
+    private static BigInteger weightedSum(BigInteger sum, BigInteger[] moments, Window window, Work work) {
+<span class="fc" id="L40">        var constant = checked(sum.multiply(BigInteger.valueOf(window.weightConstant())), work);</span>
+<span class="fc" id="L41">        var linear = checked(rangeSum(moments, window, work)</span>
+<span class="fc" id="L42">            .multiply(BigInteger.valueOf(window.weightSlope())), work);</span>
+<span class="fc" id="L43">        return checked(constant.add(linear), work);</span>
+    }
+
+    static List&lt;BigInteger&gt; maxima(List&lt;BigInteger&gt; input, List&lt;Window&gt; windows, Work work) {
+<span class="fc" id="L47">        boolean prefixes = true;</span>
+<span class="fc" id="L48">        boolean monotone = true;</span>
+<span class="fc" id="L49">        int left = 0;</span>
+<span class="fc" id="L50">        int right = 0;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (var window : windows) {</span>
+<span class="fc" id="L52">            work.charge(1);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            prefixes &amp;= window.lower() == 0;</span>
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">            monotone &amp;= window.lower() &gt;= left &amp;&amp; window.upper() &gt;= right;</span>
+<span class="fc" id="L55">            left = window.lower();</span>
+<span class="fc" id="L56">            right = window.upper();</span>
+<span class="fc" id="L57">        }</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (prefixes) return prefixMaxima(input, windows, work);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (monotone) return monotoneMaxima(input, windows, work);</span>
+<span class="fc" id="L60">        return indexedMaxima(input, windows, work);</span>
+    }
+
+    private static List&lt;BigInteger&gt; prefixMaxima(List&lt;BigInteger&gt; input, List&lt;Window&gt; windows, Work work) {
+<span class="nc" id="L64">        var prefix = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="nc" id="L65">        BigInteger maximum = null;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        for (var value : input) {</span>
+<span class="nc" id="L67">            maximum = max(maximum, value, work);</span>
+<span class="nc" id="L68">            prefix.add(maximum);</span>
+<span class="nc" id="L69">        }</span>
+<span class="nc" id="L70">        var result = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        for (var window : windows) {</span>
+<span class="nc" id="L72">            work.charge(1);</span>
+<span class="nc" id="L73">            result.add(prefix.get(window.upper()));</span>
+<span class="nc" id="L74">        }</span>
+<span class="nc" id="L75">        return result;</span>
+    }
+
+    private static List&lt;BigInteger&gt; monotoneMaxima(List&lt;BigInteger&gt; input, List&lt;Window&gt; windows, Work work) {
+<span class="fc" id="L79">        var active = new ArrayDeque&lt;Integer&gt;();</span>
+<span class="fc" id="L80">        var result = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc" id="L81">        int next = 0;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (var window : windows) {</span>
+<span class="fc" id="L83">            work.charge(1);</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">            while (!active.isEmpty() &amp;&amp; active.getFirst() &lt; window.lower()) {</span>
+<span class="fc" id="L85">                work.charge(1);</span>
+<span class="fc" id="L86">                active.removeFirst();</span>
+            }
+<span class="fc" id="L88">            next = Math.max(next, window.lower());</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            while (next &lt;= window.upper()) {</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">                while (!active.isEmpty() &amp;&amp; compare(input.get(active.getLast()), input.get(next), work) &lt;= 0) {</span>
+<span class="fc" id="L91">                    active.removeLast();</span>
+                }
+<span class="fc" id="L93">                work.charge(1);</span>
+<span class="fc" id="L94">                active.addLast(next++);</span>
+            }
+<span class="fc" id="L96">            result.add(input.get(active.getFirst()));</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        return result;</span>
+    }
+
+    private static List&lt;BigInteger&gt; indexedMaxima(List&lt;BigInteger&gt; input, List&lt;Window&gt; windows, Work work) {
+<span class="fc" id="L102">        int leaves = input.size();</span>
+<span class="fc" id="L103">        var tree = new BigInteger[2 * leaves];</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int i = 0; i &lt; leaves; i++) {</span>
+<span class="fc" id="L105">            work.charge(1);</span>
+<span class="fc" id="L106">            tree[leaves + i] = input.get(i);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int i = leaves - 1; i &gt; 0; i--) tree[i] = max(tree[2 * i], tree[2 * i + 1], work);</span>
+<span class="fc" id="L109">        var result = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (var window : windows) result.add(query(tree, leaves, window, work));</span>
+<span class="fc" id="L111">        return result;</span>
+    }
+
+    private static BigInteger query(BigInteger[] tree, int leaves, Window window, Work work) {
+<span class="fc" id="L115">        int left = leaves + window.lower(), right = leaves + window.upper();</span>
+<span class="fc" id="L116">        BigInteger result = null;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        while (left &lt;= right) {</span>
+<span class="fc" id="L118">            work.charge(1);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (left % 2 == 1) result = max(result, tree[left++], work);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (right % 2 == 0) result = max(result, tree[right--], work);</span>
+<span class="fc" id="L121">            left /= 2;</span>
+<span class="fc" id="L122">            right /= 2;</span>
+        }
+<span class="fc" id="L124">        return result;</span>
+    }
+
+    private static BigInteger max(BigInteger left, BigInteger right, Work work) {
+<span class="fc bfc" id="L128" title="All 4 branches covered.">        if (left != null) return compare(left, right, work) &lt;= 0 ? right : left;</span>
+<span class="fc" id="L129">        work.charge(1);</span>
+<span class="fc" id="L130">        return right;</span>
+    }
+
+    private static int compare(BigInteger left, BigInteger right, Work work) {
+<span class="fc" id="L134">        work.charge(1 + Math.max(left.bitLength(), right.bitLength()) / 64L);</span>
+<span class="fc" id="L135">        return left.compareTo(right);</span>
+    }
+
+    private static BigInteger checked(BigInteger value, Work work) {
+<span class="fc" id="L139">        work.runtimeInteger(value);</span>
+<span class="fc" id="L140">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

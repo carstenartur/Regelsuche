@@ -2,6 +2,7 @@
 
 import de.regelsuche.ast.*;
 import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.search.moves.TypedSourceOnlySearch;
 import java.util.ArrayDeque;
 import java.util.Objects;
@@ -11,33 +12,90 @@ final class TypedPolynomialSurfaceCost {
     private TypedPolynomialSurfaceCost() { }
     private static final class Emission implements java.util.function.LongConsumer, de.regelsuche.retention.RetainedGraph.View {
         private long units;
-<span class="fc" id="L14">        @Override public void accept(long amount) { units = Math.addExact(units, amount); }</span>
-<span class="nc" id="L15">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }</span>
+<span class="fc" id="L15">        @Override public void accept(long amount) { units = Math.addExact(units, amount); }</span>
+<span class="nc" id="L16">        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) { }</span>
     }
     static TypedSourceOnlySearch.Score evaluate(Expr expression) {
-<span class="fc" id="L18">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
-<span class="fc" id="L19">        pending.push(Objects.requireNonNull(expression, &quot;expression&quot;));</span>
-<span class="fc" id="L20">        long cost = 0, work = 0;</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L22">            Expr next = pending.pop();</span>
-<span class="fc" id="L23">            work = Math.addExact(work, 1);</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (next instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L25">                cost = Math.addExact(cost, 1);</span>
-<span class="fc" id="L26">                pending.push(binary.right()); pending.push(binary.left());</span>
-<span class="fc bfc" id="L27" title="All 2 branches covered.">            } else if (next instanceof NumberExpr number) {</span>
+<span class="fc" id="L19">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L20">        pending.push(Objects.requireNonNull(expression, &quot;expression&quot;));</span>
+<span class="fc" id="L21">        long cost = 0, work = 0;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L23">            Expr next = pending.pop();</span>
+<span class="fc" id="L24">            work = Math.addExact(work, 1);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            if (next instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L26">                cost = Math.addExact(cost, 1);</span>
+<span class="fc" id="L27">                pending.push(binary.right()); pending.push(binary.left());</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            } else if (next instanceof NumberExpr number) {</span>
                 // A typed rational leaf may print as a decimal, a fraction, or a negative.
                 // Inspect only its surface spelling; never format/reparse whole states.
-<span class="fc" id="L30">                var emitted = new Emission();</span>
-<span class="fc" id="L31">                String spelling = ExpressionFormatter.formatMeasured(number, emitted);</span>
-<span class="fc" id="L32">                work = Math.addExact(work, Math.addExact(emitted.units, spelling.length()));</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">                for (int i = 0; i &lt; spelling.length(); i++) {</span>
-<span class="fc bfc" id="L34" title="All 4 branches covered.">                    if (spelling.charAt(i) == '-' || spelling.charAt(i) == '/') cost = Math.addExact(cost, 1);</span>
+<span class="fc" id="L31">                var emitted = new Emission();</span>
+<span class="fc" id="L32">                String spelling = ExpressionFormatter.formatMeasured(number, emitted);</span>
+<span class="fc" id="L33">                work = Math.addExact(work, Math.addExact(emitted.units, spelling.length()));</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">                for (int i = 0; i &lt; spelling.length(); i++) {</span>
+<span class="fc bfc" id="L35" title="All 4 branches covered.">                    if (spelling.charAt(i) == '-' || spelling.charAt(i) == '/') cost = Math.addExact(cost, 1);</span>
                 }
-<span class="fc bfc" id="L36" title="All 2 branches covered.">            } else if (!(next instanceof VariableExpr)) {</span>
-<span class="fc" id="L37">                throw new IllegalArgumentException(&quot;not polynomial surface syntax&quot;);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            } else if (!(next instanceof VariableExpr)) {</span>
+<span class="fc" id="L38">                throw new IllegalArgumentException(&quot;not polynomial surface syntax&quot;);</span>
             }
-<span class="fc" id="L39">        }</span>
-<span class="fc" id="L40">        return new TypedSourceOnlySearch.Score(cost, work);</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc" id="L41">        return new TypedSourceOnlySearch.Score(cost, work);</span>
+    }
+
+    /** The shared exact arithmetic transport has no powers or variable denominators. */
+    static TypedSourceOnlySearch.Score evaluateSharedArithmetic(Expr expression) {
+<span class="fc" id="L46">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L47">        pending.push(Objects.requireNonNull(expression, &quot;expression&quot;));</span>
+<span class="fc" id="L48">        var work = new Emission();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L50">            Expr next = pending.pop();</span>
+<span class="fc" id="L51">            work.accept(1);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (next instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">                if (binary.operator() == BinaryOperator.POW || binary.operator() == BinaryOperator.DIV</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                        &amp;&amp; !nonzeroConstant(binary.right(), work)) {</span>
+<span class="fc" id="L55">                    return new TypedSourceOnlySearch.Score(Long.MAX_VALUE, work.units);</span>
+                }
+<span class="fc" id="L57">                pending.push(binary.right());</span>
+<span class="fc" id="L58">                pending.push(binary.left());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            } else if (next instanceof NumberExpr number) {</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">                if (number.value().numerator().abs().bitLength() &gt; 63 || number.value().denominator().bitLength() &gt; 63) {</span>
+<span class="fc" id="L61">                    return new TypedSourceOnlySearch.Score(Long.MAX_VALUE, work.units);</span>
+                }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            } else if (!(next instanceof VariableExpr)) {</span>
+<span class="nc" id="L64">                return new TypedSourceOnlySearch.Score(Long.MAX_VALUE, work.units);</span>
+            }
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        var accepted = evaluate(expression);</span>
+<span class="fc" id="L68">        return new TypedSourceOnlySearch.Score(accepted.value(), Math.addExact(work.units, accepted.work()));</span>
+    }
+
+    private static boolean nonzeroConstant(Expr expression, Emission work) {
+        try {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            return !constantValue(expression, work, 0).isZero();</span>
+<span class="fc" id="L74">        } catch (IllegalArgumentException | ArithmeticException unsupported) {</span>
+<span class="fc" id="L75">            return false;</span>
+        }
+    }
+
+    private static ExactRational constantValue(Expr expression, Emission work, int depth) {
+<span class="fc" id="L80">        work.accept(1);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new IllegalArgumentException(&quot;constant divisor depth&quot;);</span>
+        ExactRational value;
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) value = number.value();</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        else if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() != BinaryOperator.POW) {</span>
+<span class="fc" id="L85">            var left = constantValue(binary.left(), work, depth + 1);</span>
+<span class="fc" id="L86">            var right = constantValue(binary.right(), work, depth + 1);</span>
+<span class="pc bpc" id="L87" title="3 of 5 branches missed.">            value = switch (binary.operator()) {</span>
+<span class="fc" id="L88">                case ADD -&gt; left.add(right);</span>
+<span class="fc" id="L89">                case SUB -&gt; left.subtract(right);</span>
+<span class="nc" id="L90">                case MUL -&gt; left.multiply(right);</span>
+<span class="nc" id="L91">                case DIV -&gt; left.divide(right);</span>
+<span class="nc" id="L92">                case POW -&gt; throw new IllegalStateException(&quot;power outside shared arithmetic&quot;);</span>
+            };
+<span class="fc" id="L94">        } else throw new IllegalArgumentException(&quot;constant divisor required&quot;);</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        if (value.numerator().abs().bitLength() &gt; 256 || value.denominator().bitLength() &gt; 256) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;constant divisor bit limit&quot;);</span>
+        }
+<span class="fc" id="L98">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

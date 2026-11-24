@@ -38,37 +38,55 @@ public final class NativeUnivariateFactorizationEngine&lt;C&gt;
             NativeCoefficientAdapter.RationalAdapter.INSTANCE);
     }
 
+    /**
+     * Proposes inexpensive exact rational decompositions before invoking the general engine.
+     * The same independent product verifier applies to both paths.
+     */
+    public static FactorizationEngine&lt;ExactRational&gt; rationalsWithFastPath(
+            NativeUnivariateFactorizationPolicy policy) {
+<span class="fc" id="L47">        return new RationalFactorizationFastPath(policy);</span>
+    }
+
+    /**
+     * Refines verified rational decompositions under the original request budget.
+     * Unsplit factors remain in the product without an irreducibility claim.
+     */
+    public static FactorizationEngine&lt;ExactRational&gt; rationalsWithRefinement(
+            NativeUnivariateFactorizationPolicy policy) {
+<span class="fc" id="L56">        return new RationalFactorizationRefinement(policy);</span>
+    }
+
     public static NativeUnivariateFactorizationEngine&lt;BigInteger&gt;
             boundedIntegers() {
-<span class="fc" id="L43">        return integers(</span>
-<span class="fc" id="L44">            NativeUnivariateFactorizationPolicy.boundedDefaults());</span>
+<span class="fc" id="L61">        return integers(</span>
+<span class="fc" id="L62">            NativeUnivariateFactorizationPolicy.boundedDefaults());</span>
     }
 
     public static NativeUnivariateFactorizationEngine&lt;ExactRational&gt;
             boundedRationals() {
-<span class="fc" id="L49">        return rationals(</span>
-<span class="fc" id="L50">            NativeUnivariateFactorizationPolicy.boundedDefaults());</span>
+<span class="fc" id="L67">        return rationals(</span>
+<span class="fc" id="L68">            NativeUnivariateFactorizationPolicy.boundedDefaults());</span>
     }
 
     public NativeUnivariateFactorizationPolicy policy() {
-<span class="nc" id="L54">        return policy;</span>
+<span class="nc" id="L72">        return policy;</span>
     }
 
     @Override
     public String engineId() {
-<span class="fc" id="L59">        return adapter.engineId();</span>
+<span class="fc" id="L77">        return adapter.engineId();</span>
     }
 
     @Override
     public String coefficientDomainId() {
-<span class="fc" id="L64">        return adapter.domainId();</span>
+<span class="fc" id="L82">        return adapter.domainId();</span>
     }
 
     @Override
     public EngineResult&lt;C&gt; propose(
         FactorizationRequest&lt;C&gt; request
     ) {
-<span class="fc" id="L71">        return NativeUnivariateFactorizationPipeline.factor(</span>
+<span class="fc" id="L89">        return NativeUnivariateFactorizationPipeline.factor(</span>
             request,
             policy,
             adapter);

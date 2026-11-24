@@ -2,6 +2,9 @@
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,44 +19,41 @@ import java.util.zip.GZIPInputStream;
 
 /** Rechecks retained source-only responses without requiring the original tool. */
 public final class EnumoRecordedAudit {
-<span class="fc" id="L19">    private static final ObjectMapper JSON = new ObjectMapper()</span>
-<span class="fc" id="L20">        .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
-<span class="fc" id="L21">        .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
-<span class="fc" id="L22">    private static final List&lt;String&gt; PROFILES = List.of(&quot;REGELSUCHE_BASE&quot;, &quot;REGELSUCHE_LEARNED_RANKED&quot;, &quot;ENUMO_LEARNED&quot;);</span>
-<span class="fc" id="L23">    private static final Set&lt;String&gt; OUTCOMES = Set.of(&quot;VERIFIED&quot;, &quot;INVALID&quot;, &quot;OUTSIDE_SHARED_GRAMMAR&quot;,</span>
+<span class="fc" id="L22">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L23">        .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L24">        .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L25">    private static final Set&lt;String&gt; OUTCOMES = Set.of(&quot;VERIFIED&quot;, &quot;INVALID&quot;, &quot;OUTSIDE_SHARED_GRAMMAR&quot;,</span>
         &quot;WORKER_ERROR&quot;, &quot;SOURCE_BINDING_REJECTED&quot;, &quot;NATIVE_BUDGET_REJECTED&quot;, &quot;TIMEOUT&quot;, &quot;TECHNICAL_FAILURE&quot;,
         &quot;TIMEOUT_AFTER_JUDGE&quot;, &quot;BLOCKED_WORKER_UNAVAILABLE&quot;);
     private EnumoRecordedAudit() { }
 
     /** Args: checkout root and retained evidence directory. No native process is executed. */
     public static void main(String[] args) throws Exception {
-<span class="nc bnc" id="L30" title="All 2 branches missed.">        if (args.length != 2) throw new IllegalArgumentException(&quot;expected checkout and evidence directory&quot;);</span>
-<span class="nc" id="L31">        Path evidence = Path.of(args[1]);</span>
-<span class="nc" id="L32">        int verified = verify(Path.of(args[0]), JSON.readTree(readGzip(evidence.resolve(&quot;results.json.gz&quot;))),</span>
-<span class="nc" id="L33">            readGzip(evidence.resolve(&quot;responses.jsonl.gz&quot;)), Files.readAllBytes(evidence.resolve(&quot;learned.rules&quot;)));</span>
-<span class="nc" id="L34">        System.out.println(JSON.writeValueAsString(Map.of(&quot;status&quot;, &quot;VERIFIED&quot;, &quot;candidateCount&quot;, verified)));</span>
-<span class="nc" id="L35">    }</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        if (args.length != 2) throw new IllegalArgumentException(&quot;expected checkout and evidence directory&quot;);</span>
+<span class="nc" id="L33">        Path evidence = Path.of(args[1]);</span>
+<span class="nc" id="L34">        int verified = verify(Path.of(args[0]), JSON.readTree(readGzip(evidence.resolve(&quot;results.json.gz&quot;))),</span>
+<span class="nc" id="L35">            readGzip(evidence.resolve(&quot;responses.jsonl.gz&quot;)), Files.readAllBytes(evidence.resolve(&quot;learned.rules&quot;)));</span>
+<span class="nc" id="L36">        System.out.println(JSON.writeValueAsString(Map.of(&quot;status&quot;, &quot;VERIFIED&quot;, &quot;candidateCount&quot;, verified)));</span>
+<span class="nc" id="L37">    }</span>
 
     static int verify(Path checkout, JsonNode report, byte[] raw, byte[] rules) throws Exception {
-<span class="fc" id="L38">        Path corpus = checkout.resolve(&quot;research/benchmarks/enumo-public-v1/rosa.fpcore&quot;);</span>
-<span class="fc" id="L39">        require(hash(Files.readAllBytes(corpus)).equals(EnumoPublicComparison.CORPUS_SHA), &quot;foreign corpus changed&quot;);</span>
-<span class="fc" id="L40">        Path protocol = checkout.resolve(&quot;research/benchmarks/enumo-public-v1/protocol.json&quot;);</span>
-<span class="fc" id="L41">        require(hash(Files.readAllBytes(protocol)).equals(EnumoPublicComparison.PROTOCOL_SHA), &quot;protocol changed&quot;);</span>
-<span class="fc" id="L42">        require(report.path(&quot;schema&quot;).asText().equals(&quot;regelsuche.enumo-public-result/v1&quot;), &quot;report schema&quot;);</span>
-<span class="fc" id="L43">        require(report.path(&quot;semantics&quot;).asText().equals(&quot;EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE&quot;), &quot;semantics changed&quot;);</span>
-<span class="fc" id="L44">        require(report.path(&quot;corpusSha256&quot;).asText().equals(EnumoPublicComparison.CORPUS_SHA), &quot;corpus binding&quot;);</span>
-<span class="fc" id="L45">        require(report.path(&quot;protocolSha256&quot;).asText().equals(EnumoPublicComparison.PROTOCOL_SHA), &quot;protocol binding&quot;);</span>
-<span class="fc" id="L46">        require(hash(raw).equals(report.path(&quot;rawResponsesSha256&quot;).asText()), &quot;raw response hash&quot;);</span>
-<span class="fc" id="L47">        require(hash(rules).equals(report.path(&quot;acquiredRulesSha256&quot;).asText()), &quot;acquired rule hash&quot;);</span>
-<span class="fc" id="L48">        verifyProvenance(checkout, report, rules);</span>
-<span class="fc" id="L49">        var entries = FpcorePolynomialCorpus.read(Files.readString(corpus));</span>
-<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        require(entries.size() == 37 &amp;&amp; JSON.valueToTree(entries).equals(report.path(&quot;inventory&quot;)), &quot;foreign inventory binding&quot;);</span>
-<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        require(report.path(&quot;rows&quot;).isArray() &amp;&amp; report.path(&quot;rows&quot;).size() == 333, &quot;complete comparison matrix&quot;);</span>
+<span class="fc" id="L40">        var panel = EnumoPublicComparison.Panel.fromSchema(report.path(&quot;schema&quot;).asText());</span>
+<span class="fc" id="L41">        require(report.path(&quot;semantics&quot;).asText().equals(&quot;EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE&quot;), &quot;semantics changed&quot;);</span>
+<span class="fc" id="L42">        require(report.path(&quot;corpusSha256&quot;).asText().equals(panel.corpusHash()), &quot;corpus binding&quot;);</span>
+<span class="fc" id="L43">        require(report.path(&quot;protocolSha256&quot;).asText().equals(panel.protocolHash), &quot;protocol binding&quot;);</span>
+<span class="fc" id="L44">        require(hash(raw).equals(report.path(&quot;rawResponsesSha256&quot;).asText()), &quot;raw response hash&quot;);</span>
+<span class="fc" id="L45">        require(hash(rules).equals(report.path(&quot;acquiredRulesSha256&quot;).asText()), &quot;acquired rule hash&quot;);</span>
+<span class="fc" id="L46">        verifyProvenance(checkout, report, rules, panel);</span>
+<span class="fc" id="L47">        var entries = EnumoPublicComparison.inventory(checkout, panel);</span>
+<span class="fc" id="L48">        require(JSON.valueToTree(entries).equals(report.path(&quot;inventory&quot;)), &quot;foreign inventory binding&quot;);</span>
+<span class="fc" id="L49">        var profiles = panel.profiles().stream().map(Enum::name).toList();</span>
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">        require(report.path(&quot;rows&quot;).isArray() &amp;&amp; report.path(&quot;rows&quot;).size() == EnumoPublicComparison.REPETITIONS * entries.size() * profiles.size(),</span>
+            &quot;complete comparison matrix&quot;);
 <span class="fc" id="L52">        Map&lt;String, JsonNode&gt; responses = responses(raw);</span>
-<span class="fc" id="L53">        Map&lt;String, JsonNode&gt; setups = verifySetups(report.path(&quot;setups&quot;), report.path(&quot;acquisition&quot;));</span>
+<span class="fc" id="L53">        Map&lt;String, JsonNode&gt; setups = verifySetups(report.path(&quot;setups&quot;), report.path(&quot;acquisition&quot;), profiles);</span>
 <span class="fc" id="L54">        var seen = new HashSet&lt;String&gt;();</span>
 <span class="fc" id="L55">        int index = 0, verified = 0;</span>
-<span class="fc bfc" id="L56" title="All 4 branches covered.">        for (int repetition = 1; repetition &lt;= 3; repetition++) for (String profile : PROFILES) {</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        for (int repetition = 1; repetition &lt;= EnumoPublicComparison.REPETITIONS; repetition++) for (String profile : profiles) {</span>
 <span class="fc" id="L57">            boolean workerUnavailable = false;</span>
 <span class="fc bfc" id="L58" title="All 2 branches covered.">            for (var entry : entries) {</span>
 <span class="fc" id="L59">                JsonNode row = report.path(&quot;rows&quot;).get(index++);</span>
@@ -109,7 +109,7 @@ public final class EnumoRecordedAudit {
 <span class="fc" id="L109">        boolean peer = profile.equals(&quot;ENUMO_LEARNED&quot;);</span>
 <span class="fc" id="L110">        JsonNode request = retained.path(&quot;request&quot;), response = retained.path(&quot;response&quot;);</span>
 <span class="fc bfc" id="L111" title="All 2 branches covered.">        String wire = peer ? FpcorePolynomialCorpus.toPrefix(source) : source;</span>
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        String nativeProfile = profile.equals(&quot;REGELSUCHE_BASE&quot;) ? &quot;BASE&quot; : &quot;LEARNED_RANKED&quot;;</span>
+<span class="fc" id="L112">        String nativeProfile = EnumoPublicComparison.Profile.valueOf(profile).nativeProfile;</span>
 <span class="pc bpc" id="L113" title="1 of 6 branches missed.">        require(request.size() == (peer ? 2 : 3) &amp;&amp; request.path(&quot;op&quot;).asText().equals(&quot;run&quot;)</span>
 <span class="pc bpc" id="L114" title="1 of 2 branches missed.">            &amp;&amp; request.path(&quot;source&quot;).asText().equals(wire), &quot;source-only request binding&quot;);</span>
 <span class="pc bpc" id="L115" title="1 of 4 branches missed.">        require(peer || request.path(&quot;profile&quot;).asText().equals(nativeProfile), &quot;native request profile&quot;);</span>
@@ -144,7 +144,7 @@ public final class EnumoRecordedAudit {
 <span class="pc" id="L144">        catch (IllegalArgumentException unsupported) { return &quot;OUTSIDE_SHARED_GRAMMAR&quot;; }</span>
 <span class="fc" id="L145">        require(candidate.equals(row.path(&quot;output&quot;).asText()), &quot;response output binding&quot;);</span>
 <span class="fc" id="L146">        String outcome = EnumoPublicComparison.judge(source, candidate);</span>
-<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if (outcome.equals(&quot;VERIFIED&quot;) || outcome.equals(&quot;INVALID&quot;)) {</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (outcome.equals(&quot;VERIFIED&quot;) || outcome.equals(&quot;INVALID&quot;)) {</span>
 <span class="pc bpc" id="L148" title="1 of 2 branches missed.">            require(row.path(&quot;inputCost&quot;).asInt(-1) == EnumoPublicComparison.cost(source)</span>
 <span class="pc bpc" id="L149" title="1 of 2 branches missed.">                &amp;&amp; row.path(&quot;outputCost&quot;).asInt(-1) == EnumoPublicComparison.cost(candidate), &quot;surface costs&quot;);</span>
         }
@@ -167,113 +167,169 @@ public final class EnumoRecordedAudit {
 <span class="fc" id="L167">        require(response.path(&quot;internalWorkWithinBudget&quot;).isBoolean(), &quot;native budget decision&quot;);</span>
 <span class="pc bpc" id="L168" title="1 of 4 branches missed.">        boolean withinBudget = accountingComplete(search) &amp;&amp; total &lt;= nonnegative(setup.path(&quot;settings&quot;), &quot;workBudget&quot;);</span>
 <span class="fc bfc" id="L169" title="All 2 branches covered.">        require(response.path(&quot;internalWorkWithinBudget&quot;).asBoolean() == withinBudget, &quot;native work budget&quot;);</span>
-<span class="fc" id="L170">    }</span>
+<span class="fc bfc" id="L170" title="All 4 branches covered.">        if (profile.equals(&quot;POLYNOMIAL_HORNER_V1&quot;) || profile.equals(&quot;POLYNOMIAL_HORNER_ROOT_V1&quot;)) {</span>
+<span class="fc" id="L171">            verifyHornerPath(response, setup, profile.equals(&quot;POLYNOMIAL_HORNER_ROOT_V1&quot;));</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    private static void verifyHornerPath(JsonNode response, JsonNode setup, boolean rootOnly) throws Exception {
+<span class="fc" id="L176">        String current = response.path(&quot;typedInput&quot;).asText();</span>
+<span class="fc" id="L177">        var codec = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L178">        var expression = new ExpressionParser().parseTerm(response.path(&quot;input&quot;).asText());</span>
+<span class="fc" id="L179">        require(codec.encodeExpression(expression).equals(current), &quot;Horner typed input binding&quot;);</span>
+<span class="fc" id="L180">        JsonNode witness = response.path(&quot;witness&quot;);</span>
+<span class="fc" id="L181">        require(witness.isArray(), &quot;Horner witness shape&quot;);</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">        if (rootOnly) require(witness.size() &lt;= 1, &quot;root Horner witness length&quot;);</span>
+<span class="fc" id="L183">        long replay = 0, theory = 0;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (JsonNode edge : witness) {</span>
+<span class="fc" id="L185">            JsonNode move = edge.path(&quot;move&quot;), checked = edge.path(&quot;verification&quot;);</span>
+<span class="fc" id="L186">            String target = edge.path(&quot;target&quot;).asText();</span>
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">            require(edge.path(&quot;source&quot;).asText().equals(current) &amp;&amp; !target.isBlank()</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                &amp;&amp; move.path(&quot;transformation&quot;).path(&quot;transformedExpression&quot;).asText().equals(target), &quot;Horner witness path binding&quot;);</span>
+<span class="fc" id="L189">            JsonNode binding = move.path(&quot;provenance&quot;).path(&quot;evidence&quot;).path(&quot;binding&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (move.path(&quot;ruleId&quot;).asText().equals(&quot;regelsuche.structural-construction/v1:POLYNOMIAL_HORNER&quot;)) {</span>
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">                require(binding.isObject() &amp;&amp; binding.path(&quot;sourceExpression&quot;).asText().equals(current)</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                    &amp;&amp; binding.path(&quot;transformedExpression&quot;).asText().equals(target), &quot;Horner theory binding&quot;);</span>
+<span class="fc" id="L193">                String data = binding.path(&quot;canonicalEvidenceJson&quot;).asText();</span>
+<span class="fc" id="L194">                require(binding.path(&quot;evidenceHash&quot;).asText().equals(&quot;sha256:&quot; + hash(data.getBytes(StandardCharsets.UTF_8))),</span>
+                    &quot;Horner evidence hash&quot;);
+<span class="fc" id="L196">                long evidenceWork = nonnegative(binding, &quot;canonicalWorkUnits&quot;);</span>
+<span class="fc" id="L197">                JsonNode proof = JSON.readTree(data);</span>
+<span class="pc bpc" id="L198" title="4 of 8 branches missed.">                require(proof != null &amp;&amp; proof.isObject() &amp;&amp; evidenceWork &gt; 0 &amp;&amp; proof.path(&quot;source&quot;).asText().equals(current)</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                    &amp;&amp; proof.path(&quot;target&quot;).asText().equals(target)</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                    &amp;&amp; proof.path(&quot;procedure&quot;).equals(move.path(&quot;ruleId&quot;))</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                    &amp;&amp; nonnegative(proof, &quot;work&quot;) == evidenceWork, &quot;Horner evidence body&quot;);</span>
+<span class="fc" id="L202">                theory = Math.addExact(theory, evidenceWork);</span>
+<span class="pc bnc" id="L203" title="All 4 branches missed.">            } else require(!rootOnly &amp;&amp; binding.isMissingNode(), &quot;undeclared Horner theory step&quot;);</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">            require(checked.path(&quot;accepted&quot;).isBoolean() &amp;&amp; checked.path(&quot;accepted&quot;).asBoolean()</span>
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">                &amp;&amp; checked.path(&quot;receipts&quot;).isArray() &amp;&amp; !checked.path(&quot;receipts&quot;).isEmpty(), &quot;Horner checked witness&quot;);</span>
+<span class="fc" id="L206">            replay = Math.addExact(replay, nonnegative(checked, &quot;work&quot;));</span>
+<span class="fc" id="L207">            current = target;</span>
+<span class="fc" id="L208">        }</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        require(response.path(&quot;typedOutput&quot;).asText().equals(current)</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            &amp;&amp; ExpressionFormatter.format(codec.decodeExpression(current)).equals(response.path(&quot;output&quot;).asText()),</span>
+            &quot;Horner typed output binding&quot;);
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        require(replay == nonnegative(response, &quot;selectedReplayWork&quot;), &quot;Horner final replay ledger&quot;);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        require(theory &lt;= nonnegative(setup.path(&quot;settings&quot;), &quot;maxTheoryWork&quot;), &quot;Horner theory path budget&quot;);</span>
+<span class="fc bfc" id="L214" title="All 4 branches covered.">        if (rootOnly &amp;&amp; !witness.isEmpty()) {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            require(nonnegative(response, &quot;outputCost&quot;) &lt; nonnegative(response, &quot;inputCost&quot;), &quot;root Horner improvement&quot;);</span>
+        }
+<span class="fc" id="L217">    }</span>
 
     private static boolean accountingComplete(JsonNode search) {
-<span class="fc" id="L173">        JsonNode staged = search.path(&quot;stagedIncrementalExecution&quot;);</span>
-<span class="pc bpc" id="L174" title="3 of 4 branches missed.">        if (staged.isMissingNode() || staged.isNull()) return true;</span>
-<span class="nc bnc" id="L175" title="All 4 branches missed.">        require(staged.isObject() &amp;&amp; staged.path(&quot;expansions&quot;).isArray(), &quot;staged execution ledger&quot;);</span>
-<span class="nc" id="L176">        boolean complete = true;</span>
-<span class="nc bnc" id="L177" title="All 2 branches missed.">        for (JsonNode expansion : staged.path(&quot;expansions&quot;)) {</span>
-<span class="nc bnc" id="L178" title="All 4 branches missed.">            require(expansion.isObject() &amp;&amp; expansion.path(&quot;lanes&quot;).isArray(), &quot;staged expansion ledger&quot;);</span>
-<span class="nc bnc" id="L179" title="All 2 branches missed.">            for (JsonNode lane : expansion.path(&quot;lanes&quot;)) {</span>
-<span class="nc bnc" id="L180" title="All 4 branches missed.">                require(lane.isObject() &amp;&amp; lane.has(&quot;cursor&quot;), &quot;staged lane ledger&quot;);</span>
-<span class="nc" id="L181">                JsonNode cursor = lane.path(&quot;cursor&quot;);</span>
-<span class="nc bnc" id="L182" title="All 2 branches missed.">                if (cursor.isNull()) continue;</span>
-<span class="nc bnc" id="L183" title="All 4 branches missed.">                require(cursor.isObject() &amp;&amp; cursor.path(&quot;accountingComplete&quot;).isBoolean(), &quot;staged cursor accounting&quot;);</span>
-<span class="nc" id="L184">                complete &amp;= cursor.path(&quot;accountingComplete&quot;).booleanValue();</span>
-<span class="nc" id="L185">            }</span>
-<span class="nc" id="L186">        }</span>
-<span class="nc" id="L187">        return complete;</span>
+<span class="fc" id="L220">        JsonNode staged = search.path(&quot;stagedIncrementalExecution&quot;);</span>
+<span class="pc bpc" id="L221" title="3 of 4 branches missed.">        if (staged.isMissingNode() || staged.isNull()) return true;</span>
+<span class="nc bnc" id="L222" title="All 4 branches missed.">        require(staged.isObject() &amp;&amp; staged.path(&quot;expansions&quot;).isArray(), &quot;staged execution ledger&quot;);</span>
+<span class="nc" id="L223">        boolean complete = true;</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        for (JsonNode expansion : staged.path(&quot;expansions&quot;)) {</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">            require(expansion.isObject() &amp;&amp; expansion.path(&quot;lanes&quot;).isArray(), &quot;staged expansion ledger&quot;);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            for (JsonNode lane : expansion.path(&quot;lanes&quot;)) {</span>
+<span class="nc bnc" id="L227" title="All 4 branches missed.">                require(lane.isObject() &amp;&amp; lane.has(&quot;cursor&quot;), &quot;staged lane ledger&quot;);</span>
+<span class="nc" id="L228">                JsonNode cursor = lane.path(&quot;cursor&quot;);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (cursor.isNull()) continue;</span>
+<span class="nc bnc" id="L230" title="All 4 branches missed.">                require(cursor.isObject() &amp;&amp; cursor.path(&quot;accountingComplete&quot;).isBoolean(), &quot;staged cursor accounting&quot;);</span>
+<span class="nc" id="L231">                complete &amp;= cursor.path(&quot;accountingComplete&quot;).booleanValue();</span>
+<span class="nc" id="L232">            }</span>
+<span class="nc" id="L233">        }</span>
+<span class="nc" id="L234">        return complete;</span>
     }
 
-    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules) throws Exception {
-<span class="fc" id="L191">        JsonNode acquisition = report.path(&quot;acquisition&quot;);</span>
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        long ruleCount = new String(rules, StandardCharsets.UTF_8).lines().filter(line -&gt; !line.isBlank()).count();</span>
-<span class="pc bpc" id="L193" title="1 of 4 branches missed.">        require(acquisition.path(&quot;status&quot;).asText().equals(&quot;ACQUIRED&quot;) &amp;&amp; ruleCount &gt; 0</span>
-<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            &amp;&amp; acquisition.path(&quot;rules&quot;).asLong() == ruleCount, &quot;actual acquisition receipt&quot;);</span>
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        require(acquisition.path(&quot;recipe&quot;).asText().equals(&quot;original::rational_best::best_enumo_recipe&quot;)</span>
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            &amp;&amp; nonnegative(acquisition, &quot;acquisitionNanos&quot;) &gt; 0, &quot;original acquisition identity&quot;);</span>
-<span class="fc" id="L197">        JsonNode provenance = JSON.readTree(Files.readString(checkout.resolve(&quot;research/benchmarks/enumo-public-v1/provenance.json&quot;)));</span>
-<span class="fc bfc" id="L198" title="All 2 branches covered.">        require(report.path(&quot;enumoBinarySha256&quot;).asText().matches(&quot;[a-f0-9]{64}&quot;)</span>
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            &amp;&amp; report.path(&quot;enumoBinarySha256&quot;).equals(provenance.path(&quot;upstream&quot;).path(&quot;binarySha256&quot;)), &quot;original executable binding&quot;);</span>
-<span class="fc bfc" id="L200" title="All 2 branches covered.">        require(report.path(&quot;nativeWorkerClassSha256&quot;).asText().matches(&quot;[a-f0-9]{64}&quot;)</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            &amp;&amp; report.path(&quot;nativeWorkerClassSha256&quot;).equals(provenance.path(&quot;native&quot;).path(&quot;workerClassSha256&quot;)), &quot;native executable binding&quot;);</span>
-<span class="fc" id="L202">        require(acquisition.equals(provenance.path(&quot;acquisition&quot;).path(&quot;receipt&quot;)), &quot;acquisition provenance binding&quot;);</span>
-<span class="fc" id="L203">        require(report.path(&quot;acquiredRulesSha256&quot;).equals(provenance.path(&quot;acquisition&quot;).path(&quot;rulesSha256&quot;)),</span>
+    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules, EnumoPublicComparison.Panel panel) throws Exception {
+<span class="fc" id="L238">        JsonNode acquisition = report.path(&quot;acquisition&quot;);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        long ruleCount = new String(rules, StandardCharsets.UTF_8).lines().filter(line -&gt; !line.isBlank()).count();</span>
+<span class="pc bpc" id="L240" title="1 of 4 branches missed.">        require(acquisition.path(&quot;status&quot;).asText().equals(&quot;ACQUIRED&quot;) &amp;&amp; ruleCount &gt; 0</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            &amp;&amp; acquisition.path(&quot;rules&quot;).asLong() == ruleCount, &quot;actual acquisition receipt&quot;);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        require(acquisition.path(&quot;recipe&quot;).asText().equals(&quot;original::rational_best::best_enumo_recipe&quot;)</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            &amp;&amp; nonnegative(acquisition, &quot;acquisitionNanos&quot;) &gt; 0, &quot;original acquisition identity&quot;);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        Path artifacts = checkout.resolve(panel.hasHorner() ? EnumoPublicComparison.HORNER_ARTIFACTS : &quot;research/benchmarks/enumo-public-v1&quot;);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        JsonNode provenance = JSON.readTree(Files.readString(artifacts.resolve(panel.hasRootHorner() ? &quot;root-provenance.json&quot; : &quot;provenance.json&quot;)));</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        require(report.path(&quot;enumoBinarySha256&quot;).asText().matches(&quot;[a-f0-9]{64}&quot;)</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            &amp;&amp; report.path(&quot;enumoBinarySha256&quot;).equals(provenance.path(&quot;upstream&quot;).path(&quot;binarySha256&quot;)), &quot;original executable binding&quot;);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        require(report.path(&quot;nativeWorkerClassSha256&quot;).asText().matches(&quot;[a-f0-9]{64}&quot;)</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            &amp;&amp; report.path(&quot;nativeWorkerClassSha256&quot;).equals(provenance.path(&quot;native&quot;).path(&quot;workerClassSha256&quot;)), &quot;native executable binding&quot;);</span>
+<span class="fc" id="L250">        require(acquisition.equals(provenance.path(&quot;acquisition&quot;).path(&quot;receipt&quot;)), &quot;acquisition provenance binding&quot;);</span>
+<span class="fc" id="L251">        require(report.path(&quot;acquiredRulesSha256&quot;).equals(provenance.path(&quot;acquisition&quot;).path(&quot;rulesSha256&quot;)),</span>
             &quot;acquired rules provenance binding&quot;);
-<span class="fc" id="L205">    }</span>
+<span class="fc" id="L253">    }</span>
 
     private static Map&lt;String, JsonNode&gt; responses(byte[] raw) throws Exception {
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        require(raw.length &lt;= 20_000_000, &quot;raw evidence size bound&quot;);</span>
-<span class="fc" id="L209">        var result = new HashMap&lt;String, JsonNode&gt;();</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (String line : new String(raw, StandardCharsets.UTF_8).lines().toList()) {</span>
-<span class="fc" id="L211">            JsonNode value = JSON.readTree(line);</span>
-<span class="pc bpc" id="L212" title="3 of 6 branches missed.">            require(value != null &amp;&amp; value.isObject() &amp;&amp; value.path(&quot;row&quot;).isObject(), &quot;raw response shape&quot;);</span>
-<span class="fc" id="L213">            require(value.path(&quot;profile&quot;).equals(value.path(&quot;row&quot;).path(&quot;profile&quot;)), &quot;raw profile binding&quot;);</span>
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            require(result.putIfAbsent(key(value.path(&quot;row&quot;)), value) == null, &quot;duplicate raw response&quot;);</span>
-<span class="fc" id="L215">        }</span>
-<span class="fc" id="L216">        return result;</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        require(raw.length &lt;= 20_000_000, &quot;raw evidence size bound&quot;);</span>
+<span class="fc" id="L257">        var result = new HashMap&lt;String, JsonNode&gt;();</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (String line : new String(raw, StandardCharsets.UTF_8).lines().toList()) {</span>
+<span class="fc" id="L259">            JsonNode value = JSON.readTree(line);</span>
+<span class="pc bpc" id="L260" title="3 of 6 branches missed.">            require(value != null &amp;&amp; value.isObject() &amp;&amp; value.path(&quot;row&quot;).isObject(), &quot;raw response shape&quot;);</span>
+<span class="fc" id="L261">            require(value.path(&quot;profile&quot;).equals(value.path(&quot;row&quot;).path(&quot;profile&quot;)), &quot;raw profile binding&quot;);</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            require(result.putIfAbsent(key(value.path(&quot;row&quot;)), value) == null, &quot;duplicate raw response&quot;);</span>
+<span class="fc" id="L263">        }</span>
+<span class="fc" id="L264">        return result;</span>
     }
 
-    private static Map&lt;String, JsonNode&gt; verifySetups(JsonNode setups, JsonNode acquisition) throws Exception {
-<span class="pc bpc" id="L220" title="2 of 4 branches missed.">        require(setups.isArray() &amp;&amp; setups.size() == 9, &quot;complete setup inventory&quot;);</span>
-<span class="fc" id="L221">        var identities = new HashMap&lt;String, JsonNode&gt;();</span>
-<span class="fc bfc" id="L222" title="All 2 branches covered.">        for (JsonNode setup : setups) {</span>
-<span class="fc" id="L223">            String profile = setup.path(&quot;profile&quot;).asText();</span>
-<span class="fc" id="L224">            int repetition = setup.path(&quot;repetition&quot;).asInt();</span>
-<span class="fc" id="L225">            JsonNode initialized = setup.path(&quot;initialization&quot;);</span>
-<span class="pc bpc" id="L226" title="3 of 6 branches missed.">            require(PROFILES.contains(profile) &amp;&amp; repetition &gt;= 1 &amp;&amp; repetition &lt;= 3</span>
-<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                &amp;&amp; identities.putIfAbsent(profile + &quot;:&quot; + repetition, initialized) == null, &quot;setup identity&quot;);</span>
-<span class="fc" id="L228">            long elapsed = setup.path(&quot;startupAndInitializationNanos&quot;).asLong(-1);</span>
-<span class="pc bpc" id="L229" title="2 of 4 branches missed.">            require(elapsed &gt; 0 &amp;&amp; elapsed &lt;= 60_000_000_000L, &quot;startup and initialization budget&quot;);</span>
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            String expected = profile.equals(&quot;ENUMO_LEARNED&quot;) ? &quot;READY&quot; : &quot;INITIALIZED&quot;;</span>
-<span class="fc" id="L231">            require(initialized.path(&quot;status&quot;).asText().equals(expected), &quot;setup outcome&quot;);</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (profile.equals(&quot;ENUMO_LEARNED&quot;)) require(initialized.path(&quot;rules&quot;).equals(acquisition.path(&quot;rules&quot;)), &quot;loaded original rule count&quot;);</span>
-<span class="fc" id="L233">            else verifyNativeSetup(initialized, profile, elapsed);</span>
-<span class="fc" id="L234">        }</span>
-<span class="fc" id="L235">        return identities;</span>
+    private static Map&lt;String, JsonNode&gt; verifySetups(JsonNode setups, JsonNode acquisition, List&lt;String&gt; profiles) throws Exception {
+<span class="pc bpc" id="L268" title="2 of 4 branches missed.">        require(setups.isArray() &amp;&amp; setups.size() == EnumoPublicComparison.REPETITIONS * profiles.size(), &quot;complete setup inventory&quot;);</span>
+<span class="fc" id="L269">        var identities = new HashMap&lt;String, JsonNode&gt;();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        for (JsonNode setup : setups) {</span>
+<span class="fc" id="L271">            String profile = setup.path(&quot;profile&quot;).asText();</span>
+<span class="fc" id="L272">            int repetition = setup.path(&quot;repetition&quot;).asInt();</span>
+<span class="fc" id="L273">            JsonNode initialized = setup.path(&quot;initialization&quot;);</span>
+<span class="pc bpc" id="L274" title="3 of 6 branches missed.">            require(profiles.contains(profile) &amp;&amp; repetition &gt;= 1 &amp;&amp; repetition &lt;= EnumoPublicComparison.REPETITIONS</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                &amp;&amp; identities.putIfAbsent(profile + &quot;:&quot; + repetition, initialized) == null, &quot;setup identity&quot;);</span>
+<span class="fc" id="L276">            long elapsed = setup.path(&quot;startupAndInitializationNanos&quot;).asLong(-1);</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">            require(elapsed &gt; 0 &amp;&amp; elapsed &lt;= 60_000_000_000L, &quot;startup and initialization budget&quot;);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            String expected = profile.equals(&quot;ENUMO_LEARNED&quot;) ? &quot;READY&quot; : &quot;INITIALIZED&quot;;</span>
+<span class="fc" id="L279">            require(initialized.path(&quot;status&quot;).asText().equals(expected), &quot;setup outcome&quot;);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (profile.equals(&quot;ENUMO_LEARNED&quot;)) require(initialized.path(&quot;rules&quot;).equals(acquisition.path(&quot;rules&quot;)), &quot;loaded original rule count&quot;);</span>
+<span class="fc" id="L281">            else verifyNativeSetup(initialized, profile, elapsed);</span>
+<span class="fc" id="L282">        }</span>
+<span class="fc" id="L283">        return identities;</span>
     }
 
     private static void verifyNativeSetup(JsonNode initialized, String profile, long elapsed) throws Exception {
-<span class="fc bfc" id="L239" title="All 2 branches covered.">        String expected = profile.equals(&quot;REGELSUCHE_BASE&quot;) ? &quot;BASE&quot; : &quot;LEARNED_RANKED&quot;;</span>
-<span class="fc" id="L240">        require(initialized.path(&quot;profile&quot;).asText().equals(expected), &quot;native setup profile&quot;);</span>
-<span class="fc" id="L241">        String model = initialized.path(&quot;model&quot;).asText();</span>
-<span class="fc" id="L242">        require(initialized.path(&quot;modelHash&quot;).asText().equals(&quot;sha256:&quot; + hash(model.getBytes(StandardCharsets.UTF_8))), &quot;native setup model hash&quot;);</span>
-<span class="fc" id="L243">        JsonNode parsed = JSON.readTree(model);</span>
-<span class="pc bpc" id="L244" title="2 of 4 branches missed.">        require(parsed != null &amp;&amp; parsed.path(&quot;schema&quot;).asText().equals(&quot;regelsuche.typed-external-frozen-profile/v1&quot;)</span>
-<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            &amp;&amp; parsed.path(&quot;profile&quot;).asText().equals(expected), &quot;native frozen model identity&quot;);</span>
-<span class="fc" id="L246">        JsonNode settings = JSON.valueToTree(Map.of(&quot;workBudget&quot;, 16384, &quot;primitiveDepth&quot;, 9,</span>
-<span class="fc" id="L247">            &quot;searchDepth&quot;, 9, &quot;maxStates&quot;, 256, &quot;complexityDebt&quot;, 24));</span>
-<span class="pc bpc" id="L248" title="2 of 4 branches missed.">        require(settings.equals(initialized.path(&quot;settings&quot;)) &amp;&amp; settings.equals(parsed.path(&quot;settings&quot;)), &quot;native frozen limits&quot;);</span>
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        require(nonnegative(initialized, &quot;nativeWallNanos&quot;) &lt;= elapsed, &quot;native initialization interval&quot;);</span>
-<span class="fc" id="L250">        long training = 0;</span>
-<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (String component : List.of(&quot;formation&quot;, &quot;historyMemory&quot;, &quot;historySearch&quot;, &quot;policyTrials&quot;)) {</span>
-<span class="fc" id="L252">            training = Math.addExact(training, nonnegative(initialized.path(&quot;trainingWorkComponents&quot;), component));</span>
-<span class="fc" id="L253">        }</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        require(training == nonnegative(initialized, &quot;trainingWork&quot;), &quot;native acquisition ledger&quot;);</span>
-<span class="fc" id="L255">    }</span>
+<span class="fc" id="L287">        String expected = EnumoPublicComparison.Profile.valueOf(profile).nativeProfile;</span>
+<span class="fc" id="L288">        require(initialized.path(&quot;profile&quot;).asText().equals(expected), &quot;native setup profile&quot;);</span>
+<span class="fc" id="L289">        String model = initialized.path(&quot;model&quot;).asText();</span>
+<span class="fc" id="L290">        require(initialized.path(&quot;modelHash&quot;).asText().equals(&quot;sha256:&quot; + hash(model.getBytes(StandardCharsets.UTF_8))), &quot;native setup model hash&quot;);</span>
+<span class="fc" id="L291">        JsonNode parsed = JSON.readTree(model);</span>
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">        require(parsed != null &amp;&amp; parsed.path(&quot;schema&quot;).asText().equals(&quot;regelsuche.typed-external-frozen-profile/v1&quot;)</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            &amp;&amp; parsed.path(&quot;profile&quot;).asText().equals(expected), &quot;native frozen model identity&quot;);</span>
+<span class="fc" id="L294">        var limits = new HashMap&lt;&gt;(Map.of(&quot;workBudget&quot;, 16384, &quot;primitiveDepth&quot;, 9,</span>
+<span class="fc" id="L295">            &quot;searchDepth&quot;, 9, &quot;maxStates&quot;, 256, &quot;complexityDebt&quot;, 24));</span>
+<span class="fc" id="L296">        boolean rootHorner = profile.equals(&quot;REGELSUCHE_POLYNOMIAL_HORNER_ROOT&quot;);</span>
+<span class="fc bfc" id="L297" title="All 4 branches covered.">        if (profile.equals(&quot;REGELSUCHE_POLYNOMIAL_HORNER&quot;) || rootHorner) {</span>
+<span class="fc" id="L298">            limits.put(&quot;maxTheoryWork&quot;, 16384);</span>
+<span class="fc" id="L299">            require(parsed.path(&quot;constructionProfile&quot;).asText().equals(&quot;POLYNOMIAL_HORNER_V1&quot;), &quot;native construction profile&quot;);</span>
+<span class="fc" id="L300">            require(parsed.path(&quot;objective&quot;).asText().equals(&quot;SHARED_EXACT_ARITHMETIC_SURFACE&quot;), &quot;native shared surface objective&quot;);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            if (rootHorner) require(parsed.path(&quot;providerSelection&quot;).asText().equals(&quot;ROOT_HORNER_ONLY&quot;), &quot;native root provider selection&quot;);</span>
+        }
+<span class="fc" id="L303">        JsonNode settings = JSON.valueToTree(limits);</span>
+<span class="pc bpc" id="L304" title="2 of 4 branches missed.">        require(settings.equals(initialized.path(&quot;settings&quot;)) &amp;&amp; settings.equals(parsed.path(&quot;settings&quot;)), &quot;native frozen limits&quot;);</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        require(nonnegative(initialized, &quot;nativeWallNanos&quot;) &lt;= elapsed, &quot;native initialization interval&quot;);</span>
+<span class="fc" id="L306">        long training = 0;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        for (String component : List.of(&quot;formation&quot;, &quot;historyMemory&quot;, &quot;historySearch&quot;, &quot;policyTrials&quot;)) {</span>
+<span class="fc" id="L308">            training = Math.addExact(training, nonnegative(initialized.path(&quot;trainingWorkComponents&quot;), component));</span>
+<span class="fc" id="L309">        }</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        require(training == nonnegative(initialized, &quot;trainingWork&quot;), &quot;native acquisition ledger&quot;);</span>
+<span class="fc" id="L311">    }</span>
 
     private static long nonnegative(JsonNode node, String field) {
-<span class="fc" id="L258">        JsonNode value = node.path(field);</span>
-<span class="pc bpc" id="L259" title="3 of 6 branches missed.">        require(value.isIntegralNumber() &amp;&amp; value.canConvertToLong() &amp;&amp; value.longValue() &gt;= 0, &quot;invalid nonnegative &quot; + field);</span>
-<span class="fc" id="L260">        return value.longValue();</span>
+<span class="fc" id="L314">        JsonNode value = node.path(field);</span>
+<span class="pc bpc" id="L315" title="3 of 6 branches missed.">        require(value.isIntegralNumber() &amp;&amp; value.canConvertToLong() &amp;&amp; value.longValue() &gt;= 0, &quot;invalid nonnegative &quot; + field);</span>
+<span class="fc" id="L316">        return value.longValue();</span>
     }
 
     private static String key(JsonNode row) {
-<span class="fc" id="L264">        return row.path(&quot;profile&quot;).asText() + &quot;:&quot; + row.path(&quot;repetition&quot;).asInt() + &quot;:&quot; + row.path(&quot;ordinal&quot;).asInt();</span>
+<span class="fc" id="L320">        return row.path(&quot;profile&quot;).asText() + &quot;:&quot; + row.path(&quot;repetition&quot;).asInt() + &quot;:&quot; + row.path(&quot;ordinal&quot;).asInt();</span>
     }
     private static void require(boolean condition, String detail) {
-<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(detail);</span>
-<span class="fc" id="L268">    }</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(detail);</span>
+<span class="fc" id="L324">    }</span>
     private static String hash(byte[] bytes) throws Exception {
-<span class="fc" id="L270">        return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="fc" id="L326">        return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
     }
     private static byte[] readGzip(Path file) throws Exception {
-<span class="nc" id="L273">        try (var input = new GZIPInputStream(Files.newInputStream(file))) {</span>
-<span class="nc" id="L274">            byte[] bytes = input.readNBytes(20_000_001);</span>
-<span class="nc bnc" id="L275" title="All 2 branches missed.">            require(bytes.length &lt;= 20_000_000, &quot;evidence decompression bound&quot;);</span>
-<span class="nc" id="L276">            return bytes;</span>
+<span class="nc" id="L329">        try (var input = new GZIPInputStream(Files.newInputStream(file))) {</span>
+<span class="nc" id="L330">            byte[] bytes = input.readNBytes(20_000_001);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            require(bytes.length &lt;= 20_000_000, &quot;evidence decompression bound&quot;);</span>
+<span class="nc" id="L332">            return bytes;</span>
         }
     }
 }

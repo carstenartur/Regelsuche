@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineAlphaExperiment.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">AffineAlphaExperiment.java</span></div><h1>AffineAlphaExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import de.regelsuche.ast.iteration.AffineReduction;
+import de.regelsuche.math.algorithms.iteration.AffineReductionPlan;
+import de.regelsuche.math.algorithms.iteration.AffineReductionPlan.Shape;
+import de.regelsuche.math.algorithms.iteration.AffineReductionReference;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/** Comparison fixtures and subprocess adapter for the affine source fragment. */
+final class AffineAlphaExperiment {
+    static final String SCHEMA = &quot;regelsuche.external-polyhedral-affine/v2&quot;;
+<span class="fc" id="L20">    private static final IterationLimits ORACLE_LIMITS = new IterationLimits(3_000_000, 128, 5_000);</span>
+
+    private AffineAlphaExperiment() {}
+
+<span class="fc" id="L24">    record Input(String name, Optional&lt;AffineReduction&gt; affine, Optional&lt;ExternalPolyhedralComparison.Imported&gt; prefix) {</span>
+        static Input of(AlphaAffineReductionParser.Imported imported) {
+<span class="fc" id="L26">            return new Input(imported.name(), Optional.of(imported.source()), Optional.empty());</span>
+        }
+
+        static Input of(ExternalPolyhedralComparison.Imported imported) {
+<span class="fc" id="L30">            return new Input(imported.name(), Optional.empty(), Optional.of(imported));</span>
+        }
+
+        List&lt;BigInteger&gt; oracle(int count, int seed) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            if (prefix.isPresent()) return ExternalPolyhedralComparison.oracle(prefix.orElseThrow(), count, seed);</span>
+<span class="fc" id="L35">            var source = affine.orElseThrow();</span>
+<span class="fc" id="L36">            var shape = AffineReductionPlan.prepareShape(source, parameter(count), ORACLE_LIMITS, () -&gt; false).shape();</span>
+<span class="fc" id="L37">            return AffineReductionReference.evaluate(source, parameter(count), values(shape, seed),</span>
+<span class="fc" id="L38">                ORACLE_LIMITS, () -&gt; false).values();</span>
+        }
+
+        String driver() {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            return affine.isPresent()</span>
+<span class="pc" id="L43">                ? AlphaCOutputDriver.source(name, affine.orElseThrow().outputRank()) : ExternalPolyhedralComparison.driver(name);</span>
+        }
+
+        List&lt;String&gt; command(Path binary, int count, int seed) {
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (affine.isEmpty()) return List.of(binary.toString(), Integer.toString(count), Integer.toString(seed));</span>
+<span class="nc" id="L48">            var shape = AffineReductionPlan.prepareShape(affine.orElseThrow(), parameter(count), ORACLE_LIMITS, () -&gt; false).shape();</span>
+<span class="nc" id="L49">            return AlphaCOutputDriver.command(binary, parameter(count), seed, shape.inputSize(), shape.outputCoordinates());</span>
+        }
+    }
+
+    static Optional&lt;Input&gt; importSource(String source, boolean affine) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (affine) {</span>
+            try {
+<span class="fc" id="L56">                return Optional.of(Input.of(AlphaAffineReductionParser.parse(source)));</span>
+<span class="nc" id="L57">            } catch (IllegalArgumentException unsupported) {</span>
+                // Polynomial prefix proposals still take the existing checked path.
+            }
+        }
+        try {
+<span class="fc" id="L62">            return Optional.of(Input.of(ExternalPolyhedralComparison.parse(source)));</span>
+<span class="fc" id="L63">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L64">            return Optional.empty();</span>
+        }
+    }
+
+    static Map&lt;String, Object&gt; nativeRun(String source, JsonNode request) {
+<span class="fc" id="L69">        long started = System.nanoTime();</span>
+        AlphaAffineReductionParser.Imported imported;
+        try {
+<span class="fc" id="L72">            imported = AlphaAffineReductionParser.parse(source);</span>
+<span class="fc" id="L73">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L74">            var prefixResponse = ExternalPolyhedralComparison.nativeRun(source, request);</span>
+<span class="fc" id="L75">            prefixResponse.put(&quot;nativeWallNanos&quot;, System.nanoTime() - started);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (&quot;UNSUPPORTED&quot;.equals(prefixResponse.get(&quot;status&quot;)))</span>
+<span class="fc" id="L77">                prefixResponse.put(&quot;affineReason&quot;, unsupported.getMessage());</span>
+<span class="fc" id="L78">            return prefixResponse;</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        var response = new LinkedHashMap&lt;String, Object&gt;();</span>
+        try {
+<span class="fc" id="L82">            var budget = request.path(&quot;limits&quot;);</span>
+<span class="fc" id="L83">            var limits = new IterationLimits(budget.path(&quot;nativeWork&quot;).longValue(), budget.path(&quot;nativeTerms&quot;).intValue(),</span>
+<span class="fc" id="L84">                budget.path(&quot;synthesisSeconds&quot;).longValue() * 1000);</span>
+<span class="fc" id="L85">            var evaluation = evaluate(imported.source(), request, limits);</span>
+<span class="fc" id="L86">            response.put(&quot;outputs&quot;, evaluation.outputs());</span>
+<span class="fc" id="L87">            response.put(&quot;planPreparationWork&quot;, evaluation.preparationWork());</span>
+<span class="fc" id="L88">            response.put(&quot;fixturePreparationWork&quot;, evaluation.fixtureWork());</span>
+<span class="fc" id="L89">            response.put(&quot;evaluationWork&quot;, evaluation.evaluationWork());</span>
+<span class="fc" id="L90">            response.put(&quot;evaluationNanos&quot;, evaluation.evaluationNanos());</span>
+<span class="fc" id="L91">            response.put(&quot;totalNativeWork&quot;, evaluation.preparationWork() + evaluation.fixtureWork() + evaluation.evaluationWork());</span>
+<span class="fc" id="L92">            response.put(&quot;status&quot;, &quot;CANDIDATE&quot;);</span>
+<span class="nc" id="L93">        } catch (IllegalArgumentException failure) {</span>
+<span class="nc" id="L94">            response.put(&quot;status&quot;, &quot;ERROR&quot;);</span>
+<span class="nc" id="L95">            response.put(&quot;reason&quot;, failure.getMessage());</span>
+        } finally {
+<span class="fc" id="L97">            response.put(&quot;nativeWallNanos&quot;, System.nanoTime() - started);</span>
+        }
+<span class="fc" id="L99">        return response;</span>
+    }
+
+    private static Batch evaluate(AffineReduction source, JsonNode request, IterationLimits limits) {
+<span class="fc" id="L103">        var prepared = AffineReductionPlan.prepare(source, limits, () -&gt; false);</span>
+<span class="fc" id="L104">        long fixtureWork = 0, evaluationWork = 0;</span>
+<span class="fc" id="L105">        var outputs = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L106">        long evaluationNanos = 0;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (var countNode : request.path(&quot;rowCounts&quot;)) {</span>
+<span class="fc" id="L108">            int count = countNode.intValue();</span>
+<span class="fc" id="L109">            int parameter = parameter(count);</span>
+<span class="fc" id="L110">            var shape = AffineReductionPlan.prepareShape(source, parameter,</span>
+<span class="fc" id="L111">                remaining(limits, prepared.work() + fixtureWork + evaluationWork), () -&gt; false);</span>
+<span class="fc" id="L112">            fixtureWork += shape.work();</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (var seedNode : request.path(&quot;seeds&quot;)) {</span>
+<span class="fc" id="L114">                int seed = seedNode.intValue();</span>
+<span class="fc" id="L115">                fixtureWork += shape.shape().inputSize();</span>
+<span class="fc" id="L116">                var budgetLeft = remaining(limits, prepared.work() + fixtureWork + evaluationWork);</span>
+<span class="fc" id="L117">                var input = values(shape.shape(), seed);</span>
+<span class="fc" id="L118">                long evaluationStarted = System.nanoTime();</span>
+<span class="fc" id="L119">                var result = prepared.plan().evaluate(parameter, input, budgetLeft, () -&gt; false);</span>
+<span class="fc" id="L120">                evaluationNanos += System.nanoTime() - evaluationStarted;</span>
+<span class="fc" id="L121">                evaluationWork += result.work();</span>
+<span class="fc" id="L122">                outputs.add(Map.of(&quot;rows&quot;, count, &quot;seed&quot;, seed, &quot;values&quot;,</span>
+<span class="fc" id="L123">                    result.values().stream().map(BigInteger::toString).toList()));</span>
+<span class="fc" id="L124">            }</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        return new Batch(outputs, prepared.work(), fixtureWork, evaluationWork, evaluationNanos);</span>
+    }
+
+    private static IterationLimits remaining(IterationLimits limits, long used) {
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (used &gt;= limits.maximumWork()) throw new IllegalArgumentException(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L131">        return limits.withMaximumWork(limits.maximumWork() - used);</span>
+    }
+
+    private static int parameter(int count) {
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">        if (count &lt; 2 || count &gt; 20) throw new IllegalArgumentException(&quot;FIXTURE_OR_PARAMETER_DOMAIN_LIMIT&quot;);</span>
+<span class="fc" id="L136">        return count - 1;</span>
+    }
+
+    private static List&lt;BigInteger&gt; values(Shape shape, int seed) {
+<span class="pc bpc" id="L140" title="2 of 4 branches missed.">        if (seed &lt; 0 || seed &gt; 2) throw new IllegalArgumentException(&quot;FIXTURE_OR_PARAMETER_DOMAIN_LIMIT&quot;);</span>
+<span class="fc" id="L141">        var result = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i = 0; i &lt; shape.inputSize(); i++)</span>
+<span class="fc" id="L143">            result.add(BigInteger.valueOf((i * 17L + seed * 7L) % 19L - 9L));</span>
+<span class="fc" id="L144">        return result;</span>
+    }
+
+<span class="fc" id="L147">    private record Batch(List&lt;Map&lt;String, Object&gt;&gt; outputs, long preparationWork, long fixtureWork, long evaluationWork,</span>
+            long evaluationNanos) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -79,7 +79,7 @@ import java.util.Optional;
         SerializedEvidence evidence
     ) {
 <span class="fc" id="L81">        return new ExactRationalDomain(evidence.limits())</span>
-<span class="fc" id="L82">            .parse(evidence.sourceLiteral());</span>
+<span class="fc" id="L82">            .parseEvidence(evidence.sourceLiteral());</span>
     }
 
     private boolean sameFields(

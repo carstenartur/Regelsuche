@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AlphaCOutputDriver.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">AlphaCOutputDriver.java</span></div><h1>AlphaCOutputDriver.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
+/** Executes generated Alpha C over explicitly ordered, bounded source coordinates. */
+final class AlphaCOutputDriver {
+    private static final int MAX_INDEX = 512;
+    private static final int MAX_POINTS = 16_384;
+<span class="fc" id="L13">    private static final Pattern C_IDENTIFIER = Pattern.compile(&quot;[A-Za-z_][A-Za-z_0-9]*&quot;);</span>
+
+    private AlphaCOutputDriver() {}
+
+    static String source(String name, int rank) {
+<span class="fc" id="L18">        checkRank(rank);</span>
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        if (!C_IDENTIFIER.matcher(name).matches()) throw new IllegalArgumentException(&quot;ALPHA_C_IDENTIFIER&quot;);</span>
+<span class="fc" id="L20">        return String.format(Locale.ROOT, &quot;&quot;&quot;</span>
+            #include &lt;errno.h&gt;
+            #include &lt;limits.h&gt;
+            #include &lt;stdio.h&gt;
+            #include &lt;stdlib.h&gt;
+            #define RANK %d
+            #define MAX_INDEX %d
+            #define MAX_POINTS %d
+            #define ALPHA_FUNCTION %s
+
+            #if RANK == 1
+            void ALPHA_FUNCTION(long, long*, long*);
+            #else
+            void ALPHA_FUNCTION(long, long*, long**);
+            #endif
+
+            static long read_nonnegative(const char *text, long maximum) {
+                char *end;
+                errno = 0;
+                long value = strtol(text, &amp;end, 10);
+                if (errno || end == text || *end || value &lt; 0 || value &gt; maximum) return -1;
+                return value;
+            }
+
+            int main(int argc, char **argv) {
+                if (argc &lt; 4 + RANK || (argc - 4) %% RANK || (argc - 4) / RANK &gt; MAX_POINTS) return 2;
+                if (sizeof(long) != 8) return 3;
+                long parameter = read_nonnegative(argv[1], MAX_INDEX);
+                long seed = read_nonnegative(argv[2], 2);
+                long input_size = read_nonnegative(argv[3], MAX_INDEX + 1);
+                if (parameter &lt; 0 || seed &lt; 0 || input_size &lt; 1) return 4;
+
+                long extents[] = {1, 1};
+                for (int i = 4; i &lt; argc; i++) {
+                    long coordinate = read_nonnegative(argv[i], MAX_INDEX);
+                    if (coordinate &lt; 0) return 5;
+                    int axis = (i - 4) %% RANK;
+                    if (coordinate &gt;= extents[axis]) extents[axis] = coordinate + 1;
+                }
+                long cells = extents[0] * extents[1];
+                long *values = malloc((size_t)cells * sizeof(*values));
+                long *input = malloc((size_t)input_size * sizeof(*input));
+                if (!values || !input) {
+                    free(values);
+                    free(input);
+                    return 6;
+                }
+                for (long i = 0; i &lt; input_size; i++) input[i] = (i * 17 + seed * 7) %% 19 - 9;
+                for (long i = 0; i &lt; cells; i++) values[i] = LONG_MIN;
+                #if RANK == 1
+                ALPHA_FUNCTION(parameter, input, values);
+                #else
+                long *rows[MAX_INDEX + 1];
+                for (long i = 0; i &lt; extents[0]; i++) rows[i] = values + i * extents[1];
+                ALPHA_FUNCTION(parameter, input, rows);
+                #endif
+                for (int i = 4; i &lt; argc; i += RANK) {
+                    long index = read_nonnegative(argv[i], MAX_INDEX);
+                    #if RANK == 2
+                    index = index * extents[1] + read_nonnegative(argv[i + 1], MAX_INDEX);
+                    #endif
+                    printf(&quot;%%ld\\n&quot;, values[index]);
+                }
+                free(values);
+                free(input);
+                return 0;
+            }
+<span class="fc" id="L87">            &quot;&quot;&quot;, rank, MAX_INDEX, MAX_POINTS, name);</span>
+    }
+
+    static List&lt;String&gt; command(Path binary, int parameter, int seed, int inputSize,
+            List&lt;List&lt;Integer&gt;&gt; outputCoordinates) {
+<span class="pc bpc" id="L92" title="5 of 12 branches missed.">        if (parameter &lt; 0 || parameter &gt; MAX_INDEX || seed &lt; 0 || seed &gt; 2</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                || inputSize &lt; 1 || inputSize &gt; MAX_INDEX + 1 || outputCoordinates.isEmpty()</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                || outputCoordinates.size() &gt; MAX_POINTS) throw new IllegalArgumentException(&quot;ALPHA_C_INPUT_LIMIT&quot;);</span>
+<span class="fc" id="L95">        int rank = outputCoordinates.getFirst().size();</span>
+<span class="fc" id="L96">        checkRank(rank);</span>
+<span class="fc" id="L97">        var command = new ArrayList&lt;&gt;(List.of(binary.toString(), Integer.toString(parameter), Integer.toString(seed),</span>
+<span class="fc" id="L98">            Integer.toString(inputSize)));</span>
+<span class="fc" id="L99">        List&lt;Integer&gt; previous = List.of();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (var point : outputCoordinates) {</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">            if (point.size() != rank || !inOrder(previous, point)) {</span>
+<span class="fc" id="L102">                throw new IllegalArgumentException(&quot;ALPHA_C_OUTPUT_ORDER&quot;);</span>
+            }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            for (int coordinate : point) {</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">                if (coordinate &lt; 0 || coordinate &gt; MAX_INDEX) throw new IllegalArgumentException(&quot;ALPHA_C_INDEX_LIMIT&quot;);</span>
+<span class="fc" id="L106">                command.add(Integer.toString(coordinate));</span>
+<span class="fc" id="L107">            }</span>
+<span class="fc" id="L108">            previous = point;</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        return List.copyOf(command);</span>
+    }
+
+    private static boolean inOrder(List&lt;Integer&gt; previous, List&lt;Integer&gt; current) {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int i = 0; i &lt; previous.size(); i++) {</span>
+<span class="fc" id="L115">            int comparison = Integer.compare(previous.get(i), current.get(i));</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">            if (comparison != 0) return comparison &lt; 0;</span>
+        }
+<span class="fc" id="L118">        return previous.isEmpty();</span>
+    }
+
+    private static void checkRank(int rank) {
+<span class="fc bfc" id="L122" title="All 4 branches covered.">        if (rank != 1 &amp;&amp; rank != 2) throw new IllegalArgumentException(&quot;ALPHA_C_OUTPUT_RANK&quot;);</span>
+<span class="fc" id="L123">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

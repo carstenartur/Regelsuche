@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RenamedTaskPath.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RenamedTaskPath.java</span></div><h1>RenamedTaskPath.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.function.Function;
+
+/** A selected primitive path with consistently renamed, unscoped variables. */
+final class RenamedTaskPath implements RetainedGraph.View {
+    private static final int MAXIMUM_NODES = 256;
+    private static final int MAXIMUM_DEPTH = 64;
+    private static final int MAXIMUM_STEPS = 32;
+<span class="fc" id="L28">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L29">    private static final MoveProvider.Descriptor DESCRIPTOR = new MoveProvider.Descriptor(&quot;renamed-task-path/v1&quot;,</span>
+        &quot;renamed-task-path&quot;, SearchMove.SourceKind.PREPARATION, SearchMove.ProofStrength.REPLAYABLE,
+<span class="fc" id="L31">        List.of(), SearchMove.ValueEvidence.UNKNOWN, &quot;rebound-prior-primitive-path&quot;);</span>
+
+<span class="fc" id="L33">    record Shape(Expr source, Expr concrete, Map&lt;VariableExpr, VariableExpr&gt; slots) {</span>
+        static Shape of(Expr source, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L35">            var slots = new HashMap&lt;VariableExpr, VariableExpr&gt;();</span>
+<span class="fc" id="L36">            Expr numbered = rewrite(source, variable -&gt; slots.computeIfAbsent(variable,</span>
+<span class="fc" id="L37">                ignored -&gt; new VariableExpr(&quot;slot&quot; + slots.size())), work);</span>
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">            return numbered == null || slots.isEmpty() ? null : new Shape(numbered, source, slots);</span>
+        }
+    }
+
+<span class="fc" id="L42">    private record Step(TreePosition position, Expr replacement, TypedMoveSearch.PrimitiveProposal proposal) implements RetainedGraph.View {</span>
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L44">            visitor.reference(position); visitor.reference(replacement); visitor.reference(proposal);</span>
+<span class="fc" id="L45">        }</span>
+    }
+
+    private final List&lt;Step&gt; steps;
+
+<span class="fc" id="L50">    private RenamedTaskPath(List&lt;Step&gt; steps) { this.steps = List.copyOf(steps); }</span>
+
+    static RenamedTaskPath retain(Shape shape, List&lt;TypedMoveSearch.WitnessStep&gt; witness, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L53">        work.add(1);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (witness.isEmpty() || witness.size() &gt; MAXIMUM_STEPS) return null;</span>
+<span class="fc" id="L55">        var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (var edge : witness) {</span>
+<span class="fc" id="L57">            work.add(1);</span>
+<span class="fc" id="L58">            var proposal = TypedMoveSearch.PrimitiveProposal.from(edge.move());</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (proposal.isEmpty()) return null;</span>
+<span class="fc" id="L60">            var position = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L61">            Expr replaced = replacement(edge.source().expression(), edge.target().expression(), position, work);</span>
+<span class="fc" id="L62">            Expr numbered = rewrite(replaced, shape.slots()::get, work, work.units, position.size());</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (numbered == null) return null; // An introduced symbol has no binding in the new task.</span>
+<span class="fc" id="L64">            steps.add(new Step(new TreePosition(position, &quot;&quot;), numbered, proposal.orElseThrow()));</span>
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">        return new RenamedTaskPath(steps);</span>
+    }
+
+    TypedMoveSearch.TypedProvider bind(Shape shape, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L70">        var names = new HashMap&lt;VariableExpr, VariableExpr&gt;();</span>
+<span class="fc" id="L71">        shape.slots().forEach((variable, slot) -&gt; names.put(slot, variable));</span>
+<span class="fc" id="L72">        work.add(2L + names.size());</span>
+<span class="fc" id="L73">        return new TypedMoveSearch.TypedProvider() {</span>
+<span class="fc" id="L74">            private Expr source = shape.concrete();</span>
+            private String expected;
+            private int nextStep;
+<span class="fc" id="L77">            @Override public MoveProvider.Descriptor descriptor() { return DESCRIPTOR; }</span>
+
+            @Override public MoveProvider.Batch candidates(MoveState state, MoveContext context) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                if (Thread.currentThread().isInterrupted()) throw new CancellationException(&quot;renamed path replay interrupted&quot;);</span>
+<span class="fc" id="L81">                var local = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L82">                local.add(1);</span>
+<span class="fc" id="L83">                int index = state.searchDepth();</span>
+<span class="pc bpc" id="L84" title="4 of 8 branches missed.">                if (index != nextStep || index &gt;= steps.size() || !state.assumptions().isEmpty() || !context.initialAssumptions().isEmpty())</span>
+<span class="nc" id="L85">                    return batch(List.of(), local);</span>
+<span class="fc" id="L86">                local.add(1);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                if (expected == null) expected = CODEC.encodeExpression(source);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (!state.expression().equals(expected)) return batch(List.of(), local);</span>
+<span class="fc" id="L89">                var step = steps.get(index);</span>
+<span class="fc" id="L90">                Expr replacement = rewrite(step.replacement(), names::get, local);</span>
+<span class="fc" id="L91">                local.add(2L + 3L * step.position().path().size());</span>
+<span class="fc" id="L92">                var target = step.position().replaceAt(source, replacement).rewrittenRoot();</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (target.isEmpty()) return batch(List.of(), local);</span>
+<span class="fc" id="L94">                source = target.orElseThrow();</span>
+<span class="fc" id="L95">                expected = CODEC.encodeExpression(source);</span>
+<span class="fc" id="L96">                nextStep++;</span>
+<span class="fc" id="L97">                local.add(1); // Construct a fresh source-bound proposal for the actual receiving state.</span>
+<span class="fc" id="L98">                return batch(List.of(step.proposal().bind(state, expected, local.units)), local);</span>
+            }
+        };
+    }
+
+    private static MoveProvider.Batch batch(List&lt;SearchMove&gt; moves, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L104">        return new MoveProvider.Batch(moves, TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(work.units), false);</span>
+    }
+
+    private static Expr replacement(Expr before, Expr after, List&lt;Integer&gt; path, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L108">        work.add(1);</span>
+<span class="pc bpc" id="L109" title="2 of 6 branches missed.">        if (path.size() &gt;= MAXIMUM_DEPTH || !(before instanceof BinaryExpr left) || !(after instanceof BinaryExpr right)</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                || left.operator() != right.operator()) return after;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (same(left.right(), right.right(), work)) {</span>
+<span class="fc" id="L112">            path.add(0);</span>
+<span class="fc" id="L113">            return replacement(left.left(), right.left(), path, work);</span>
+        }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (same(left.left(), right.left(), work)) {</span>
+<span class="fc" id="L116">            path.add(1);</span>
+<span class="fc" id="L117">            return replacement(left.right(), right.right(), path, work);</span>
+        }
+<span class="nc" id="L119">        return after;</span>
+    }
+
+    private static boolean same(Expr left, Expr right, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L123">        work.add(1);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (left == right) return true;</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        if (left instanceof BinaryExpr a &amp;&amp; right instanceof BinaryExpr b) {</span>
+<span class="nc bnc" id="L126" title="All 6 branches missed.">            return a.operator() == b.operator() &amp;&amp; same(a.left(), b.left(), work) &amp;&amp; same(a.right(), b.right(), work);</span>
+        }
+<span class="fc" id="L128">        return left.equals(right);</span>
+    }
+
+    private static Expr rewrite(Expr source, Function&lt;VariableExpr, VariableExpr&gt; rename, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L132">        return rewrite(source, rename, work, work.units, 0);</span>
+    }
+
+    private static Expr rewrite(Expr source, Function&lt;VariableExpr, VariableExpr&gt; rename,
+            CheckedSchemaSupport.Work work, long start, int depth) {
+<span class="fc" id="L137">        work.add(1);</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">        if (work.units - start &gt; MAXIMUM_NODES || depth &gt; MAXIMUM_DEPTH) return null;</span>
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        return switch (source) {</span>
+<span class="fc" id="L140">            case NumberExpr number -&gt; number;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            case VariableExpr variable -&gt; variable.symbol().isEmpty() ? rename.apply(variable) : null;</span>
+<span class="fc" id="L142">            case BinaryExpr binary -&gt; {</span>
+<span class="fc" id="L143">                Expr left = rewrite(binary.left(), rename, work, start, depth + 1);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                Expr right = left == null ? null : rewrite(binary.right(), rename, work, start, depth + 1);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                yield right == null ? null : new BinaryExpr(left, binary.operator(), right);</span>
+            }
+<span class="nc" id="L147">            default -&gt; null;</span>
+        };
+    }
+
+<span class="fc" id="L151">    @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(steps); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

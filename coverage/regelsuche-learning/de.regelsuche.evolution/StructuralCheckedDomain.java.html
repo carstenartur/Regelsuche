@@ -16,32 +16,41 @@ final class StructuralCheckedDomain {
 <span class="fc" id="L16">    }</span>
 
     static int inspect(Expr expression, CheckedSchemaSupport.Work work) {
-<span class="fc" id="L19">        requireUnobserved();</span>
-<span class="fc" id="L20">        CheckedSchemaSupport.domain(expression, CheckedLearnedSchemaModel.Bounds.defaults(), work);</span>
-<span class="fc" id="L21">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
-<span class="fc" id="L22">        pending.push(expression);</span>
-<span class="fc" id="L23">        int nodes = 0;</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
-<span class="fc" id="L25">            var node = pending.pop();</span>
-<span class="fc" id="L26">            nodes++;</span>
-<span class="fc" id="L27">            work.add(1);</span>
-<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (node instanceof VariableExpr variable) {</span>
-<span class="fc" id="L29">                String name = variable.name();</span>
+<span class="fc" id="L19">        return inspect(expression, work, false);</span>
+    }
+
+    static int inspect(Expr expression, CheckedSchemaSupport.Work work, boolean sharedArithmetic) {
+<span class="fc" id="L23">        requireUnobserved();</span>
+<span class="fc" id="L24">        CheckedSchemaSupport.domain(expression, CheckedLearnedSchemaModel.Bounds.defaults(), work, sharedArithmetic);</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (sharedArithmetic) {</span>
+<span class="fc" id="L26">            var surface = TypedPolynomialSurfaceCost.evaluateSharedArithmetic(expression);</span>
+<span class="fc" id="L27">            work.add(surface.work());</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            if (surface.value() == Long.MAX_VALUE) throw new CheckedSchemaSupport.DomainRejected(&quot;outside shared exact arithmetic&quot;);</span>
+        }
+<span class="fc" id="L30">        var pending = new ArrayDeque&lt;Expr&gt;();</span>
+<span class="fc" id="L31">        pending.push(expression);</span>
+<span class="fc" id="L32">        int nodes = 0;</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        while (!pending.isEmpty()) {</span>
+<span class="fc" id="L34">            var node = pending.pop();</span>
+<span class="fc" id="L35">            nodes++;</span>
+<span class="fc" id="L36">            work.add(1);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (node instanceof VariableExpr variable) {</span>
+<span class="fc" id="L38">                String name = variable.name();</span>
                 // Mirrors ExpressionParser's character-by-character identifier grammar.
-<span class="fc" id="L31">                work.add(name.length());</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                if (!Character.isLetter(name.charAt(0))) throw new CheckedSchemaSupport.DomainRejected(&quot;symbol is not a parser identifier&quot;);</span>
-<span class="fc bfc" id="L33" title="All 2 branches covered.">                for (int i = 1; i &lt; name.length(); i++) {</span>
-<span class="fc" id="L34">                    char item = name.charAt(i);</span>
-<span class="fc bfc" id="L35" title="All 4 branches covered.">                    if (!Character.isLetterOrDigit(item) &amp;&amp; item != '_') {</span>
-<span class="fc" id="L36">                        throw new CheckedSchemaSupport.DomainRejected(&quot;symbol is not a parser identifier&quot;);</span>
+<span class="fc" id="L40">                work.add(name.length());</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                if (!Character.isLetter(name.charAt(0))) throw new CheckedSchemaSupport.DomainRejected(&quot;symbol is not a parser identifier&quot;);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                for (int i = 1; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L43">                    char item = name.charAt(i);</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">                    if (!Character.isLetterOrDigit(item) &amp;&amp; item != '_') {</span>
+<span class="fc" id="L45">                        throw new CheckedSchemaSupport.DomainRejected(&quot;symbol is not a parser identifier&quot;);</span>
                     }
                 }
-<span class="fc bfc" id="L39" title="All 2 branches covered.">            } else if (node instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L40">                pending.push(binary.right());</span>
-<span class="fc" id="L41">                pending.push(binary.left());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            } else if (node instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L49">                pending.push(binary.right());</span>
+<span class="fc" id="L50">                pending.push(binary.left());</span>
             }
-<span class="fc" id="L43">        }</span>
-<span class="fc" id="L44">        return nodes;</span>
+<span class="fc" id="L52">        }</span>
+<span class="fc" id="L53">        return nodes;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
