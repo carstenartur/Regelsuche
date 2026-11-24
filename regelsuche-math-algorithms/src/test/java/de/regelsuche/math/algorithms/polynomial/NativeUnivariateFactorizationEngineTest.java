@@ -67,6 +67,25 @@ class NativeUnivariateFactorizationEngineTest {
     }
 
     @Test
+    void verifiesQuadraticInAPowerWithoutDensifyingThePolynomial() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithFastPath(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var source = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(12), ExactRational.integer(6),
+            Monomial.of(6), ExactRational.integer(-7),
+            Monomial.of(0), ExactRational.integer(2)));
+        var result = FactorizationVerifier.execute(engine, FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, 64));
+        assertTrue(result.successful(), result.detailCode());
+        assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+        var factors = result.candidates().getFirst().factors();
+        assertEquals(2, factors.size());
+        assertTrue(factors.stream().allMatch(factor -> factor.polynomial().degree(0) == 6));
+        assertTrue(result.work().within(64));
+        assertEquals(3, result.work().units("native-rational-fast.quadratic-shape-terms"));
+        assertEquals(0, result.work().units("native-rational-fast.synthetic-division"));
+    }
+
+    @Test
     void completelyFactorsGeneralIntegerPolynomial() {
         SparsePolynomial<BigInteger> xMinusOne = integer(-1, 1);
         SparsePolynomial<BigInteger> xPlusTwo = integer(2, 1);

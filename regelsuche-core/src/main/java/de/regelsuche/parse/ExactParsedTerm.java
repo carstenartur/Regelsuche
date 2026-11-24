@@ -62,11 +62,10 @@ public final class ExactParsedTerm {
         this.literals = List.copyOf(
             Objects.requireNonNull(literals, "literals"));
         this.literalsByNode = validateAndIndexLiterals();
-        Set<Expr> visited = validateUniqueNodeIdentities();
-        this.nodeCount = visited.size();
+        SourceRanges validated = copyAndValidateSourceRanges(Objects.requireNonNull(sourceRanges, "sourceRanges"));
+        this.sourceRangesByNode = validated.byNode();
+        this.nodeCount = validated.nodeCount();
         this.parserRoot = parserRoot;
-        this.sourceRangesByNode = copyAndValidateSourceRanges(
-            Objects.requireNonNull(sourceRanges, "sourceRanges"), visited);
     }
 
     int nodeCount() {
@@ -111,9 +110,8 @@ public final class ExactParsedTerm {
         return Collections.unmodifiableMap(occurrences);
     }
 
-    private Map<Expr, SourceRange> copyAndValidateSourceRanges(
-        Map<Expr, SourceRange> sourceRanges,
-        Set<Expr> visitedNodes
+    private SourceRanges copyAndValidateSourceRanges(
+        Map<Expr, SourceRange> sourceRanges
     ) {
         IdentityHashMap<Expr, SourceRange> ranges =
             new IdentityHashMap<>();
@@ -142,6 +140,7 @@ public final class ExactParsedTerm {
                     "numeric literal is outside its AST source range");
             }
         });
+        Set<Expr> visitedNodes = validateUniqueNodeIdentities();
         validateTreeRangesIteratively(ranges);
         for (Expr rangedNode : ranges.keySet()) {
             if (!visitedNodes.contains(rangedNode)) {
@@ -149,8 +148,10 @@ public final class ExactParsedTerm {
                     "AST source range belongs to a node outside the parsed tree");
             }
         }
-        return Collections.unmodifiableMap(ranges);
+        return new SourceRanges(Collections.unmodifiableMap(ranges), visitedNodes.size());
     }
+
+    private record SourceRanges(Map<Expr, SourceRange> byNode, int nodeCount) { }
 
     private Set<Expr> validateUniqueNodeIdentities() {
         Set<Expr> visitedNodes = Collections.newSetFromMap(

@@ -300,6 +300,23 @@ public final class TypedMoveSearch {
         return "typed:" + sha256(encodedSource + "\n" + encodedTarget + "\n" + rule);
     }
 
+    /** Rebind an assumption-free primitive proposal to another typed edge. The receiving verifier must check it. */
+    public static SearchMove rebindPrimitiveProposal(SearchMove proposal, MoveState source, String encodedTarget, long generationWork) {
+        var template = proposal.transformation();
+        if (proposal.sourceKind() != SearchMove.SourceKind.PRIMITIVE || !proposal.assumptions().isEmpty()
+                || !proposal.capabilityDelta().isEmpty() || !template.primitiveRuleIds().equals(List.of(proposal.ruleId()))
+                || !template.rule().equals(proposal.ruleId())
+                || !(template.provenance() instanceof de.regelsuche.transform.TransformationProvenance.PrimitiveRewriteSequence)) {
+            throw new IllegalArgumentException("an unconditional single primitive proposal is required");
+        }
+        var descriptor = new MoveProvider.Descriptor(proposal.ruleId(), proposal.ruleFamily(), proposal.sourceKind(),
+            proposal.proofStrength(), List.of(), proposal.valueEvidence(), proposal.ruleId());
+        var transformation = new Transformation(template.rule(), encodedTarget, template.kind(), template.mayIncreaseComplexity(),
+            template.estimatedCostDelta(), template.equivalencePreservingByConstruction(),
+            applicationKey(source.expression(), encodedTarget, template.rule()), List.of(), template.packId(), template.license());
+        return SearchMove.from(transformation, descriptor, generationWork);
+    }
+
     private static String sha256(String value) {
         try {
             return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

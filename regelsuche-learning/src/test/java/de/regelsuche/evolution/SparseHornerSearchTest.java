@@ -52,4 +52,15 @@ class SparseHornerSearchTest {
         assertTrue(partial.moves().isEmpty());
         assertTrue(partial.work().totalWorkUnits() > 0);
     }
+
+    @Test void sharedSurfaceObjectiveRefusesIllegalCheapCandidates() {
+        for (String text : List.of("a^2", "a/(b-b+1)", "a/(2-2)", "a*9223372036854775808")) {
+            var scored = TypedPolynomialSurfaceCost.evaluateSharedArithmetic(parser.parseTerm(text));
+            assertEquals(Long.MAX_VALUE, scored.value(), text);
+            assertTrue(scored.work() > 0, text);
+        }
+        var rational = TypedPolynomialSurfaceCost.evaluateSharedArithmetic(parser.parseTerm("a*(a+2)/(2+3)"));
+        assertEquals(4, rational.value());
+        assertTrue(rational.work() > 4);
+    }
 }

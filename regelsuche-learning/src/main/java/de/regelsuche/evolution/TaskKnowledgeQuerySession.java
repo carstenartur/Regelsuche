@@ -35,10 +35,11 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
         public long knownWork() { return knownWork; }
         public boolean accountingComplete() { return false; }
     }
-    private record Key(Expr source, List<String> assumptions, TypedSourceOnlySearch.Objective objective,
+    private record Key(Expr source, boolean renamed, List<String> assumptions, TypedSourceOnlySearch.Objective objective,
             long maximumScore, MoveSearch.Budget budget, CumulativeTaskKnowledge.Strategy strategy) implements RetainedGraph.View {
-        static Key of(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy) {
-            return new Key(task.source(), AssumptionSignature.ofExpressions(task.assumptions()).normalizedAssumptions(),
+        static Key of(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy, RenamedTaskPath.Shape shape) {
+            return new Key(shape == null ? task.source() : shape.source(), shape != null,
+                AssumptionSignature.ofExpressions(task.assumptions()).normalizedAssumptions(),
                 task.goal().objective(), task.goal().maximumOutputScore(), task.budget(), strategy);
         }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
@@ -46,11 +47,12 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
             // Only explicitly admitted stateless built-in objective and strategy enums enter keys.
         }
     }
-    private record Entry(RetainedTaskPath path, long characters) { }
-    private record Footprint(long characters, long work) { }
+    private record RenamingEvidence(long ordinaryWork, long keyCharacters, boolean declined) { }
+    private record Entry(RetainedGraph.View path, long characters, RenamingEvidence renaming) { }
     private final CumulativeTaskKnowledge knowledge;
     private final int maximumQueries;
     private final long maximumCharacters;
+    private final boolean variableRenaming;
     private final LinkedHashMap<Key, Entry> retained = new LinkedHashMap<>(16, .75f, true);
     private long queries, hits, misses, bypasses, observations, admissions, failures, evictions, characters, knownWork;
     private int retainedPaths;
@@ -58,10 +60,22 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
 
     /** Zero capacity disables reuse and keeps the existing persistent solver's work contract. */
     public TaskKnowledgeQuerySession(CumulativeTaskKnowledge knowledge, int maximumQueries, long maximumCharacters) {
+        this(knowledge, maximumQueries, maximumCharacters, false);
+    }
+
+    /** Opt into replay across bijective renamings of free variables in bounded, unconditional primitive paths. */
+    public static TaskKnowledgeQuerySession withVariableRenaming(CumulativeTaskKnowledge knowledge,
+            int maximumQueries, long maximumCharacters) {
+        return new TaskKnowledgeQuerySession(knowledge, maximumQueries, maximumCharacters, true);
+    }
+
+    private TaskKnowledgeQuerySession(CumulativeTaskKnowledge knowledge, int maximumQueries, long maximumCharacters,
+            boolean variableRenaming) {
         this.knowledge = Objects.requireNonNull(knowledge);
         if (maximumQueries < 0 || maximumQueries > 256 || maximumCharacters < 0)
             throw new IllegalArgumentException("nonnegative bounded query capacity required");
         this.maximumQueries = maximumQueries; this.maximumCharacters = maximumCharacters;
+        this.variableRenaming = variableRenaming;
     }
 
     public synchronized Query solve(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy) {
@@ -82,25 +96,47 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
                 return new Query(execution, false, 0, 0);
             }
             completedWork = 1;
-            key = Key.of(task, strategy);
+            RenamedTaskPath.Shape shape = null;
+            if (variableRenaming && task.assumptions().isEmpty() && task.goal().objective() == NativeNodeCountObjective.INSTANCE) {
+                var work = new CheckedSchemaSupport.Work();
+                shape = RenamedTaskPath.Shape.of(task.source(), work);
+                completedWork = Math.addExact(completedWork, work.units);
+            }
+            key = Key.of(task, strategy, shape);
             var previous = retained.get(key);
-            boolean reused = previous != null && previous.path() != null;
+            var path = previous == null ? null : previous.path();
+            boolean reused;
+            CumulativeTaskKnowledge.Execution execution;
+            if (path instanceof RenamedTaskPath renamed) {
+                var work = new CheckedSchemaSupport.Work();
+                var bound = renamed.bind(shape, work);
+                completedWork = Math.addExact(completedWork, work.units);
+                var searched = knowledge.solveRenamedInSession(task, strategy, completedWork, bound);
+                execution = searched.execution();
+                reused = searched.reused();
+            } else {
+                reused = path != null;
+                execution = knowledge.solveInSession(task, strategy, completedWork, (RetainedTaskPath) path);
+            }
             if (reused) hits = Math.addExact(hits, 1); else misses = Math.addExact(misses, 1);
-            var execution = knowledge.solveInSession(task, strategy, 1, previous == null ? null : previous.path());
+            long lookupWork = completedWork;
             completedWork = execution.totalWork();
             complete &= accounted(execution);
             checkInterrupted();
             long retentionWork = 0;
-            if (!reused && execution.solved() && !execution.solution().orElseThrow().evidence().witness().isEmpty()) {
-                retentionWork = previous == null ? observe(key, execution) : prepare(key, execution);
+            if (path instanceof RenamedTaskPath && (!reused || completedWork >= previous.renaming().ordinaryWork())) {
+                retentionWork = declineRenaming(key, previous);
+                completedWork = Math.addExact(completedWork, retentionWork);
+            } else if (!reused && execution.solved() && !execution.solution().orElseThrow().evidence().witness().isEmpty()) {
+                retentionWork = previous == null ? observe(key, execution) : prepare(key, shape, previous, lookupWork, execution);
                 completedWork = Math.addExact(completedWork, retentionWork);
                 checkInterrupted();
-            } else if (previous != null && !execution.solved()) {
+            } else if (previous != null && !execution.solved() && (previous.renaming() == null || !previous.renaming().declined())) {
                 discard(retained.remove(key));
                 retentionWork = 1; completedWork = Math.addExact(completedWork, 1);
             }
             knownWork = Math.addExact(knownWork, completedWork);
-            return new Query(execution, reused, 1, retentionWork);
+            return new Query(execution, reused, lookupWork, retentionWork);
         } catch (RuntimeException failure) {
             if (key != null && retained.containsKey(key)) {
                 discard(retained.remove(key)); completedWork = Math.addExact(completedWork, 1);
@@ -117,6 +153,11 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
 
     /** The existing typed input encoding conservatively bounds the retained AST's scalar/text characters. */
     private long observe(Key key, CumulativeTaskKnowledge.Execution execution) {
+        if (key.renamed()) {
+            var measured = RetainedGraph.measure(key);
+            long size = measured.retained().characters();
+            return admit(key, new Entry(null, size, new RenamingEvidence(0, size, false)), measured.work(), execution);
+        }
         long work = 1, size = 0;
         for (var state : execution.solution().orElseThrow().evidence().search().encodedResult().stateAssessments().keySet()) {
             work = Math.addExact(work, 1);
@@ -126,24 +167,44 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
         for (var assumption : key.assumptions()) {
             size = Math.addExact(size, assumption.length()); work = Math.addExact(work, 1);
         }
-        return admit(key, null, new Footprint(size, work), execution);
+        return admit(key, new Entry(null, size, null), work, execution);
     }
 
-    private long prepare(Key key, CumulativeTaskKnowledge.Execution execution) {
-        var path = new RetainedTaskPath(execution.solution().orElseThrow().evidence().witness());
+    private long prepare(Key key, RenamedTaskPath.Shape shape, Entry previous, long lookupWork,
+            CumulativeTaskKnowledge.Execution execution) {
+        if (previous.renaming() != null && previous.renaming().declined()) return 0;
+        var witness = execution.solution().orElseThrow().evidence().witness();
+        if (shape != null) {
+            var work = new CheckedSchemaSupport.Work();
+            var path = RenamedTaskPath.retain(shape, witness, work);
+            if (path == null) return Math.addExact(work.units, declineRenaming(key, previous));
+            var measured = RetainedGraph.measure(List.of(key, path));
+            var evidence = new RenamingEvidence(execution.totalWork() - lookupWork, previous.renaming().keyCharacters(), false);
+            return admit(key, new Entry(path, measured.retained().characters(), evidence),
+                Math.addExact(work.units, measured.work()), execution);
+        }
+        var path = new RetainedTaskPath(witness);
         var measured = RetainedGraph.measure(List.of(key, path));
-        return admit(key, path, new Footprint(measured.retained().characters(),
-            Math.addExact(path.constructionWork(), measured.work())), execution);
+        return admit(key, new Entry(path, measured.retained().characters(), null),
+            Math.addExact(path.constructionWork(), measured.work()), execution);
     }
 
-    private long admit(Key key, RetainedTaskPath path, Footprint footprint, CumulativeTaskKnowledge.Execution execution) {
-        long paid = Math.addExact(execution.totalWork(), footprint.work());
+    private long declineRenaming(Key key, Entry previous) {
+        long size = previous.renaming().keyCharacters();
+        var rejected = new RenamingEvidence(previous.renaming().ordinaryWork(), size, true);
+        discard(retained.put(key, new Entry(null, size, rejected)));
+        characters = Math.addExact(characters, size);
+        return 1;
+    }
+
+    private long admit(Key key, Entry entry, long footprintWork, CumulativeTaskKnowledge.Execution execution) {
+        long paid = Math.addExact(execution.totalWork(), footprintWork);
         long budget = execution.task().budget().totalWork();
         checkInterrupted();
-        if (footprint.characters() > maximumCharacters || paid >= budget) return footprint.work();
+        if (entry.characters() > maximumCharacters || paid >= budget) return footprintWork;
         // Reserve replacement and worst-case evictions before scanning or mutating retained entries.
-        if (2L + 2L * retained.size() > budget - paid) return footprint.work();
-        return Math.addExact(footprint.work(), remember(key, path, footprint.characters()));
+        if (2L + 2L * retained.size() > budget - paid) return footprintWork;
+        return Math.addExact(footprintWork, remember(key, entry));
     }
 
     private boolean cacheable(CheckedSchemaTaskSolver.Task task) {
@@ -153,18 +214,18 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
     private static void checkInterrupted() {
         if (Thread.currentThread().isInterrupted()) throw new CancellationException("query interrupted after paid execution");
     }
-    private long remember(Key key, RetainedTaskPath path, long incoming) {
+    private long remember(Key key, Entry entry) {
         long work = 1;
         var replaced = retained.remove(key);
         if (replaced != null) { discard(replaced); work = Math.addExact(work, 1); }
-        while (retained.size() >= maximumQueries || characters > maximumCharacters - incoming) {
+        while (retained.size() >= maximumQueries || characters > maximumCharacters - entry.characters()) {
             var iterator = retained.entrySet().iterator();
             var oldest = iterator.next(); discard(oldest.getValue()); iterator.remove();
             evictions = Math.addExact(evictions, 1);
             work = Math.addExact(work, 2);
         }
-        retained.put(key, new Entry(path, incoming)); characters = Math.addExact(characters, incoming);
-        if (path == null) observations = Math.addExact(observations, 1);
+        retained.put(key, entry); characters = Math.addExact(characters, entry.characters());
+        if (entry.path() == null) observations = Math.addExact(observations, 1);
         else { admissions = Math.addExact(admissions, 1); retainedPaths++; }
         return work;
     }

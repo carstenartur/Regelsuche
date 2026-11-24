@@ -2,7 +2,13 @@ package de.regelsuche.evolution;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.symbol.SymbolId;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import de.regelsuche.search.moves.MoveSearch;
 import org.junit.jupiter.api.BeforeAll;
@@ -233,5 +239,99 @@ class TaskKnowledgeQuerySessionTest {
             assertTrue(session.statistics().retainedCharacters() <= 1_000_000);
             assertEquals(8, session.statistics().retainedObservations());
         }
+    }
+
+    @Test void renamedPathsRecheckNewSourcesAndRetireCostlyFamilies() {
+        var strategy = CumulativeTaskKnowledge.Strategy.BASELINE;
+        var tasks = java.util.stream.IntStream.range(0, 18)
+            .mapToObj(index -> TaskKnowledgeSessionTest.task(CumulativeTaskKnowledgeContract.nested(
+                "left" + index + "*right" + index, 2, "guard" + index + "_") + "+11", 9)).toList();
+        long ordinaryWork = 0;
+        long renamedWork = 0;
+        int witnessedReuses = 0;
+        try (var session = TaskKnowledgeQuerySession.withVariableRenaming(knowledge, 8, 1_000_000)) {
+            for (var task : tasks) {
+                var ordinary = knowledge.solve(task, strategy);
+                var renamed = session.solve(task, strategy);
+                assertTrue(ordinary.solved());
+                assertTrue(renamed.solved());
+                var expected = ordinary.solution().orElseThrow().evidence();
+                var actual = renamed.execution().solution().orElseThrow().evidence();
+                assertEquals(expected.outputScore(), actual.outputScore());
+                assertEquals(task.source(), actual.witness().getFirst().source().expression());
+                new ExactPolynomialAnalysis().requireEquivalent(ExpressionFormatter.format(task.source()),
+                    ExpressionFormatter.format(actual.incumbent().expression()));
+                if (renamed.reused()) {
+                    witnessedReuses++;
+                    assertTrue(actual.search().metrics().verificationWork() > 0);
+                    assertTrue(actual.replayWork() > 0);
+                    assertFalse(actual.search().completeBoundedRelation());
+                    assertTrue(renamed.totalWork() > ordinary.totalWork());
+                }
+                ordinaryWork += ordinary.totalWork();
+                renamedWork += renamed.totalWork();
+            }
+            assertEquals(1, witnessedReuses);
+            assertEquals(witnessedReuses, session.statistics().hits());
+            assertEquals(0, session.statistics().retainedQueries());
+            assertEquals(renamedWork, session.statistics().knownWork());
+            assertTrue(session.statistics().accountingComplete());
+            System.out.printf("Variable renaming: %d tasks, %d fresh replays, ordinary=%d, with matching and admission=%d logical work units%n",
+                tasks.size(), witnessedReuses, ordinaryWork, renamedWork);
+        }
+    }
+
+    @Test void scopedSymbolsVariableCoalescingAndDifferentAssumptionsDoNotHitRenamedPaths() {
+        var strategy = CumulativeTaskKnowledge.Strategy.BASELINE;
+        var anchor = TaskKnowledgeSessionTest.task("(x+0)+y", 3);
+        try (var session = TaskKnowledgeQuerySession.withVariableRenaming(knowledge, 8, 1_000_000)) {
+            session.solve(anchor, strategy);
+            session.solve(anchor, strategy);
+            var scoped = new SymbolId(new UUID(0, 0), 1);
+            assertFalse(session.solve(TaskKnowledgeSessionTest.task("(" + scoped.identifier() + "+0)+y", 3), strategy).reused());
+            assertTrue(session.solve(TaskKnowledgeSessionTest.task("(y+0)+x", 3), strategy).reused());
+            assertFalse(session.solve(TaskKnowledgeSessionTest.task("(x+0)+x", 3), strategy).reused());
+            assertFalse(session.solve(TaskKnowledgeSessionTest.task("(u+1)+v", 3), strategy).reused());
+            var assumed = new CheckedSchemaTaskSolver.Task(anchor.source(), List.of("x!=0"), anchor.goal(), anchor.budget());
+            assertFalse(session.solve(assumed, strategy).reused());
+            assertEquals(1, session.statistics().hits());
+        }
+    }
+
+    @Test void rejectedTransplantedProposalPaysForAttemptBeforeOrdinarySearch() {
+        var strategy = CumulativeTaskKnowledge.Strategy.BASELINE;
+        var anchor = TaskKnowledgeSessionTest.task("(x+0)+y", 3);
+        var evidence = knowledge.solve(anchor, strategy).solution().orElseThrow().evidence();
+        var step = evidence.witness().getFirst();
+        var actual = step.target();
+        var falseTarget = new TypedMoveSearch.State(new VariableExpr("x"), actual.searchDepth(), actual.primitiveDepth(),
+            actual.previousRule(), actual.assumptions(), actual.capabilities(), actual.complexityDebt());
+        var meter = new CheckedSchemaSupport.Work();
+        var forged = RenamedTaskPath.retain(RenamedTaskPath.Shape.of(anchor.source(), meter),
+            List.of(new TypedMoveSearch.WitnessStep(step.source(), falseTarget, step.move(), step.verification())), meter);
+        assertNotNull(forged);
+        var receiving = TaskKnowledgeSessionTest.task("(a+0)+b", 3);
+        var shape = RenamedTaskPath.Shape.of(receiving.source(), meter);
+        var bound = forged.bind(shape, meter);
+        var rejected = knowledge.solveInSession(receiving, strategy, meter.units, bound);
+        assertFalse(rejected.solved());
+        assertTrue(rejected.solution().orElseThrow().evidence().search().events().stream()
+            .anyMatch(event -> event.decision() == MoveSearch.Decision.PROOF_REJECTED));
+        var retry = forged.bind(shape, new CheckedSchemaSupport.Work());
+        var fallback = knowledge.solveRenamedInSession(receiving, strategy, meter.units, retry);
+        var ordinary = knowledge.solve(receiving, strategy);
+        assertTrue(fallback.execution().solved());
+        assertFalse(fallback.reused());
+        assertEquals(rejected.totalWork() + 1, fallback.execution().selectionWork());
+        assertEquals(ordinary.solution().orElseThrow().evidence().witness(),
+            fallback.execution().solution().orElseThrow().evidence().witness());
+
+        var budget = receiving.budget();
+        var tight = new CheckedSchemaTaskSolver.Task(receiving.source(), receiving.assumptions(), receiving.goal(),
+            new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(), budget.maxStates(),
+                rejected.totalWork(), budget.maxComplexityDebt()));
+        var limited = knowledge.solveRenamedInSession(tight, strategy, meter.units, forged.bind(shape, new CheckedSchemaSupport.Work()));
+        assertFalse(limited.execution().solved());
+        assertFalse(limited.reused());
     }
 }

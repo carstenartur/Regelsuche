@@ -97,8 +97,9 @@ public final class TypedExternalPolynomialComparisonWorker {
             TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION),
             providers, policy(), verifier, state -> 0, MoveSearch.Mode.FAST,
             MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(9, 9, theoryWork, 256, workBudget, 24));
-        var selected = new TypedSourceOnlySearch().search(problem,
-            state -> TypedPolynomialSurfaceCost.evaluate(state.expression()));
+        var selected = new TypedSourceOnlySearch().search(problem, profile.equals(HORNER)
+            ? state -> TypedPolynomialSurfaceCost.evaluateSharedArithmetic(state.expression())
+            : state -> TypedPolynomialSurfaceCost.evaluate(state.expression()));
         if (!frozen.equals(modelJson())) throw new IllegalStateException("evaluation changed frozen knowledge");
         var result = new TreeMap<String, Object>();
         result.put("status", "CANDIDATE"); result.put("profile", profile); result.put("input", source);
@@ -133,7 +134,10 @@ public final class TypedExternalPolynomialComparisonWorker {
         var model = new TreeMap<String, Object>();
         model.put("schema", "regelsuche.typed-external-frozen-profile/v1"); model.put("profile", profile);
         model.put("inventory", TraceStrategyTransferExample.inventory().toCanonicalJson());
-        if (profile.equals(HORNER)) model.put("constructionProfile", TaskConstructionProfile.POLYNOMIAL_HORNER_V1.name());
+        if (profile.equals(HORNER)) {
+            model.put("constructionProfile", TaskConstructionProfile.POLYNOMIAL_HORNER_V1.name());
+            model.put("objective", "SHARED_EXACT_ARITHMETIC_SURFACE");
+        }
         model.put("settings", settings()); model.put("excludedIdentities", exclusions);
         model.put("formation", formation == null ? "" : formation.toCanonicalJson());
         model.put("policy", training == null ? (profile.equals("EXPERT") ? "FIXED_DEFAULT_WEIGHTS" : "INVENTORY_ORDER")

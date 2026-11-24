@@ -178,8 +178,9 @@ class ExternalPolyhedralContractTest {
         Path source = directory.resolve("input.alpha"); Files.writeString(source, prefix("X[j]"));
         ObjectNode panel = panel(100_000); JSON.writeValue(directory.resolve("request.json").toFile(), panel);
         Map<String, Object> row = invoke("nativeRow",
-            new Class<?>[]{JsonNode.class, JsonNode.class, Path.class, Path.class, Path.class, Path.class, List.class, long.class},
-            entry(source), panel, checkout(), directory, directory, source, prefixOutputs(), 0L);
+            new Class<?>[]{JsonNode.class, JsonNode.class, Path.class, Path.class, Path.class, Path.class, List.class, long.class,
+                boolean.class},
+            entry(source), panel, checkout(), directory, directory, source, prefixOutputs(), 0L, false);
         assertEquals("VERIFIED_FINITE_OUTPUTS", row.get("judgment"));
         assertEquals(0, ((ExternalPolyhedralComparison.Execution) row.get("process")).exit());
         assertEquals(JSON.valueToTree(prefixOutputs()), ((JsonNode) row.get("response")).path("outputs"));
@@ -238,8 +239,9 @@ class ExternalPolyhedralContractTest {
         JsonNode entry = entry(source); Files.delete(source);
         ObjectNode panel = panel(100_000); JSON.writeValue(directory.resolve("request.json").toFile(), panel);
         var row = invoke("nativeRow",
-            new Class<?>[]{JsonNode.class, JsonNode.class, Path.class, Path.class, Path.class, Path.class, List.class, long.class},
-            entry, panel, checkout(), directory, directory, source, prefixOutputs(), 0L);
+            new Class<?>[]{JsonNode.class, JsonNode.class, Path.class, Path.class, Path.class, Path.class, List.class, long.class,
+                boolean.class},
+            entry, panel, checkout(), directory, directory, source, prefixOutputs(), 0L, false);
         assertEquals("PROCESS_FAILURE", row.get("judgment"));
         var process = (ExternalPolyhedralComparison.Execution) row.get("process");
         assertNotEquals(0, process.exit());
@@ -305,9 +307,7 @@ class ExternalPolyhedralContractTest {
             + "/fixture.c\" <<'FIXTURE_C'\n" + c + "\nFIXTURE_C\n";
         Path command = upstream.resolve("acc"); Files.writeString(command, script + finish + "\n");
         assertTrue(command.toFile().setExecutable(true));
-        Optional<ExternalPolyhedralComparison.Imported> imported;
-        try { imported = Optional.of(ExternalPolyhedralComparison.parse(alpha)); }
-        catch (IllegalArgumentException unsupported) { imported = Optional.empty(); }
+        var imported = AffineAlphaExperiment.importSource(alpha, false);
         return invoke("externalRow", new Class<?>[]{JsonNode.class, JsonNode.class, Path.class, Path.class,
             Path.class, Optional.class, List.class, long.class}, entry(source), panel, upstream,
             directory, source, imported, imported.isPresent() ? prefixOutputs() : List.of(), 0L);

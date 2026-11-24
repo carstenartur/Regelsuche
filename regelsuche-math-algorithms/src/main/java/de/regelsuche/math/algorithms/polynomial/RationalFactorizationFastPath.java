@@ -41,9 +41,8 @@ final class RationalFactorizationFastPath implements FactorizationEngine<ExactRa
             if (request.evidenceRequirement() == FactorizationRequest.EvidenceRequirement.VERIFIED_DECOMPOSITION
                     && request.maxCandidates() > 0 && source.ring().coefficientDomain() == ExactRationalField.INSTANCE
                     && source.ring().variableCount() == 1 && request.structuralViolation().isEmpty()
-                    && source.degree(0) >= 2 && source.degree(0) <= MAX_FAST_DEGREE
                     && source.maxCoefficientBitLength() <= MAX_FAST_COEFFICIENT_BITS) {
-                var result = source.degree(0) == 2 ? quadratic(source, work) : unitRoot(source, work);
+                var result = fastCandidate(source, work);
                 if (result != null && result.factors().stream()
                         .allMatch(factor -> request.structuralLimits().firstViolation(factor.polynomial()).isEmpty())) {
                     return candidate(request, result, work);
@@ -73,22 +72,40 @@ final class RationalFactorizationFastPath implements FactorizationEngine<ExactRa
             "NATIVE_RATIONAL_FAST_FACTOR_PROPOSAL", ledger, List.of(proposal), BackendClaim.NONE, List.of());
     }
 
-    private static Candidate quadratic(SparsePolynomial<ExactRational> source, PolynomialWorkBudget work) {
+    private static Candidate fastCandidate(SparsePolynomial<ExactRational> source, PolynomialWorkBudget work) {
+        int degree = source.degree(0);
+        if (degree < 2 || degree > MAX_FAST_DEGREE) return null;
+        int spacing = quadraticSpacing(source, degree, work);
+        return spacing == 0 ? unitRoot(source, degree, work) : quadratic(source, spacing, work);
+    }
+
+    private static int quadraticSpacing(SparsePolynomial<ExactRational> source, int degree, PolynomialWorkBudget work) {
+        if (degree == 2) return 1;
+        if ((degree & 1) != 0 || source.termCount() > 3) return 0;
+        int spacing = degree / 2;
+        for (Monomial monomial : source.terms().keySet()) {
+            work.consume("native-rational-fast.quadratic-shape-terms", 1);
+            if (monomial.exponent(0) % spacing != 0) return 0;
+        }
+        return spacing;
+    }
+
+    private static Candidate quadratic(SparsePolynomial<ExactRational> source, int spacing, PolynomialWorkBudget work) {
         work.consume("native-rational-fast.quadratic-discriminant", 8);
-        ExactRational a = source.coefficient(2);
-        ExactRational b = source.coefficient(1);
+        ExactRational a = source.coefficient(2 * spacing);
+        ExactRational b = source.coefficient(spacing);
         ExactRational c = source.coefficient(0);
         var squareRoot = b.multiply(b).subtract(FOUR.multiply(a).multiply(c)).sqrtExact();
         if (squareRoot.isEmpty()) return null;
         work.consume("native-rational-fast.quadratic-factors", 10);
         var root = squareRoot.orElseThrow();
         var denominator = TWO.multiply(a);
-        var first = linear(source.ring(), b.subtract(root).divide(denominator));
-        var second = linear(source.ring(), b.add(root).divide(denominator));
+        var first = monicBinomial(source.ring(), spacing, b.subtract(root).divide(denominator));
+        var second = monicBinomial(source.ring(), spacing, b.add(root).divide(denominator));
         return new Candidate(a, List.of(new PolynomialFactor<>(first, 1), new PolynomialFactor<>(second, 1)));
     }
 
-    private static Candidate unitRoot(SparsePolynomial<ExactRational> source, PolynomialWorkBudget work) {
+    private static Candidate unitRoot(SparsePolynomial<ExactRational> source, int degree, PolynomialWorkBudget work) {
         ExactRational atOne = ExactRational.ZERO;
         ExactRational atMinusOne = ExactRational.ZERO;
         for (var term : source.terms().entrySet()) {
@@ -102,20 +119,20 @@ final class RationalFactorizationFastPath implements FactorizationEngine<ExactRa
         boolean positiveRoot = atOne.isZero();
         var quotient = new TreeMap<Monomial, ExactRational>(source.ring().monomialComparator());
         ExactRational value = ExactRational.ZERO;
-        for (int degree = source.degree(0); degree >= 1; degree--) {
+        for (int exponent = degree; exponent >= 1; exponent--) {
             work.consume("native-rational-fast.synthetic-division", 3);
-            ExactRational coefficient = source.coefficient(degree);
+            ExactRational coefficient = source.coefficient(exponent);
             value = positiveRoot ? coefficient.add(value) : coefficient.subtract(value);
-            if (!value.isZero()) quotient.put(Monomial.of(degree - 1), value);
+            if (!value.isZero()) quotient.put(Monomial.of(exponent - 1), value);
         }
-        var linear = linear(source.ring(), positiveRoot ? ExactRational.NEGATIVE_ONE : ExactRational.ONE);
+        var linear = monicBinomial(source.ring(), 1, positiveRoot ? ExactRational.NEGATIVE_ONE : ExactRational.ONE);
         return new Candidate(ExactRational.ONE, List.of(new PolynomialFactor<>(linear, 1),
             new PolynomialFactor<>(new SparsePolynomial<>(source.ring(), quotient), 1)));
     }
 
-    private static SparsePolynomial<ExactRational> linear(PolynomialRing<ExactRational> ring,
-            ExactRational constant) {
-        return new SparsePolynomial<>(ring, Map.of(Monomial.of(1), ExactRational.ONE, Monomial.of(0), constant));
+    private static SparsePolynomial<ExactRational> monicBinomial(PolynomialRing<ExactRational> ring,
+            int exponent, ExactRational constant) {
+        return new SparsePolynomial<>(ring, Map.of(Monomial.of(exponent), ExactRational.ONE, Monomial.of(0), constant));
     }
 
     private record Candidate(ExactRational unit, List<PolynomialFactor<ExactRational>> factors) { }

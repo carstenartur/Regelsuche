@@ -170,7 +170,7 @@ public final class CheckedSchemaTaskSolver {
     }
 
     /** A retained path replaces proposal generation only; both verification passes remain fresh. */
-    Solution replay(Task task, RetainedTaskPath path) {
+    Solution replay(Task task, TypedMoveSearch.TypedProvider path) {
         var prepared = prepare(task);
         var original = problem(task);
         var replay = new TypedMoveSearch.Problem(original.source(), original.context(), List.of(path),
