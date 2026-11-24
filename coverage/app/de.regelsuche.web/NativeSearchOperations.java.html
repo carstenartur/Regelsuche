@@ -107,12 +107,12 @@ final class NativeSearchOperations implements AutoCloseable {
 <span class="nc" id="L107">            persist(active);</span>
 <span class="nc" id="L108">            notifyAll();</span>
         }
-<span class="fc bfc" id="L110" title="All 4 branches covered.">        while (&quot;PAUSED&quot;.equals(active.status()) &amp;&amp; !closing) {</span>
-<span class="fc" id="L111">            try { wait(); }</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        while (&quot;PAUSED&quot;.equals(active.status()) &amp;&amp; !closing) {</span>
+<span class="nc" id="L111">            try { wait(); }</span>
 <span class="nc" id="L112">            catch (InterruptedException stopped) {</span>
 <span class="nc" id="L113">                Thread.currentThread().interrupt();</span>
 <span class="nc" id="L114">                throw new Stopped();</span>
-<span class="fc" id="L115">            }</span>
+<span class="nc" id="L115">            }</span>
         }
 <span class="pc bpc" id="L117" title="1 of 6 branches missed.">        if (closing || active.status().equals(&quot;CANCELLING&quot;) || Thread.currentThread().isInterrupted()) throw new Stopped();</span>
 <span class="fc" id="L118">    }</span>
