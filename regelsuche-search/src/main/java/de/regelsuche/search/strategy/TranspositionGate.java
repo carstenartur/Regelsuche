@@ -10,8 +10,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Helper used by {@link SearchStrategy} implementations to consult the
- * {@link SearchMemory transposition table} attached to a {@link SearchProblem}.
+ * Records durable value observations and provides the legacy summary-based
+ * verdict for direct callers.
  *
  * <p>Returns a {@link Verdict#KEEP keep verdict} if the state should be
  * expanded, or a {@link Verdict#PRUNE prune verdict} if not. When
@@ -65,7 +65,15 @@ public final class TranspositionGate {
         return evaluate(memory, state, pathId, compatibleIdentityHashes, true);
     }
 
-    static Verdict evaluate(
+    static void observe(
+            SearchMemory memory,
+            SearchState state,
+            String pathId,
+            List<String> compatibleIdentityHashes) {
+        evaluate(memory, state, pathId, compatibleIdentityHashes, false);
+    }
+
+    private static Verdict evaluate(
             SearchMemory memory,
             SearchState state,
             String pathId,

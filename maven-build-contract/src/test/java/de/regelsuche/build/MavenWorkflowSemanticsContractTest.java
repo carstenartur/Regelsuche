@@ -113,7 +113,7 @@ class MavenWorkflowSemanticsContractTest {
         "(?<![A-Za-z0-9_.-])"
             + "(?:python(?:[23](?:\\.\\d+)?)?|pypy(?:[23](?:\\.\\d+)?)?"
             + "|pip(?:[23](?:\\.\\d+)?)?|pipx|uvx?|node(?:js)?|npm|npx|pnpm|yarn|corepack|deno|bunx?"
-            + "|perl|ruby|pwsh|powershell)(?=\\s+|$)"
+            + "|perl|ruby|pwsh|powershell)(?=\\s+|$|[;&|<>]|\\$|\\\\$)"
     );
 
     // These four folded YAML commands are retained only until their Maven
@@ -146,11 +146,9 @@ class MavenWorkflowSemanticsContractTest {
     // workflow while migration to Maven/Java is still incomplete. These
     // exact existing commands are transitional, not approved build authority.
     private static final Set<String> LEGACY_RELEASE_HOST_COMMANDS = Set.of(
-        "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release",
         "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check",
         "python3 -B scripts/package-student-sdk.py \\",
-        "python3 -B scripts/package-optimization-sdk.py \\",
-        "python3 .github/scripts/update-release-metadata.py \"$NEXT_VERSION\""
+        "python3 -B scripts/package-optimization-sdk.py \\"
     );
 
     @Test
@@ -321,7 +319,7 @@ class MavenWorkflowSemanticsContractTest {
     @Test
     void releaseWorkflowHostRuntimeInventoryRejectsNewAndDuplicateDrivers() {
         String command =
-            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release";
+            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check";
         String release = "jobs:\n  release:\n    steps:\n      - run: |\n          "
             + command + "\n";
 
@@ -364,7 +362,7 @@ class MavenWorkflowSemanticsContractTest {
     @Test
     void releaseRuntimeGuardParsesYamlBlockHeadersWithCommentsAndIndentIndicators() {
         String grandfathered =
-            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --release";
+            "python3 .github/scripts/update-release-metadata.py \"$VERSION\" --check";
         for (String header : List.of(
                 "|", "|-", "|2", "|2-", "|-2", ">+2",
                 "| # retained", "|- # retained", "|2 # retained",
@@ -448,6 +446,55 @@ class MavenWorkflowSemanticsContractTest {
             + "\n      - run: >-\n          python3\n"
             + "          scripts/new-check.py\n";
         assertViolation(splitExecutable, governance, "undeclared-host-runtime");
+    }
+
+    @Test
+    void shellOperatorsAndEmptyExpansionsCannotBypassHostRuntimeInventory() {
+        MergeGovernance governance = validGovernance();
+        // A shell does not require whitespace before operators or redirects.
+        // Earlier inventory checks accepted these undeclared host commands.
+        // Empty shell substitutions can also retain the exact executable name.
+        for (String invocation : List.of(
+                "python3<<'PY'",
+                "node<<<'console.log(1)'",
+                "perl; echo continuing",
+                "python3&&echo continuing",
+                "python3||echo failed",
+                "python3|cat",
+                "/usr/bin/python3>/tmp/result",
+                "python3$(true) --version",
+                "python3${NO_SUCH_VAR:-} --version",
+                "nodejs<test.js",
+                "pip3.13<<<'list'")) {
+            assertViolation(validWorkflow() + "\n      - run: "
+                + invocation + "\n", governance, "undeclared-host-runtime");
+            String release = "jobs:\n  release:\n    steps:\n      - run: "
+                + invocation + "\n";
+            assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml", release),
+                "undeclared-host-runtime"), invocation);
+        }
+        assertNoViolation(validWorkflow()
+            + "\n      - run: echo python3-helper\n",
+            governance, "undeclared-host-runtime");
+    }
+
+    @Test
+    void shellLineContinuationsCannotHideHostRuntimeCommands() {
+        MergeGovernance governance = validGovernance();
+        // Bash removes the backslash-newline pair before interpreting
+        // the space on the following physical line: this runs python3.
+        String continued = "      - run: |\n"
+            + "          python3\\\n"
+            + "           --version\n";
+        assertViolation(validWorkflow() + "\n" + continued,
+            governance, "undeclared-host-runtime");
+        String release = "jobs:\n  release:\n    steps:\n" + continued;
+        assertTrue(hasCategory(scanPlatformHostRuntimes("release.yml", release),
+            "undeclared-host-runtime"));
+        // An escaped ordinary character does not end the executable name.
+        assertNoViolation(validWorkflow()
+            + "\n      - run: echo python3\\suffix\n",
+            governance, "undeclared-host-runtime");
     }
 
     @Test

@@ -489,7 +489,10 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          python3 .github/scripts/update-release-metadata.py "$VERSION" --release
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+            -Dtest=MavenReleaseMetadataTransitionTest#executeRequestedTransition \
+            -Dsurefire.failIfNoSpecifiedTests=false -Dregelsuche.releaseMetadata.operation=release \
+            -Dregelsuche.releaseMetadata.version="$VERSION" test
           git add -- \
             CITATION.cff \
             CITATION.md \
@@ -550,6 +553,7 @@ jobs:
         if: steps.release-state.outputs.publication_required == 'true'
         env:
           VERSION: ${{ steps.release-state.outputs.release_version }}
+          EXISTING_TAG: ${{ steps.release-state.outputs.tag_exists }}
         run: |
           set -euo pipefail
           # Old tags predate the SDK archive contract and remain replayable.
@@ -560,9 +564,22 @@ jobs:
               -pl regelsuche-discovery-sdk,regelsuche-optimization-sdk,regelsuche-plugin-api,regelsuche-extension-api,regelsuche-extension-runtime,regelsuche-bom -am \
               -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH" \
               -Dmaven.repo.local="$SDK_REPOSITORY" -DskipTests clean install
-            python3 -B scripts/package-student-sdk.py \
-              --repository "$SDK_REPOSITORY" --version "$VERSION" \
-              --output "app/target/regelsuche-sdk-${VERSION}.zip"
+            if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/StudentSdkArchive.java ]]; then
+              mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+                -Dtest=MavenStudentSdkArchiveTest#packageConfiguredRepository \
+                -Dregelsuche.studentSdk.package=true \
+                "-Dregelsuche.studentSdk.repository=$SDK_REPOSITORY" \
+                "-Dregelsuche.studentSdk.version=$VERSION" \
+                "-Dregelsuche.studentSdk.output=$PWD/app/target/regelsuche-sdk-${VERSION}.zip" test
+            elif [[ "$EXISTING_TAG" == 'true' ]]; then
+              # Replay only an existing tag that predates the Java archive producer.
+              python3 -B scripts/package-student-sdk.py \
+                --repository "$SDK_REPOSITORY" --version "$VERSION" \
+                --output "app/target/regelsuche-sdk-${VERSION}.zip"
+            else
+              echo "::error::Missing Maven Student SDK archive producer in a new release" >&2
+              exit 1
+            fi
 
             # Publish the existing qualified standalone runtime closure as well.
             # Eclipse consumers can then copy released bytes instead of rebuilding
@@ -574,9 +591,22 @@ jobs:
               -pl regelsuche-optimization-sdk dependency:copy-dependencies \
               -DincludeScope=runtime -DexcludeGroupIds=io.github.carstenartur \
               -DoutputDirectory="$SDK_DEPENDENCIES"
-            python3 -B scripts/package-optimization-sdk.py \
-              --external-dependencies "$SDK_DEPENDENCIES" \
-              --output "$SDK_STANDALONE" --java-home "$JAVA_HOME"
+            if [[ -f maven-build-contract/src/test/java/de/regelsuche/build/OptimizationSdkArchive.java ]]; then
+              mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+                -Dtest=MavenOptimizationSdkDistributionTest#packageConfiguredDistribution \
+                -Dregelsuche.sdk.packageOptimization=true \
+                "-Dregelsuche.sdk.optimizationRepository=$SDK_REPOSITORY" \
+                "-Dregelsuche.sdk.optimizationDependencies=$SDK_DEPENDENCIES" \
+                "-Dregelsuche.sdk.optimizationOutput=$SDK_STANDALONE" test
+            elif [[ "$EXISTING_TAG" == 'true' ]]; then
+              # Replay only existing tags that predate the Java optimizer archive.
+              python3 -B scripts/package-optimization-sdk.py \
+                --external-dependencies "$SDK_DEPENDENCIES" \
+                --output "$SDK_STANDALONE" --java-home "$JAVA_HOME"
+            else
+              echo "::error::Missing Maven optimizer SDK archive producer in a new release" >&2
+              exit 1
+            fi
             source_revision=$(git rev-parse HEAD)
             standalone_version="${VERSION}-issue1657-${source_revision:0:12}"
             cp "$SDK_STANDALONE/regelsuche-optimization-sdk-${standalone_version}.zip" \
@@ -849,25 +879,12 @@ jobs:
           NEXT_VERSION: ${{ steps.release-state.outputs.next_version }}
         run: |
           set -euo pipefail
-          test -d .git
-          test "$(git rev-parse --show-toplevel)" = "$(pwd -P)"
-          test -z "$(git status --porcelain --untracked-files=all)"
-          CURRENT=$(sed -n 's/^version=//p' release.properties | head -n 1 | tr -d '[:space:]')
-          if [[ "$CURRENT" == "$NEXT_VERSION" ]]; then
-            echo "required=false" >> "$GITHUB_OUTPUT"
-            echo "Main already contains ${NEXT_VERSION}"
-          elif [[ "$CURRENT" == "${RELEASE_VERSION}-SNAPSHOT" ]]; then
-            python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
-            mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
-              -Dtest=MavenReleaseMetadataAlignmentTest \
-              -Dsurefire.failIfNoSpecifiedTests=false \
-              -Dregelsuche.expectedDevelopmentVersion="$NEXT_VERSION" test
-            git diff --check
-            echo "required=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "required=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Main is at ${CURRENT}; not creating a follow-up version PR"
-          fi
+          mvn --batch-mode --no-transfer-progress -pl maven-build-contract -am \
+            -Dtest=MavenReleaseMetadataTransitionTest#executeRequestedTransition \
+            -Dsurefire.failIfNoSpecifiedTests=false -Dregelsuche.releaseMetadata.operation=follow-up \
+            -Dregelsuche.releaseMetadata.predecessor="$RELEASE_VERSION" \
+            -Dregelsuche.releaseMetadata.version="$NEXT_VERSION" test
+          git diff --check
 
       - name: Open next development metadata PR
         if: steps.next-development.outputs.required == 'true'

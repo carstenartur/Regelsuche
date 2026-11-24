@@ -13,6 +13,46 @@ integration. New source methods do not retroactively become part of a release.
 
 ## Exact finite certificates in current source
 
+`combinatorics.FiniteConstraintSdk.count` and `verify` provide exact weighted
+Boolean model counts, conditional counts through source-bound fixed variables,
+an elimination trace and a positive-weight witness. The verifier independently
+replays each local sum. See [factor tables and counting limits](../docs/research/finite-constraint-counting.md).
+
+`combinatorics.EnergyGameSdk.solve` and `verify` expose bounded cyclic
+Min/Max credit synthesis and local invariant checking. Every Min edge and the
+chosen Max edge must preserve the certified nonnegative credits inside the
+region. See [energy-game contracts and example](../docs/research/energy-game-certificates.md).
+Resource exhaustion in either API carries no mathematical result. Both are
+source APIs introduced after the published 0.5.3 release.
+
+`positivity.SosSynthesisSdk.search` and `verify` expose bounded rational Gram
+synthesis with polynomial equality/inequality premises and polynomial potential
+synthesis for a supplied simultaneous transition. The independent checks bind
+the full coefficient identity and every domain assumption. A termination claim
+requires the caller's explicit transition/domain contract. See [SOS and potentials](../docs/research/sos-synthesis.md).
+
+`algebra.BilinearProgramSdk.search`, `verify` and `evaluate` find shared products
+for a multioutput rational tensor from finite input-form dictionaries. The
+verifier checks every tensor coefficient; reported costs include additions,
+constant factors and temporary slots. See [search limits and executable example](../docs/research/bilinear-program-search.md).
+
+`noncommutative.RationalFormulaSdk.realize` constructs an affine pencil for a
+rational formula. `verify` binds it to every inverse occurrence. `evaluate`
+uses the supplied rational square matrices and reports the exact value or
+the singular inverse that makes this assignment undefined. These operations
+take `IterationLimits` and a cancellation token.
+[Mathematical contract](../docs/research/rational-formula-realization.md) · [Java 25 example](../examples/external-consumers/RationalMatrixFormula.java)
+
+`polynomial.DynamicAlgebraSdk.evaluate` splits a square-free quotient over a
+prime field when an inverse or zero test encounters a zero divisor. Each
+terminal factor carries a value or an explicit undefined result. `verify`
+checks the complete coprime factor cover, values and decisions against the
+original expression. Both methods accept an `OptimizationBudget` and a
+cancellation token. [Mathematical contract](../docs/research/dynamic-algebra-evaluation.md) · [Java 25 example](../examples/external-consumers/DynamicQuotient.java)
+
+These four APIs require the `0.5.4-SNAPSHOT` source checkout and a Java 25
+build. Release 0.5.3 predates them. Their examples run as Java programs.
+
 `positivity.PolynomialPositivitySdk` exposes rational polynomial `bounds` and
 `verifyBounds`, subdivision `prove` and `verify`, exact `checkMatrix`, and
 `verifyPolynomial` for a supplied Gram identity. A PSD matrix proves a
@@ -227,14 +267,18 @@ From a clean committed checkout, build with Java 25:
 
 ```sh
 SDK_SOURCE_EPOCH=$(git show -s --format=%ct HEAD)
+SDK_REPOSITORY=$(mktemp -d)
 mvn -B -Psdk-release -pl regelsuche-optimization-sdk -am clean install \
-  -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH"
+  -Dproject.build.outputTimestamp="$SDK_SOURCE_EPOCH" -Dmaven.repo.local="$SDK_REPOSITORY"
 mvn -B -pl regelsuche-optimization-sdk dependency:copy-dependencies \
   -DincludeScope=runtime -DexcludeGroupIds=io.github.carstenartur \
-  -DoutputDirectory=/absolute/external-runtime
-python3 scripts/package-optimization-sdk.py \
-  --external-dependencies /absolute/external-runtime \
-  --output /absolute/distribution --java-home "$JAVA_HOME"
+  -Dmaven.repo.local="$SDK_REPOSITORY" -DoutputDirectory=/absolute/external-runtime
+mvn -B -pl maven-build-contract -am \
+  -Dtest=MavenOptimizationSdkDistributionTest#packageConfiguredDistribution \
+  -Dregelsuche.sdk.packageOptimization=true \
+  -Dregelsuche.sdk.optimizationRepository="$SDK_REPOSITORY" \
+  -Dregelsuche.sdk.optimizationDependencies=/absolute/external-runtime \
+  -Dregelsuche.sdk.optimizationOutput=/absolute/distribution test
 ```
 
 The commit timestamp fixes Maven input-JAR timestamps as well as the deterministic
@@ -243,8 +287,8 @@ the provenance includes raw input-JAR hashes, not only their class entries.
 The packager refuses dirty sources, conflicting class bytes and forbidden
 application dependencies. It merges service entries and keeps dependency
 notices. Repeat the same build and packaging command, then compare every
-artifact hash. JUnit owns packaging regressions; Python is only the production
-build adapter. The normal API, publication, coverage and `ciCheck` authorities
+artifact hash. The standalone packager and isolated consumer checks run through
+Maven/JUnit. The normal API, publication, coverage and `ciCheck` authorities
 include this module. See the [current qualification and integration status](../docs/superpowers/plans/2026-10-26-typed-cas-computation.md#current-status-2026-10-27).
 The [October 4 reconstruction report](../docs/java-optimization-sdk-qualification.md)
 is historical evidence for its recorded revision, not the current distribution.

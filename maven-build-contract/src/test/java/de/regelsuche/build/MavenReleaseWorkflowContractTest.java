@@ -30,13 +30,32 @@ class MavenReleaseWorkflowContractTest {
             "SDK input timestamps must derive from the committed release source"
         );
         int build = sdkStep.indexOf("mvn --batch-mode --no-transfer-progress -Psdk-release");
-        int packageSdk = sdkStep.indexOf("python3 -B scripts/package-student-sdk.py", build);
+        int packageSdk = sdkStep.indexOf("-Dtest=MavenStudentSdkArchiveTest#packageConfiguredRepository", build);
         assertTrue(build >= 0 && packageSdk > build, "SDK modules must be built before packaging");
         String install = sdkStep.substring(build, packageSdk);
         assertTrue(install.contains("-Dproject.build.outputTimestamp=\"$SDK_SOURCE_EPOCH\""),
             "SDK Maven build must receive the source timestamp used by the reproduction contract");
         assertTrue(install.contains("-DskipTests clean install"),
             "SDK packaging must rebuild its Maven inputs from clean module outputs");
+        int oldTag = sdkStep.indexOf("elif [[ \"$EXISTING_TAG\" == 'true' ]]; then", packageSdk);
+        int oldProducer = sdkStep.indexOf("python3 -B scripts/package-student-sdk.py", packageSdk);
+        int missingProducer = sdkStep.indexOf("Missing Maven Student SDK archive producer in a new release", oldProducer);
+        assertTrue(oldTag > packageSdk && oldProducer > oldTag && missingProducer > oldProducer,
+            "only an existing historical tag may use the old Student SDK producer");
+        int prepareOptimization = sdkStep.indexOf("dependency:copy-dependencies", missingProducer);
+        int packageOptimization = sdkStep.indexOf(
+            "-Dtest=MavenOptimizationSdkDistributionTest#packageConfiguredDistribution", prepareOptimization);
+        int oldOptimizationTag = sdkStep.indexOf("elif [[ \"$EXISTING_TAG\" == 'true' ]]; then", packageOptimization);
+        int oldOptimizationProducer = sdkStep.indexOf("python3 -B scripts/package-optimization-sdk.py", missingProducer);
+        int missingOptimization = sdkStep.indexOf("Missing Maven optimizer SDK archive producer in a new release",
+            oldOptimizationProducer);
+        assertTrue(prepareOptimization > missingProducer && packageOptimization > prepareOptimization
+            && oldOptimizationTag > packageOptimization && oldOptimizationProducer > oldOptimizationTag
+            && missingOptimization > oldOptimizationProducer,
+            "fresh releases must use the staged Maven optimizer producer and fail when it is absent");
+        assertTrue(sdkStep.substring(packageOptimization, oldOptimizationTag)
+            .contains("-Dregelsuche.sdk.optimizationRepository=$SDK_REPOSITORY"),
+            "the Maven producer must receive the isolated repository used to stage SDK artifacts");
     }
 
     @Test
@@ -103,42 +122,17 @@ class MavenReleaseWorkflowContractTest {
     }
 
     @Test
-    void releaseMetadataContractIncludesThePublicOpenApiVersion()
-            throws IOException {
-        Path root = MavenPomTestSupport.repositoryRoot();
-        String script = Files.readString(
-            root.resolve(".github/scripts/update-release-metadata.py"),
-            StandardCharsets.UTF_8
-        );
-        String releaseProperties = Files.readString(
-            root.resolve("release.properties"),
-            StandardCharsets.UTF_8
-        );
-        String version = releaseProperties.lines()
-            .filter(line -> line.startsWith("version="))
-            .map(line -> line.substring("version=".length()).trim())
-            .findFirst()
-            .orElseThrow();
-        String openApi = Files.readString(
-            root.resolve(OPENAPI_PATH),
-            StandardCharsets.UTF_8
-        );
-
-        assertTrue(
-            script.contains("OPENAPI_PATH = ROOT / '" + OPENAPI_PATH + "'"),
-            "the coordinated metadata helper must own the embedded OpenAPI document"
-        );
-        assertTrue(
-            script.contains("update_openapi(args.version)"),
-            "release and next-development transitions must update OpenAPI"
-        );
-        assertTrue(
-            script.contains("actual_openapi != version"),
-            "metadata checking must fail closed on OpenAPI version drift"
-        );
-        assertTrue(
-            openApi.contains("\"version\": \"" + version + "\""),
-            "the checked-in OpenAPI version must equal release.properties"
-        );
+    void releaseMetadataContractIncludesThePublicOpenApiVersion(@org.junit.jupiter.api.io.TempDir Path root)
+            throws Exception {
+        MavenReleaseMetadataTransitionTest.fixture(root);
+        ReleaseMetadataTransition.write(root, "9.8.7", java.time.LocalDate.parse("2026-11-18"));
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var openApi = root.resolve(OPENAPI_PATH);
+        org.junit.jupiter.api.Assertions.assertEquals("9.8.7", mapper.readTree(openApi.toFile()).at("/info/version").textValue());
+        ReleaseMetadataTransition.write(root, "9.9.0-SNAPSHOT", null);
+        org.junit.jupiter.api.Assertions.assertEquals("9.9.0-SNAPSHOT", mapper.readTree(openApi.toFile()).at("/info/version").textValue());
+        Files.writeString(openApi, Files.readString(openApi).replace("9.9.0-SNAPSHOT", "9.8.7"));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> MavenReleaseMetadataAlignmentTest.verify(root, "9.9.0-SNAPSHOT"));
     }
 }

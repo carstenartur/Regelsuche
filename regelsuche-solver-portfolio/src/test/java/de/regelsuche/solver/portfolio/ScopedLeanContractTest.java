@@ -1,6 +1,7 @@
 package de.regelsuche.solver.portfolio;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static de.regelsuche.solver.ir.ScopedProofDag.Rule.*;
 
 import de.regelsuche.solver.ir.*;
 import de.regelsuche.solver.ir.SolverIr.*;
@@ -46,6 +47,45 @@ class ScopedLeanContractTest {
     static Obligation limit(Expression target) {
         return theorem(List.of(), List.of(), app("tends_to",
             new Binder(BinderKind.SEQUENCE, Sort.NATURAL, zero), target));
+    }
+
+    static Expression witnessIndependentConclusion() {
+        return new Binder(BinderKind.FORALL, Sort.NATURAL, app("at", g, n));
+    }
+
+    static Obligation existentialEliminationSource(Expression endpoint, Expression ruleConclusion) {
+        var witnessProperty = app("at", f, n);
+        var exists = new Binder(BinderKind.EXISTS, Sort.NATURAL, witnessProperty);
+        var rule = new Binder(BinderKind.FORALL, Sort.NATURAL, app("implies", witnessProperty, ruleConclusion));
+        return theorem(List.of(new SymbolDeclaration("f", Sort.NAT_PREDICATE),
+            new SymbolDeclaration("g", Sort.NAT_PREDICATE)),
+            List.of(Predicate.holds("paired", app("and", exists, rule))), endpoint);
+    }
+
+    @Test void formsAnExistentialConclusionFromBothProjectionsWithoutInspectingTheEndpoint() {
+        var conclusion = witnessIndependentConclusion();
+        var unrelated = app("at", f, app("nat", zero));
+        var source = existentialEliminationSource(unrelated, conclusion);
+        var report = ScopedProofSearch.discover(source, 1_024);
+        assertEquals(report, ScopedProofSearch.discover(existentialEliminationSource(conclusion, conclusion), 1_024));
+        assertFalse(report.exhausted());
+        var dag = report.proposals().stream().filter(p -> p.dag().obligation().goal().left().equals(conclusion))
+            .findFirst().orElseThrow().dag();
+        assertEquals(List.of(PREMISE, AND_LEFT, PREMISE, AND_RIGHT, LOCAL, SPECIALIZE, LOCAL, APPLY, EXISTS_ELIM),
+            dag.nodes().stream().map(ScopedProofDag.Node::rule).toList());
+        assertEquals(dag, ScopedProofDag.read(dag.obligation(), dag.canonical()));
+        var plan = new LeanDagPlan(dag);
+        assertTrue(plan.proof().contains("(Exists.elim (And.left h0) (fun l0 l1 => (((And.right h0) l0) l1)))"));
+        assertTrue(ScopedProofSearch.discover(source, 1).exhausted());
+    }
+
+    @Test void cannotExtractAConclusionThatDependsOnTheWitnessUnderAnotherBinder() {
+        var conclusion = new Binder(BinderKind.FORALL, Sort.NATURAL, app("at", g, new Bound(1)));
+        var source = existentialEliminationSource(witnessIndependentConclusion(), conclusion);
+        var report = ScopedProofSearch.discover(source, 1_024);
+        assertFalse(report.exhausted());
+        assertEquals(List.of(AND_LEFT, AND_RIGHT),
+            report.proposals().stream().map(p -> p.dag().nodes().getLast().rule()).toList());
     }
 
     @Test void captureAvoidanceAndExactWireRoundTrip() {

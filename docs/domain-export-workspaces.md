@@ -8,6 +8,12 @@ begrenzt reproduzieren. Das ist ein produktiver Consumer von
 `VerifiedDomainExport` für einen konkreten Objekttyp. Es schließt den weiteren
 Lifecycle-Umfang von #224 nicht.
 
+`scoped-logic@v1` lässt sich über denselben Import als logische Quellenansicht
+laden und mit sämtlichen Originaldateien herunterladen. Der Arbeitsbereich
+führt dabei keine Obligation, Suche oder Beweisprüfung aus. Ergebnisstatus und
+Zertifikate werden als gespeicherte Angaben angezeigt. Für einen Replay dieser
+Domäne ist hier noch kein unabhängiger Kernel-/Rebuild-Empfänger eingerichtet.
+
 ## Benutzung
 
 1. In der Workbench **Eigene Discovery-Domänen** öffnen. Die Seite ist unter
@@ -79,7 +85,7 @@ Das additive Schema `regelsuche.domain-export-workspace/v1` enthält:
 | `manifest`, `verification` | Bestehende Manifest-, Artefaktwurzel- und Originalbyte-Identitäten |
 | `evidence`, `lifecycleHandoff` | Vollständige typisierte Quelle, ohne zusätzliche Proof-/Novelty-Autorität |
 | `artifacts` | Rollenprojektionen mit explizitem Quellschema, Quellhash und Status |
-| `replaySupported` | Ob die unveränderten Quellenbudgets innerhalb der lokalen Replay-Grenze liegen |
+| `replaySupported` | Ob ein lokaler Replay-Empfänger vorhanden ist und die unveränderten Quellenbudgets innerhalb seiner Grenze liegen |
 | `claimBoundary` | Grenze der Quellenansicht und der endlichen Validierung |
 | `contentHash` | SHA-256 der UTF-8-Ansicht vor Hinzufügen dieses Feldes, in der vom Renderer ausgegebenen Feldreihenfolge |
 
@@ -87,6 +93,15 @@ Der Ansichts-Hash ist eine Integritätsbindung, keine zweite Laufidentität.
 `RepresentationDiscoveryRunPlan/v1`, R1–R4 und deren skalare Arbeitsverträge
 bleiben unverändert. Es wird keine Sequenz auf R1 abgebildet und kein Summenscore
 aus unterschiedlichen Arbeitsdimensionen gebildet.
+
+Logische Exporte behalten `replaySupported=false`; die Rolle `PATH_REPLAY` nennt
+`SCOPED_PROOF_REPLAY_NOT_CONFIGURED`. Die getrennte Assessment-Antwort nennt
+`REPLAY_NOT_CONFIGURED` und lässt Proof und Gegenbeispielprüfung unbewertet.
+Die direkten Sequenzvalidierungs- und Modellbeweis-Routen geben `UNSUPPORTED`
+zurück, ohne einen Replay-Versuch oder eine mathematische Prüfung zu buchen.
+Auch ein importierter `CONFIRMED`-Status mit Zertifikat erzeugt dadurch keinen
+neuen Beweis, kein verifiziertes Neuheitssubjekt und keine Freigabe. Die drei
+bisherigen Domänen behalten ihre Ansichtsidentitäten und Replay-Verträge.
 
 Die fünf Ressourcenrollen bleiben vollständig: `EXPLORED_STATES`,
 `GENERATED_SUCCESSORS`, `CANDIDATE_EVALUATIONS`, `CERTIFICATE_ATTEMPTS` und
@@ -115,6 +130,39 @@ Domain-Schemas. Sie behaupten keine Kompatibilität mit ausdrucksspezifischen
 Graph-, Dossier- oder Proof-Artefakten. Eine fehlende Guard- oder Proof-Struktur
 wird nicht aus einer Kandidatenmetrik erfunden.
 
+### Einzelne logische Kandidaten mit einem unabhängigen Empfänger prüfen
+
+Die Ansicht eines logischen Exports bietet bei jedem gespeicherten Versuch
+**Kandidat erneut prüfen** an. Ein Java-Consumer kann dieselbe Prüfung über
+`ScopedLogicWorkspaceCheck.check(workspace, candidateHash, receiver)` ausführen
+und stellt dafür den vertrauenswürdigen `ScopedProofExecutor` bereit. Der Abruf
+und der Import eines Workspaces starten diese Prüfung nicht.
+
+Die Web-Workbench führt die Gegenbeispielprüfung auch ohne Lean-Installation aus.
+Für die anschließende formale Prüfung verwendet sie zwei separat bereitgestellte,
+gleich gepinnte Lean-Projekte. Konfiguration über `REGELSUCHE_LEAN_PROJECT` und
+`REGELSUCHE_LEAN_REBUILD_PROJECT` oder die Java-Eigenschaften
+`regelsuche.lean.project` und `regelsuche.lean.rebuild.project`. Lean speichert
+seine Nachweise im Verzeichnis aus `regelsuche.proof.evidence`.
+
+Die Prüfung rekonstruiert den Vorschlag aus dem ursprünglichen Seed und verlangt
+den exakten Kandidatenhash, den passenden gespeicherten Zustand und seine
+akzeptierte Quellkante. Kandidat und Zustände müssen innerhalb von 4.096 Einheiten
+Graphbildung und einem Seed von höchstens 8.192 UTF-16-Codeeinheiten überprüfbar
+sein. Bis zu 256 konstante Interpretationen liefern einen getrennten
+Gegenbeispielbefund. Ein gespeicherter Zeuge gilt nur bei identischem Zeugen und
+gleicher Zahl von Versuchen als reproduziert. Der Empfänger führt die formale
+Prüfung nur nach `NONE_FOUND` aus.
+
+Das Ergebnis enthält die Run-, Workspace-, Evidenz-, Seed-, Kandidaten- und
+Zustandshashes sowie gegebenenfalls neue Kernel- und Rebuild-Quittungen. Der
+Vorschlag darf ein anderes Ziel als der Seed haben. Die Prämissen, Deklarationen,
+Theorien und Quellprovenienz bleiben exakt gebunden. Historische Quittungen
+werden während der neuen Prüfung nicht als Nachweis verwendet. Die neue Prüfung
+bewertet einen Kandidaten und gibt das Ergebnis in der laufenden Ansicht aus.
+Die Quellenansicht und gespeicherte Prüfbelege zur vollständigen historischen
+Laufwiederholung behalten ihren eigenen Vertrag.
+
 ## Unveränderlicher Speicher und begrenzte API
 
 Die bestehenden Server-Authentifizierungs- und OpenAPI-Grenzen gelten auch für
@@ -127,6 +175,7 @@ die neuen Routen unter `/api/discovery-domains/exports`:
 | `GET /{runDigest}` | Die erneut verifizierte, gespeicherte Quellenansicht |
 | `GET /{runDigest}/files/{fileName}` | Eine der vier byteidentischen Originaldateien |
 | `POST /{runDigest}/replay` | Genau `expectedWorkspaceHash` und `expectedEvidenceHash`; nur passend zur ausgewählten Quelle |
+| `POST /{runDigest}/scoped-check` | Dieselben beiden Quellhashes und der `candidateHash` eines gespeicherten logischen Versuchs. Gibt den neuen Gegenbeispiel- und gegebenenfalls formalen Prüfbefund zurück. |
 | `POST /{runDigest}/validate` | Unabhängige endliche Prüfung mit denselben zwei Quellenbindungen; eigener Validierungsbeleg |
 | `GET /{runDigest}/validate/{receiptDigest}` | Gespeicherter endlicher Validierungsbeleg mit geprüfter Quellenbindung |
 | `POST /{runDigest}/model-proof` | Bedingtes affines Modellgesetz nach Replay und endlicher Prüfung; eigener Modellbeleg |

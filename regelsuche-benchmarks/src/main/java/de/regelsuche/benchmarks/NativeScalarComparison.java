@@ -27,12 +27,19 @@ final class NativeScalarComparison {
     private static final String PANEL="native-scalar-panel-v1.json";
     private NativeScalarComparison() {}
 
-    static void write(Path script,String revision,Path output) throws IOException {
-        byte[] panel;
+    static byte[] readPanel() throws IOException {
         try (var input=NativeScalarComparison.class.getResourceAsStream(PANEL)) {
             if (input==null) throw new IOException("missing native scalar comparison panel");
-            panel=input.readAllBytes();
+            return input.readAllBytes();
         }
+    }
+
+    static NativeScalarSaturation.Budget budget(NativeScalarSaturation.Schedule schedule) {
+        return new NativeScalarSaturation.Budget(8, 256, 4000, schedule);
+    }
+
+    static void write(Path script,String revision,Path output) throws IOException {
+        byte[] panel=readPanel();
         var cases=JSON.readTree(panel);
         var requests=JSON.createArrayNode();
         for(var row:cases) {
@@ -66,7 +73,7 @@ final class NativeScalarComparison {
             result.put("externalReached",ext.has("output") && same(ext.get("output").asText(),target));
             var schedules=result.putArray("native");
             for(var scheduler:NativeScalarSaturation.Schedule.values()) {
-                var budget=new NativeScalarSaturation.Budget(8,256,4000,scheduler);
+                var budget=budget(scheduler);
                 var artifact=NativeScalarEvidence.run(source,context,revision,budget);
                 var dir=output.resolve(id).resolve(scheduler.name());
                 artifact.write(dir);

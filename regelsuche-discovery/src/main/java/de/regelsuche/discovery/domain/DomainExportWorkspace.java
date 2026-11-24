@@ -55,12 +55,15 @@ public final class DomainExportWorkspace {
         available(roles, "LIFECYCLE_HANDOFF", DiscoveryLifecycleHandoff.SCHEMA, snapshot.manifest().lifecycleHandoffHash());
         available(roles, "EXPORT_BUNDLE", DomainDiscoveryExport.SCHEMA, runId());
         if (replaySupported()) available(roles, "PATH_REPLAY", DomainDiscoveryEvidence.SCHEMA, evidence.contentHash());
-        else unavailable(roles, "PATH_REPLAY", "SOURCE_EXCEEDS_BOUNDED_REPLAY_ADMISSION");
+        else unavailable(roles, "PATH_REPLAY", replayUnavailableReason());
         for (String role : List.of("RULE_RADAR", "PROOF_OBLIGATIONS", "EXTERNAL_NOVELTY", "PROMOTION", "PUBLIC_EVIDENCE")) {
             unavailable(roles, role, "NOT_PRODUCED_BY_SOURCE_EXPORT");
         }
         view.put("replaySupported", replaySupported());
-        view.put("claimBoundary", expressionDomain()
+        view.put("claimBoundary", scopedLogicDomain()
+            ? "Retained scoped logical source and recorded certificate assertions; import does not execute or verify "
+                + "a proof kernel, independent reconstruction, external novelty, promotion or Public Evidence."
+            : expressionDomain()
             ? "Retained expression-rewrite validation evidence and bounded deterministic replay; "
                 + "not formal proof, external novelty, promotion, Public Evidence or domain-generic qualification."
             : "Retained finite-sequence validation evidence and bounded deterministic replay; "
@@ -75,8 +78,7 @@ public final class DomainExportWorkspace {
         long size = snapshot.manifestBytes().length;
         for (ArtifactRole role : ArtifactRole.values()) size += snapshot.artifactBytes(role).length;
         if (size > MAX_EXPORT_BYTES) throw new IllegalArgumentException("domain export exceeds 512 KiB application limit");
-        var domain = supportedDomain(snapshot.manifest().domainId(), snapshot.manifest().domainRevision());
-        var descriptor = DiscoveryDomainDescriptor.from(domain);
+        var descriptor = supportedDescriptor(snapshot.manifest().domainId(), snapshot.manifest().domainRevision());
         if (!read(descriptor.toCanonicalJson()).equals(read(snapshot.artifactBytes(ArtifactRole.DOMAIN_DESCRIPTOR)))) {
             throw new IllegalArgumentException("retained descriptor differs from the supported domain contract");
         }
@@ -110,7 +112,7 @@ public final class DomainExportWorkspace {
     }
 
     ReplayObservation replayObserved() {
-        if (!replaySupported()) throw new IllegalStateException("source exceeds bounded replay admission");
+        requireReplaySupported();
         return replayWith(replayDomain());
     }
 
@@ -120,7 +122,7 @@ public final class DomainExportWorkspace {
     }
 
     DomainDiscoveryEvidence depthZeroControl() {
-        if (!replaySupported()) throw new IllegalStateException("source exceeds bounded replay admission");
+        requireReplaySupported();
         var b = evidence.budget();
         var budget = new DiscoveryBudget(0, b.maxExploredStates(), b.maxGeneratedSuccessors(),
             b.maxCandidatesPerState(), b.maxCandidateAttempts(), b.maxCounterexampleAttempts());
@@ -152,6 +154,16 @@ public final class DomainExportWorkspace {
         return new ReplayObservation(result, rejected.stream().findFirst());
     }
 
+    private static DiscoveryDomainDescriptor supportedDescriptor(String id, String revision) {
+        if ("scoped-logic".equals(id) && "v1".equals(revision)) {
+            // Metadata comes from the real producer. This instance is never a replay receiver.
+            return DiscoveryDomainDescriptor.from(new ScopedLogicDiscoveryDomain(proposal -> {
+                throw new IllegalStateException("workspace descriptor cannot execute a proof receiver");
+            }, 0));
+        }
+        return DiscoveryDomainDescriptor.from(supportedDomain(id, revision));
+    }
+
     private static DiscoveryDomain<?, ?, ?> supportedDomain(String id, String revision) {
         if (FiniteDifferenceSequenceDomain.DOMAIN_ID.equals(id) && FiniteDifferenceSequenceDomain.REVISION.equals(revision)) {
             return new FiniteDifferenceSequenceDomain();
@@ -169,6 +181,19 @@ public final class DomainExportWorkspace {
 
     private boolean expressionDomain() {
         return ExpressionRewriteDiscoveryDomain.DOMAIN_ID.equals(evidence.descriptor().domainId());
+    }
+
+    boolean scopedLogicDomain() {
+        return "scoped-logic".equals(evidence.descriptor().domainId()) && "v1".equals(evidence.descriptor().revision());
+    }
+
+    String replayUnavailableReason() {
+        return scopedLogicDomain() ? "SCOPED_PROOF_REPLAY_NOT_CONFIGURED" : "SOURCE_EXCEEDS_BOUNDED_REPLAY_ADMISSION";
+    }
+
+    private void requireReplaySupported() {
+        if (!replaySupported()) throw new IllegalStateException(scopedLogicDomain()
+            ? "scoped proof replay requires a configured independent proof receiver" : "source exceeds bounded replay admission");
     }
 
     private String expectedExpressionTarget() {
@@ -200,6 +225,7 @@ public final class DomainExportWorkspace {
     }
 
     public boolean replaySupported() {
+        if (scopedLogicDomain()) return false;
         var b = evidence.budget();
         if (expressionDomain() && (evidence.seed().payload().length() > MAX_EXPRESSION_CHARACTERS
                 || expectedExpressionTarget().length() > MAX_EXPRESSION_CHARACTERS)) return false;

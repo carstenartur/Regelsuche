@@ -33,7 +33,8 @@ class MavenParallelVerificationWorkflowContractTest {
       .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
   private static final String PLAYWRIGHT_VERSION = "1.65.0";
   private static final String FULL_MAVEN_COMMAND =
-      "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release verify";
+      "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release,web-workbench-image verify";
+  private static final String GIT_FREE_AUTHORITY = "maven-git-free-verification";
   private static final String COVERAGE_PROFILE = "verify-cross-authority-coverage";
   private static final String PUBLISH_COVERAGE = "regelsuche.coverage.publish";
   private static final String COVERAGE_MAVEN_COMMAND =
@@ -47,13 +48,45 @@ class MavenParallelVerificationWorkflowContractTest {
   private static final Set<String> SHOWCASE_AUTHORITIES = Set.of(
       "gradle-verification", "jmh-verification", "sympy-runtime-verification");
   private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
-      "maven-product-verification", "external-polynomial-comparison",
+      "maven-product-verification", GIT_FREE_AUTHORITY, "external-polynomial-comparison",
       "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
-      "maven-polynomial-qualification");
+      "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-typed-polynomial-study",
+      "maven-schema-polynomial-study", "maven-student-sdk-archive-qualification");
   private static final Pattern FAILURE_TERM =
       Pattern.compile("needs\\.([A-Za-z][A-Za-z0-9_-]*)\\.result != 'success'");
   private static final String ROUTINE_FAILURE_GROUP = " || (github.event_name != 'create' && (";
   private static final String REJECTION_STEP = "Reject incomplete verification authority";
+
+  @Test
+  void onlyObsoletePullRequestsCancelRunningVerification() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    assertEquals("${{ github.event_name == 'pull_request' }}",
+        workflow.path("concurrency").path("cancel-in-progress").asText(),
+        "main and manually repeated ancestor runs must complete their acceptance evidence");
+  }
+
+  @Test
+  void reportPublicationRequiresCurrentMainAndSuccessfulRemoteLookup() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    List<JsonNode> steps = workflow.path("jobs").path("publish-pages")
+        .path("steps").valueStream().toList();
+    JsonNode publish = steps.getLast();
+    assertTrue(publish.path("uses").asText().startsWith("peaceiris/actions-gh-pages@"));
+    assertEquals("${{ steps.current-main.outputs.current == 'true' }}",
+        publish.path("if").asText(), "a superseded main run must not publish stale reports");
+    JsonNode guard = steps.get(steps.size() - 2);
+    assertEquals("current-main", guard.path("id").asText());
+    assertFalse(guard.has("continue-on-error"));
+    String script = guard.path("run").asText();
+    assertTrue(script.startsWith("set -euo pipefail\n"),
+        "failed remote lookup must stop publication, not reuse a stale local ref");
+    assertTrue(script.contains("git ls-remote --exit-code origin refs/heads/main"));
+    assertTrue(script.contains("if [[ \"$remote_sha\" == \"$GITHUB_SHA\" ]]; then"));
+    assertTrue(script.contains("echo \"current=true\" >> \"$GITHUB_OUTPUT\""));
+    assertTrue(script.contains("echo \"current=false\" >> \"$GITHUB_OUTPUT\""));
+  }
 
   @Test
   void independentAuthoritiesRunInParallelAndConvergeFailClosed()
@@ -78,7 +111,7 @@ class MavenParallelVerificationWorkflowContractTest {
     String maven = section(
         workflow,
         "  maven-product-verification:\n",
-        "  external-polynomial-comparison:\n");
+        "  " + GIT_FREE_AUTHORITY + ":\n");
     String convergence = section(
         workflow,
         "  verification:\n",
@@ -162,6 +195,15 @@ class MavenParallelVerificationWorkflowContractTest {
         "regelsuche-math-sympy/target/site/jacoco/**"));
     assertTrue(sympy.contains("if-no-files-found: error"),
         "missing runtime evidence must fail the isolated authority");
+    String sympyProducer = Files.readString(root.resolve(
+        "regelsuche-math-sympy/src/maven-test/java/de/regelsuche/math/sympy/SympyRuntimeContainerIT.java"));
+    assertTrue(sympyProducer.contains("retainCoverageInputs(root, target);"),
+        "isolated worker must retain its own tested classes, sources and execution data");
+    assertTrue(sympyProducer.contains("target.resolve(\"site/jacoco/inputs\")"),
+        "the independent artifact must retain renderable JaCoCo inputs");
+    assertTrue(sympyProducer.contains("target.resolve(\"jacoco.exec\")"));
+    assertTrue(sympyProducer.contains("inputs.resolve(\"execution-data/jacoco.exec\")"));
+
 
     assertTrue(maven.contains("actions/checkout@"),
         "the Maven authority must start from a separate fresh checkout");
@@ -171,7 +213,9 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(maven.contains(
         "org.codehaus.mojo:exec-maven-plugin:3.5.0:java"));
     assertTrue(maven.contains(FULL_MAVEN_COMMAND),
-        "the complete product and Docker contract must remain unchanged");
+        "the complete checkout reactor must also run the Web Workbench image suite");
+    assertFalse(maven.contains("-Pfull,web-workbench-image"),
+        "Web Workbench must not rerun the upstream reactor");
     assertFalse(maven.contains("needs:"),
         "Maven must begin concurrently rather than wait for another authority");
     assertFalse(maven.contains("actions/download-artifact@"),
@@ -183,6 +227,10 @@ class MavenParallelVerificationWorkflowContractTest {
 
     JsonNode jobs = YAML.readTree(workflow).required("jobs");
     assertRequiredAuthorities(jobs);
+    assertEquals("playwright-bootstrap/pom.xml", mavenCacheInputs(jobs.required("gradle-verification")));
+    String fullCacheInputs = "**/pom.xml\n.mvn/maven.config";
+    assertEquals(fullCacheInputs, mavenCacheInputs(jobs.required("maven-product-verification")));
+    assertEquals(fullCacheInputs, mavenCacheInputs(jobs.required(GIT_FREE_AUTHORITY)));
 
     int rejection = convergence.indexOf(
         "- name: Reject incomplete verification authority");
@@ -213,6 +261,13 @@ class MavenParallelVerificationWorkflowContractTest {
     assertTrue(convergence.contains(
         "needs.sympy-runtime-verification.result == 'success'"),
         "coverage retention must require the independent runtime authority");
+    JsonNode coverageRetention = jobs.required("verification").required("steps")
+        .valueStream().filter(step -> "coverage-verification".equals(step.path("with").path("name").asText()))
+        .findFirst().orElseThrow();
+    assertTrue(compact(coverageRetention.required("if").asText()).contains(
+        "(github.event_name == 'create' || (needs.maven-product-verification.result == 'success' && "
+            + "needs." + GIT_FREE_AUTHORITY + ".result == 'success'))"),
+        "routine coverage retention must require both Maven authorities");
     assertTrue(convergence.contains("if-no-files-found: error"),
         "the converged coverage report must be retained fail closed");
     assertFalse(convergence.contains("./gradlew"));
@@ -245,6 +300,127 @@ class MavenParallelVerificationWorkflowContractTest {
   }
 
   @Test
+  void fullMavenEvidenceIsRetainedBeforeAnotherCheckoutLifecycleCanReplaceIt() throws IOException {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
+        .findFirst().orElseThrow();
+    assertFalse(steps.stream().anyMatch(step ->
+        step.path("run").asText().contains("-Dregelsuche.qualityAcceptance.registerArchive=true")),
+        "the checkout reactor must run independently of archive preparation");
+
+    var retention = steps.stream()
+        .filter(step -> "maven-full-reactor-verification".equals(step.path("with").path("name").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("missing full-reactor report artifact"));
+    int produced = steps.indexOf(product);
+    int retained = steps.indexOf(retention);
+    assertTrue(produced < retained, "the artifact must come from the full product lifecycle");
+    assertFalse(steps.subList(produced + 1, retained).stream()
+        .anyMatch(step -> step.path("run").asText().contains("mvn ")),
+        "an intervening Maven lifecycle can clean the first run's reports");
+    assertTrue(retention.path("uses").asText().startsWith("actions/upload-artifact@"));
+    assertTrue(retention.path("if").asText().contains("always()"), "retain reports from failed runs as well");
+    var paths = retention.required("with").required("path").asText().lines().map(String::strip).toList();
+    assertTrue(paths.containsAll(List.of("**/target/surefire-reports/**", "**/target/failsafe-reports/**",
+        "**/target/jacoco.exec", "**/target/site/jacoco/**")), "retain the original test and JaCoCo evidence");
+  }
+
+  @Test
+  void gitFreeLifecycleStartsWithoutWaitingForTheCheckoutAndOwnsItsSource() throws IOException {
+    var jobs = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml"))).required("jobs");
+    var archive = jobs.get(GIT_FREE_AUTHORITY);
+    assertNotNull(archive, "the complete Git-free lifecycle must be an independent CI job");
+    assertEquals("github.event_name != 'create'", archive.required("if").asText());
+    assertFalse(archive.has("needs"), "archive verification must start in parallel with checkout verification");
+    assertFalse(archive.has("continue-on-error"));
+    assertEquals("${{ github.sha }}", archive.required("env").required("REGELSUCHE_AUTHORITY_GITHUB_SHA").asText());
+    var steps = archive.required("steps").valueStream().toList();
+    assertFalse(steps.stream().anyMatch(step -> step.path("uses").asText().startsWith("actions/download-artifact@")),
+        "the archive must be prepared from its own checkout");
+    assertFalse(steps.stream().anyMatch(step -> step.has("continue-on-error")));
+    var checkout = steps.stream().filter(step -> step.path("uses").asText().startsWith("actions/checkout@"))
+        .findFirst().orElseThrow();
+    assertEquals("${{ github.sha }}", checkout.required("with").required("ref").asText());
+    assertEquals("0", checkout.required("with").required("fetch-depth").asText());
+    var registration = steps.stream().filter(step -> "source_archive".equals(step.path("id").asText()))
+        .findFirst().orElseThrow();
+    assertTrue(steps.indexOf(checkout) < steps.indexOf(registration));
+    var registrationCommand = registration.required("run").asText();
+    assertTrue(registrationCommand.contains("-DdisableXmlReport=true")
+        && registrationCommand.contains("-Dsurefire.useFile=false")
+        && registrationCommand.contains("-Djacoco.skip=true"),
+        "registration-only output must not be retained as reactor evidence");
+  }
+
+  @Test
+  void mavenPagesReplayTheFullReactorFilesInsteadOfLaterReports() throws IOException {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var snapshot = steps.stream().filter(step -> "full_maven_reports".equals(step.path("id").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("missing full-reactor report snapshot"));
+    var product = steps.stream().filter(step -> FULL_MAVEN_COMMAND.equals(step.path("run").asText().strip()))
+        .findFirst().orElseThrow();
+    int produced = steps.indexOf(product);
+    int captured = steps.indexOf(snapshot);
+    assertTrue(produced < captured, "capture the reports after the full product run");
+    assertFalse(steps.subList(produced + 1, captured).stream()
+        .anyMatch(step -> step.path("run").asText().contains("mvn ")),
+        "capture the reports before any Maven reinitialization");
+    assertTrue(snapshot.path("run").asText().contains("**/target/surefire-reports/TEST-*.xml"));
+    assertTrue(snapshot.path("run").asText().contains("**/target/failsafe-reports/TEST-*.xml"));
+    var replay = steps.stream()
+        .filter(step -> step.path("run").asText().contains("-Dregelsuche.tests.mavenPages=true"))
+        .findFirst().orElseThrow();
+    assertEquals("${{ steps.full_maven_reports.outputs.root }}",
+        replay.required("env").required("REGELSUCHE_MAVEN_REPORT_ROOT").asText());
+    assertTrue(replay.path("run").asText().contains("-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}"));
+  }
+
+  @Test
+  void workbenchImageEvidenceMustComeFromTheUnmodifiedCheckoutSnapshot() throws Exception {
+    var workflow = YAML.readTree(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml")));
+    var steps = workflow.required("jobs").required("maven-product-verification")
+        .required("steps").valueStream().toList();
+    var snapshot = steps.stream().filter(step -> "full_maven_reports".equals(step.path("id").asText()))
+        .findFirst().orElseThrow();
+    var proof = steps.stream().filter(step -> "verify_workbench_evidence".equals(step.path("id").asText()))
+        .findFirst().orElseThrow(() -> new AssertionError("the checkout must verify the executed Workbench image suite"));
+    assertTrue(steps.indexOf(snapshot) < steps.indexOf(proof));
+    assertFalse(proof.has("if") || proof.has("continue-on-error"));
+    assertEquals("${{ steps.full_maven_reports.outputs.root }}",
+        proof.required("env").required("REGELSUCHE_MAVEN_REPORT_ROOT").asText());
+    assertEquals("mvn --batch-mode --no-transfer-progress -pl maven-build-contract -Pverify-workbench-report "
+        + "\"-Dregelsuche.tests.mavenReportRoot=${REGELSUCHE_MAVEN_REPORT_ROOT:?}\" "
+        + "test", proof.required("run").asText().strip());
+
+    var pom = parse(repositoryRoot().resolve("maven-build-contract/pom.xml")).getDocumentElement();
+    var profile = requiredChild(directChild(pom, "profiles"), "profile", "id", "verify-workbench-report");
+    var surefire = requiredChild(directChild(directChild(profile, "build"), "plugins"),
+        "plugin", "artifactId", "maven-surefire-plugin");
+    var selector = directChild(surefire, "configuration");
+    assertStrictWorkbenchReportSelector(selector);
+    for (String flag : List.of("failIfNoTests", "failIfNoSpecifiedTests")) {
+      var permissive = (Element) selector.cloneNode(true);
+      directChild(permissive, flag).setTextContent("false");
+      assertThrows(AssertionError.class, () -> assertStrictWorkbenchReportSelector(permissive));
+    }
+    var missingTest = (Element) selector.cloneNode(true);
+    missingTest.removeChild(directChild(missingTest, "test"));
+    assertThrows(AssertionError.class, () -> assertStrictWorkbenchReportSelector(missingTest));
+  }
+
+  private static void assertStrictWorkbenchReportSelector(Element selector) {
+    assertEquals("MavenBuildContractTest#checkoutReportRequiresExecutedWorkbenchImageTests",
+        directChildText(selector, "test"));
+    assertEquals("true", directChildText(selector, "failIfNoTests"));
+    assertEquals("true", directChildText(selector, "failIfNoSpecifiedTests"));
+    assertEquals("true", directChildText(directChild(selector, "systemPropertyVariables"),
+        "regelsuche.tests.requireWorkbenchImageReport"));
+  }
+
+  @Test
   void additionalAuthoritiesMustBeBothDependenciesAndFailClosed() throws IOException {
     var jobs = (ObjectNode) YAML.readTree(Files.readString(repositoryRoot().resolve(
         ".github/workflows/gradle.yml"))).required("jobs");
@@ -266,6 +442,14 @@ class MavenParallelVerificationWorkflowContractTest {
     while (!"checked-proofs".equals(needs.get(proofIndex).asText())) proofIndex++;
     needs.remove(proofIndex);
     assertThrows(AssertionError.class, () -> assertRequiredAuthorities(jobs));
+  }
+
+  private static String mavenCacheInputs(JsonNode job) {
+    var setup = job.required("steps").valueStream()
+        .filter(step -> step.path("uses").asText().startsWith("actions/setup-java@"))
+        .findFirst().orElseThrow().required("with");
+    assertEquals("maven", setup.required("cache").asText());
+    return setup.required("cache-dependency-path").asText().strip();
   }
 
   private static void assertRequiredAuthorities(JsonNode jobs) {
@@ -309,6 +493,28 @@ class MavenParallelVerificationWorkflowContractTest {
       assertTrue(names.add(failure.group(1)), "duplicate authority " + term);
     }
     return names;
+  }
+
+  @Test
+  void studentArchiveUsesCleanMavenStagingAndRetainsOnlyQualificationEvidence() throws IOException {
+    var jobs = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
+    var job = jobs.required("maven-student-sdk-archive-qualification");
+    assertEquals("github.event_name != 'create'", job.required("if").asText());
+    var steps = job.required("steps");
+    assertEquals("${{ github.event.pull_request.head.sha || github.sha }}", steps.get(0).required("with").required("ref").asText());
+    assertEquals("false", steps.get(0).required("with").required("persist-credentials").asText());
+    String commands = steps.get(2).required("run").asText();
+    int stage = commands.indexOf("-Psdk-release");
+    int packageArchive = commands.indexOf("#packageConfiguredRepository");
+    int qualify = commands.indexOf("#qualifyConfiguredArchive");
+    assertTrue(stage >= 0 && packageArchive > stage && qualify > packageArchive);
+    assertTrue(commands.substring(stage, packageArchive).contains("-DskipTests clean install"));
+    assertTrue(commands.contains("work=$(mktemp -d \"$RUNNER_TEMP/student-sdk-archive/work.XXXXXXXX\")"));
+    assertTrue(commands.contains("-Dregelsuche.studentSdk.qualify=true"));
+    assertFalse(commands.contains("git tag") || commands.contains("gh release") || commands.contains("git push"));
+    var artifact = steps.get(3).required("with");
+    assertEquals("${{ runner.temp }}/student-sdk-archive/evidence", artifact.required("path").asText());
+    assertEquals("error", artifact.required("if-no-files-found").asText());
   }
 
   @Test

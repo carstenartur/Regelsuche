@@ -140,19 +140,39 @@ vollständig typisierte Evidenzzeilen. Die beiden positiven Zeilen dienen nur de
 Charakterisierung der bereits festgelegten Serialisierung und begründen keine
 mathematische Profilwirkung oder Studienaussage.
 
-## Nächster Schritt
+## Externe Freigabe und Entscheidung
 
-Nach sequenziellem Merge und vollständiger Qualifikation der Mess- und
-Freeze-Verträge kann der erste mathematische Profiladapter implementiert
-werden. `ON_DEMAND_VERIFIED_FACTORIZATION` muss dann Resultate, Pfade,
-Faktorisierungsreports und Arbeitswerte in exakt diese bereits festgelegte
-Grenze liefern.
+`PolynomialTheoryUtilityDecisionGate` prüft zwei getrennte Ed25519-Signaturen
+gegen öffentlich provisionierte Vertrauensanker der Verwahrstelle und der
+unabhängigen Studienprüfung. Beide Schlüssel müssen aus einer vertrauenswürdigen
+Konfiguration stammen. Die vorgelegten Belege legen keine Vertrauensanker fest.
 
-Die Qualifikation darf erst geöffnet werden, nachdem die endgültigen
-Candidate-Freeze-Bytes aller obligatorischen Profile feststehen. Erst ein
-getrennter Qualifikations- und Entscheidungsschritt darf zusätzliche
-Reichweite, Cache-Amortisation oder eine Default-/Opt-in-/Nullentscheidung
-ableiten.
+1. `releasePayload` erzeugt das kanonische UTF-8-Dokument
+   `regelsuche.polynomial-theory-utility-qualification-release/v1` für die
+   Verwahrstelle. Es bindet die Präregistrierung, den exakten v2-Freeze mit
+   beobachteten Messdaten und die versiegelte Qualifikation über Pfad, Länge und
+   Hash. `requireReleased` prüft die getrennte Signatur über diese Bytes und
+   benötigt dafür ausschließlich die gebundene Identität der Qualifikation.
+2. `decisionPayload` erzeugt das kanonische UTF-8-Dokument
+   `regelsuche.polynomial-theory-utility-decision/v1` für die Studienprüfung. Es
+   bindet per SHA-256 das Freigabedokument, dessen Signatur und die erhaltenen
+   Vergleichsbytes sowie einen der fünf Statuswerte aus der Präregistrierung.
+3. `requireAuthorized` rekonstruiert beide Dokumente und liefert den angegebenen
+   Status erst nach Prüfung beider Signaturen. Für die spätere Prüfung lassen
+   sich die Nutzdaten und die beiden getrennten 64-Byte-Signaturen archivieren.
+
+Die Entscheidung attestiert die Aussage der externen Studienprüfung für genau
+diese Belege. Die fachliche Auswertung, Auswahl und Provisionierung der echten
+Vertrauensanker sowie die Entscheidung über Datenzugriff oder Veröffentlichung
+liegen bei den extern Verantwortlichen. Der Prüfer liest keine versiegelten
+Daten und ändert keine Produktvorgaben. Die Tests verwenden synthetische
+Vergleichsbytes und ausschließlich für die Tests erzeugte Schlüssel.
+
+```sh
+mvn -B -ntp -pl regelsuche-experiments -am \
+  -Dtest=PolynomialTheoryUtilityDecisionGateTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
 
 ## Claim-Grenze
 

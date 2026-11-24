@@ -20,6 +20,8 @@ dependencies {
     implementation project(':regelsuche-math-algorithms')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.23.0'
 
+    // Temporary Gradle parity: Maven already owns the identical 3.0.9 schema validator.
+    testImplementation 'com.networknt:json-schema-validator:3.0.9'
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

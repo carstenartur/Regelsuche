@@ -1,5 +1,31 @@
 # Solver IR verification
 
+## Maven/JUnit evidence verification (new, additive)
+
+The Maven reactor now generates the actual Solver IR example in a temporary
+JUnit directory twice. It checks byte-identical output, validates both
+obligations and all three backend results against the checkout's Draft 2020-12
+schemas using the repository-pinned Java validator, and independently checks
+obligation hashes, backend status, translation status, capability, message and
+unsupported-assumption evidence. Negative tests distinguish a structurally
+invalid JSON result from a structurally valid but falsely rebound or promoted
+result. Nothing in these synthetic controls claims an external formal proof.
+
+Run with JDK 25 and Maven:
+
+```sh
+mvn -B -ntp -pl regelsuche-solver-ir -am \
+  -Dtest=SolverIrMavenEvidenceTest -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+This is an **additive Maven migration slice** for #749, not an assertion that
+all Gradle and Python production paths have been replaced. The historical
+Python verifier and its workflow remain as an independent transitional
+reference until complete raw-result and negative-case parity, Maven/Failsafe
+lifecycle ownership and clean-checkout/source-archive/container reproducibility
+have all been demonstrated. Do not remove or weaken their existing gates on
+the strength of this test alone.
+
 The authoritative Solver IR verification is implemented in the repository and runs from a plain checkout:
 
 ```bash

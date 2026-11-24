@@ -8,6 +8,8 @@ import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import de.regelsuche.discovery.domain.*;
 import de.regelsuche.discovery.domain.DiscoveryDomain.*;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -40,6 +42,32 @@ class DomainModelProofSchemaTest {
         }
     }
 
+    @Test void sourceOnlyLogicalReceiptsSatisfyAllClosedSchemas() throws Exception {
+        var source = logicalSource();
+        var schemas = registry();
+        var reports = java.util.Map.of(
+            "domain-snapshot-assessment", DomainSnapshotAssessment.assess(source).toCanonicalJson(),
+            "domain-downstream-validation", DomainDownstreamValidation.validate(source).toCanonicalJson(),
+            "domain-model-proof", DomainModelProof.prove(source).toCanonicalJson());
+        for (var entry : reports.entrySet()) {
+            var schema = schemas.getSchema(SchemaLocation.of("urn:regelsuche:" + entry.getKey() + ":v1"));
+            var report = json.readTree(entry.getValue());
+            assertTrue(schema.validate(report).isEmpty(), () -> schema.validate(report).toString());
+            assertEquals("scoped-logic", report.at("/source/domainId").asText());
+        }
+    }
+
+    private DomainExportWorkspace logicalSource() throws Exception {
+        var domain = new ScopedLogicDiscoveryDomain(proposal -> {
+            throw new AssertionError("schema source must not run a proof receiver");
+        }, 0);
+        var proposition = new Symbol("p");
+        var context = Obligation.create("logical-schema-source", List.of(new SymbolDeclaration("p", Sort.PROPOSITION)),
+            List.of(Theory.SCOPED_ANALYSIS), List.of(Predicate.holds("given", proposition)), Goal.holds(proposition),
+            RequestedEvidence.FORMAL_PROOF, new SourceProvenance("public-control", "schema", SolverIr.sha256("public context")));
+        return workspace(domain, context.toCanonicalJson());
+    }
+
     @Test void schemaAcceptsActualProofsForBothDomainsAndEverySupportedDimension() throws Exception {
         var schema = registry().getSchema(SchemaLocation.of("urn:regelsuche:domain-model-proof:v1"));
         var sources = List.of(
@@ -52,6 +80,55 @@ class DomainModelProofSchemaTest {
             assertEquals("PROVED_MODEL", receipt.path("status").asText());
             assertTrue(schema.validate(receipt).isEmpty(), () -> schema.validate(receipt).toString());
         }
+    }
+
+    @Test void schemasRejectRebindingPositiveReceiptsToSourceOnlyLogicalDomain() throws Exception {
+        var source = recurrence("observed=2,3,5,8,13,21;holdout=34,55,89;maximumOrder=3");
+        assertAll(
+            () -> rejectScopedPositive("domain-snapshot-assessment", DomainSnapshotAssessment.assess(source).toCanonicalJson()),
+            () -> rejectScopedPositive("domain-downstream-validation", DomainDownstreamValidation.validate(source).toCanonicalJson()),
+            () -> rejectScopedPositive("domain-model-proof", DomainModelProof.prove(source).toCanonicalJson()));
+    }
+
+    private void rejectScopedPositive(String name, String receipt) throws Exception {
+        var forged = (ObjectNode) json.readTree(receipt);
+        var schema = registry().getSchema(SchemaLocation.of("urn:regelsuche:" + name + ":v1"));
+        assertTrue(schema.validate(forged).isEmpty(), () -> schema.validate(forged).toString());
+        ((ObjectNode) forged.path("source")).put("domainId", "scoped-logic");
+        assertFalse(schema.validate(forged).isEmpty(), "positive scoped receipt accepted by " + name);
+    }
+
+    @Test void scopedNegativeReceiptsCannotBorrowPositivePayloadsOrInventExecution() throws Exception {
+        var source = logicalSource();
+        var checked = recurrence("observed=2,3,5,8,13,21;holdout=34,55,89;maximumOrder=3");
+        var positiveAssessment = (ObjectNode) json.readTree(DomainSnapshotAssessment.assess(checked).toCanonicalJson());
+        var positiveValidation = (ObjectNode) json.readTree(DomainDownstreamValidation.validate(checked).toCanonicalJson());
+        var positiveModel = read(DomainModelProof.prove(checked));
+        var assessment = (ObjectNode) json.readTree(DomainSnapshotAssessment.assess(source).toCanonicalJson());
+        var validation = (ObjectNode) json.readTree(DomainDownstreamValidation.validate(source).toCanonicalJson());
+        var model = read(DomainModelProof.prove(source));
+        assertAll(
+            () -> rejectScopedMutation("domain-snapshot-assessment", assessment, "borrowed embedded proof", bad ->
+                ((ObjectNode) bad.path("proof")).set("modelReceipt", positiveModel.deepCopy())),
+            () -> rejectScopedMutation("domain-snapshot-assessment", assessment, "invented replay resources", bad ->
+                bad.set("resources", positiveAssessment.path("resources").deepCopy())),
+            () -> rejectScopedMutation("domain-downstream-validation", validation, "borrowed finite check", bad ->
+                bad.set("check", positiveValidation.path("check").deepCopy())),
+            () -> rejectScopedMutation("domain-downstream-validation", validation, "borrowed validation artifacts", bad ->
+                bad.set("artifacts", positiveValidation.path("artifacts").deepCopy())),
+            () -> rejectScopedMutation("domain-model-proof", model, "borrowed finite check", bad ->
+                bad.set("finiteCheck", positiveModel.path("finiteCheck").deepCopy())),
+            () -> rejectScopedMutation("domain-model-proof", model, "invented replay admission", bad ->
+                ((ObjectNode) bad.at("/replay/admission")).put("executed", 1).put("remaining", 0)));
+    }
+
+    private void rejectScopedMutation(String name, ObjectNode receipt, String detail, Consumer<ObjectNode> edit)
+            throws Exception {
+        var schema = registry().getSchema(SchemaLocation.of("urn:regelsuche:" + name + ":v1"));
+        assertTrue(schema.validate(receipt).isEmpty(), () -> schema.validate(receipt).toString());
+        var forged = receipt.deepCopy();
+        edit.accept(forged);
+        assertFalse(schema.validate(forged).isEmpty(), name + " accepted " + detail);
     }
 
     @Test void schemaAcceptsActualUnsupportedAndStoppedReceiptsWithoutProof() throws Exception {

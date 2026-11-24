@@ -51,8 +51,20 @@ public final class ScopedProofSearch {
         for (int round = 0; round < 4; round++) {
             int before = facts.size();
             var previous = List.copyOf(facts.values());
-            for (var implication : previous) apply(implication);
+            for (var fact : previous) apply(fact);
+            if (before == facts.size()) break;
+        }
+        // Retained discovery states contain the original formation work at each proposal.
+        // Run the additional rules after the original proposal prefix has been formed.
+        for (int round = 0; round < 4; round++) {
+            int before = facts.size();
+            var previous = List.copyOf(facts.values());
+            for (var fact : previous) {
+                projectConjunction(fact);
+                eliminateExistential(fact, previous);
+            }
             if (before == facts.size()) return;
+            for (var fact : List.copyOf(facts.values())) apply(fact);
         }
     }
     private void fromPremise(Fact fact, List<Fact> initial) {
@@ -128,11 +140,67 @@ public final class ScopedProofSearch {
         var nodes = new ArrayList<>(fact.proof());
         int offset = nodes.size();
         if (offset + antecedent.proof().size() >= 128) return;
-        for (var n : antecedent.proof()) {
-            nodes.add(new Node(n.rule(),n.operand(),n.children().stream().map(i -> i + offset).toList()));
-        }
-        nodes.add(of(APPLY,offset-1,nodes.size()-1));
+        int argument = appendProof(nodes, antecedent);
+        nodes.add(of(APPLY, offset - 1, argument));
         retain(result,nodes);
+    }
+
+    private void projectConjunction(Fact fact) {
+        if (!(fact.formula() instanceof Call conjunction) || !conjunction.function().equals("and")
+                || conjunction.arguments().size() != 2 || fact.proof().size() >= 128) return;
+        var left = new ArrayList<>(fact.proof());
+        left.add(of(AND_LEFT, left.size() - 1));
+        retain(conjunction.arguments().getFirst(), left);
+        var right = new ArrayList<>(fact.proof());
+        right.add(of(AND_RIGHT, right.size() - 1));
+        retain(conjunction.arguments().getLast(), right);
+    }
+
+    private void eliminateExistential(Fact fact, List<Fact> available) {
+        if (!(fact.formula() instanceof Binder exists) || exists.kind() != BinderKind.EXISTS) return;
+        for (var candidate : available) {
+            charge(1);
+            if (!(candidate.formula() instanceof Binder universal) || universal.kind() != BinderKind.FORALL
+                    || universal.domain() != exists.domain() || !(universal.body() instanceof Call implication)
+                    || !implication.function().equals("implies") || implication.arguments().size() != 2
+                    || !implication.arguments().getFirst().equals(exists.body())) continue;
+            var conclusion = implication.arguments().getLast();
+            if (facts.containsKey(conclusion) || usesBinder(conclusion, 0)
+                    || fact.proof().size() + candidate.proof().size() + 5 > 128) continue;
+            var nodes = new ArrayList<>(fact.proof());
+            int source = nodes.size() - 1;
+            int rule = appendProof(nodes, candidate);
+            int witness = nodes.size();
+            nodes.add(local(1));
+            int specialized = nodes.size();
+            nodes.add(of(SPECIALIZE, rule, witness));
+            int hypothesis = nodes.size();
+            nodes.add(local(0));
+            int continuation = nodes.size();
+            nodes.add(of(APPLY, specialized, hypothesis));
+            nodes.add(of(EXISTS_ELIM, source, continuation));
+            retain(conclusion, nodes);
+        }
+    }
+
+    /** A nested lexical binder increments the index of the eliminated witness. */
+    private boolean usesBinder(Expression expression, int depth) {
+        charge(1);
+        return switch (expression) {
+            case Bound bound -> bound.index() == depth;
+            case Binder binder -> usesBinder(binder.body(), depth + 1);
+            case Call call -> call.arguments().stream().anyMatch(argument -> usesBinder(argument, depth));
+            case Binary binary -> usesBinder(binary.left(), depth) || usesBinder(binary.right(), depth);
+            default -> false;
+        };
+    }
+
+    private static int appendProof(List<Node> nodes, Fact fact) {
+        int offset = nodes.size();
+        for (var node : fact.proof()) {
+            nodes.add(new Node(node.rule(), node.operand(), node.children().stream().map(i -> i + offset).toList()));
+        }
+        return nodes.size() - 1;
     }
     private void specialize(Fact fact, Binder binder) {
         for (int i = 0; i < context.declarations().size(); i++) {

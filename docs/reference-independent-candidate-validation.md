@@ -150,10 +150,24 @@ ReferenceIndependentValidationHistoricalComparison
 ```
 
 These commands use the discovery module runtime classpath. `verify` performs
-binding verification and full oracle re-execution. The separate schema checker
-uses the repository's existing pinned verification Python environment. It owns
-only the exchange schema and content-root check; Java owns candidate and work
-semantics and oracle replay.
+binding verification and full oracle re-execution. Gradle checks its generated
+companion with the same Java Draft 2020-12 verifier used by Maven/JUnit. The
+Maven integration test passes the original bytes from a real 4,316-call worker
+run through the schema verifier after replay and before the historical join.
+The separate exchange-schema controls use all 144 archived rows without
+opening the historical qualification or calling the oracle:
+
+```sh
+mvn -B -ntp -pl regelsuche-discovery -am \
+  '-Dtest=ReferenceIndependent*' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+The JUnit gate checks the positive exchange shape, separately rejects forbidden
+reference labels, forged formal-proof claims, invalid budgets and false freshness,
+and verifies that strict Java content-root parsing rejects a forged hash, duplicate
+JSON members and noncanonical bytes. This completes the exchange-schema migration
+for the companion within #749.
 
 ## Observed bounded result and remaining work
 

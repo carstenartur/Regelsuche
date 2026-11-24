@@ -39,11 +39,12 @@ eigene `.git`-Directory, den passenden Git-Wurzelpfad und einen sauberen Status
 auch bezüglich neuer Dateien. Ein versehentlich fehlender Checkout darf nicht
 über Gits Suche in Elternverzeichnissen zum Produktrepository zurückfallen.
 
-Die vorhandene Versionsentscheidung bleibt erhalten. Nur die passende frühere
-SNAPSHOT-Version wird auf die angeforderte nächste Version geändert. Steht
-`main` bereits auf der nächsten oder einer anderen Entwicklungslinie, erzeugt
-der Schritt keine Änderung. Der vorhandene Metadatenhelfer sowie die explizite
-`add-paths`-Liste des Folge-PRs bleiben die Eigentümer des Versionsdiffs.
+Nur die zum Release gehörende frühere SNAPSHOT-Version wird auf die
+angeforderte nächste Version geändert. Bei einer anderen Entwicklungslinie
+oder einem bereits erfolgten Versionswechsel meldet der Maven-Schritt
+`required=false`. Bei einer Änderung prüft `ReleaseMetadataTransition` die
+POMs aller deklarierten Module und Profile sowie die sechs Metadatendateien
+gemeinsam. Die explizite `add-paths`-Liste begrenzt den Folge-PR.
 
 Das Build-Verzeichnis wird für diesen Übergang weder gelöscht noch umbenannt,
 rekursiv umberechtigt oder privilegiert verändert. Dadurch können seine Dateien
@@ -53,38 +54,18 @@ ihre Aufbewahrung über das Ende eines gehosteten Runner-Jobs hinaus.
 
 ## Reproduzierbare Regression
 
-Die bestehenden Tests in `.github/scripts/test_release_metadata.py` enthalten
-zusätzlich die folgenden Verträge:
+Die Maven-Tests prüfen die tatsächliche Versionsumstellung in einem
+lokalen Klon mit eigenem Bare-Remote. Sie vergleichen Originaldateien,
+Release-Commit, Tag, Zugriffsrechte und geschützte Evidenz mit dem
+Ausgangszustand. Sie prüfen die unveränderte Entwicklungslinie, den
+bereits erfolgten Wechsel, fremde Entwicklungslinien, schmutzige Checkouts
+und den fehlenden eigenen Repository-Wurzelpfad. Mutationen im Workflow
+prüfen die Bindung an Checkout, Bedingungen, Maven-Aufruf und Dateiliste.
 
-- Checkout-Revision, `main`-Ref, Arbeitsverzeichnisse und PR-Pfad passen zusammen;
-  Trockenlauf- und verwaltete-Release-Bedingungen sowie die Dateipositivliste
-  bleiben erhalten. Sechs absichtliche Pfad-/Guard-Mutationen müssen scheitern.
-- Ein lokales Git-Repository mit eigenem Bare-Remote modelliert das veröffentlichte
-  Quellrepository und den separaten Checkout. Die tatsächliche Shell des
-  Metadatenschritts wird aus dem Workflow gelesen und mit dem unveränderten
-  Metadatenhelfer ausgeführt. Es gibt keinen GitHub-Aufruf und keinen Push.
-- Ein ignoriertes Evidence-Verzeichnis mit POSIX-Modus `0555` bleibt einschließlich
-  Inhalt und Rechten erhalten. Unter einem unprivilegierten Benutzer wird auch
-  der tatsächliche fehlgeschlagene Löschversuch geprüft. Root kann POSIX-DAC
-  umgehen; dort werden weiterhin Erhaltung und Berechtigungen geprüft, aber
-  kein beobachtetes `Permission denied` behauptet.
-- Der Versionsdiff umfasst ausschließlich die Metadatendateien und deklarierten
-  Fixture-POMs. Release-Commit, Tag und sämtliche ursprünglichen versionierten
-  Dateien bleiben unverändert. Bereits weitergeschaltetes `main`, eine andere
-  Entwicklungslinie, schmutzige Zielcheckouts und fehlende Git-Wurzeln sind
-  eigene Prüffälle.
-
-Aus einem normalen Checkout mit Python 3, Git und Bash:
-
-```bash
-python3 -B -m unittest discover -s .github/scripts -p test_release_metadata.py -v
-./gradlew --no-daemon verifyReleaseMetadata
+```sh
+mvn -pl maven-build-contract -am   -Dtest=MavenReleaseMetadataAlignmentTest,MavenReleaseMetadataTransitionTest,MavenReleaseFollowUpTest   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-Der bereits vorhandene Task `verifyReleaseMetadata` führt diese Tests ohne
-wiederverwendetes Erfolgsartefakt als Bestandteil von `check` aus. Es gibt keinen
-zusätzlichen Workflow und keine neue Bibliotheksabhängigkeit. Der lokale
-Git-Test prüft den Checkout-Vertrag und die tatsächliche Metadaten-Shell, nicht
-die Implementierung des gehosteten Checkout- oder PR-Actions-Dienstes. Deren
-Zusammenspiel wird beim nächsten regulären verwalteten Release erneut geprüft;
-ein alter Release wird dafür nicht neu veröffentlicht.
+GitHub Actions übernimmt den Checkout und das Öffnen des Folge-PRs beim
+regulären verwalteten Release. Die lokalen Regressionstests verwenden
+ausschließlich temporäre Repositories.

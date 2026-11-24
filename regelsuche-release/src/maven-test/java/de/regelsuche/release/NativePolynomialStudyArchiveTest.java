@@ -18,7 +18,7 @@ class NativePolynomialStudyArchiveTest {
         try (var tar = output(archive)) {
             add(tar, "native-polynomial-comparison/rows.json");
         }
-        Path output = FrozenPolynomialStudyContainer.extract(archive, root.resolve("result"), "native-polynomial-comparison");
+        Path output = NativePolynomialComparisonContainerIT.extract(archive, root.resolve("result"));
         assertEquals("[]\n", Files.readString(output.resolve("rows.json")));
     }
 
@@ -39,7 +39,7 @@ class NativePolynomialStudyArchiveTest {
                 }
             }
             assertThrows(IOException.class,
-                () -> FrozenPolynomialStudyContainer.extract(archive, directory.resolve("result"), "native-polynomial-comparison"), invalid);
+                () -> NativePolynomialComparisonContainerIT.extract(archive, directory.resolve("result")), invalid);
             assertFalse(Files.exists(directory.resolve("outside")), invalid);
         }
     }
@@ -47,9 +47,9 @@ class NativePolynomialStudyArchiveTest {
     @Test void rejectsTruncatedArchiveAgainstWorkerDigest(@TempDir Path root) throws Exception {
         Path archive = Files.writeString(root.resolve("evidence.tgz"), "abc");
         String digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        FrozenPolynomialStudyContainer.verifyArchiveDigest(archive, digest);
+        NativePolynomialComparisonContainerIT.verifyArchiveDigest(archive, digest);
         Files.writeString(archive, "ab");
-        assertThrows(IOException.class, () -> FrozenPolynomialStudyContainer.verifyArchiveDigest(archive, digest));
+        assertThrows(IOException.class, () -> NativePolynomialComparisonContainerIT.verifyArchiveDigest(archive, digest));
     }
 
     private static TarArchiveOutputStream output(Path archive) throws IOException {

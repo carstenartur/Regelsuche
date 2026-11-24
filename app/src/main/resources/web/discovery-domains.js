@@ -214,6 +214,7 @@
     function show(view) {
         selected = view;
         const source = view.evidence;
+        const scopedLogic = view.domainId === 'scoped-logic' && view.domainRevision === 'v1';
         const sequence = view.domainRevision === 'v1' &&
             ['integer-sequence-finite-difference', 'integer-sequence-linear-recurrence'].includes(view.domainId);
         detail.append(node('h2', `${source.campaignId} · ${source.outcome}`));
@@ -224,7 +225,10 @@
             ['Quellenangabe', source.seed.sourceReference], ['Eingabe-Hash', view.inputHash]
         ]) identity.append(node('dt', label), node('dd', value));
         detail.append(identity, node('h3', sequence
-            ? 'Beobachtete Folge und zurückgehaltene Prüfdaten' : 'Formel und Umschreibungsnachweis'));
+            ? 'Beobachtete Folge und zurückgehaltene Prüfdaten' : scopedLogic
+                ? 'Logischer Kontext und gespeicherte Belegangaben' : 'Formel und Umschreibungsnachweis'));
+        if (scopedLogic) detail.append(node('p', 'Kontext, Ergebnisstatus und Zertifikate sind gespeicherte Angaben der Quelle. '
+            + 'Der Import prüft ihre Quellenbindung und führt keinen Beweisprüfer aus.'));
         detail.append(table(['Gespeichertes Feld', 'Wert'], source.domainEvidence.properties.map(item => [item.key, item.value])));
         detail.append(node('h3', 'Gespeicherte Arbeit je Dimension'));
         detail.append(table(['Ressource', 'Budget', 'Ausgeführt', 'Übersprungen', 'Verbleibend'],
@@ -239,6 +243,14 @@
             const item = node('li');
             item.append(node('p', `${attempt.disposition} · ${attempt.evaluationStatus}: ${attempt.evaluationSummary}`));
             if (attempt.counterexampleWitness) item.append(node('pre', attempt.counterexampleWitness));
+            if (scopedLogic) {
+                const button = node('button', `Kandidat ${attempt.sequence} erneut prüfen`);
+                button.type = 'button'; button.dataset.scopedCandidate = attempt.candidateHash;
+                const message = node('p'); message.setAttribute('role', 'status');
+                const result = node('div');
+                button.addEventListener('click', () => recheckScopedCandidate(view, attempt.candidateHash, button, message, result));
+                item.append(button, message, result);
+            }
             item.append(disclosure('Gespeicherter Kandidatenversuch', attempt)); attempts.append(item);
         }
         if (!source.candidateAttempts.length) attempts.append(node('li', 'Keine Kandidatenversuche gespeichert.'));
@@ -264,9 +276,10 @@
         element('retainedDomainReplay').hidden = false;
         element('replayDomainExport').disabled = !view.replaySupported;
         replayStatus.textContent = view.replaySupported ? 'Noch kein Replay für diese Auswahl ausgeführt.'
+            : scopedLogic ? 'Eine vollständige Wiederholung des historischen Laufs ist nicht verfügbar. Der Beweisprüfer kann gespeicherte Kandidaten einzeln neu prüfen.'
             : 'Die Quelle überschreitet das begrenzte Replay-Budget. Die gespeicherten Daten bleiben lesbar.';
-        element('domainAssessment').hidden = false;
-        element('assessDomainExport').disabled = false;
+        element('domainAssessment').hidden = scopedLogic;
+        element('assessDomainExport').disabled = scopedLogic;
         validationPanel.hidden = !sequence;
         validateButton.disabled = !sequence;
         proofPanel.hidden = !sequence;
@@ -275,6 +288,51 @@
         history.replaceState(null, '', `#export=${view.runId.slice(7)}`);
         status.textContent = 'Originalexport geladen. Die gespeicherte Quellenidentität bleibt unverändert.';
         markSelection();
+    }
+    async function recheckScopedCandidate(view, candidateHash, button, message, output) {
+        if (selected !== view || button.disabled || !hashPattern.test(candidateHash)) return;
+        button.disabled = true;
+        output.replaceChildren(); delete message.dataset.status;
+        message.textContent = 'Gespeicherter Kandidat wird rekonstruiert und geprüft …';
+        try {
+            const response = await fetch(`${base}/${view.runId.slice(7)}/scoped-check`, {method: 'POST', redirect: 'error',
+                headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expectedWorkspaceHash: view.contentHash,
+                    expectedEvidenceHash: view.evidence.contentHash, candidateHash})});
+            const report = await readResponse(response), source = report.source;
+            if (selected !== view) return;
+            if (report.schema !== 'regelsuche.scoped-workspace-candidate-check/v1' || source?.runId !== view.runId
+                || source.workspaceHash !== view.contentHash || source.evidenceHash !== view.evidence.contentHash
+                || source.seedHash !== view.inputHash || source.candidateHash !== candidateHash
+                || !view.evidence.states.some(state => state.candidateReady && state.stateHash === source.stateHash)
+                || response.headers.get('X-Regelsuche-Run-Id') !== view.runId) throw new Error('Fremde Prüfquelle.');
+            const {counterexample, proof, retainedWitness} = report;
+            const counterexamples = {
+                FOUND: 'Gegenbeispiel gefunden.', NONE_FOUND: 'Bei diesen Versuchen wurde kein Gegenbeispiel gefunden.',
+                INCONCLUSIVE: 'Die Interpretationen liefern keine Entscheidung.', UNSUPPORTED: 'Die Gegenbeispielprüfung unterstützt diese Aussage nicht.'
+            };
+            const proofs = {
+                CONFIRMED: 'Aussage im Lean-Kernel geprüft und in einem zweiten Projekt rekonstruiert.',
+                REFUTED: 'Die formale Prüfung hat die Aussage widerlegt.',
+                INCONCLUSIVE: 'Die Lean-Prüfung hat keinen bestätigten Beleg geliefert.',
+                UNSUPPORTED: 'Die Lean-Prüfung unterstützt diese Aussage nicht.', NOT_RUN: 'Die formale Prüfung wurde nicht ausgeführt.'
+            };
+            if (!hashPattern.test(report.obligationHash) || !hashPattern.test(report.proposalHash)
+                || !Object.hasOwn(counterexamples, counterexample.status) || !Number.isInteger(counterexample.attempts)
+                || counterexample.attempts < 0 || counterexample.attempts > 256 || !Object.hasOwn(proofs, proof.status)
+                || (proof.status === 'CONFIRMED' && (!proof.backendConfigured || !hashPattern.test(proof.kernelHash)
+                    || !hashPattern.test(proof.rebuildHash)))) throw new Error('Ungültiger Prüfbeleg.');
+            const proofMessage = proof.backendConfigured ? proofs[proof.status] : 'Für eine formale Prüfung sind zwei Lean-Projekte einzurichten.';
+            message.textContent = proofMessage;
+            message.dataset.status = proof.status;
+            output.append(node('p', `${counterexamples[counterexample.status]} Versuche: ${counterexample.attempts}.`));
+            if (counterexample.status === 'FOUND') output.append(node('pre', counterexample.witness));
+            if (retainedWitness === 'DIFFERS') output.append(node('p', 'Der gespeicherte Zeuge konnte nicht reproduziert werden.'));
+            output.append(disclosure('Neuer Prüfbeleg mit Quellenbindung', report));
+        } catch (error) {
+            if (selected === view) message.textContent = `Kandidatenprüfung fehlgeschlagen: ${error.message}`;
+        } finally {
+            if (selected === view) button.disabled = false;
+        }
     }
     async function load(runId) {
         const ticket = beginSelection();
@@ -355,7 +413,7 @@
     });
     element('assessDomainExport').addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
-        if (!view) return;
+        if (!view || (view.domainId === 'scoped-logic' && view.domainRevision === 'v1')) return;
         const button = element('assessDomainExport'), message = element('domainAssessmentStatus');
         const result = element('domainAssessmentResult'), link = element('downloadDomainAssessment');
         const path = `${base}/${view.runId.slice(7)}/assessment`;
@@ -400,12 +458,12 @@
         } catch (error) {
             if (ticket === selectionEpoch) message.textContent = `Prüfung fehlgeschlagen: ${error.message}`;
         } finally {
-            if (ticket === selectionEpoch) button.disabled = false;
+            if (ticket === selectionEpoch) button.disabled = view.domainId === 'scoped-logic' && view.domainRevision === 'v1';
         }
     });
     validateButton.addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
-        if (!view) return;
+        if (!view || (view.domainId === 'scoped-logic' && view.domainRevision === 'v1')) return;
         const actionPath = `${base}/${view.runId.slice(7)}/validate`;
         validateButton.disabled = true;
         clearValidation('Gespeicherte Folgenglieder werden geprüft …');
@@ -601,7 +659,7 @@
     }
     proofButton.addEventListener('click', async () => {
         const view = selected, ticket = selectionEpoch;
-        if (!view) return;
+        if (!view || (view.domainId === 'scoped-logic' && view.domainRevision === 'v1')) return;
         const actionPath = `${base}/${view.runId.slice(7)}/model-proof`;
         proofButton.disabled = true;
         clearProof('Quelle, endliche Daten und Modellgesetz werden geprüft …');

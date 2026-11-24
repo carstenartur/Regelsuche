@@ -51,6 +51,30 @@ class ExtractionProofCheckerTest {
                         .status());
     }
 
+    @Test
+    void rejectsSwappedCongruencePremisesWithValidFinalEndpoints() {
+        var terms = List.of(
+                new Term(Kind.FUNCTION, "a", List.of()),
+                new Term(Kind.FUNCTION, "b", List.of()),
+                new Term(Kind.FUNCTION, "f", List.of(0, 1)),
+                new Term(Kind.FUNCTION, "f", List.of(1, 0)));
+        var trusted = rule();
+        var rules = List.of(new RuleIdentity(trusted.id(), trusted.source(), trusted.target()));
+        var valid = new ExtractionCertificate(1, terms, rules, List.of(
+                new PatternInstance(0, Map.of(), 0, 1),
+                new Symmetry(0),
+                new Congruence(2, 3, List.of(0, 1))), 2, 3, 2);
+        var tampered = new ExtractionCertificate(1, terms, rules, List.of(
+                valid.steps().get(0), valid.steps().get(1),
+                new Congruence(2, 3, List.of(1, 0))), 2, 3, 2);
+        var source = fn("f", fn("a"), fn("b"));
+        var target = fn("f", fn("b"), fn("a"));
+        assertEquals(ExtractionProofChecker.Status.ACCEPTED,
+                ExtractionProofChecker.check(source, target, valid, List.of(trusted), ProofLimits.defaults()).status());
+        assertEquals(ExtractionProofChecker.Status.REJECTED,
+                ExtractionProofChecker.check(source, target, tampered, List.of(trusted), ProofLimits.defaults()).status());
+    }
+
     static ExtractionCertificate leafCertificate(String label) {
         return new ExtractionCertificate(
                 1,

@@ -34,7 +34,10 @@ or mathematical validation.
 The retained budget commitment and configured work must match the scenario's
 recorded search budget. Required nested identities, provenance text, evidence
 statuses and recorded counts are checked before persistence; missing or malformed
-fields return `400 INVALID_DOSSIER`. This contract check does not supply any of
+fields return `400 INVALID_DOSSIER`. An unsupported `Content-Type` on dossier
+imports also returns `400 INVALID_DOSSIER`; duplicate-run POSTs return
+`400 INVALID_RUN_CHANGE`. Both reject before retaining state rather than
+reporting an unrelated run-workspace error. This contract check does not supply any of
 the proof or guard evidence that the source artifact does not retain.
 
 The dossier shows the selected retained state hash and expression together with:
@@ -166,7 +169,7 @@ The candidate dossier's **Ausgewähltes Vorkommen prüfen** controls keep the en
 
 For a frozen #663 transition the server resolves the retained parent, rule, application identity and successor. For a native candidate it additionally checks generation membership in its recorded path and the archived position. It matches the source formation inventory hash and independently applies the exact rule to the source. The radar uses the same occurrence and its real matching bindings. Reused expressions elsewhere in the tree cannot substitute for the selected occurrence. The receipt records the local before/after subtrees, whole roots, syntax and sharing metrics, historical assumptions, formation inventory and information boundary.
 
-**Beweisverpflichtung** builds a typed equality obligation with a source-binding hash and any required side conditions. Within the bounded polynomial fragment the installed polynomial backend executes it and retains its own translation, result and certificate references. The Workbench displays the backend's actual status. It keeps historical symbolic classification for the frozen trigonometric example and reports the scope of the current independent checker separately.
+**Beweisverpflichtung** builds a typed equality obligation with a source-binding hash and any required side conditions. Within the bounded polynomial fragment the installed polynomial backend executes it and retains its own translation, result and certificate references. For a rewrite such as `sin(x) + 0 → sin(x)` the obligation remains open. The Workbench explains that the polynomial checker cannot handle the expression, and the reopened receipt keeps the exact obligation and candidate ID. The historical symbolic classification for the frozen trigonometric example remains visible separately.
 
 **Zusätzlichen Annahmekontext untersuchen** compares a typed guard against entered predicates, for example `x != 0` and `x = 0`. Two attributed evaluators independently look for an identical predicate and its exact logical complement on the same operands. A conflict stores both witnesses and resolves to UNKNOWN. Each result is written in text. Extra premises affect only this review and cannot certify the original rewrite or change its typed equality obligation.
 

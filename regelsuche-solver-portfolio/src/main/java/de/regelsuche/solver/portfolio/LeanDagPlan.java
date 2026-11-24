@@ -34,7 +34,11 @@ record LeanDagPlan(ScopedProofDag dag) implements LeanProofPlan {
             case UNFOLD -> "(by dsimp only [" + local(scope,node.operand()) + "] at * <;> exact " + children.getFirst() + ")";
             case REWRITE -> "(" + children.getFirst() + " ▸ " + children.getLast() + ")";
             case PAIR -> "(And.intro " + children.getFirst() + " " + children.getLast() + ")";
+            case AND_LEFT -> "(And.left " + children.getFirst() + ")";
+            case AND_RIGHT -> "(And.right " + children.getFirst() + ")";
             case WITNESS -> "(Exists.intro " + children.getFirst() + " " + children.getLast() + ")";
+            case EXISTS_ELIM -> "(Exists.elim " + children.getFirst() + " (fun " + next + " l"
+                + (scope.size() + 1) + " => " + children.getLast() + "))";
             case CASES -> "(Or.elim " + children.getFirst() + " (fun " + next + " => " + children.get(1)
                 + ") (fun " + next + " => " + children.get(2) + "))";
             case BY_CONTRADICTION -> "(Classical.byContradiction (fun " + next + " => " + children.getFirst() + " " + children.getLast() + "))";

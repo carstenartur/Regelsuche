@@ -50,7 +50,13 @@
             if (!data.guards.length) add(parent, 'p', 'Die angewandte Regel deklariert an diesem Vorkommen keine Voraussetzungen.');
             guards(parent, data.guards);
         } else if (role === 'PROOF_OBLIGATIONS') {
-            add(parent, 'p', 'Gleichheitsprüfung · ' + data.verificationStatus);
+            const verification = add(parent, 'p', 'Gleichheitsprüfung · ' + data.verificationStatus);
+            verification.dataset.verificationStatus = data.verificationStatus;
+            if (data.verificationStatus === 'OUTSIDE_BOUNDED_POLYNOMIAL_FRAGMENT') {
+                add(parent, 'p', 'Der Polynomprüfer unterstützt diesen Ausdruck nicht. Die gebundene Gleichheitsverpflichtung bleibt offen.');
+            } else if (data.verificationStatus === 'UNSUPPORTED_TYPED_OBLIGATION') {
+                add(parent, 'p', 'Für diesen Schritt konnte keine typisierte Gleichheitsverpflichtung erstellt werden.');
+            }
             if (data.obligation) add(parent, 'p', 'Verpflichtung ' + data.obligation.contentHash + ' · Annahmen '
                 + (data.obligationAssumptions.join(', ') || 'keine'));
             if (data.verification) add(parent, 'p', 'Backend ' + data.verification.backendId + ' · ' + data.verification.resultHash);

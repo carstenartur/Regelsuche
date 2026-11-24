@@ -75,13 +75,15 @@ historical test corpus is changed.
 
 ## Maven-owned standard Web Workbench image verification
 
-The hosted verification workflow now invokes the existing full Maven product
-authority unchanged, then runs a dedicated checkout-owned Maven/JUnit authority:
+Hosted verification runs the Web Workbench image suite in the full Maven
+checkout reactor.
 
 ```sh
-mvn --batch-mode --no-transfer-progress -Pfull,web-workbench-image \
-  -pl regelsuche-integration-tests -am verify
+mvn --batch-mode --no-transfer-progress -Pfull,sdk-release,web-workbench-image verify
 ```
+
+For a focused local run, use `-Pfull,web-workbench-image -pl
+regelsuche-integration-tests -am verify`.
 
 The opt-in Maven Failsafe profile compiles and executes the **existing**
 `WebWorkbenchDockerImageTest` with Testcontainers. It builds the final
@@ -90,8 +92,10 @@ Testcontainers-managed random host port, waits for HTTP readiness and checks
 HTML, JavaScript, styles, bundled vendor assets, the OpenAPI reference,
 path-traversal rejection and both discovery API response structures.
 `DockerAvailabilityIT` requires an actual reachable daemon, so an absent
-Docker engine does not silently count as an image acceptance. This preserves
-the repository's workflow-semantics contract: no manual `docker build`,
+Docker engine does not silently count as an image acceptance. CI also checks
+that the report captured from the full checkout reactor contains executed image
+tests with zero failures, errors and skips. This preserves the repository's
+workflow-semantics contract: no manual `docker build`,
 `docker run`, port binding or inline Python assertions in GitHub Actions.
 
 The image suite is **explicitly checkout-only** because its current
