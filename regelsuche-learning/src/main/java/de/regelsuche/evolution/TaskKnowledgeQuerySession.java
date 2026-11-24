@@ -63,6 +63,16 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
             return expression instanceof BinaryExpr binary ? binary.operator() : null;
         }
     }
+    private record Lookup(Entry previous, RenamedTaskPath.Shape shape, RenamingProfile profile, Boolean profileDecision) {
+        RetainedGraph.View path() { return previous == null ? null : previous.path(); }
+    }
+    /** Keep the selected key and completed charges available even when a stage throws. */
+    private static final class QueryProgress {
+        private Key key;
+        private long completedWork;
+
+        void addWork(long units) { completedWork = Math.addExact(completedWork, units); }
+    }
     private final CumulativeTaskKnowledge knowledge;
     private final int maximumQueries;
     private final long maximumCharacters;
@@ -98,99 +108,123 @@ public final class TaskKnowledgeQuerySession implements AutoCloseable {
         Objects.requireNonNull(task); Objects.requireNonNull(strategy);
         if (Thread.currentThread().isInterrupted()) throw new CancellationException("query interrupted before execution");
         queries = Math.addExact(queries, 1);
-        long completedWork = 0;
-        Key key = null;
+        var progress = new QueryProgress();
         try {
-            if (!cacheable(task)) {
-                bypasses = Math.addExact(bypasses, 1);
-                var execution = knowledge.solve(task, strategy);
-                completedWork = execution.totalWork();
-                complete &= accounted(execution);
-                checkInterrupted();
-                knownWork = Math.addExact(knownWork, completedWork);
-                return new Query(execution, false, 0, 0);
-            }
-            completedWork = 1;
-            key = Key.of(task, strategy, null);
-            var previous = retained.get(key);
-            RenamedTaskPath.Shape shape = null;
-            RenamingProfile requestProfile = null;
-            Boolean profileDecision = null;
-            if (previous == null && variableRenaming && task.assumptions().isEmpty()
-                    && task.goal().objective() == NativeNodeCountObjective.INSTANCE && task.source() instanceof BinaryExpr binary) {
-                requestProfile = RenamingProfile.of(binary, task, strategy);
-                profileDecision = renamingProfiles.get(requestProfile);
-                completedWork = Math.addExact(completedWork, 4); // Three root inspections and one profile lookup.
-                if (Boolean.TRUE.equals(profileDecision)) {
-                    var work = new CheckedSchemaSupport.Work();
-                    shape = RenamedTaskPath.Shape.of(task.source(), work);
-                    completedWork = Math.addExact(completedWork, work.units);
-                    if (shape != null) {
-                        key = Key.of(task, strategy, shape);
-                        previous = retained.get(key);
-                        completedWork = Math.addExact(completedWork, 1);
-                    }
-                }
-            }
-            var path = previous == null ? null : previous.path();
-            boolean reused;
-            CumulativeTaskKnowledge.Execution execution;
-            if (path instanceof RenamedTaskPath renamed) {
-                var work = new CheckedSchemaSupport.Work();
-                var bound = renamed.bind(shape, work);
-                completedWork = Math.addExact(completedWork, work.units);
-                var searched = knowledge.solveRenamedInSession(task, strategy, completedWork, bound);
-                execution = searched.execution();
-                reused = searched.reused();
-            } else if (path instanceof CompactTaskPath compact) {
-                var searched = knowledge.solveRenamedInSession(task, strategy, completedWork, compact);
-                execution = searched.execution();
-                reused = searched.reused();
-            } else {
-                reused = path != null;
-                execution = knowledge.solveInSession(task, strategy, completedWork, (RetainedTaskPath) path);
-            }
+            if (!cacheable(task)) return solveWithoutRetention(task, strategy, progress);
+            var lookup = lookup(task, strategy, progress);
+            var attempt = attempt(task, strategy, lookup, progress);
+            boolean reused = attempt.reused();
             if (reused) hits = Math.addExact(hits, 1); else misses = Math.addExact(misses, 1);
-            long lookupWork = completedWork;
-            completedWork = execution.totalWork();
-            complete &= accounted(execution);
-            checkInterrupted();
-            long retentionWork = 0;
-            if (requestProfile != null && profileDecision == null) {
-                boolean promising = execution.solution().filter(CheckedSchemaTaskSolver.Solution::solved)
-                    .map(solution -> promisingRenaming(solution.evidence())).orElse(false);
-                if (promising) {
-                    var work = new CheckedSchemaSupport.Work();
-                    shape = RenamedTaskPath.Shape.of(task.source(), work);
-                    retentionWork = work.units;
-                    if (shape != null) key = Key.of(task, strategy, shape);
-                }
-                retentionWork = Math.addExact(retentionWork, rememberProfile(requestProfile, shape != null));
-                completedWork = Math.addExact(completedWork, retentionWork);
-            }
-            if (path instanceof RenamedTaskPath && (!reused || completedWork >= previous.renaming().ordinaryWork())) {
-                long work = Math.addExact(declineRenaming(key, previous), rememberProfile(requestProfile, false));
-                retentionWork = Math.addExact(retentionWork, work);
-                completedWork = Math.addExact(completedWork, work);
-            } else if (!reused && execution.solved() && !execution.solution().orElseThrow().evidence().witness().isEmpty()) {
-                long work = previous == null ? observe(key, execution, retentionWork) : prepare(key, shape, previous, lookupWork, execution);
-                retentionWork = Math.addExact(retentionWork, work);
-                completedWork = Math.addExact(completedWork, work);
-                checkInterrupted();
-            } else if (previous != null && !execution.solved() && (previous.renaming() == null || !previous.renaming().declined())) {
-                discard(retained.remove(key));
-                retentionWork = 1; completedWork = Math.addExact(completedWork, 1);
-            }
-            knownWork = Math.addExact(knownWork, completedWork);
-            return new Query(execution, reused, lookupWork, retentionWork);
+            long lookupWork = progress.completedWork;
+            recordExecution(attempt.execution(), progress);
+            long retentionWork = updateRetention(strategy, lookup, attempt, lookupWork, progress);
+            knownWork = Math.addExact(knownWork, progress.completedWork);
+            return new Query(attempt.execution(), reused, lookupWork, retentionWork);
         } catch (RuntimeException failure) {
-            if (key != null && retained.containsKey(key)) {
-                discard(retained.remove(key)); completedWork = Math.addExact(completedWork, 1);
+            if (progress.key != null && retained.containsKey(progress.key)) {
+                discard(retained.remove(progress.key));
+                progress.addWork(1);
             }
             failures = Math.addExact(failures, 1);
-            knownWork = Math.addExact(knownWork, completedWork);
-            throw new QueryFailure(completedWork, failure);
+            knownWork = Math.addExact(knownWork, progress.completedWork);
+            throw new QueryFailure(progress.completedWork, failure);
         }
+    }
+
+    private Query solveWithoutRetention(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy,
+            QueryProgress progress) {
+        bypasses = Math.addExact(bypasses, 1);
+        var execution = knowledge.solve(task, strategy);
+        recordExecution(execution, progress);
+        knownWork = Math.addExact(knownWork, progress.completedWork);
+        return new Query(execution, false, 0, 0);
+    }
+
+    private Lookup lookup(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy, QueryProgress progress) {
+        progress.completedWork = 1;
+        progress.key = Key.of(task, strategy, null);
+        var previous = retained.get(progress.key);
+        if (previous != null || !variableRenaming || !task.assumptions().isEmpty()
+                || task.goal().objective() != NativeNodeCountObjective.INSTANCE || !(task.source() instanceof BinaryExpr binary)) {
+            return new Lookup(previous, null, null, null);
+        }
+        var profile = RenamingProfile.of(binary, task, strategy);
+        var decision = renamingProfiles.get(profile);
+        progress.addWork(4); // Three root inspections and one profile lookup.
+        if (!Boolean.TRUE.equals(decision)) return new Lookup(previous, null, profile, decision);
+
+        var work = new CheckedSchemaSupport.Work();
+        var shape = RenamedTaskPath.Shape.of(task.source(), work);
+        progress.addWork(work.units);
+        if (shape != null) {
+            progress.key = Key.of(task, strategy, shape);
+            previous = retained.get(progress.key);
+            progress.addWork(1);
+        }
+        return new Lookup(previous, shape, profile, decision);
+    }
+
+    private CumulativeTaskKnowledge.SessionExecution attempt(CheckedSchemaTaskSolver.Task task,
+            CumulativeTaskKnowledge.Strategy strategy, Lookup lookup, QueryProgress progress) {
+        var path = lookup.path();
+        if (path instanceof RenamedTaskPath renamed) {
+            var work = new CheckedSchemaSupport.Work();
+            var bound = renamed.bind(lookup.shape(), work);
+            progress.addWork(work.units);
+            return knowledge.solveRenamedInSession(task, strategy, progress.completedWork, bound);
+        }
+        if (path instanceof CompactTaskPath compact) {
+            return knowledge.solveRenamedInSession(task, strategy, progress.completedWork, compact);
+        }
+        var execution = knowledge.solveInSession(task, strategy, progress.completedWork, (RetainedTaskPath) path);
+        return new CumulativeTaskKnowledge.SessionExecution(execution, path != null);
+    }
+
+    private void recordExecution(CumulativeTaskKnowledge.Execution execution, QueryProgress progress) {
+        progress.completedWork = execution.totalWork();
+        complete &= accounted(execution);
+        checkInterrupted();
+    }
+
+    private long updateRetention(CumulativeTaskKnowledge.Strategy strategy, Lookup lookup,
+            CumulativeTaskKnowledge.SessionExecution attempt, long lookupWork, QueryProgress progress) {
+        var execution = attempt.execution();
+        var previous = lookup.previous();
+        var shape = lookup.shape();
+        long retentionWork = 0;
+        if (lookup.profile() != null && lookup.profileDecision() == null) {
+            var work = new CheckedSchemaSupport.Work();
+            shape = observeProfile(strategy, execution, work, progress);
+            retentionWork = Math.addExact(work.units, rememberProfile(lookup.profile(), shape != null));
+            progress.addWork(retentionWork);
+        }
+        if (lookup.path() instanceof RenamedTaskPath && (!attempt.reused() || progress.completedWork >= previous.renaming().ordinaryWork())) {
+            long work = Math.addExact(declineRenaming(progress.key, previous), rememberProfile(lookup.profile(), false));
+            retentionWork = Math.addExact(retentionWork, work);
+            progress.addWork(work);
+        } else if (!attempt.reused() && execution.solved() && !execution.solution().orElseThrow().evidence().witness().isEmpty()) {
+            long work = previous == null ? observe(progress.key, execution, retentionWork)
+                : prepare(progress.key, shape, previous, lookupWork, execution);
+            retentionWork = Math.addExact(retentionWork, work);
+            progress.addWork(work);
+            checkInterrupted();
+        } else if (previous != null && !execution.solved() && (previous.renaming() == null || !previous.renaming().declined())) {
+            discard(retained.remove(progress.key));
+            retentionWork = 1;
+            progress.addWork(1);
+        }
+        return retentionWork;
+    }
+
+    private RenamedTaskPath.Shape observeProfile(CumulativeTaskKnowledge.Strategy strategy,
+            CumulativeTaskKnowledge.Execution execution, CheckedSchemaSupport.Work work, QueryProgress progress) {
+        boolean promising = execution.solution().filter(CheckedSchemaTaskSolver.Solution::solved)
+            .map(solution -> promisingRenaming(solution.evidence())).orElse(false);
+        if (!promising) return null;
+        var task = execution.task();
+        var shape = RenamedTaskPath.Shape.of(task.source(), work);
+        if (shape != null) progress.key = Key.of(task, strategy, shape);
+        return shape;
     }
 
     private static boolean accounted(CumulativeTaskKnowledge.Execution execution) {

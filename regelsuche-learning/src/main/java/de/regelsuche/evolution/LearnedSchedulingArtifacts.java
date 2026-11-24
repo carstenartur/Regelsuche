@@ -171,43 +171,60 @@ public final class LearnedSchedulingArtifacts {
     }
 
     private static void writeValue(JsonGenerator writer, Object value) throws IOException, ReflectiveOperationException {
-        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
-            writer.writeObject(value);
-        } else if (value instanceof Enum<?> enumeration) {
-            writer.writeString(enumeration.name());
-        } else if (value instanceof de.regelsuche.transform.ExactTheoryEvidence evidence) {
-            writer.writeStartObject();
-            writer.writeFieldName("binding");
-            writeValue(writer, evidence.binding());
-            writer.writeEndObject();
-        } else if (value instanceof Map<?, ?> map) {
-            writer.writeStartObject();
-            for (String key : map.keySet().stream().map(String.class::cast).sorted().toList()) {
-                writer.writeFieldName(key);
-                writeValue(writer, map.get(key));
+        switch (value) {
+            case null -> writer.writeNull();
+            case String string -> writer.writeString(string);
+            case Number number -> writer.writeObject(number);
+            case Boolean flag -> writer.writeBoolean(flag);
+            case Enum<?> enumeration -> writer.writeString(enumeration.name());
+            case de.regelsuche.transform.ExactTheoryEvidence evidence -> {
+                writer.writeStartObject();
+                writer.writeFieldName("binding");
+                writeValue(writer, evidence.binding());
+                writer.writeEndObject();
             }
-            writer.writeEndObject();
-        } else if (value instanceof Set<?> set) {
-            writer.writeStartArray();
-            var elements = set.stream().map(LearnedSchedulingArtifacts::json).sorted().toList();
-            for (String element : elements) writer.writeRawValue(element);
-            writer.writeEndArray();
-        } else if (value instanceof Collection<?> collection) {
-            writer.writeStartArray();
-            for (Object element : collection) writeValue(writer, element);
-            writer.writeEndArray();
-        } else if (value.getClass().isRecord()) {
-            writer.writeStartObject();
-            for (RecordComponent component : COMPONENTS.get(value.getClass())) {
-                Object part = component.getAccessor().invoke(value);
-                if (value instanceof de.regelsuche.search.moves.IncrementalProviderContract.Work
-                        && component.getName().equals("prepaidApplications") && part == null) continue;
-                writer.writeFieldName(component.getName());
-                writeValue(writer, part);
-            }
-            writer.writeEndObject();
-        } else {
+            case Map<?, ?> map -> writeMap(writer, map);
+            case Set<?> set -> writeSet(writer, set);
+            case Collection<?> collection -> writeCollection(writer, collection);
+            default -> writeRecord(writer, value);
+        }
+    }
+
+    private static void writeMap(JsonGenerator writer, Map<?, ?> map) throws IOException, ReflectiveOperationException {
+        writer.writeStartObject();
+        for (String key : map.keySet().stream().map(String.class::cast).sorted().toList()) {
+            writer.writeFieldName(key);
+            writeValue(writer, map.get(key));
+        }
+        writer.writeEndObject();
+    }
+
+    private static void writeSet(JsonGenerator writer, Set<?> set) throws IOException {
+        writer.writeStartArray();
+        var elements = set.stream().map(LearnedSchedulingArtifacts::json).sorted().toList();
+        for (String element : elements) writer.writeRawValue(element);
+        writer.writeEndArray();
+    }
+
+    private static void writeCollection(JsonGenerator writer, Collection<?> collection)
+            throws IOException, ReflectiveOperationException {
+        writer.writeStartArray();
+        for (Object element : collection) writeValue(writer, element);
+        writer.writeEndArray();
+    }
+
+    private static void writeRecord(JsonGenerator writer, Object value) throws IOException, ReflectiveOperationException {
+        if (!value.getClass().isRecord()) {
             throw new IllegalArgumentException("unsupported evidence value: " + value.getClass());
         }
+        writer.writeStartObject();
+        for (RecordComponent component : COMPONENTS.get(value.getClass())) {
+            Object part = component.getAccessor().invoke(value);
+            if (value instanceof IncrementalProviderContract.Work
+                    && component.getName().equals("prepaidApplications") && part == null) continue;
+            writer.writeFieldName(component.getName());
+            writeValue(writer, part);
+        }
+        writer.writeEndObject();
     }
 }

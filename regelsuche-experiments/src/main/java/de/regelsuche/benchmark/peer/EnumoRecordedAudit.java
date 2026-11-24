@@ -37,31 +37,23 @@ public final class EnumoRecordedAudit {
     }
 
     static int verify(Path checkout, JsonNode report, byte[] raw, byte[] rules) throws Exception {
-        String schema = report.path("schema").asText();
-        boolean rootHorner = schema.equals(EnumoPublicComparison.ROOT_ROSA) || schema.equals(EnumoPublicComparison.ROOT_TRANSFER);
-        boolean transfer = schema.equals(EnumoPublicComparison.HORNER_TRANSFER) || schema.equals(EnumoPublicComparison.ROOT_TRANSFER);
-        boolean horner = rootHorner || transfer || schema.equals(EnumoPublicComparison.HORNER_V2);
-        require(horner || schema.equals(EnumoPublicComparison.V1), "report schema");
-        String protocolHash = rootHorner ? EnumoPublicComparison.ROOT_PROTOCOL_SHA
-            : transfer ? EnumoPublicComparison.TRANSFER_PROTOCOL_SHA
-            : horner ? EnumoPublicComparison.HORNER_PROTOCOL_SHA : EnumoPublicComparison.PROTOCOL_SHA;
-        String corpusHash = transfer ? EnumoPublicComparison.TRANSFER_CORPUS_SHA : EnumoPublicComparison.CORPUS_SHA;
+        var panel = EnumoPublicComparison.Panel.fromSchema(report.path("schema").asText());
         require(report.path("semantics").asText().equals("EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE"), "semantics changed");
-        require(report.path("corpusSha256").asText().equals(corpusHash), "corpus binding");
-        require(report.path("protocolSha256").asText().equals(protocolHash), "protocol binding");
+        require(report.path("corpusSha256").asText().equals(panel.corpusHash()), "corpus binding");
+        require(report.path("protocolSha256").asText().equals(panel.protocolHash), "protocol binding");
         require(hash(raw).equals(report.path("rawResponsesSha256").asText()), "raw response hash");
         require(hash(rules).equals(report.path("acquiredRulesSha256").asText()), "acquired rule hash");
-        verifyProvenance(checkout, report, rules, horner, rootHorner);
-        var entries = EnumoPublicComparison.inventory(checkout, horner, transfer, rootHorner);
+        verifyProvenance(checkout, report, rules, panel);
+        var entries = EnumoPublicComparison.inventory(checkout, panel);
         require(JSON.valueToTree(entries).equals(report.path("inventory")), "foreign inventory binding");
-        var profiles = EnumoPublicComparison.profiles(horner, rootHorner).stream().map(Enum::name).toList();
-        require(report.path("rows").isArray() && report.path("rows").size() == 3 * entries.size() * profiles.size(),
+        var profiles = panel.profiles().stream().map(Enum::name).toList();
+        require(report.path("rows").isArray() && report.path("rows").size() == EnumoPublicComparison.REPETITIONS * entries.size() * profiles.size(),
             "complete comparison matrix");
         Map<String, JsonNode> responses = responses(raw);
         Map<String, JsonNode> setups = verifySetups(report.path("setups"), report.path("acquisition"), profiles);
         var seen = new HashSet<String>();
         int index = 0, verified = 0;
-        for (int repetition = 1; repetition <= 3; repetition++) for (String profile : profiles) {
+        for (int repetition = 1; repetition <= EnumoPublicComparison.REPETITIONS; repetition++) for (String profile : profiles) {
             boolean workerUnavailable = false;
             for (var entry : entries) {
                 JsonNode row = report.path("rows").get(index++);
@@ -242,15 +234,15 @@ public final class EnumoRecordedAudit {
         return complete;
     }
 
-    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules, boolean horner, boolean rootHorner) throws Exception {
+    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules, EnumoPublicComparison.Panel panel) throws Exception {
         JsonNode acquisition = report.path("acquisition");
         long ruleCount = new String(rules, StandardCharsets.UTF_8).lines().filter(line -> !line.isBlank()).count();
         require(acquisition.path("status").asText().equals("ACQUIRED") && ruleCount > 0
             && acquisition.path("rules").asLong() == ruleCount, "actual acquisition receipt");
         require(acquisition.path("recipe").asText().equals("original::rational_best::best_enumo_recipe")
             && nonnegative(acquisition, "acquisitionNanos") > 0, "original acquisition identity");
-        Path artifacts = checkout.resolve(horner ? EnumoPublicComparison.HORNER_ARTIFACTS : "research/benchmarks/enumo-public-v1");
-        JsonNode provenance = JSON.readTree(Files.readString(artifacts.resolve(rootHorner ? "root-provenance.json" : "provenance.json")));
+        Path artifacts = checkout.resolve(panel.hasHorner() ? EnumoPublicComparison.HORNER_ARTIFACTS : "research/benchmarks/enumo-public-v1");
+        JsonNode provenance = JSON.readTree(Files.readString(artifacts.resolve(panel.hasRootHorner() ? "root-provenance.json" : "provenance.json")));
         require(report.path("enumoBinarySha256").asText().matches("[a-f0-9]{64}")
             && report.path("enumoBinarySha256").equals(provenance.path("upstream").path("binarySha256")), "original executable binding");
         require(report.path("nativeWorkerClassSha256").asText().matches("[a-f0-9]{64}")
@@ -273,13 +265,13 @@ public final class EnumoRecordedAudit {
     }
 
     private static Map<String, JsonNode> verifySetups(JsonNode setups, JsonNode acquisition, List<String> profiles) throws Exception {
-        require(setups.isArray() && setups.size() == 3 * profiles.size(), "complete setup inventory");
+        require(setups.isArray() && setups.size() == EnumoPublicComparison.REPETITIONS * profiles.size(), "complete setup inventory");
         var identities = new HashMap<String, JsonNode>();
         for (JsonNode setup : setups) {
             String profile = setup.path("profile").asText();
             int repetition = setup.path("repetition").asInt();
             JsonNode initialized = setup.path("initialization");
-            require(profiles.contains(profile) && repetition >= 1 && repetition <= 3
+            require(profiles.contains(profile) && repetition >= 1 && repetition <= EnumoPublicComparison.REPETITIONS
                 && identities.putIfAbsent(profile + ":" + repetition, initialized) == null, "setup identity");
             long elapsed = setup.path("startupAndInitializationNanos").asLong(-1);
             require(elapsed > 0 && elapsed <= 60_000_000_000L, "startup and initialization budget");
