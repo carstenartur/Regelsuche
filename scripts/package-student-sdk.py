@@ -7,11 +7,47 @@ from pathlib import Path
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+from xml.dom import minidom
 from student_sdk_source import current_sdk_consumer_files
 
 EXAMPLES = ('hello-rule-java25', 'geometric-sequence-domain-java25',
             'finite-difference-domain-java25', 'solver-adapter-java25', 'number-theory-plan-java25',
-            'extension-runtime-java25', 'java-optimization-java25')
+            'extension-runtime-java25', 'java-optimization-java25', 'checked-math-java25')
+
+
+def stage_consumer_pom(source, version):
+    """Compatibility producer for the same archive-owned Maven coordinates."""
+    data = source.read_bytes()
+    if b'<!DOCTYPE' in data:
+        raise ValueError('consumer Maven project must not declare a DTD')
+    document = minidom.parseString(data)
+    root = document.documentElement
+    namespace = 'http://maven.apache.org/POM/4.0.0'
+    if root.localName != 'project' or root.namespaceURI != namespace:
+        raise ValueError('invalid consumer Maven project')
+
+    def child(parent, name):
+        found = [node for node in parent.childNodes
+                 if node.nodeType == node.ELEMENT_NODE and node.localName == name
+                 and node.namespaceURI == namespace]
+        if len(found) != 1:
+            raise ValueError(f'expected one consumer POM element: {name}')
+        return found[0]
+
+    def value(element, text):
+        for node in list(element.childNodes):
+            element.removeChild(node)
+        element.appendChild(document.createTextNode(text))
+
+    properties = child(root, 'properties')
+    value(child(properties, 'regelsuche.groupId'), 'io.github.carstenartur')
+    value(child(properties, 'regelsuche.version'), version)
+    value(child(properties, 'regelsuche.repository'), 'file://${project.basedir}/../../../repository')
+    repository = child(child(root, 'repositories'), 'repository')
+    if child(repository, 'id').firstChild.data != 'regelsuche-sdk':
+        raise ValueError('consumer must declare its SDK repository')
+    value(child(child(repository, 'snapshots'), 'enabled'), str(version.endswith('-SNAPSHOT')).lower())
+    return (root.toxml() + '\n').encode('utf-8')
 
 
 def single(directory, pattern):
@@ -111,11 +147,16 @@ def package(root, repository, version, output):
                 raise ValueError('SDK examples must not contain symbolic links')
             if file.is_file():
                 data = file.read_bytes()
+                if file.name == 'pom.xml':
+                    data = stage_consumer_pom(file, version)
                 if file.suffix in ('.gradle', '.md') and example != 'number-theory-plan-java25':
                     data = data.replace(b'0.5.0-SNAPSHOT', version.encode()).replace(b'0.4.0-SNAPSHOT', version.encode())
                 members[relative.as_posix()] = data
     members['README.md'] = (f'# Regelsuche Java SDK {version}\n\n'
-        'Start with [the 15-minute quickstart](docs/java-sdk-quickstart.md).\n\n'
+        'Run the [six checked calculations](examples/external-consumers/checked-math-java25/README.md) with Java 25 and Maven 3.9.9+:\n\n'
+        '```sh\nmvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify\n```\n\n'
+        "The bundled Maven projects use this archive's SDK version without overrides.\n"
+        'The [SDK guide](docs/java-sdk-quickstart.md) also documents the published Central release and historical archives.\n\n'
         'Use the `repository` directory as a Maven repository; `sdk-compatibility.json`\n'
         'records coordinates, API revisions and artifact hashes. Each public module has\n'
         'sources and Javadoc JARs; browse `javadoc/<module>/index.html` locally.\n').encode()

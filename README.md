@@ -482,14 +482,18 @@ allgemeinen Aussage über unendliche Folgen. Das vollständige Beispiel testet
 auch `REFUTED`, `BUDGET_EXHAUSTED` und das Laden über `ServiceLoader`.
 
 [Java Discovery SDK](docs/java-discovery-sdk.md) erklärt Builder, Budgets,
-Assertions und Provider-SPI. Das **SDK 0.5.2 ist veröffentlicht**:
-[GitHub Release vom 7. November 2026](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2).
-Der bevorzugte externe Weg verwendet das SDK-ZIP als Maven-Repository und das
-[ausführbare Maven-Beispiel](examples/external-consumers/hello-rule-java25/).
+Assertions und Provider-SPI. Das **SDK 0.5.3 ist auf Maven Central veröffentlicht**:
+[GitHub Release vom 17. November 2026](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.3).
+Der [Java-Quickstart](docs/java-sdk-quickstart.md) führt über das vollständige
+[Maven-Beispiel](examples/external-consumers/hello-rule-java25/) zum ersten
+geprüften Ergebnis. Seine Standardkonfiguration verwendet den Namespace
+`io.github.carstenartur`; Java-Importe bleiben unter `de.regelsuche`.
 Die API-Revisionen und Grenzen stehen im [API-Vertrag](docs/java-sdk-api-policy.md).
-`main` ist `0.5.3-SNAPSHOT`; spätere API-Ergänzungen und dieses neue Consumer-POM
-sind nicht rückwirkend Inhalt des 0.5.2-Archivs. Eine Veröffentlichung auf Maven
-Central wird nicht behauptet.
+`main` entwickelt `0.5.4-SNAPSHOT`. Die [Verfügbarkeitsmatrix](docs/mathematical-capabilities.md)
+trennt veröffentlichte APIs von neueren Quellfunktionen. Für sechs neue Verfahren
+gibt es einen [eigenständigen Maven-Consumer](examples/external-consumers/checked-math-java25/)
+mit vollständigem Build- und Ausführungspfad. Seine APIs benötigen den Quellbuild
+oder ein späteres SDK-Archiv, das dieses Beispiel enthält.
 
 ### Zusammenspiel mit Sandbox
 

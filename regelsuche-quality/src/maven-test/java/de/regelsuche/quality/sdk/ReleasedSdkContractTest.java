@@ -139,6 +139,29 @@ class ReleasedSdkContractTest {
         assertThrows(Exception.class, () -> ReleasedSdkChecks.closure(graph, deps, repository, Set.of("regelsuche-core")));
     }
 
+    @Test void centralClosureRejectsChangedBytesNamespaceAndVersion() throws Exception {
+        Path dependencies = Files.createDirectory(tmp.resolve("central-dependencies"));
+        Path jar = Files.writeString(dependencies.resolve("regelsuche-core-0.5.3.jar"), "published bytes");
+        var receipt = java.util.Map.of("regelsuche-core", ReleasedSdkArchive.digest(jar));
+        String valid = "1 example:hello-rule:jar:1.0.0\n2 io.github.carstenartur:regelsuche-core:jar:0.5.3:compile\n#\n1 2\n";
+        Path graph = Files.writeString(tmp.resolve("central.tgf"), valid);
+        assertEquals(Set.of("regelsuche-core"), ReleasedSdkChecks.closure(graph, dependencies,
+            "io.github.carstenartur", "0.5.3", receipt).get("regelsucheModules"));
+        for (String changed : List.of(valid.replace("io.github.carstenartur", "de.regelsuche"),
+                valid.replace("0.5.3", "0.5.4"))) {
+            Files.writeString(graph, changed);
+            assertThrows(IOException.class, () -> ReleasedSdkChecks.closure(graph, dependencies,
+                "io.github.carstenartur", "0.5.3", receipt));
+        }
+        Files.writeString(graph, valid);
+        Files.writeString(jar, "substituted bytes");
+        assertThrows(IOException.class, () -> ReleasedSdkChecks.closure(graph, dependencies,
+            "io.github.carstenartur", "0.5.3", receipt));
+        Files.delete(jar);
+        assertThrows(IOException.class, () -> ReleasedSdkChecks.closure(graph, dependencies,
+            "io.github.carstenartur", "0.5.3", receipt));
+    }
+
     @Test void copiedConsumerInputsExcludeGeneratedOutputsAndRejectLinks() throws Exception {
         Path source = Files.createDirectory(tmp.resolve("input"));
         Files.writeString(source.resolve("pom.xml"), "input");

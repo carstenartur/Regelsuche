@@ -19,6 +19,73 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 class MavenStudentSdkArchiveTest {
+    @Test void archiveCarriesTheCompleteCheckedMathConsumer(@TempDir Path temp) throws Exception {
+        Path root = MavenPomTestSupport.repositoryRoot();
+        Path archive = temp.resolve("sdk.zip");
+        StudentSdkArchive.create(root, fixture(root, temp, "0.5.4"), "0.5.4", archive);
+        try (var zip = ZipFile.builder().setPath(archive).get()) {
+            String consumer = "regelsuche-sdk-0.5.4/examples/external-consumers/checked-math-java25/";
+            assertNotNull(zip.getEntry(consumer + "pom.xml"), "The delivered examples need their standalone build");
+            for (String name : List.of("FiniteConstraintCount", "EnergyCredits", "SosPotential", "BilinearSearch",
+                    "RationalMatrixFormula", "DynamicQuotient", "CheckedMathExamples")) {
+                assertNotNull(zip.getEntry(consumer + "src/main/java/example/" + name + ".java"),
+                    "Missing executable example: " + name);
+            }
+            assertNotNull(zip.getEntry(consumer + "src/test/java/example/CheckedMathExamplesTest.java"));
+        }
+    }
+
+    @Test void missingOrAlteredArtifactsCannotReachTheConsumerBuild(@TempDir Path temp) throws Exception {
+        Path root = MavenPomTestSupport.repositoryRoot();
+        Path archive = temp.resolve("sdk.zip");
+        StudentSdkArchive.create(root, fixture(root, temp, "0.5.4"), "0.5.4", archive);
+        String core = "regelsuche-sdk-0.5.4/repository/io/github/carstenartur/regelsuche-core/0.5.4/regelsuche-core-0.5.4.jar";
+        for (String mutation : List.of("missing", "altered")) {
+            var members = OptimizationSdkArchive.readZip(archive);
+            if (mutation.equals("missing")) members.remove(core);
+            else members.put(core, new byte[] {1, 2, 3});
+            Path corrupt = temp.resolve(mutation + ".zip");
+            OptimizationSdkArchive.writeZip(corrupt, members);
+            Path extracted = temp.resolve(mutation);
+            assertThrows(IOException.class, () -> StudentSdkMavenConsumers.extract(corrupt, "0.5.4", extracted));
+            assertFalse(Files.exists(extracted), "Invalid archive artifacts must fail before creating a consumer workspace");
+        }
+    }
+
+    @Test void archivedMavenConsumersUseTheArchiveVersionWithoutOverrides(@TempDir Path temp) throws Exception {
+        Path root = MavenPomTestSupport.repositoryRoot();
+        for (String version : List.of("0.5.4", "0.5.4-SNAPSHOT")) {
+            Path work = Files.createDirectory(temp.resolve(version));
+            Path repository = fixture(root, work, version);
+            Path archive = work.resolve("sdk.zip");
+            Path source = root.resolve("examples/external-consumers/hello-rule-java25/pom.xml");
+            byte[] original = Files.readAllBytes(source);
+            StudentSdkArchive.create(root, repository, version, archive);
+            try (var zip = ZipFile.builder().setPath(archive).get()) {
+                for (String consumer : List.of("hello-rule-java25", "extension-runtime-java25",
+                        "geometric-sequence-domain-java25", "checked-math-java25")) {
+                    String name = "regelsuche-sdk-" + version + "/examples/external-consumers/" + consumer + "/pom.xml";
+                    Path staged = work.resolve(consumer + ".pom");
+                    try (var input = zip.getInputStream(zip.getEntry(name))) {
+                        Files.copy(input, staged);
+                    }
+                    var pom = MavenPomTestSupport.parse(staged).getDocumentElement();
+                    var properties = MavenPomTestSupport.directChild(pom, "properties");
+                    assertEquals(version, MavenPomTestSupport.directChildText(properties, "regelsuche.version"),
+                        consumer + " must resolve the artifact shipped in its archive");
+                    assertEquals("io.github.carstenartur",
+                        MavenPomTestSupport.directChildText(properties, "regelsuche.groupId"));
+                    var repositories = MavenPomTestSupport.directChild(pom, "repositories");
+                    var local = MavenPomTestSupport.directChild(repositories, "repository");
+                    var snapshots = MavenPomTestSupport.directChild(local, "snapshots");
+                    assertEquals(Boolean.toString(version.endsWith("-SNAPSHOT")),
+                        MavenPomTestSupport.directChildText(snapshots, "enabled"));
+                }
+            }
+            assertArrayEquals(original, Files.readAllBytes(source), "Packaging must not change the source consumer pin");
+        }
+    }
+
     @Test
     @EnabledIfSystemProperty(named = "regelsuche.studentSdk.package", matches = "true")
     void packageConfiguredRepository() throws Exception {
@@ -30,7 +97,7 @@ class MavenStudentSdkArchiveTest {
 
     @Test
     @EnabledIfSystemProperty(named = "regelsuche.studentSdk.qualify", matches = "true")
-    void qualifyConfiguredArchive() throws Exception {
+    void qualifyConfiguredArchive(@TempDir Path scratch) throws Exception {
         Path root = MavenPomTestSupport.repositoryRoot();
         Path evidence = Path.of(System.getProperty("regelsuche.studentSdk.evidence"));
         var process = new ProcessBuilder("python3", "-B", "scripts/test_student_sdk_package.py",
@@ -48,6 +115,16 @@ class MavenStudentSdkArchiveTest {
         } finally {
             if (process.isAlive()) process.destroyForcibly();
         }
+        StudentSdkMavenConsumers.qualify(Path.of(System.getProperty("regelsuche.studentSdk.output")),
+            System.getProperty("regelsuche.studentSdk.version"), evidence, scratch);
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "regelsuche.studentSdk.qualifyMaven", matches = "true")
+    void qualifyConfiguredMavenConsumers(@TempDir Path scratch) throws Exception {
+        StudentSdkMavenConsumers.qualify(Path.of(System.getProperty("regelsuche.studentSdk.output")),
+            System.getProperty("regelsuche.studentSdk.version"),
+            Path.of(System.getProperty("regelsuche.studentSdk.evidence")), scratch);
     }
 
     @Test void stagesExactArtifactBytesAndReproducibleZipMetadata(@TempDir Path temp) throws Exception {

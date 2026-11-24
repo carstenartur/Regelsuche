@@ -1,3 +1,5 @@
+package example;
+
 import de.regelsuche.math.algorithms.polynomial.DynamicAlgebraEvaluation.Inverse;
 import de.regelsuche.math.algorithms.polynomial.DynamicAlgebraEvaluation.Literal;
 import de.regelsuche.math.algorithms.polynomial.DynamicAlgebraEvaluation.Request;

@@ -26,12 +26,17 @@ controls and recorded stopping conditions.
 | Study learned-rule reuse | [Autonomous discovery walkthrough](autonomous-discovery-walkthrough.md) and [research methodology](research-methodology.md) | Frozen inputs, candidate lineage, independent checking, controls and total costs |
 | Derive a numeric computation plan | [Optimization SDK](../regelsuche-optimization-sdk/README.md) and [finite sums and iterations](../regelsuche-optimization-sdk/FINITE_SERIES.md) | Typed numeric domain, checked plan, independent verifier and source-adapter obligations |
 
-For an independent Java integration, use the **[released SDK 0.5.2 ZIP and Maven
-quickstart](java-sdk-quickstart.md)**. The runnable example needs JDK 25 and
-Maven 3.9.9+ from the 3.x line; it does not need a Regelsuche source build,
-database or web server. Maven plugins and third-party dependencies still need
-Central access on the first run. The new consumer POM is maintained in source
-after 0.5.2 and consumes unchanged 0.5.2 binaries.
+For an independent Java integration, use the **[released SDK 0.5.3 on Maven
+Central and the complete Maven quickstart](java-sdk-quickstart.md)**. The runnable
+example needs JDK 25 and Maven 3.9.9+ from the 3.x line; it does not need a
+Regelsuche source build, database or web server. The current example POM imports
+`io.github.carstenartur:regelsuche-bom:0.5.3`. Maven resolves plugins and
+dependencies on the first run. The historical 0.5.2 archive recipe remains
+available in the same guide.
+
+To explore the newer source APIs, the [six checked mathematics examples](../examples/external-consumers/checked-math-java25/README.md)
+provide one Maven command after installing the source SDK, or directly from an
+SDK archive containing the examples. They do not run against the 0.5.3 binaries.
 
 ## What the evidence means
 
@@ -49,8 +54,8 @@ factorisation over integers/rationals, finite-field methods and a Gröbner engin
 for small rational ideals. It does not provide a universal CAS capability claim.
 [Architecture](architecture.md), [mathematical algorithms](mathematical-algorithms.md)
 and [capability status](generated/capability-status.md) state the supported scope.
-The source on `main` is `0.5.3-SNAPSHOT`; use the
-[0.5.2 source and release documentation](https://github.com/carstenartur/Regelsuche/tree/v0.5.2)
+The source on `main` is `0.5.4-SNAPSHOT`; use the
+[0.5.3 source and release documentation](https://github.com/carstenartur/Regelsuche/tree/v0.5.3)
 when consuming its binaries.
 
 Measured results apply to their named tasks and cost model. Public development

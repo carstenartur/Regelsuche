@@ -55,6 +55,15 @@ und die Reduktionszahlen der direkten und verschobenen Pläne.
 Die Workbench prüft die jeweilige Eingabe und blendet den Nachweis
 nach erfolgreicher Prüfung ein. [Galerie mit Bildschirmaufnahmen](demo-gallery.md#ein-lokales-hall-defizit-nachweisen)
 
+Für die sechs neueren Java-Rechenbeispiele bietet der
+[eigenständige Maven-Consumer](../examples/external-consumers/checked-math-java25/README.md)
+einen vollständigen Pfad ohne Workbench: Quell-SDK installieren, dann
+`mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify`
+ausführen. In einem SDK-Archiv mit diesem Consumer entfällt der Quellbuild.
+Der Lauf zeigt Constraint-Anzahlen, Energiekredite, ein SOS-Potential,
+bilineare Faltung, Matrixformeln und Quotientenkomponenten. Diese APIs sind
+noch nicht im veröffentlichten SDK 0.5.3 enthalten.
+
 ---
 
 ## 1. Lernen und Lehren — „Zeige mir einen nachvollziehbaren Schulweg“

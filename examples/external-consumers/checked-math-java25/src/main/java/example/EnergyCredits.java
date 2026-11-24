@@ -1,3 +1,5 @@
+package example;
+
 import de.regelsuche.math.algorithms.combinatorics.EnergyGame;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;

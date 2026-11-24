@@ -16,8 +16,71 @@ Download- und Installationszeiten werden separat erfasst.
 
 Die Regelsuche-BOM hat dieselbe Group-ID und Version. Für neue Maven-Projekte
 ist dies der Einstieg. Die [Verfügbarkeitsmatrix](mathematical-capabilities.md)
-trennt diesen Release von neueren Quellcode-APIs. Die folgenden Schritte
-beschreiben das archivierte SDK 0.5.2 samt dessen unveränderten Prüfsummen.
+trennt diesen Release von neueren Quellcode-APIs. Java-Importe verwenden weiter
+`de.regelsuche`.
+
+## Aktueller Weg: das vollständige Maven-Beispiel
+
+Kopiere das vollständige Verzeichnis
+[hello-rule-java25](../examples/external-consumers/hello-rule-java25/) an einen
+beliebigen Ort. Es enthält POM, Java-Code, JUnit-Tests und die erforderliche
+ServiceLoader-Registrierung. Mit JDK 25 im kopierten Verzeichnis:
+
+```bash
+mvn --batch-mode --no-transfer-progress clean package
+java -cp "target/classes:target/dependency/*" example.HelloRule
+```
+
+Unter Windows trennt `;` die beiden Classpath-Einträge. Der POM-Default importiert
+`io.github.carstenartur:regelsuche-bom:0.5.3` und verwendet die Plugin-API derselben
+Version. Maven lädt die veröffentlichten Bibliotheken von Central. Die erste
+Ausführung braucht Netzwerkzugriff für Plugins und Abhängigkeiten; weder der
+Regelsuche-Reaktor noch ein Webserver werden gebaut oder gestartet.
+
+Die zwei Tests prüfen die Identität und einen abgelehnten Fall. Die CLI liefert:
+
+```text
+rule=hello-add-zero
+before=x + 0
+after=x
+replay=VERIFIED
+negative=REJECTED
+proof=AUTHOR_SUPPLIED_IDENTITY
+```
+
+Der Replay führt dieselbe Regel erneut aus. Die Identität `a + 0 = a` stammt
+hier vom Autor; die Ausgabe behauptet keinen externen formalen Beweis für
+beliebigen Plugin-Code. Für eine eigene typisierte Erweiterung führt
+[extension-runtime-java25](../examples/external-consumers/extension-runtime-java25/README.md)
+in die SPI v2. Das [geometrische Folgenbeispiel](../examples/external-consumers/geometric-sequence-domain-java25/README.md)
+zeigt bestätigte und widerlegte Kandidaten sowie Budgetabbruch.
+
+Die [Consumer-Qualifikation](released-sdk-maven-qualification.md) führt diesen
+aktuellen Default-Pfad mit leerem Maven-Cache und unverändertem POM aus. Sie
+prüft die tatsächlichen Tests, Runtime-Koordinaten, veröffentlichten JAR-Hashes
+und die CLI-Ausgabe zusätzlich zur historischen 0.5.2-Qualifikation.
+
+## Neuere Mathematik aus dem Quell-SDK oder einem neuen Archiv
+
+Die sechs [geprüften Mathematikbeispiele](../examples/external-consumers/checked-math-java25/README.md)
+verwenden APIs nach Release 0.5.3. Aus dem aktuellen Checkout:
+
+```bash
+mvn -pl regelsuche-optimization-sdk,regelsuche-bom -am install
+mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify
+```
+
+Aus einem entpackten SDK-Archiv, das dieses Projekt enthält, genügt der zweite
+Befehl im Archiv-Wurzelverzeichnis. Das erzeugte Beispiel-POM bindet die
+Archivversion; zusätzliche Versionsparameter und ein handgebautes `lib/`
+sind nicht erforderlich. `verify` prüft sechs konkrete Ergebnisse und führt
+anschließend alle sechs Programme aus. Ein solches lokales Archiv ist kein
+Nachweis einer Veröffentlichung. Das SDK 0.5.3 enthält diese APIs noch nicht.
+
+## Historische Reproduktion mit SDK 0.5.2
+
+Die folgenden Schritte beschreiben das archivierte SDK 0.5.2 samt seinen
+unveränderten Prüfsummen und seinem damaligen Maven-Namespace.
 
 ## 1. Archivierter Weg: das SDK-Repository 0.5.2
 

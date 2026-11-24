@@ -1,5 +1,28 @@
 # hello-rule-java25
 
+## Current Maven Central release
+
+Copy this complete directory anywhere. With JDK 25 and Maven 3.9.9+ from the
+3.x line, its unchanged POM resolves the published SDK 0.5.3:
+
+```bash
+mvn --batch-mode --no-transfer-progress clean package
+java -cp "target/classes:target/dependency/*" example.HelloRule
+```
+
+The BOM and Plugin API use group `io.github.carstenartur`; Java imports use
+`de.regelsuche`. The command runs both tests and prints the rule, the result `x`,
+`replay=VERIFIED`, `negative=REJECTED` and `proof=AUTHOR_SUPPLIED_IDENTITY`.
+Windows uses `;` in the classpath. Maven needs network access on the first run.
+No Regelsuche source build, server or database is required.
+
+Inside a newly generated SDK archive, the staged POM uses that archive's version
+and bundled repository instead. The source POM remains pinned to the published
+Central release. The [qualification](../../../docs/released-sdk-maven-qualification.md)
+checks the current Central default separately from the historical archive below.
+
+## Archived 0.5.2 reproduction
+
 An independent Java 25 consumer of the **released 0.5.2 SDK**. Copy this whole
 directory anywhere; it has no dependency on a Regelsuche source checkout.
 Download and unpack [regelsuche-sdk-0.5.2.zip](https://github.com/carstenartur/Regelsuche/releases/download/v0.5.2/regelsuche-sdk-0.5.2.zip),
