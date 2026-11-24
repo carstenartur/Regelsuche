@@ -1,10 +1,10 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.ast.BinaryExpr;
-import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.retention.RetainedGraph;
 import de.regelsuche.search.moves.MoveContext;
 import de.regelsuche.search.moves.MoveProvider;
@@ -12,11 +12,9 @@ import de.regelsuche.search.moves.MoveState;
 import de.regelsuche.search.moves.SearchMove;
 import de.regelsuche.search.moves.TypedMoveSearch;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
-import de.regelsuche.transform.TransformationProvenance;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -41,24 +39,13 @@ final class RenamedTaskPath implements RetainedGraph.View {
         }
     }
 
-    private record Step(Expr target, SearchMove template) implements RetainedGraph.View {
+    private record Step(TreePosition position, Expr replacement, TypedMoveSearch.PrimitiveProposal proposal) implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-            visitor.reference(target);
-            visitor.reference(template);
+            visitor.reference(position); visitor.reference(replacement); visitor.reference(proposal);
         }
     }
 
     private final List<Step> steps;
-
-    private record Branch(Expr left, BinaryOperator operator, Expr right) {
-        @Override public boolean equals(Object other) {
-            return other instanceof Branch branch && left == branch.left && operator == branch.operator && right == branch.right;
-        }
-
-        @Override public int hashCode() {
-            return 31 * (31 * System.identityHashCode(left) + operator.hashCode()) + System.identityHashCode(right);
-        }
-    }
 
     private RenamedTaskPath(List<Step> steps) { this.steps = List.copyOf(steps); }
 
@@ -66,18 +53,15 @@ final class RenamedTaskPath implements RetainedGraph.View {
         work.add(1);
         if (witness.isEmpty() || witness.size() > MAXIMUM_STEPS) return null;
         var steps = new ArrayList<Step>();
-        var branches = new HashMap<Branch, BinaryExpr>();
-        var numbers = new HashMap<NumberExpr, NumberExpr>();
         for (var edge : witness) {
             work.add(1);
-            var move = edge.move();
-            if (move.sourceKind() != SearchMove.SourceKind.PRIMITIVE || !move.assumptions().isEmpty()
-                    || !move.capabilityDelta().isEmpty() || !move.transformation().rule().equals(move.ruleId())
-                    || !move.transformation().primitiveRuleIds().equals(List.of(move.ruleId()))
-                    || !(move.provenance() instanceof TransformationProvenance.PrimitiveRewriteSequence)) return null;
-            Expr target = rewrite(edge.target().expression(), shape.slots()::get, work);
-            if (target == null) return null; // An introduced symbol has no binding in the new task.
-            steps.add(new Step(intern(target, branches, numbers, work), move));
+            var proposal = TypedMoveSearch.PrimitiveProposal.from(edge.move());
+            if (proposal.isEmpty()) return null;
+            var position = new ArrayList<Integer>();
+            Expr replaced = replacement(edge.source().expression(), edge.target().expression(), position, work);
+            Expr numbered = rewrite(replaced, shape.slots()::get, work, work.units, position.size());
+            if (numbered == null) return null; // An introduced symbol has no binding in the new task.
+            steps.add(new Step(new TreePosition(position, ""), numbered, proposal.orElseThrow()));
         }
         return new RenamedTaskPath(steps);
     }
@@ -85,10 +69,11 @@ final class RenamedTaskPath implements RetainedGraph.View {
     TypedMoveSearch.TypedProvider bind(Shape shape, CheckedSchemaSupport.Work work) {
         var names = new HashMap<VariableExpr, VariableExpr>();
         shape.slots().forEach((variable, slot) -> names.put(slot, variable));
-        work.add(2L + names.size() + steps.size());
+        work.add(2L + names.size());
         return new TypedMoveSearch.TypedProvider() {
-            private final String[] endpoints = new String[steps.size()];
-            private final Map<Expr, Expr> instantiated = new IdentityHashMap<>();
+            private Expr source = shape.concrete();
+            private String expected;
+            private int nextStep;
             @Override public MoveProvider.Descriptor descriptor() { return DESCRIPTOR; }
 
             @Override public MoveProvider.Batch candidates(MoveState state, MoveContext context) {
@@ -96,19 +81,21 @@ final class RenamedTaskPath implements RetainedGraph.View {
                 var local = new CheckedSchemaSupport.Work();
                 local.add(1);
                 int index = state.searchDepth();
-                if (index >= steps.size() || !state.assumptions().isEmpty() || !context.initialAssumptions().isEmpty())
+                if (index != nextStep || index >= steps.size() || !state.assumptions().isEmpty() || !context.initialAssumptions().isEmpty())
                     return batch(List.of(), local);
                 local.add(1);
-                String expected = index == 0 ? CODEC.encodeExpression(shape.concrete()) : endpoints[index - 1];
+                if (expected == null) expected = CODEC.encodeExpression(source);
                 if (!state.expression().equals(expected)) return batch(List.of(), local);
                 var step = steps.get(index);
-                if (endpoints[index] == null) {
-                    Expr target = instantiate(step.target(), names, instantiated, local);
-                    endpoints[index] = CODEC.encodeExpression(target);
-                    local.add(1);
-                }
+                Expr replacement = rewrite(step.replacement(), names::get, local);
+                local.add(2L + 3L * step.position().path().size());
+                var target = step.position().replaceAt(source, replacement).rewrittenRoot();
+                if (target.isEmpty()) return batch(List.of(), local);
+                source = target.orElseThrow();
+                expected = CODEC.encodeExpression(source);
+                nextStep++;
                 local.add(1); // Construct a fresh source-bound proposal for the actual receiving state.
-                return batch(List.of(TypedMoveSearch.rebindPrimitiveProposal(step.template(), state, endpoints[index], local.units)), local);
+                return batch(List.of(step.proposal().bind(state, expected, local.units)), local);
             }
         };
     }
@@ -117,29 +104,28 @@ final class RenamedTaskPath implements RetainedGraph.View {
         return new MoveProvider.Batch(moves, TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(work.units), false);
     }
 
-    private static Expr intern(Expr term, Map<Branch, BinaryExpr> branches, Map<NumberExpr, NumberExpr> numbers,
-            CheckedSchemaSupport.Work work) {
+    private static Expr replacement(Expr before, Expr after, List<Integer> path, CheckedSchemaSupport.Work work) {
         work.add(1);
-        if (term instanceof NumberExpr number) return numbers.computeIfAbsent(number, value -> value);
-        if (!(term instanceof BinaryExpr binary)) return term;
-        var branch = new Branch(intern(binary.left(), branches, numbers, work), binary.operator(),
-            intern(binary.right(), branches, numbers, work));
-        work.add(1);
-        return branches.computeIfAbsent(branch, value -> new BinaryExpr(value.left(), value.operator(), value.right()));
+        if (path.size() >= MAXIMUM_DEPTH || !(before instanceof BinaryExpr left) || !(after instanceof BinaryExpr right)
+                || left.operator() != right.operator()) return after;
+        if (same(left.right(), right.right(), work)) {
+            path.add(0);
+            return replacement(left.left(), right.left(), path, work);
+        }
+        if (same(left.left(), right.left(), work)) {
+            path.add(1);
+            return replacement(left.right(), right.right(), path, work);
+        }
+        return after;
     }
 
-    private static Expr instantiate(Expr term, Map<VariableExpr, VariableExpr> names, Map<Expr, Expr> instantiated,
-            CheckedSchemaSupport.Work work) {
+    private static boolean same(Expr left, Expr right, CheckedSchemaSupport.Work work) {
         work.add(1);
-        if (term instanceof VariableExpr variable) return names.get(variable);
-        if (!(term instanceof BinaryExpr binary)) return term;
-        Expr previous = instantiated.get(term);
-        if (previous != null) return previous;
-        var target = new BinaryExpr(instantiate(binary.left(), names, instantiated, work), binary.operator(),
-            instantiate(binary.right(), names, instantiated, work));
-        instantiated.put(term, target);
-        work.add(1);
-        return target;
+        if (left == right) return true;
+        if (left instanceof BinaryExpr a && right instanceof BinaryExpr b) {
+            return a.operator() == b.operator() && same(a.left(), b.left(), work) && same(a.right(), b.right(), work);
+        }
+        return left.equals(right);
     }
 
     private static Expr rewrite(Expr source, Function<VariableExpr, VariableExpr> rename, CheckedSchemaSupport.Work work) {
