@@ -213,6 +213,26 @@ for line in sys.stdin:
             self.assertGreater(sequence['accounting']['wholeWorkerCpu']['totalNanos'], 0)
             self.assertGreater(sequence['accounting']['peakWorkerRssBytes'], 0)
             self.assertEqual(5, sequence['accounting']['reportedNativeMethodAllocatedBytes'])
+            expected = phases['training']['response']['modelHash']
+            self.assertEqual(expected, self.driver.verify_model_lifecycle(Path(directory), sequence))
+            for key in ('modelPersistence', 'modelLoad'):
+                for field, value in [('file', 'different.model.json'), ('modelHash', 'sha256:' + '0' * 64)]:
+                    broken = deepcopy(sequence)
+                    broken['phases'][key][field] = value
+                    with self.subTest(phase=key, field=field), self.assertRaises(ValueError):
+                        self.driver.verify_model_lifecycle(Path(directory), broken)
+            for key in ('training', 'modelPersistence', 'modelLoad'):
+                broken = deepcopy(sequence)
+                broken['phases'][key]['status'] = 'BLOCKED'
+                with self.subTest(incomplete=key), self.assertRaises(ValueError):
+                    self.driver.verify_model_lifecycle(Path(directory), broken)
+            model_path = Path(directory) / phases['modelPersistence']['file']
+            original = model_path.read_bytes()
+            model_path.write_bytes(original + b' ')
+            with self.assertRaises(ValueError):
+                self.driver.verify_model_lifecycle(Path(directory), sequence)
+            model_path.write_bytes(original)
+            self.assertEqual(expected, self.driver.verify_model_lifecycle(Path(directory), sequence))
             for missing in ['training', 'restore']:
                 broken = deepcopy(sequence)
                 del broken['phases'][missing]
