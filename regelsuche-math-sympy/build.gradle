@@ -73,6 +73,14 @@ tasks.named('test') { task ->
     forkEvery = 1
     finalizedBy tasks.named('jacocoTestReport')
     configureTestProcessBaseline(task)
+    // Preserve explicit historical provisioning in the test worker, including
+    // empty values so that incomplete requests fail instead of being skipped.
+    ['frozen.checkout', 'frozen.graalpy', 'frozen.packages'].each { name ->
+        def value = providers.systemProperty(name).orNull
+        if (value != null) {
+            systemProperty name, value
+        }
+    }
 }
 
 jmh {
