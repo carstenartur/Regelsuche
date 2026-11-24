@@ -118,13 +118,24 @@ public final class EnumoRecordedAudit {
         if (response.path("status").asText().equals("CANDIDATE")) {
             long internal = nonnegative(response, peer ? "nativeNanos" : "nativeWallNanos");
             require(elapsed >= internal, "worker interval exceeds common request interval");
-            if (!peer) verifyNativeResponse(row, response, setup, nativeProfile);
-            outcome = response.path(peer ? "source" : "input").asText().equals(wire)
-                ? candidateOutcome(row, response, source, peer) : "SOURCE_BINDING_REJECTED";
-            if (!peer && !response.path("internalWorkWithinBudget").asBoolean(false)) outcome = "NATIVE_BUDGET_REJECTED";
+            if (!peer) verifyNativeResponse(response, setup, nativeProfile);
+            outcome = candidateResponseOutcome(row, response, source, wire, peer);
             if (elapsed > 2_000_000_000L && outcome.equals("VERIFIED")) outcome = "TIMEOUT_AFTER_JUDGE";
         }
         require(outcome.equals(row.path("status").asText()), "raw response contradicts retained outcome");
+    }
+
+    private static String candidateResponseOutcome(JsonNode row, JsonNode response, String source, String wire, boolean peer) {
+        if (!response.path(peer ? "source" : "input").asText().equals(wire)) {
+            requireNoCandidate(row);
+            return "SOURCE_BINDING_REJECTED";
+        }
+        String outcome = candidateOutcome(row, response, source, peer);
+        if (!peer) {
+            require(nonnegative(row, "nativeWork") == nonnegative(response, "totalWork"), "native row work binding");
+            if (!response.path("internalWorkWithinBudget").asBoolean(false)) return "NATIVE_BUDGET_REJECTED";
+        }
+        return outcome;
     }
 
     private static String candidateOutcome(JsonNode row, JsonNode response, String source, boolean peer) {
@@ -140,7 +151,7 @@ public final class EnumoRecordedAudit {
         return outcome;
     }
 
-    private static void verifyNativeResponse(JsonNode row, JsonNode response, JsonNode setup, String profile) throws Exception {
+    private static void verifyNativeResponse(JsonNode response, JsonNode setup, String profile) throws Exception {
         require(response.path("profile").asText().equals(profile), "native response profile");
         require(response.path("modelHash").equals(setup.path("modelHash")), "native frozen model binding");
         require(response.path("target").asText("missing").isEmpty() && !response.path("targetReached").asBoolean(true), "native source-only result");
@@ -152,7 +163,7 @@ public final class EnumoRecordedAudit {
         require(searchWork == nonnegative(search, "totalWork"), "native search work sum");
         long total = Math.addExact(Math.addExact(searchWork, nonnegative(response, "selectionWork")),
             nonnegative(response, "selectedReplayWork"));
-        require(total == nonnegative(response, "totalWork") && total == nonnegative(row, "nativeWork"), "native total work sum");
+        require(total == nonnegative(response, "totalWork"), "native total work sum");
         require(response.path("internalWorkWithinBudget").isBoolean(), "native budget decision");
         boolean withinBudget = accountingComplete(search) && total <= nonnegative(setup.path("settings"), "workBudget");
         require(response.path("internalWorkWithinBudget").asBoolean() == withinBudget, "native work budget");

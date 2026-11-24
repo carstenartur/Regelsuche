@@ -86,6 +86,25 @@
     "redLog": "evidence/enumo-second-review-red.log.gz",
     "greenLog": "evidence/enumo-second-review-green.log.gz",
     "archiveLog": "evidence/enumo-second-review-archive.log.gz",
+    "historicalMeasurementFilesUnchanged": true,
+    "publicSourceCommit": "ace8e0d99158691e973ba55b91e4f8bb79a028c6"
+  },
+  "sourceBindingFailureVerification": {
+    "scope": "later archive-only writer/auditor consistency correction; no new optimizer execution or timing",
+    "javaTests": 30,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "newUnexpectedExceptionsBeforeCorrection": 2,
+    "acceptedRetainedCandidates": 54,
+    "consistentRejectedSourceControlAcceptedCandidates": 53,
+    "sourceSha256": {
+      "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoRecordedAudit.java": "49d964b3c29fdfcc75427683274b4ef509c616f70d863bbfe6c4e2ec7eb92415",
+      "regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/EnumoRecordedAuditTest.java": "79952549a85a9a82c9ef4526bf9c58120089d526a23d844d12aa708c5c31234b"
+    },
+    "redLog": "evidence/enumo-source-rejection-red.log.gz",
+    "greenLog": "evidence/enumo-source-rejection-green.log.gz",
+    "archiveLog": "evidence/enumo-source-rejection-archive.log.gz",
     "historicalMeasurementFilesUnchanged": true
   }
 }

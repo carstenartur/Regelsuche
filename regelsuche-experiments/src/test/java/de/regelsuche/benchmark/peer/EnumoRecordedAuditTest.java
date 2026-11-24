@@ -172,6 +172,29 @@ class EnumoRecordedAuditTest {
         }, ignored -> { });
     }
 
+    @Test
+    void acceptsTheRecordedRejectionOfAForeignSourceEcho() throws Exception {
+        assertEquals(53, auditRawMutation(EnumoRecordedAuditTest::rejectForeignSource, ignored -> { }));
+    }
+
+    @Test
+    void sourceRejectionPrecedesAnActualBudgetRejection() throws Exception {
+        assertEquals(53, auditRawMutation(recorded -> {
+            rejectForeignSource(recorded);
+            ObjectNode response = (ObjectNode) recorded.get("response");
+            long extra = 16385 - response.path("totalWork").longValue();
+            response.put("selectionWork", response.path("selectionWork").longValue() + extra);
+            response.put("totalWork", 16385).put("internalWorkWithinBudget", false);
+        }, ignored -> { }));
+    }
+
+    private static void rejectForeignSource(ObjectNode recorded) {
+        ((ObjectNode) recorded.get("response")).put("input", "x1");
+        ObjectNode row = (ObjectNode) recorded.get("row");
+        discardCandidate(row);
+        row.put("status", "SOURCE_BINDING_REJECTED");
+    }
+
     private static void discardCandidate(ObjectNode row) {
         for (String field : java.util.List.of("output", "inputCost", "outputCost", "nativeWork")) row.remove(field);
     }
@@ -189,6 +212,11 @@ class EnumoRecordedAuditTest {
 
     private static void assertRawMutationRejected(java.util.function.Consumer<ObjectNode> changeRaw,
             java.util.function.Consumer<ObjectNode> changeReport) throws Exception {
+        assertThrows(IllegalArgumentException.class, () -> auditRawMutation(changeRaw, changeReport));
+    }
+
+    private static int auditRawMutation(java.util.function.Consumer<ObjectNode> changeRaw,
+            java.util.function.Consumer<ObjectNode> changeReport) throws Exception {
         ObjectNode report = report();
         String[] lines = new String(raw(), StandardCharsets.UTF_8).split("\n");
         ObjectNode recorded = (ObjectNode) JSON.readTree(lines[0]);
@@ -201,7 +229,7 @@ class EnumoRecordedAuditTest {
         byte[] forged = (String.join("\n", lines) + "\n").getBytes(StandardCharsets.UTF_8);
         report.put("rawResponsesSha256", hash(forged));
         changeReport.accept(report);
-        assertThrows(IllegalArgumentException.class, () -> EnumoRecordedAudit.verify(ROOT, report, forged, rules()));
+        return EnumoRecordedAudit.verify(ROOT, report, forged, rules());
     }
 
     private static boolean sameKey(JsonNode a, JsonNode b) {

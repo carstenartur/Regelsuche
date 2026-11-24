@@ -213,13 +213,30 @@ and derives the budget decision in both directions from the retained work and
 cursor accounting. A consistent timeout remains accepted with all later
 supported queries blocked; the auditor does not require 54 successes.
 
-The resulting focused suite passes 28 tests without failures, errors or skips.
+That archive-hardening suite passes 28 tests without failures, errors or skips.
 Its [failing regression run](evidence/enumo-second-review-red.log.gz),
 [passing full focused run](evidence/enumo-second-review-green.log.gz), and
 [fresh archive check](evidence/enumo-second-review-archive.log.gz) are retained.
 These changes affect only the archive checker and its tests. The final matrix,
 raw responses, measured code history, resource receipts and earlier development
 logs remain byte-for-byte unchanged; no new optimizer timing is claimed.
+
+A subsequent writer/auditor consistency check found one overly strict negative
+path. A native candidate with the wrong source echo is recorded as
+`SOURCE_BINDING_REJECTED` before candidate fields are added, but the auditor
+previously demanded the absent summarized work and could replace that status
+with a budget rejection. Two focused regressions reproduce these failures.
+The raw native ledger remains fully checked; summarized candidate work and
+budget-outcome selection now apply only after the source echo matches, as in
+the recorder. A correctly recorded rejected source is accepted as a negative
+row, including when its raw ledger also exceeds the budget. It is never
+counted as a verified candidate. The final focused suite now passes **30 tests**
+without failures, errors or skips; the unchanged final archive still verifies
+54 candidates. The separate [red](evidence/enumo-source-rejection-red.log.gz),
+[green](evidence/enumo-source-rejection-green.log.gz) and
+[archive](evidence/enumo-source-rejection-archive.log.gz) logs preserve this
+additional archive-only correction.
+
 A successful archive audit confirms the retained response contract; it does
 not authenticate historical execution from an untrusted author or replay the
 original synthesizer.
@@ -292,8 +309,8 @@ git fetch research/benchmarks/enumo-public-v1/source-history.bundle \
 ```
 
 The bundle includes the shared-grammar check and the archive auditor present
-when the final panel was recorded. The second archive-only review correction
-is in the public repository history after that measured source; it is not
+when the final panel was recorded. The later archive-only review corrections
+are in the public repository history after that measured source; they are not
 retroactively inserted into the measurement bundle. Product optimizer code
 remains the recorded base.
 [artifact-sha256.json](artifact-sha256.json) binds all retained files. The
