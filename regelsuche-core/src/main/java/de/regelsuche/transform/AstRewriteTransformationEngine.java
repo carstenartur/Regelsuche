@@ -82,14 +82,16 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             return List.of();
         }
 
+        boolean observed = RetainedOperation.isObserved();
         String formattedInput = formatState(root);
-        int originalSize = canonicalizer.astNodeCount(formattedInput);
+        int originalSize = observed ? canonicalizer.astNodeCount(formattedInput) : -1;
         Set<Transformation> transformations = new LinkedHashSet<>();
         for (RewriteResult result : rewriteEverywhere(root, observer == null ? null : List.of())) {
             String formatted = formatState(result.expression());
             if (formatted.equals(formattedInput)) {
                 continue;
             }
+            if (originalSize < 0) originalSize = canonicalizer.astNodeCount(formattedInput);
             int growth = canonicalizer.astNodeCount(formatted) - originalSize;
             if (growth > maxAstSizeIncreasePerStep) {
                 continue;
@@ -126,11 +128,14 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
     private List<RewriteResult> rewriteEverywhere(Expr subtree, List<Integer> path) {
         List<RewriteResult> results = new ArrayList<>();
-        String subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));
+        // Canonicalization can expand a polynomial. A subtree with no changed rewrite needs no key.
+        String subtreeHash = RetainedOperation.isObserved()
+            ? canonicalizer.stableHash(ExpressionFormatter.format(subtree)) : null;
         for (RewriteRule rule : rules) {
             if (rule.matches(subtree)) {
                 Expr rewritten = rule.apply(subtree);
                 if (!rewritten.equals(subtree)) {
+                    if (subtreeHash == null) subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));
                     results.add(new RewriteResult(
                         rule,
                         rewritten,

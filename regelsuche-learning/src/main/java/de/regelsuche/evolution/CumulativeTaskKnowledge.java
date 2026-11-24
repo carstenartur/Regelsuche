@@ -3,6 +3,7 @@ package de.regelsuche.evolution;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.TypedMoveSearch;
 import de.regelsuche.search.moves.TypedSearchAlternatives;
 import java.util.Set;
 import java.io.IOException;
@@ -242,13 +243,27 @@ public final class CumulativeTaskKnowledge {
     }
 
     /** Session bookkeeping shares the original query budget; a retained proposal grants no proof authority. */
-    Execution solveInSession(CheckedSchemaTaskSolver.Task task, Strategy strategy, long lookupWork, RetainedTaskPath path) {
+    Execution solveInSession(CheckedSchemaTaskSolver.Task task, Strategy strategy, long lookupWork, TypedMoveSearch.TypedProvider path) {
         Objects.requireNonNull(task, "task"); Objects.requireNonNull(strategy, "strategy");
         if (lookupWork < 0) throw new IllegalArgumentException("negative query lookup work");
         if (constructionProfile.requiresExactPolynomialSteps() || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
             StructuralCheckedDomain.requireUnobserved();
         var selected = strategy == Strategy.AUTOMATIC ? route(task, routes, knowledgeGoals) : new Routing(strategy, 0);
         return run(id, task, selected.strategy(), Math.addExact(selected.work(), lookupWork), baseline, learned, path);
+    }
+
+    record SessionExecution(Execution execution, boolean reused) { }
+
+    SessionExecution solveRenamedInSession(CheckedSchemaTaskSolver.Task task, Strategy strategy, long lookupWork,
+            TypedMoveSearch.TypedProvider path) {
+        var attempt = solveInSession(task, strategy, lookupWork, path);
+        if (attempt.solved()) return new SessionExecution(attempt, true);
+        if (attempt.solution().isEmpty() || !attempt.solution().orElseThrow().evidence().accountingComplete()
+                || attempt.totalWork() >= task.budget().totalWork()) return new SessionExecution(attempt, false);
+        // A structurally matching path can be inapplicable after rebinding. Pay the full failed
+        // attempt before restoring the usual providers on the original task and remaining budget.
+        long spent = Math.addExact(attempt.totalWork(), 1);
+        return new SessionExecution(run(id, task, attempt.selectedStrategy(), spent, baseline, learned), false);
     }
 
     /** Bounded alternative output uses the same frozen library, routing and strict task checks as solve. */
@@ -306,7 +321,7 @@ public final class CumulativeTaskKnowledge {
     }
 
     private static Execution run(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
-            long selectionWork, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, RetainedTaskPath path) {
+            long selectionWork, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, TypedMoveSearch.TypedProvider path) {
         if (selectionWork >= task.budget().totalWork()) return new Execution(generationId, task, selected, selectionWork, null);
         var remaining = task.budget();
         if (selectionWork > 0) remaining = new MoveSearch.Budget(remaining.maxPrimitiveSteps(), remaining.maxSearchDepth(),

@@ -300,6 +300,37 @@ public final class TypedMoveSearch {
         return "typed:" + sha256(encodedSource + "\n" + encodedTarget + "\n" + rule);
     }
 
+    /** Only the rule metadata needed to propose a fresh unconditional primitive edge. */
+    public record PrimitiveProposal(String rule, String family, de.regelsuche.transform.RewriteKind kind,
+            boolean expanding, int costDelta, boolean equivalencePreserving, String pack, String license)
+            implements de.regelsuche.retention.RetainedGraph.View {
+        public static java.util.Optional<PrimitiveProposal> from(SearchMove proposal) {
+            var template = proposal.transformation();
+            if (proposal.sourceKind() != SearchMove.SourceKind.PRIMITIVE || !proposal.assumptions().isEmpty()
+                    || !proposal.capabilityDelta().isEmpty() || !template.primitiveRuleIds().equals(List.of(proposal.ruleId()))
+                    || !template.rule().equals(proposal.ruleId())
+                    || !(template.provenance() instanceof de.regelsuche.transform.TransformationProvenance.PrimitiveRewriteSequence)) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.of(new PrimitiveProposal(template.rule(), proposal.ruleFamily(), template.kind(),
+                template.mayIncreaseComplexity(), template.estimatedCostDelta(), template.equivalencePreservingByConstruction(),
+                template.packId(), template.license()));
+        }
+
+        /** Bind a new candidate. A receiving verifier still needs to check the edge. */
+        public SearchMove bind(MoveState source, String target, long generationWork) {
+            var descriptor = new MoveProvider.Descriptor(rule, family, SearchMove.SourceKind.PRIMITIVE,
+                SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, rule);
+            var transformation = new Transformation(rule, target, kind, expanding, costDelta, equivalencePreserving,
+                applicationKey(source.expression(), target, rule), List.of(), pack, license);
+            return SearchMove.from(transformation, descriptor, generationWork);
+        }
+
+        @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor visitor) {
+            visitor.reference(rule); visitor.reference(family); visitor.reference(pack); visitor.reference(license);
+        }
+    }
+
     private static String sha256(String value) {
         try {
             return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

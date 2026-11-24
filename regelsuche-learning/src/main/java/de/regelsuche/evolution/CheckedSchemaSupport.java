@@ -189,6 +189,11 @@ final class CheckedSchemaSupport {
     }
     /** Total rational polynomial syntax: no functions, variable denominators or variable/negative powers. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+        domain(root, bounds, work, false);
+    }
+
+    /** For the shared surface, a separate exact guard checks constant denominator expressions. */
+    static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface) {
         var pending = new ArrayDeque<Node>();
         pending.push(new Node(root, 0));
         var current = new Node[1];
@@ -213,7 +218,7 @@ final class CheckedSchemaSupport {
                             if (variable.name().length() > 128) throw new DomainRejected("checked symbol size limit");
                         }
                         case BinaryExpr binary -> {
-                            binaryDomain(binary,bounds);
+                            if (!checkSharedSurface || binary.operator() != BinaryOperator.DIV) binaryDomain(binary,bounds);
                             pending.push(new Node(binary.right(), node.depth() + 1));
                             RetainedOperation.work(2);
                             pending.push(new Node(binary.left(), node.depth() + 1));

@@ -10,6 +10,7 @@ import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.FactorizationVerifier;
 import de.regelsuche.polynomial.IndependentCompletenessTrace;
+import de.regelsuche.polynomial.Monomial;
 import de.regelsuche.polynomial.PolynomialFactor;
 import de.regelsuche.polynomial.PolynomialRing;
 import de.regelsuche.polynomial.PolynomialVariable;
@@ -19,6 +20,7 @@ import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class NativeUnivariateFactorizationEngineTest {
@@ -41,6 +43,82 @@ class NativeUnivariateFactorizationEngineTest {
             ExactRationalField.INSTANCE,
             List.of(new PolynomialVariable("x")),
             PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+
+    @Test
+    void verifiesRationalQuadraticsAndUnitRootProposalsWithTightWork() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithFastPath(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var quadratic = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(2), ExactRational.integer(6),
+            Monomial.of(1), ExactRational.integer(-7),
+            Monomial.of(0), ExactRational.integer(2)));
+        var cubic = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(3), ExactRational.integer(3),
+            Monomial.of(2), ExactRational.integer(-3),
+            Monomial.of(1), ExactRational.integer(2),
+            Monomial.of(0), ExactRational.integer(-2)));
+        for (var source : List.of(quadratic, cubic)) {
+            var request = FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, 64);
+            var result = FactorizationVerifier.execute(engine, request);
+            assertTrue(result.successful(), result.detailCode());
+            assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+            assertTrue(result.work().within(64));
+        }
+    }
+
+    @Test
+    void verifiesQuadraticInAPowerWithoutDensifyingThePolynomial() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithFastPath(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var source = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(12), ExactRational.integer(6),
+            Monomial.of(6), ExactRational.integer(-7),
+            Monomial.of(0), ExactRational.integer(2)));
+        var result = FactorizationVerifier.execute(engine, FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, 64));
+        assertTrue(result.successful(), result.detailCode());
+        assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+        var factors = result.candidates().getFirst().factors();
+        assertEquals(2, factors.size());
+        assertTrue(factors.stream().allMatch(factor -> factor.polynomial().degree(0) == 6));
+        assertTrue(result.work().within(64));
+        assertEquals(3, result.work().units("native-rational-fast.quadratic-shape-terms"));
+        assertEquals(0, result.work().units("native-rational-fast.synthetic-division"));
+    }
+
+    @Test
+    void refinesNestedFactorsWithMultiplicitiesAndPreservesTheScalar() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithRefinement(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var source = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(8), ExactRational.integer(6),
+            Monomial.of(4), ExactRational.integer(-12),
+            Monomial.of(0), ExactRational.integer(6)));
+        var result = FactorizationVerifier.execute(engine, FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, WORK));
+        assertTrue(result.successful(), result.detailCode());
+        assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+        var candidate = result.candidates().getFirst();
+        assertEquals(ExactRational.integer(6), candidate.unit());
+        assertEquals(List.of(1, 1, 2),
+            candidate.factors().stream().map(factor -> factor.polynomial().degree(0)).sorted().toList());
+        assertTrue(candidate.factors().stream().allMatch(factor -> factor.multiplicity() == 2));
+        assertTrue(result.work().units("native-rational-refinement.factor-visits") >= 2);
+        assertTrue(result.work().units("verify.product-comparisons") >= 3);
+    }
+
+    @Test
+    void aTightSharedBudgetKeepsThePreviouslyAvailableExactSplit() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithRefinement(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var source = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(8), ExactRational.ONE, Monomial.of(0), ExactRational.NEGATIVE_ONE));
+        var request = FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, 30);
+        var result = FactorizationVerifier.execute(engine, request);
+        assertTrue(result.successful(), result.detailCode());
+        assertTrue(result.work().within(30));
+        assertEquals(List.of(4, 4), result.candidates().getFirst().factors().stream()
+            .map(factor -> factor.polynomial().degree(0)).sorted().toList());
+        assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+    }
 
     @Test
     void completelyFactorsGeneralIntegerPolynomial() {

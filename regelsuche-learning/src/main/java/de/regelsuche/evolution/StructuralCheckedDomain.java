@@ -16,8 +16,17 @@ final class StructuralCheckedDomain {
     }
 
     static int inspect(Expr expression, CheckedSchemaSupport.Work work) {
+        return inspect(expression, work, false);
+    }
+
+    static int inspect(Expr expression, CheckedSchemaSupport.Work work, boolean sharedArithmetic) {
         requireUnobserved();
-        CheckedSchemaSupport.domain(expression, CheckedLearnedSchemaModel.Bounds.defaults(), work);
+        CheckedSchemaSupport.domain(expression, CheckedLearnedSchemaModel.Bounds.defaults(), work, sharedArithmetic);
+        if (sharedArithmetic) {
+            var surface = TypedPolynomialSurfaceCost.evaluateSharedArithmetic(expression);
+            work.add(surface.work());
+            if (surface.value() == Long.MAX_VALUE) throw new CheckedSchemaSupport.DomainRejected("outside shared exact arithmetic");
+        }
         var pending = new ArrayDeque<Expr>();
         pending.push(expression);
         int nodes = 0;

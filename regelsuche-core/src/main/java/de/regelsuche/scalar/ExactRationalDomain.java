@@ -59,10 +59,32 @@ public final class ExactRationalDomain implements RetainedGraph.View {
     }
 
     public ExactRationalParseEvidence parse(String literal) {
+        if (limits.equals(DEFAULT_LIMITS) && literal != null && literal.length() == 1) {
+            int digit = literal.charAt(0) - '0';
+            if (digit >= 0 && digit <= 9) return DigitEvidence.VALUES[digit];
+        }
+        return parseEvidence(literal);
+    }
+
+    /** Reconstruct evidence for independent replay directly from the spelling and declared limits. */
+    ExactRationalParseEvidence parseEvidence(String literal) {
         ParsedLiteral parsed = parseLiteral(literal);
         return parsed.value() == null
             ? ExactRationalParseEvidence.failure(parsed.status(), parsed.detailCode(), parsed.source(), limits)
             : issueEvidence(parsed.source(), parsed.value());
+    }
+
+    private static final class DigitEvidence {
+        private static final ExactRationalParseEvidence[] VALUES = create();
+
+        private static ExactRationalParseEvidence[] create() {
+            var domain = new ExactRationalDomain();
+            var values = new ExactRationalParseEvidence[10];
+            for (int digit = 0; digit < values.length; digit++) {
+                values[digit] = domain.parseEvidence(Integer.toString(digit));
+            }
+            return values;
+        }
     }
 
     /** Parses under the identical source policy without constructing unused certificates. */

@@ -38,6 +38,8 @@ public final class ExactParsedTerm {
     private final List<LiteralOccurrence> literals;
     private final Map<NumberExpr, LiteralOccurrence> literalsByNode;
     private final Map<Expr, SourceRange> sourceRangesByNode;
+    private final int nodeCount;
+    private final boolean parserRoot;
 
     ExactParsedTerm(
         String source,
@@ -45,13 +47,33 @@ public final class ExactParsedTerm {
         List<LiteralOccurrence> literals,
         Map<Expr, SourceRange> sourceRanges
     ) {
+        this(source, expression, literals, sourceRanges, false);
+    }
+
+    static ExactParsedTerm parserRoot(String source, Expr expression,
+            List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges) {
+        return new ExactParsedTerm(source, expression, literals, sourceRanges, true);
+    }
+
+    private ExactParsedTerm(String source, Expr expression,
+            List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges, boolean parserRoot) {
         this.source = Objects.requireNonNull(source, "source");
         this.expression = Objects.requireNonNull(expression, "expression");
         this.literals = List.copyOf(
             Objects.requireNonNull(literals, "literals"));
         this.literalsByNode = validateAndIndexLiterals();
-        this.sourceRangesByNode = copyAndValidateSourceRanges(
-            Objects.requireNonNull(sourceRanges, "sourceRanges"));
+        SourceRanges validated = copyAndValidateSourceRanges(Objects.requireNonNull(sourceRanges, "sourceRanges"));
+        this.sourceRangesByNode = validated.byNode();
+        this.nodeCount = validated.nodeCount();
+        this.parserRoot = parserRoot;
+    }
+
+    int nodeCount() {
+        return nodeCount;
+    }
+
+    boolean isParserRoot() {
+        return parserRoot;
     }
 
     private Map<NumberExpr, LiteralOccurrence> validateAndIndexLiterals() {
@@ -88,7 +110,7 @@ public final class ExactParsedTerm {
         return Collections.unmodifiableMap(occurrences);
     }
 
-    private Map<Expr, SourceRange> copyAndValidateSourceRanges(
+    private SourceRanges copyAndValidateSourceRanges(
         Map<Expr, SourceRange> sourceRanges
     ) {
         IdentityHashMap<Expr, SourceRange> ranges =
@@ -126,8 +148,10 @@ public final class ExactParsedTerm {
                     "AST source range belongs to a node outside the parsed tree");
             }
         }
-        return Collections.unmodifiableMap(ranges);
+        return new SourceRanges(Collections.unmodifiableMap(ranges), visitedNodes.size());
     }
+
+    private record SourceRanges(Map<Expr, SourceRange> byNode, int nodeCount) { }
 
     private Set<Expr> validateUniqueNodeIdentities() {
         Set<Expr> visitedNodes = Collections.newSetFromMap(

@@ -8,9 +8,18 @@ import java.util.ServiceLoader;
 public final class ExactTheoryEvidence implements de.regelsuche.retention.RetainedGraph.View {
     @Override public void retainedReferences(de.regelsuche.retention.RetainedGraph.Visitor v){v.reference(binding);}
 
-    private final Binding binding;
+    private static final java.util.regex.Pattern HASH = java.util.regex.Pattern.compile("sha256:[0-9a-f]{64}");
+    private static final class Providers {
+        private static final java.util.List<ServiceLoader.Provider<ExactTheoryEvidenceProvider>> INSTALLED =
+            ServiceLoader.load(ExactTheoryEvidenceProvider.class, ExactTheoryEvidence.class.getClassLoader())
+                .stream().toList();
+    }
 
-    private ExactTheoryEvidence(Binding binding) {
+    private final Binding binding;
+    private final Class<?> issuerType;
+
+    private ExactTheoryEvidence(Binding binding, Class<?> issuerType) {
+        this.issuerType = issuerType;
         this.binding = Objects.requireNonNull(binding, "binding");
     }
 
@@ -23,8 +32,8 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
         Throwable primary = null;
         try {
             Binding accepted = null;
-            for (ExactTheoryEvidenceProvider provider : ServiceLoader.load(
-                    ExactTheoryEvidenceProvider.class, ExactTheoryEvidence.class.getClassLoader())) {
+            for (var installed : Providers.INSTALLED) {
+                ExactTheoryEvidenceProvider provider = installed.get();
                 var result = Objects.requireNonNull(provider.bind(verifierOwnedEvidence), "provider result");
                 pending[1] = result;
                 RetainedOperation.work(1);
@@ -41,7 +50,7 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
             if (accepted == null) {
                 throw new IllegalArgumentException("no installed verifier recognizes this evidence capability");
             }
-            return RetainedOperation.produced(new ExactTheoryEvidence(accepted));
+            return RetainedOperation.produced(new ExactTheoryEvidence(accepted, verifierOwnedEvidence.getClass()));
         } catch (RuntimeException | Error failure) {
             primary = failure;
             try { RetainedOperation.checkpoint(); }
@@ -64,6 +73,9 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
     }
 
     public Binding binding() { return binding; }
+
+    /** Process-local issuer identity of the capability presented to the installed verifier. */
+    public boolean issuedFrom(Class<?> type) { return issuerType == type; }
 
     @Override public boolean equals(Object other) {
         return other instanceof ExactTheoryEvidence evidence && binding.equals(evidence.binding);
@@ -92,7 +104,7 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
             if (value == null || value.isBlank()) throw new IllegalArgumentException("blank evidence field");
         }
         private static void requireHash(String hash) {
-            if (hash == null || !hash.matches("sha256:[0-9a-f]{64}")) {
+            if (hash == null || !HASH.matcher(hash).matches()) {
                 throw new IllegalArgumentException("invalid evidence/artifact identity");
             }
         }

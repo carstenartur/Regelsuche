@@ -40,6 +40,31 @@ public final class StructuralConstructionSafetyTest {
         require(unsupported.candidates().isEmpty() && unsupported.work() > 0, "a rejected domain inspection is not free work");
     }
     @Test
+    public void aResidualReplayChecksOnlyTheIssuedAlternativeAndItsActualProcedure() {
+        var residual = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.RESIDUAL_BALANCE);
+        var other = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.COMPLETE_SQUARE);
+        var codec = new CompiledAstReplayCodec();
+        var source = parse("(a^2+b^2)*(c^2+d^2)");
+        var batch = residual.candidates(MoveState.root(codec.encodeExpression(source)), MoveContext.frozen(""));
+        var state = new TypedMoveSearch.State(source, 0, 0, "", List.of(), Set.of(), 0);
+        var context = TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION);
+        require(batch.moves().size() == 2, "two separately issued residual alternatives are expected");
+        for (var move : batch.moves()) {
+            var verification = residual.verifier().verify(state, move, context);
+            String target = ExpressionFormatter.format(codec.decodeExpression(move.targetExpression()));
+            long[] exactProjection = {0};
+            ExactPolynomialAnalysis.withProductWork(units -> exactProjection[0] += units)
+                .requireEquivalent(ExpressionFormatter.format(source), target);
+            require(verification.accepted() && verification.work() >= exactProjection[0],
+                "each replay must pay for the complete independent source/target projection");
+            require(verification.work() < batch.work().totalWorkUnitsV2(),
+                "a single replay should not construct both residual alternatives again");
+            require(!other.verifier().verify(state, move, context).accepted(),
+                "a genuine equivalent target issued by another procedure cannot authorize this move");
+        }
+    }
+
+    @Test
     public void incrementalConstructionCannotHideAnAtomicOverrun() {
         var provider = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.RESIDUAL_BALANCE);
         var source = parse("(a^2+b^2)*(c^2+d^2)");

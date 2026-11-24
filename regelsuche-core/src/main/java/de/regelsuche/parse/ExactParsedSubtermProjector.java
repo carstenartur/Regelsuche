@@ -47,6 +47,7 @@ public final class ExactParsedSubtermProjector {
 
     private final Policy policy;
     private final PolynomialWorkAuthority authority;
+    private final boolean reuseParserRoot;
 
     public ExactParsedSubtermProjector() {
         this(Policy.boundedDefaults());
@@ -57,8 +58,19 @@ public final class ExactParsedSubtermProjector {
     }
 
     public ExactParsedSubtermProjector(Policy policy, PolynomialWorkAuthority authority) {
+        this(policy, authority, false);
+    }
+
+    /** Reuses parser-issued evidence when the selected source is the whole parsed input. */
+    public static ExactParsedSubtermProjector withParserRootReuse(Policy policy, PolynomialWorkAuthority authority) {
+        return new ExactParsedSubtermProjector(policy, authority, true);
+    }
+
+    private ExactParsedSubtermProjector(Policy policy, PolynomialWorkAuthority authority,
+            boolean reuseParserRoot) {
         this.authority = Objects.requireNonNull(authority, "authority");
         this.policy = Objects.requireNonNull(policy, "policy");
+        this.reuseParserRoot = reuseParserRoot;
     }
 
     public Policy policy() {
@@ -171,6 +183,12 @@ public final class ExactParsedSubtermProjector {
                 throw limit("MAX_SUBTREE_SOURCE_CODE_UNITS_EXCEEDED");
             }
 
+            boolean wholeParserRoot = reuseParserRoot && stablePath.isEmpty() && root.isParserRoot()
+                && occurrenceRange.startInclusive() == 0 && occurrenceRange.endExclusive() == root.source().length();
+            if (wholeParserRoot) {
+                return projectWholeParserRoot(root, stablePath, expected, rootSourceHash, occurrenceRange, work);
+            }
+
             Scan scan = scan(
                 root,
                 selected,
@@ -276,6 +294,28 @@ public final class ExactParsedSubtermProjector {
                 "",
                 work);
         }
+    }
+
+    private Result projectWholeParserRoot(ExactParsedTerm root, List<Integer> path, String expected,
+            String rootSourceHash, ExactParsedTerm.SourceRange range, Work work) {
+        if (root.nodeCount() > policy.maxSubtreeNodes()) {
+            throw limit("MAX_SUBTREE_NODES_EXCEEDED");
+        }
+        work.consume("projection.staleness-format-node-visits", root.nodeCount());
+        String actual = ExpressionFormatter.formatMeasured(root.expression(),
+            units -> work.consume("projection.staleness-format-code-units", units));
+        if (actual.length() > policy.maxFormattedCodeUnits()) {
+            throw limit("MAX_ACTUAL_FORMATTED_CODE_UNITS_EXCEEDED");
+        }
+        work.consume("projection.staleness-text-comparison", (long) expected.length() + actual.length());
+        // Parsing fixes all range and literal bindings from the whole source. No ranges are shifted.
+        if (!expected.equals(actual)) {
+            return failure(Status.POSITION_STALE, "SELECTED_POSITION_TEXT_IS_STALE", path, expected,
+                rootSourceHash, Optional.of(actual), Optional.of(range), rootSourceHash, "", work);
+        }
+        return new Result(Status.PROJECTED, "EXACT_PARSER_ROOT_REUSED", policy, path, expected,
+            Optional.of(actual), Optional.of(rootSourceHash), Optional.of(range), Optional.of(rootSourceHash),
+            Optional.of(root), work.ledger());
     }
 
     private Scan scan(

@@ -79,7 +79,7 @@ public final class ExactRationalEvidenceVerifier {
         SerializedEvidence evidence
     ) {
         return new ExactRationalDomain(evidence.limits())
-            .parse(evidence.sourceLiteral());
+            .parseEvidence(evidence.sourceLiteral());
     }
 
     private boolean sameFields(

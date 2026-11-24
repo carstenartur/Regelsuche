@@ -208,17 +208,50 @@ Rolle übernehmen. Untersucht werden die festgelegten Verfahren, Aufgaben und
 Messgrößen; die [Forschungsmethodik](docs/research-methodology.md) erläutert die
 Auswahl und die Informationsgrenzen.
 
-Das optionale [native Polynomprofil](docs/native-polynomial-simplification.md)
-ergänzt exakte Bruchrechnung, Normalisierung, Ausklammern und Faktorisierung im
-gemeinsamen Suchkern. Im [Vergleich vom 6. November 2026](docs/research/native-polynomial-parity-2026-11-06.md)
-benötigen beide nativen Varianten bei 69 der 72 unterstützten Fall-IDs gleich
-viele arithmetische Syntaxoperationen wie das feste Referenzportfolio und bei
-drei weniger. Die Fall-IDs enthalten 70 unterschiedliche Eingaben. Die native
-Basis benötigt rund 9,2 Sekunden, das Referenzportfolio rund 2,1 Sekunden pro
-vollständiger Aufgabenfolge. Das gelernte Profil erzielt hier keine zusätzliche
-Qualitäts- oder Gesamtkostenverbesserung gegenüber der nativen Basis.
+Im [Polynomvergleich vom 24. November 2026](docs/research/polynomial-runtime-2026-11-24/README.md)
+erzielt das [direkte Java-Profil](docs/native-polynomial-simplification.md)
+auf den 72 unterstützten Fall-IDs bei 69 dieselbe Operationszahl wie das
+feste SymPy-Portfolio und bei drei eine kleinere. Beide nativen Profile
+erreichen dieselbe Ergebnisqualität. In drei rotierten Wiederholungen auf vier
+CPUs lag die mediane Wandzeit pro Folge bei 1,80 Sekunden für das direkte
+Profil, 4,88 Sekunden für die native Basis und 1,91 Sekunden für SymPy.
+Eine zweite Messreihe ergab 2,32 Sekunden für das direkte Profil und 2,40
+für SymPy. In beiden Reihen war Java in zwei von drei gepaarten Läufen
+schneller. Das direkte Profil benötigte 4,16 bis 5,11 CPU-Sekunden und
+175 bis 177 MiB Spitzenspeicher, das Referenzportfolio 1,88 bis 2,39
+CPU-Sekunden und rund 47 MiB. Der
+[frühere Vergleich](docs/research/native-polynomial-parity-2026-11-06.md)
+dokumentiert die Ausgangsmessung.
+
+Das zusätzliche Horner-Verfahren konstruiert Darstellungen dünn besetzter
+Polynome und prüft ihre exakte Gleichheit mit der Eingabe. Auf den sechs
+gemeinsam auswertbaren Programmen der 37 Rosa-Programme sinkt die Summe der
+arithmetischen Operationen von 67 auf 41. Das originale Enumo erreicht 61.
+Auf zwei weiteren vollständigen Korpusdateien liegen drei von 46 Programmen
+im gemeinsamen Fragment. Hier erreicht das neue Verfahren auf einem Programm
+eine kleinere Form und auf zwei dieselbe Operationszahl wie Enumo.
+[Quellen, Einzelwerte und Laufzeiten](research/benchmarks/enumo-horner-v2/README.md)
+
+Das SDK wertet affine Summen und Maxima über typisierte Indexbereiche aus.
+Bei sechs von sieben unveränderten Alpha-Programmen stimmen alle 4.416
+Ausgabewerte mit der exakten Referenz und dem vom Originalcompiler erzeugten
+C-Code überein. Das frühere Profil konnte ein Programm gemeinsam prüfen.
+[SDK-Einstieg und vollständiger Alpha-Vergleich](docs/research/external-polyhedral-affine-v2.md)
+
+Für rationale Polynome kann die native Faktorisierung gefundene Faktoren im
+verbleibenden Budget weiter zerlegen und das Gesamtprodukt erneut prüfen. In
+38 Kaltstartanfragen stimmten die Faktorgrade einschließlich Vielfachheiten
+mit den separat verifizierten SymPy-Ausgaben überein.
+[Einzelmessungen und Grenzen der Arbeitsrechnung](docs/research/frozen-polynomial-external-prefixes-2026-11-24/wall-time/refined/README.md)
 
 ### Einen gelernten Pfad untersuchen
+
+Bei konsistenter Variablenumbenennung kann eine optionale Sitzung einen
+früheren Suchpfad neu binden und prüfen. Bei jeweils 80 Anfragen sank die
+gezählte Arbeit auf wiederholten Aufgaben um 12,3 Prozent und auf einer
+gemischten Folge um 1,2 Prozent. Neun Treffer betrafen zuvor ungesehene
+Eingaben. Auf der gemischten Folge stieg die mediane CPU-Zeit von 180 auf
+220 Millisekunden. [Messung und Java-Einstieg](docs/research/variable-renaming-query-path.md)
 
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und

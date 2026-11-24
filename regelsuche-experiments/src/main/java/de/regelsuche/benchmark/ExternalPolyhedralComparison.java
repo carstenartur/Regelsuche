@@ -15,6 +15,8 @@ import de.regelsuche.symbol.SymbolScope;
 import de.regelsuche.symbol.SymbolicExpression;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -153,17 +155,33 @@ public final class ExternalPolyhedralComparison {
 
     /** The subprocess accepts source and budgets, never expected outputs or case labels. */
     public static void main(String[] args) throws Exception {
-        if (args.length == 4 && args[0].equals("--native")) {
-            var request = JSON.readTree(Path.of(args[2]).toFile());
-            write(Path.of(args[3]), nativeRun(Files.readString(Path.of(args[1])), request));
+        if (args.length == 4 && (args[0].equals("--native") || args[0].equals("--native-affine"))) {
+            Path sourceFile = Path.of(args[1]), requestFile = Path.of(args[2]);
+            boolean affine = args[0].equals("--native-affine");
+            var request = affine ? JSON.readTree(readAffineMessage(requestFile)) : JSON.readTree(requestFile.toFile());
+            var source = affine ? StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(readAffineMessage(sourceFile))).toString()
+                : Files.readString(sourceFile);
+            var response = !affine
+                ? nativeRun(source, request) : AffineAlphaExperiment.nativeRun(source, request);
+            write(Path.of(args[3]), response);
         } else if (args.length == 3 && args[0].equals("--verify")) {
             audit(Path.of(args[1]), Path.of(args[2]));
+        } else if (args.length == 4 && args[0].equals("--affine")) {
+            runAffine(Path.of(args[1]), Path.of(args[2]), Path.of(args[3]));
         } else if (args.length == 3) {
             run(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]));
-        } else throw new IllegalArgumentException("checkout upstream output, or --native source request output");
+        } else throw new IllegalArgumentException("[--affine] checkout upstream output, or --native source request output");
     }
 
-    private static Map<String, Object> nativeRun(String source, JsonNode request) {
+    private static byte[] readAffineMessage(Path file) throws IOException {
+        try (var stream = Files.newInputStream(file)) {
+            var message = stream.readNBytes(65_537);
+            if (message.length > 65_536) throw new IllegalArgumentException("AFFINE_SUBPROCESS_MESSAGE_LIMIT");
+            return message;
+        }
+    }
+
+    static Map<String, Object> nativeRun(String source, JsonNode request) {
         long started = System.nanoTime();
         var response = new LinkedHashMap<String, Object>();
         Imported input;
@@ -208,6 +226,14 @@ public final class ExternalPolyhedralComparison {
     }
 
     public static Map<String, Object> run(Path checkout, Path upstream, Path output) throws Exception {
+        return run(checkout, upstream, output, false);
+    }
+
+    public static Map<String, Object> runAffine(Path checkout, Path upstream, Path output) throws Exception {
+        return run(checkout, upstream, output, true);
+    }
+
+    private static Map<String, Object> run(Path checkout, Path upstream, Path output, boolean affine) throws Exception {
         checkout = checkout.toAbsolutePath(); upstream = upstream.toAbsolutePath(); output = output.toAbsolutePath();
         var panel = protocol(checkout);
         if (Files.exists(output)) throw new IllegalArgumentException("OUTPUT_ALREADY_EXISTS");
@@ -219,7 +245,8 @@ public final class ExternalPolyhedralComparison {
         for (String key : List.of("limits", "rowCounts", "seeds")) request.set(key, panel.get(key));
         write(output.resolve("request.json"), request);
         var report = new LinkedHashMap<String, Object>();
-        report.put("schema", panel.path("schema").asText()); report.put("protocolSha256", PROTOCOL_HASH);
+        report.put("schema", affine ? AffineAlphaExperiment.SCHEMA : panel.path("schema").asText());
+        report.put("protocolSha256", PROTOCOL_HASH);
         report.put("upstreamRevision", panel.path("revision").asText()); report.put("java", System.getProperty("java.runtime.version"));
         report.put("platform", System.getProperty("os.name") + " " + System.getProperty("os.arch") + " " + System.getProperty("os.version"));
         report.put("processors", Runtime.getRuntime().availableProcessors()); report.put("limits", request.path("limits"));
@@ -227,6 +254,8 @@ public final class ExternalPolyhedralComparison {
         report.put("acquisitionCost", "NOT_MEASURED: pinned original prebuilt artifact; checkout/download excluded from query phases.");
         report.put("memoryBoundary", "512 MiB Java heap per subprocess; native/JNI/process RSS is not a hard-capped comparable work measure.");
         report.put("nativeRevision", commandText(List.of("git", "rev-parse", "HEAD"), checkout, output.resolve("native-revision")));
+        if (affine) report.put("nativeWorkingTree", commandText(List.of("git", "status", "--porcelain"),
+            checkout, output.resolve("native-working-tree")));
         report.put("gcc", commandText(List.of("gcc", "--version"), checkout, output.resolve("gcc-version")));
         report.put("timingInterpretation", "One cold run; phase diagnostics only, no relative speed ranking or common instruction-count claim.");
         var rows = new ArrayList<Map<String, Object>>();
@@ -234,17 +263,12 @@ public final class ExternalPolyhedralComparison {
             Path directory = output.resolve(entry.path("id").asText()); Files.createDirectories(directory);
             Path source = directory.resolve("input.alpha"); Files.writeString(source, entry.path("source").asText());
             if (!hash(Files.readAllBytes(source)).equals(entry.path("sha256").asText())) throw new IllegalStateException("SOURCE_HASH");
-            Optional<Imported> imported;
-            try { imported = Optional.of(parse(Files.readString(source))); }
-            catch (IllegalArgumentException unsupported) { imported = Optional.empty(); }
+            var imported = AffineAlphaExperiment.importSource(Files.readString(source), affine);
             long judgeStarted = System.nanoTime();
-            var expected = new ArrayList<Map<String, Object>>();
-            if (imported.isPresent()) for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds"))
-                expected.add(Map.of("rows", count.intValue(), "seed", seed.intValue(), "values",
-                    oracle(imported.orElseThrow(), count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));
+            var expected = imported.map(input -> expectedOutputs(panel, input)).orElseGet(List::of);
             long oracleNanos = System.nanoTime() - judgeStarted;
             write(directory.resolve("oracle.json"), expected);
-            rows.add(nativeRow(entry, panel, checkout, output, directory, source, expected, oracleNanos));
+            rows.add(nativeRow(entry, panel, checkout, output, directory, source, expected, oracleNanos, affine));
             rows.add(externalRow(entry, panel, upstream, directory, source, imported, expected, oracleNanos));
             report.put("rows", rows); write(output.resolve("results.json"), report);
         }
@@ -267,9 +291,12 @@ public final class ExternalPolyhedralComparison {
         auditManifest(output, manifest);
         var report = JSON.readTree(output.resolve("results.json").toFile());
         if (!report.path("protocolSha256").asText().equals(PROTOCOL_HASH)) throw new IllegalArgumentException("REPORT_PROTOCOL");
+        String schema = report.path("schema").asText();
+        boolean affine = schema.equals(AffineAlphaExperiment.SCHEMA);
+        if (!affine && !schema.equals(panel.path("schema").asText())) throw new IllegalArgumentException("REPORT_SCHEMA");
         var expectedKeys = new HashSet<String>(); var observedKeys = new HashSet<String>();
         var cases = retainedCases(output, panel, expectedKeys);
-        for (var row : report.path("rows")) auditRow(output, panel, manifest, cases, observedKeys, row);
+        for (var row : report.path("rows")) auditRow(output, panel, manifest, cases, observedKeys, row, affine);
         if (!expectedKeys.equals(observedKeys)) throw new IllegalArgumentException("INCOMPLETE_RETAINED_MATRIX");
     }
 
@@ -295,7 +322,7 @@ public final class ExternalPolyhedralComparison {
     }
 
     private static void auditRow(Path output, JsonNode panel, JsonNode manifest,
-            Map<String, JsonNode> cases, HashSet<String> observedKeys, JsonNode row) throws Exception {
+            Map<String, JsonNode> cases, HashSet<String> observedKeys, JsonNode row, boolean affine) throws Exception {
         String id = row.path("case").asText(), arm = row.path("arm").asText();
         if (!observedKeys.add(id + "@" + arm) || !cases.containsKey(id)
                 || !cases.get(id).path("sha256").asText().equals(row.path("sourceSha256").asText()))
@@ -310,12 +337,18 @@ public final class ExternalPolyhedralComparison {
         if (!row.path("judgment").asText().equals("VERIFIED_FINITE_OUTPUTS")) return;
         JsonNode actual = nativeArm ? retainedNativeOutputs(panel, row, nativeResponse)
             : retainedOriginalOutputs(output, panel, manifest, row, id);
-        var input = parse(cases.get(id).path("source").asText());
+        var input = AffineAlphaExperiment.importSource(cases.get(id).path("source").asText(), affine)
+            .orElseThrow(() -> new IllegalArgumentException("RETAINED_SOURCE_UNSUPPORTED"));
+        var expected = expectedOutputs(panel, input);
+        if (!JSON.valueToTree(expected).equals(actual)) throw new IllegalArgumentException("RETAINED_OUTPUT_MISMATCH");
+    }
+
+    private static List<Map<String, Object>> expectedOutputs(JsonNode panel, AffineAlphaExperiment.Input input) {
         var expected = new ArrayList<Map<String, Object>>();
         for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds"))
             expected.add(Map.of("rows", count.intValue(), "seed", seed.intValue(), "values",
-                oracle(input, count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));
-        if (!JSON.valueToTree(expected).equals(actual)) throw new IllegalArgumentException("RETAINED_OUTPUT_MISMATCH");
+                input.oracle(count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));
+        return expected;
     }
 
     private static JsonNode retainedNativeOutputs(JsonNode panel, JsonNode row, JsonNode nativeResponse) {
@@ -362,11 +395,11 @@ public final class ExternalPolyhedralComparison {
     }
 
     private static Map<String, Object> nativeRow(JsonNode entry, JsonNode panel, Path checkout, Path output,
-            Path directory, Path source, List<Map<String, Object>> expected, long oracleNanos) throws Exception {
+            Path directory, Path source, List<Map<String, Object>> expected, long oracleNanos, boolean affine) throws Exception {
         var row = row(entry, "REGELSUCHE_ORDERED_PREFIX", oracleNanos);
         var command = List.of(java(), "-Xmx" + panel.at("/limits/javaHeapMiB").intValue() + "m", "-cp",
             System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")),
-            ExternalPolyhedralComparison.class.getName(), "--native", source.toString(),
+            ExternalPolyhedralComparison.class.getName(), affine ? "--native-affine" : "--native", source.toString(),
             output.resolve("request.json").toString(), directory.resolve("native.json").toString());
         var process = process(command, checkout, Map.of(), directory.resolve("native"), panel.at("/limits/synthesisSeconds").intValue());
         row.put("process", process); row.put("command", command);
@@ -382,7 +415,7 @@ public final class ExternalPolyhedralComparison {
     }
 
     private static Map<String, Object> externalRow(JsonNode entry, JsonNode panel, Path upstream, Path directory,
-            Path source, Optional<Imported> imported, List<Map<String, Object>> expected, long oracleNanos) throws Exception {
+            Path source, Optional<AffineAlphaExperiment.Input> imported, List<Map<String, Object>> expected, long oracleNanos) throws Exception {
         var row = row(entry, "ORIGINAL_ALPHA_COMPILER", oracleNanos);
         var command = new ArrayList<String>(); command.add(upstream.resolve("acc").toString());
         panel.path("originalOptions").forEach(option -> command.add(option.asText()));
@@ -402,15 +435,18 @@ public final class ExternalPolyhedralComparison {
         if (imported.isEmpty()) { row.put("judgment", "OUTSIDE_COMMON_FRAGMENT"); return row; }
         if (generated.exceeded(panel.at("/limits/synthesisSeconds").intValue())) { row.put("judgment", "TIMEOUT"); return row; }
         if (generated.exit() == 125) { row.put("judgment", "OUTPUT_LIMIT"); return row; }
-        String name = imported.orElseThrow().name(); Path base = directory.resolve("generated").resolve(name);
+        var input = imported.orElseThrow();
+        String name = input.name(); Path base = directory.resolve("generated").resolve(name);
         Path simplified = base.resolve("simplifications/v0/" + name + ".c");
         Path selected = Files.exists(simplified) ? simplified : base.resolve(name + ".c");
         row.put("candidateKind", !Files.exists(selected) ? "NONE" : Files.exists(simplified) ? "SIMPLIFIED" : "BASELINE_FALLBACK");
         if (!Files.exists(selected)) { row.put("judgment", "NO_GENERATED_CANDIDATE"); return row; }
         row.put("candidateSha256", hash(Files.readAllBytes(selected)));
         Path driver = directory.resolve("driver.c"), binary = directory.resolve("candidate");
-        Files.writeString(driver, driver(name));
+        Files.writeString(driver, input.driver());
         var compile = new ArrayList<String>(); compile.add("gcc"); panel.path("compilerOptions").forEach(o -> compile.add(o.asText()));
+        boolean checkAddresses = input.affine().isPresent();
+        if (checkAddresses) Collections.addAll(compile, "-fsanitize=address", "-no-pie");
         Collections.addAll(compile, selected.toString(), driver.toString(), "-lm", "-o", binary.toString());
         var compiled = process(compile, directory, Map.of(), directory.resolve("compile"), panel.at("/limits/compileSeconds").intValue());
         row.put("compileProcess", compiled); row.put("compileCommand", compile);
@@ -419,7 +455,8 @@ public final class ExternalPolyhedralComparison {
         var actual = new ArrayList<Map<String, Object>>(); var executions = new ArrayList<Execution>();
         for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds")) {
             Path log = directory.resolve("run-" + count.intValue() + "-" + seed.intValue());
-            var executed = process(List.of(binary.toString(), count.asText(), seed.asText()), directory, Map.of(), log,
+            var runtime = checkAddresses ? Map.of("ASAN_OPTIONS", "detect_leaks=0") : Map.<String, String>of();
+            var executed = process(input.command(binary, count.intValue(), seed.intValue()), directory, runtime, log,
                 panel.at("/limits/executionSeconds").intValue()); executions.add(executed);
             if (executed.exit() != 0 || executed.exceeded(panel.at("/limits/executionSeconds").intValue())) {
                 row.put("judgment", "EXECUTION_FAILED"); row.put("executions", executions); return row;
@@ -433,7 +470,7 @@ public final class ExternalPolyhedralComparison {
         return row;
     }
 
-    private static String driver(String name) {
+    static String driver(String name) {
         return "#include <stdio.h>\n#include <stdlib.h>\nvoid " + name + "(long,long*,long*);\n"
             + "int main(int argc,char**argv){if(argc!=3)return 2;long n=strtol(argv[1],0,10),s=strtol(argv[2],0,10);"
             + "if(n<2||n>20||s<0||s>2)return 3;if(sizeof(long)!=8)return 4;long x[20],y[20]={0};"

@@ -10,6 +10,9 @@ import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scalar.ExactRational;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.LongConsumer;
 
 /**
  * Bounded source-exact projection into the existing Polynomial arithmetic.
@@ -60,9 +63,11 @@ final class ExactResidualPolynomialArithmetic {
 
     Polynomial parse(String expression) {
         ExactParsedTerm parsed = exactTerm(expression);
-        var work = new Work();
-        try { return convert(parsed.expression(), parsed, work); }
-        finally {
+        var work = new Work(Integer.MAX_VALUE, null, includeProductWork);
+        try {
+            return convert(parsed.expression(), number -> parsed.literalFor(number)
+                .map(ExactParsedTerm.LiteralOccurrence::exactValue), work);
+        } finally {
             if (workObserver != null) {
                 long units = Math.addExact(work.nodes, work.terms);
                 workObserver.accept(includeProductWork ? Math.addExact(units, work.products) : units);
@@ -70,29 +75,31 @@ final class ExactResidualPolynomialArithmetic {
         }
     }
 
-    private Polynomial convert(Expr node, ExactParsedTerm parsed, Work work) {
-        work.nodes++;
+    /** Typed producers retain exact rational leaves independently of textual occurrence provenance. */
+    Polynomial project(Expr expression) {
+        return convert(expression, number -> Optional.of(number.value()), new Work(513, workObserver, includeProductWork));
+    }
+
+    private Polynomial convert(Expr node, Function<NumberExpr, Optional<ExactRational>> literals, Work work) {
+        work.visit();
         if (node instanceof NumberExpr number) {
-            // ExactParsedTerm validates that the only unbacked numeric node is
-            // the zero synthesized by its own unary-minus parser production.
-            ExactRational value = parsed.literalFor(number)
-                .map(ExactParsedTerm.LiteralOccurrence::exactValue)
-                .orElse(ExactRational.ZERO);
+            // Only parser-synthesized zero lacks a textual occurrence.
+            ExactRational value = literals.apply(number).orElse(ExactRational.ZERO);
             return checked(Polynomial.constant(Rational.fromExact(value)), work);
         }
         if (node instanceof VariableExpr variable) {
-            work.terms++;
+            work.terms(1);
             return Polynomial.variable(variable.name());
         }
         if (!(node instanceof BinaryExpr binary)) {
             throw new IllegalArgumentException("non-polynomial residual term");
         }
-        Polynomial left = convert(binary.left(), parsed, work);
+        Polynomial left = convert(binary.left(), literals, work);
         if (binary.operator() == BinaryOperator.POW) {
-            work.nodes++;
-            return power(left, exponent(binary.right(), parsed), work);
+            work.visit();
+            return power(left, exponent(binary.right(), literals), work);
         }
-        Polynomial right = convert(binary.right(), parsed, work);
+        Polynomial right = convert(binary.right(), literals, work);
         return switch (binary.operator()) {
             case ADD -> add(left, right, false, work);
             case SUB -> add(left, right, true, work);
@@ -102,14 +109,12 @@ final class ExactResidualPolynomialArithmetic {
         };
     }
 
-    private static int exponent(Expr node, ExactParsedTerm parsed) {
+    private static int exponent(Expr node, Function<NumberExpr, Optional<ExactRational>> literals) {
         if (!(node instanceof NumberExpr number)) {
             throw new IllegalArgumentException("exponent must be a literal");
         }
-        ExactRational value = parsed.literalFor(number)
-            .orElseThrow(() -> new IllegalArgumentException(
-                "exponent lacks exact provenance"))
-            .exactValue();
+        ExactRational value = literals.apply(number)
+            .orElseThrow(() -> new IllegalArgumentException("exponent lacks exact provenance"));
         if (!value.isInteger() || value.numerator().signum() < 0
                 || value.numerator().bitLength() > 6
                 || value.numerator().intValue() > MAX_EXPONENT) {
@@ -120,7 +125,7 @@ final class ExactResidualPolynomialArithmetic {
 
     private static Polynomial power(Polynomial base, int exponent, Work work) {
         Polynomial result = Polynomial.constant(Rational.ONE);
-        work.terms = Math.addExact(work.terms, result.termCount());
+        work.terms(result.termCount());
         Polynomial factor = base;
         int remaining = exponent;
         while (remaining != 0) {
@@ -172,7 +177,7 @@ final class ExactResidualPolynomialArithmetic {
     }
 
     private static Polynomial checked(Polynomial polynomial, Work work) {
-        work.terms = Math.addExact(work.terms, polynomial.termCount());
+        work.terms(polynomial.termCount());
         if (polynomial.termCount() > MAX_TERMS
                 || polynomial.totalDegree() > MAX_DEGREE) {
             throw new IllegalArgumentException("residual polynomial size limit");
@@ -198,14 +203,34 @@ final class ExactResidualPolynomialArithmetic {
     }
 
     private static final class Work {
+        private final int maxNodes;
+        private final LongConsumer observer;
+        private final boolean includeProducts;
         private long products;
         private long nodes;
         private long terms;
+
+        private Work(int maxNodes, LongConsumer observer, boolean includeProducts) {
+            this.maxNodes = maxNodes;
+            this.observer = observer;
+            this.includeProducts = includeProducts;
+        }
+
+        private void visit() {
+            if (++nodes > maxNodes) throw new IllegalArgumentException("residual AST work limit");
+            if (observer != null) observer.accept(1);
+        }
+
+        private void terms(int count) {
+            terms = Math.addExact(terms, count);
+            if (observer != null) observer.accept(count);
+        }
 
         private void consume(long count) {
             if (count > MAX_TERM_PRODUCTS - products) {
                 throw new IllegalArgumentException("residual arithmetic work limit");
             }
+            if (observer != null && includeProducts) observer.accept(count);
             products += count;
         }
     }

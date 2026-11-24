@@ -63,8 +63,18 @@ public final class ExactNestedFactorizationTransformationPipeline {
     }
 
     public ExactNestedFactorizationTransformationPipeline(PolynomialWorkAuthority authority) {
+        this(authority, new ExactParsedSubtermProjector(ExactParsedSubtermProjector.Policy.boundedDefaults(), authority));
+    }
+
+    public static ExactNestedFactorizationTransformationPipeline withParserRootReuse(PolynomialWorkAuthority authority) {
+        return new ExactNestedFactorizationTransformationPipeline(authority,
+            ExactParsedSubtermProjector.withParserRootReuse(ExactParsedSubtermProjector.Policy.boundedDefaults(), authority));
+    }
+
+    private ExactNestedFactorizationTransformationPipeline(PolynomialWorkAuthority authority,
+            ExactParsedSubtermProjector projector) {
         this(
-            new ExactParsedSubtermProjector(ExactParsedSubtermProjector.Policy.boundedDefaults(), authority),
+            projector,
             new ExactParsedUnivariatePolynomialView(ExactParsedUnivariatePolynomialView.DEFAULT_BUDGET, authority),
             new ExactFactorizationExpressionRenderer(ExactFactorizationExpressionRenderer.Policy.boundedDefaults(), authority),
             new ExpressionParser(),
@@ -508,6 +518,10 @@ public final class ExactNestedFactorizationTransformationPipeline {
                 "SELECTED_OCCURRENCE_IDENTITY_CHANGED_BEFORE_APPLICATION");
         }
 
+        // The immutable parser root already passed the formatter guard during projection.
+        if (prepared.projected() == root) {
+            return selected;
+        }
         work.consume(
             "nested.application-staleness-format-node-visits",
             prepared.projection().work().units(

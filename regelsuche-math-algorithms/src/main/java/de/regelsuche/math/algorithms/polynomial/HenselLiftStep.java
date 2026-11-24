@@ -6,6 +6,7 @@ import java.util.Objects;
 
 /** Issuer-owned verified transition from p^e to p^(e + 1). */
 public final class HenselLiftStep {
+    private static final java.util.regex.Pattern HASH = java.util.regex.Pattern.compile("sha256:[0-9a-f]{64}");
     private final State state;
 
     private HenselLiftStep(State state) {
@@ -153,20 +154,16 @@ public final class HenselLiftStep {
                     || !toModulus.mod(fromModulus).equals(
                         BigInteger.ZERO)
                     || errorPolynomialHash == null
-                    || !errorPolynomialHash.matches(
-                        "sha256:[0-9a-f]{64}")
+                    || !HASH.matcher(errorPolynomialHash).matches()
                     || correctionPolynomialHashes.isEmpty()
                     || correctionPolynomialHashes.stream().anyMatch(
                         hash -> hash == null
-                            || !hash.matches(
-                                "sha256:[0-9a-f]{64}"))
+                            || !HASH.matcher(hash).matches())
                     || liftedProductHash == null
-                    || !liftedProductHash.matches(
-                        "sha256:[0-9a-f]{64}")
+                    || !HASH.matcher(liftedProductHash).matches()
                     || workUnits < 1
                     || certificateHash == null
-                    || !certificateHash.matches(
-                        "sha256:[0-9a-f]{64}")) {
+                    || !HASH.matcher(certificateHash).matches()) {
                 throw new IllegalArgumentException(
                     "Hensel lift step is invalid");
             }

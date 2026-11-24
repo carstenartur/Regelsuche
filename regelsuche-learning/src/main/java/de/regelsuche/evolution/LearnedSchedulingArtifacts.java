@@ -1,9 +1,13 @@
 package de.regelsuche.evolution;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.search.moves.*;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.lang.reflect.RecordComponent;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -16,6 +20,14 @@ import java.util.TreeMap;
 /** Canonical evidence and scientific qualification are a layer above the mathematical search. */
 public final class LearnedSchedulingArtifacts {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ClassValue<RecordComponent[]> COMPONENTS = new ClassValue<>() {
+        @Override protected RecordComponent[] computeValue(Class<?> type) {
+            var components = type.getRecordComponents();
+            Arrays.sort(components, Comparator.comparing(RecordComponent::getName));
+            return components;
+        }
+    };
+
     private LearnedSchedulingArtifacts() {}
     public static String modelJson(LearnedSchedulingModel model) {
         return json(Map.of("knowledge", model.knowledge().toCanonicalJson(), "traces", model.traces(), "activity", model.activity(),
@@ -126,8 +138,11 @@ public final class LearnedSchedulingArtifacts {
         payload.put("completeBoundedRelation", result.completeBoundedRelation()); payload.put("witness", result.witness()); payload.put("events", result.events());
         payload.put("reachedStates", result.reachedStates()); payload.put("deadEndStates", result.deadEndStates()); payload.put("metrics", result.metrics());
         payload.put("totalWork", result.metrics().totalWork()); payload.put("effectiveBranchingFactor", result.metrics().effectiveBranchingFactor());
+        record Assessment(String key, Map<String, Object> value) { }
         payload.put("stateAssessments", result.stateAssessments().entrySet().stream()
-            .map(entry -> Map.of("state", entry.getKey(), "assessment", entry.getValue())).sorted(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)).toList());
+            .map(entry -> Map.<String, Object>of("state", entry.getKey(), "assessment", entry.getValue()))
+            .map(value -> new Assessment(json(value), value)).sorted(Comparator.comparing(Assessment::key))
+            .map(Assessment::value).toList());
         return payload;
     }
     private static String csv(LearnedSchedulingStudy.Report report) {
@@ -146,33 +161,70 @@ public final class LearnedSchedulingArtifacts {
         return csv.toString();
     }
     public static String json(Object value) {
-        try { return JSON.writeValueAsString(normalize(value)); }
-        catch (IOException | ReflectiveOperationException exception) { throw new IllegalStateException("cannot write canonical scheduling evidence", exception); }
+        var buffer = new StringWriter();
+        try (JsonGenerator writer = JSON.getFactory().createGenerator(buffer)) {
+            writeValue(writer, value);
+        } catch (IOException | ReflectiveOperationException exception) {
+            throw new IllegalStateException("cannot write canonical scheduling evidence", exception);
+        }
+        return buffer.toString();
     }
-    private static Object normalize(Object value) throws ReflectiveOperationException, IOException {
-        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;
-        if (value instanceof Enum<?> enumeration) return enumeration.name();
-        // An observational binding may be serialized; it cannot reconstruct the private capability.
-        if (value instanceof de.regelsuche.transform.ExactTheoryEvidence evidence)
-            return Map.of("binding", normalize(evidence.binding()));
-        if (value instanceof Map<?, ?> map) {
-            var result = new TreeMap<String, Object>();
-            for (var entry : map.entrySet()) result.put((String) entry.getKey(), normalize(entry.getValue())); return result;
-        }
-        if (value instanceof Collection<?> collection) {
-            var result = new ArrayList<Object>(); for (Object element : collection) result.add(normalize(element));
-            if (value instanceof Set<?>) result.sort(java.util.Comparator.comparing(LearnedSchedulingArtifacts::json)); return result;
-        }
-        if (value.getClass().isRecord()) {
-            var result = new TreeMap<String, Object>();
-            for (RecordComponent component : value.getClass().getRecordComponents()) {
-                Object part = component.getAccessor().invoke(value);
-                if (value instanceof de.regelsuche.search.moves.IncrementalProviderContract.Work
-                        && component.getName().equals("prepaidApplications") && part == null) continue;
-                result.put(component.getName(), normalize(part));
+
+    private static void writeValue(JsonGenerator writer, Object value) throws IOException, ReflectiveOperationException {
+        switch (value) {
+            case null -> writer.writeNull();
+            case String string -> writer.writeString(string);
+            case Number number -> writer.writeObject(number);
+            case Boolean flag -> writer.writeBoolean(flag);
+            case Enum<?> enumeration -> writer.writeString(enumeration.name());
+            case de.regelsuche.transform.ExactTheoryEvidence evidence -> {
+                writer.writeStartObject();
+                writer.writeFieldName("binding");
+                writeValue(writer, evidence.binding());
+                writer.writeEndObject();
             }
-            return result;
+            case Map<?, ?> map -> writeMap(writer, map);
+            case Set<?> set -> writeSet(writer, set);
+            case Collection<?> collection -> writeCollection(writer, collection);
+            default -> writeRecord(writer, value);
         }
-        throw new IllegalArgumentException("unsupported evidence value: " + value.getClass());
+    }
+
+    private static void writeMap(JsonGenerator writer, Map<?, ?> map) throws IOException, ReflectiveOperationException {
+        writer.writeStartObject();
+        for (String key : map.keySet().stream().map(String.class::cast).sorted().toList()) {
+            writer.writeFieldName(key);
+            writeValue(writer, map.get(key));
+        }
+        writer.writeEndObject();
+    }
+
+    private static void writeSet(JsonGenerator writer, Set<?> set) throws IOException {
+        writer.writeStartArray();
+        var elements = set.stream().map(LearnedSchedulingArtifacts::json).sorted().toList();
+        for (String element : elements) writer.writeRawValue(element);
+        writer.writeEndArray();
+    }
+
+    private static void writeCollection(JsonGenerator writer, Collection<?> collection)
+            throws IOException, ReflectiveOperationException {
+        writer.writeStartArray();
+        for (Object element : collection) writeValue(writer, element);
+        writer.writeEndArray();
+    }
+
+    private static void writeRecord(JsonGenerator writer, Object value) throws IOException, ReflectiveOperationException {
+        if (!value.getClass().isRecord()) {
+            throw new IllegalArgumentException("unsupported evidence value: " + value.getClass());
+        }
+        writer.writeStartObject();
+        for (RecordComponent component : COMPONENTS.get(value.getClass())) {
+            Object part = component.getAccessor().invoke(value);
+            if (value instanceof IncrementalProviderContract.Work
+                    && component.getName().equals("prepaidApplications") && part == null) continue;
+            writer.writeFieldName(component.getName());
+            writeValue(writer, part);
+        }
+        writer.writeEndObject();
     }
 }

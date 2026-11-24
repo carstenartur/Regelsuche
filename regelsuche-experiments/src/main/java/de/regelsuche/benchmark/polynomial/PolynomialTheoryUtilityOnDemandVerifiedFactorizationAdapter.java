@@ -201,6 +201,12 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
 
     static Occurrence executeOccurrence(ExactParsedTerm parsed, List<Integer> path,
             PolynomialTheoryUtilityWorkAuthority authority, Supplier<FactorizationEngine<ExactRational>> engine) {
+        return executeOccurrence(parsed, path, authority, engine, false);
+    }
+
+    static Occurrence executeOccurrence(ExactParsedTerm parsed, List<Integer> path,
+            PolynomialTheoryUtilityWorkAuthority authority, Supplier<FactorizationEngine<ExactRational>> engine,
+            boolean reuseParserRoot) {
         var before = authority.work();
         ExactNestedFactorizationTransformationPipeline.Result nested = null;
         try {
@@ -212,8 +218,9 @@ public final class PolynomialTheoryUtilityOnDemandVerifiedFactorizationAdapter
             var selected = new TreePosition(path, "pending").subtreeAt(parsed.expression()).orElseThrow();
             var position = new TreePosition(path, ExpressionFormatter.formatMeasured(selected,
                 units -> authority.consume("projection.study-position-format-code-units", units)));
-            nested = new ExactNestedFactorizationTransformationPipeline(authority).transform(parsed, position,
-                engine.get(), 0);
+            var pipeline = reuseParserRoot ? ExactNestedFactorizationTransformationPipeline.withParserRootReuse(authority)
+                : new ExactNestedFactorizationTransformationPipeline(authority);
+            nested = pipeline.transform(parsed, position, engine.get(), 0);
             if (nested.transformed()) {
                 var expansion = VerifiedTransition.from(nested.transformation().orElseThrow()).primitiveExpansion();
                 if (expansion.size() != PRIMITIVE_EXPANSION_LENGTH) {

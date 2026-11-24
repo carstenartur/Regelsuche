@@ -95,7 +95,7 @@ public class ExpressionParser implements RetainedGraph.View {
         Cursor cursor = new Cursor(source, true, offset);
         Expr expr = parseExpression(cursor);
         requireEnd(cursor);
-        return new ExactParsedTerm(
+        return ExactParsedTerm.parserRoot(
             source,
             expr,
             cursor.exactLiterals(),

@@ -18,6 +18,19 @@ class ExactRationalDomainTest {
         new ExactRationalDomain();
 
     @Test
+    void digitEvidenceMatchesFreshReplayAndRespectsDeclaredLimits() {
+        var standard = new ExactRationalDomain();
+        var restricted = new ExactRationalDomain(new ExactRationalDomain.Limits(3, 1, 0));
+        for (int n = 0; n <= 9; n++) {
+            String text = Integer.toString(n);
+            var issued = standard.parse(text);
+            assertEquals(standard.parseEvidence(text), issued);
+            assertEquals(ExactRationalEvidenceVerifier.Status.VERIFIED_EXACT, issued.verify().status());
+            assertEquals(restricted.limits(), restricted.parse(text).limits());
+        }
+    }
+
+    @Test
     void decimalDiagnosticsRetainPrecisionAndRoundingWithoutCreatingAnExactLeaf() {
         var third = ExactRational.parse("1/3");
         var up = new MathContext(3, RoundingMode.UP);

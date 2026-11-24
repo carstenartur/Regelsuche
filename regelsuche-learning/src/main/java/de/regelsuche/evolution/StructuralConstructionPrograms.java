@@ -7,12 +7,15 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.math.algorithms.equivalence.AlgebraicConstruction;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer;
+import de.regelsuche.math.algorithms.equivalence.SparsePolynomialHorner;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.ExactMonomialSquareExposureOperator;
 import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.SquareBaseSignSymmetryOperator;
 import de.regelsuche.transform.SumOfSquaresCompletionOperator;
 import de.regelsuche.transform.SubtreeHypothesisOperator;
@@ -26,14 +29,20 @@ final class StructuralConstructionPrograms {
     enum Operation { EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE,
         BINARY_QUARTIC, RESIDUAL_EXPANDED, AUXILIARY_COMPLEMENT, AUXILIARY_FACTOR, RECOGNIZE_SQUARE,
         RATIONAL_EXPOSE_SQUARE, RECOGNIZE_RATIONAL_SQUARE, RECOGNIZE_METERED_SQUARE,
-        POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR }
+        POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR,
+        POLYNOMIAL_HORNER, POLYNOMIAL_DIRECT }
     record Report(List<String> candidates, long work) { Report { candidates = List.copyOf(candidates); } }
     private static final long LIMIT = 100_000;
     private StructuralConstructionPrograms() { }
 
     static Report generate(Operation operation, Expr source) {
-        var work = new Work();
+        var work = operation == Operation.POLYNOMIAL_HORNER ? new Work(4_096) : new Work();
         try {
+            if (operation == Operation.POLYNOMIAL_HORNER) {
+                var candidate = SparsePolynomialHorner.propose(source, work::add);
+                return new Report(candidate.stream()
+                    .map(expression -> ExpressionFormatter.formatMeasured(expression, work::add)).toList(), work.units());
+            }
             var domain = new CheckedSchemaSupport.Work();
             try {
                 CheckedSchemaSupport.domain(source, CheckedLearnedSchemaModel.Bounds.defaults(), domain);
@@ -57,6 +66,8 @@ final class StructuralConstructionPrograms {
                 case RECOGNIZE_METERED_SQUARE -> recognizeSquare(text, work, false, true);
                 case POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR ->
                     PolynomialSimplificationPrograms.generate(operation, source, LIMIT - work.units, work::add);
+                case POLYNOMIAL_HORNER -> throw new IllegalStateException("Horner handled before legacy generation");
+                case POLYNOMIAL_DIRECT -> throw new IllegalStateException("direct portfolio requires a request budget");
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {
@@ -74,9 +85,17 @@ final class StructuralConstructionPrograms {
         }
         return List.copyOf(result);
     }
-    private static List<String> factorDifference(String source, Work work) {
-        var rules = AstRewriteTransformationEngine.allBuiltInRules().stream()
+    private static final class DifferenceOfSquares {
+        static final List<RewriteRule> RULES = differenceOfSquaresRules();
+    }
+
+    private static List<RewriteRule> differenceOfSquaresRules() {
+        return AstRewriteTransformationEngine.allBuiltInRules().stream()
             .filter(rule -> rule.id().equals("ast_square_difference_factor")).toList();
+    }
+
+    private static List<String> factorDifference(String source, Work work) {
+        var rules = RetainedOperation.isObserved() ? differenceOfSquaresRules() : DifferenceOfSquares.RULES;
         return apply(new AstRewriteTransformationEngine(rules)::transform, source, work);
     }
 
