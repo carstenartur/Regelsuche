@@ -96,3 +96,25 @@ Originalarchiv und Messquellstand-Bundle sind erneut geprüft und unverändert.
 Das Bundle bewahrt weiterhin den ursprünglichen Messquellstand; die spätere
 Auditor-/Importkorrektur wird nicht rückwirkend als damals verwendeter Code
 ausgegeben.
+
+## CI-Kontrolle der Methodenkomplexität
+
+Die reguläre CI des Piloten wies die erweiterte `audit`-Methode als neuen
+Komplexitätsschwerpunkt zurück (kognitiv 61, zyklomatisch 30). Die Prüfung ist
+jetzt in Manifestbindung, Fallinventar, einzelne Ergebniszeilen und die beiden
+Rohoutputpfade gegliedert. Alle bisherigen Prüfschritte bleiben erhalten.
+Weder Hotspot-Policy noch Baseline oder Schwellenwerte wurden geändert.
+
+Die unveränderte AST-Messung des gepinnten Extractors v0.1.10 reproduziert die
+ursprünglichen 61/30 exakt. Nach der Zerlegung liegen sämtliche Methoden
+dieser Klasse höchstens bei 26/20; die neue Zeilenprüfung liegt bei 12/11.
+Das ist eine gezielte Methodenmessung, kein Ersatz für die vollständige CI.
+
+Der erneut aktivierte Archiv-Replay und seine Manipulationskontrollen bestehen:
+elf ausgeführte Tests, null Fehler, ein bewusst nicht gestarteter vollständiger
+Originalcompilerlauf. Die historischen Messquellen, Ergebnisdateien und
+Rohbelege bleiben bytegleich. Die Hashangaben des vorherigen Abschnitts
+bezeichnen weiterhin den damaligen Reviewstand vor dieser reinen Zerlegung.
+
+[Methodenmessung](audit-decomposition-metrics.json) ·
+[Erneut ausgeführte Archivkontrollen](review-audit-decomposition-green.log.gz)

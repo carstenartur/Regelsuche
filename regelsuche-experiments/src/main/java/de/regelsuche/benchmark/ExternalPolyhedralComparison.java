@@ -264,15 +264,26 @@ public final class ExternalPolyhedralComparison {
         output = output.toAbsolutePath().normalize();
         var panel = protocol(checkout);
         var manifest = JSON.readTree(output.resolve("manifest.json").toFile());
+        auditManifest(output, manifest);
+        var report = JSON.readTree(output.resolve("results.json").toFile());
+        if (!report.path("protocolSha256").asText().equals(PROTOCOL_HASH)) throw new IllegalArgumentException("REPORT_PROTOCOL");
+        var expectedKeys = new HashSet<String>(); var observedKeys = new HashSet<String>();
+        var cases = retainedCases(output, panel, expectedKeys);
+        for (var row : report.path("rows")) auditRow(output, panel, manifest, cases, observedKeys, row);
+        if (!expectedKeys.equals(observedKeys)) throw new IllegalArgumentException("INCOMPLETE_RETAINED_MATRIX");
+    }
+
+    private static void auditManifest(Path output, JsonNode manifest) throws Exception {
         for (var fields = manifest.fields(); fields.hasNext();) {
             var entry = fields.next();
             Path file = output.resolve(entry.getKey()).normalize();
             if (!file.startsWith(output.normalize()) || !hash(Files.readAllBytes(file)).equals(entry.getValue().asText()))
                 throw new IllegalArgumentException("EVIDENCE_FILE_CHANGED");
         }
-        var report = JSON.readTree(output.resolve("results.json").toFile());
-        if (!report.path("protocolSha256").asText().equals(PROTOCOL_HASH)) throw new IllegalArgumentException("REPORT_PROTOCOL");
-        var expectedKeys = new HashSet<String>(); var observedKeys = new HashSet<String>();
+    }
+
+    private static Map<String, JsonNode> retainedCases(Path output, JsonNode panel,
+            HashSet<String> expectedKeys) throws Exception {
         var cases = new LinkedHashMap<String, JsonNode>();
         for (var entry : panel.path("cases")) {
             cases.put(entry.path("id").asText(), entry);
@@ -280,52 +291,60 @@ public final class ExternalPolyhedralComparison {
                     .equals(entry.path("sha256").asText())) throw new IllegalArgumentException("RETAINED_SOURCE_CHANGED");
             for (var arm : panel.path("arms")) expectedKeys.add(entry.path("id").asText() + "@" + arm.asText());
         }
-        for (var row : report.path("rows")) {
-            String id = row.path("case").asText(), arm = row.path("arm").asText();
-            if (!observedKeys.add(id + "@" + arm) || !cases.containsKey(id)
-                    || !cases.get(id).path("sha256").asText().equals(row.path("sourceSha256").asText()))
-                throw new IllegalArgumentException("ROW_SOURCE_OR_DUPLICATE");
-            boolean nativeArm = arm.equals("REGELSUCHE_ORDERED_PREFIX");
-            JsonNode nativeResponse = null;
-            if (nativeArm && row.has("response")) {
-                nativeResponse = JSON.readTree(requiredEvidence(output, manifest, id + "/native.json").toFile());
-                if (!row.path("response").equals(nativeResponse))
-                    throw new IllegalArgumentException("RETAINED_NATIVE_RESPONSE_MISMATCH");
-            }
-            if (!row.path("judgment").asText().equals("VERIFIED_FINITE_OUTPUTS")) continue;
-            JsonNode actual;
-            if (nativeArm) {
-                auditProcess(row.path("process"), panel.at("/limits/synthesisSeconds").intValue(), true);
-                var work = row.path("response").path("totalNativeWork");
-                if (!work.isIntegralNumber() || work.longValue() < 0 || work.longValue() > panel.at("/limits/nativeWork").longValue())
-                    throw new IllegalArgumentException("RETAINED_WORK_LIMIT");
-                if (nativeResponse == null) throw new IllegalArgumentException("MISSING_NATIVE_RESPONSE");
-                actual = nativeResponse.path("outputs");
-            } else {
-                auditProcess(row.path("synthesisProcess"), panel.at("/limits/synthesisSeconds").intValue(), false);
-                auditProcess(row.path("compileProcess"), panel.at("/limits/compileSeconds").intValue(), true);
-                if (row.path("executions").size() != panel.path("rowCounts").size() * panel.path("seeds").size())
-                    throw new IllegalArgumentException("RETAINED_EXECUTION_MATRIX");
-                for (var execution : row.path("executions"))
-                    auditProcess(execution, panel.at("/limits/executionSeconds").intValue(), true);
-                var retained = new ArrayList<Map<String, Object>>();
-                for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds")) {
-                    String relative = id + "/run-" + count.intValue() + "-" + seed.intValue() + ".stdout";
-                    String text = Files.readString(requiredEvidence(output, manifest, relative)).trim();
-                    var values = text.isEmpty() ? List.<String>of() : List.of(text.split("\\s+"));
-                    retained.add(Map.of("rows", count.intValue(), "seed", seed.intValue(), "values", values));
-                }
-                actual = JSON.valueToTree(retained);
-                if (!actual.equals(row.path("outputs"))) throw new IllegalArgumentException("RETAINED_STDOUT_MISMATCH");
-            }
-            var input = parse(cases.get(id).path("source").asText());
-            var expected = new ArrayList<Map<String, Object>>();
-            for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds"))
-                expected.add(Map.of("rows", count.intValue(), "seed", seed.intValue(), "values",
-                    oracle(input, count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));
-            if (!JSON.valueToTree(expected).equals(actual)) throw new IllegalArgumentException("RETAINED_OUTPUT_MISMATCH");
+        return cases;
+    }
+
+    private static void auditRow(Path output, JsonNode panel, JsonNode manifest,
+            Map<String, JsonNode> cases, HashSet<String> observedKeys, JsonNode row) throws Exception {
+        String id = row.path("case").asText(), arm = row.path("arm").asText();
+        if (!observedKeys.add(id + "@" + arm) || !cases.containsKey(id)
+                || !cases.get(id).path("sha256").asText().equals(row.path("sourceSha256").asText()))
+            throw new IllegalArgumentException("ROW_SOURCE_OR_DUPLICATE");
+        boolean nativeArm = arm.equals("REGELSUCHE_ORDERED_PREFIX");
+        JsonNode nativeResponse = null;
+        if (nativeArm && row.has("response")) {
+            nativeResponse = JSON.readTree(requiredEvidence(output, manifest, id + "/native.json").toFile());
+            if (!row.path("response").equals(nativeResponse))
+                throw new IllegalArgumentException("RETAINED_NATIVE_RESPONSE_MISMATCH");
         }
-        if (!expectedKeys.equals(observedKeys)) throw new IllegalArgumentException("INCOMPLETE_RETAINED_MATRIX");
+        if (!row.path("judgment").asText().equals("VERIFIED_FINITE_OUTPUTS")) return;
+        JsonNode actual = nativeArm ? retainedNativeOutputs(panel, row, nativeResponse)
+            : retainedOriginalOutputs(output, panel, manifest, row, id);
+        var input = parse(cases.get(id).path("source").asText());
+        var expected = new ArrayList<Map<String, Object>>();
+        for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds"))
+            expected.add(Map.of("rows", count.intValue(), "seed", seed.intValue(), "values",
+                oracle(input, count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));
+        if (!JSON.valueToTree(expected).equals(actual)) throw new IllegalArgumentException("RETAINED_OUTPUT_MISMATCH");
+    }
+
+    private static JsonNode retainedNativeOutputs(JsonNode panel, JsonNode row, JsonNode nativeResponse) {
+        auditProcess(row.path("process"), panel.at("/limits/synthesisSeconds").intValue(), true);
+        var work = row.path("response").path("totalNativeWork");
+        if (!work.isIntegralNumber() || work.longValue() < 0 || work.longValue() > panel.at("/limits/nativeWork").longValue())
+            throw new IllegalArgumentException("RETAINED_WORK_LIMIT");
+        if (nativeResponse == null) throw new IllegalArgumentException("MISSING_NATIVE_RESPONSE");
+        return nativeResponse.path("outputs");
+    }
+
+    private static JsonNode retainedOriginalOutputs(Path output, JsonNode panel, JsonNode manifest,
+            JsonNode row, String id) throws Exception {
+        auditProcess(row.path("synthesisProcess"), panel.at("/limits/synthesisSeconds").intValue(), false);
+        auditProcess(row.path("compileProcess"), panel.at("/limits/compileSeconds").intValue(), true);
+        if (row.path("executions").size() != panel.path("rowCounts").size() * panel.path("seeds").size())
+            throw new IllegalArgumentException("RETAINED_EXECUTION_MATRIX");
+        for (var execution : row.path("executions"))
+            auditProcess(execution, panel.at("/limits/executionSeconds").intValue(), true);
+        var retained = new ArrayList<Map<String, Object>>();
+        for (var count : panel.path("rowCounts")) for (var seed : panel.path("seeds")) {
+            String relative = id + "/run-" + count.intValue() + "-" + seed.intValue() + ".stdout";
+            String text = Files.readString(requiredEvidence(output, manifest, relative)).trim();
+            var values = text.isEmpty() ? List.<String>of() : List.of(text.split("\\s+"));
+            retained.add(Map.of("rows", count.intValue(), "seed", seed.intValue(), "values", values));
+        }
+        JsonNode actual = JSON.valueToTree(retained);
+        if (!actual.equals(row.path("outputs"))) throw new IllegalArgumentException("RETAINED_STDOUT_MISMATCH");
+        return actual;
     }
 
     private static Path requiredEvidence(Path output, JsonNode manifest, String relative) {
