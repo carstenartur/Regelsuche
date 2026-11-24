@@ -106,5 +106,21 @@
         <forkedProcessTimeoutInSeconds>2700</forkedProcessTimeoutInSeconds>
       </configuration>
     </plugin></plugins></build></profile>
+    <profile><id>schema-polynomial-comparison</id><build><plugins><plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-clean-plugin</artifactId>
+      <executions><execution><id>clear-previous-schema-polynomial-reports</id><phase>initialize</phase><goals><goal>clean</goal></goals>
+        <configuration><excludeDefaultDirectories>true</excludeDefaultDirectories><filesets>
+          <fileset><directory>${project.build.directory}/reports/learned-schema-efficiency-v2</directory><followSymlinks>false</followSymlinks></fileset>
+          <fileset><directory>${project.build.directory}/schema-polynomial-worker-input</directory><followSymlinks>false</followSymlinks></fileset>
+        </filesets></configuration></execution></executions>
+    </plugin><plugin>
+      <groupId>org.apache.maven.plugins</groupId><artifactId>maven-failsafe-plugin</artifactId>
+      <executions><execution><id>run-frozen-schema-polynomial-study</id><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
+      <configuration><test>de.regelsuche.release.SchemaPolynomialComparisonContainerIT</test>
+        <skipTests>false</skipTests><failIfNoTests>true</failIfNoTests><failIfNoSpecifiedTests>true</failIfNoSpecifiedTests>
+        <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+        <forkedProcessTimeoutInSeconds>2700</forkedProcessTimeoutInSeconds>
+      </configuration>
+    </plugin></plugins></build></profile>
   </profiles>
 </project>

@@ -26,13 +26,15 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.utility.MountableFile;
 
-/** Shared source admission and evidence transport for the two frozen studies. */
+/** Shared source admission and evidence transport for the frozen studies. */
 final class FrozenPolynomialStudyContainer {
     enum Study {
         NATIVE("native-polynomial-comparison", "native-polynomial-worker-input", "run_native", 675,
             List.of("test_native", "test_run_schema", "test_registered_source")),
         TYPED("typed-external-polynomial-comparison", "typed-polynomial-worker-input", "run_typed", 729,
-            List.of("test_typed_run", "test_typed_audit", "test_registered_source"));
+            List.of("test_typed_run", "test_typed_audit", "test_registered_source")),
+        SCHEMA("learned-schema-efficiency-v2", "schema-polynomial-worker-input", "run_schema", 492,
+            List.of("test_run_schema", "test_schema_source", "test_registered_source"));
 
         final String directory;
         final String workerInput;
@@ -64,7 +66,11 @@ final class FrozenPolynomialStudyContainer {
         PolynomialArchiveProvenanceMain.requireRegisteredImplementation(root, registration);
         Path source = input.resolve("source.tar");
         packSource(root, source, registration);
-        Path ancestry = study == Study.TYPED ? typedWitness(root, identity, reports) : null;
+        Path ancestry = switch (study) {
+            case NATIVE -> null;
+            case TYPED -> typedWitness(root, identity, reports);
+            case SCHEMA -> schemaWitness(root, identity, reports);
+        };
 
         var image = new ImageFromDockerfile().withFileFromPath("Dockerfile", root.resolve("Dockerfile.external-polynomial"))
             .withFileFromPath("requirements.txt", root.resolve("regelsuche-sympy-jmh/requirements.txt"));
@@ -125,9 +131,16 @@ final class FrozenPolynomialStudyContainer {
                 assertEquals(revision, metadata.required("sourceRevision").textValue());
                 assertEquals("git:" + identity.required("tree").textValue(), metadata.required("sourceTreeHash").textValue());
                 assertTrue(Files.size(extracted.resolve("runtime-inventory.json")) > 0);
-            } else {
+            } else if (study == Study.TYPED) {
                 assertEquals(revision, metadata.required("revision").textValue());
                 assertEquals(PolynomialSourceProof.TYPED, metadata.required("freezeCommit").textValue());
+            } else {
+                verifySchemaMetadata(metadata, identity);
+                var sequences = json.readTree(extracted.resolve("sequences.json").toFile());
+                assertTrue(sequences.isArray());
+                assertEquals(36, sequences.size());
+                var runtime = json.readTree(extracted.resolve("runtime-inventory.json").toFile());
+                assertEquals(metadata.required("runtimeBytesHash"), runtime.required("runtimeBytesHash"));
             }
             assertTrue(Files.isRegularFile(extracted.resolve("summary.json")));
             assertTrue(Files.size(extracted.resolve("manifest.json")) > 0);
@@ -140,6 +153,27 @@ final class FrozenPolynomialStudyContainer {
         assertTrue(verified.required("ancestors").required(PolynomialSourceProof.TYPED).booleanValue());
         Files.writeString(reports.resolve("verified-typed-source.json"), verified.toString() + "\n");
         return Files.writeString(reports.resolve("typed-source-witness.json"), proof.toString() + "\n");
+    }
+
+    private static Path schemaWitness(Path root, JsonNode identity, Path reports) throws Exception {
+        var proof = PolynomialSourceProof.prepare(root);
+        var verified = PolynomialSourceProof.verify(root, proof, identity);
+        assertEquals(BooleanNode.TRUE, verified.required("ancestors").required(PolynomialSourceProof.SCHEMA));
+        assertEquals(PolynomialSourceProof.SCHEMA_HASH, verified.required("registeredProtocolSha256").textValue());
+        Files.writeString(reports.resolve("verified-schema-source.json"), verified.toString() + "\n");
+        return Files.writeString(reports.resolve("schema-source-witness.json"), proof.toString() + "\n");
+    }
+
+    static void verifySchemaMetadata(JsonNode metadata, JsonNode identity) throws IOException {
+        String revision = identity.required("revision").textValue();
+        if (!revision.equals(metadata.path("revision").textValue())
+                || !revision.equals(metadata.path("sourceRevision").textValue())
+                || !("git:" + identity.required("tree").textValue()).equals(metadata.path("sourceTreeHash").textValue())
+                || !PolynomialSourceProof.SCHEMA.equals(metadata.path("freezeCommit").textValue())
+                || !PolynomialSourceProof.SCHEMA_HASH.equals(metadata.path("freezeProtocolHash").textValue())
+                || !PolynomialSourceProof.SCHEMA_HASH.equals(metadata.path("protocolHash").textValue())
+                || !"5bc9e21e61131be287b89060ef39f93df111dc25".equals(metadata.path("sourceLocalFreezeCommit").textValue()))
+            throw new IOException("schema metadata does not bind the admitted source and historical protocol");
     }
 
     static void verifyTypedAudit(Path receipt, String revision) throws IOException {

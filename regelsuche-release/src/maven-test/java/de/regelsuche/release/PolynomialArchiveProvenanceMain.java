@@ -14,14 +14,26 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.FS;
 
-/** Read-only verification of the native study's registered source tree. */
+/** Read-only verification of frozen studies' registered source and protocol. */
 public final class PolynomialArchiveProvenanceMain {
     private static final Set<String> IMPLEMENTATION = Set.of(".java", ".py", ".gradle", ".kts", ".sh", ".json",
         ".yaml", ".yml", ".xml", ".toml", ".properties");
 
-    public static void main(String[] args) throws IOException {
-        if (args.length != 1) throw new IllegalArgumentException("expected a registered source directory");
-        System.out.println(verify(Path.of(args[0]).toRealPath()));
+    public static void main(String[] args) throws Exception {
+        if (args.length == 1) System.out.println(verify(Path.of(args[0]).toRealPath()));
+        else if (args.length == 2 && args[0].equals("schema-freeze"))
+            System.out.println(schemaFreeze(Path.of(args[1]).toRealPath()));
+        else throw new IllegalArgumentException("expected a registered source directory or schema-freeze directory");
+    }
+
+    static JsonNode schemaFreeze(Path root) throws Exception {
+        var identity = verify(root);
+        try (var files = new OwnedReleaseEvidenceFiles(root)) {
+            var receipt = ReleaseEvidenceJson.parse(files.readBytes(PolynomialSourceProof.RECEIPT), "polynomial source witness");
+            var verified = PolynomialSourceProof.verify(root, receipt, identity);
+            verified.set("trackedChangesPresent", identity.required("trackedChangesPresent"));
+            return verified;
+        }
     }
 
     static JsonNode verify(Path root) throws IOException {
