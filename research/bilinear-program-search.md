@@ -72,7 +72,7 @@ nicht den JVM-Heap oder die Suchkosten.
 
 ## Ausführbares SDK-Beispiel
 
-Eine vollständige Java-Datei ist [BilinearSearch.java](../../examples/external-consumers/BilinearSearch.java).
+Eine vollständige Java-Datei ist [BilinearSearch.java](../../examples/external-consumers/checked-math-java25/src/main/java/example/BilinearSearch.java).
 Sie benötigt den aktuellen Quell-SDK-Stand; die API ist noch nicht in Release 0.5.3 enthalten.
 
 Mit den SDK- und Kernklassen im Klassenpfad lässt sich das Beispiel in JShell

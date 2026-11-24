@@ -88,7 +88,7 @@ Erreichbarkeit und Invarianz sind vom Aufrufer zu begründen.
 
 ## Befund und Reproduktion
 
-Das vollständige [Java-25-Potentialbeispiel](../../examples/external-consumers/SosPotential.java)
+Das vollständige [Java-25-Potentialbeispiel](../../examples/external-consumers/checked-math-java25/src/main/java/example/SosPotential.java)
 ist mit dem aktuellen Quell-SDK ausführbar; Aufruf und Verfügbarkeit stehen
 in der [Beispielübersicht](../demo-gallery.md#neue-ausführbare-beispiele-im-quell-sdk).
 

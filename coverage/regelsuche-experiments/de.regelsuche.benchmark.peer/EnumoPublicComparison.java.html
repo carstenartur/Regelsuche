@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>EnumoPublicComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.peer</a> &gt; <span class="el_source">EnumoPublicComparison.java</span></div><h1>EnumoPublicComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.peer;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionParser;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/** Executes the frozen public source-only comparison, with retained failures. */
+public final class EnumoPublicComparison {
+<span class="fc" id="L30">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L31">        .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L32">        .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+    static final String CORPUS_SHA = &quot;17caef3eb6065513600918f56f294a5c2401cf5593026d30aefe1bf4e62db09f&quot;;
+    static final String PROTOCOL_SHA = &quot;5ed4b7a7fff5dcd023dfd31d1bddcff92cad7392b4a6eca4ce4272929a6e3137&quot;;
+<span class="fc" id="L35">    private static final long REQUEST_NANOS = TimeUnit.SECONDS.toNanos(2);</span>
+<span class="fc" id="L36">    private enum Profile { REGELSUCHE_BASE, REGELSUCHE_LEARNED_RANKED, ENUMO_LEARNED }</span>
+    private EnumoPublicComparison() { }
+
+    static String judge(String source, String candidate) {
+        try {
+            // Both arms must pass the identical frozen surface grammar before
+            // coefficient comparison; native powers or cancelled variable
+            // denominators must not receive a cheaper, one-sided cost model.
+<span class="fc" id="L44">            FpcorePolynomialCorpus.fromPrefix(FpcorePolynomialCorpus.toPrefix(source));</span>
+<span class="fc" id="L45">            FpcorePolynomialCorpus.fromPrefix(FpcorePolynomialCorpus.toPrefix(candidate));</span>
+<span class="fc" id="L46">            var analysis = new ExactPolynomialAnalysis();</span>
+<span class="fc" id="L47">            var expected = analysis.normalForm(source);</span>
+<span class="fc" id="L48">            var actual = analysis.normalForm(candidate);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            return expected.equals(actual) ? &quot;VERIFIED&quot; : &quot;INVALID&quot;;</span>
+<span class="fc" id="L50">        } catch (IllegalArgumentException | ArithmeticException unsupported) {</span>
+<span class="fc" id="L51">            return &quot;OUTSIDE_SHARED_GRAMMAR&quot;;</span>
+        }
+    }
+
+    /** Args: checkout root, built original-tool bridge, acquired rules, new report directory. */
+    public static void main(String[] args) throws Exception {
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (args.length != 4) throw new IllegalArgumentException(&quot;expected checkout, Enumo binary, acquired rules, output directory&quot;);</span>
+<span class="fc" id="L58">        Path checkout = Path.of(args[0]).toAbsolutePath();</span>
+<span class="fc" id="L59">        Path binary = Path.of(args[1]).toAbsolutePath();</span>
+<span class="fc" id="L60">        Path rules = Path.of(args[2]).toAbsolutePath();</span>
+<span class="fc" id="L61">        Path output = Path.of(args[3]).toAbsolutePath();</span>
+<span class="fc" id="L62">        Path corpus = checkout.resolve(&quot;research/benchmarks/enumo-public-v1/rosa.fpcore&quot;);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!hash(Files.readAllBytes(corpus)).equals(CORPUS_SHA)) throw new IllegalArgumentException(&quot;foreign corpus differs from freeze&quot;);</span>
+<span class="fc" id="L64">        Path protocol = checkout.resolve(&quot;research/benchmarks/enumo-public-v1/protocol.json&quot;);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (!hash(Files.readAllBytes(protocol)).equals(PROTOCOL_SHA)) throw new IllegalArgumentException(&quot;protocol differs from freeze&quot;);</span>
+<span class="fc bfc" id="L66" title="All 4 branches covered.">        if (!Files.isExecutable(binary) || !Files.isRegularFile(rules)) throw new IllegalArgumentException(&quot;original tool and acquired rules required&quot;);</span>
+<span class="fc" id="L67">        JsonNode acquisition = JSON.readTree(Files.readString(Path.of(rules + &quot;.receipt.json&quot;)));</span>
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">        if (!acquisition.path(&quot;status&quot;).asText().equals(&quot;ACQUIRED&quot;) || acquisition.path(&quot;rules&quot;).asInt() &lt; 1) {</span>
+<span class="fc" id="L69">            throw new IllegalArgumentException(&quot;original acquisition receipt required&quot;);</span>
+        }
+<span class="nc" id="L71">        Files.createDirectory(output);</span>
+<span class="nc" id="L72">        var entries = FpcorePolynomialCorpus.read(Files.readString(corpus));</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (entries.size() != 37) throw new IllegalArgumentException(&quot;incomplete foreign inventory&quot;);</span>
+<span class="nc" id="L74">        var rows = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L75">        var setups = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc" id="L76">        try (var raw = Files.newBufferedWriter(output.resolve(&quot;responses.jsonl&quot;), StandardCharsets.UTF_8)) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            for (int repetition = 1; repetition &lt;= 3; repetition++) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                for (Profile profile : Profile.values()) {</span>
+<span class="nc" id="L79">                    int before = rows.size();</span>
+                    try {
+<span class="nc" id="L81">                        runProfile(profile, repetition, entries, binary, rules, output, raw, rows, setups);</span>
+<span class="nc" id="L82">                    } catch (Exception unavailable) {</span>
+<span class="nc" id="L83">                        setups.add(Map.of(&quot;profile&quot;, profile, &quot;repetition&quot;, repetition,</span>
+<span class="nc" id="L84">                            &quot;status&quot;, &quot;SETUP_OR_TRANSPORT_FAILURE&quot;, &quot;detail&quot;, unavailable.toString()));</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                        for (int index = rows.size() - before; index &lt; entries.size(); index++) {</span>
+<span class="nc" id="L86">                            var entry = entries.get(index);</span>
+<span class="nc" id="L87">                            rows.add(Map.of(&quot;profile&quot;, profile, &quot;repetition&quot;, repetition,</span>
+<span class="nc" id="L88">                                &quot;ordinal&quot;, entry.ordinal(), &quot;name&quot;, entry.name(), &quot;source&quot;, entry.source(),</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                                &quot;status&quot;, entry.status() == FpcorePolynomialCorpus.Status.UNSUPPORTED</span>
+<span class="nc" id="L90">                                    ? &quot;UNSUPPORTED_INPUT&quot; : &quot;BLOCKED_WORKER_UNAVAILABLE&quot;,</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                                &quot;detail&quot;, entry.status() == FpcorePolynomialCorpus.Status.UNSUPPORTED</span>
+<span class="nc" id="L92">                                    ? entry.detail() : unavailable.toString()));</span>
+                        }
+<span class="nc" id="L94">                    }</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (rows.size() != entries.size() * 3 * Profile.values().length) throw new IllegalStateException(&quot;incomplete comparison matrix&quot;);</span>
+<span class="nc" id="L99">        var report = new TreeMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L100">        report.put(&quot;schema&quot;, &quot;regelsuche.enumo-public-result/v1&quot;);</span>
+<span class="nc" id="L101">        report.put(&quot;semantics&quot;, &quot;EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE&quot;);</span>
+<span class="nc" id="L102">        report.put(&quot;protocolSha256&quot;, PROTOCOL_SHA);</span>
+<span class="nc" id="L103">        report.put(&quot;corpusSha256&quot;, CORPUS_SHA);</span>
+<span class="nc" id="L104">        report.put(&quot;enumoBinarySha256&quot;, hash(Files.readAllBytes(binary)));</span>
+<span class="nc" id="L105">        report.put(&quot;acquiredRulesSha256&quot;, hash(Files.readAllBytes(rules)));</span>
+<span class="nc" id="L106">        report.put(&quot;acquisition&quot;, acquisition);</span>
+<span class="nc" id="L107">        report.put(&quot;nativeWorkerClassSha256&quot;, nativeWorkerHash());</span>
+<span class="nc" id="L108">        report.put(&quot;javaVersion&quot;, Runtime.version().toString());</span>
+<span class="nc" id="L109">        report.put(&quot;availableProcessors&quot;, Runtime.getRuntime().availableProcessors());</span>
+<span class="nc" id="L110">        report.put(&quot;inventory&quot;, entries); report.put(&quot;setups&quot;, setups); report.put(&quot;rows&quot;, rows);</span>
+<span class="nc" id="L111">        report.put(&quot;rawResponsesSha256&quot;, hash(Files.readAllBytes(output.resolve(&quot;responses.jsonl&quot;))));</span>
+<span class="nc" id="L112">        JSON.writerWithDefaultPrettyPrinter().writeValue(output.resolve(&quot;results.json&quot;).toFile(), report);</span>
+<span class="nc" id="L113">        var counts = new TreeMap&lt;String, Integer&gt;();</span>
+<span class="nc" id="L114">        rows.forEach(row -&gt; counts.merge(row.get(&quot;profile&quot;) + &quot;:&quot; + row.get(&quot;status&quot;), 1, Integer::sum));</span>
+<span class="nc" id="L115">        System.out.println(JSON.writeValueAsString(counts));</span>
+<span class="nc" id="L116">    }</span>
+
+    private static void runProfile(Profile profile, int repetition, List&lt;FpcorePolynomialCorpus.Entry&gt; entries,
+            Path binary, Path rules, Path output, BufferedWriter raw, List&lt;Map&lt;String, Object&gt;&gt; rows,
+            List&lt;Map&lt;String, Object&gt;&gt; setups) throws Exception {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        String nativeProfile = profile == Profile.REGELSUCHE_BASE ? &quot;BASE&quot; : &quot;LEARNED_RANKED&quot;;</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        List&lt;String&gt; command = profile == Profile.ENUMO_LEARNED</span>
+<span class="nc" id="L123">            ? List.of(binary.toString(), &quot;worker&quot;, rules.toString())</span>
+<span class="nc" id="L124">            : List.of(Path.of(System.getProperty(&quot;java.home&quot;), &quot;bin&quot;, &quot;java&quot;).toString(), &quot;-Xmx512m&quot;,</span>
+<span class="nc" id="L125">                &quot;-cp&quot;, System.getProperty(&quot;java.class.path&quot;), &quot;de.regelsuche.evolution.TypedExternalPolynomialComparisonWorker&quot;);</span>
+<span class="nc" id="L126">        long setupStart = System.nanoTime();</span>
+<span class="nc" id="L127">        long setupDeadline = setupStart + TimeUnit.SECONDS.toNanos(60);</span>
+<span class="nc" id="L128">        try (var session = new Session(command, output.resolve(profile + &quot;-&quot; + repetition + &quot;.stderr&quot;),</span>
+                setupDeadline)) {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            JsonNode initialization = profile == Profile.ENUMO_LEARNED ? session.ready</span>
+<span class="nc" id="L131">                : session.request(Map.of(&quot;op&quot;, &quot;initialize&quot;, &quot;profile&quot;, nativeProfile), setupDeadline - System.nanoTime());</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (System.nanoTime() &gt; setupDeadline) throw new TimeoutException(&quot;startup and initialization exceeded their shared budget&quot;);</span>
+<span class="nc bnc" id="L133" title="All 4 branches missed.">            if (profile != Profile.ENUMO_LEARNED &amp;&amp; !initialization.path(&quot;status&quot;).asText().equals(&quot;INITIALIZED&quot;)) {</span>
+<span class="nc" id="L134">                throw new IOException(&quot;native profile initialization failed: &quot; + initialization);</span>
+            }
+<span class="nc" id="L136">            setups.add(Map.of(&quot;profile&quot;, profile, &quot;repetition&quot;, repetition,</span>
+<span class="nc" id="L137">                &quot;startupAndInitializationNanos&quot;, System.nanoTime() - setupStart, &quot;initialization&quot;, initialization));</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">            for (var entry : entries) {</span>
+<span class="nc" id="L139">                var row = new TreeMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L140">                row.put(&quot;profile&quot;, profile); row.put(&quot;repetition&quot;, repetition);</span>
+<span class="nc" id="L141">                row.put(&quot;ordinal&quot;, entry.ordinal()); row.put(&quot;name&quot;, entry.name());</span>
+<span class="nc" id="L142">                row.put(&quot;source&quot;, entry.source());</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (entry.status() == FpcorePolynomialCorpus.Status.UNSUPPORTED) {</span>
+<span class="nc" id="L144">                    row.put(&quot;status&quot;, &quot;UNSUPPORTED_INPUT&quot;); row.put(&quot;detail&quot;, entry.detail());</span>
+                } else {
+<span class="nc" id="L146">                    query(session, profile, nativeProfile, entry, row, raw);</span>
+                }
+<span class="nc" id="L148">                rows.add(row);</span>
+<span class="nc" id="L149">            }</span>
+        }
+<span class="nc" id="L151">    }</span>
+
+    private static void query(Session session, Profile profile, String nativeProfile,
+            FpcorePolynomialCorpus.Entry entry, Map&lt;String, Object&gt; row, BufferedWriter raw) throws IOException {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (session.failed) { row.put(&quot;status&quot;, &quot;BLOCKED_WORKER_UNAVAILABLE&quot;); return; }</span>
+<span class="fc" id="L156">        long started = System.nanoTime();</span>
+<span class="fc" id="L157">        Object retainedRequest = null;</span>
+<span class="fc" id="L158">        JsonNode retainedResponse = null;</span>
+        try {
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            String wire = profile == Profile.ENUMO_LEARNED ? FpcorePolynomialCorpus.toPrefix(entry.source()) : entry.source();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            Object request = profile == Profile.ENUMO_LEARNED ? Map.of(&quot;op&quot;, &quot;run&quot;, &quot;source&quot;, wire)</span>
+<span class="fc" id="L162">                : Map.of(&quot;op&quot;, &quot;run&quot;, &quot;profile&quot;, nativeProfile, &quot;source&quot;, wire);</span>
+<span class="fc" id="L163">            JsonNode response = session.request(request, REQUEST_NANOS - (System.nanoTime() - started));</span>
+<span class="fc" id="L164">            retainedRequest = request; retainedResponse = response;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (!response.path(&quot;status&quot;).asText().equals(&quot;CANDIDATE&quot;)) {</span>
+<span class="fc" id="L166">                row.put(&quot;status&quot;, &quot;WORKER_ERROR&quot;); row.put(&quot;detail&quot;, response.toString());</span>
+<span class="fc bfc" id="L167" title="All 4 branches covered.">            } else if (!(profile == Profile.ENUMO_LEARNED ? response.path(&quot;source&quot;) : response.path(&quot;input&quot;)).asText().equals(wire)) {</span>
+<span class="fc" id="L168">                row.put(&quot;status&quot;, &quot;SOURCE_BINDING_REJECTED&quot;);</span>
+            } else {
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                String candidate = profile == Profile.ENUMO_LEARNED</span>
+<span class="fc" id="L171">                    ? FpcorePolynomialCorpus.fromPrefix(response.path(&quot;output&quot;).asText()) : response.path(&quot;output&quot;).asText();</span>
+<span class="fc" id="L172">                row.put(&quot;output&quot;, candidate);</span>
+<span class="fc" id="L173">                row.put(&quot;status&quot;, judge(entry.source(), candidate));</span>
+<span class="fc" id="L174">                row.put(&quot;inputCost&quot;, cost(entry.source())); row.put(&quot;outputCost&quot;, cost(candidate));</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                if (response.has(&quot;totalWork&quot;)) row.put(&quot;nativeWork&quot;, response.path(&quot;totalWork&quot;).asLong());</span>
+<span class="fc bfc" id="L176" title="All 4 branches covered.">                if (response.has(&quot;internalWorkWithinBudget&quot;) &amp;&amp; !response.path(&quot;internalWorkWithinBudget&quot;).asBoolean()) {</span>
+<span class="fc" id="L177">                    row.put(&quot;status&quot;, &quot;NATIVE_BUDGET_REJECTED&quot;);</span>
+                }
+            }
+<span class="fc" id="L180">        } catch (TimeoutException timeout) {</span>
+<span class="fc" id="L181">            row.put(&quot;status&quot;, &quot;TIMEOUT&quot;); session.failed = true; session.close();</span>
+<span class="fc" id="L182">        } catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L183">            row.put(&quot;status&quot;, &quot;OUTSIDE_SHARED_GRAMMAR&quot;); row.put(&quot;detail&quot;, unsupported.toString());</span>
+<span class="fc" id="L184">        } catch (Exception error) {</span>
+<span class="fc" id="L185">            row.put(&quot;status&quot;, &quot;TECHNICAL_FAILURE&quot;); row.put(&quot;detail&quot;, error.toString());</span>
+<span class="fc" id="L186">            session.failed = true; session.close();</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc" id="L188">        long elapsed = System.nanoTime() - started;</span>
+<span class="fc" id="L189">        row.put(&quot;requestAndJudgeNanos&quot;, elapsed);</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">        if (elapsed &gt; REQUEST_NANOS &amp;&amp; &quot;VERIFIED&quot;.equals(row.get(&quot;status&quot;))) row.put(&quot;status&quot;, &quot;TIMEOUT_AFTER_JUDGE&quot;);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (retainedResponse != null) {</span>
+<span class="fc" id="L192">            raw.write(JSON.writeValueAsString(Map.of(&quot;profile&quot;, profile, &quot;row&quot;, row,</span>
+                &quot;request&quot;, retainedRequest, &quot;response&quot;, retainedResponse)));
+<span class="fc" id="L194">            raw.newLine(); raw.flush();</span>
+        }
+<span class="fc" id="L196">    }</span>
+
+<span class="fc" id="L198">    static int cost(String expression) { return cost(new ExpressionParser().parseExactTerm(expression).expression()); }</span>
+    private static int cost(Expr expression) {
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        return expression instanceof BinaryExpr binary ? 1 + cost(binary.left()) + cost(binary.right()) : 0;</span>
+    }
+    private static String hash(byte[] bytes) throws java.security.NoSuchAlgorithmException {
+<span class="fc" id="L203">        return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+    }
+    private static String nativeWorkerHash() throws Exception {
+<span class="nc" id="L206">        try (var stream = ClassLoader.getSystemResourceAsStream(&quot;de/regelsuche/evolution/TypedExternalPolynomialComparisonWorker.class&quot;)) {</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            if (stream == null) throw new IllegalArgumentException(&quot;native worker absent from runtime classpath&quot;);</span>
+<span class="nc" id="L208">            return hash(stream.readAllBytes());</span>
+        }
+    }
+
+    static final class Session implements AutoCloseable {
+        private final Process process;
+        private final BufferedReader output;
+        private final BufferedWriter input;
+<span class="fc" id="L216">        private final ExecutorService io = Executors.newSingleThreadExecutor(Thread.ofPlatform().daemon().factory());</span>
+        private final JsonNode ready;
+        private boolean failed;
+<span class="fc" id="L219">        Session(List&lt;String&gt; command, Path stderr, long startupDeadlineNanos) throws Exception {</span>
+<span class="fc" id="L220">            process = new ProcessBuilder(command).redirectError(stderr.toFile()).start();</span>
+<span class="fc" id="L221">            output = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));</span>
+<span class="fc" id="L222">            input = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));</span>
+            try {
+<span class="fc" id="L224">                long remaining = startupDeadlineNanos - System.nanoTime();</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                if (remaining &lt;= 0) throw new TimeoutException(&quot;startup budget exhausted before READY&quot;);</span>
+<span class="fc" id="L226">                ready = io.submit(this::receive).get(remaining, TimeUnit.NANOSECONDS);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                if (!ready.path(&quot;status&quot;).asText().equals(&quot;READY&quot;)) throw new IOException(&quot;worker did not become ready&quot;);</span>
+<span class="fc" id="L228">            } catch (Exception error) { close(); throw error; }</span>
+<span class="fc" id="L229">        }</span>
+        JsonNode request(Object value, long nanos) throws Exception {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (nanos &lt;= 0) throw new TimeoutException(&quot;request budget exhausted before dispatch&quot;);</span>
+<span class="fc" id="L232">            return io.submit(() -&gt; {</span>
+<span class="fc" id="L233">                input.write(JSON.writeValueAsString(value)); input.newLine(); input.flush();</span>
+<span class="fc" id="L234">                return receive();</span>
+<span class="fc" id="L235">            }).get(nanos, TimeUnit.NANOSECONDS);</span>
+        }
+        private JsonNode receive() throws IOException {
+<span class="fc" id="L238">            var line = new StringBuilder();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            for (int count = 0; count &lt; 8 * 1024 * 1024; count++) {</span>
+<span class="fc" id="L240">                int next = output.read();</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                if (next &lt; 0) throw new IOException(&quot;worker closed stdout&quot;);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                if (next == '\n') return JSON.readTree(line.toString());</span>
+<span class="fc" id="L243">                line.append((char) next);</span>
+            }
+<span class="fc" id="L245">            throw new IOException(&quot;worker response exceeds transport bound&quot;);</span>
+        }
+        @Override public void close() {
+<span class="fc" id="L248">            process.descendants().forEach(ProcessHandle::destroyForcibly);</span>
+<span class="fc" id="L249">            process.destroyForcibly(); io.shutdownNow();</span>
+<span class="fc" id="L250">            try { process.waitFor(2, TimeUnit.SECONDS); }</span>
+<span class="pc" id="L251">            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }</span>
+<span class="pc" id="L252">            try { input.close(); } catch (IOException ignored) { }</span>
+<span class="pc" id="L253">            try { output.close(); } catch (IOException ignored) { }</span>
+<span class="fc" id="L254">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

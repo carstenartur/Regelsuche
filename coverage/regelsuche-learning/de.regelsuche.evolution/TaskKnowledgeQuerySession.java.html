@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskKnowledgeQuerySession.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskKnowledgeQuerySession.java</span></div><h1>TaskKnowledgeQuerySession.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.Expr;
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.NativeNodeCountObjective;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CancellationException;
+
+/**
+ * Bounded, caller-owned positive path reuse for one immutable knowledge generation.
+ * First success retains only a query observation; the second may retain its path.
+ * Later hits execute fresh regular candidate verification and final selected-path replay.
+ * Repeated-query savings are reuse of earlier search, not transfer to unseen mathematics.
+ */
+public final class TaskKnowledgeQuerySession implements AutoCloseable {
+    /** Lookup work is already included in execution.selectionWork; retention is an additional paid charge. */
+<span class="fc" id="L22">    public record Query(CumulativeTaskKnowledge.Execution execution, boolean reused, long lookupWork, long retentionWork) {</span>
+<span class="fc" id="L23">        public long totalWork() { return Math.addExact(execution.totalWork(), retentionWork); }</span>
+<span class="fc bfc" id="L24" title="All 4 branches covered.">        public boolean solved() { return execution.solved() &amp;&amp; totalWork() &lt;= execution.task().budget().totalWork(); }</span>
+    }
+    /** Character limits measure retained logical data, not JVM heap bytes. Failed work is a lower bound. */
+<span class="fc" id="L27">    public record Statistics(long queries, long hits, long misses, long bypasses, long observations, long admissions, long failures,</span>
+            long evictions, int retainedQueries, int retainedObservations, long retainedCharacters, long knownWork, boolean accountingComplete) { }
+    public static final class QueryFailure extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+        private final long knownWork;
+        QueryFailure(long knownWork, RuntimeException cause) {
+<span class="fc" id="L33">            super(&quot;query failed; unfinished work may be unknown&quot;, cause); this.knownWork = knownWork;</span>
+<span class="fc" id="L34">        }</span>
+<span class="nc" id="L35">        public long knownWork() { return knownWork; }</span>
+<span class="nc" id="L36">        public boolean accountingComplete() { return false; }</span>
+    }
+<span class="fc" id="L38">    private record Key(Expr source, List&lt;String&gt; assumptions, TypedSourceOnlySearch.Objective objective,</span>
+            long maximumScore, MoveSearch.Budget budget, CumulativeTaskKnowledge.Strategy strategy) implements RetainedGraph.View {
+        static Key of(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy) {
+<span class="fc" id="L41">            return new Key(task.source(), AssumptionSignature.ofExpressions(task.assumptions()).normalizedAssumptions(),</span>
+<span class="fc" id="L42">                task.goal().objective(), task.goal().maximumOutputScore(), task.budget(), strategy);</span>
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="fc" id="L45">            visitor.reference(source); visitor.reference(assumptions); visitor.reference(budget);</span>
+            // Only explicitly admitted stateless built-in objective and strategy enums enter keys.
+<span class="fc" id="L47">        }</span>
+    }
+<span class="fc" id="L49">    private record Entry(RetainedTaskPath path, long characters) { }</span>
+<span class="fc" id="L50">    private record Footprint(long characters, long work) { }</span>
+    private final CumulativeTaskKnowledge knowledge;
+    private final int maximumQueries;
+    private final long maximumCharacters;
+<span class="fc" id="L54">    private final LinkedHashMap&lt;Key, Entry&gt; retained = new LinkedHashMap&lt;&gt;(16, .75f, true);</span>
+    private long queries, hits, misses, bypasses, observations, admissions, failures, evictions, characters, knownWork;
+    private int retainedPaths;
+<span class="fc" id="L57">    private boolean closed, complete = true;</span>
+
+    /** Zero capacity disables reuse and keeps the existing persistent solver's work contract. */
+<span class="fc" id="L60">    public TaskKnowledgeQuerySession(CumulativeTaskKnowledge knowledge, int maximumQueries, long maximumCharacters) {</span>
+<span class="fc" id="L61">        this.knowledge = Objects.requireNonNull(knowledge);</span>
+<span class="pc bpc" id="L62" title="3 of 6 branches missed.">        if (maximumQueries &lt; 0 || maximumQueries &gt; 256 || maximumCharacters &lt; 0)</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(&quot;nonnegative bounded query capacity required&quot;);</span>
+<span class="fc" id="L64">        this.maximumQueries = maximumQueries; this.maximumCharacters = maximumCharacters;</span>
+<span class="fc" id="L65">    }</span>
+
+    public synchronized Query solve(CheckedSchemaTaskSolver.Task task, CumulativeTaskKnowledge.Strategy strategy) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (closed) throw new IllegalStateException(&quot;query session is closed&quot;);</span>
+<span class="fc" id="L69">        Objects.requireNonNull(task); Objects.requireNonNull(strategy);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (Thread.currentThread().isInterrupted()) throw new CancellationException(&quot;query interrupted before execution&quot;);</span>
+<span class="fc" id="L71">        queries = Math.addExact(queries, 1);</span>
+<span class="fc" id="L72">        long completedWork = 0;</span>
+<span class="fc" id="L73">        Key key = null;</span>
+        try {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (!cacheable(task)) {</span>
+<span class="fc" id="L76">                bypasses = Math.addExact(bypasses, 1);</span>
+<span class="fc" id="L77">                var execution = knowledge.solve(task, strategy);</span>
+<span class="fc" id="L78">                completedWork = execution.totalWork();</span>
+<span class="fc" id="L79">                complete &amp;= accounted(execution);</span>
+<span class="fc" id="L80">                checkInterrupted();</span>
+<span class="fc" id="L81">                knownWork = Math.addExact(knownWork, completedWork);</span>
+<span class="fc" id="L82">                return new Query(execution, false, 0, 0);</span>
+            }
+<span class="fc" id="L84">            completedWork = 1;</span>
+<span class="fc" id="L85">            key = Key.of(task, strategy);</span>
+<span class="fc" id="L86">            var previous = retained.get(key);</span>
+<span class="fc bfc" id="L87" title="All 4 branches covered.">            boolean reused = previous != null &amp;&amp; previous.path() != null;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (reused) hits = Math.addExact(hits, 1); else misses = Math.addExact(misses, 1);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            var execution = knowledge.solveInSession(task, strategy, 1, previous == null ? null : previous.path());</span>
+<span class="fc" id="L90">            completedWork = execution.totalWork();</span>
+<span class="fc" id="L91">            complete &amp;= accounted(execution);</span>
+<span class="fc" id="L92">            checkInterrupted();</span>
+<span class="fc" id="L93">            long retentionWork = 0;</span>
+<span class="fc bfc" id="L94" title="All 6 branches covered.">            if (!reused &amp;&amp; execution.solved() &amp;&amp; !execution.solution().orElseThrow().evidence().witness().isEmpty()) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                retentionWork = previous == null ? observe(key, execution) : prepare(key, execution);</span>
+<span class="fc" id="L96">                completedWork = Math.addExact(completedWork, retentionWork);</span>
+<span class="fc" id="L97">                checkInterrupted();</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">            } else if (previous != null &amp;&amp; !execution.solved()) {</span>
+<span class="nc" id="L99">                discard(retained.remove(key));</span>
+<span class="nc" id="L100">                retentionWork = 1; completedWork = Math.addExact(completedWork, 1);</span>
+            }
+<span class="fc" id="L102">            knownWork = Math.addExact(knownWork, completedWork);</span>
+<span class="fc" id="L103">            return new Query(execution, reused, 1, retentionWork);</span>
+<span class="fc" id="L104">        } catch (RuntimeException failure) {</span>
+<span class="pc bpc" id="L105" title="3 of 4 branches missed.">            if (key != null &amp;&amp; retained.containsKey(key)) {</span>
+<span class="nc" id="L106">                discard(retained.remove(key)); completedWork = Math.addExact(completedWork, 1);</span>
+            }
+<span class="fc" id="L108">            failures = Math.addExact(failures, 1);</span>
+<span class="fc" id="L109">            knownWork = Math.addExact(knownWork, completedWork);</span>
+<span class="fc" id="L110">            throw new QueryFailure(completedWork, failure);</span>
+        }
+    }
+
+    private static boolean accounted(CumulativeTaskKnowledge.Execution execution) {
+<span class="fc" id="L115">        return execution.solution().map(solution -&gt; solution.evidence().accountingComplete()).orElse(true);</span>
+    }
+
+    /** The existing typed input encoding conservatively bounds the retained AST's scalar/text characters. */
+    private long observe(Key key, CumulativeTaskKnowledge.Execution execution) {
+<span class="fc" id="L120">        long work = 1, size = 0;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        for (var state : execution.solution().orElseThrow().evidence().search().encodedResult().stateAssessments().keySet()) {</span>
+<span class="fc" id="L122">            work = Math.addExact(work, 1);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (state.searchDepth() == 0) { size = state.expression().length(); break; }</span>
+<span class="fc" id="L124">        }</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (size == 0) throw new IllegalStateException(&quot;completed query has no bound initial state&quot;);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (var assumption : key.assumptions()) {</span>
+<span class="fc" id="L127">            size = Math.addExact(size, assumption.length()); work = Math.addExact(work, 1);</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        return admit(key, null, new Footprint(size, work), execution);</span>
+    }
+
+    private long prepare(Key key, CumulativeTaskKnowledge.Execution execution) {
+<span class="fc" id="L133">        var path = new RetainedTaskPath(execution.solution().orElseThrow().evidence().witness());</span>
+<span class="fc" id="L134">        var measured = RetainedGraph.measure(List.of(key, path));</span>
+<span class="fc" id="L135">        return admit(key, path, new Footprint(measured.retained().characters(),</span>
+<span class="fc" id="L136">            Math.addExact(path.constructionWork(), measured.work())), execution);</span>
+    }
+
+    private long admit(Key key, RetainedTaskPath path, Footprint footprint, CumulativeTaskKnowledge.Execution execution) {
+<span class="fc" id="L140">        long paid = Math.addExact(execution.totalWork(), footprint.work());</span>
+<span class="fc" id="L141">        long budget = execution.task().budget().totalWork();</span>
+<span class="fc" id="L142">        checkInterrupted();</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        if (footprint.characters() &gt; maximumCharacters || paid &gt;= budget) return footprint.work();</span>
+        // Reserve replacement and worst-case evictions before scanning or mutating retained entries.
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (2L + 2L * retained.size() &gt; budget - paid) return footprint.work();</span>
+<span class="fc" id="L146">        return Math.addExact(footprint.work(), remember(key, path, footprint.characters()));</span>
+    }
+
+    private boolean cacheable(CheckedSchemaTaskSolver.Task task) {
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        return maximumQueries &gt; 0 &amp;&amp; maximumCharacters &gt; 0</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">            &amp;&amp; (task.goal().objective() == NativeNodeCountObjective.INSTANCE || task.goal().objective() instanceof StructuralTaskObjective);</span>
+    }
+    private static void checkInterrupted() {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (Thread.currentThread().isInterrupted()) throw new CancellationException(&quot;query interrupted after paid execution&quot;);</span>
+<span class="fc" id="L155">    }</span>
+    private long remember(Key key, RetainedTaskPath path, long incoming) {
+<span class="fc" id="L157">        long work = 1;</span>
+<span class="fc" id="L158">        var replaced = retained.remove(key);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (replaced != null) { discard(replaced); work = Math.addExact(work, 1); }</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        while (retained.size() &gt;= maximumQueries || characters &gt; maximumCharacters - incoming) {</span>
+<span class="fc" id="L161">            var iterator = retained.entrySet().iterator();</span>
+<span class="fc" id="L162">            var oldest = iterator.next(); discard(oldest.getValue()); iterator.remove();</span>
+<span class="fc" id="L163">            evictions = Math.addExact(evictions, 1);</span>
+<span class="fc" id="L164">            work = Math.addExact(work, 2);</span>
+<span class="fc" id="L165">        }</span>
+<span class="fc" id="L166">        retained.put(key, new Entry(path, incoming)); characters = Math.addExact(characters, incoming);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (path == null) observations = Math.addExact(observations, 1);</span>
+<span class="fc" id="L168">        else { admissions = Math.addExact(admissions, 1); retainedPaths++; }</span>
+<span class="fc" id="L169">        return work;</span>
+    }
+    private void discard(Entry entry) {
+<span class="fc" id="L172">        characters -= entry.characters();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (entry.path() != null) retainedPaths--;</span>
+<span class="fc" id="L174">    }</span>
+    public synchronized Statistics statistics() {
+<span class="fc" id="L176">        return new Statistics(queries, hits, misses, bypasses, observations, admissions, failures, evictions,</span>
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">            retainedPaths, retained.size() - retainedPaths, characters, knownWork, complete &amp;&amp; failures == 0);</span>
+    }
+<span class="fc" id="L179">    @Override public synchronized void close() { retained.clear(); retainedPaths = 0; characters = 0; closed = true; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

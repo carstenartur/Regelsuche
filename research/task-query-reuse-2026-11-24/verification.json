@@ -1,0 +1,84 @@
+{
+  "command": "MAVEN_OPTS=-Xmx768m python3 /workspace/scratch/9d9b08d5e080/mvn-workspace.py -B -ntp -pl regelsuche-learning -am test",
+  "runtime": "strict Java25; existing local proxy/truststore wrapper, no POM edits",
+  "exitCode": 0,
+  "logSha256": "358dbdc24f31c2f17ec83d30ff7f41bb0f4a4749fe06c09738d36aebf22f34b1",
+  "modules": [
+    {
+      "module": "regelsuche-core",
+      "tests": 1211,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suiteAttributeTests": 1211
+    },
+    {
+      "module": "regelsuche-egraph",
+      "tests": 181,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suiteAttributeTests": 181
+    },
+    {
+      "module": "regelsuche-search",
+      "tests": 801,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suiteAttributeTests": 801
+    },
+    {
+      "module": "regelsuche-validation",
+      "tests": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suiteAttributeTests": 45
+    },
+    {
+      "module": "regelsuche-math-algorithms",
+      "tests": 699,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suiteAttributeTests": 699
+    },
+    {
+      "module": "regelsuche-solver-ir",
+      "tests": 33,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suiteAttributeTests": 33
+    },
+    {
+      "module": "regelsuche-learning",
+      "tests": 1315,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suiteAttributeTests": 1237
+    }
+  ],
+  "total": {
+    "tests": 4285,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "skips": [
+    {
+      "class": "de.regelsuche.math.algorithms.linalg.ExternalRecurrenceObservationStudyTest",
+      "test": "measuresStreamWallTimeAndThreadAllocation",
+      "reason": "System property [externalObservationMetricsOutput] does not exist"
+    }
+  ],
+  "suiteAttributeTotal": {
+    "tests": 4207,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "countingNote": "Counts use actual testcase elements and agree with Maven summaries. Learning suite attributes omit 78 nested CheckedLearnedSchemaModelTest$NativeProviderAccounting cases present as testcase elements; their smaller total is retained separately, not treated as missing execution."
+}

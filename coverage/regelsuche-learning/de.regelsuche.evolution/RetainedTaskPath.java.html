@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RetainedTaskPath.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RetainedTaskPath.java</span></div><h1>RetainedTaskPath.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.retention.RetainedGraph;
+import de.regelsuche.search.moves.*;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CancellationException;
+
+/** Retained proposals only: the receiving generation must verify every edge again. */
+final class RetainedTaskPath implements TypedMoveSearch.TypedProvider, RetainedGraph.View {
+<span class="fc" id="L14">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+<span class="fc" id="L15">    private static final Descriptor DESCRIPTOR = new Descriptor(&quot;retained-task-path/v1&quot;, &quot;retained-task-path&quot;,</span>
+<span class="fc" id="L16">        SearchMove.SourceKind.PREPARATION, SearchMove.ProofStrength.REPLAYABLE, List.of(),</span>
+        SearchMove.ValueEvidence.UNKNOWN, &quot;source-bound-prior-selected-path&quot;);
+    private final Map&lt;MoveState, SearchMove&gt; proposals;
+
+<span class="fc" id="L20">    RetainedTaskPath(List&lt;TypedMoveSearch.WitnessStep&gt; witness) {</span>
+<span class="fc" id="L21">        var selected = new LinkedHashMap&lt;MoveState, SearchMove&gt;();</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (var step : witness) {</span>
+<span class="fc" id="L23">            var state = step.source();</span>
+<span class="fc" id="L24">            var source = new MoveState(CODEC.encodeExpression(state.expression()), state.searchDepth(), state.primitiveDepth(),</span>
+<span class="fc" id="L25">                state.previousRule(), state.assumptions(), state.capabilities(), state.complexityDebt());</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (selected.put(source, step.move()) != null) throw new IllegalArgumentException(&quot;duplicate selected path state&quot;);</span>
+<span class="fc" id="L27">        }</span>
+<span class="fc" id="L28">        proposals = Map.copyOf(selected);</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    long constructionWork() { return Math.addExact(1, 2L * proposals.size()); }</span>
+<span class="fc" id="L32">    @Override public Descriptor descriptor() { return DESCRIPTOR; }</span>
+
+    @Override public Batch candidates(MoveState state, MoveContext context) {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (Thread.currentThread().isInterrupted()) throw new CancellationException(&quot;query replay interrupted&quot;);</span>
+<span class="fc" id="L36">        var move = proposals.get(state);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        var moves = move == null ? List.&lt;SearchMove&gt;of() : List.of(move);</span>
+        // Retain producer metadata. This receipt pays the current lookup, while Batch
+        // also retains the actual mathematical application work of the proposal.
+<span class="fc" id="L40">        var work = TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(1L + moves.size());</span>
+<span class="fc" id="L41">        return new Batch(moves, work, false);</span>
+    }
+
+<span class="fc" id="L44">    @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(proposals); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

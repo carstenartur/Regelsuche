@@ -48,88 +48,89 @@ public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List&lt;
 <span class="fc" id="L48">    record Layout(List&lt;List&lt;Split&gt;&gt; statistics, List&lt;WeightedSplit&gt; pairTotal, List&lt;WeightedSplit&gt; total) {}</span>
 
     static void checkSource(OrderedReduction source, Work work) {
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (var restriction : source.restrictions()) {</span>
-<span class="fc" id="L52">            work.charge(1);</span>
-<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (restriction != All.ROWS) throw new Unavailable(&quot;POINT_UPDATES_REQUIRE_UNRESTRICTED_ROWS&quot;);</span>
-<span class="fc" id="L54">        }</span>
-<span class="fc" id="L55">    }</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (source.slots().size() &lt; 2) throw new Unavailable(&quot;POINT_UPDATES_REQUIRE_MULTIPLE_SLOTS&quot;);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (var restriction : source.restrictions()) {</span>
+<span class="fc" id="L53">            work.charge(1);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (restriction != All.ROWS) throw new Unavailable(&quot;POINT_UPDATES_REQUIRE_UNRESTRICTED_ROWS&quot;);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">    }</span>
 
     static OrderedBlockReductionPlan derive(OrderedReductionPlan reduction, Work work) {
-<span class="fc" id="L58">        var required = new LinkedHashSet&lt;List&lt;Moment&gt;&gt;();</span>
-<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (var term : reduction.terms()) {</span>
-<span class="fc" id="L60">            var factors = term.factors();</span>
-<span class="fc bfc" id="L61" title="All 2 branches covered.">            for (int length = 1; length &lt; factors.size(); length++) {</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">                for (int start = 0; start + length &lt;= factors.size(); start++) {</span>
-<span class="fc" id="L63">                    work.charge(1L + length);</span>
-<span class="fc" id="L64">                    required.add(List.copyOf(factors.subList(start, start + length)));</span>
+<span class="fc" id="L59">        var required = new LinkedHashSet&lt;List&lt;Moment&gt;&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (var term : reduction.terms()) {</span>
+<span class="fc" id="L61">            var factors = term.factors();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (int length = 1; length &lt; factors.size(); length++) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                for (int start = 0; start + length &lt;= factors.size(); start++) {</span>
+<span class="fc" id="L64">                    work.charge(1L + length);</span>
+<span class="fc" id="L65">                    required.add(List.copyOf(factors.subList(start, start + length)));</span>
                 }
             }
-<span class="fc" id="L67">        }</span>
-<span class="fc" id="L68">        return new OrderedBlockReductionPlan(reduction, List.copyOf(required));</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">        return new OrderedBlockReductionPlan(reduction, List.copyOf(required));</span>
     }
 
     static OrderedBlockReductionPlan supply(OrderedReductionPlan reduction, List&lt;List&lt;Moment&gt;&gt; statistics, Work work) {
-<span class="fc" id="L72">        work.charge(1);</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (statistics.size() &gt; MAX_STATISTICS) throw new Unavailable(&quot;BLOCK_STATISTIC_LIMIT&quot;);</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (var factors : statistics) {</span>
-<span class="pc bpc" id="L75" title="2 of 4 branches missed.">            if (factors.isEmpty() || factors.size() &gt;= OrderedReduction.MAX_ARITY) {</span>
-<span class="nc" id="L76">                throw new Unavailable(&quot;INVALID_BLOCK_STATISTIC&quot;);</span>
+<span class="fc" id="L73">        work.charge(1);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (statistics.size() &gt; MAX_STATISTICS) throw new Unavailable(&quot;BLOCK_STATISTIC_LIMIT&quot;);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var factors : statistics) {</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">            if (factors.isEmpty() || factors.size() &gt;= OrderedReduction.MAX_ARITY) {</span>
+<span class="nc" id="L77">                throw new Unavailable(&quot;INVALID_BLOCK_STATISTIC&quot;);</span>
             }
-<span class="fc" id="L78">            work.charge(1L + factors.size());</span>
-<span class="fc" id="L79">        }</span>
-<span class="fc" id="L80">        return new OrderedBlockReductionPlan(reduction, statistics);</span>
+<span class="fc" id="L79">            work.charge(1L + factors.size());</span>
+<span class="fc" id="L80">        }</span>
+<span class="fc" id="L81">        return new OrderedBlockReductionPlan(reduction, statistics);</span>
     }
 
     static Verified check(OrderedReduction source, OrderedBlockReductionPlan plan, Work work) {
-<span class="fc" id="L84">        checkSource(source, work);</span>
-<span class="fc" id="L85">        OrderedReductionPlan.check(source, plan.reduction(), false, work);</span>
-<span class="fc" id="L86">        var indices = new HashMap&lt;List&lt;Moment&gt;, Integer&gt;();</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var factors : plan.statistics()) {</span>
-<span class="fc" id="L88">            work.charge(1L + factors.size());</span>
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (factors.size() &gt;= source.slots().size()) throw new Unavailable(&quot;INVALID_BLOCK_STATISTIC&quot;);</span>
-<span class="fc" id="L90">            int degree = 0;</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (var moment : factors) {</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">                for (int column : moment.columns()) {</span>
-<span class="fc" id="L93">                    work.charge(1);</span>
-<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                    if (column &gt;= source.columnCount()) throw new Unavailable(&quot;UNKNOWN_COLUMN&quot;);</span>
-<span class="fc" id="L95">                    degree++;</span>
-<span class="fc" id="L96">                }</span>
-<span class="fc" id="L97">            }</span>
-<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (degree &gt; PairReduction.MAX_DEGREE) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (indices.putIfAbsent(factors, indices.size()) != null) {</span>
-<span class="nc" id="L100">                throw new Unavailable(&quot;DUPLICATE_BLOCK_STATISTIC&quot;);</span>
+<span class="fc" id="L85">        checkSource(source, work);</span>
+<span class="fc" id="L86">        OrderedReductionPlan.check(source, plan.reduction(), false, work);</span>
+<span class="fc" id="L87">        var indices = new HashMap&lt;List&lt;Moment&gt;, Integer&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (var factors : plan.statistics()) {</span>
+<span class="fc" id="L89">            work.charge(1L + factors.size());</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (factors.size() &gt;= source.slots().size()) throw new Unavailable(&quot;INVALID_BLOCK_STATISTIC&quot;);</span>
+<span class="fc" id="L91">            int degree = 0;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (var moment : factors) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                for (int column : moment.columns()) {</span>
+<span class="fc" id="L94">                    work.charge(1);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                    if (column &gt;= source.columnCount()) throw new Unavailable(&quot;UNKNOWN_COLUMN&quot;);</span>
+<span class="fc" id="L96">                    degree++;</span>
+<span class="fc" id="L97">                }</span>
+<span class="fc" id="L98">            }</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (degree &gt; PairReduction.MAX_DEGREE) throw new Unavailable(&quot;DEGREE_LIMIT&quot;);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (indices.putIfAbsent(factors, indices.size()) != null) {</span>
+<span class="nc" id="L101">                throw new Unavailable(&quot;DUPLICATE_BLOCK_STATISTIC&quot;);</span>
             }
-<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        }</span>
 
         // An increasing tuple across a cut is uniquely a left prefix and a right suffix.
         // Compile only these prescribed products and check that every operand is available.
-<span class="fc" id="L106">        var statistics = new ArrayList&lt;List&lt;Split&gt;&gt;();</span>
-<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (var factors : plan.statistics()) {</span>
-<span class="fc" id="L108">            statistics.add(compileSplits(factors, indices, work));</span>
-<span class="fc" id="L109">        }</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (plan.pairState().isPresent()) {</span>
-<span class="fc" id="L111">            var compiled = plan.pairState().orElseThrow().checkAndCompile(plan.reduction(), indices, work);</span>
-<span class="fc" id="L112">            return new Verified(source, plan, new Layout(List.copyOf(statistics), compiled.pair(), compiled.total()));</span>
+<span class="fc" id="L107">        var statistics = new ArrayList&lt;List&lt;Split&gt;&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (var factors : plan.statistics()) {</span>
+<span class="fc" id="L109">            statistics.add(compileSplits(factors, indices, work));</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (plan.pairState().isPresent()) {</span>
+<span class="fc" id="L112">            var compiled = plan.pairState().orElseThrow().checkAndCompile(plan.reduction(), indices, work);</span>
+<span class="fc" id="L113">            return new Verified(source, plan, new Layout(List.copyOf(statistics), compiled.pair(), compiled.total()));</span>
         }
-<span class="fc" id="L114">        var total = new ArrayList&lt;WeightedSplit&gt;();</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (var term : plan.reduction().terms()) {</span>
-<span class="fc bfc" id="L116" title="All 2 branches covered.">            for (var split : compileSplits(term.factors(), indices, work)) {</span>
-<span class="fc" id="L117">                total.add(new WeightedSplit(term.coefficient(), split));</span>
-<span class="fc" id="L118">            }</span>
-<span class="fc" id="L119">        }</span>
-<span class="fc" id="L120">        return new Verified(source, plan, new Layout(List.copyOf(statistics), List.of(), List.copyOf(total)));</span>
+<span class="fc" id="L115">        var total = new ArrayList&lt;WeightedSplit&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (var term : plan.reduction().terms()) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (var split : compileSplits(term.factors(), indices, work)) {</span>
+<span class="fc" id="L118">                total.add(new WeightedSplit(term.coefficient(), split));</span>
+<span class="fc" id="L119">            }</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        return new Verified(source, plan, new Layout(List.copyOf(statistics), List.of(), List.copyOf(total)));</span>
     }
 
     private static List&lt;Split&gt; compileSplits(List&lt;Moment&gt; factors, Map&lt;List&lt;Moment&gt;, Integer&gt; indices, Work work) {
-<span class="fc" id="L124">        var splits = new ArrayList&lt;Split&gt;();</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (int cut = 1; cut &lt; factors.size(); cut++) {</span>
-<span class="fc" id="L126">            work.charge(1L + factors.size());</span>
-<span class="fc" id="L127">            var left = indices.get(factors.subList(0, cut));</span>
-<span class="fc" id="L128">            var right = indices.get(factors.subList(cut, factors.size()));</span>
-<span class="pc bpc" id="L129" title="1 of 4 branches missed.">            if (left == null || right == null) throw new Unavailable(&quot;MISSING_BLOCK_STATISTIC&quot;);</span>
-<span class="fc" id="L130">            splits.add(new Split(left, right));</span>
+<span class="fc" id="L125">        var splits = new ArrayList&lt;Split&gt;();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int cut = 1; cut &lt; factors.size(); cut++) {</span>
+<span class="fc" id="L127">            work.charge(1L + factors.size());</span>
+<span class="fc" id="L128">            var left = indices.get(factors.subList(0, cut));</span>
+<span class="fc" id="L129">            var right = indices.get(factors.subList(cut, factors.size()));</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">            if (left == null || right == null) throw new Unavailable(&quot;MISSING_BLOCK_STATISTIC&quot;);</span>
+<span class="fc" id="L131">            splits.add(new Split(left, right));</span>
         }
-<span class="fc" id="L132">        return List.copyOf(splits);</span>
+<span class="fc" id="L133">        return List.copyOf(splits);</span>
     }
 
     /** Only checked plans can create a mutable execution session. */
@@ -138,22 +139,22 @@ public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List&lt;
         private final OrderedBlockReductionPlan plan;
         private final Layout layout;
 
-<span class="fc" id="L141">        private Verified(OrderedReduction source, OrderedBlockReductionPlan plan, Layout layout) {</span>
-<span class="fc" id="L142">            this.source = source;</span>
-<span class="fc" id="L143">            this.plan = plan;</span>
-<span class="fc" id="L144">            this.layout = layout;</span>
-<span class="fc" id="L145">        }</span>
+<span class="fc" id="L142">        private Verified(OrderedReduction source, OrderedBlockReductionPlan plan, Layout layout) {</span>
+<span class="fc" id="L143">            this.source = source;</span>
+<span class="fc" id="L144">            this.plan = plan;</span>
+<span class="fc" id="L145">            this.layout = layout;</span>
+<span class="fc" id="L146">        }</span>
 
-<span class="fc" id="L147">        public OrderedReduction source() { return source; }</span>
-<span class="fc" id="L148">        public OrderedBlockReductionPlan plan() { return plan; }</span>
+<span class="fc" id="L148">        public OrderedReduction source() { return source; }</span>
+<span class="fc" id="L149">        public OrderedBlockReductionPlan plan() { return plan; }</span>
 
         public OrderedBlockAccumulator newAccumulator(List&lt;? extends List&lt;BigInteger&gt;&gt; rows,
                 IterationLimits limits, BooleanSupplier cancellation) {
             try {
-<span class="fc" id="L153">                return new OrderedBlockAccumulator(source.columnCount(), plan.statistics(), layout, rows,</span>
+<span class="fc" id="L154">                return new OrderedBlockAccumulator(source.columnCount(), plan.statistics(), layout, rows,</span>
                     new Work(limits, cancellation, PairReduction.MAX_DEGREE));
-<span class="nc" id="L155">            } catch (Unavailable unavailable) {</span>
-<span class="nc" id="L156">                throw new IllegalArgumentException(unavailable.getMessage(), unavailable);</span>
+<span class="nc" id="L156">            } catch (Unavailable unavailable) {</span>
+<span class="nc" id="L157">                throw new IllegalArgumentException(unavailable.getMessage(), unavailable);</span>
             }
         }
     }

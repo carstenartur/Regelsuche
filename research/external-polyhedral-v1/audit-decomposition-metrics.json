@@ -1,0 +1,991 @@
+{
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "extractorVersion": "0.1.10",
+  "jdtVersion": "3.41.0",
+  "boundary": "unchanged native CodeComplexityAnalyzer method facts only; not a complete repository CI qualification",
+  "measurements": [
+    {
+      "source": "before/ExternalPolyhedralComparison.java",
+      "methods": [
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private ExternalPolyhedralComparison()",
+          "constructor": true,
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 42,
+          "endLine": 42,
+          "lineCount": 1,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static Imported parse(String source)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 45,
+          "endLine": 78,
+          "lineCount": 34,
+          "cyclomaticComplexity": 13,
+          "cognitiveComplexity": 13,
+          "maxNestingDepth": 2,
+          "decisionPointCount": 12,
+          "decisionPointsByKind": {
+            "if": 5,
+            "booleanOperator": 3,
+            "loop": 4
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger bound(Expr expression, int arity)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 80,
+          "endLine": 99,
+          "lineCount": 20,
+          "cyclomaticComplexity": 11,
+          "cognitiveComplexity": 7,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 10,
+          "decisionPointsByKind": {
+            "if": 4,
+            "booleanOperator": 2,
+            "switchCase": 4
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static int exponent(Expr expression)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 101,
+          "endLine": 107,
+          "lineCount": 7,
+          "cyclomaticComplexity": 4,
+          "cognitiveComplexity": 3,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 3,
+          "decisionPointsByKind": {
+            "if": 1,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static List<BigInteger> oracle(Imported input, int count, int seed)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 109,
+          "endLine": 118,
+          "lineCount": 10,
+          "cyclomaticComplexity": 7,
+          "cognitiveComplexity": 6,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 6,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 3,
+            "loop": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger enumerate(Expr term, BigInteger[] tuple, int slot, int start, int end, int seed)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 120,
+          "endLine": 128,
+          "lineCount": 9,
+          "cyclomaticComplexity": 3,
+          "cognitiveComplexity": 2,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 2,
+          "decisionPointsByKind": {
+            "if": 1,
+            "loop": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger interpret(Expr expression, BigInteger[] tuple)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 130,
+          "endLine": 142,
+          "lineCount": 13,
+          "cyclomaticComplexity": 8,
+          "cognitiveComplexity": 2,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 7,
+          "decisionPointsByKind": {
+            "if": 2,
+            "switchCase": 5
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger value(int index, int seed)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 144,
+          "endLine": 146,
+          "lineCount": 3,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static JsonNode protocol(Path checkout)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 148,
+          "endLine": 152,
+          "lineCount": 5,
+          "cyclomaticComplexity": 2,
+          "cognitiveComplexity": 1,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 1,
+          "decisionPointsByKind": {
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "public static void main(String[] args)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 154,
+          "endLine": 164,
+          "lineCount": 11,
+          "cyclomaticComplexity": 6,
+          "cognitiveComplexity": 6,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 5,
+          "decisionPointsByKind": {
+            "if": 3,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> nativeRun(String source, JsonNode request)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 166,
+          "endLine": 208,
+          "lineCount": 43,
+          "cyclomaticComplexity": 8,
+          "cognitiveComplexity": 10,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 7,
+          "decisionPointsByKind": {
+            "catch": 2,
+            "if": 2,
+            "loop": 3
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "public static Map<String,Object> run(Path checkout, Path upstream, Path output)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 210,
+          "endLine": 260,
+          "lineCount": 51,
+          "cyclomaticComplexity": 11,
+          "cognitiveComplexity": 18,
+          "maxNestingDepth": 4,
+          "decisionPointCount": 10,
+          "decisionPointsByKind": {
+            "if": 4,
+            "loop": 5,
+            "catch": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "public static void audit(Path checkout, Path output)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 262,
+          "endLine": 329,
+          "lineCount": 68,
+          "cyclomaticComplexity": 30,
+          "cognitiveComplexity": 61,
+          "maxNestingDepth": 5,
+          "decisionPointCount": 29,
+          "decisionPointsByKind": {
+            "loop": 9,
+            "if": 14,
+            "booleanOperator": 5,
+            "conditionalExpression": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Path requiredEvidence(Path output, JsonNode manifest, String relative)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 331,
+          "endLine": 334,
+          "lineCount": 4,
+          "cyclomaticComplexity": 2,
+          "cognitiveComplexity": 1,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 1,
+          "decisionPointsByKind": {
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void auditProcess(JsonNode process, int seconds, boolean zeroExit)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 336,
+          "endLine": 343,
+          "lineCount": 8,
+          "cyclomaticComplexity": 6,
+          "cognitiveComplexity": 5,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 5,
+          "decisionPointsByKind": {
+            "if": 1,
+            "booleanOperator": 4
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> nativeRow(JsonNode entry, JsonNode panel, Path checkout, Path output, Path directory, Path source, List<Map<String,Object>> expected, long oracleNanos)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 345,
+          "endLine": 363,
+          "lineCount": 19,
+          "cyclomaticComplexity": 6,
+          "cognitiveComplexity": 10,
+          "maxNestingDepth": 4,
+          "decisionPointCount": 5,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 1,
+            "conditionalExpression": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> externalRow(JsonNode entry, JsonNode panel, Path upstream, Path directory, Path source, Optional<Imported> imported, List<Map<String,Object>> expected, long oracleNanos)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 365,
+          "endLine": 415,
+          "lineCount": 51,
+          "cyclomaticComplexity": 20,
+          "cognitiveComplexity": 26,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 19,
+          "decisionPointsByKind": {
+            "conditionalExpression": 7,
+            "if": 8,
+            "booleanOperator": 2,
+            "loop": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static String driver(String name)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 417,
+          "endLine": 423,
+          "lineCount": 7,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> row(JsonNode entry, String arm, long oracleNanos)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 425,
+          "endLine": 430,
+          "lineCount": 6,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void verifyUpstream(JsonNode panel, Path upstream, Path output)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 432,
+          "endLine": 452,
+          "lineCount": 21,
+          "cyclomaticComplexity": 8,
+          "cognitiveComplexity": 11,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 7,
+          "decisionPointsByKind": {
+            "if": 5,
+            "loop": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Execution process(List<String> command, Path directory, Map<String,String> environment, Path log, int seconds)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 458,
+          "endLine": 472,
+          "lineCount": 15,
+          "cyclomaticComplexity": 5,
+          "cognitiveComplexity": 4,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 4,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static String commandText(List<String> command, Path directory, Path log)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 474,
+          "endLine": 478,
+          "lineCount": 5,
+          "cyclomaticComplexity": 2,
+          "cognitiveComplexity": 1,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 1,
+          "decisionPointsByKind": {
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static String java()",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 480,
+          "endLine": 480,
+          "lineCount": 1,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void write(Path path, Object value)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 481,
+          "endLine": 483,
+          "lineCount": 3,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static String hash(byte[] value)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 484,
+          "endLine": 484,
+          "lineCount": 1,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        }
+      ]
+    },
+    {
+      "source": "after/ExternalPolyhedralComparison.java",
+      "methods": [
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private ExternalPolyhedralComparison()",
+          "constructor": true,
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 42,
+          "endLine": 42,
+          "lineCount": 1,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static Imported parse(String source)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 45,
+          "endLine": 78,
+          "lineCount": 34,
+          "cyclomaticComplexity": 13,
+          "cognitiveComplexity": 13,
+          "maxNestingDepth": 2,
+          "decisionPointCount": 12,
+          "decisionPointsByKind": {
+            "if": 5,
+            "booleanOperator": 3,
+            "loop": 4
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger bound(Expr expression, int arity)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 80,
+          "endLine": 99,
+          "lineCount": 20,
+          "cyclomaticComplexity": 11,
+          "cognitiveComplexity": 7,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 10,
+          "decisionPointsByKind": {
+            "if": 4,
+            "booleanOperator": 2,
+            "switchCase": 4
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static int exponent(Expr expression)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 101,
+          "endLine": 107,
+          "lineCount": 7,
+          "cyclomaticComplexity": 4,
+          "cognitiveComplexity": 3,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 3,
+          "decisionPointsByKind": {
+            "if": 1,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static List<BigInteger> oracle(Imported input, int count, int seed)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 109,
+          "endLine": 118,
+          "lineCount": 10,
+          "cyclomaticComplexity": 7,
+          "cognitiveComplexity": 6,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 6,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 3,
+            "loop": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger enumerate(Expr term, BigInteger[] tuple, int slot, int start, int end, int seed)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 120,
+          "endLine": 128,
+          "lineCount": 9,
+          "cyclomaticComplexity": 3,
+          "cognitiveComplexity": 2,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 2,
+          "decisionPointsByKind": {
+            "if": 1,
+            "loop": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger interpret(Expr expression, BigInteger[] tuple)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 130,
+          "endLine": 142,
+          "lineCount": 13,
+          "cyclomaticComplexity": 8,
+          "cognitiveComplexity": 2,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 7,
+          "decisionPointsByKind": {
+            "if": 2,
+            "switchCase": 5
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static BigInteger value(int index, int seed)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 144,
+          "endLine": 146,
+          "lineCount": 3,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static JsonNode protocol(Path checkout)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 148,
+          "endLine": 152,
+          "lineCount": 5,
+          "cyclomaticComplexity": 2,
+          "cognitiveComplexity": 1,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 1,
+          "decisionPointsByKind": {
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "public static void main(String[] args)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 154,
+          "endLine": 164,
+          "lineCount": 11,
+          "cyclomaticComplexity": 6,
+          "cognitiveComplexity": 6,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 5,
+          "decisionPointsByKind": {
+            "if": 3,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> nativeRun(String source, JsonNode request)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 166,
+          "endLine": 208,
+          "lineCount": 43,
+          "cyclomaticComplexity": 8,
+          "cognitiveComplexity": 10,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 7,
+          "decisionPointsByKind": {
+            "catch": 2,
+            "if": 2,
+            "loop": 3
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "public static Map<String,Object> run(Path checkout, Path upstream, Path output)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 210,
+          "endLine": 260,
+          "lineCount": 51,
+          "cyclomaticComplexity": 11,
+          "cognitiveComplexity": 18,
+          "maxNestingDepth": 4,
+          "decisionPointCount": 10,
+          "decisionPointsByKind": {
+            "if": 4,
+            "loop": 5,
+            "catch": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "public static void audit(Path checkout, Path output)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 262,
+          "endLine": 274,
+          "lineCount": 13,
+          "cyclomaticComplexity": 4,
+          "cognitiveComplexity": 3,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 3,
+          "decisionPointsByKind": {
+            "if": 2,
+            "loop": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void auditManifest(Path output, JsonNode manifest)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 276,
+          "endLine": 283,
+          "lineCount": 8,
+          "cyclomaticComplexity": 4,
+          "cognitiveComplexity": 4,
+          "maxNestingDepth": 2,
+          "decisionPointCount": 3,
+          "decisionPointsByKind": {
+            "loop": 1,
+            "if": 1,
+            "booleanOperator": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,JsonNode> retainedCases(Path output, JsonNode panel, HashSet<String> expectedKeys)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 285,
+          "endLine": 295,
+          "lineCount": 11,
+          "cyclomaticComplexity": 4,
+          "cognitiveComplexity": 5,
+          "maxNestingDepth": 2,
+          "decisionPointCount": 3,
+          "decisionPointsByKind": {
+            "loop": 2,
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void auditRow(Path output, JsonNode panel, JsonNode manifest, Map<String,JsonNode> cases, HashSet<String> observedKeys, JsonNode row)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 297,
+          "endLine": 319,
+          "lineCount": 23,
+          "cyclomaticComplexity": 11,
+          "cognitiveComplexity": 12,
+          "maxNestingDepth": 2,
+          "decisionPointCount": 10,
+          "decisionPointsByKind": {
+            "if": 5,
+            "booleanOperator": 2,
+            "conditionalExpression": 1,
+            "loop": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static JsonNode retainedNativeOutputs(JsonNode panel, JsonNode row, JsonNode nativeResponse)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 321,
+          "endLine": 328,
+          "lineCount": 8,
+          "cyclomaticComplexity": 5,
+          "cognitiveComplexity": 4,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 4,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static JsonNode retainedOriginalOutputs(Path output, JsonNode panel, JsonNode manifest, JsonNode row, String id)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 330,
+          "endLine": 348,
+          "lineCount": 19,
+          "cyclomaticComplexity": 7,
+          "cognitiveComplexity": 9,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 6,
+          "decisionPointsByKind": {
+            "if": 2,
+            "loop": 3,
+            "conditionalExpression": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Path requiredEvidence(Path output, JsonNode manifest, String relative)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 350,
+          "endLine": 353,
+          "lineCount": 4,
+          "cyclomaticComplexity": 2,
+          "cognitiveComplexity": 1,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 1,
+          "decisionPointsByKind": {
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void auditProcess(JsonNode process, int seconds, boolean zeroExit)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 355,
+          "endLine": 362,
+          "lineCount": 8,
+          "cyclomaticComplexity": 6,
+          "cognitiveComplexity": 5,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 5,
+          "decisionPointsByKind": {
+            "if": 1,
+            "booleanOperator": 4
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> nativeRow(JsonNode entry, JsonNode panel, Path checkout, Path output, Path directory, Path source, List<Map<String,Object>> expected, long oracleNanos)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 364,
+          "endLine": 382,
+          "lineCount": 19,
+          "cyclomaticComplexity": 6,
+          "cognitiveComplexity": 10,
+          "maxNestingDepth": 4,
+          "decisionPointCount": 5,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 1,
+            "conditionalExpression": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> externalRow(JsonNode entry, JsonNode panel, Path upstream, Path directory, Path source, Optional<Imported> imported, List<Map<String,Object>> expected, long oracleNanos)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 384,
+          "endLine": 434,
+          "lineCount": 51,
+          "cyclomaticComplexity": 20,
+          "cognitiveComplexity": 26,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 19,
+          "decisionPointsByKind": {
+            "conditionalExpression": 7,
+            "if": 8,
+            "booleanOperator": 2,
+            "loop": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static String driver(String name)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 436,
+          "endLine": 442,
+          "lineCount": 7,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Map<String,Object> row(JsonNode entry, String arm, long oracleNanos)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 444,
+          "endLine": 449,
+          "lineCount": 6,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void verifyUpstream(JsonNode panel, Path upstream, Path output)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 451,
+          "endLine": 471,
+          "lineCount": 21,
+          "cyclomaticComplexity": 8,
+          "cognitiveComplexity": 11,
+          "maxNestingDepth": 3,
+          "decisionPointCount": 7,
+          "decisionPointsByKind": {
+            "if": 5,
+            "loop": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static Execution process(List<String> command, Path directory, Map<String,String> environment, Path log, int seconds)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 477,
+          "endLine": 491,
+          "lineCount": 15,
+          "cyclomaticComplexity": 5,
+          "cognitiveComplexity": 4,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 4,
+          "decisionPointsByKind": {
+            "if": 2,
+            "booleanOperator": 2
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static String commandText(List<String> command, Path directory, Path log)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 493,
+          "endLine": 497,
+          "lineCount": 5,
+          "cyclomaticComplexity": 2,
+          "cognitiveComplexity": 1,
+          "maxNestingDepth": 1,
+          "decisionPointCount": 1,
+          "decisionPointsByKind": {
+            "if": 1
+          },
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static String java()",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 499,
+          "endLine": 499,
+          "lineCount": 1,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "private static void write(Path path, Object value)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 500,
+          "endLine": 502,
+          "lineCount": 3,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        },
+        {
+          "type": "de.regelsuche.benchmark.ExternalPolyhedralComparison",
+          "signature": "static String hash(byte[] value)",
+          "sourceFile": "ExternalPolyhedralComparison.java",
+          "startLine": 503,
+          "endLine": 503,
+          "lineCount": 1,
+          "cyclomaticComplexity": 1,
+          "cognitiveComplexity": 0,
+          "maxNestingDepth": 0,
+          "decisionPointCount": 0,
+          "decisionPointsByKind": {},
+          "complexityProvider": "jdt-ast",
+          "complexityAccuracy": "ast"
+        }
+      ]
+    }
+  ],
+  "sourcePath": "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ExternalPolyhedralComparison.java",
+  "beforeSha256": "9bf9be018c098766f10a844752e715fdf737014a62e68b5c75e43ceecc3c4cc9",
+  "afterSha256": "fee418b2cc39f699576c1ae0935e852abcb83547123c2c4e6d929c8bdfb1debd",
+  "nativeAnalyzerSha256": "d88f6747157b6dbe4996cbdd9d8fea07139a591541e208605ce88494db0df0f9",
+  "beforeLocalCommit": "0ac1cd58a4200fb25e2a0bc08cc919345dcbe8ee",
+  "beforePublicCommit": "ccaa209a6159dbf25d3930f0ff3e9c70d6d24f5e",
+  "beforeTree": "230602b14daf1c6bf858941c2791cb51e54455d5"
+}

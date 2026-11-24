@@ -189,7 +189,7 @@ public final class TypedLearnedMoveInventory {
 <span class="fc" id="L189">        learned.forEach(provider -&gt; programs.put(provider.descriptor().id(), provider.verifier()));</span>
 <span class="fc" id="L190">        return (source, move, context) -&gt; {</span>
 <span class="fc bfc" id="L191" title="All 2 branches covered.">            var verifier = (move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitiveVerifiers : programs).get(move.ruleId());</span>
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            return verifier == null ? new MoveVerifier.Verification(false, 1, List.of(), &quot;UNKNOWN_TYPED_PROGRAM&quot;)</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            return verifier == null ? new MoveVerifier.Verification(false, 1, List.of(), &quot;UNKNOWN_TYPED_PROGRAM&quot;)</span>
 <span class="fc" id="L193">                : verifier.verify(source, move, context);</span>
         };
     }

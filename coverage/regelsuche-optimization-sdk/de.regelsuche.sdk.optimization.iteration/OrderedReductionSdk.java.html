@@ -18,7 +18,7 @@ public final class OrderedReductionSdk {
 
     public static OrderedReductionSearch.Result search(OrderedReduction source, OptimizationBudget budget,
             CancellationToken cancellation) {
-<span class="nc" id="L21">        return OrderedReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
+<span class="fc" id="L21">        return OrderedReductionSearch.search(source, limits(budget), budget.maximumStates(), cancellation::isCancelled);</span>
     }
 
     public static OrderedReductionSearch.Result searchWindows(OrderedReduction source, OptimizationBudget budget,
@@ -70,7 +70,7 @@ public final class OrderedReductionSdk {
 
     public static OrderedReductionPlan.Verification verify(OrderedReduction source, OrderedReductionPlan plan,
             boolean windows, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L73">        return OrderedReductionSearch.verify(source, plan, windows, limits(budget), cancellation::isCancelled);</span>
+<span class="fc" id="L73">        return OrderedReductionSearch.verify(source, plan, windows, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static OrderedReductionPlan.Evaluation evaluate(OrderedReductionPlan.Verified plan,
@@ -83,8 +83,13 @@ public final class OrderedReductionSdk {
 <span class="nc" id="L83">        return plan.evaluateWindows(rows, width, limits(budget), cancellation::isCancelled);</span>
     }
 
+    public static OrderedReductionPlan.Evaluation evaluatePrefixes(OrderedReductionPlan.Verified plan,
+            List&lt;? extends List&lt;BigInteger&gt;&gt; rows, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L88">        return plan.evaluatePrefixes(rows, limits(budget), cancellation::isCancelled);</span>
+    }
+
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="fc" id="L87">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L92">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,640 @@
+{
+  "schema" : "regelsuche.external-polyhedral/v1",
+  "protocolSha256" : "d87c7ada9ccf9e5c2b1b270ba6a4c1f987feb45c8572b5540ca30d00e24cd46c",
+  "upstreamRevision" : "d91815edbfb0463c1b195173dbff46a4a2e52f39",
+  "java" : "25.0.2+10-LTS",
+  "platform" : "Linux amd64 6.18.57",
+  "processors" : 9,
+  "limits" : {
+    "synthesisSeconds" : 30,
+    "compileSeconds" : 15,
+    "executionSeconds" : 5,
+    "javaHeapMiB" : 512,
+    "nativeWork" : 1000000,
+    "nativeTerms" : 128,
+    "maxStates" : 4,
+    "maxOutputBytes" : 1048576
+  },
+  "sourceVerificationSetupNanos" : 429483048,
+  "acquisitionCost" : "NOT_MEASURED: pinned original prebuilt artifact; checkout/download excluded from query phases.",
+  "memoryBoundary" : "512 MiB Java heap per subprocess; native/JNI/process RSS is not a hard-capped comparable work measure.",
+  "nativeRevision" : "1e168e8562254231440e86982b43dd23d0b3f4dd",
+  "gcc" : "gcc (Debian 14.2.0-19) 14.2.0\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+  "timingInterpretation" : "One cold run; phase diagnostics only, no relative speed ranking or common instruction-count claim.",
+  "rows" : [ {
+    "case" : "example_3d_max",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "6524d5b40a9c37f8841c7f935b1a8b69b491a2ae959309f5b73fc21574d29c40",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 7011,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 493216781
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/example_3d_max/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/example_3d_max/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "ALPHA_PREFIX_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 2545175
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "example_3d_max",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "6524d5b40a9c37f8841c7f935b1a8b69b491a2ae959309f5b73fc21574d29c40",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 7011,
+    "synthesisProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 9318633656
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/example_3d_max/generated", "/tmp/regelsuche-polyhedral-v1-run/example_3d_max/input.alpha" ],
+    "generatedSources" : [ "generated/example_3d_max/example_3d_max-wrapper.c", "generated/example_3d_max/example_3d_max.c", "generated/example_3d_max/example_3d_max_verify.c", "generated/example_3d_max/simplifications/v0/example_3d_max.alpha", "generated/example_3d_max/simplifications/v0/example_3d_max.c" ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  }, {
+    "case" : "example_3d_sum",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "9a41aa31529ba38a2a6a83a4b05f034bf092b61c03d8851c6c3e18238fb621a6",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1442,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 233111114
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/example_3d_sum/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/example_3d_sum/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "ALPHA_PREFIX_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 835072
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "example_3d_sum",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "9a41aa31529ba38a2a6a83a4b05f034bf092b61c03d8851c6c3e18238fb621a6",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1442,
+    "synthesisProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 8440278719
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/example_3d_sum/generated", "/tmp/regelsuche-polyhedral-v1-run/example_3d_sum/input.alpha" ],
+    "generatedSources" : [ "generated/example_3d_sum/example_3d_sum-wrapper.c", "generated/example_3d_sum/example_3d_sum.c", "generated/example_3d_sum/example_3d_sum_verify.c", "generated/example_3d_sum/simplifications/v0/example_3d_sum.alpha", "generated/example_3d_sum/simplifications/v0/example_3d_sum.c" ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  }, {
+    "case" : "example_4d",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "02dd69f8c990cfcd48bdaa6f94767ac0d7b048299be729bd7ea8196c38c5db04",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1212,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 239166551
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/example_4d/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/example_4d/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "ALPHA_PREFIX_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 950302
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "example_4d",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "02dd69f8c990cfcd48bdaa6f94767ac0d7b048299be729bd7ea8196c38c5db04",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1212,
+    "synthesisProcess" : {
+      "exit" : 124,
+      "timedOut" : true,
+      "wallNanos" : 45387072401
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/example_4d/generated", "/tmp/regelsuche-polyhedral-v1-run/example_4d/input.alpha" ],
+    "generatedSources" : [ ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  }, {
+    "case" : "increasing_max_filter",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "1c1df302b9f11de153ed45fe0a4cb04c14ecbe2c9cc8528e181aa378e70e59a6",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1523,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 1887145165
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/increasing_max_filter/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/increasing_max_filter/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "ALPHA_PREFIX_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 961609
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "increasing_max_filter",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "1c1df302b9f11de153ed45fe0a4cb04c14ecbe2c9cc8528e181aa378e70e59a6",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1523,
+    "synthesisProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 14544940448
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/increasing_max_filter/generated", "/tmp/regelsuche-polyhedral-v1-run/increasing_max_filter/input.alpha" ],
+    "generatedSources" : [ "generated/increasing_max_filter/increasing_max_filter-wrapper.c", "generated/increasing_max_filter/increasing_max_filter.c", "generated/increasing_max_filter/increasing_max_filter_verify.c", "generated/increasing_max_filter/simplifications/v0/increasing_max_filter.alpha", "generated/increasing_max_filter/simplifications/v0/increasing_max_filter.c" ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  }, {
+    "case" : "prefix_max",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "fe1845458ac060ff98ba7a446fe527b2544c8620f6c0db6a4f9e2febb8f7a309",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1562,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 235173668
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/prefix_max/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/prefix_max/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "ALPHA_PREFIX_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 859428
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "prefix_max",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "fe1845458ac060ff98ba7a446fe527b2544c8620f6c0db6a4f9e2febb8f7a309",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1562,
+    "synthesisProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 7640356341
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/prefix_max/generated", "/tmp/regelsuche-polyhedral-v1-run/prefix_max/input.alpha" ],
+    "generatedSources" : [ "generated/prefix_max/prefix_max-wrapper.c", "generated/prefix_max/prefix_max.c", "generated/prefix_max/prefix_max_verify.c", "generated/prefix_max/simplifications/v0/prefix_max.alpha", "generated/prefix_max/simplifications/v0/prefix_max.c" ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  }, {
+    "case" : "prefix_sum",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "1d6f1e81bebd16c63e1dfb5a97016b02fb8184926e4bef6e999f29f35360f79c",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1772485,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 367811935
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/native.json" ],
+    "response" : {
+      "searchWork" : 42,
+      "searchReason" : "VERIFIED",
+      "replayWork" : 11,
+      "planTerms" : [ {
+        "coefficient" : 1,
+        "factors" : [ {
+          "columns" : [ 0 ]
+        } ]
+      } ],
+      "evaluationNanos" : 7464343,
+      "evaluationWork" : 729,
+      "totalNativeWork" : 782,
+      "outputs" : [ {
+        "values" : [ "-9", "-1" ],
+        "rows" : 2,
+        "seed" : 0
+      }, {
+        "values" : [ "-2", "-6" ],
+        "rows" : 2,
+        "seed" : 1
+      }, {
+        "values" : [ "5", "8" ],
+        "rows" : 2,
+        "seed" : 2
+      }, {
+        "values" : [ "-9", "-1", "5" ],
+        "rows" : 3,
+        "seed" : 0
+      }, {
+        "values" : [ "-2", "-6", "-12" ],
+        "rows" : 3,
+        "seed" : 1
+      }, {
+        "values" : [ "5", "8", "9" ],
+        "rows" : 3,
+        "seed" : 2
+      }, {
+        "values" : [ "-9", "-1", "5", "9", "11", "11", "9", "5" ],
+        "rows" : 8,
+        "seed" : 0
+      }, {
+        "values" : [ "-2", "-6", "-12", "-20", "-11", "-4", "1", "4" ],
+        "rows" : 8,
+        "seed" : 1
+      }, {
+        "values" : [ "5", "8", "9", "8", "5", "0", "-7", "-16" ],
+        "rows" : 8,
+        "seed" : 2
+      }, {
+        "values" : [ "-9", "-1", "5", "9", "11", "11", "9", "5", "-1", "-9", "0", "7", "12", "15", "16", "15", "12", "7", "0", "-9" ],
+        "rows" : 20,
+        "seed" : 0
+      }, {
+        "values" : [ "-2", "-6", "-12", "-20", "-11", "-4", "1", "4", "5", "4", "1", "-4", "-11", "-20", "-12", "-6", "-2", "0", "0", "-2" ],
+        "rows" : 20,
+        "seed" : 1
+      }, {
+        "values" : [ "5", "8", "9", "8", "5", "0", "-7", "-16", "-8", "-2", "2", "4", "4", "2", "-2", "-8", "-16", "-7", "0", "5" ],
+        "rows" : 20,
+        "seed" : 2
+      } ],
+      "status" : "CANDIDATE",
+      "nativeWallNanos" : 107415616
+    },
+    "judgment" : "VERIFIED_FINITE_OUTPUTS"
+  }, {
+    "case" : "prefix_sum",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "1d6f1e81bebd16c63e1dfb5a97016b02fb8184926e4bef6e999f29f35360f79c",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1772485,
+    "synthesisProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 7862676538
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/generated", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/input.alpha" ],
+    "generatedSources" : [ "generated/prefix_sum/prefix_sum-wrapper.c", "generated/prefix_sum/prefix_sum.c", "generated/prefix_sum/prefix_sum_verify.c", "generated/prefix_sum/simplifications/v0/prefix_sum.alpha", "generated/prefix_sum/simplifications/v0/prefix_sum.c" ],
+    "candidateKind" : "SIMPLIFIED",
+    "candidateSha256" : "90dd64ba49c0e9eb5fe6a532e14c2fa64dbb19432ff53a63c899cf4614e01243",
+    "compileProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 138003537
+    },
+    "compileCommand" : [ "gcc", "-std=c11", "-O2", "-fsanitize=undefined", "-fno-sanitize-recover=all", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/generated/prefix_sum/simplifications/v0/prefix_sum.c", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/driver.c", "-lm", "-o", "/tmp/regelsuche-polyhedral-v1-run/prefix_sum/candidate" ],
+    "executions" : [ {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 4471698
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3993914
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3329362
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3162967
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3710255
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3263394
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3596687
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3098842
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 2969742
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3105191
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 2832659
+    }, {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 3251227
+    } ],
+    "outputs" : [ {
+      "rows" : 2,
+      "seed" : 0,
+      "values" : [ "-9", "-1" ]
+    }, {
+      "rows" : 2,
+      "seed" : 1,
+      "values" : [ "-2", "-6" ]
+    }, {
+      "rows" : 2,
+      "seed" : 2,
+      "values" : [ "5", "8" ]
+    }, {
+      "rows" : 3,
+      "seed" : 0,
+      "values" : [ "-9", "-1", "5" ]
+    }, {
+      "rows" : 3,
+      "seed" : 1,
+      "values" : [ "-2", "-6", "-12" ]
+    }, {
+      "rows" : 3,
+      "seed" : 2,
+      "values" : [ "5", "8", "9" ]
+    }, {
+      "rows" : 8,
+      "seed" : 0,
+      "values" : [ "-9", "-1", "5", "9", "11", "11", "9", "5" ]
+    }, {
+      "rows" : 8,
+      "seed" : 1,
+      "values" : [ "-2", "-6", "-12", "-20", "-11", "-4", "1", "4" ]
+    }, {
+      "rows" : 8,
+      "seed" : 2,
+      "values" : [ "5", "8", "9", "8", "5", "0", "-7", "-16" ]
+    }, {
+      "rows" : 20,
+      "seed" : 0,
+      "values" : [ "-9", "-1", "5", "9", "11", "11", "9", "5", "-1", "-9", "0", "7", "12", "15", "16", "15", "12", "7", "0", "-9" ]
+    }, {
+      "rows" : 20,
+      "seed" : 1,
+      "values" : [ "-2", "-6", "-12", "-20", "-11", "-4", "1", "4", "5", "4", "1", "-4", "-11", "-20", "-12", "-6", "-2", "0", "0", "-2" ]
+    }, {
+      "rows" : 20,
+      "seed" : 2,
+      "values" : [ "5", "8", "9", "8", "5", "0", "-7", "-16", "-8", "-2", "2", "4", "4", "2", "-2", "-8", "-16", "-7", "0", "5" ]
+    } ],
+    "judgment" : "VERIFIED_FINITE_OUTPUTS"
+  }, {
+    "case" : "working_example",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "8388601a7b7328b9b87b722864c39094a74bf03ee3771d7d32c9fa274a6d255f",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1252,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 238528688
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/working_example/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/working_example/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "ALPHA_PREFIX_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 1321209
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "working_example",
+    "origin" : "UPSTREAM_COMPLETE_INVENTORY",
+    "sourceSha256" : "8388601a7b7328b9b87b722864c39094a74bf03ee3771d7d32c9fa274a6d255f",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1252,
+    "synthesisProcess" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 9339919422
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/working_example/generated", "/tmp/regelsuche-polyhedral-v1-run/working_example/input.alpha" ],
+    "generatedSources" : [ "generated/working_example/simplifications/v0/working_example.alpha", "generated/working_example/simplifications/v0/working_example.c", "generated/working_example/working_example-wrapper.c", "generated/working_example/working_example.c", "generated/working_example/working_example_verify.c" ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  }, {
+    "case" : "prefix_polynomial",
+    "origin" : "PROJECT_AUTHORED_CONTROL",
+    "sourceSha256" : "3bb8eec1523f4d8141616e12a09158cdac13fcf89c373b2352080b3bd6971022",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 2115501,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 423442212
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/prefix_polynomial/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/prefix_polynomial/native.json" ],
+    "response" : {
+      "searchWork" : 125,
+      "searchReason" : "VERIFIED",
+      "replayWork" : 42,
+      "planTerms" : [ {
+        "coefficient" : 1,
+        "factors" : [ {
+          "columns" : [ 0, 0 ]
+        } ]
+      }, {
+        "coefficient" : 3,
+        "factors" : [ {
+          "columns" : [ 0 ]
+        } ]
+      } ],
+      "evaluationNanos" : 6292233,
+      "evaluationWork" : 1149,
+      "totalNativeWork" : 1316,
+      "outputs" : [ {
+        "seed" : 0,
+        "rows" : 2,
+        "values" : [ "54", "142" ]
+      }, {
+        "seed" : 1,
+        "rows" : 2,
+        "values" : [ "-2", "2" ]
+      }, {
+        "seed" : 2,
+        "rows" : 2,
+        "values" : [ "40", "58" ]
+      }, {
+        "seed" : 0,
+        "rows" : 3,
+        "values" : [ "54", "142", "196" ]
+      }, {
+        "seed" : 1,
+        "rows" : 3,
+        "values" : [ "-2", "2", "20" ]
+      }, {
+        "seed" : 2,
+        "rows" : 3,
+        "values" : [ "40", "58", "62" ]
+      }, {
+        "seed" : 0,
+        "rows" : 8,
+        "values" : [ "54", "142", "196", "224", "234", "234", "232", "236" ]
+      }, {
+        "seed" : 1,
+        "rows" : 8,
+        "values" : [ "-2", "2", "20", "60", "168", "238", "278", "296" ]
+      }, {
+        "seed" : 2,
+        "rows" : 8,
+        "values" : [ "40", "58", "62", "60", "60", "70", "98", "152" ]
+      }, {
+        "seed" : 0,
+        "rows" : 20,
+        "values" : [ "54", "142", "196", "224", "234", "234", "232", "236", "254", "294", "402", "472", "512", "530", "534", "532", "532", "542", "570", "624" ]
+      }, {
+        "seed" : 1,
+        "rows" : 20,
+        "values" : [ "-2", "2", "20", "60", "168", "238", "278", "296", "300", "298", "298", "308", "336", "390", "478", "532", "560", "570", "570", "568" ]
+      }, {
+        "seed" : 2,
+        "rows" : 20,
+        "values" : [ "40", "58", "62", "60", "60", "70", "98", "152", "240", "294", "322", "332", "332", "330", "334", "352", "392", "500", "570", "610" ]
+      } ],
+      "status" : "CANDIDATE",
+      "nativeWallNanos" : 100957276
+    },
+    "judgment" : "VERIFIED_FINITE_OUTPUTS"
+  }, {
+    "case" : "prefix_polynomial",
+    "origin" : "PROJECT_AUTHORED_CONTROL",
+    "sourceSha256" : "3bb8eec1523f4d8141616e12a09158cdac13fcf89c373b2352080b3bd6971022",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 2115501,
+    "synthesisProcess" : {
+      "exit" : 1,
+      "timedOut" : false,
+      "wallNanos" : 2497014949
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/prefix_polynomial/generated", "/tmp/regelsuche-polyhedral-v1-run/prefix_polynomial/input.alpha" ],
+    "generatedSources" : [ ],
+    "candidateKind" : "BASELINE_FALLBACK",
+    "judgment" : "NO_GENERATED_CANDIDATE"
+  }, {
+    "case" : "pair_prefix_product",
+    "origin" : "PROJECT_AUTHORED_CONTROL",
+    "sourceSha256" : "f08ec9721f98685796c8c9bdf869112bb41afa3868d55c976c5e8fa6e42ee469",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 2085968,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 413578246
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/pair_prefix_product/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/pair_prefix_product/native.json" ],
+    "response" : {
+      "searchWork" : 71,
+      "searchReason" : "VERIFIED",
+      "replayWork" : 22,
+      "planTerms" : [ {
+        "coefficient" : 1,
+        "factors" : [ {
+          "columns" : [ 0 ]
+        }, {
+          "columns" : [ 0 ]
+        } ]
+      } ],
+      "evaluationNanos" : 7038985,
+      "evaluationWork" : 1038,
+      "totalNativeWork" : 1131,
+      "outputs" : [ {
+        "values" : [ "0", "-72" ],
+        "seed" : 0,
+        "rows" : 2
+      }, {
+        "values" : [ "0", "8" ],
+        "seed" : 1,
+        "rows" : 2
+      }, {
+        "values" : [ "0", "15" ],
+        "seed" : 2,
+        "rows" : 2
+      }, {
+        "values" : [ "0", "-72", "-78" ],
+        "seed" : 0,
+        "rows" : 3
+      }, {
+        "values" : [ "0", "8", "44" ],
+        "seed" : 1,
+        "rows" : 3
+      }, {
+        "values" : [ "0", "15", "23" ],
+        "seed" : 2,
+        "rows" : 3
+      }, {
+        "values" : [ "0", "-72", "-78", "-58", "-40", "-40", "-62", "-98" ],
+        "seed" : 0,
+        "rows" : 8
+      }, {
+        "values" : [ "0", "8", "44", "140", "-40", "-117", "-137", "-134" ],
+        "seed" : 1,
+        "rows" : 8
+      }, {
+        "values" : [ "0", "15", "23", "14", "-10", "-35", "-35", "28" ],
+        "seed" : 2,
+        "rows" : 8
+      }, {
+        "values" : [ "0", "-72", "-78", "-58", "-40", "-40", "-62", "-98", "-128", "-120", "-201", "-201", "-166", "-130", "-115", "-131", "-176", "-236", "-285", "-285" ],
+        "seed" : 0,
+        "rows" : 20
+      }, {
+        "values" : [ "0", "8", "44", "140", "-40", "-117", "-137", "-134", "-130", "-135", "-147", "-152", "-124", "-25", "-185", "-257", "-281", "-285", "-285", "-285" ],
+        "seed" : 1,
+        "rows" : 20
+      }, {
+        "values" : [ "0", "15", "23", "14", "-10", "-35", "-35", "28", "-100", "-148", "-156", "-152", "-152", "-160", "-168", "-156", "-92", "-236", "-285", "-285" ],
+        "seed" : 2,
+        "rows" : 20
+      } ],
+      "status" : "CANDIDATE",
+      "nativeWallNanos" : 105959779
+    },
+    "judgment" : "VERIFIED_FINITE_OUTPUTS"
+  }, {
+    "case" : "pair_prefix_product",
+    "origin" : "PROJECT_AUTHORED_CONTROL",
+    "sourceSha256" : "f08ec9721f98685796c8c9bdf869112bb41afa3868d55c976c5e8fa6e42ee469",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 2085968,
+    "synthesisProcess" : {
+      "exit" : 1,
+      "timedOut" : false,
+      "wallNanos" : 2160042787
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/pair_prefix_product/generated", "/tmp/regelsuche-polyhedral-v1-run/pair_prefix_product/input.alpha" ],
+    "generatedSources" : [ ],
+    "candidateKind" : "BASELINE_FALLBACK",
+    "judgment" : "NO_GENERATED_CANDIDATE"
+  }, {
+    "case" : "variable_denominator",
+    "origin" : "PROJECT_AUTHORED_CONTROL",
+    "sourceSha256" : "47f2ee2cbe5bec0461086f6f38e804c7f79855e416cfed4b428fcbc96a7dc160",
+    "arm" : "REGELSUCHE_ORDERED_PREFIX",
+    "oracleNanos" : 1062,
+    "process" : {
+      "exit" : 0,
+      "timedOut" : false,
+      "wallNanos" : 254304663
+    },
+    "command" : [ "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java", "-Xmx512m", "-cp", "/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-experiments/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-optimization-sdk/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-discovery/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-solver-ir/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-peer-fix/regelsuche-math-algorithms/target/classes:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:", "de.regelsuche.benchmark.ExternalPolyhedralComparison", "--native", "/tmp/regelsuche-polyhedral-v1-run/variable_denominator/input.alpha", "/tmp/regelsuche-polyhedral-v1-run/request.json", "/tmp/regelsuche-polyhedral-v1-run/variable_denominator/native.json" ],
+    "response" : {
+      "status" : "UNSUPPORTED",
+      "reason" : "INTEGER_POLYNOMIAL_FRAGMENT_UNSUPPORTED",
+      "nativeWallNanos" : 19696180
+    },
+    "judgment" : "UNSUPPORTED"
+  }, {
+    "case" : "variable_denominator",
+    "origin" : "PROJECT_AUTHORED_CONTROL",
+    "sourceSha256" : "47f2ee2cbe5bec0461086f6f38e804c7f79855e416cfed4b428fcbc96a7dc160",
+    "arm" : "ORIGINAL_ALPHA_COMPILER",
+    "oracleNanos" : 1062,
+    "synthesisProcess" : {
+      "exit" : 1,
+      "timedOut" : false,
+      "wallNanos" : 2076371226
+    },
+    "command" : [ "/workspace/scratch/9d9b08d5e080/external-polyhedral/acc", "-s", "--num-simplifications", "1", "--try-splitting", "-d", "long", "-o", "/tmp/regelsuche-polyhedral-v1-run/variable_denominator/generated", "/tmp/regelsuche-polyhedral-v1-run/variable_denominator/input.alpha" ],
+    "generatedSources" : [ ],
+    "judgment" : "OUTSIDE_COMMON_FRAGMENT"
+  } ]
+}

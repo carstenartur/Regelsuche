@@ -17,7 +17,7 @@ public record OrderedReduction(List&lt;List&lt;SymbolId&gt;&gt; slots, List&lt;R
     public static final int MAX_ARITY = 8;
 
 <span class="nc" id="L19">    public OrderedReduction {</span>
-<span class="nc bnc" id="L20" title="All 6 branches missed.">        if (slots.size() &lt; 2 || slots.size() &gt; MAX_ARITY || restrictions.size() != slots.size() - 1) {</span>
+<span class="nc bnc" id="L20" title="All 6 branches missed.">        if (slots.isEmpty() || slots.size() &gt; MAX_ARITY || restrictions.size() != slots.size() - 1) {</span>
 <span class="nc" id="L21">            throw new IllegalArgumentException(&quot;INVALID_ORDERED_ARITY&quot;);</span>
         }
 <span class="nc" id="L23">        slots = List.copyOf(slots);</span>

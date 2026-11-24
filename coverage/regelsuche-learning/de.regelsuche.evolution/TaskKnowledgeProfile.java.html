@@ -21,11 +21,11 @@ final class TaskKnowledgeProfile {
     }
     static String objectiveKey(CheckedSchemaTaskSolver.Task task) {
 <span class="fc bfc" id="L23" title="All 2 branches covered.">        if (task.goal().objective() == NativeNodeCountObjective.INSTANCE) return &quot;nodes&quot;;</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        return task.goal().objective() instanceof StructuralTaskObjective structure ? structure.key() : null;</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        return task.goal().objective() instanceof StructuralTaskObjective structure ? structure.key() : null;</span>
     }
     static String goalKey(CheckedSchemaTaskSolver.Task task) {
 <span class="fc" id="L27">        String objective = objectiveKey(task);</span>
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        return objective == null ? &quot;custom&quot; : objective + &quot;:&quot; + task.goal().maximumOutputScore();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        return objective == null ? &quot;custom&quot; : objective + &quot;:&quot; + task.goal().maximumOutputScore();</span>
     }
     private static long append(Expr expression, int depth, StringBuilder text) {
 <span class="fc bfc" id="L31" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>

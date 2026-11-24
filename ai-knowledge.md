@@ -172,9 +172,42 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after scoped-proof integration (2026-11-24)
+
+The current reference is accepted main `f183aedd1ff2ab061ed903559b96a11d28974e7f`,
+tree `c5764e9bdb462df4ac4d92a06532c169d96f68cb`.
+[Original main CI 45290302102](https://github.com/carstenartur/Regelsuche/actions/runs/45290302102)
+passed all thirteen mandatory source authorities, the aggregate `ciCheck` and
+report publication. The four optional manual JMH study jobs were skipped. The
+downloaded quality artifact `14878535049` matches its API-reported ZIP digest;
+all 293 indexed file lengths and SHA-256 hashes were verified, and its 64 tracked
+source files match the exact accepted commit. Its index binds a clean checkout.
+
+The original native check passed at **876,100** estimated context tokens and
+concept radius **121**: **+14,915** tokens and **+2** radius units against the
+previous 861,185-token reference, within the unchanged 15,000-token and
+three-radius allowances. The [active snapshot](../ai-knowledge/baseline-history/2026-11-24-main-f183aedd/metrics-snapshot.json)
+is a complete projection of that accepted complexity report through the original
+extractor 0.1.10 `TrendAnalyzer.snapshot` and `StableIo.writeJson`. The quality
+artifact did not retain its native snapshot. The original classes are bound to
+their released commit and Git blob hashes; no baseline fields were selected by
+hand. [Provenance and reproduction](../ai-knowledge/baseline-history/2026-11-24-main-f183aedd/README.md)
+retain the original reports, source authorities, policy hashes and projection.
+
+The separate SDK #1376 Gradle measurement recorded **876,785** tokens and failed
+the former comparison at **+15,600**. Its original check, snapshot and trend are
+retained. The unchanged native trend implementation reproduces the original
+snapshot and trend bytes, then compares that same measurement with accepted main
+at **+685** tokens and **+0** radius units. This is a retained-measurement replay,
+not a new extraction or complete acceptance of #1376. Other source jobs in its
+original run were still running when inspected. The reference contains no
+feature-branch measurement, and updated candidates still require fresh extraction
+and their complete integration CI. Thresholds, selectors and hotspot exceptions
+remain unchanged.
+
 ### Integrated main after #1361 (2026-11-22)
 
-The current reference comes from main `9d1d4ac0ece4fd056cf9f952795772feba6baa82`,
+The preceding reference comes from main `9d1d4ac0ece4fd056cf9f952795772feba6baa82`,
 tree `eb8e739a8084b063c5f480837fc1da2f78cbcd48`. The fully successful
 [#1361 CI](https://github.com/carstenartur/Regelsuche/actions/runs/45030696246)
 tested GitHub merge commit `28c7446500ab435f4fca30f093b5a2509f3387be` with that
@@ -182,7 +215,7 @@ identical tree. All eleven source jobs, the aggregate gate and CodeQL passed.
 The separate push run for `9d1d4ac` was cancelled. The retained CI artifact binds
 the clean tested checkout and all 293 indexed files by length and SHA-256.
 
-The [active snapshot](../ai-knowledge/baseline-history/2026-11-22-main-9d1d4ac/metrics-snapshot.json)
+The [retained snapshot](../ai-knowledge/baseline-history/2026-11-22-main-9d1d4ac/metrics-snapshot.json)
 projects the original passing extractor 0.1.10 measurement of **861,185** context
 tokens and concept radius **119**. The later main `d599e2d` measurement of 873,185
 tokens had exceeded the prior reference by 17,980. The same measurement replays

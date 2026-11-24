@@ -8,7 +8,7 @@ import java.util.Objects;
 /** Caller-owned reuse of independently verified generations; never a query-result cache. */
 public final class TaskKnowledgeSession implements AutoCloseable {
 <span class="fc" id="L10">    public record Preparation(CumulativeTaskKnowledge knowledge, boolean reused, long lookupWork, long preparationWork) {</span>
-<span class="nc" id="L11">        public long totalWork() { return Math.addExact(lookupWork, preparationWork); }</span>
+<span class="fc" id="L11">        public long totalWork() { return Math.addExact(lookupWork, preparationWork); }</span>
     }
     /** Character bounds describe retained canonical data, not a JVM heap or RSS limit. */
 <span class="fc" id="L14">    public record Statistics(long loads, long hits, long admissions, long failures, long evictions, int retainedGenerations,</span>

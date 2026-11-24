@@ -158,6 +158,18 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - [`BilinearPairCandidatesTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/BilinearPairCandidatesTest.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/BilinearPairCandidatesTest.java | class BilinearPairCandidatesTest { -->
 - [`BilinearCandidates.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/BilinearCandidates.java#L9) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/BilinearCandidates.java | final class BilinearCandidates { -->
 
+## Originales Enumo auf einem vollständigen fremden Programmkorpus
+
+- **Hypothese.** Der gemeinsame, vorab festgelegte rationale Ausdrucksvertrag erlaubt einen direkten Vergleich der nativen Basissuche, des gelernten Rankings und der tatsächlich ausgeführten Enumo-Implementierung.
+- **Umsetzungsstand.** Der Vergleich übernimmt alle 37 Programme der öffentlichen FPBench-Rosa-Datei unverändert. Die originale Enumo-Rezeptur erzeugt 128 gerichtete Regeln; der Bridge-Code verwendet die originalen rationalen Domänen- und Suchkomponenten. Alle Anfragen enthalten nur die Quelle. Ein nachträglicher Prüfer bindet Rohantworten, Profile, Modellidentitäten, Arbeit, Laufzeitgrenzen und exakte Koeffizienten an das vollständige 333-Zeilen-Archiv. Die zweite Archivnachprüfung sichert zusätzlich die Worker-Schließungsfolge, die tatsächlich erworbenen Regelbytes und beide Richtungen der Budgetentscheidung ab; konsistente negative Ergebnisse bleiben zulässig. Korrekt protokollierte Quellidentitätsablehnungen behalten ihre Statuspriorität und werden nicht als erfolgreiche Kandidaten gezählt.
+- **Befund.** Sechs Programme liegen im gemeinsamen Fragment; beide nativen Profile und Enumo liefern dafür in drei Wiederholungen insgesamt 54 korrekt geprüfte Kandidaten. 279 nicht unterstützte Zeilen bleiben erhalten. Enumo erreicht auf drei Programmen kleinere Ausdrücke; die nativen Anfragen haben geringere beobachtete Latenz. Die verschärfte Prüfung wurde nach zunächst fehlgeschlagenen Gegenproben erneut über das vollständige Panel ausgeführt. [Protokoll, Ergebnisse, Quellhistorie und Reproduktion](../../research/benchmarks/enumo-public-v1/README.md)
+- **Folgerung.** Der direkte Originalvergleich schließt eine konkrete Beleglücke. Er belegt keine allgemeine Überlegenheit, IEEE-Äquivalenz oder Lernamortisation: gemeinsame Abdeckung und Wiederholungszahl sind klein, die Lernsprachen verschieden und der Korpus öffentlich.
+
+- [`FpcorePolynomialCorpus.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/FpcorePolynomialCorpus.java#L18) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/FpcorePolynomialCorpus.java | public final class FpcorePolynomialCorpus { -->
+- [`EnumoPublicComparison.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoPublicComparison.java#L29) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoPublicComparison.java | public final class EnumoPublicComparison { -->
+- [`EnumoRecordedAudit.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoRecordedAudit.java#L18) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoRecordedAudit.java | public final class EnumoRecordedAudit { -->
+- [`EnumoRecordedAuditTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/EnumoRecordedAuditTest.java#L17) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/EnumoRecordedAuditTest.java | class EnumoRecordedAuditTest { -->
+
 ## Laufgebundene Wiederverwendung verifizierter Polynomübergänge
 
 - **Hypothese.** Ein leerer Cache-Verlauf pro Lauf kann vor dem Freeze prüfen, ob jeder beobachtete Hit aus einer früheren, noch gehaltenen Einfügung desselben Laufs stammt.
@@ -175,7 +187,8 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - **Hypothese.** Direkte Faktorisierung, Cache und Quartik-Spezialisierung können bei gleichem Budget andere verifizierte Übergänge erreichen als der Lauf mit deaktivierter Faktorisierung.
 - **Umsetzungsstand.** Die öffentliche Formation läuft mit den vier verfügbaren Adaptern und je sechs Checkpoints. Die Auswertung prüft gleiche Fallbudgets, den Cache-Verlauf sowie die zeilenweise Bindung an das Ergebnis und seine Messung.
 - **Befund.** Die offenen 480 Zeilen enthalten in keinem ausgeführten Profil eine verifizierte Transition. Der Cache erreicht zwei Misses ohne Einfügung oder Replay. Die übrigen 120 Zeilen sind als extern blockiert ausgewiesen. [Befund und Reproduktion](../polynomial-theory-utility-active-adapters.md#öffentlicher-profilvergleich-bei-eingefrorenen-budgets)
-- **Folgerung.** Weitere Untersuchungen müssen erklären, wo die vorhandenen Budgets verbraucht werden, bevor sich unter diesen Bedingungen verifizierte Übergänge vergleichen lassen.
+- **Diagnose.** Eine unveränderte vollständige Reproduktion bestätigt sämtliche historischen Zeilenbindungen. Von 360 ausgeführten Faktorisierungszeilen erreichen 32 eine Faktoranforderung; keine liefert einen verifizierten Kandidaten. Quellenprojektion dominiert die mechanische Arbeit. Unter den bestehenden Cache-Reservierungen ist die erste Einfügung bei den eingefrorenen Budgets unerreichbar. 144 delegiert beobachtete Ausführungsstufen stimmen mit den realen Adaptern überein. [Diagnose, vollständige Matrix und 43 Kontrollen](polynomial-profile-diagnosis-2026-11-24/README.md)
+- **Folgerung.** Ein Nutzenvergleich benötigt nachgewiesene Einsparungen im Quellen- und Nachweispfad sowie eine unter den bestehenden Grenzen erreichbare Cache-Zulassung. Die Diagnose erklärt den Nullbefund; sie belegt keine behobene allgemeine Faktorisierungs- oder externe Messlücke.
 
 - [`PolynomialTheoryUtilityPublicProfileComparisonTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityPublicProfileComparisonTest.java#L21) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/polynomial/PolynomialTheoryUtilityPublicProfileComparisonTest.java | class PolynomialTheoryUtilityPublicProfileComparisonTest { -->
 
@@ -284,6 +297,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`TaskKnowledgeSelfImprover.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java#L17) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java | public final class TaskKnowledgeSelfImprover { -->
 - [`TaskKnowledgeSelfImproverTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeSelfImproverTest.java#L7) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeSelfImproverTest.java | class TaskKnowledgeSelfImproverTest { -->
 
+## Geprüfte Pfadkandidaten für wiederholte Aufgaben
+
+- **Hypothese.** Bei exakt wiederholten Aufgaben derselben unveränderlichen Wissensgeneration kann ein begrenzter Pfadkandidat erneute Vorschlagsarbeit vermeiden; Prüfung, Final-Replay und Gesamtaufwand bleiben bezahlt.
+- **Umsetzungsstand.** Die optionale `TaskKnowledgeQuerySession` bindet Quelle, Annahmen, Built-in-Ziel, alle Budgetdimensionen und Strategie. Erst eine zweite erfolgreiche Beobachtung erlaubt volle Pfadaufnahme; spätere Treffer werden vom bestehenden Verifier und im Final-Replay neu geprüft. Beobachtungen und Pfade teilen dieselben LRU- und Zeichengrenzen.
+- **Befund.** Der erste öffentliche Entwicklungsversuch sparte 3,87 % volle logische Arbeit bei Wiederholung, verursachte aber 56,21 % Zusatzarbeit bei neuen Quellen. Die darauf entwickelte V2 erreicht −3,33 % bei Wiederholung, +0,22 % beim Kaltstart und +0,65 % bei neuen Quellen. Je Version wurden 1.584 Ergebnisse und 5.742 Beweiskanten unabhängig exakt geprüft. V2 spart in keinem der drei Wiederholungspaare gleichzeitig Wandzeit und CPU. [Protokolle, negative Ergebnisse und Reproduktion](task-query-reuse-2026-11-24/README.md)
+- **Folgerung.** Als optionalen Pfad für beobachtete Wiederholungen verwenden. Die Messung begründet keine allgemeine Aktivierung, keinen bestätigten Laufzeit-Payback und keinen Lerntransfer. Der bisherige gemischte Adoptionsbefund bleibt unverändert negativ.
+
+- [`TaskKnowledgeQuerySession.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeQuerySession.java#L20) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeQuerySession.java | public final class TaskKnowledgeQuerySession implements AutoCloseable { -->
+- [`TaskKnowledgeQuerySessionTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeQuerySessionTest.java#L11) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeQuerySessionTest.java | class TaskKnowledgeQuerySessionTest { -->
+
 ## Automatische Wahl bewiesener Rekurrenzgesetze
 
 - **Hypothese.** Der bestehende Wissenskatalog kann einen passenden Beweis für neue Übergänge wählen und gegenüber der direkten Suche Arbeit sparen.
@@ -303,6 +326,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`CounterStateSynthesis.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/incremental/CounterStateSynthesis.java#L13) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/incremental/CounterStateSynthesis.java | public final class CounterStateSynthesis { -->
 - [`CounterStateSynthesisTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/incremental/CounterStateSynthesisTest.java#L9) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/incremental/CounterStateSynthesisTest.java | class CounterStateSynthesisTest { -->
+
+## Präfixpläne gegenüber dem originalen Polyhedral-Compiler
+
+- **Hypothese.** Die vorhandene geprüfte Reduktionssynthese kann unveränderte fremde Präfixquellen übernehmen und gegen das originale Compilerartefakt geprüft werden.
+- **Umsetzungsstand.** Geordnete Reduktionen erlauben eine bis acht Bindungen; der generische Präfixpfad ist über das SDK verfügbar. Der enge Alpha-Importer übernimmt Quelle und Bereiche, validiert Zugriffe vor der Umbenennung und weist undefinierte leere Alpha-Reduktionen zurück. Der Archivaudit bindet Ergebnisse an native Antworten, C-stdout und das Quellorakel.
+- **Befund.** Das vollständige fremde Inventar enthält sieben Programme. Für das unveränderte `prefix_sum` liefern beide Originalausführungen auf zwölf Folgen dieselben 99 Werte. Sechs weitere fremde Quellen bleiben am nativen Import unsupported. Drei Projektkontrollen stehen getrennt; Originalfrontendfehler gelten nicht als native Suchsiege. [Protokoll, Originalartefakt, Rohdaten und Reproduktion](external-polyhedral-v1/README.md)
+- **Folgerung.** Der gemeinsame Fall belegt eine konkrete Fremdquellenintegration. Er begründet keine allgemeine Compilerabdeckung, Laufzeitüberlegenheit oder Neuheit der Präfixaggregation. Breitere fremde Anwendungen und unabhängige Replikation bleiben erforderlich.
+
+- [`ExternalPolyhedralComparison.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ExternalPolyhedralComparison.java#L33) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ExternalPolyhedralComparison.java | public final class ExternalPolyhedralComparison { -->
+- [`OrderedReductionPrefixTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedReductionPrefixTest.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedReductionPrefixTest.java | class OrderedReductionPrefixTest { -->
 
 ## Blockzustände für Punktänderungen an geordneten Summen
 

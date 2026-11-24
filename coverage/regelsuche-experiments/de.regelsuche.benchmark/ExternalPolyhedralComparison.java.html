@@ -1,0 +1,505 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExternalPolyhedralComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">ExternalPolyhedralComparison.java</span></div><h1>ExternalPolyhedralComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.ast.iteration.OrderedReduction;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.iteration.OrderedReductionSearch;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.symbol.SymbolId;
+import de.regelsuche.symbol.SymbolScope;
+import de.regelsuche.symbol.SymbolicExpression;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
+
+/** Bounded source-only adapter for the frozen original-compiler comparison. */
+public final class ExternalPolyhedralComparison {
+<span class="fc" id="L34">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+    static final String PROTOCOL_HASH = &quot;d87c7ada9ccf9e5c2b1b270ba6a4c1f987feb45c8572b5540ca30d00e24cd46c&quot;;
+<span class="fc" id="L36">    private static final Pattern PREFIX = Pattern.compile(</span>
+        &quot;affine([A-Za-z][A-Za-z0-9_]*)\\[N\\]-&gt;\\{:0&lt;N\\}&quot;
+        + &quot;inputsX:\\{\\[i\\]:0&lt;=i&lt;=N\\}outputsY:\\{\\[i\\]:0&lt;=i&lt;=N\\}&quot;
+        + &quot;letY\\[i\\]=reduce\\(\\+,\\[([a-z][a-z0-9]*(?:,[a-z][a-z0-9]*)*)\\],&quot;
+        + &quot;\\{:(.*?)\\}:(.*?)\\);\\.&quot;);
+<span class="fc" id="L41">    private static final Pattern SOURCE_REFERENCE = Pattern.compile(&quot;[A-Za-z_][A-Za-z0-9_]*(?:\\[[^\\]]*\\])?&quot;);</span>
+    private ExternalPolyhedralComparison() {}
+<span class="fc" id="L43">    record Imported(String name, int arity, Expr term, OrderedReduction source) {}</span>
+
+    static Imported parse(String source) {
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (source.length() &gt; 4096) throw new IllegalArgumentException(&quot;SOURCE_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L47">        var match = PREFIX.matcher(source.replaceAll(&quot;//[^\\n]*&quot;, &quot;&quot;).replaceAll(&quot;\\s+&quot;, &quot;&quot;));</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!match.matches()) throw new IllegalArgumentException(&quot;ALPHA_PREFIX_FRAGMENT_UNSUPPORTED&quot;);</span>
+<span class="fc" id="L49">        var indices = List.of(match.group(2).split(&quot;,&quot;));</span>
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        if (indices.size() &gt; OrderedReduction.MAX_ARITY || indices.contains(&quot;i&quot;)</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                || new HashSet&lt;&gt;(indices).size() != indices.size()</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                || !match.group(3).equals(&quot;0&lt;=&quot; + String.join(&quot;&lt;&quot;, indices) + &quot;&lt;=i&quot;)) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;ORDERED_PREFIX_DOMAIN_UNSUPPORTED&quot;);</span>
+        }
+        // Alpha leaves an empty reduction undefined. The native mathematical
+        // empty-sum identity must not silently define the first k-1 outputs.
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (indices.size() &gt; 1) throw new IllegalArgumentException(&quot;ALPHA_EMPTY_PREFIX_REDUCTION_UNSUPPORTED&quot;);</span>
+<span class="fc" id="L58">        String expression = match.group(4);</span>
+<span class="fc" id="L59">        var allowedReferences = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (String index : indices) allowedReferences.add(&quot;X[&quot; + index + &quot;]&quot;);</span>
+        // Validate source references before introducing internal names: a bare
+        // x0 in Alpha is undeclared, even though x0 is used after translation.
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (var references = SOURCE_REFERENCE.matcher(expression); references.find();)</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (!allowedReferences.contains(references.group()))</span>
+<span class="fc" id="L65">                throw new IllegalArgumentException(&quot;ALPHA_SOURCE_REFERENCE_UNSUPPORTED&quot;);</span>
+<span class="fc" id="L66">        var scope = new SymbolScope();</span>
+<span class="fc" id="L67">        var slots = new ArrayList&lt;List&lt;SymbolId&gt;&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int i = 0; i &lt; indices.size(); i++) {</span>
+<span class="fc" id="L69">            expression = expression.replace(&quot;X[&quot; + indices.get(i) + &quot;]&quot;, &quot;x&quot; + i);</span>
+<span class="fc" id="L70">            slots.add(List.of(scope.declare(&quot;x&quot; + i)));</span>
+        }
+<span class="fc" id="L72">        var term = new ExpressionParser().parseTerm(expression);</span>
+<span class="fc" id="L73">        bound(term, indices.size()); // Reject unsupported arithmetic before proposing any plan.</span>
+<span class="fc" id="L74">        var restrictions = new ArrayList&lt;OrderedReduction.Restriction&gt;();</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        for (int i = 1; i &lt; indices.size(); i++) restrictions.add(OrderedReduction.All.ROWS);</span>
+<span class="fc" id="L76">        return new Imported(match.group(1), indices.size(), term,</span>
+<span class="fc" id="L77">            new OrderedReduction(slots, restrictions, SymbolicExpression.parse(expression, scope).expression()));</span>
+    }
+
+    /** Absolute bounds for the source arithmetic, without a rewrite or native plan. */
+    private static BigInteger bound(Expr expression, int arity) {
+        BigInteger result;
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        if (expression instanceof NumberExpr number &amp;&amp; number.value().denominator().equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L84">            result = number.value().numerator().abs();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        } else if (expression instanceof VariableExpr variable</span>
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">                &amp;&amp; variable.name().matches(&quot;x[0-7]&quot;) &amp;&amp; Integer.parseInt(variable.name().substring(1)) &lt; arity) {</span>
+<span class="fc" id="L87">            result = BigInteger.valueOf(9);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        } else if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L89">            var left = bound(binary.left(), arity);</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">            result = switch (binary.operator()) {</span>
+<span class="fc" id="L91">                case ADD, SUB -&gt; left.add(bound(binary.right(), arity));</span>
+<span class="fc" id="L92">                case MUL -&gt; left.multiply(bound(binary.right(), arity));</span>
+<span class="fc" id="L93">                case POW -&gt; left.pow(exponent(binary.right()));</span>
+<span class="fc" id="L94">                default -&gt; throw new IllegalArgumentException(&quot;INTEGER_POLYNOMIAL_FRAGMENT_UNSUPPORTED&quot;);</span>
+            };
+<span class="pc" id="L96">        } else throw new IllegalArgumentException(&quot;INTEGER_POLYNOMIAL_FRAGMENT_UNSUPPORTED&quot;);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (result.bitLength() &gt; 60) throw new IllegalArgumentException(&quot;SIGNED_LONG_SOURCE_BOUND&quot;);</span>
+<span class="fc" id="L98">        return result;</span>
+    }
+
+    private static int exponent(Expr expression) {
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (expression instanceof NumberExpr number &amp;&amp; number.value().denominator().equals(BigInteger.ONE)</span>
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">                &amp;&amp; number.value().numerator().signum() &gt;= 0 &amp;&amp; number.value().numerator().compareTo(BigInteger.valueOf(8)) &lt;= 0) {</span>
+<span class="fc" id="L104">            return number.value().numerator().intValueExact();</span>
+        }
+<span class="nc" id="L106">        throw new IllegalArgumentException(&quot;EXPONENT_UNSUPPORTED&quot;);</span>
+    }
+
+    /** Exhaustive tuple evaluation shares only the source AST, not the native algebra or schedule. */
+    static List&lt;BigInteger&gt; oracle(Imported input, int count, int seed) {
+<span class="pc bpc" id="L111" title="3 of 8 branches missed.">        if (count &lt; 2 || count &gt; 20 || seed &lt; 0 || seed &gt; 2) throw new IllegalArgumentException(&quot;FIXTURE_OR_PARAMETER_DOMAIN_LIMIT&quot;);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (bound(input.term(), input.arity()).multiply(BigInteger.valueOf(count).pow(input.arity())).bitLength() &gt; 60)</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(&quot;SIGNED_LONG_SUM_BOUND&quot;);</span>
+<span class="fc" id="L114">        var output = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int prefix = 1; prefix &lt;= count; prefix++)</span>
+<span class="fc" id="L116">            output.add(enumerate(input.term(), new BigInteger[input.arity()], 0, 0, prefix, seed));</span>
+<span class="fc" id="L117">        return List.copyOf(output);</span>
+    }
+
+    private static BigInteger enumerate(Expr term, BigInteger[] tuple, int slot, int start, int end, int seed) {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (slot == tuple.length) return interpret(term, tuple);</span>
+<span class="fc" id="L122">        BigInteger total = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int i = start; i &lt; end; i++) {</span>
+<span class="fc" id="L124">            tuple[slot] = value(i, seed);</span>
+<span class="fc" id="L125">            total = total.add(enumerate(term, tuple, slot + 1, i + 1, end, seed));</span>
+        }
+<span class="fc" id="L127">        return total;</span>
+    }
+
+    private static BigInteger interpret(Expr expression, BigInteger[] tuple) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) return number.value().numerator();</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) return tuple[Integer.parseInt(variable.name().substring(1))];</span>
+<span class="fc" id="L133">        var binary = (BinaryExpr) expression;</span>
+<span class="fc" id="L134">        var left = interpret(binary.left(), tuple);</span>
+<span class="pc bpc" id="L135" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L136">            case ADD -&gt; left.add(interpret(binary.right(), tuple));</span>
+<span class="nc" id="L137">            case SUB -&gt; left.subtract(interpret(binary.right(), tuple));</span>
+<span class="fc" id="L138">            case MUL -&gt; left.multiply(interpret(binary.right(), tuple));</span>
+<span class="nc" id="L139">            case POW -&gt; left.pow(exponent(binary.right()));</span>
+<span class="nc" id="L140">            default -&gt; throw new IllegalArgumentException(&quot;UNSUPPORTED_ORACLE_OPERATOR&quot;);</span>
+        };
+    }
+
+    private static BigInteger value(int index, int seed) {
+<span class="fc" id="L145">        return BigInteger.valueOf((index * 17L + seed * 7L) % 19L - 9L);</span>
+    }
+
+    static JsonNode protocol(Path checkout) throws Exception {
+<span class="fc" id="L149">        var bytes = Files.readAllBytes(checkout.resolve(&quot;config/benchmarks/external-polyhedral-v1.json&quot;));</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (!hash(bytes).equals(PROTOCOL_HASH)) throw new IllegalArgumentException(&quot;PROTOCOL_CHANGED&quot;);</span>
+<span class="fc" id="L151">        return JSON.readTree(bytes);</span>
+    }
+
+    /** The subprocess accepts source and budgets, never expected outputs or case labels. */
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if (args.length == 4 &amp;&amp; args[0].equals(&quot;--native&quot;)) {</span>
+<span class="fc" id="L157">            var request = JSON.readTree(Path.of(args[2]).toFile());</span>
+<span class="fc" id="L158">            write(Path.of(args[3]), nativeRun(Files.readString(Path.of(args[1])), request));</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">        } else if (args.length == 3 &amp;&amp; args[0].equals(&quot;--verify&quot;)) {</span>
+<span class="fc" id="L160">            audit(Path.of(args[1]), Path.of(args[2]));</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        } else if (args.length == 3) {</span>
+<span class="nc" id="L162">            run(Path.of(args[0]), Path.of(args[1]), Path.of(args[2]));</span>
+<span class="nc" id="L163">        } else throw new IllegalArgumentException(&quot;checkout upstream output, or --native source request output&quot;);</span>
+<span class="fc" id="L164">    }</span>
+
+    private static Map&lt;String, Object&gt; nativeRun(String source, JsonNode request) {
+<span class="fc" id="L167">        long started = System.nanoTime();</span>
+<span class="fc" id="L168">        var response = new LinkedHashMap&lt;String, Object&gt;();</span>
+        Imported input;
+<span class="fc" id="L170">        try { input = parse(source); }</span>
+<span class="fc" id="L171">        catch (IllegalArgumentException unsupported) {</span>
+<span class="fc" id="L172">            response.put(&quot;status&quot;, &quot;UNSUPPORTED&quot;); response.put(&quot;reason&quot;, unsupported.getMessage());</span>
+<span class="fc" id="L173">            response.put(&quot;nativeWallNanos&quot;, System.nanoTime() - started); return response;</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        var budget = request.path(&quot;limits&quot;);</span>
+<span class="fc" id="L176">        long maximum = budget.path(&quot;nativeWork&quot;).longValue();</span>
+<span class="fc" id="L177">        var limits = new IterationLimits(maximum, budget.path(&quot;nativeTerms&quot;).intValue(),</span>
+<span class="fc" id="L178">            budget.path(&quot;synthesisSeconds&quot;).longValue() * 1000);</span>
+        try {
+<span class="fc" id="L180">            var search = OrderedReductionSearch.search(input.source(), limits, budget.path(&quot;maxStates&quot;).intValue(), () -&gt; false);</span>
+<span class="fc" id="L181">            long work = search.metrics().totalWork();</span>
+<span class="fc" id="L182">            response.put(&quot;searchWork&quot;, work); response.put(&quot;searchReason&quot;, search.reason());</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (search.verified().isEmpty()) { response.put(&quot;status&quot;, &quot;NO_VERIFIED_PLAN&quot;); return response; }</span>
+<span class="fc" id="L184">            var plan = search.verified().orElseThrow().plan();</span>
+<span class="fc" id="L185">            var replay = OrderedReductionSearch.verify(input.source(), plan, false,</span>
+<span class="fc" id="L186">                limits.withMaximumWork(maximum - work), () -&gt; false);</span>
+<span class="fc" id="L187">            work += replay.work(); response.put(&quot;replayWork&quot;, replay.work());</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (replay.verified().isEmpty()) throw new IllegalStateException(&quot;PLAN_REPLAY_FAILED&quot;);</span>
+<span class="fc" id="L189">            response.put(&quot;planTerms&quot;, plan.terms());</span>
+<span class="fc" id="L190">            var outputs = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L191">            long beforeEvaluation = System.nanoTime(), evaluationWork = 0;</span>
+<span class="fc bfc" id="L192" title="All 4 branches covered.">            for (var count : request.path(&quot;rowCounts&quot;)) for (var seed : request.path(&quot;seeds&quot;)) {</span>
+<span class="fc" id="L193">                var rows = new ArrayList&lt;List&lt;BigInteger&gt;&gt;();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                for (int i = 0; i &lt; count.intValue(); i++) rows.add(List.of(value(i, seed.intValue())));</span>
+<span class="fc" id="L195">                var evaluated = replay.verified().orElseThrow().evaluatePrefixes(rows,</span>
+<span class="fc" id="L196">                    limits.withMaximumWork(maximum - work), () -&gt; false);</span>
+<span class="fc" id="L197">                work += evaluated.work(); evaluationWork += evaluated.work();</span>
+<span class="fc" id="L198">                outputs.add(Map.of(&quot;rows&quot;, count.intValue(), &quot;seed&quot;, seed.intValue(),</span>
+<span class="fc" id="L199">                    &quot;values&quot;, evaluated.sums().stream().map(BigInteger::toString).toList()));</span>
+<span class="fc" id="L200">            }</span>
+<span class="fc" id="L201">            response.put(&quot;evaluationNanos&quot;, System.nanoTime() - beforeEvaluation);</span>
+<span class="fc" id="L202">            response.put(&quot;evaluationWork&quot;, evaluationWork); response.put(&quot;totalNativeWork&quot;, work);</span>
+<span class="fc" id="L203">            response.put(&quot;outputs&quot;, outputs); response.put(&quot;status&quot;, &quot;CANDIDATE&quot;);</span>
+<span class="fc" id="L204">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L205">            response.put(&quot;status&quot;, &quot;ERROR&quot;); response.put(&quot;reason&quot;, failure.toString());</span>
+<span class="fc" id="L206">        } finally { response.put(&quot;nativeWallNanos&quot;, System.nanoTime() - started); }</span>
+<span class="fc" id="L207">        return response;</span>
+    }
+
+    public static Map&lt;String, Object&gt; run(Path checkout, Path upstream, Path output) throws Exception {
+<span class="fc" id="L211">        checkout = checkout.toAbsolutePath(); upstream = upstream.toAbsolutePath(); output = output.toAbsolutePath();</span>
+<span class="fc" id="L212">        var panel = protocol(checkout);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (Files.exists(output)) throw new IllegalArgumentException(&quot;OUTPUT_ALREADY_EXISTS&quot;);</span>
+<span class="fc" id="L214">        Files.createDirectories(output);</span>
+<span class="fc" id="L215">        long setupStarted = System.nanoTime();</span>
+<span class="nc" id="L216">        verifyUpstream(panel, upstream, output);</span>
+<span class="nc" id="L217">        long setupNanos = System.nanoTime() - setupStarted;</span>
+<span class="nc" id="L218">        var request = JSON.createObjectNode();</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        for (String key : List.of(&quot;limits&quot;, &quot;rowCounts&quot;, &quot;seeds&quot;)) request.set(key, panel.get(key));</span>
+<span class="nc" id="L220">        write(output.resolve(&quot;request.json&quot;), request);</span>
+<span class="nc" id="L221">        var report = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L222">        report.put(&quot;schema&quot;, panel.path(&quot;schema&quot;).asText()); report.put(&quot;protocolSha256&quot;, PROTOCOL_HASH);</span>
+<span class="nc" id="L223">        report.put(&quot;upstreamRevision&quot;, panel.path(&quot;revision&quot;).asText()); report.put(&quot;java&quot;, System.getProperty(&quot;java.runtime.version&quot;));</span>
+<span class="nc" id="L224">        report.put(&quot;platform&quot;, System.getProperty(&quot;os.name&quot;) + &quot; &quot; + System.getProperty(&quot;os.arch&quot;) + &quot; &quot; + System.getProperty(&quot;os.version&quot;));</span>
+<span class="nc" id="L225">        report.put(&quot;processors&quot;, Runtime.getRuntime().availableProcessors()); report.put(&quot;limits&quot;, request.path(&quot;limits&quot;));</span>
+<span class="nc" id="L226">        report.put(&quot;sourceVerificationSetupNanos&quot;, setupNanos);</span>
+<span class="nc" id="L227">        report.put(&quot;acquisitionCost&quot;, &quot;NOT_MEASURED: pinned original prebuilt artifact; checkout/download excluded from query phases.&quot;);</span>
+<span class="nc" id="L228">        report.put(&quot;memoryBoundary&quot;, &quot;512 MiB Java heap per subprocess; native/JNI/process RSS is not a hard-capped comparable work measure.&quot;);</span>
+<span class="nc" id="L229">        report.put(&quot;nativeRevision&quot;, commandText(List.of(&quot;git&quot;, &quot;rev-parse&quot;, &quot;HEAD&quot;), checkout, output.resolve(&quot;native-revision&quot;)));</span>
+<span class="nc" id="L230">        report.put(&quot;gcc&quot;, commandText(List.of(&quot;gcc&quot;, &quot;--version&quot;), checkout, output.resolve(&quot;gcc-version&quot;)));</span>
+<span class="nc" id="L231">        report.put(&quot;timingInterpretation&quot;, &quot;One cold run; phase diagnostics only, no relative speed ranking or common instruction-count claim.&quot;);</span>
+<span class="nc" id="L232">        var rows = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        for (var entry : panel.path(&quot;cases&quot;)) {</span>
+<span class="nc" id="L234">            Path directory = output.resolve(entry.path(&quot;id&quot;).asText()); Files.createDirectories(directory);</span>
+<span class="nc" id="L235">            Path source = directory.resolve(&quot;input.alpha&quot;); Files.writeString(source, entry.path(&quot;source&quot;).asText());</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            if (!hash(Files.readAllBytes(source)).equals(entry.path(&quot;sha256&quot;).asText())) throw new IllegalStateException(&quot;SOURCE_HASH&quot;);</span>
+            Optional&lt;Imported&gt; imported;
+<span class="nc" id="L238">            try { imported = Optional.of(parse(Files.readString(source))); }</span>
+<span class="nc" id="L239">            catch (IllegalArgumentException unsupported) { imported = Optional.empty(); }</span>
+<span class="nc" id="L240">            long judgeStarted = System.nanoTime();</span>
+<span class="nc" id="L241">            var expected = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="nc bnc" id="L242" title="All 6 branches missed.">            if (imported.isPresent()) for (var count : panel.path(&quot;rowCounts&quot;)) for (var seed : panel.path(&quot;seeds&quot;))</span>
+<span class="nc" id="L243">                expected.add(Map.of(&quot;rows&quot;, count.intValue(), &quot;seed&quot;, seed.intValue(), &quot;values&quot;,</span>
+<span class="nc" id="L244">                    oracle(imported.orElseThrow(), count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));</span>
+<span class="nc" id="L245">            long oracleNanos = System.nanoTime() - judgeStarted;</span>
+<span class="nc" id="L246">            write(directory.resolve(&quot;oracle.json&quot;), expected);</span>
+<span class="nc" id="L247">            rows.add(nativeRow(entry, panel, checkout, output, directory, source, expected, oracleNanos));</span>
+<span class="nc" id="L248">            rows.add(externalRow(entry, panel, upstream, directory, source, imported, expected, oracleNanos));</span>
+<span class="nc" id="L249">            report.put(&quot;rows&quot;, rows); write(output.resolve(&quot;results.json&quot;), report);</span>
+<span class="nc" id="L250">        }</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (rows.size() != panel.path(&quot;cases&quot;).size() * panel.path(&quot;arms&quot;).size()) throw new IllegalStateException(&quot;INCOMPLETE_MATRIX&quot;);</span>
+<span class="nc" id="L252">        var hashes = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="nc" id="L253">        try (var files = Files.walk(output)) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            for (Path path : files.filter(Files::isRegularFile).sorted().toList())</span>
+<span class="nc" id="L255">                hashes.put(output.relativize(path).toString(), hash(Files.readAllBytes(path)));</span>
+        }
+<span class="nc" id="L257">        write(output.resolve(&quot;manifest.json&quot;), hashes);</span>
+<span class="nc" id="L258">        audit(checkout, output);</span>
+<span class="nc" id="L259">        return report;</span>
+    }
+
+    /** Rechecks retained identities and the full matrix without invoking either optimizer. */
+    public static void audit(Path checkout, Path output) throws Exception {
+<span class="fc" id="L264">        output = output.toAbsolutePath().normalize();</span>
+<span class="fc" id="L265">        var panel = protocol(checkout);</span>
+<span class="fc" id="L266">        var manifest = JSON.readTree(output.resolve(&quot;manifest.json&quot;).toFile());</span>
+<span class="fc" id="L267">        auditManifest(output, manifest);</span>
+<span class="fc" id="L268">        var report = JSON.readTree(output.resolve(&quot;results.json&quot;).toFile());</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (!report.path(&quot;protocolSha256&quot;).asText().equals(PROTOCOL_HASH)) throw new IllegalArgumentException(&quot;REPORT_PROTOCOL&quot;);</span>
+<span class="fc" id="L270">        var expectedKeys = new HashSet&lt;String&gt;(); var observedKeys = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L271">        var cases = retainedCases(output, panel, expectedKeys);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        for (var row : report.path(&quot;rows&quot;)) auditRow(output, panel, manifest, cases, observedKeys, row);</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (!expectedKeys.equals(observedKeys)) throw new IllegalArgumentException(&quot;INCOMPLETE_RETAINED_MATRIX&quot;);</span>
+<span class="fc" id="L274">    }</span>
+
+    private static void auditManifest(Path output, JsonNode manifest) throws Exception {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        for (var fields = manifest.fields(); fields.hasNext();) {</span>
+<span class="fc" id="L278">            var entry = fields.next();</span>
+<span class="fc" id="L279">            Path file = output.resolve(entry.getKey()).normalize();</span>
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">            if (!file.startsWith(output.normalize()) || !hash(Files.readAllBytes(file)).equals(entry.getValue().asText()))</span>
+<span class="nc" id="L281">                throw new IllegalArgumentException(&quot;EVIDENCE_FILE_CHANGED&quot;);</span>
+<span class="fc" id="L282">        }</span>
+<span class="fc" id="L283">    }</span>
+
+    private static Map&lt;String, JsonNode&gt; retainedCases(Path output, JsonNode panel,
+            HashSet&lt;String&gt; expectedKeys) throws Exception {
+<span class="fc" id="L287">        var cases = new LinkedHashMap&lt;String, JsonNode&gt;();</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        for (var entry : panel.path(&quot;cases&quot;)) {</span>
+<span class="fc" id="L289">            cases.put(entry.path(&quot;id&quot;).asText(), entry);</span>
+<span class="fc" id="L290">            if (!hash(Files.readAllBytes(output.resolve(entry.path(&quot;id&quot;).asText()).resolve(&quot;input.alpha&quot;)))</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                    .equals(entry.path(&quot;sha256&quot;).asText())) throw new IllegalArgumentException(&quot;RETAINED_SOURCE_CHANGED&quot;);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            for (var arm : panel.path(&quot;arms&quot;)) expectedKeys.add(entry.path(&quot;id&quot;).asText() + &quot;@&quot; + arm.asText());</span>
+<span class="fc" id="L293">        }</span>
+<span class="fc" id="L294">        return cases;</span>
+    }
+
+    private static void auditRow(Path output, JsonNode panel, JsonNode manifest,
+            Map&lt;String, JsonNode&gt; cases, HashSet&lt;String&gt; observedKeys, JsonNode row) throws Exception {
+<span class="fc" id="L299">        String id = row.path(&quot;case&quot;).asText(), arm = row.path(&quot;arm&quot;).asText();</span>
+<span class="pc bpc" id="L300" title="1 of 4 branches missed.">        if (!observedKeys.add(id + &quot;@&quot; + arm) || !cases.containsKey(id)</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">                || !cases.get(id).path(&quot;sha256&quot;).asText().equals(row.path(&quot;sourceSha256&quot;).asText()))</span>
+<span class="fc" id="L302">            throw new IllegalArgumentException(&quot;ROW_SOURCE_OR_DUPLICATE&quot;);</span>
+<span class="fc" id="L303">        boolean nativeArm = arm.equals(&quot;REGELSUCHE_ORDERED_PREFIX&quot;);</span>
+<span class="fc" id="L304">        JsonNode nativeResponse = null;</span>
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        if (nativeArm &amp;&amp; row.has(&quot;response&quot;)) {</span>
+<span class="fc" id="L306">            nativeResponse = JSON.readTree(requiredEvidence(output, manifest, id + &quot;/native.json&quot;).toFile());</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (!row.path(&quot;response&quot;).equals(nativeResponse))</span>
+<span class="nc" id="L308">                throw new IllegalArgumentException(&quot;RETAINED_NATIVE_RESPONSE_MISMATCH&quot;);</span>
+        }
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (!row.path(&quot;judgment&quot;).asText().equals(&quot;VERIFIED_FINITE_OUTPUTS&quot;)) return;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        JsonNode actual = nativeArm ? retainedNativeOutputs(panel, row, nativeResponse)</span>
+<span class="fc" id="L312">            : retainedOriginalOutputs(output, panel, manifest, row, id);</span>
+<span class="fc" id="L313">        var input = parse(cases.get(id).path(&quot;source&quot;).asText());</span>
+<span class="fc" id="L314">        var expected = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L315" title="All 4 branches covered.">        for (var count : panel.path(&quot;rowCounts&quot;)) for (var seed : panel.path(&quot;seeds&quot;))</span>
+<span class="fc" id="L316">            expected.add(Map.of(&quot;rows&quot;, count.intValue(), &quot;seed&quot;, seed.intValue(), &quot;values&quot;,</span>
+<span class="fc" id="L317">                oracle(input, count.intValue(), seed.intValue()).stream().map(BigInteger::toString).toList()));</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (!JSON.valueToTree(expected).equals(actual)) throw new IllegalArgumentException(&quot;RETAINED_OUTPUT_MISMATCH&quot;);</span>
+<span class="fc" id="L319">    }</span>
+
+    private static JsonNode retainedNativeOutputs(JsonNode panel, JsonNode row, JsonNode nativeResponse) {
+<span class="fc" id="L322">        auditProcess(row.path(&quot;process&quot;), panel.at(&quot;/limits/synthesisSeconds&quot;).intValue(), true);</span>
+<span class="fc" id="L323">        var work = row.path(&quot;response&quot;).path(&quot;totalNativeWork&quot;);</span>
+<span class="pc bpc" id="L324" title="2 of 6 branches missed.">        if (!work.isIntegralNumber() || work.longValue() &lt; 0 || work.longValue() &gt; panel.at(&quot;/limits/nativeWork&quot;).longValue())</span>
+<span class="fc" id="L325">            throw new IllegalArgumentException(&quot;RETAINED_WORK_LIMIT&quot;);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (nativeResponse == null) throw new IllegalArgumentException(&quot;MISSING_NATIVE_RESPONSE&quot;);</span>
+<span class="fc" id="L327">        return nativeResponse.path(&quot;outputs&quot;);</span>
+    }
+
+    private static JsonNode retainedOriginalOutputs(Path output, JsonNode panel, JsonNode manifest,
+            JsonNode row, String id) throws Exception {
+<span class="fc" id="L332">        auditProcess(row.path(&quot;synthesisProcess&quot;), panel.at(&quot;/limits/synthesisSeconds&quot;).intValue(), false);</span>
+<span class="fc" id="L333">        auditProcess(row.path(&quot;compileProcess&quot;), panel.at(&quot;/limits/compileSeconds&quot;).intValue(), true);</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (row.path(&quot;executions&quot;).size() != panel.path(&quot;rowCounts&quot;).size() * panel.path(&quot;seeds&quot;).size())</span>
+<span class="nc" id="L335">            throw new IllegalArgumentException(&quot;RETAINED_EXECUTION_MATRIX&quot;);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        for (var execution : row.path(&quot;executions&quot;))</span>
+<span class="fc" id="L337">            auditProcess(execution, panel.at(&quot;/limits/executionSeconds&quot;).intValue(), true);</span>
+<span class="fc" id="L338">        var retained = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L339" title="All 4 branches covered.">        for (var count : panel.path(&quot;rowCounts&quot;)) for (var seed : panel.path(&quot;seeds&quot;)) {</span>
+<span class="fc" id="L340">            String relative = id + &quot;/run-&quot; + count.intValue() + &quot;-&quot; + seed.intValue() + &quot;.stdout&quot;;</span>
+<span class="fc" id="L341">            String text = Files.readString(requiredEvidence(output, manifest, relative)).trim();</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            var values = text.isEmpty() ? List.&lt;String&gt;of() : List.of(text.split(&quot;\\s+&quot;));</span>
+<span class="fc" id="L343">            retained.add(Map.of(&quot;rows&quot;, count.intValue(), &quot;seed&quot;, seed.intValue(), &quot;values&quot;, values));</span>
+<span class="fc" id="L344">        }</span>
+<span class="fc" id="L345">        JsonNode actual = JSON.valueToTree(retained);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (!actual.equals(row.path(&quot;outputs&quot;))) throw new IllegalArgumentException(&quot;RETAINED_STDOUT_MISMATCH&quot;);</span>
+<span class="fc" id="L347">        return actual;</span>
+    }
+
+    private static Path requiredEvidence(Path output, JsonNode manifest, String relative) {
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (!manifest.path(relative).isTextual()) throw new IllegalArgumentException(&quot;MISSING_EVIDENCE_MANIFEST_ENTRY&quot;);</span>
+<span class="fc" id="L352">        return output.resolve(relative);</span>
+    }
+
+    private static void auditProcess(JsonNode process, int seconds, boolean zeroExit) {
+<span class="pc bpc" id="L356" title="2 of 4 branches missed.">        if (!process.path(&quot;exit&quot;).isIntegralNumber() || !process.path(&quot;timedOut&quot;).isBoolean()</span>
+<span class="pc bpc" id="L357" title="1 of 4 branches missed.">                || !process.path(&quot;wallNanos&quot;).isIntegralNumber() || process.path(&quot;timedOut&quot;).booleanValue()</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                || process.path(&quot;wallNanos&quot;).longValue() &lt; 0</span>
+<span class="pc bpc" id="L359" title="1 of 4 branches missed.">                || process.path(&quot;wallNanos&quot;).longValue() &gt; TimeUnit.SECONDS.toNanos(seconds)</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                || (zeroExit &amp;&amp; process.path(&quot;exit&quot;).intValue() != 0))</span>
+<span class="fc" id="L361">            throw new IllegalArgumentException(&quot;RETAINED_PROCESS_LIMIT&quot;);</span>
+<span class="fc" id="L362">    }</span>
+
+    private static Map&lt;String, Object&gt; nativeRow(JsonNode entry, JsonNode panel, Path checkout, Path output,
+            Path directory, Path source, List&lt;Map&lt;String, Object&gt;&gt; expected, long oracleNanos) throws Exception {
+<span class="fc" id="L366">        var row = row(entry, &quot;REGELSUCHE_ORDERED_PREFIX&quot;, oracleNanos);</span>
+<span class="fc" id="L367">        var command = List.of(java(), &quot;-Xmx&quot; + panel.at(&quot;/limits/javaHeapMiB&quot;).intValue() + &quot;m&quot;, &quot;-cp&quot;,</span>
+<span class="fc" id="L368">            System.getProperty(&quot;surefire.test.class.path&quot;, System.getProperty(&quot;java.class.path&quot;)),</span>
+<span class="fc" id="L369">            ExternalPolyhedralComparison.class.getName(), &quot;--native&quot;, source.toString(),</span>
+<span class="fc" id="L370">            output.resolve(&quot;request.json&quot;).toString(), directory.resolve(&quot;native.json&quot;).toString());</span>
+<span class="fc" id="L371">        var process = process(command, checkout, Map.of(), directory.resolve(&quot;native&quot;), panel.at(&quot;/limits/synthesisSeconds&quot;).intValue());</span>
+<span class="fc" id="L372">        row.put(&quot;process&quot;, process); row.put(&quot;command&quot;, command);</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        if (process.exceeded(panel.at(&quot;/limits/synthesisSeconds&quot;).intValue())) row.put(&quot;judgment&quot;, &quot;TIMEOUT&quot;);</span>
+<span class="pc bpc" id="L374" title="1 of 4 branches missed.">        else if (process.exit() != 0 || !Files.exists(directory.resolve(&quot;native.json&quot;))) row.put(&quot;judgment&quot;, &quot;PROCESS_FAILURE&quot;);</span>
+        else {
+<span class="fc" id="L376">            var response = JSON.readTree(directory.resolve(&quot;native.json&quot;).toFile()); row.put(&quot;response&quot;, response);</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            row.put(&quot;judgment&quot;, response.path(&quot;status&quot;).asText().equals(&quot;CANDIDATE&quot;)</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">                ? JSON.valueToTree(expected).equals(response.path(&quot;outputs&quot;)) ? &quot;VERIFIED_FINITE_OUTPUTS&quot; : &quot;INVALID_OUTPUT&quot;</span>
+<span class="nc" id="L379">                : response.path(&quot;status&quot;).asText());</span>
+        }
+<span class="fc" id="L381">        return row;</span>
+    }
+
+    private static Map&lt;String, Object&gt; externalRow(JsonNode entry, JsonNode panel, Path upstream, Path directory,
+            Path source, Optional&lt;Imported&gt; imported, List&lt;Map&lt;String, Object&gt;&gt; expected, long oracleNanos) throws Exception {
+<span class="fc" id="L386">        var row = row(entry, &quot;ORIGINAL_ALPHA_COMPILER&quot;, oracleNanos);</span>
+<span class="fc" id="L387">        var command = new ArrayList&lt;String&gt;(); command.add(upstream.resolve(&quot;acc&quot;).toString());</span>
+<span class="pc" id="L388">        panel.path(&quot;originalOptions&quot;).forEach(option -&gt; command.add(option.asText()));</span>
+<span class="fc" id="L389">        command.add(&quot;-o&quot;); command.add(directory.resolve(&quot;generated&quot;).toString()); command.add(source.toString());</span>
+<span class="fc" id="L390">        var environment = Map.of(&quot;JAVA_TOOL_OPTIONS&quot;, &quot;-Xmx&quot; + panel.at(&quot;/limits/javaHeapMiB&quot;).intValue() + &quot;m&quot;,</span>
+<span class="fc" id="L391">            &quot;PATH&quot;, Path.of(java()).getParent() + &quot;:&quot; + System.getenv(&quot;PATH&quot;));</span>
+<span class="fc" id="L392">        var generated = process(command, upstream, environment, directory.resolve(&quot;original&quot;), panel.at(&quot;/limits/synthesisSeconds&quot;).intValue());</span>
+<span class="fc" id="L393">        row.put(&quot;synthesisProcess&quot;, generated); row.put(&quot;command&quot;, command);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        row.put(&quot;synthesisStatus&quot;, generated.exceeded(panel.at(&quot;/limits/synthesisSeconds&quot;).intValue()) ? &quot;TIMEOUT&quot;</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            : generated.exit() == 0 ? &quot;COMPLETED&quot; : &quot;EXIT_NONZERO&quot;);</span>
+<span class="fc" id="L396">        var generatedFiles = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (Files.exists(directory.resolve(&quot;generated&quot;))) try (var paths = Files.walk(directory.resolve(&quot;generated&quot;))) {</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            generatedFiles.addAll(paths.filter(Files::isRegularFile).filter(path -&gt; path.toString().endsWith(&quot;.c&quot;)</span>
+<span class="pc bnc" id="L399" title="All 2 branches missed.">                || path.toString().endsWith(&quot;.alpha&quot;)).map(directory::relativize).map(Path::toString).sorted().toList());</span>
+        }
+<span class="fc" id="L401">        row.put(&quot;generatedSources&quot;, generatedFiles);</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (imported.isEmpty()) { row.put(&quot;judgment&quot;, &quot;OUTSIDE_COMMON_FRAGMENT&quot;); return row; }</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (generated.exceeded(panel.at(&quot;/limits/synthesisSeconds&quot;).intValue())) { row.put(&quot;judgment&quot;, &quot;TIMEOUT&quot;); return row; }</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        if (generated.exit() == 125) { row.put(&quot;judgment&quot;, &quot;OUTPUT_LIMIT&quot;); return row; }</span>
+<span class="fc" id="L405">        String name = imported.orElseThrow().name(); Path base = directory.resolve(&quot;generated&quot;).resolve(name);</span>
+<span class="fc" id="L406">        Path simplified = base.resolve(&quot;simplifications/v0/&quot; + name + &quot;.c&quot;);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        Path selected = Files.exists(simplified) ? simplified : base.resolve(name + &quot;.c&quot;);</span>
+<span class="fc bfc" id="L408" title="All 4 branches covered.">        row.put(&quot;candidateKind&quot;, !Files.exists(selected) ? &quot;NONE&quot; : Files.exists(simplified) ? &quot;SIMPLIFIED&quot; : &quot;BASELINE_FALLBACK&quot;);</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        if (!Files.exists(selected)) { row.put(&quot;judgment&quot;, &quot;NO_GENERATED_CANDIDATE&quot;); return row; }</span>
+<span class="fc" id="L410">        row.put(&quot;candidateSha256&quot;, hash(Files.readAllBytes(selected)));</span>
+<span class="fc" id="L411">        Path driver = directory.resolve(&quot;driver.c&quot;), binary = directory.resolve(&quot;candidate&quot;);</span>
+<span class="fc" id="L412">        Files.writeString(driver, driver(name));</span>
+<span class="fc" id="L413">        var compile = new ArrayList&lt;String&gt;(); compile.add(&quot;gcc&quot;); panel.path(&quot;compilerOptions&quot;).forEach(o -&gt; compile.add(o.asText()));</span>
+<span class="fc" id="L414">        Collections.addAll(compile, selected.toString(), driver.toString(), &quot;-lm&quot;, &quot;-o&quot;, binary.toString());</span>
+<span class="fc" id="L415">        var compiled = process(compile, directory, Map.of(), directory.resolve(&quot;compile&quot;), panel.at(&quot;/limits/compileSeconds&quot;).intValue());</span>
+<span class="fc" id="L416">        row.put(&quot;compileProcess&quot;, compiled); row.put(&quot;compileCommand&quot;, compile);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (compiled.exceeded(panel.at(&quot;/limits/compileSeconds&quot;).intValue())) { row.put(&quot;judgment&quot;, &quot;COMPILATION_TIMEOUT&quot;); return row; }</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (compiled.exit() != 0) { row.put(&quot;judgment&quot;, &quot;COMPILATION_FAILED&quot;); return row; }</span>
+<span class="fc" id="L419">        var actual = new ArrayList&lt;Map&lt;String, Object&gt;&gt;(); var executions = new ArrayList&lt;Execution&gt;();</span>
+<span class="fc bfc" id="L420" title="All 4 branches covered.">        for (var count : panel.path(&quot;rowCounts&quot;)) for (var seed : panel.path(&quot;seeds&quot;)) {</span>
+<span class="fc" id="L421">            Path log = directory.resolve(&quot;run-&quot; + count.intValue() + &quot;-&quot; + seed.intValue());</span>
+<span class="fc" id="L422">            var executed = process(List.of(binary.toString(), count.asText(), seed.asText()), directory, Map.of(), log,</span>
+<span class="fc" id="L423">                panel.at(&quot;/limits/executionSeconds&quot;).intValue()); executions.add(executed);</span>
+<span class="pc bpc" id="L424" title="1 of 4 branches missed.">            if (executed.exit() != 0 || executed.exceeded(panel.at(&quot;/limits/executionSeconds&quot;).intValue())) {</span>
+<span class="fc" id="L425">                row.put(&quot;judgment&quot;, &quot;EXECUTION_FAILED&quot;); row.put(&quot;executions&quot;, executions); return row;</span>
+            }
+<span class="fc" id="L427">            String text = Files.readString(Path.of(log + &quot;.stdout&quot;)).trim();</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            var values = text.isEmpty() ? List.&lt;String&gt;of() : List.of(text.split(&quot;\\s+&quot;));</span>
+<span class="fc" id="L429">            actual.add(Map.of(&quot;rows&quot;, count.intValue(), &quot;seed&quot;, seed.intValue(), &quot;values&quot;, values));</span>
+<span class="fc" id="L430">        }</span>
+<span class="fc" id="L431">        row.put(&quot;executions&quot;, executions); row.put(&quot;outputs&quot;, actual);</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        row.put(&quot;judgment&quot;, expected.equals(actual) ? &quot;VERIFIED_FINITE_OUTPUTS&quot; : &quot;INVALID_OUTPUT&quot;);</span>
+<span class="fc" id="L433">        return row;</span>
+    }
+
+    private static String driver(String name) {
+<span class="fc" id="L437">        return &quot;#include &lt;stdio.h&gt;\n#include &lt;stdlib.h&gt;\nvoid &quot; + name + &quot;(long,long*,long*);\n&quot;</span>
+            + &quot;int main(int argc,char**argv){if(argc!=3)return 2;long n=strtol(argv[1],0,10),s=strtol(argv[2],0,10);&quot;
+            + &quot;if(n&lt;2||n&gt;20||s&lt;0||s&gt;2)return 3;if(sizeof(long)!=8)return 4;long x[20],y[20]={0};&quot;
+            + &quot;for(long i=0;i&lt;n;i++)x[i]=(i*17+s*7)%19-9;&quot; + name + &quot;(n-1,x,y);&quot;
+            + &quot;for(long i=0;i&lt;n;i++)printf(\&quot;%ld\\n\&quot;,y[i]);return 0;}\n&quot;;
+    }
+
+    private static Map&lt;String, Object&gt; row(JsonNode entry, String arm, long oracleNanos) {
+<span class="fc" id="L445">        var row = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L446">        row.put(&quot;case&quot;, entry.path(&quot;id&quot;).asText()); row.put(&quot;origin&quot;, entry.path(&quot;origin&quot;).asText());</span>
+<span class="fc" id="L447">        row.put(&quot;sourceSha256&quot;, entry.path(&quot;sha256&quot;).asText()); row.put(&quot;arm&quot;, arm); row.put(&quot;oracleNanos&quot;, oracleNanos);</span>
+<span class="fc" id="L448">        return row;</span>
+    }
+
+    private static void verifyUpstream(JsonNode panel, Path upstream, Path output) throws Exception {
+<span class="fc" id="L452">        if (!commandText(List.of(&quot;git&quot;, &quot;rev-parse&quot;, &quot;HEAD&quot;), upstream, output.resolve(&quot;upstream-revision&quot;))</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">                .equals(panel.path(&quot;revision&quot;).asText())) throw new IllegalArgumentException(&quot;UPSTREAM_REVISION&quot;);</span>
+<span class="fc" id="L454">        commandText(List.of(&quot;git&quot;, &quot;diff&quot;, &quot;--exit-code&quot;, &quot;HEAD&quot;, &quot;--&quot;, &quot;acc&quot;, &quot;lib&quot;, &quot;inputs&quot;), upstream,</span>
+<span class="fc" id="L455">            output.resolve(&quot;upstream-clean&quot;));</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        for (var fields = panel.path(&quot;toolHashes&quot;).fields(); fields.hasNext();) {</span>
+<span class="fc" id="L457">            var entry = fields.next();</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            if (!hash(Files.readAllBytes(upstream.resolve(&quot;lib&quot;).resolve(entry.getKey()))).equals(entry.getValue().asText()))</span>
+<span class="fc" id="L459">                throw new IllegalArgumentException(&quot;ORIGINAL_JAR_CHANGED&quot;);</span>
+<span class="fc" id="L460">        }</span>
+<span class="fc" id="L461">        var inventory = new HashSet&lt;String&gt;();</span>
+<span class="pc bpc" id="L462" title="1 of 4 branches missed.">        for (var entry : panel.path(&quot;cases&quot;)) if (!entry.path(&quot;path&quot;).isNull()) {</span>
+<span class="fc" id="L463">            String path = entry.path(&quot;path&quot;).asText(); inventory.add(path);</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (!hash(Files.readAllBytes(upstream.resolve(path))).equals(entry.path(&quot;sha256&quot;).asText()))</span>
+<span class="fc" id="L465">                throw new IllegalArgumentException(&quot;UPSTREAM_SOURCE_CHANGED&quot;);</span>
+        }
+<span class="fc" id="L467">        try (var files = Files.list(upstream.resolve(&quot;inputs&quot;))) {</span>
+<span class="fc" id="L468">            var observed = files.filter(p -&gt; p.toString().endsWith(&quot;.alpha&quot;)).map(p -&gt; &quot;inputs/&quot; + p.getFileName()).toList();</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            if (!inventory.equals(new HashSet&lt;&gt;(observed))) throw new IllegalArgumentException(&quot;UPSTREAM_INVENTORY_CHANGED&quot;);</span>
+        }
+<span class="fc" id="L471">    }</span>
+
+<span class="fc" id="L473">    public record Execution(int exit, boolean timedOut, long wallNanos) {</span>
+<span class="fc bfc" id="L474" title="All 4 branches covered.">        boolean exceeded(int seconds) { return timedOut || wallNanos &gt; TimeUnit.SECONDS.toNanos(seconds); }</span>
+    }
+
+    private static Execution process(List&lt;String&gt; command, Path directory, Map&lt;String, String&gt; environment,
+            Path log, int seconds) throws Exception {
+<span class="fc" id="L479">        var wrapped = new ArrayList&lt;&gt;(List.of(&quot;timeout&quot;, &quot;--kill-after=2s&quot;, seconds + &quot;s&quot;)); wrapped.addAll(command);</span>
+<span class="fc" id="L480">        var builder = new ProcessBuilder(wrapped).directory(directory.toFile()); builder.environment().putAll(environment);</span>
+<span class="fc" id="L481">        builder.redirectOutput(Path.of(log + &quot;.stdout&quot;).toFile()); builder.redirectError(Path.of(log + &quot;.stderr&quot;).toFile());</span>
+<span class="fc" id="L482">        long started = System.nanoTime(); var process = builder.start();</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">        if (!process.waitFor(seconds + 4L, TimeUnit.SECONDS)) {</span>
+<span class="nc" id="L484">            var descendants = process.descendants().toList(); process.destroyForcibly();</span>
+<span class="nc" id="L485">            descendants.forEach(ProcessHandle::destroyForcibly); process.waitFor();</span>
+        }
+<span class="fc" id="L487">        int exit = process.exitValue();</span>
+<span class="pc bpc" id="L488" title="2 of 4 branches missed.">        if (Files.size(Path.of(log + &quot;.stdout&quot;)) &gt; 1_048_576 || Files.size(Path.of(log + &quot;.stderr&quot;)) &gt; 1_048_576)</span>
+<span class="nc" id="L489">            return new Execution(125, false, System.nanoTime() - started);</span>
+<span class="pc bpc" id="L490" title="1 of 4 branches missed.">        return new Execution(exit, exit == 124 || exit == 137, System.nanoTime() - started);</span>
+    }
+
+    private static String commandText(List&lt;String&gt; command, Path directory, Path log) throws Exception {
+<span class="fc" id="L494">        var result = process(command, directory, Map.of(), log, 10);</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        if (result.exit() != 0) throw new IllegalStateException(&quot;COMMAND_FAILED &quot; + command);</span>
+<span class="fc" id="L496">        return Files.readString(Path.of(log + &quot;.stdout&quot;)).trim();</span>
+    }
+
+<span class="fc" id="L499">    private static String java() { return Path.of(System.getProperty(&quot;java.home&quot;), &quot;bin&quot;, &quot;java&quot;).toString(); }</span>
+    private static void write(Path path, Object value) throws IOException {
+<span class="fc" id="L501">        Files.writeString(path, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(value) + &quot;\n&quot;);</span>
+<span class="fc" id="L502">    }</span>
+<span class="fc" id="L503">    static String hash(byte[] value) throws Exception { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value)); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

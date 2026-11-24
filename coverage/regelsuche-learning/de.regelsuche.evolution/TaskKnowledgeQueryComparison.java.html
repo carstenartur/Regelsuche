@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskKnowledgeQueryComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskKnowledgeQueryComparison.java</span></div><h1>TaskKnowledgeQueryComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.*;
+import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.parse.ExpressionFormatter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
+/** Fixed public cold/repeated/distinct comparison; every arm pays acquisition and independent auditing. */
+<span class="fc" id="L13">public final class TaskKnowledgeQueryComparison {</span>
+    public static final String REVISION = &quot;regelsuche.task-query-reuse/v2-second-observation&quot;;
+<span class="fc" id="L15">    public enum Profile { PERSISTENT, RETAINED_PATH }</span>
+<span class="fc" id="L16">    public enum Scenario {</span>
+<span class="fc" id="L17">        COLD_ONE(1), REPEATED_SIXTEEN(16), DISTINCT_SIXTEEN(16);</span>
+        private final int blocks;
+<span class="fc" id="L19">        Scenario(int blocks) { this.blocks = blocks; }</span>
+<span class="fc" id="L20">        public int blocks() { return blocks; }</span>
+    }
+<span class="fc" id="L22">    public record Acquisition(CumulativeTaskKnowledge.Decision decision, long work, String generationId) { }</span>
+<span class="fc" id="L23">    public record Edge(String source, String target, String rule, boolean accepted, long verificationWork) { }</span>
+    public record Row(int block, MixedTaskKnowledgeWorkload.Case input, boolean reused, boolean solved,
+            long score, String output, long queryWork, long retentionWork, long verificationWork, long replayWork,
+            long auditWork, List&lt;Edge&gt; witness, boolean verified, String failure, KnowledgeCostGate.Cost paidIncludingAudit) {
+<span class="fc" id="L27">        public Row { witness = List.copyOf(witness); }</span>
+    }
+    public record Arm(int repetition, Scenario scenario, Profile profile, List&lt;Acquisition&gt; acquisition,
+            String generationId, long setupWork, KnowledgeCostGate.Cost setupCost, List&lt;Row&gt; queries,
+            TaskKnowledgeQuerySession.Statistics statistics, long knownWork, boolean accountingComplete,
+            String failure, KnowledgeCostGate.Cost paidIncludingSetupAndAudit) {
+<span class="fc" id="L33">        public Arm { acquisition = List.copyOf(acquisition); queries = List.copyOf(queries); }</span>
+    }
+<span class="fc" id="L35">    public record Comparison(int repetition, Scenario scenario, boolean qualityNonRegressing,</span>
+            long observedWorkSavings, long observedWallSavingsNanos, long observedCpuSavingsNanos,
+            boolean observedBothResourcePayback) { }
+    public record Report(String revision, List&lt;Arm&gt; arms, List&lt;Comparison&gt; comparisons,
+            KnowledgeCostGate.Cost studyPaidBeforeSerialization) {
+<span class="fc" id="L40">        public Report { arms = List.copyOf(arms); comparisons = List.copyOf(comparisons); }</span>
+    }
+<span class="fc" id="L42">    private static final Pattern VARIABLE = Pattern.compile(&quot;[A-Za-z][A-Za-z0-9]*&quot;);</span>
+<span class="fc" id="L43">    private final TaskKnowledgeSelfImprover.Meter meter = TaskKnowledgeSelfImprover.systemMeter();</span>
+
+    /** The output directory must be new. Default registered repetition count is three. */
+    public Report run(Path directory, int repetitions) throws Exception {
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (repetitions &lt; 1 || repetitions &gt; 9) throw new IllegalArgumentException(&quot;bounded positive repetitions required&quot;);</span>
+<span class="fc" id="L48">        var begin = meter.now();</span>
+<span class="fc" id="L49">        Files.createDirectory(directory);</span>
+<span class="fc" id="L50">        var arms = new ArrayList&lt;Arm&gt;();</span>
+<span class="fc" id="L51">        var comparisons = new ArrayList&lt;Comparison&gt;();</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int repetition = 0; repetition &lt; repetitions; repetition++) {</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (var scenario : Scenario.values()) {</span>
+<span class="fc" id="L54">                var pair = new ArrayList&lt;Arm&gt;();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                for (int index = 0; index &lt; 2; index++) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                    var profile = ((repetition + scenario.ordinal() + index) &amp; 1) == 0 ? Profile.PERSISTENT : Profile.RETAINED_PATH;</span>
+<span class="fc" id="L57">                    var arm = arm(repetition, scenario, profile, directory.resolve(&quot;r&quot; + repetition + &quot;-&quot; + scenario + &quot;-&quot; + profile));</span>
+<span class="fc" id="L58">                    arms.add(arm); pair.add(arm);</span>
+                }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                var previous = pair.stream().filter(arm -&gt; arm.profile() == Profile.PERSISTENT).findFirst().orElseThrow();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                var candidate = pair.stream().filter(arm -&gt; arm.profile() == Profile.RETAINED_PATH).findFirst().orElseThrow();</span>
+<span class="fc" id="L62">                comparisons.add(compare(previous, candidate));</span>
+            }
+        }
+<span class="fc" id="L65">        return new Report(REVISION, arms, comparisons, elapsed(begin));</span>
+    }
+
+    private Arm arm(int repetition, Scenario scenario, Profile profile, Path directory) {
+<span class="fc" id="L69">        var begin = meter.now();</span>
+<span class="fc" id="L70">        var acquisition = new ArrayList&lt;Acquisition&gt;();</span>
+<span class="fc" id="L71">        var rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc" id="L72">        long setupWork = 0;</span>
+<span class="fc" id="L73">        String generation = &quot;&quot;, failure = &quot;&quot;;</span>
+<span class="fc" id="L74">        boolean complete = true;</span>
+<span class="fc" id="L75">        KnowledgeCostGate.Cost setupCost = new KnowledgeCostGate.Cost(0, 0);</span>
+<span class="fc" id="L76">        TaskKnowledgeQuerySession.Statistics statistics = null;</span>
+        try {
+<span class="fc" id="L78">            var knowledge = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (var batch : MixedTaskKnowledgeWorkload.seedBatches()) {</span>
+<span class="fc" id="L80">                var update = knowledge.learnBatch(batch.lessons(), batch.validation(), 1_000_000);</span>
+<span class="fc" id="L81">                setupWork = Math.addExact(setupWork, update.work().total());</span>
+<span class="fc" id="L82">                knowledge = update.next();</span>
+<span class="fc" id="L83">                acquisition.add(new Acquisition(update.reason(), update.work().total(), knowledge.id()));</span>
+<span class="fc" id="L84">            }</span>
+<span class="fc" id="L85">            var snapshot = knowledge.save(directory);</span>
+<span class="fc" id="L86">            try (var preparation = new TaskKnowledgeSession(TraceStrategyTransferExample.inventory(), 4, 4_000_000)) {</span>
+<span class="fc" id="L87">                var prepared = preparation.prepare(snapshot);</span>
+<span class="fc" id="L88">                setupWork = Math.addExact(setupWork, prepared.totalWork());</span>
+<span class="fc" id="L89">                generation = prepared.knowledge().id();</span>
+<span class="fc" id="L90">                try (var queries = new TaskKnowledgeQuerySession(prepared.knowledge(),</span>
+<span class="fc bfc" id="L91" title="All 4 branches covered.">                        profile == Profile.PERSISTENT ? 0 : 32, profile == Profile.PERSISTENT ? 0 : 4_000_000)) {</span>
+<span class="fc" id="L92">                    setupCost = elapsed(begin);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                    for (int block = 0; block &lt; scenario.blocks(); block++) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                        for (var input : cases(scenario, block)) {</span>
+<span class="fc" id="L95">                            var row = observe(queries, block, input);</span>
+<span class="fc" id="L96">                            rows.add(row); complete &amp;= row.verified();</span>
+<span class="fc" id="L97">                        }</span>
+                    }
+<span class="fc" id="L99">                    statistics = queries.statistics();</span>
+<span class="fc" id="L100">                    complete &amp;= statistics.accountingComplete();</span>
+                }
+            }
+<span class="pc" id="L103">        } catch (Exception error) { complete = false; failure = error.toString(); }</span>
+<span class="fc" id="L104">        long knownWork = setupWork;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (var row : rows) knownWork = Math.addExact(knownWork, Math.addExact(row.queryWork(), row.auditWork()));</span>
+<span class="fc" id="L106">        var paid = elapsed(begin);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        return new Arm(repetition, scenario, profile, acquisition, generation, setupWork, setupCost, rows, statistics,</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            knownWork, complete &amp;&amp; paid.cpuNanos() &gt;= 0, failure, paid);</span>
+    }
+
+    private Row observe(TaskKnowledgeQuerySession session, int block, MixedTaskKnowledgeWorkload.Case input) {
+<span class="fc" id="L112">        var begin = meter.now();</span>
+<span class="fc" id="L113">        long[] auditWork = {0};</span>
+<span class="fc" id="L114">        long queryWork = 0, retentionWork = 0, verification = 0, replay = 0, score = Long.MAX_VALUE;</span>
+<span class="fc" id="L115">        boolean reused = false, solved = false, verified = false;</span>
+<span class="fc" id="L116">        String output = &quot;&quot;, failure = &quot;&quot;;</span>
+<span class="fc" id="L117">        var edges = new ArrayList&lt;Edge&gt;();</span>
+        try {
+<span class="fc" id="L119">            var task = input.task();</span>
+<span class="fc" id="L120">            var query = session.solve(task, CumulativeTaskKnowledge.Strategy.AUTOMATIC);</span>
+<span class="fc" id="L121">            queryWork = query.totalWork(); retentionWork = query.retentionWork();</span>
+<span class="fc" id="L122">            reused = query.reused(); solved = query.solved();</span>
+<span class="fc" id="L123">            var evidence = query.execution().solution().orElseThrow().evidence();</span>
+<span class="fc" id="L124">            verification = evidence.search().metrics().verificationWork(); replay = evidence.replayWork();</span>
+<span class="fc" id="L125">            var exact = new ExactPolynomialAnalysis(units -&gt; auditWork[0] = Math.addExact(auditWork[0], units));</span>
+<span class="fc" id="L126">            String current = ExpressionFormatter.format(task.source());</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (var edge : evidence.witness()) {</span>
+<span class="fc" id="L128">                String source = ExpressionFormatter.format(edge.source().expression());</span>
+<span class="fc" id="L129">                String target = ExpressionFormatter.format(edge.target().expression());</span>
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">                if (!source.equals(current) || !edge.verification().accepted()) throw new IllegalStateException(&quot;invalid witness continuity&quot;);</span>
+<span class="fc" id="L131">                exact.requireEquivalent(source, target); current = target;</span>
+<span class="fc" id="L132">                edges.add(new Edge(source, target, edge.move().ruleId(), edge.verification().accepted(), edge.verification().work()));</span>
+<span class="fc" id="L133">            }</span>
+<span class="fc" id="L134">            output = ExpressionFormatter.format(evidence.incumbent().expression());</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (!current.equals(output)) throw new IllegalStateException(&quot;unbound endpoint&quot;);</span>
+<span class="fc" id="L136">            exact.requireEquivalent(input.source(), output);</span>
+<span class="fc" id="L137">            score = nodes(evidence.incumbent().expression()); auditWork[0] = Math.addExact(auditWork[0], score);</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">            if (score != evidence.outputScore() || solved != (score &lt;= input.maximumNodes()</span>
+<span class="pc bpc" id="L139" title="3 of 6 branches missed.">                    &amp;&amp; queryWork &lt;= task.budget().totalWork() &amp;&amp; evidence.withinBudget()))</span>
+<span class="nc" id="L140">                throw new IllegalStateException(&quot;score/budget inconsistency&quot;);</span>
+<span class="fc" id="L141">            verified = evidence.accountingComplete();</span>
+<span class="nc" id="L142">        } catch (RuntimeException error) {</span>
+<span class="nc" id="L143">            failure = error.toString();</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (error instanceof TaskKnowledgeQuerySession.QueryFailure stopped) queryWork = stopped.knownWork();</span>
+<span class="fc" id="L145">        }</span>
+<span class="fc" id="L146">        return new Row(block, input, reused, solved, score, output, queryWork, retentionWork, verification, replay,</span>
+<span class="fc" id="L147">            auditWork[0], edges, verified, failure, elapsed(begin));</span>
+    }
+
+    private static List&lt;MixedTaskKnowledgeWorkload.Case&gt; cases(Scenario scenario, int block) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (scenario != Scenario.DISTINCT_SIXTEEN) return MixedTaskKnowledgeWorkload.evaluation();</span>
+<span class="fc" id="L152">        return MixedTaskKnowledgeWorkload.evaluation().stream().map(input -&gt; new MixedTaskKnowledgeWorkload.Case(input.role(),</span>
+<span class="fc" id="L153">            VARIABLE.matcher(input.source()).replaceAll(match -&gt; match.group() + &quot;_q&quot; + block), input.maximumNodes())).toList();</span>
+    }
+    private static long nodes(Expr expression) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L157">            case BinaryExpr binary -&gt; 1 + nodes(binary.left()) + nodes(binary.right());</span>
+<span class="nc" id="L158">            case FunctionExpr function -&gt; 1 + function.arguments().stream().mapToLong(TaskKnowledgeQueryComparison::nodes).sum();</span>
+<span class="fc" id="L159">            case NumberExpr ignored -&gt; 1;</span>
+<span class="fc" id="L160">            case VariableExpr ignored -&gt; 1;</span>
+        };
+    }
+    private static Comparison compare(Arm previous, Arm candidate) {
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        boolean quality = previous.accountingComplete() &amp;&amp; candidate.accountingComplete()</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            &amp;&amp; previous.queries().size() == candidate.queries().size();</span>
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        for (int i = 0; quality &amp;&amp; i &lt; previous.queries().size(); i++) {</span>
+<span class="fc" id="L167">            var before = previous.queries().get(i); var after = candidate.queries().get(i);</span>
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">            quality = before.verified() &amp;&amp; after.verified() &amp;&amp; before.input().equals(after.input())</span>
+<span class="pc bpc" id="L169" title="2 of 6 branches missed.">                &amp;&amp; (!before.solved() || after.solved()) &amp;&amp; after.score() &lt;= before.score();</span>
+        }
+<span class="fc" id="L171">        long wall = previous.paidIncludingSetupAndAudit().wallNanos() - candidate.paidIncludingSetupAndAudit().wallNanos();</span>
+<span class="fc" id="L172">        long cpu = previous.paidIncludingSetupAndAudit().cpuNanos() - candidate.paidIncludingSetupAndAudit().cpuNanos();</span>
+<span class="pc bpc" id="L173" title="3 of 6 branches missed.">        return new Comparison(previous.repetition(), previous.scenario(), quality, previous.knownWork() - candidate.knownWork(),</span>
+            wall, cpu, quality &amp;&amp; wall &gt; 0 &amp;&amp; cpu &gt; 0);
+    }
+    private KnowledgeCostGate.Cost elapsed(KnowledgeCostGate.Cost start) {
+<span class="fc" id="L177">        var end = meter.now();</span>
+<span class="fc" id="L178">        return new KnowledgeCostGate.Cost(end.wallNanos() - start.wallNanos(),</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">            start.cpuNanos() &lt; 0 || end.cpuNanos() &lt; start.cpuNanos() ? -1 : end.cpuNanos() - start.cpuNanos());</span>
+    }
+    public static void main(String[] args) throws Exception {
+<span class="nc bnc" id="L182" title="All 4 branches missed.">        if (args.length &lt; 1 || args.length &gt; 2) throw new IllegalArgumentException(&quot;new snapshot directory [repetitions=3]&quot;);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        var report = new TaskKnowledgeQueryComparison().run(Path.of(args[0]), args.length == 2 ? Integer.parseInt(args[1]) : 3);</span>
+<span class="nc" id="L184">        System.out.println(LearnedSchedulingArtifacts.json(report));</span>
+<span class="nc" id="L185">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

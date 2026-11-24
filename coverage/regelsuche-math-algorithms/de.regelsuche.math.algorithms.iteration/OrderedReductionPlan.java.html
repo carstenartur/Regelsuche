@@ -34,7 +34,7 @@ public record OrderedReductionPlan(List&lt;Term&gt; terms, List&lt;Lookup&gt; lo
     public record Term(BigInteger coefficient, List&lt;Moment&gt; factors) {
 <span class="fc" id="L35">        public Term {</span>
 <span class="pc bpc" id="L36" title="2 of 4 branches missed.">            if (coefficient.signum() == 0 || coefficient.abs().bitLength() &gt; FiniteIteration.MAX_COEFFICIENT_BITS</span>
-<span class="pc bpc" id="L37" title="2 of 4 branches missed.">                    || factors.size() &lt; 2 || factors.size() &gt; OrderedReduction.MAX_ARITY) {</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">                    || factors.isEmpty() || factors.size() &gt; OrderedReduction.MAX_ARITY) {</span>
 <span class="nc" id="L38">                throw new IllegalArgumentException(&quot;INVALID_ORDERED_TERM&quot;);</span>
             }
 <span class="fc" id="L40">            factors = List.copyOf(factors);</span>
@@ -133,7 +133,7 @@ public record OrderedReductionPlan(List&lt;Term&gt; terms, List&lt;Lookup&gt; lo
     }
 
     private static boolean opposite(Optional&lt;Bound&gt; bound, Optional&lt;Bound&gt; opposite) {
-<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (bound.isEmpty()) return opposite.isEmpty();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (bound.isEmpty()) return opposite.isEmpty();</span>
 <span class="fc" id="L137">        var forward = bound.orElseThrow();</span>
 <span class="fc bfc" id="L138" title="All 2 branches covered.">        return opposite.filter(reverse -&gt; forward.inclusive() == reverse.inclusive()</span>
 <span class="pc bpc" id="L139" title="1 of 2 branches missed.">            &amp;&amp; forward.offset().add(reverse.offset()).signum() == 0).isPresent();</span>
@@ -165,11 +165,18 @@ public record OrderedReductionPlan(List&lt;Term&gt; terms, List&lt;Lookup&gt; lo
 <span class="fc" id="L165">            return OrderedReductionEvaluation.evaluate(source, plan, rows, 0, limits, cancellation);</span>
         }
 
+        /** Returns the source's tuple sum for each nonempty prefix, in input order. */
+        public Evaluation evaluatePrefixes(List&lt;? extends List&lt;BigInteger&gt;&gt; rows, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (plan.eviction().isPresent()) throw new IllegalArgumentException(&quot;PREFIX_REQUIRES_NONWINDOW_PLAN&quot;);</span>
+<span class="fc" id="L172">            return OrderedReductionEvaluation.evaluatePrefixes(source, plan, rows, limits, cancellation);</span>
+        }
+
         /** Returns one sum per complete window, in input order. */
         public Evaluation evaluateWindows(List&lt;? extends List&lt;BigInteger&gt;&gt; rows, int width, IterationLimits limits,
                 BooleanSupplier cancellation) {
-<span class="pc bpc" id="L171" title="2 of 4 branches missed.">            if (width &lt; 1 || plan.eviction().isEmpty()) throw new IllegalArgumentException(&quot;INVALID_WINDOW&quot;);</span>
-<span class="fc" id="L172">            return OrderedReductionEvaluation.evaluate(source, plan, rows, width, limits, cancellation);</span>
+<span class="pc bpc" id="L178" title="2 of 4 branches missed.">            if (width &lt; 1 || plan.eviction().isEmpty()) throw new IllegalArgumentException(&quot;INVALID_WINDOW&quot;);</span>
+<span class="fc" id="L179">            return OrderedReductionEvaluation.evaluate(source, plan, rows, width, limits, cancellation);</span>
         }
     }
 }
