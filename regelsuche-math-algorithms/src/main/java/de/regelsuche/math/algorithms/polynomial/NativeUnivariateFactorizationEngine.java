@@ -38,6 +38,15 @@ public final class NativeUnivariateFactorizationEngine<C>
             NativeCoefficientAdapter.RationalAdapter.INSTANCE);
     }
 
+    /**
+     * Proposes inexpensive exact rational decompositions before invoking the general engine.
+     * The same independent product verifier applies to both paths.
+     */
+    public static FactorizationEngine<ExactRational> rationalsWithFastPath(
+            NativeUnivariateFactorizationPolicy policy) {
+        return new RationalFactorizationFastPath(policy);
+    }
+
     public static NativeUnivariateFactorizationEngine<BigInteger>
             boundedIntegers() {
         return integers(

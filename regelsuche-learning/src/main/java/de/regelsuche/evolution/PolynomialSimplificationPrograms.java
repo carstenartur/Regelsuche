@@ -4,6 +4,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.canonical.PolynomialNormalizer;
 import de.regelsuche.math.algorithms.polynomial.NativeUnivariateFactorizationEngine;
@@ -15,6 +16,7 @@ import de.regelsuche.polynomial.ExactParsedFactorizationPipeline;
 import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.retention.RetainedOperation;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -94,6 +96,7 @@ final class PolynomialSimplificationPrograms {
         work.accept(1);
         if (!(source instanceof BinaryExpr binary)
                 || binary.operator() != BinaryOperator.ADD && binary.operator() != BinaryOperator.SUB) return List.of();
+        if (hasMultiplePolynomialVariables(source, work)) return List.of();
         var formatted = StructuralExpansionRules.observe(() -> ExpressionFormatter.format(source), work.remaining());
         work.accept(formatted.work());
         if (formatted.exhausted()) return List.of();
@@ -118,6 +121,28 @@ final class PolynomialSimplificationPrograms {
         String result = transformed.transformedExpression().orElseThrow();
         work.accept(result.length());
         return List.of(new ExpressionParser().parseExactTerm(result).expression());
+    }
+
+    /** Distinct indeterminates in additive or multiplicative operands cannot merge in the univariate view. */
+    private static boolean hasMultiplePolynomialVariables(Expr source, ProcedureWork work) {
+        var pending = new ArrayDeque<Expr>();
+        pending.push(source);
+        String first = null;
+        while (!pending.isEmpty()) {
+            var node = pending.pop();
+            work.accept(1);
+            if (node instanceof VariableExpr variable) {
+                if (first != null && !first.equals(variable.name())) return true;
+                first = variable.name();
+            } else if (node instanceof BinaryExpr binary) {
+                pending.push(binary.left());
+                // A denominator may simplify to a constant even when it mentions another variable.
+                if (binary.operator() != BinaryOperator.DIV && binary.operator() != BinaryOperator.POW) {
+                    pending.push(binary.right());
+                }
+            }
+        }
+        return false;
     }
 
     /** Shorter exact scalar placement, without creating any variable denominator. */

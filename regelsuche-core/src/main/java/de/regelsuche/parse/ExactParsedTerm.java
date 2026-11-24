@@ -38,6 +38,8 @@ public final class ExactParsedTerm {
     private final List<LiteralOccurrence> literals;
     private final Map<NumberExpr, LiteralOccurrence> literalsByNode;
     private final Map<Expr, SourceRange> sourceRangesByNode;
+    private final int nodeCount;
+    private final boolean parserRoot;
 
     ExactParsedTerm(
         String source,
@@ -45,13 +47,34 @@ public final class ExactParsedTerm {
         List<LiteralOccurrence> literals,
         Map<Expr, SourceRange> sourceRanges
     ) {
+        this(source, expression, literals, sourceRanges, false);
+    }
+
+    static ExactParsedTerm parserRoot(String source, Expr expression,
+            List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges) {
+        return new ExactParsedTerm(source, expression, literals, sourceRanges, true);
+    }
+
+    private ExactParsedTerm(String source, Expr expression,
+            List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges, boolean parserRoot) {
         this.source = Objects.requireNonNull(source, "source");
         this.expression = Objects.requireNonNull(expression, "expression");
         this.literals = List.copyOf(
             Objects.requireNonNull(literals, "literals"));
         this.literalsByNode = validateAndIndexLiterals();
+        Set<Expr> visited = validateUniqueNodeIdentities();
+        this.nodeCount = visited.size();
+        this.parserRoot = parserRoot;
         this.sourceRangesByNode = copyAndValidateSourceRanges(
-            Objects.requireNonNull(sourceRanges, "sourceRanges"));
+            Objects.requireNonNull(sourceRanges, "sourceRanges"), visited);
+    }
+
+    int nodeCount() {
+        return nodeCount;
+    }
+
+    boolean isParserRoot() {
+        return parserRoot;
     }
 
     private Map<NumberExpr, LiteralOccurrence> validateAndIndexLiterals() {
@@ -89,7 +112,8 @@ public final class ExactParsedTerm {
     }
 
     private Map<Expr, SourceRange> copyAndValidateSourceRanges(
-        Map<Expr, SourceRange> sourceRanges
+        Map<Expr, SourceRange> sourceRanges,
+        Set<Expr> visitedNodes
     ) {
         IdentityHashMap<Expr, SourceRange> ranges =
             new IdentityHashMap<>();
@@ -118,7 +142,6 @@ public final class ExactParsedTerm {
                     "numeric literal is outside its AST source range");
             }
         });
-        Set<Expr> visitedNodes = validateUniqueNodeIdentities();
         validateTreeRangesIteratively(ranges);
         for (Expr rangedNode : ranges.keySet()) {
             if (!visitedNodes.contains(rangedNode)) {

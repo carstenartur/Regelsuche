@@ -10,6 +10,7 @@ import de.regelsuche.polynomial.FactorizationEngine;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.polynomial.FactorizationVerifier;
 import de.regelsuche.polynomial.IndependentCompletenessTrace;
+import de.regelsuche.polynomial.Monomial;
 import de.regelsuche.polynomial.PolynomialFactor;
 import de.regelsuche.polynomial.PolynomialRing;
 import de.regelsuche.polynomial.PolynomialVariable;
@@ -19,6 +20,7 @@ import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class NativeUnivariateFactorizationEngineTest {
@@ -41,6 +43,28 @@ class NativeUnivariateFactorizationEngineTest {
             ExactRationalField.INSTANCE,
             List.of(new PolynomialVariable("x")),
             PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
+
+    @Test
+    void verifiesRationalQuadraticsAndUnitRootProposalsWithTightWork() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithFastPath(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var quadratic = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(2), ExactRational.integer(6),
+            Monomial.of(1), ExactRational.integer(-7),
+            Monomial.of(0), ExactRational.integer(2)));
+        var cubic = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(3), ExactRational.integer(3),
+            Monomial.of(2), ExactRational.integer(-3),
+            Monomial.of(1), ExactRational.integer(2),
+            Monomial.of(0), ExactRational.integer(-2)));
+        for (var source : List.of(quadratic, cubic)) {
+            var request = FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, 64);
+            var result = FactorizationVerifier.execute(engine, request);
+            assertTrue(result.successful(), result.detailCode());
+            assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+            assertTrue(result.work().within(64));
+        }
+    }
 
     @Test
     void completelyFactorsGeneralIntegerPolynomial() {

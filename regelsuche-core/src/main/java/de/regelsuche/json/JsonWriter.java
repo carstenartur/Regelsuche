@@ -407,30 +407,46 @@ public final class JsonWriter implements de.regelsuche.retention.RetainedGraph.V
             return;
         }
         append('"');
-        for (int i = 0; i < value.length(); i++) {
-            drainIfNeeded();
-            char current = value.charAt(i);
-            worked(1);
-            switch (current) {
-                case '\\' -> append("\\\\");
-                case '"' -> append("\\\"");
-                case '\n' -> append("\\n");
-                case '\r' -> append("\\r");
-                case '\t' -> append("\\t");
-                case '\b' -> append("\\b");
-                case '\f' -> append("\\f");
-                default -> {
-                    if (current < 0x20) {
-                        append("\\u00");
-                        append(Character.forDigit(current >>> 4, 16));
-                        append(Character.forDigit(current & 15, 16));
-                    } else {
-                        append(current);
-                    }
+        if (sink == null && !RetainedOperation.isObserved()) {
+            int start = 0;
+            for (int i = 0; i < value.length(); i++) {
+                char current = value.charAt(i);
+                if (current < 0x20 || current == '"' || current == '\\') {
+                    builder.append(value, start, i);
+                    appendEscaped(current);
+                    start = i + 1;
                 }
+            }
+            builder.append(value, start, value.length());
+        } else {
+            for (int i = 0; i < value.length(); i++) {
+                drainIfNeeded();
+                worked(1);
+                appendEscaped(value.charAt(i));
             }
         }
         append('"');
+    }
+
+    private void appendEscaped(char current) {
+        switch (current) {
+            case '\\' -> append("\\\\");
+            case '"' -> append("\\\"");
+            case '\n' -> append("\\n");
+            case '\r' -> append("\\r");
+            case '\t' -> append("\\t");
+            case '\b' -> append("\\b");
+            case '\f' -> append("\\f");
+            default -> {
+                if (current < 0x20) {
+                    append("\\u00");
+                    append(Character.forDigit(current >>> 4, 16));
+                    append(Character.forDigit(current & 15, 16));
+                } else {
+                    append(current);
+                }
+            }
+        }
     }
 
     private void append(char value) {

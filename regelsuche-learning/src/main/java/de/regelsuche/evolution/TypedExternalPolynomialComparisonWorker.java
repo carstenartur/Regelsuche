@@ -25,7 +25,8 @@ public final class TypedExternalPolynomialComparisonWorker {
     private static final ObjectMapper JSON = new ObjectMapper()
         .enable(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
         .enable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-    private static final Set<String> PROFILES = Set.of("BASE", "EXPERT", "PRIMITIVE_SELECTED", "LEARNED_NAIVE", "LEARNED_RANKED");
+    private static final String HORNER = "POLYNOMIAL_HORNER_V1";
+    private static final Set<String> PROFILES = Set.of("BASE", "EXPERT", "PRIMITIVE_SELECTED", "LEARNED_NAIVE", "LEARNED_RANKED", HORNER);
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private static final Map<String, Integer> SETTINGS = Map.of("workBudget", 16384, "primitiveDepth", 9,
         "searchDepth", 9, "maxStates", 256, "complexityDebt", 24);
@@ -43,7 +44,7 @@ public final class TypedExternalPolynomialComparisonWorker {
         var genome = TraceStrategyTransferExample.inventory();
         var exact = new ExactPolynomialAnalysis();
         for (var input : TraceStrategyTransferExample.trainingInputs()) exclusions.add(exact.alphaIdentity(input.expression()));
-        if (requestedProfile.equals("BASE") || requestedProfile.equals("EXPERT")) {
+        if (requestedProfile.equals("BASE") || requestedProfile.equals("EXPERT") || requestedProfile.equals(HORNER)) {
             inventory = TypedLearnedMoveInventory.primitives(genome);
         } else {
             formation = new TraceRewriteStrategyLearner().learn(genome,
@@ -64,7 +65,7 @@ public final class TypedExternalPolynomialComparisonWorker {
         var result = new TreeMap<String, Object>();
         result.put("status", "INITIALIZED"); result.put("profile", profile);
         result.put("model", frozen); result.put("modelHash", SchematicProofPlan.hash(frozen));
-        result.put("settings", SETTINGS); result.put("trainingWorkComponents", costs);
+        result.put("settings", settings()); result.put("trainingWorkComponents", costs);
         result.put("trainingWork", costs.values().stream().mapToLong(Long::longValue).reduce(0, Math::addExact));
         result.put("learnedPrograms", profile.startsWith("LEARNED_") ? inventory.learnedPrograms().size() : 0);
         result.put("nativeWallNanos", System.nanoTime() - start); result.put("nativeCpuNanos", elapsedCpu(cpu));
@@ -79,10 +80,23 @@ public final class TypedExternalPolynomialComparisonWorker {
         if (exclusions.contains(new ExactPolynomialAnalysis().alphaIdentity(source))) throw new IllegalArgumentException("TRAIN overlap");
         var expression = new ExpressionParser().parseTerm(source);
         var providers = profile.startsWith("LEARNED_") ? inventory.providers() : inventory.primitiveProviders();
+        var verifier = inventory.verifier();
+        if (profile.equals(HORNER)) {
+            var horner = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER);
+            var augmented = new java.util.ArrayList<>(providers);
+            augmented.add(horner);
+            providers = List.copyOf(augmented);
+            var replay = horner.verifier();
+            var ordinary = verifier;
+            verifier = (state, move, context) -> (move.ruleId().equals(horner.descriptor().id()) ? replay : ordinary)
+                .verify(state, move, context);
+        }
+        int workBudget = SETTINGS.get("workBudget");
+        long theoryWork = profile.equals(HORNER) ? workBudget : 0;
         var problem = new TypedMoveSearch.Problem(expression,
             TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION),
-            providers, policy(), inventory.verifier(), state -> 0, MoveSearch.Mode.FAST,
-            MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(9, 9, 0, 256, 16384, 24));
+            providers, policy(), verifier, state -> 0, MoveSearch.Mode.FAST,
+            MoveSearch.Scheduling.STAGED, new MoveSearch.Budget(9, 9, theoryWork, 256, workBudget, 24));
         var selected = new TypedSourceOnlySearch().search(problem,
             state -> TypedPolynomialSurfaceCost.evaluate(state.expression()));
         if (!frozen.equals(modelJson())) throw new IllegalStateException("evaluation changed frozen knowledge");
@@ -119,7 +133,8 @@ public final class TypedExternalPolynomialComparisonWorker {
         var model = new TreeMap<String, Object>();
         model.put("schema", "regelsuche.typed-external-frozen-profile/v1"); model.put("profile", profile);
         model.put("inventory", TraceStrategyTransferExample.inventory().toCanonicalJson());
-        model.put("settings", SETTINGS); model.put("excludedIdentities", exclusions);
+        if (profile.equals(HORNER)) model.put("constructionProfile", TaskConstructionProfile.POLYNOMIAL_HORNER_V1.name());
+        model.put("settings", settings()); model.put("excludedIdentities", exclusions);
         model.put("formation", formation == null ? "" : formation.toCanonicalJson());
         model.put("policy", training == null ? (profile.equals("EXPERT") ? "FIXED_DEFAULT_WEIGHTS" : "INVENTORY_ORDER")
             : training.policy().toCanonicalJson());
@@ -127,6 +142,13 @@ public final class TypedExternalPolynomialComparisonWorker {
             "id", run.id(), "source", run.source(), "goal", run.goal(),
             "search", LearnedSchedulingArtifacts.resultJson(run.result().encodedResult()))).toList());
         return LearnedSchedulingArtifacts.json(model);
+    }
+
+    private Map<String, Integer> settings() {
+        if (!profile.equals(HORNER)) return SETTINGS;
+        var settings = new TreeMap<>(SETTINGS);
+        settings.put("maxTheoryWork", SETTINGS.get("workBudget"));
+        return settings;
     }
 
     /** Strict source-only boundary; unknown fields cannot smuggle targets into evaluation. */

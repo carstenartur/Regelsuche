@@ -11,6 +11,7 @@ import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
 import de.regelsuche.scalar.ExactRational;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,36 @@ class ExactParsedSubtermProjectorTest {
     private final ExpressionParser parser = new ExpressionParser();
     private final ExactParsedSubtermProjector projector =
         new ExactParsedSubtermProjector();
+
+    @Test
+    void reusesWholeParserRootWithoutLosingStalenessOrRangeGuards() {
+        var reusable = ExactParsedSubtermProjector.withParserRootReuse(
+            ExactParsedSubtermProjector.Policy.boundedDefaults(), PolynomialWorkAuthority.unbounded());
+        var root = parser.parseExactTerm("x^2-1/9");
+        String formatted = ExpressionFormatter.format(root.expression());
+        var compact = reusable.project(root, List.of(), formatted);
+        var legacy = projector.project(root, List.of(), formatted);
+        assertSame(root, compact.projected().orElseThrow());
+        assertEquals(legacy.selectedRange(), compact.selectedRange());
+        var legacyLiterals = legacy.projected().orElseThrow().literals();
+        for (int index = 0; index < root.literals().size(); index++) {
+            var original = root.literals().get(index);
+            var copied = legacyLiterals.get(index);
+            assertSame(original.node(), copied.node());
+            assertEquals(original.startInclusive(), copied.startInclusive());
+            assertEquals(original.endExclusive(), copied.endExclusive());
+            assertEquals(original.evidence().certificateHash(), copied.evidence().certificateHash());
+        }
+        assertTrue(compact.work().totalWorkUnits() < legacy.work().totalWorkUnits());
+        assertEquals(ExactParsedSubtermProjector.Status.POSITION_STALE,
+            reusable.project(root, List.of(), "x^2-2").status());
+
+        var padded = parser.parseExactTerm("  x^2-1/9 ");
+        var projected = reusable.project(padded, List.of(), formatted).projected().orElseThrow();
+        assertNotSame(padded, projected);
+        assertEquals(root.source(), projected.source());
+        assertEquals(root.rootSourceRange(), projected.rootSourceRange());
+    }
 
     @Test
     void projectsANestedExactPolynomialWithoutReparseOrNewAstNodes() {

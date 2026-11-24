@@ -16,8 +16,10 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
     }
 
     private final Binding binding;
+    private final Class<?> issuerType;
 
-    private ExactTheoryEvidence(Binding binding) {
+    private ExactTheoryEvidence(Binding binding, Class<?> issuerType) {
+        this.issuerType = issuerType;
         this.binding = Objects.requireNonNull(binding, "binding");
     }
 
@@ -48,7 +50,7 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
             if (accepted == null) {
                 throw new IllegalArgumentException("no installed verifier recognizes this evidence capability");
             }
-            return RetainedOperation.produced(new ExactTheoryEvidence(accepted));
+            return RetainedOperation.produced(new ExactTheoryEvidence(accepted, verifierOwnedEvidence.getClass()));
         } catch (RuntimeException | Error failure) {
             primary = failure;
             try { RetainedOperation.checkpoint(); }
@@ -71,6 +73,9 @@ public final class ExactTheoryEvidence implements de.regelsuche.retention.Retain
     }
 
     public Binding binding() { return binding; }
+
+    /** Process-local issuer identity of the capability presented to the installed verifier. */
+    public boolean issuedFrom(Class<?> type) { return issuerType == type; }
 
     @Override public boolean equals(Object other) {
         return other instanceof ExactTheoryEvidence evidence && binding.equals(evidence.binding);

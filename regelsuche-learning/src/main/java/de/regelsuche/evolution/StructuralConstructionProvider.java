@@ -34,6 +34,10 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
     @Override public Descriptor descriptor() { return descriptor; }
 
     @Override public Batch candidates(MoveState state, MoveContext context) {
+        if (operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER && state.searchDepth() != 0) {
+            // Its endpoint depends only on the polynomial, so equivalent later states add no candidates.
+            return new Batch(List.of(), TransformationWorkMetrics.ZERO, true);
+        }
         var source = CODEC.decodeExpression(state.expression());
         var generated = StructuralConstructionPrograms.generate(operation, source);
         long[] work = {generated.work()};
@@ -50,6 +54,7 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
                 || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_EXPANDED
                 || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_COMMON_FACTOR
                 || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR
+                || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER
             ? ExactPolynomialAnalysis.withProductWork(account) : new ExactPolynomialAnalysis(account);
         String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());
         var proofs = new ArrayList<Transformation>();
@@ -89,6 +94,11 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
     }
 
     TypedMoveSearch.Verifier verifier() {
+        switch (operation) {
+            case POLYNOMIAL_HORNER, POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED,
+                 POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR -> { return this::verifyPolynomial; }
+            default -> { }
+        }
         return (source, move, context) -> {
             var encoded = new MoveState(CODEC.encodeExpression(source.expression()), source.searchDepth(), source.primitiveDepth(),
                 source.previousRule(), source.assumptions(), source.capabilities(), source.complexityDebt());
@@ -99,6 +109,40 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
                 accepted ? List.of("construction-replayed:" + move.provenance().contentHash()) : List.of(),
                 accepted ? "EXACT_CONSTRUCTION_REPLAYED" : "CONSTRUCTION_REPLAY_REJECTED");
         };
+    }
+
+    private MoveVerifier.Verification verifyPolynomial(TypedMoveSearch.State source, SearchMove move,
+            TypedMoveSearch.Context context) {
+        long[] work = {1};
+        try {
+            if ((operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER && source.searchDepth() != 0)
+                    || !move.ruleId().equals(descriptor.id())
+                    || !(move.provenance() instanceof de.regelsuche.transform.TransformationProvenance.ExactTheoryStep theory)
+                    || !theory.evidence().issuedFrom(VerifiedConstruction.class)) {
+                return new MoveVerifier.Verification(false, work[0], List.of(), "CONSTRUCTION_REPLAY_REJECTED");
+            }
+            String encodedSource = CODEC.encodeExpression(source.expression());
+            move.requireSource(encodedSource);
+            String input = ExpressionFormatter.format(source.expression());
+            var target = CODEC.decodeExpression(move.targetExpression());
+            String output = ExpressionFormatter.format(target);
+            long initialProofWork = Math.addExact(output.length(), Math.addExact((long) move.targetExpression().length(), 1));
+            work[0] = Math.addExact(work[0], Math.addExact(input.length(), initialProofWork));
+            long before = work[0];
+            ExactPolynomialAnalysis.withProductWork(units -> work[0] = Math.addExact(work[0], units))
+                .requireEquivalent(input, output);
+            long bindingWork = Math.addExact(initialProofWork, work[0] - before);
+            var expected = new VerifiedConstruction(encodedSource, move.targetExpression(), descriptor.id(), bindingWork);
+            boolean accepted = theory.evidence().binding().equals(expected.binding())
+                && SearchMove.from(Transformation.exactTheory(theory.evidence()), descriptor, move.generationCost()).equals(move);
+            if (accepted) {
+                return new MoveVerifier.Verification(true, work[0], List.of("construction-replayed:" + move.provenance().contentHash()),
+                    "EXACT_CONSTRUCTION_REPLAYED");
+            }
+        } catch (IllegalArgumentException invalid) {
+            // Invalid endpoint or binding never issues a replay receipt.
+        }
+        return new MoveVerifier.Verification(false, work[0], List.of(), "CONSTRUCTION_REPLAY_REJECTED");
     }
 
     static final class VerifiedConstruction {

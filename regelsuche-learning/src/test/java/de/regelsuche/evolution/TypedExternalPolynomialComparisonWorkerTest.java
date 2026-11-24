@@ -48,6 +48,24 @@ class TypedExternalPolynomialComparisonWorkerTest {
         assertEquals(first.get("search"), second.get("search"));
         assertEquals(setup.get("modelHash"), second.get("modelHash"));
     }
+    @Test void hornerProfileUsesTheOrdinaryBudgetAndRetainsIndependentExactReplay() {
+        String profile = "POLYNOMIAL_HORNER_V1";
+        var worker = new TypedExternalPolynomialComparisonWorker();
+        var setup = worker.initialize(profile);
+        assertEquals(0L, setup.get("trainingWork"));
+        assertTrue(setup.get("model").toString().contains(profile));
+        for (String source : List.of("2*a*b*c+3*c*c-b*a*b*c+3*c*c-b",
+                "1+x/2-x*x/8+x*x*x/16-5*x*x*x*x/128", "7*x/5-13*x*x*x/25")) {
+            var result = worker.run(profile, source);
+            assertTrue((Long) result.get("outputCost") < (Long) result.get("inputCost"), result::toString);
+            assertEquals(true, result.get("internalWorkWithinBudget"), result::toString);
+            assertTrue((Long) result.get("selectedReplayWork") > 0);
+            assertTrue(result.get("witness").toString().contains("EXACT_CONSTRUCTION_REPLAYED"));
+            assertEquals(setup.get("modelHash"), result.get("modelHash"));
+            new de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis()
+                .requireEquivalent(source, (String) result.get("output"));
+        }
+    }
     @Test void rejectsLifecycleProfileSwitchAndTrainReuse() {
         var worker = new TypedExternalPolynomialComparisonWorker();
         assertThrows(IllegalStateException.class, () -> worker.run("BASE", "x+2"));
