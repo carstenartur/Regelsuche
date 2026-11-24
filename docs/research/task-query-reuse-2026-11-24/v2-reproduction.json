@@ -1,0 +1,32 @@
+{
+  "v2-query": {
+    "process": {
+      "command": [
+        "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java",
+        "-Xmx512m",
+        "-cp",
+        "/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-math-algorithms/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-solver-ir/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.23.0/jackson-datatype-jsr310-2.23.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:",
+        "de.regelsuche.evolution.TaskKnowledgeQueryComparison",
+        "/workspace/scratch/9d9b08d5e080/learning-evidence/query-reuse-v2/snapshots",
+        "3"
+      ],
+      "exitCode": 0,
+      "wallNanos": 6330307936,
+      "childUserSeconds": 15.892879,
+      "childSystemSeconds": 0.835398,
+      "childPeakRssKiB": 310692,
+      "scope": "single owned JVM including startup, shutdown and JSON output; excludes build and report extraction"
+    },
+    "reportSha256": "28445cbded1b4832ceece18e9c2e9a20bf624bd95e30d899e1798ff7afc0250d",
+    "stdoutSha256": "8c0e82a92ac44efafa6664807a457f1e9283a67b403775589e034b6f439b744f",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "runtime": {
+    "version": "[0.001s][warning][perf,memops] Cannot use file /tmp/hsperfdata_agent/6 because it is locked by another process (errno = 11)\nopenjdk 25.0.2 2026-01-20 LTS\nOpenJDK Runtime Environment Zulu25.32+21-CA (build 25.0.2+10-LTS)\nOpenJDK 64-Bit Server VM Zulu25.32+21-CA (build 25.0.2+10-LTS, mixed mode, sharing)\n",
+    "baseCommit": "e3c643a8dd866572aa3cb762d994fed9aacae676",
+    "worktree": "uncommitted v2 second-observation changes at measurement; v1 artifact bytes remain frozen",
+    "mainSourceAndPomSha256": "4abe72a08695b550c47c4965833e582496558d7bc0952bac062914c358aa7049",
+    "sourceFileCount": 2075,
+    "sourceHashAlgorithm": "SHA256 of sorted relative UTF-8 path, NUL, file bytes, NUL for every rg --files Java /src/main/ file and pom.xml"
+  }
+}

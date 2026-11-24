@@ -1,0 +1,1993 @@
+{
+  "blocks": 16,
+  "comparisons": [
+    {
+      "observedBothResourcePayback": true,
+      "observedCpuSavingsNanos": 1340000000,
+      "observedWallSavingsNanos": 505773065,
+      "qualityNonRegressing": true,
+      "repetition": 0
+    },
+    {
+      "observedBothResourcePayback": false,
+      "observedCpuSavingsNanos": -730000000,
+      "observedWallSavingsNanos": -243306853,
+      "qualityNonRegressing": true,
+      "repetition": 1
+    },
+    {
+      "observedBothResourcePayback": false,
+      "observedCpuSavingsNanos": -110000000,
+      "observedWallSavingsNanos": -70367484,
+      "qualityNonRegressing": true,
+      "repetition": 2
+    }
+  ],
+  "evaluation": [
+    {
+      "maximumNodes": 7,
+      "role": "shallow",
+      "source": "((r+t1)*(r-t1)+t1*t1)+53"
+    },
+    {
+      "maximumNodes": 9,
+      "role": "medium",
+      "source": "((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)+59"
+    },
+    {
+      "maximumNodes": 11,
+      "role": "deep",
+      "source": "((((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)+t3)*(((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)-t3)+t3*t3)+61"
+    },
+    {
+      "maximumNodes": 7,
+      "role": "compound-sum",
+      "source": "(((r+s)+t1)*((r+s)-t1)+t1*t1)+67"
+    },
+    {
+      "maximumNodes": 9,
+      "role": "compound-product",
+      "source": "(((((r*s)+t1)*((r*s)-t1)+t1*t1)+t2)*((((r*s)+t1)*((r*s)-t1)+t1*t1)-t2)+t2*t2)+71"
+    },
+    {
+      "maximumNodes": 9,
+      "role": "offset",
+      "source": "((((z+w1)*(z-w1)+w1*w1)+w2)*(((z+w1)*(z-w1)+w1*w1)-w2)+w2*w2)+73"
+    },
+    {
+      "maximumNodes": 1,
+      "role": "negative",
+      "source": "(r+s)*(r-s)+s*(s+3)"
+    },
+    {
+      "maximumNodes": 1,
+      "role": "already-solved",
+      "source": "3"
+    }
+  ],
+  "improvementCostScope": "IMPROVEMENT_RUN",
+  "informationRegime": "PUBLIC_PROSPECTIVE_WITHIN_FAMILY_ALPHA_POLYNOMIAL_DISJOINT",
+  "promotion": [
+    {
+      "maximumNodes": 7,
+      "role": "shallow",
+      "source": "((r+t1)*(r-t1)+t1*t1)+29"
+    },
+    {
+      "maximumNodes": 9,
+      "role": "medium",
+      "source": "((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)+31"
+    },
+    {
+      "maximumNodes": 11,
+      "role": "deep",
+      "source": "((((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)+t3)*(((((r+t1)*(r-t1)+t1*t1)+t2)*(((r+t1)*(r-t1)+t1*t1)-t2)+t2*t2)-t3)+t3*t3)+37"
+    },
+    {
+      "maximumNodes": 7,
+      "role": "compound-sum",
+      "source": "(((r+s)+t1)*((r+s)-t1)+t1*t1)+41"
+    },
+    {
+      "maximumNodes": 9,
+      "role": "compound-product",
+      "source": "(((((r*s)+t1)*((r*s)-t1)+t1*t1)+t2)*((((r*s)+t1)*((r*s)-t1)+t1*t1)-t2)+t2*t2)+43"
+    },
+    {
+      "maximumNodes": 9,
+      "role": "offset",
+      "source": "((((z+w1)*(z-w1)+w1*w1)+w2)*(((z+w1)*(z-w1)+w1*w1)-w2)+w2*w2)+47"
+    },
+    {
+      "maximumNodes": 1,
+      "role": "negative",
+      "source": "(r+s)*(r-s)+s*(s+2)"
+    },
+    {
+      "maximumNodes": 1,
+      "role": "already-solved",
+      "source": "2"
+    }
+  ],
+  "repetitions": 3,
+  "revision": "regelsuche.knowledge-mixed-workload/v2",
+  "separationWork": 12084,
+  "studyPaidBeforeSerialization": {
+    "cpuNanos": 12500000000,
+    "wallNanos": 4563392377
+  },
+  "arms": [
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": {
+            "formation": 202,
+            "lessons": 354,
+            "preparation": 462,
+            "restoration": 0,
+            "selection": 40,
+            "splitChecking": 406,
+            "validation": 2136
+          }
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": {
+            "formation": 477,
+            "lessons": 1026,
+            "preparation": 593,
+            "restoration": 0,
+            "selection": 42,
+            "splitChecking": 914,
+            "validation": 3886
+          }
+        }
+      ],
+      "activeId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 185794,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 3800000000,
+        "wallNanos": 1379434215
+      },
+      "profile": "PREPARED_REUSE",
+      "repetition": 0,
+      "seedId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "setupCost": {
+        "cpuNanos": 1200000000,
+        "wallNanos": 562089805
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": {
+            "formation": 202,
+            "lessons": 354,
+            "preparation": 462,
+            "restoration": 0,
+            "selection": 40,
+            "splitChecking": 406,
+            "validation": 2136
+          }
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": {
+            "formation": 477,
+            "lessons": 1026,
+            "preparation": 593,
+            "restoration": 0,
+            "selection": 42,
+            "splitChecking": 914,
+            "validation": 3886
+          }
+        }
+      ],
+      "activeId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "improvement": {
+        "accountingComplete": true,
+        "attempts": [
+          {
+            "accountingComplete": true,
+            "adoptionCost": {
+              "cpuNanos": 730000000,
+              "wallNanos": 266826372
+            },
+            "candidateId": "sha256:80ff91f48a45298cbaafa20838e89beba9107fdc08c60cbd5344ad619755fce6",
+            "decision": "NO_GAIN",
+            "failure": "",
+            "knownWork": 32634,
+            "learnerDecision": "PROMOTED",
+            "lessonGenerations": [
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75"
+            ],
+            "paid": {
+              "cpuNanos": 720000000,
+              "wallNanos": 264797268
+            },
+            "parentId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+            "trials": [
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2105036
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2398519
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2924686
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2649540
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 5898844
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 5626651
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 5450762
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3483610
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2850847
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2228228
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3600853
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2206045
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 462052
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 464805
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 86117
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 56714
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 15660396
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2134629
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 4385041
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2142962
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 5424804
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 5633141
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3304606
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 4783287
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 30000000,
+                    "wallNanos": 11041021
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 30000000,
+                    "wallNanos": 7951692
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 4379241
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3424743
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 706021
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 520017
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 56573
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 89993
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2273394
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 4241217
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3826055
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2200657
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 8333666
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 5105573
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 15572888
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3933543
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 4158125
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3705407
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 5104281
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2991404
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 742535
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 735505
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 116221
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 334784
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              }
+            ]
+          },
+          {
+            "accountingComplete": true,
+            "adoptionCost": {
+              "cpuNanos": 770000000,
+              "wallNanos": 280773139
+            },
+            "candidateId": "",
+            "decision": "NO_CANDIDATE",
+            "failure": "",
+            "knownWork": 3623,
+            "learnerDecision": "NO_NEW_SCHEMA",
+            "lessonGenerations": [
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75"
+            ],
+            "paid": {
+              "cpuNanos": 30000000,
+              "wallNanos": 12512101
+            },
+            "parentId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+            "trials": []
+          }
+        ],
+        "budgetExhausted": false,
+        "knownWork": 36257,
+        "paid": {
+          "cpuNanos": 770000000,
+          "wallNanos": 280783595
+        }
+      },
+      "knownWork": 225883,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 2460000000,
+        "wallNanos": 873661150
+      },
+      "profile": "MIXED_MEASURED_IMPROVEMENT",
+      "repetition": 0,
+      "seedId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "setupCost": {
+        "cpuNanos": 1060000000,
+        "wallNanos": 369981302
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": {
+            "formation": 202,
+            "lessons": 354,
+            "preparation": 462,
+            "restoration": 0,
+            "selection": 40,
+            "splitChecking": 406,
+            "validation": 2136
+          }
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": {
+            "formation": 477,
+            "lessons": 1026,
+            "preparation": 593,
+            "restoration": 0,
+            "selection": 42,
+            "splitChecking": 914,
+            "validation": 3886
+          }
+        }
+      ],
+      "activeId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "improvement": {
+        "accountingComplete": true,
+        "attempts": [
+          {
+            "accountingComplete": true,
+            "adoptionCost": {
+              "cpuNanos": 500000000,
+              "wallNanos": 177572400
+            },
+            "candidateId": "sha256:80ff91f48a45298cbaafa20838e89beba9107fdc08c60cbd5344ad619755fce6",
+            "decision": "NO_GAIN",
+            "failure": "",
+            "knownWork": 32634,
+            "learnerDecision": "PROMOTED",
+            "lessonGenerations": [
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75"
+            ],
+            "paid": {
+              "cpuNanos": 490000000,
+              "wallNanos": 176336356
+            },
+            "parentId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+            "trials": [
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1869909
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2395034
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1552791
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1903529
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 3045974
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2998685
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1796881
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1390763
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 1802460
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1244025
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1874876
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1140824
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 254526
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 284309
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 943081
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 43144
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1464070
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1328420
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1934084
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1102337
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 4607409
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 3017182
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1440495
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1827907
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2683489
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1413135
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2517414
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1001287
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 427751
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 296478
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 30976
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 46719
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3036380
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2711310
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1644997
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1237356
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 4454653
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 2788404
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2859930
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1411042
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2161159
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1228823
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1486814
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1124709
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 254456
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 334904
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 43264
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 29304
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              }
+            ]
+          },
+          {
+            "accountingComplete": true,
+            "adoptionCost": {
+              "cpuNanos": 510000000,
+              "wallNanos": 181371014
+            },
+            "candidateId": "",
+            "decision": "NO_CANDIDATE",
+            "failure": "",
+            "knownWork": 3623,
+            "learnerDecision": "NO_NEW_SCHEMA",
+            "lessonGenerations": [
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75"
+            ],
+            "paid": {
+              "cpuNanos": 10000000,
+              "wallNanos": 3779446
+            },
+            "parentId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+            "trials": []
+          }
+        ],
+        "budgetExhausted": false,
+        "knownWork": 36257,
+        "paid": {
+          "cpuNanos": 510000000,
+          "wallNanos": 181378495
+        }
+      },
+      "knownWork": 225883,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1750000000,
+        "wallNanos": 577537225
+      },
+      "profile": "MIXED_MEASURED_IMPROVEMENT",
+      "repetition": 1,
+      "seedId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "setupCost": {
+        "cpuNanos": 750000000,
+        "wallNanos": 260055209
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": {
+            "formation": 202,
+            "lessons": 354,
+            "preparation": 462,
+            "restoration": 0,
+            "selection": 40,
+            "splitChecking": 406,
+            "validation": 2136
+          }
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": {
+            "formation": 477,
+            "lessons": 1026,
+            "preparation": 593,
+            "restoration": 0,
+            "selection": 42,
+            "splitChecking": 914,
+            "validation": 3886
+          }
+        }
+      ],
+      "activeId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 185794,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1020000000,
+        "wallNanos": 334230372
+      },
+      "profile": "PREPARED_REUSE",
+      "repetition": 1,
+      "seedId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "setupCost": {
+        "cpuNanos": 190000000,
+        "wallNanos": 62869542
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": {
+            "formation": 202,
+            "lessons": 354,
+            "preparation": 462,
+            "restoration": 0,
+            "selection": 40,
+            "splitChecking": 406,
+            "validation": 2136
+          }
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": {
+            "formation": 477,
+            "lessons": 1026,
+            "preparation": 593,
+            "restoration": 0,
+            "selection": 42,
+            "splitChecking": 914,
+            "validation": 3886
+          }
+        }
+      ],
+      "activeId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 185794,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1210000000,
+        "wallNanos": 366114576
+      },
+      "profile": "PREPARED_REUSE",
+      "repetition": 2,
+      "seedId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "setupCost": {
+        "cpuNanos": 200000000,
+        "wallNanos": 58254582
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": {
+            "formation": 202,
+            "lessons": 354,
+            "preparation": 462,
+            "restoration": 0,
+            "selection": 40,
+            "splitChecking": 406,
+            "validation": 2136
+          }
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": {
+            "formation": 477,
+            "lessons": 1026,
+            "preparation": 593,
+            "restoration": 0,
+            "selection": 42,
+            "splitChecking": 914,
+            "validation": 3886
+          }
+        }
+      ],
+      "activeId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "improvement": {
+        "accountingComplete": true,
+        "attempts": [
+          {
+            "accountingComplete": true,
+            "adoptionCost": {
+              "cpuNanos": 490000000,
+              "wallNanos": 145392049
+            },
+            "candidateId": "sha256:80ff91f48a45298cbaafa20838e89beba9107fdc08c60cbd5344ad619755fce6",
+            "decision": "NO_GAIN",
+            "failure": "",
+            "knownWork": 32634,
+            "learnerDecision": "PROMOTED",
+            "lessonGenerations": [
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75"
+            ],
+            "paid": {
+              "cpuNanos": 460000000,
+              "wallNanos": 137054177
+            },
+            "parentId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+            "trials": [
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1012363
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1349852
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1181303
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1353947
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2142621
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2408043
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1952801
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1456920
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1634372
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 861481
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1207352
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1121304
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 169760
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 176380
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 18057
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 8894
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1441116
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 3600472
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2961329
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 896383
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2571214
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2139627
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1091370
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1274761
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1926372
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1003991
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1212289
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 658532
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 779440
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 196149
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 9714
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 19579
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 4840442
+                  },
+                  "score": 5,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1041076
+                  },
+                  "score": 5,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 1378323
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 752800
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 10000000,
+                    "wallNanos": 2099768
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 2096974
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1129967
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 949341
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 20000000,
+                    "wallNanos": 1294600
+                  },
+                  "score": 9,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1248362
+                  },
+                  "score": 9,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 1102026
+                  },
+                  "score": 7,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 725720
+                  },
+                  "score": 7,
+                  "solved": true
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 143823
+                  },
+                  "score": 13,
+                  "solved": false
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 166926
+                  },
+                  "score": 13,
+                  "solved": false
+                }
+              },
+              {
+                "candidate": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 13860
+                  },
+                  "score": 1,
+                  "solved": true
+                },
+                "previous": {
+                  "complete": true,
+                  "cost": {
+                    "cpuNanos": 0,
+                    "wallNanos": 8352
+                  },
+                  "score": 1,
+                  "solved": true
+                }
+              }
+            ]
+          },
+          {
+            "accountingComplete": true,
+            "adoptionCost": {
+              "cpuNanos": 510000000,
+              "wallNanos": 149962072
+            },
+            "candidateId": "",
+            "decision": "NO_CANDIDATE",
+            "failure": "",
+            "knownWork": 3623,
+            "learnerDecision": "NO_NEW_SCHEMA",
+            "lessonGenerations": [
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+              "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75"
+            ],
+            "paid": {
+              "cpuNanos": 20000000,
+              "wallNanos": 4552817
+            },
+            "parentId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+            "trials": []
+          }
+        ],
+        "budgetExhausted": false,
+        "knownWork": 36257,
+        "paid": {
+          "cpuNanos": 510000000,
+          "wallNanos": 149969773
+        }
+      },
+      "knownWork": 225883,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1320000000,
+        "wallNanos": 436482060
+      },
+      "profile": "MIXED_MEASURED_IMPROVEMENT",
+      "repetition": 2,
+      "seedId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "setupCost": {
+        "cpuNanos": 710000000,
+        "wallNanos": 214501097
+      }
+    }
+  ]
+}

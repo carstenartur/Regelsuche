@@ -1,0 +1,75 @@
+{
+  "v1-query": {
+    "process": {
+      "command": [
+        "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java",
+        "-Xmx512m",
+        "-cp",
+        "/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-math-algorithms/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-solver-ir/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.23.0/jackson-datatype-jsr310-2.23.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:",
+        "de.regelsuche.evolution.TaskKnowledgeQueryComparison",
+        "/workspace/scratch/9d9b08d5e080/learning-evidence/query-reuse-v1/snapshots",
+        "3"
+      ],
+      "exitCode": 0,
+      "wallNanos": 10953704872,
+      "childUserSeconds": 18.145637,
+      "childSystemSeconds": 0.5671849999999999,
+      "childPeakRssKiB": 299880,
+      "scope": "owned JVM including startup, shutdown and JSON output; excludes build and report extraction",
+      "rssScope": "maximum child RSS in this supervisor, cumulative across its children"
+    },
+    "reportSha256": "6fe69d3cd98559b113adc3214ff66193bedfadb36a55ced4fe653126e088e0b9",
+    "stdoutSha256": "40d2fdf026e25467d17de7abad646674b7ab5f6067b287dbf5ac6810da6ff284"
+  },
+  "mixed-v2-before": {
+    "process": {
+      "command": [
+        "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java",
+        "-Xmx512m",
+        "-cp",
+        "/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-math-algorithms/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-solver-ir/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.23.0/jackson-datatype-jsr310-2.23.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:",
+        "de.regelsuche.evolution.MixedTaskKnowledgeStudy",
+        "/workspace/scratch/9d9b08d5e080/learning-evidence/baseline-mixed-v2-r1/snapshots",
+        "16",
+        "3"
+      ],
+      "exitCode": 0,
+      "wallNanos": 5638014658,
+      "childUserSeconds": 11.365207999999999,
+      "childSystemSeconds": 0.620308,
+      "childPeakRssKiB": 264448,
+      "scope": "single owned JVM including startup, shutdown and JSON output; excludes build"
+    },
+    "reportSha256": "a39d62b89421fbddd6973b1c5aae2e7ebef80bbfd59eb4498560c81b0e917ed2",
+    "stdoutSha256": "a5d353607f1f6f8d4b749eafc8a3e822987ddf404f1e26cb2a32a6e10f074bea"
+  },
+  "mixed-v2-after": {
+    "process": {
+      "command": [
+        "/workspace/scratch/65d7b6be9bfb/build-tools/jdk25/bin/java",
+        "-Xmx512m",
+        "-cp",
+        "/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/test-classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-learning/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-core/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.23/jackson-annotations-2.23.jar:/home/agent/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.23.0/jackson-dataformat-yaml-2.23.0.jar:/home/agent/.m2/repository/org/yaml/snakeyaml/2.5/snakeyaml-2.5.jar:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-search/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-egraph/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-validation/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-math-algorithms/target/classes:/workspace/scratch/9d9b08d5e080/regelsuche-learning-fix/regelsuche-solver-ir/target/classes:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.23.0/jackson-databind-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.23.0/jackson-core-2.23.0.jar:/home/agent/.m2/repository/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.23.0/jackson-datatype-jsr310-2.23.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter/6.1.3/junit-jupiter-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-api/6.1.3/junit-jupiter-api-6.1.3.jar:/home/agent/.m2/repository/org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-commons/6.1.3/junit-platform-commons-6.1.3.jar:/home/agent/.m2/repository/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar:/home/agent/.m2/repository/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-params/6.1.3/junit-jupiter-params-6.1.3.jar:/home/agent/.m2/repository/org/junit/jupiter/junit-jupiter-engine/6.1.3/junit-jupiter-engine-6.1.3.jar:/home/agent/.m2/repository/org/junit/platform/junit-platform-engine/6.1.3/junit-platform-engine-6.1.3.jar:",
+        "de.regelsuche.evolution.MixedTaskKnowledgeStudy",
+        "/workspace/scratch/9d9b08d5e080/learning-evidence/after-mixed-v2/snapshots",
+        "16",
+        "3"
+      ],
+      "exitCode": 0,
+      "wallNanos": 4823559553,
+      "childUserSeconds": 12.495231999999998,
+      "childSystemSeconds": 0.35723400000000005,
+      "childPeakRssKiB": 299880,
+      "scope": "owned JVM including startup, shutdown and JSON output; excludes build and report extraction",
+      "rssScope": "maximum child RSS in this supervisor, cumulative across its children"
+    },
+    "reportSha256": "7199d3cc887629c198e6e343dbcf1efefd1724d391d174d9e329337458992710",
+    "stdoutSha256": "7199d3cc887629c198e6e343dbcf1efefd1724d391d174d9e329337458992710"
+  },
+  "runtime": {
+    "version": "[0.001s][warning][perf,memops] Cannot use file /tmp/hsperfdata_agent/6 because it is locked by another process (errno = 11)\nopenjdk 25.0.2 2026-01-20 LTS\nOpenJDK Runtime Environment Zulu25.32+21-CA (build 25.0.2+10-LTS)\nOpenJDK 64-Bit Server VM Zulu25.32+21-CA (build 25.0.2+10-LTS, mixed mode, sharing)\n",
+    "baseCommit": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+    "worktree": "source additions and diff at measurement, before v2 follow-up",
+    "mainSourceAndPomSha256": "8e46c0162161431b087eee458f55aad2ce5d951b5a78fb82464ec3d0e4513abe"
+  }
+}
