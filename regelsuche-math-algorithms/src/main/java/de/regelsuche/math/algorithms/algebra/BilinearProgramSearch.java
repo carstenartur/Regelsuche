@@ -2,6 +2,7 @@ package de.regelsuche.math.algorithms.algebra;
 
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Result;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Tensor;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Witness;
 import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
@@ -15,15 +16,16 @@ public final class BilinearProgramSearch {
     private BilinearProgramSearch() {}
 
     public static Result<Witness> search(Request request, IterationLimits limits, BooleanSupplier cancellation) {
-        return BilinearProgram.run(limits, cancellation, work -> find(request, work));
+        return BilinearProgram.run(limits, cancellation, work -> find(request, 0, 0, work));
     }
 
-    private static Witness find(Request request, CertificateWork work) {
-        long sourceCells = request.checkInputs(work);
+    static Witness find(Request request, int minimumRank, long additionalRetained, CertificateWork work) {
+        long sourceCells = request.checkInputs(work) + additionalRetained;
+        work.cells(sourceCells);
         long pairs = (long) request.leftForms().size() * request.rightForms().size();
         int dimension = request.tensor().outputs().getFirst().size();
         int maximum = (int) Math.min(pairs, Math.min(dimension, request.maximumProducts()));
-        for (int rank = 0; rank <= maximum; rank++) {
+        for (int rank = minimumRank; rank <= maximum; rank++) {
             work.cells(sourceCells + rank);
             long[] subset = new long[rank];
             for (int i = 0; i < rank; i++) {
@@ -59,20 +61,48 @@ public final class BilinearProgramSearch {
 
     private static BilinearProgram solve(Request request, long[] subset, long sourceCells, CertificateWork work) {
         int rank = subset.length;
-        var tensor = request.tensor();
-        int rows = tensor.outputs().getFirst().size();
-        int outputs = tensor.outputs().size();
-        long retained = sourceCells + 3L * rank + rows * (1L + rank + outputs);
-        work.cells(retained);
-        var matrix = new ExactRational[rows][rank + outputs];
+        work.cells(sourceCells + 3L * rank);
         var left = new ArrayList<List<ExactRational>>(rank);
         var right = new ArrayList<List<ExactRational>>(rank);
+        int rightCount = request.rightForms().size();
+        for (long index : subset) {
+            work.charge(1);
+            left.add(request.leftForms().get((int) (index / rightCount)));
+            right.add(request.rightForms().get((int) (index % rightCount)));
+        }
+        return solveWeights(request.tensor(), left, right, sourceCells + 3L * rank, work);
+    }
+
+    /** Refit output weights to an ordered list of independent paired forms. */
+    static BilinearProgram fitProducts(Tensor tensor, List<List<ExactRational>> left,
+                                       List<List<ExactRational>> right, long additionalRetained,
+                                       CertificateWork work) {
+        int rank = left.size();
+        if (rank != right.size() || rank > tensor.outputs().getFirst().size()) return null;
+        long cells = additionalRetained + BilinearProgram.matrixCells(tensor.outputs())
+            + rank * (2L + tensor.leftSize() + tensor.rightSize());
+        work.cells(cells);
+        for (int i = 0; i < rank; i++) {
+            work.charge(1);
+            if (left.get(i).size() != tensor.leftSize() || right.get(i).size() != tensor.rightSize()) return null;
+        }
+        BilinearProgram.checkEntries(left, work);
+        BilinearProgram.checkEntries(right, work);
+        BilinearProgram.checkEntries(tensor.outputs(), work);
+        return solveWeights(tensor, left, right, cells, work);
+    }
+
+    private static BilinearProgram solveWeights(Tensor tensor, List<List<ExactRational>> left,
+            List<List<ExactRational>> right, long sourceCells, CertificateWork work) {
+        int rank = left.size();
+        int rows = tensor.outputs().getFirst().size();
+        int outputs = tensor.outputs().size();
+        long retained = sourceCells + rows * (1L + rank + outputs);
+        work.cells(retained);
+        var matrix = new ExactRational[rows][rank + outputs];
         for (int column = 0; column < rank; column++) {
-            int rightCount = request.rightForms().size();
-            var u = request.leftForms().get((int) (subset[column] / rightCount));
-            var v = request.rightForms().get((int) (subset[column] % rightCount));
-            left.add(u);
-            right.add(v);
+            var u = left.get(column);
+            var v = right.get(column);
             for (int i = 0; i < u.size(); i++) {
                 for (int j = 0; j < v.size(); j++) {
                     matrix[i * v.size() + j][column] = work.mul(u.get(i), v.get(j));
@@ -87,14 +117,16 @@ public final class BilinearProgramSearch {
             }
         }
         if (!reduce(matrix, rank, work)) return null;
-        work.cells(retained + (long) outputs * (1L + rank));
+        work.cells(retained + (long) outputs * (2L + rank) + 3L * rank + 1);
         var weights = new ArrayList<List<ExactRational>>(outputs);
         for (int k = 0; k < outputs; k++) {
             work.charge(1L + rank);
             var output = new ArrayList<ExactRational>(rank);
             for (int i = 0; i < rank; i++) output.add(matrix[i][rank + k]);
-            weights.add(output);
+            work.charge(rank);
+            weights.add(List.copyOf(output));
         }
+        work.charge(2L * rank + outputs);
         return new BilinearProgram(left, right, weights);
     }
 

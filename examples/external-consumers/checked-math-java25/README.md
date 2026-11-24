@@ -40,10 +40,10 @@ Run that Java command inside this project. Windows uses `;` instead of `:`.
 
 | Program | Result checked by the example tests |
 | --- | --- |
-| `FiniteConstraintCount` | Counts `5`, `1`, `4` for all, true-conditioned and false-conditioned assignments |
+| `FiniteConstraintCount` | Counts `5`, `1`, `4` for all, true-conditioned and false-conditioned assignments. On a 20-leaf star, minimum degree verifies `1,048,577` within the same budget at which ascending order hits the table limit. |
 | `EnergyCredits` | Credits `(2,0)` and selected Max edge `0` |
 | `SosPotential` | `V=x²`, minimum decrease `1` on the supplied active domain `x>=1` |
-| `BilinearSearch` | Three variable products, convolution `[8,22,15]` |
+| `BilinearSearch` | Search with supplied forms and discovery from coefficients alone. Joint replay of the lower and upper bounds proves three rational bilinear products suffice and are necessary. Evaluating the discovered plan gives `[8,22,15]`. |
 | `RationalMatrixFormula` | Original inverse remains undefined on singular `X`; defined value `[2,1,0,3]` |
 | `DynamicQuotient` | Undefined modulo `T-1`, value `2` modulo `T+1`, with checked factor coverage |
 

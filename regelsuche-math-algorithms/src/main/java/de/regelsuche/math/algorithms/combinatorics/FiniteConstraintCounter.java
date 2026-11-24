@@ -65,7 +65,14 @@ public final class FiniteConstraintCounter {
             String reason, long work) {}
 
     public static Result count(Problem problem, IterationLimits limits, BooleanSupplier cancellation) {
+        return count(problem, FiniteConstraintPlanner.Strategy.MIN_DEGREE, limits, cancellation);
+    }
+
+    /** Count in the selected order, including planning and independent replay in the work budget. */
+    public static Result count(Problem problem, FiniteConstraintPlanner.Strategy strategy,
+            IterationLimits limits, BooleanSupplier cancellation) {
         Objects.requireNonNull(problem);
+        Objects.requireNonNull(strategy);
         var work = new CertificateWork(limits, cancellation);
         try {
             long retained = FiniteConstraintSupport.inspect(problem, work);
@@ -73,7 +80,7 @@ public final class FiniteConstraintCounter {
             var history = new ArrayList<Factor>();
             retained = condition(problem, active, history, retained, work);
             var steps = new ArrayList<Step>();
-            retained = eliminate(problem, active, history, steps, retained, work);
+            retained = eliminate(problem, active, history, steps, strategy, retained, work);
             BigInteger total = BigInteger.ONE;
             for (Factor factor : active.values()) total = FiniteConstraintSupport.multiply(total, factor.values().get(0), work);
             Optional<Map<Integer, Boolean>> witness = findWitness(problem, total, history, steps, retained, work);
@@ -125,10 +132,16 @@ public final class FiniteConstraintCounter {
     }
 
     private static long eliminate(Problem problem, Map<Integer, Factor> active, List<Factor> history,
-            List<Step> steps, long retained, CertificateWork work) {
-        // Stable ascending order makes the exact certificate deterministic. Width is explicitly bounded.
-        for (int variable = 0; variable < problem.variableCount(); variable++) {
+            List<Step> steps, FiniteConstraintPlanner.Strategy strategy, long retained, CertificateWork work) {
+        // The historical order needs no auxiliary graph or order array.
+        int[] order = strategy == FiniteConstraintPlanner.Strategy.ASCENDING ? null
+            : FiniteConstraintPlanner.order(problem, active.values(), strategy, retained, work);
+        int variables = order == null ? problem.variableCount() : order.length;
+        long orderCells = order == null ? 0 : order.length;
+        retained += orderCells;
+        for (int position = 0; position < variables; position++) {
             work.charge(1);
+            int variable = order == null ? position : order[position];
             if (problem.fixed().containsKey(variable)) continue;
             var inputs = new ArrayList<Integer>();
             var union = new TreeSet<Integer>();
@@ -147,7 +160,7 @@ public final class FiniteConstraintCounter {
             steps.add(new Step(variable, inputs, output));
             work.charge(0);
         }
-        return retained;
+        return retained - orderCells;
     }
 
     private static void collectInputs(int variable, Map<Integer, Factor> active, List<Integer> inputs,

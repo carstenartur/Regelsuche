@@ -116,6 +116,23 @@ Der [Verfügbarkeitsstand](../mathematical-capabilities.md) ordnet die implement
 Verfahren dem aktuellen Checkout, dem veröffentlichten SDK und den Demos zu.
 Die Ergänzungen sind durch die [Umsetzungsspezifikation](../superpowers/specs/2026-11-20-exact-certificates-and-demos.md) begrenzt.
 
+## Ergänzung vom 24. November 2026
+
+Der [Folgestand `f570285`](https://github.com/openai/math/commit/f5702854040e97fa7675c21ba37a9608f5f92dd3)
+ergänzt Familie 379. Die [Lean-Dokumentation](https://github.com/openai/math/blob/f5702854040e97fa7675c21ba37a9608f5f92dd3/lean/docs/379.md)
+beschreibt die superpolynomielle Schranke für exakte arithmetische Schaltkreise. Rangargumente für
+begrenzte bilineare Programme lassen sich direkt durch exakte lineare Algebra prüfen. Die
+[automatische Formensuche](bilinear-program-search.md) benötigt eine Koeffiziententabelle und
+ein Produktbudget. Ober- und Untergrenze werden gegen die Eingabe geprüft. Ein gelerntes
+Produktpaar-Schema kann neue Ausgabegewichte erhalten. Der [Vergleich](../../research/benchmarks/bilinear-form-transfer/product-reuse.md)
+enthält auch einen fest vorgegebenen Satz von Produkten als Kontrolle.
+
+Für die lokale Tabellendarstellung aus Familie 378 bestimmt der [Zählplaner](finite-constraint-counting.md)
+die Eliminationsfolge aus dem Faktorgraphen. Eine auf früheren Aufgaben trainierte Strategieauswahl
+wird auf zurückgehaltenen Konfigurationsmodellen einschließlich Erwerbsaufwand verglichen.
+Die [Messung](../../research/benchmarks/constraint-planning-transfer/README.md) enthält den
+unabhängig bestätigten axTLS-Zählwert, feste heuristische Kontrollen und deren Grenzen.
+
 ## Verbraucher und Abschlusskriterien
 
 Die [akzeptierte Umsetzung](../superpowers/plans/2026-11-20-mathematical-transfer.md)

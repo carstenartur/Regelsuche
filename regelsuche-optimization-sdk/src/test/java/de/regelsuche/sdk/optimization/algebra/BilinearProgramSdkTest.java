@@ -25,4 +25,20 @@ class BilinearProgramSdkTest {
         assertEquals(BilinearProgram.Status.INCONCLUSIVE,
             BilinearProgramSdk.search(request, budget, () -> true).status());
     }
+
+    @Test void discoversFromSourceAndReplaysBothCertificates() {
+        var one = List.of(ExactRational.ONE);
+        var tensor = new BilinearProgram.Tensor(1,1,List.of(one));
+        var budget = OptimizationBudget.DEFAULT;
+        var found = BilinearProgramSdk.discover(tensor, 1, budget, CancellationToken.NONE).value().orElseThrow();
+        assertEquals(found.witness().cost(), BilinearProgramSdk.verify(found.request(), found.witness().program(),
+            budget, CancellationToken.NONE).value().orElseThrow());
+        assertEquals(found.lowerBound(), BilinearProgramSdk.computeRankBound(tensor, budget,
+            CancellationToken.NONE).value().orElseThrow());
+        assertEquals(1, BilinearProgramSdk.verifyRankBound(tensor, found.lowerBound(), budget,
+            CancellationToken.NONE).value().orElseThrow());
+        assertTrue(BilinearProgramSdk.certifyProductBounds(found.request(), found.witness().program(),
+            found.lowerBound(), budget, CancellationToken.NONE).value().orElseThrow().productOptimal());
+        assertEquals("CANCELLED", BilinearProgramSdk.discover(tensor, 1, budget, () -> true).reason());
+    }
 }
