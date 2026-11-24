@@ -83,6 +83,11 @@ public final class OrderedReductionSdk {
         return plan.evaluateWindows(rows, width, limits(budget), cancellation::isCancelled);
     }
 
+    public static OrderedReductionPlan.Evaluation evaluatePrefixes(OrderedReductionPlan.Verified plan,
+            List<? extends List<BigInteger>> rows, OptimizationBudget budget, CancellationToken cancellation) {
+        return plan.evaluatePrefixes(rows, limits(budget), cancellation::isCancelled);
+    }
+
     private static IterationLimits limits(OptimizationBudget budget) {
         return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());
     }

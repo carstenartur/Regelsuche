@@ -12,8 +12,25 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class OrderedReductionSdkTest {
+    @Test
+    void derivesVerifiesAndEvaluatesUnaryPrefixesThroughTheSdk() {
+        var scope = new SymbolScope();
+        var source = new OrderedReduction(List.of(List.of(scope.declare("x"))), List.of(),
+            SymbolicExpression.parse("x*x", scope).expression());
+        var budget = OptimizationBudget.DEFAULT;
+        var found = OrderedReductionSdk.search(source, budget, CancellationToken.NONE).verified().orElseThrow();
+        var checked = OrderedReductionSdk.verify(source, found.plan(), false, budget,
+            CancellationToken.NONE).verified().orElseThrow();
+        assertEquals(List.of(BigInteger.valueOf(4), BigInteger.valueOf(13), BigInteger.valueOf(29)),
+            OrderedReductionSdk.evaluatePrefixes(checked, List.of(row(2), row(-3), row(4)), budget,
+                CancellationToken.NONE).sums());
+        assertThrows(IllegalArgumentException.class, () -> OrderedReductionSdk.evaluatePrefixes(checked,
+            List.of(row(2)), budget, () -> true));
+    }
+
     @Test
     void checksPreparesAndUpdatesAnOrderedSumThroughTheSdk() {
         var scope = new SymbolScope();

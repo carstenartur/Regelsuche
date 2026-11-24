@@ -48,6 +48,7 @@ public record OrderedBlockReductionPlan(OrderedReductionPlan reduction, List<Lis
     record Layout(List<List<Split>> statistics, List<WeightedSplit> pairTotal, List<WeightedSplit> total) {}
 
     static void checkSource(OrderedReduction source, Work work) {
+        if (source.slots().size() < 2) throw new Unavailable("POINT_UPDATES_REQUIRE_MULTIPLE_SLOTS");
         for (var restriction : source.restrictions()) {
             work.charge(1);
             if (restriction != All.ROWS) throw new Unavailable("POINT_UPDATES_REQUIRE_UNRESTRICTED_ROWS");

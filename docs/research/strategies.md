@@ -314,6 +314,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`CounterStateSynthesis.java`](../../regelsuche-search/src/main/java/de/regelsuche/search/incremental/CounterStateSynthesis.java#L13) <!-- strategy-code: regelsuche-search/src/main/java/de/regelsuche/search/incremental/CounterStateSynthesis.java | public final class CounterStateSynthesis { -->
 - [`CounterStateSynthesisTest.java`](../../regelsuche-search/src/test/java/de/regelsuche/search/incremental/CounterStateSynthesisTest.java#L9) <!-- strategy-code: regelsuche-search/src/test/java/de/regelsuche/search/incremental/CounterStateSynthesisTest.java | class CounterStateSynthesisTest { -->
 
+## Präfixpläne gegenüber dem originalen Polyhedral-Compiler
+
+- **Hypothese.** Die vorhandene geprüfte Reduktionssynthese kann unveränderte fremde Präfixquellen übernehmen und gegen das originale Compilerartefakt geprüft werden.
+- **Umsetzungsstand.** Geordnete Reduktionen erlauben eine bis acht Bindungen; der generische Präfixpfad ist über das SDK verfügbar. Der enge Alpha-Importer übernimmt Quelle und Bereiche, validiert Zugriffe vor der Umbenennung und weist undefinierte leere Alpha-Reduktionen zurück. Der Archivaudit bindet Ergebnisse an native Antworten, C-stdout und das Quellorakel.
+- **Befund.** Das vollständige fremde Inventar enthält sieben Programme. Für das unveränderte `prefix_sum` liefern beide Originalausführungen auf zwölf Folgen dieselben 99 Werte. Sechs weitere fremde Quellen bleiben am nativen Import unsupported. Drei Projektkontrollen stehen getrennt; Originalfrontendfehler gelten nicht als native Suchsiege. [Protokoll, Originalartefakt, Rohdaten und Reproduktion](external-polyhedral-v1/README.md)
+- **Folgerung.** Der gemeinsame Fall belegt eine konkrete Fremdquellenintegration. Er begründet keine allgemeine Compilerabdeckung, Laufzeitüberlegenheit oder Neuheit der Präfixaggregation. Breitere fremde Anwendungen und unabhängige Replikation bleiben erforderlich.
+
+- [`ExternalPolyhedralComparison.java`](../../regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ExternalPolyhedralComparison.java#L33) <!-- strategy-code: regelsuche-experiments/src/main/java/de/regelsuche/benchmark/ExternalPolyhedralComparison.java | public final class ExternalPolyhedralComparison { -->
+- [`OrderedReductionPrefixTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedReductionPrefixTest.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/iteration/OrderedReductionPrefixTest.java | class OrderedReductionPrefixTest { -->
+
 ## Blockzustände für Punktänderungen an geordneten Summen
 
 - **Hypothese.** Aus der Abhängigkeit zwischen zwei Teilblöcken lassen sich die nötigen Zustandsgrößen ableiten und bei einzelnen Wertänderungen zusammenführen.
