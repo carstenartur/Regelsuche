@@ -507,10 +507,14 @@ def account_sequence(protocol: dict, sequence: dict) -> dict:
                         and all(row['judgment']['valid'] for row in rows)}
 
 
+def _sequence_id(profile, length, repetition):
+    return f'{profile}.n{length}.r{repetition}'
+
+
 def run_sequence(protocol, profile, length, repetition, command, output):
     """Execute a full fresh lifecycle; never multiply a measured short run."""
     started, controller = time.perf_counter_ns(), time.process_time_ns()
-    name = f'{profile}.n{length}.r{repetition}'
+    name = _sequence_id(profile, length, repetition)
     sequence = {'id': name, 'profile': profile, 'length': length, 'repetition': repetition,
                 'configuredQueryWorkBudget': protocol['workBudget'], 'command': command, 'phases': {}, 'rows': [],
                 'processes': [], 'errors': []}
@@ -757,6 +761,8 @@ def verify_model_lifecycle(output: Path, sequence: dict):
     original records and cannot authorize a later completed phase.
     """
     profile, phases = sequence['profile'], sequence['phases']
+    _require(sequence['id'] == _sequence_id(profile, sequence['length'], sequence['repetition']),
+             'sequence identity mismatch')
     if profile.startswith('SYMPY_'):
         return None
     ordered = ('training', 'modelPersistence', 'modelLoad', 'restore')
