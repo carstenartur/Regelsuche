@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,8 +18,8 @@ class MavenGitFreeFullLifecycleContractTest {
         "      - name: Prepare the exact Git-free source archive";
     private static final String STEP =
         "      - name: Reproduce full Maven lifecycle from a Git-free source archive";
-    private static final String NEXT =
-        "  external-polynomial-comparison:";
+    private static final String JOB = "  maven-git-free-verification:";
+    private static final Pattern JOB_HEADER = Pattern.compile("(?m)^  [a-zA-Z_][a-zA-Z0-9_-]*:[ \\t]*$");
     private static final String ARCHIVE_ROOT = "${{ steps.source_archive.outputs.root }}";
     private static final String FULL_COMMAND =
         "mvn --batch-mode --no-transfer-progress -Pfull verify";
@@ -32,9 +33,13 @@ class MavenGitFreeFullLifecycleContractTest {
 
     @Test
     void gitFreeRunRetainsItsOwnRawReportsEvenAfterFailure() throws IOException {
-        String workflow = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/gradle.yml"));
-        String step = workflow.substring(workflow.indexOf(STEP), workflow.indexOf(NEXT));
-        String preparation = workflow.substring(workflow.indexOf(PREPARE), workflow.indexOf(STEP));
+        String workflow = gitFreeJob(Files.readString(MavenPomTestSupport.repositoryRoot()
+            .resolve(".github/workflows/gradle.yml")));
+        int start = workflow.indexOf(STEP);
+        int setup = workflow.indexOf(PREPARE);
+        assertTrue(setup >= 0 && start > setup, "missing full source-archive step");
+        String step = workflow.substring(start);
+        String preparation = workflow.substring(setup, start);
         assertTrue(preparation.contains("id: source_archive"));
         assertTrue(preparation.contains("echo \"root=$source_root\" >> \"$GITHUB_OUTPUT\""));
         assertTrue(step.contains("always() && !cancelled() && steps.source_archive.outputs.root != ''"));
@@ -47,9 +52,13 @@ class MavenGitFreeFullLifecycleContractTest {
 
     @Test
     void archiveCommitWitnessAndSuccessfulPreflightAreRetainedAlongsideTheFullReactor() throws IOException {
-        String workflow = Files.readString(MavenPomTestSupport.repositoryRoot().resolve(".github/workflows/gradle.yml"));
-        String step = workflow.substring(workflow.indexOf(STEP), workflow.indexOf(NEXT));
-        String preparation = workflow.substring(workflow.indexOf(PREPARE), workflow.indexOf(STEP));
+        String workflow = gitFreeJob(Files.readString(MavenPomTestSupport.repositoryRoot()
+            .resolve(".github/workflows/gradle.yml")));
+        int start = workflow.indexOf(STEP);
+        int setup = workflow.indexOf(PREPARE);
+        assertTrue(setup >= 0 && start > setup, "missing full source-archive step");
+        String step = workflow.substring(start);
+        String preparation = workflow.substring(setup, start);
         assertTrue(preparation.contains("-Dregelsuche.qualityAcceptance.registerArchive=true")
             && preparation.contains("$source_root/build/authority-evidence/quality-source-tree.json"),
             "register the source receipt in the directory prepared by the archive step");
@@ -102,7 +111,7 @@ class MavenGitFreeFullLifecycleContractTest {
     }
 
     private static String fixture() {
-        return PREPARE + "\n"
+        return JOB + "\n" + PREPARE + "\n"
             + "        run: |\n"
             + "          git archive --format=tar HEAD | tar -xf - -C \"$source_root\"\n"
             + STEP + "\n"
@@ -115,16 +124,41 @@ class MavenGitFreeFullLifecycleContractTest {
             + "          -Dregelsuche.sourceArchiveMode=true \\\n"
             + "          -Dregelsuche.sourceArchiveContainerMode=true \\\n"
             + "          -DfailIfNoTests=true test\n"
-            + NEXT + "\n";
+            + "  unrelated-job:\n";
+    }
+
+    @Test
+    void jobBoundaryDoesNotDependOnAdjacentJobNameAndRejectsCrossJobEvidence() {
+        String valid = fixture();
+        verifyFullGitFreeLifecycle(valid.replace("unrelated-job:", "renamed-job:"));
+        verifyFullGitFreeLifecycle(valid.replace("  unrelated-job:\n", ""));
+        assertThrows(AssertionError.class, () -> verifyFullGitFreeLifecycle(
+            valid.replace(JOB, "  different-job:")));
+        assertThrows(AssertionError.class, () -> verifyFullGitFreeLifecycle(
+            valid.replace(FULL_COMMAND, "echo skipped") + "          " + FULL_COMMAND + "\n"));
+        assertThrows(AssertionError.class, () -> verifyFullGitFreeLifecycle(
+            valid.replace(STEP, "      - name: Missing archive step") + STEP + "\n"));
+    }
+
+    private static String gitFreeJob(String workflow) {
+        var headers = JOB_HEADER.matcher(workflow);
+        while (headers.find()) {
+            if (JOB.equals(headers.group().stripTrailing())) {
+                int start = headers.start();
+                int end = headers.find() ? headers.start() : workflow.length();
+                return workflow.substring(start, end);
+            }
+        }
+        throw new AssertionError("missing Git-free verification job");
     }
 
     private static void verifyFullGitFreeLifecycle(String workflow) {
-        int setup = workflow.indexOf(PREPARE);
-        int start = workflow.indexOf(STEP);
-        int end = start < 0 ? -1 : workflow.indexOf(NEXT, start + STEP.length());
-        assertTrue(setup >= 0 && start > setup && end > start, "missing full source-archive step");
-        String preparation = workflow.substring(setup, start);
-        String block = workflow.substring(start, end);
+        String job = gitFreeJob(workflow);
+        int setup = job.indexOf(PREPARE);
+        int start = job.indexOf(STEP);
+        assertTrue(setup >= 0 && start > setup, "missing full source-archive step");
+        String preparation = job.substring(setup, start);
+        String block = job.substring(start);
         assertTrue(preparation.contains("git archive --format=tar HEAD | tar -xf - -C \"$source_root\""),
             "source archive must come from Git rather than copying .git");
         assertTrue(block.contains("REGELSUCHE_SOURCE_ARCHIVE_ROOT: " + ARCHIVE_ROOT),
