@@ -1,0 +1,51 @@
+{
+  "schema": "regelsuche.enumo-public-comparison/v1",
+  "status": "OPEN_PUBLIC_PILOT_FROZEN_BEFORE_EXECUTION",
+  "corpus": {
+    "repository": "https://github.com/FPBench/FPBench",
+    "commit": "090d81982edc0d2a597f4c15644253d4f266a6ef",
+    "path": "benchmarks/rosa.fpcore",
+    "sha256": "17caef3eb6065513600918f56f294a5c2401cf5593026d30aefe1bf4e62db09f",
+    "completeFile": true
+  },
+  "peer": {
+    "repository": "https://github.com/uwplse/ruler",
+    "commit": "7ed456de94df26fdddc0c15417a987d101dc57b5",
+    "acquisition": "original rational_best::best_enumo_recipe",
+    "application": "original egg 0.9.5 with the acquired rules",
+    "build": "upstream documented dynamic Z3 configuration; version and lock retained"
+  },
+  "semantics": "exact rational polynomial projection of original FPCore bodies; no IEEE-754 equivalence or range-dependent simplification",
+  "grammar": [
+    "declared scalar variables",
+    "exact decimal and integer constants representable by both worker bridges",
+    "binary + - *",
+    "unary -",
+    "division by nonzero constant",
+    "parallel let and sequential let*"
+  ],
+  "unsupported": "retain every original program; variable denominators, non-polynomial operators, control flow and excessive inputs are unsupported",
+  "limits": {
+    "sourceCharacters": 2048,
+    "variables": 4,
+    "inputNodes": 256,
+    "coefficientBits": 63,
+    "acquisitionSeconds": 600,
+    "requestSeconds": 2,
+    "startupSeconds": 60,
+    "memory": "512 MiB JVM heap; external RSS observed separately, no equal-RSS claim"
+  },
+  "profiles": [
+    "REGELSUCHE_BASE",
+    "REGELSUCHE_LEARNED_RANKED",
+    "ENUMO_LEARNED"
+  ],
+  "queryOrders": [
+    "corpus order"
+  ],
+  "repetitions": 3,
+  "warmup": "none; report first request and later requests separately",
+  "outcome": "exact coefficient comparison of every returned candidate; source-only requests, all failed and unsupported rows retained",
+  "cost": "surface arithmetic operations, one per binary operation or unary negation; startup, acquisition, request including bridge and judge reported separately; internal work units never equated",
+  "claimBoundary": "public development pilot; not an unseen holdout, independent human evaluation, novelty or general performance claim"
+}
