@@ -38,10 +38,12 @@ public final class EnumoRecordedAudit {
 
     static int verify(Path checkout, JsonNode report, byte[] raw, byte[] rules) throws Exception {
         String schema = report.path("schema").asText();
-        boolean transfer = schema.equals(EnumoPublicComparison.HORNER_TRANSFER);
-        boolean horner = transfer || schema.equals(EnumoPublicComparison.HORNER_V2);
+        boolean rootHorner = schema.equals(EnumoPublicComparison.ROOT_ROSA) || schema.equals(EnumoPublicComparison.ROOT_TRANSFER);
+        boolean transfer = schema.equals(EnumoPublicComparison.HORNER_TRANSFER) || schema.equals(EnumoPublicComparison.ROOT_TRANSFER);
+        boolean horner = rootHorner || transfer || schema.equals(EnumoPublicComparison.HORNER_V2);
         require(horner || schema.equals(EnumoPublicComparison.V1), "report schema");
-        String protocolHash = transfer ? EnumoPublicComparison.TRANSFER_PROTOCOL_SHA
+        String protocolHash = rootHorner ? EnumoPublicComparison.ROOT_PROTOCOL_SHA
+            : transfer ? EnumoPublicComparison.TRANSFER_PROTOCOL_SHA
             : horner ? EnumoPublicComparison.HORNER_PROTOCOL_SHA : EnumoPublicComparison.PROTOCOL_SHA;
         String corpusHash = transfer ? EnumoPublicComparison.TRANSFER_CORPUS_SHA : EnumoPublicComparison.CORPUS_SHA;
         require(report.path("semantics").asText().equals("EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE"), "semantics changed");
@@ -49,10 +51,10 @@ public final class EnumoRecordedAudit {
         require(report.path("protocolSha256").asText().equals(protocolHash), "protocol binding");
         require(hash(raw).equals(report.path("rawResponsesSha256").asText()), "raw response hash");
         require(hash(rules).equals(report.path("acquiredRulesSha256").asText()), "acquired rule hash");
-        verifyProvenance(checkout, report, rules, horner);
-        var entries = EnumoPublicComparison.inventory(checkout, horner, transfer);
+        verifyProvenance(checkout, report, rules, horner, rootHorner);
+        var entries = EnumoPublicComparison.inventory(checkout, horner, transfer, rootHorner);
         require(JSON.valueToTree(entries).equals(report.path("inventory")), "foreign inventory binding");
-        var profiles = EnumoPublicComparison.profiles(horner).stream().map(Enum::name).toList();
+        var profiles = EnumoPublicComparison.profiles(horner, rootHorner).stream().map(Enum::name).toList();
         require(report.path("rows").isArray() && report.path("rows").size() == 3 * entries.size() * profiles.size(),
             "complete comparison matrix");
         Map<String, JsonNode> responses = responses(raw);
@@ -173,16 +175,19 @@ public final class EnumoRecordedAudit {
         require(response.path("internalWorkWithinBudget").isBoolean(), "native budget decision");
         boolean withinBudget = accountingComplete(search) && total <= nonnegative(setup.path("settings"), "workBudget");
         require(response.path("internalWorkWithinBudget").asBoolean() == withinBudget, "native work budget");
-        if (profile.equals("POLYNOMIAL_HORNER_V1")) verifyHornerPath(response, setup);
+        if (profile.equals("POLYNOMIAL_HORNER_V1") || profile.equals("POLYNOMIAL_HORNER_ROOT_V1")) {
+            verifyHornerPath(response, setup, profile.equals("POLYNOMIAL_HORNER_ROOT_V1"));
+        }
     }
 
-    private static void verifyHornerPath(JsonNode response, JsonNode setup) throws Exception {
+    private static void verifyHornerPath(JsonNode response, JsonNode setup, boolean rootOnly) throws Exception {
         String current = response.path("typedInput").asText();
         var codec = new CompiledAstReplayCodec();
         var expression = new ExpressionParser().parseTerm(response.path("input").asText());
         require(codec.encodeExpression(expression).equals(current), "Horner typed input binding");
         JsonNode witness = response.path("witness");
         require(witness.isArray(), "Horner witness shape");
+        if (rootOnly) require(witness.size() <= 1, "root Horner witness length");
         long replay = 0, theory = 0;
         for (JsonNode edge : witness) {
             JsonNode move = edge.path("move"), checked = edge.path("verification");
@@ -203,7 +208,7 @@ public final class EnumoRecordedAudit {
                     && proof.path("procedure").equals(move.path("ruleId"))
                     && nonnegative(proof, "work") == evidenceWork, "Horner evidence body");
                 theory = Math.addExact(theory, evidenceWork);
-            } else require(binding.isMissingNode(), "undeclared Horner theory step");
+            } else require(!rootOnly && binding.isMissingNode(), "undeclared Horner theory step");
             require(checked.path("accepted").isBoolean() && checked.path("accepted").asBoolean()
                 && checked.path("receipts").isArray() && !checked.path("receipts").isEmpty(), "Horner checked witness");
             replay = Math.addExact(replay, nonnegative(checked, "work"));
@@ -214,6 +219,9 @@ public final class EnumoRecordedAudit {
             "Horner typed output binding");
         require(replay == nonnegative(response, "selectedReplayWork"), "Horner final replay ledger");
         require(theory <= nonnegative(setup.path("settings"), "maxTheoryWork"), "Horner theory path budget");
+        if (rootOnly && !witness.isEmpty()) {
+            require(nonnegative(response, "outputCost") < nonnegative(response, "inputCost"), "root Horner improvement");
+        }
     }
 
     private static boolean accountingComplete(JsonNode search) {
@@ -234,7 +242,7 @@ public final class EnumoRecordedAudit {
         return complete;
     }
 
-    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules, boolean horner) throws Exception {
+    private static void verifyProvenance(Path checkout, JsonNode report, byte[] rules, boolean horner, boolean rootHorner) throws Exception {
         JsonNode acquisition = report.path("acquisition");
         long ruleCount = new String(rules, StandardCharsets.UTF_8).lines().filter(line -> !line.isBlank()).count();
         require(acquisition.path("status").asText().equals("ACQUIRED") && ruleCount > 0
@@ -242,7 +250,7 @@ public final class EnumoRecordedAudit {
         require(acquisition.path("recipe").asText().equals("original::rational_best::best_enumo_recipe")
             && nonnegative(acquisition, "acquisitionNanos") > 0, "original acquisition identity");
         Path artifacts = checkout.resolve(horner ? EnumoPublicComparison.HORNER_ARTIFACTS : "research/benchmarks/enumo-public-v1");
-        JsonNode provenance = JSON.readTree(Files.readString(artifacts.resolve("provenance.json")));
+        JsonNode provenance = JSON.readTree(Files.readString(artifacts.resolve(rootHorner ? "root-provenance.json" : "provenance.json")));
         require(report.path("enumoBinarySha256").asText().matches("[a-f0-9]{64}")
             && report.path("enumoBinarySha256").equals(provenance.path("upstream").path("binarySha256")), "original executable binding");
         require(report.path("nativeWorkerClassSha256").asText().matches("[a-f0-9]{64}")
@@ -293,10 +301,12 @@ public final class EnumoRecordedAudit {
             && parsed.path("profile").asText().equals(expected), "native frozen model identity");
         var limits = new HashMap<>(Map.of("workBudget", 16384, "primitiveDepth", 9,
             "searchDepth", 9, "maxStates", 256, "complexityDebt", 24));
-        if (profile.equals("REGELSUCHE_POLYNOMIAL_HORNER")) {
+        boolean rootHorner = profile.equals("REGELSUCHE_POLYNOMIAL_HORNER_ROOT");
+        if (profile.equals("REGELSUCHE_POLYNOMIAL_HORNER") || rootHorner) {
             limits.put("maxTheoryWork", 16384);
-            require(parsed.path("constructionProfile").asText().equals(expected), "native construction profile");
+            require(parsed.path("constructionProfile").asText().equals("POLYNOMIAL_HORNER_V1"), "native construction profile");
             require(parsed.path("objective").asText().equals("SHARED_EXACT_ARITHMETIC_SURFACE"), "native shared surface objective");
+            if (rootHorner) require(parsed.path("providerSelection").asText().equals("ROOT_HORNER_ONLY"), "native root provider selection");
         }
         JsonNode settings = JSON.valueToTree(limits);
         require(settings.equals(initialized.path("settings")) && settings.equals(parsed.path("settings")), "native frozen limits");

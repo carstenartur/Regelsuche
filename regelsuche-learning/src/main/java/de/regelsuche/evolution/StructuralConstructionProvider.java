@@ -87,9 +87,10 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         var proofs = new ArrayList<Transformation>();
         var seen = new java.util.HashSet<String>();
         for (String output : generated.candidates()) {
-            long before = work[0];
             try {
                 var target = new ExpressionParser().parseExactTerm(output).expression();
+                if (isSharedHorner() && !improvesSharedSurface(source, target, account)) continue;
+                long before = work[0];
                 String encoded = CODEC.encodeExpression(target);
                 work[0] = Math.addExact(work[0], output.length() + (long) encoded.length() + 1);
                 if (target.equals(source) || !seen.add(encoded)) continue;
@@ -105,6 +106,18 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         var metrics = TransformationWorkMetrics.flatEngine(proofs.size()).withCandidateWork(math)
             .withDelegatedMechanicalWork(mechanics);
         return new Batch(proofs.stream().map(proof -> SearchMove.from(proof, descriptor, metrics.totalWorkUnits())).toList(), metrics, false);
+    }
+
+    private boolean isSharedHorner() {
+        return operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER && sharedArithmetic;
+    }
+
+    private static boolean improvesSharedSurface(de.regelsuche.ast.Expr source, de.regelsuche.ast.Expr target,
+            java.util.function.LongConsumer work) {
+        var initial = TypedPolynomialSurfaceCost.evaluateSharedArithmetic(source);
+        var candidate = TypedPolynomialSurfaceCost.evaluateSharedArithmetic(target);
+        work.accept(Math.addExact(initial.work(), candidate.work()));
+        return initial.value() != Long.MAX_VALUE && candidate.value() < initial.value();
     }
 
     MoveProvider incremental() {
@@ -125,18 +138,26 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
             case POLYNOMIAL_DIRECT -> { return this::verifyDirect; }
             case POLYNOMIAL_HORNER, POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED,
                  POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR -> { return this::verifyPolynomial; }
-            default -> { }
+            case EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE -> {
+                return (source, move, context) ->
+                    move.provenance() instanceof de.regelsuche.transform.TransformationProvenance.ExactTheoryStep step
+                        && step.evidence().issuedFrom(VerifiedConstruction.class)
+                        ? verifyPolynomial(source, move, context) : verifyByGeneration(source, move, context);
+            }
+            default -> { return this::verifyByGeneration; }
         }
-        return (source, move, context) -> {
-            var encoded = new MoveState(CODEC.encodeExpression(source.expression()), source.searchDepth(), source.primitiveDepth(),
-                source.previousRule(), source.assumptions(), source.capabilities(), source.complexityDebt());
-            var batch = candidates(encoded, new MoveContext("", context.initialAssumptions(), context.phase()));
-            boolean accepted = move.sourceKind() == descriptor.sourceKind() && batch.moves().stream()
-                .anyMatch(expected -> SearchMove.from(expected.transformation(), descriptor, move.generationCost()).equals(move));
-            return new MoveVerifier.Verification(accepted, batch.work().totalWorkUnitsV2(),
-                accepted ? List.of("construction-replayed:" + move.provenance().contentHash()) : List.of(),
-                accepted ? "EXACT_CONSTRUCTION_REPLAYED" : "CONSTRUCTION_REPLAY_REJECTED");
-        };
+    }
+
+    private MoveVerifier.Verification verifyByGeneration(TypedMoveSearch.State source, SearchMove move,
+            TypedMoveSearch.Context context) {
+        var encoded = new MoveState(CODEC.encodeExpression(source.expression()), source.searchDepth(), source.primitiveDepth(),
+            source.previousRule(), source.assumptions(), source.capabilities(), source.complexityDebt());
+        var batch = candidates(encoded, new MoveContext("", context.initialAssumptions(), context.phase()));
+        boolean accepted = move.sourceKind() == descriptor.sourceKind() && batch.moves().stream()
+            .anyMatch(expected -> SearchMove.from(expected.transformation(), descriptor, move.generationCost()).equals(move));
+        return new MoveVerifier.Verification(accepted, batch.work().totalWorkUnitsV2(),
+            accepted ? List.of("construction-replayed:" + move.provenance().contentHash()) : List.of(),
+            accepted ? "EXACT_CONSTRUCTION_REPLAYED" : "CONSTRUCTION_REPLAY_REJECTED");
     }
 
     private MoveVerifier.Verification verifyDirect(TypedMoveSearch.State source, SearchMove move,
@@ -172,6 +193,10 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
             move.requireSource(encodedSource);
             String input = ExpressionFormatter.format(source.expression());
             var target = CODEC.decodeExpression(move.targetExpression());
+            if (isSharedHorner() && !improvesSharedSurface(source.expression(), target,
+                    units -> work[0] = Math.addExact(work[0], units))) {
+                return new MoveVerifier.Verification(false, work[0], List.of(), "CONSTRUCTION_REPLAY_REJECTED");
+            }
             String output = ExpressionFormatter.format(target);
             long initialProofWork = Math.addExact(output.length(), Math.addExact((long) move.targetExpression().length(), 1));
             work[0] = Math.addExact(work[0], Math.addExact(input.length(), initialProofWork));
@@ -179,7 +204,16 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
             ExactPolynomialAnalysis.withProductWork(units -> work[0] = Math.addExact(work[0], units))
                 .requireEquivalent(input, output);
             long bindingWork = Math.addExact(initialProofWork, work[0] - before);
-            var expected = new VerifiedConstruction(encodedSource, move.targetExpression(), descriptor.id(), bindingWork);
+            // V1 construction certificates were issued with their procedure's original spelling and
+            // pre-product generation cost. Only the private issuer, after a real procedure yielded
+            // that exact endpoint, can attest those historical units. Replay charges today's full
+            // exact projection and rebuilds the entire operation/endpoint binding with the issued bill.
+            long generationWork = switch (operation) {
+                case EXPOSE_SQUARE, COMPLETE_SQUARE, FACTOR_DIFFERENCE, FACTOR_PARTITION, RESIDUAL_BALANCE ->
+                    theory.evidence().binding().canonicalWorkUnits();
+                default -> bindingWork;
+            };
+            var expected = new VerifiedConstruction(encodedSource, move.targetExpression(), descriptor.id(), generationWork);
             boolean accepted = theory.evidence().binding().equals(expected.binding())
                 && SearchMove.from(Transformation.exactTheory(theory.evidence()), descriptor, move.generationCost()).equals(move);
             if (accepted) {

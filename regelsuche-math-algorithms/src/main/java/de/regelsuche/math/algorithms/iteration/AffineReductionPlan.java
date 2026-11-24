@@ -163,9 +163,16 @@ public final class AffineReductionPlan {
     }
 
     static List<BigInteger> checkedInput(List<BigInteger> input, Shape shape, Work work) {
-        if (input.size() != shape.inputSize()) throw new IllegalArgumentException("AFFINE_INPUT_LENGTH");
-        var data = List.copyOf(input);
-        for (var value : data) work.runtimeInteger(Objects.requireNonNull(value));
+        int size = shape.inputSize();
+        if (input.size() != size) throw new IllegalArgumentException("AFFINE_INPUT_LENGTH");
+        var data = new ArrayList<BigInteger>();
+        var values = input.iterator();
+        for (int index = 0; index < size; index++) {
+            work.charge(1);
+            var value = Objects.requireNonNull(values.next());
+            work.runtimeInteger(value, 0); // The fixed read unit was paid before accessing the element.
+            data.add(value);
+        }
         return data;
     }
 

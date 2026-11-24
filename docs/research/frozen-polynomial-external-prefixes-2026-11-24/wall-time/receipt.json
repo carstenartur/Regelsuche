@@ -1,0 +1,37 @@
+{
+  "affinity": [
+    2
+  ],
+  "comparisonProtocolSha256": "e32870c5bd933f8507729444840462d0ccb02e95f72599c4a932715287e2f93a",
+  "externalArchiveProvisionNanos": 2799283075,
+  "javaVersion": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-25.0.5+8 (build 25.0.5+8-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.5+8 (build 25.0.5+8-LTS, mixed mode, sharing)\n",
+  "nativeWorkerSha256": "56117d08de3ee647daa762185ed075569054f55089be15754f348ae21cf69d6a",
+  "observationsSha256": "30bf0f742ee46bb5731a7dca14574d2599fcb1969e0e12e7e14acf2fb5ee365f",
+  "pairedCompletedComparison": {
+    "count": 36,
+    "medianExternalToNativeWallRatio": 7.4990895363072685,
+    "nativeFasterCount": 36,
+    "quality": {
+      "externalFiner": 14,
+      "neitherNontrivial": 8,
+      "sameNontrivialDegreeVector": 14
+    },
+    "sameNontrivialDegreeVectorMedianExternalToNativeWallRatio": 8.547913177511349
+  },
+  "summary": {
+    "external": {
+      "completed": 36,
+      "medianWallMillis": 6169.846911,
+      "nontrivial": 28,
+      "requests": 38,
+      "totalWallSeconds": 242.057559562
+    },
+    "native": {
+      "completed": 38,
+      "medianWallMillis": 780.3413095,
+      "nontrivial": 30,
+      "requests": 38,
+      "totalWallSeconds": 31.93027665
+    }
+  }
+}

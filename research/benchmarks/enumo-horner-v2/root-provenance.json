@@ -1,0 +1,54 @@
+{
+  "acquisition": {
+    "receipt": {
+      "acquisitionNanos": 15121796947,
+      "bidirectionalRules": 71,
+      "recipe": "original::rational_best::best_enumo_recipe",
+      "rules": 128,
+      "status": "ACQUIRED"
+    },
+    "resources": {
+      "maxRssKiB": 785956,
+      "status": 0,
+      "systemSeconds": 1.181849,
+      "userSeconds": 13.84255,
+      "wallNanos": 15185940805
+    },
+    "rulesSha256": "c4568d83c8bb177c4635246331945a8319de96f4c0e31f51561e462aa1469d91"
+  },
+  "hostAvailableProcessors": 9,
+  "native": {
+    "compilation": "Isolated clean Maven JDK 25 learning and experiments reactor at measured core with the v3 runner and auditor source overlay.",
+    "javaVersion": "25.0.5+8-LTS",
+    "measuredCoreCommit": "29be97c81cbabe470a21273d72346ed7fd752a84",
+    "sourceSha256": {
+      "regelsuche-experiments/src/main/java/de/regelsuche/benchmark/peer/EnumoPublicComparison.java": "6fdf698810c42b42bb8ad10cf87a2f85ed4f8c6d8b13c19f5c041e0f1aec18fa",
+      "regelsuche-learning/src/main/java/de/regelsuche/evolution/StructuralConstructionPrograms.java": "d2eea9f48957958e62e8243aea66637c3c69d9b47808be67ae852a37dbca6a93",
+      "regelsuche-learning/src/main/java/de/regelsuche/evolution/StructuralConstructionProvider.java": "87af5bd429efcef738dbe408f483dc604777a96af677bb0a23c9a8d9a32972e4",
+      "regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedExternalPolynomialComparisonWorker.java": "c302276f34b6cff2022d89bded9dae28036b11e8eb14147d1cd99f5968bde89e",
+      "regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedPolynomialSurfaceCost.java": "d773edd1ccd47bfabb34bf78bbfd0185464b85ce4add377a28256d66d6d0f801",
+      "regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/equivalence/SparsePolynomialHorner.java": "3dd5b7492dfc2b35025601a8d419232cf3a268a0ba347178447cf97ab31ae743"
+    },
+    "workerClassSha256": "6aee1afa42ca07fc44f74aa7f2a780689c4c3fe7fb566e796f3a7ebb5229712a"
+  },
+  "profiles": [
+    "ENUMO_LEARNED",
+    "REGELSUCHE_BASE",
+    "REGELSUCHE_LEARNED_RANKED",
+    "REGELSUCHE_POLYNOMIAL_HORNER",
+    "REGELSUCHE_POLYNOMIAL_HORNER_ROOT"
+  ],
+  "upstream": {
+    "binarySha256": "27fd364571e0db6283cf420cdb81ad164637bc37c5ab20eb88a8000188a1bde4",
+    "bridgeSha256": "b0a3df07c248a6fec8645aae8b895116063e3e5952f39aefbbf50cb2ddab02b2",
+    "cargo": "1.100.0",
+    "cargoLockSha256": "9fe28f9cfc3b72ead8b245caee075cadda78be869eeccb7162673eacdcc26df6",
+    "libclang": "19",
+    "patchSha256": "a6b5b0d74a1aadfb549418b364749bacbcd46c620d601a2dace8069a275a13fa",
+    "repository": "https://github.com/uwplse/ruler",
+    "rust": "1.100.0",
+    "sourceCommit": "7ed456de94df26fdddc0c15417a987d101dc57b5",
+    "z3": "4.13.3 (official Linux x64 glibc-2.35 binary distribution)",
+    "z3LibrarySha256": "b2f3a8b551d136b2efaecdfddca590779d77038fb8958be5f6bc27581d50b29d"
+  }
+}

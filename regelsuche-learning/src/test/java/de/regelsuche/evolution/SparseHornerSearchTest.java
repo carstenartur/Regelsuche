@@ -63,4 +63,44 @@ class SparseHornerSearchTest {
         assertEquals(4, rational.value());
         assertTrue(rational.work() > 4);
     }
+
+    @Test void rootOnlyProfileChecksOneImprovementAndPaysForANoOp() throws Exception {
+        String profile = "POLYNOMIAL_HORNER_ROOT_V1";
+        var worker = new TypedExternalPolynomialComparisonWorker();
+        var setup = worker.initialize(profile);
+        assertTrue(setup.get("model").toString().contains("ROOT_HORNER_ONLY"));
+        String input = "a*b+a*c-a*b+a-b+c+b";
+        var improved = worker.run(profile, input);
+        assertEquals(true, improved.get("internalWorkWithinBudget"));
+        assertTrue((Long) improved.get("outputCost") < (Long) improved.get("inputCost"));
+        assertTrue((Long) improved.get("selectedReplayWork") > 0);
+        assertEquals(1, ((List<?>) improved.get("witness")).size());
+        new ExactPolynomialAnalysis().requireEquivalent(input, (String) improved.get("output"));
+
+        var rejected = worker.run(profile, "(0-t*t*t)/6");
+        assertEquals(rejected.get("inputCost"), rejected.get("outputCost"));
+        assertEquals(List.of(), rejected.get("witness"));
+        assertEquals(0L, rejected.get("selectedReplayWork"));
+        assertTrue((Long) rejected.get("totalWork") > 0);
+        var trace = new com.fasterxml.jackson.databind.ObjectMapper().readTree((String) rejected.get("search"));
+        assertEquals(0, trace.path("metrics").path("generatedSuccessors").intValue());
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> worker.run(profile, "t^3"));
+    }
+
+    @Test void rootReceiverRejectsAValidEqualityThatWouldNotImproveTheSurface() {
+        var operation = StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER;
+        var general = new StructuralConstructionProvider(operation);
+        var root = new StructuralConstructionProvider(operation, 0, true);
+        var source = parser.parseTerm("a+a");
+        var state = MoveState.root(new CompiledAstReplayCodec().encodeExpression(source));
+        var moveContext = MoveContext.frozen("");
+        var move = general.candidates(state, moveContext).moves().getFirst();
+        var context = TypedMoveSearch.Context.sourceOnly(List.of(), MoveContext.Phase.FROZEN_EVALUATION);
+        var typed = new TypedMoveSearch.State(source, 0, 0, "", List.of(), Set.of(), 0);
+        assertTrue(general.verifier().verify(typed, move, context).accepted());
+        assertTrue(root.candidates(state, moveContext).moves().isEmpty());
+        var rejected = root.verifier().verify(typed, move, context);
+        assertFalse(rejected.accepted());
+        assertTrue(rejected.work() > 0);
+    }
 }

@@ -36,21 +36,27 @@ public final class EnumoPublicComparison {
     static final String V1 = "regelsuche.enumo-public-result/v1";
     static final String HORNER_V2 = "regelsuche.enumo-public-result/v2-horner";
     static final String HORNER_TRANSFER = "regelsuche.enumo-transfer-result/v2-horner";
+    static final String ROOT_ROSA = "regelsuche.enumo-public-result/v3-root-horner";
+    static final String ROOT_TRANSFER = "regelsuche.enumo-transfer-result/v3-root-horner";
     static final String HORNER_ARTIFACTS = "research/benchmarks/enumo-horner-v2";
+    static final String ROOT_PROTOCOL_SHA = "f4484a4055e49f740b2868d842f3c8e6bfb9791dd130b8d7bcbcecc561bbe218";
     static final String TRANSFER_PROTOCOL_SHA = "9da63810060e023f6e8cd760d6e74527d293a4434a72d5abfabd354be5d7b5ca";
     static final String TRANSFER_CORPUS_SHA = "34eafa5b61de5b1cadfe5305459ee564fbae568ad5d821991af592126fcc9921";
     private static final long REQUEST_NANOS = TimeUnit.SECONDS.toNanos(2);
     enum Profile {
         REGELSUCHE_BASE("BASE"), REGELSUCHE_LEARNED_RANKED("LEARNED_RANKED"),
-        REGELSUCHE_POLYNOMIAL_HORNER("POLYNOMIAL_HORNER_V1"), ENUMO_LEARNED("");
+        REGELSUCHE_POLYNOMIAL_HORNER("POLYNOMIAL_HORNER_V1"),
+        REGELSUCHE_POLYNOMIAL_HORNER_ROOT("POLYNOMIAL_HORNER_ROOT_V1"), ENUMO_LEARNED("");
 
         final String nativeProfile;
         Profile(String nativeProfile) { this.nativeProfile = nativeProfile; }
     }
 
-    static List<Profile> profiles(boolean horner) {
-        return horner ? List.of(Profile.values())
-            : List.of(Profile.REGELSUCHE_BASE, Profile.REGELSUCHE_LEARNED_RANKED, Profile.ENUMO_LEARNED);
+    static List<Profile> profiles(boolean horner, boolean rootHorner) {
+        if (rootHorner) return List.of(Profile.values());
+        if (horner) return List.of(Profile.REGELSUCHE_BASE, Profile.REGELSUCHE_LEARNED_RANKED,
+            Profile.REGELSUCHE_POLYNOMIAL_HORNER, Profile.ENUMO_LEARNED);
+        return List.of(Profile.REGELSUCHE_BASE, Profile.REGELSUCHE_LEARNED_RANKED, Profile.ENUMO_LEARNED);
     }
     private EnumoPublicComparison() { }
 
@@ -72,16 +78,18 @@ public final class EnumoPublicComparison {
 
     /** Args: checkout root, original bridge, acquired rules, new report directory, optional panel selector. */
     public static void main(String[] args) throws Exception {
-        boolean transfer = args.length == 5 && args[4].equals("--horner-transfer");
-        boolean horner = transfer || args.length == 5 && args[4].equals("--horner-v2");
+        String panel = args.length == 5 ? args[4] : "";
+        boolean rootHorner = panel.equals("--root-horner-rosa") || panel.equals("--root-horner-transfer");
+        boolean transfer = panel.equals("--horner-transfer") || panel.equals("--root-horner-transfer");
+        boolean horner = rootHorner || transfer || panel.equals("--horner-v2");
         if (args.length != 4 && !horner) {
-            throw new IllegalArgumentException("expected checkout, Enumo binary, acquired rules, output directory [--horner-v2|--horner-transfer]");
+            throw new IllegalArgumentException("expected checkout, Enumo binary, acquired rules, output directory, optional Horner panel");
         }
         Path checkout = Path.of(args[0]).toAbsolutePath();
         Path binary = Path.of(args[1]).toAbsolutePath();
         Path rules = Path.of(args[2]).toAbsolutePath();
         Path output = Path.of(args[3]).toAbsolutePath();
-        var entries = inventory(checkout, horner, transfer);
+        var entries = inventory(checkout, horner, transfer, rootHorner);
         if (!Files.isExecutable(binary) || !Files.isRegularFile(rules)) throw new IllegalArgumentException("original tool and acquired rules required");
         JsonNode acquisition = JSON.readTree(Files.readString(Path.of(rules + ".receipt.json")));
         if (!acquisition.path("status").asText().equals("ACQUIRED") || acquisition.path("rules").asInt() < 1) {
@@ -90,7 +98,7 @@ public final class EnumoPublicComparison {
         Files.createDirectory(output);
         var rows = new ArrayList<Map<String, Object>>();
         var setups = new ArrayList<Map<String, Object>>();
-        var profiles = profiles(horner);
+        var profiles = profiles(horner, rootHorner);
         try (var raw = Files.newBufferedWriter(output.resolve("responses.jsonl"), StandardCharsets.UTF_8)) {
             for (int repetition = 1; repetition <= 3; repetition++) {
                 for (Profile profile : profiles) {
@@ -115,9 +123,11 @@ public final class EnumoPublicComparison {
         }
         if (rows.size() != entries.size() * 3 * profiles.size()) throw new IllegalStateException("incomplete comparison matrix");
         var report = new TreeMap<String, Object>();
-        report.put("schema", transfer ? HORNER_TRANSFER : horner ? HORNER_V2 : V1);
+        report.put("schema", rootHorner ? (transfer ? ROOT_TRANSFER : ROOT_ROSA)
+            : transfer ? HORNER_TRANSFER : horner ? HORNER_V2 : V1);
         report.put("semantics", "EXACT_RATIONAL_PROJECTION_NOT_IEEE_EQUIVALENCE");
-        report.put("protocolSha256", transfer ? TRANSFER_PROTOCOL_SHA : horner ? HORNER_PROTOCOL_SHA : PROTOCOL_SHA);
+        report.put("protocolSha256", rootHorner ? ROOT_PROTOCOL_SHA
+            : transfer ? TRANSFER_PROTOCOL_SHA : horner ? HORNER_PROTOCOL_SHA : PROTOCOL_SHA);
         report.put("corpusSha256", transfer ? TRANSFER_CORPUS_SHA : CORPUS_SHA);
         report.put("enumoBinarySha256", hash(Files.readAllBytes(binary)));
         report.put("acquiredRulesSha256", hash(Files.readAllBytes(rules)));
@@ -133,13 +143,14 @@ public final class EnumoPublicComparison {
         System.out.println(JSON.writeValueAsString(counts));
     }
 
-    static List<FpcorePolynomialCorpus.Entry> inventory(Path checkout, boolean horner, boolean transfer) throws Exception {
+    static List<FpcorePolynomialCorpus.Entry> inventory(Path checkout, boolean horner, boolean transfer, boolean rootHorner) throws Exception {
         Path original = checkout.resolve("research/benchmarks/enumo-public-v1");
         Path corpus = original.resolve("rosa.fpcore");
         checkHash(corpus, CORPUS_SHA, "foreign corpus differs from freeze");
         checkHash(original.resolve("protocol.json"), PROTOCOL_SHA, "protocol differs from freeze");
         Path hornerArtifacts = checkout.resolve(HORNER_ARTIFACTS);
         if (horner) checkHash(hornerArtifacts.resolve("protocol.json"), HORNER_PROTOCOL_SHA, "Horner protocol differs from freeze");
+        if (rootHorner) checkHash(hornerArtifacts.resolve("root-protocol.json"), ROOT_PROTOCOL_SHA, "root Horner protocol differs from freeze");
         if (!transfer) return completeInventory(Files.readString(corpus), 37);
         checkHash(hornerArtifacts.resolve("transfer-protocol.json"), TRANSFER_PROTOCOL_SHA, "transfer protocol differs from freeze");
         String first = Files.readString(hornerArtifacts.resolve("transfer/fptaylor-extra.fpcore"));

@@ -40,6 +40,19 @@ class EnumoRecordedAuditTest {
     }
 
     @Test
+    void rechecksBothRootHornerPanelsWithAllFiveArmsAndNoProfileDrift() throws Exception {
+        var data = ROOT.resolve(EnumoPublicComparison.HORNER_ARTIFACTS).resolve("evidence");
+        for (String panel : java.util.List.of("root-rosa", "root-transfer")) {
+            Path directory = data.resolve(panel);
+            JsonNode report = JSON.readTree(gunzip(directory.resolve("results.json.gz")));
+            boolean rosa = panel.equals("root-rosa");
+            assertEquals((rosa ? 37 : 46) * 15, report.path("rows").size());
+            assertEquals(rosa ? 90 : 39, EnumoRecordedAudit.verify(ROOT, report,
+                gunzip(directory.resolve("responses.jsonl.gz")), Files.readAllBytes(directory.resolve("learned.rules"))));
+        }
+    }
+
+    @Test
     void rejectsAnUnboundHornerWitnessAfterTheRawHashIsRecomputed() throws Exception {
         var directory = ROOT.resolve(EnumoPublicComparison.HORNER_ARTIFACTS).resolve("evidence/rosa");
         var report = (ObjectNode) JSON.readTree(gunzip(directory.resolve("results.json.gz")));

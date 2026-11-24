@@ -43,8 +43,13 @@ public final class IterationPolynomial {
         }
 
         public void runtimeInteger(BigInteger value) {
-            charge(1 + value.bitLength() / 64L);
-            if (value.bitLength() > IterationLimits.MAX_RUNTIME_BITS) throw new Unavailable("RUNTIME_BIT_LIMIT");
+            runtimeInteger(value, 1);
+        }
+
+        void runtimeInteger(BigInteger value, int fixedWork) {
+            int bits = value.bitLength();
+            charge(fixedWork + bits / 64L);
+            if (bits > IterationLimits.MAX_RUNTIME_BITS) throw new Unavailable("RUNTIME_BIT_LIMIT");
         }
 
         public void coefficient(ExactRational c) {

@@ -10,10 +10,12 @@ import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer
 import de.regelsuche.math.algorithms.equivalence.SparsePolynomialHorner;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.retention.RetainedOperation;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.ConservativeCompleteSquareHypothesisOperator;
 import de.regelsuche.transform.ExactMonomialSquareExposureOperator;
 import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.SquareBaseSignSymmetryOperator;
 import de.regelsuche.transform.SumOfSquaresCompletionOperator;
 import de.regelsuche.transform.SubtreeHypothesisOperator;
@@ -83,9 +85,17 @@ final class StructuralConstructionPrograms {
         }
         return List.copyOf(result);
     }
-    private static List<String> factorDifference(String source, Work work) {
-        var rules = AstRewriteTransformationEngine.allBuiltInRules().stream()
+    private static final class DifferenceOfSquares {
+        static final List<RewriteRule> RULES = differenceOfSquaresRules();
+    }
+
+    private static List<RewriteRule> differenceOfSquaresRules() {
+        return AstRewriteTransformationEngine.allBuiltInRules().stream()
             .filter(rule -> rule.id().equals("ast_square_difference_factor")).toList();
+    }
+
+    private static List<String> factorDifference(String source, Work work) {
+        var rules = RetainedOperation.isObserved() ? differenceOfSquaresRules() : DifferenceOfSquares.RULES;
         return apply(new AstRewriteTransformationEngine(rules)::transform, source, work);
     }
 

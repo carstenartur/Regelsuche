@@ -129,3 +129,66 @@ coefficient computation with SymPy 1.14.0 and an independent syntax-tree
 operator count matched all 102 verified rows. The complete fresh responses
 and exit intervals are under [evidence](evidence). The external files carry
 the [same FPBench license](../enumo-public-v1/FPBENCH-LICENSE.txt).
+
+## Root-only Horner follow-up
+
+The transfer trace attributed most of the `himmilbeau` search to cheaper
+power expressions outside the shared grammar. The mixed Horner arm
+examined 111 proposals, including 110 instances from the `square-product`
+rule family. It also verified a Horner candidate that did not improve
+the incumbent. The incumbent stayed at cost 15 without a selected proof
+path. Each mixed-arm response exceeded 1.4 MB.
+
+The root profile `POLYNOMIAL_HORNER_ROOT_V1` registers the existing Horner
+provider alone. A whole-source candidate receives an exact certificate
+only if its shared-grammar cost is strictly lower. An independent
+receiver repeats the cost admission and exact projection. The same
+frontier, budgets and final replay apply. Unchanged inputs retain the
+original expression and the cost of the proposal attempt.
+
+The [new protocol](root-protocol.json) reran all previous arms plus root
+Horner in three fresh processes per profile. It retains 555 Rosa rows and
+690 transfer rows. There are 90 verified Rosa and 39 verified transfer
+rows, including repeated queries. All 31 Rosa and 43 transfer exclusions
+per profile are retained.
+
+| Panel and arm | Total operators per repetition | Sum of request-and-judge times per repetition, ms |
+| --- | ---: | --- |
+| Rosa, native base | 67 | 472 / 404 / 349 |
+| Rosa, native learned | 67 | 300 / 270 / 212 |
+| Rosa, mixed Horner | 41 | 1,254 / 893 / 599 |
+| Rosa, root Horner | 41 | 370 / 354 / 390 |
+| Rosa, original Enumo | 61 | 1,713 / 1,884 / 1,979 |
+| Transfer, native base | Incomplete | 975 / 748 / 538 |
+| Transfer, native learned | Incomplete | 564 / 401 / 386 |
+| Transfer, mixed Horner | 18 | 679 / 937 / 643 |
+| Transfer, root Horner | 18 | 242 / 244 / 187 |
+| Transfer, original Enumo | 24 | 669 / 872 / 515 |
+
+Root Horner preserves every verified mixed-arm operator count. On
+`himmilbeau`, all three matching arms have cost 15. The median
+request-and-judge time fell from 508.7 ms for mixed Horner to 26.8 ms for
+root Horner. Original Enumo took 184.0 ms. On `floudas`, both root Horner
+and original Enumo had cost 1, with medians of 134.3 and 122.1 ms.
+The root profile still paid JVM startup and setup of 373–583 ms
+across the panels. The original application worker took 5–18 ms to
+start with its acquired rules. These are request and startup measurements
+in fixed order on the same development host. The narrower common
+arithmetic domain and the cost and learning boundaries above still apply.
+
+Use the same built tools and classpath for the follow-up:
+
+```sh
+java -Xmx512m -cp "$classpath" de.regelsuche.benchmark.peer.EnumoPublicComparison \
+  "$PWD" "$enumo_binary" "$enumo_rules" /tmp/regelsuche-root-horner-rosa --root-horner-rosa
+java -Xmx512m -cp "$classpath" de.regelsuche.benchmark.peer.EnumoPublicComparison \
+  "$PWD" "$enumo_binary" "$enumo_rules" /tmp/regelsuche-root-horner-transfer --root-horner-transfer
+java -cp "$classpath" de.regelsuche.benchmark.peer.EnumoRecordedAudit \
+  "$PWD" research/benchmarks/enumo-horner-v2/evidence/root-rosa
+java -cp "$classpath" de.regelsuche.benchmark.peer.EnumoRecordedAudit \
+  "$PWD" research/benchmarks/enumo-horner-v2/evidence/root-transfer
+```
+
+See [root-run provenance](root-provenance.json) for source and executable
+identities. A separate exact coefficient computation and syntax-tree count
+matched all 129 verified rows.

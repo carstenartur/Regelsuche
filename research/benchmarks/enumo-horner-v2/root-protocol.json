@@ -1,0 +1,20 @@
+{
+  "schema": "regelsuche.enumo-comparison/v3-root-horner",
+  "rosaProtocolSha256": "3e042d3e4915c5a42ec957f4967f9f8f26540477506979b69893a66d53a6f551",
+  "transferProtocolSha256": "9da63810060e023f6e8cd760d6e74527d293a4434a72d5abfabd354be5d7b5ca",
+  "profiles": [
+    "REGELSUCHE_BASE",
+    "REGELSUCHE_LEARNED_RANKED",
+    "REGELSUCHE_POLYNOMIAL_HORNER",
+    "REGELSUCHE_POLYNOMIAL_HORNER_ROOT",
+    "ENUMO_LEARNED"
+  ],
+  "rootProfile": {
+    "profile": "POLYNOMIAL_HORNER_ROOT_V1",
+    "policy": "One bounded whole-source Horner provider; a strictly better shared-grammar candidate alone receives exact proof and fresh replay.",
+    "totalQueryWork": 16384,
+    "maximumTheoryWorkPerPath": 16384,
+    "generationWorkPerRoot": 4096
+  },
+  "scope": "All complete inventories, rules, grammar, limits, order and judge from v2. Each arm is rerun in three fresh processes. The root profile is a development response to an observed transfer latency problem."
+}
