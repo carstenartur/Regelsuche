@@ -1,0 +1,310 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_ORIGINAL_COMPLETE_CI",
+  "sourceCommit": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+  "sourceTree": "c5764e9bdb462df4ac4d92a06532c169d96f68cb",
+  "originalMainCI": {
+    "runId": 45290302102,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102",
+    "event": "push",
+    "runAttempt": 1,
+    "conclusion": "success",
+    "successfulMandatoryJobs": 13,
+    "gradleJobId": 138097015309,
+    "aggregateCiCheckJobId": 138125261197,
+    "reportPublicationJobId": 138125987515,
+    "qualificationRecord": {
+      "path": "ci-qualification.json",
+      "bytes": 6848,
+      "sha256": "fc947720b24841bb23a574836c2ca42de632f683aa90f493b1869edc3817d107"
+    }
+  },
+  "originalQualityEvidence": {
+    "artifactId": 14878535049,
+    "artifactName": "quality-acceptance-evidence",
+    "artifactUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/14878535049",
+    "downloadedZipBytes": 29211916,
+    "downloadedZipSha256": "2aaf9601814adfb78f3ca8bd4968aa1a4429935f053961facd6fab48c15250d5",
+    "apiDigestMatchesDownloadedZip": true,
+    "zipIndexSha256": "7b2b305b6ed2610b65b3737b3e868ddb6ccffc4d952af26bddfb8b93f7569f0c",
+    "indexCheckoutRevision": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+    "indexCheckoutTree": "c5764e9bdb462df4ac4d92a06532c169d96f68cb",
+    "indexTrackedChangesPresent": false,
+    "indexedFilesVerified": 293,
+    "indexedFileFailures": 0,
+    "trackedSourceFilesMatched": 64,
+    "verificationRecord": {
+      "path": "artifact-verification.json",
+      "bytes": 19891,
+      "sha256": "cb44397083cf5c80a02ee64785848c1653cbd77619903a92c95e8a2098e66a5c"
+    },
+    "nativeCheck": {
+      "path": "accepted-check.json",
+      "bytes": 10185,
+      "sha256": "19c199142e0ccf5fa126b4d05d5e0e593fa516cbbb03d8707a94d3524465ffee",
+      "passed": true,
+      "trendPassed": true,
+      "trendViolationCount": 0,
+      "claimFailureCount": 0
+    },
+    "nativeComplexity": {
+      "path": "accepted-complexity.json",
+      "bytes": 20795,
+      "sha256": "e7545f345510d881d203c9b40cf64130a96538030c0cb9e397f22cadb83c4ec0"
+    }
+  },
+  "snapshot": {
+    "extractorRelease": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "extractorTagObject": "ef0956a5743197a2aa62f425591282396ad46825",
+    "projection": "Original TrendAnalyzer.snapshot and StableIo.writeJson, compiled unchanged from the pinned release, receive the complete original accepted complexity report.",
+    "nativeSnapshotAbsentFromOriginalQualityArtifact": true,
+    "path": "metrics-snapshot.json",
+    "bytes": 339,
+    "sha256": "56cfa7cd7dc090533ba4de401bca9af95fea31086704865b6d988539a0a64c6b",
+    "extractorSourceFiles": [
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/ExtractionOptions.java",
+        "gitBlob": "5adbc86925c03d7a11e604ba91e3ec2fd657696f",
+        "bytes": 8461,
+        "sha256": "4e09d4181d5c7b0d5c06e14d13f70c15552175eee65ec39143171e0f25bed0be"
+      },
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/JsonSupport.java",
+        "gitBlob": "efa421c9521d3c209544f86ef4ab1875a1352713",
+        "bytes": 2077,
+        "sha256": "f1c11d0d129ac36d1bea700fbbc3c94730261cce02bc71a145e8258f9f5928ad"
+      },
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/StableIo.java",
+        "gitBlob": "7247ea8188ed67665419d1ff3263638fd474cf02",
+        "bytes": 672,
+        "sha256": "f3a56731aff707b4b8f157aef716c5324582875873970ab970ea7914c166bde6"
+      },
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java",
+        "gitBlob": "7964f1ecf2ad7fe9ab18c393a39c9112b92d28dd",
+        "bytes": 10083,
+        "sha256": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae"
+      }
+    ],
+    "driver": {
+      "path": "ProjectionDriver.java",
+      "bytes": 1560,
+      "sha256": "cc538f449e04082e795347fac54044e44dab3ad0daafef64c914287ae958fa82"
+    },
+    "verificationRecord": {
+      "path": "projection-verification.json",
+      "bytes": 710,
+      "sha256": "cab28ba73b458fb4c389ede99a91fc2b99279a9e88f53f0c1095d2dc7678cde8"
+    },
+    "replacedReference": {
+      "path": "previous-baseline.json",
+      "bytes": 341,
+      "sha256": "951b3f9624a9fa16136e0b7803cd6d20b8e1ddd75f70f2bd4629d02810c4ba23"
+    },
+    "acceptedTrendProjection": {
+      "path": "accepted-trend-projected.json",
+      "bytes": 2030,
+      "sha256": "d552979a6fc8acb2d664a4ceac8cf15b2133ba66d9314b62f2724f43b3d27c92"
+    },
+    "claimBoundary": "Projection of the original passing main measurement; no fresh extraction and no manually selected baseline fields.",
+    "execution": {
+      "javaVersion": "25.0.2",
+      "javaRuntime": "Zulu25.32+21-CA",
+      "compiledRelease": 17,
+      "scope": "Compile four original release classes plus the retained JSON-input driver; no fresh repository extraction."
+    },
+    "jsonInputParser": [
+      {
+        "coordinate": "com.fasterxml.jackson.core:jackson-databind:2.23.0",
+        "sha256": "abd1edd2736c764da03fe6cb7a9de70d48dd0a198aed131604c564bff62f9cc1",
+        "role": "Parse complete retained JSON only; native extractor supplies projection, trend semantics and output serialization."
+      },
+      {
+        "coordinate": "com.fasterxml.jackson.core:jackson-core:2.23.0",
+        "sha256": "449798beb4c4ec26de9cc25b39ca2198036883fb905ca968cbef7136d19a25d9",
+        "role": "Parse complete retained JSON only; native extractor supplies projection, trend semantics and output serialization."
+      },
+      {
+        "coordinate": "com.fasterxml.jackson.core:jackson-annotations:2.23",
+        "sha256": "e5b60c3088e0887b290ff9226394354589a1dad583743944b7f5538661056b4c",
+        "role": "Parse complete retained JSON only; native extractor supplies projection, trend semantics and output serialization."
+      }
+    ]
+  },
+  "unchangedPolicies": {
+    "trendThresholds": {
+      "maxCognitiveDebtIncrease": 10.0,
+      "maxConceptRadiusIncrease": 3.0,
+      "maxContextTokenIncrease": 15000.0,
+      "failOnWarnings": false
+    },
+    "maxCognitiveDebt": 21.7,
+    "files": [
+      {
+        "path": "gradle.properties",
+        "bytes": 370,
+        "sha256": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285"
+      },
+      {
+        "path": "settings.gradle",
+        "bytes": 8065,
+        "sha256": "384b73ba3908d2eb055a8f81a127d1691068a59f746816355f1f1a1f5b0fc229"
+      },
+      {
+        "path": "build.gradle",
+        "bytes": 12937,
+        "sha256": "0c4e2217e2b754dc22022b5130d7026ffca0496fe6c91f5ebd2efd1ae12d78ae"
+      },
+      {
+        "path": "ai-knowledge-verification/build.gradle",
+        "bytes": 1156,
+        "sha256": "d98aab126212c0a594a46faf9b94fc01b3adcbb98c491d6b2aeb5549792b891b"
+      },
+      {
+        "path": "gradle/ai-knowledge-verification.gradle",
+        "bytes": 4349,
+        "sha256": "dc0d8833e2fbb0cf045326b4a6924abc0717dfa21247b6a026d4ad5915176368"
+      },
+      {
+        "path": "gradle/quality-gates.gradle",
+        "bytes": 11893,
+        "sha256": "2bdeae0cfa30bad464022f7adf2827ef92d1b62ac476648ef9943418305b55ab"
+      },
+      {
+        "path": "ai-knowledge/capabilities.seed.yaml",
+        "bytes": 20351,
+        "sha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b"
+      },
+      {
+        "path": "ai-knowledge/claims.seed.yaml",
+        "bytes": 6232,
+        "sha256": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108"
+      },
+      {
+        "path": "ai-knowledge/claims.json",
+        "bytes": 6422,
+        "sha256": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1"
+      },
+      {
+        "path": "config/ai-knowledge-capability-coverage.json",
+        "bytes": 721,
+        "sha256": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed"
+      },
+      {
+        "path": "config/quality/complexity-hotspots.json",
+        "bytes": 7741,
+        "sha256": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4"
+      },
+      {
+        "path": "config/quality/coverage-policy.json",
+        "bytes": 2419,
+        "sha256": "4591f7817ba3db5830b345511a8b0c6ab8ad821e0ba87bc1d69be6cf13f84f6c"
+      },
+      {
+        "path": "scripts/verify-ai-knowledge-artifacts.py",
+        "bytes": 12589,
+        "sha256": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b"
+      },
+      {
+        "path": "scripts/test_ai_knowledge_coverage.py",
+        "bytes": 5509,
+        "sha256": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4"
+      }
+    ],
+    "selectorsThresholdsAndExceptionsChanged": false
+  },
+  "rejectedSdkEvidence": {
+    "pullRequest": 1376,
+    "headCommit": "31298a6a5aafb7325c30eaf63ca715e161b89c76",
+    "headTree": "35236683dca6e4669bcf1ee314751d4546e0e48e",
+    "checkoutRevision": "9921b04b673e1520378efca9c343f866715f4023",
+    "checkoutTree": "35236683dca6e4669bcf1ee314751d4546e0e48e",
+    "checkoutBinding": "Original Gradle job checkout log identifies refs/remotes/pull/1376/merge; GitHub commit API confirms its parents and tree.",
+    "checkoutLogExcerpt": {
+      "path": "rejected-sdk-checkout-log.txt",
+      "bytes": 1963,
+      "sha256": "f14103e5ec43548080427b86ecf109bcda739d20d852de00fd876b556ef72243"
+    },
+    "decodedOriginalJobLog": {
+      "bytes": 298559,
+      "sha256": "563bff3ab763d9cacb05971b16a8366eb847032a366b4856cf7775da8c1658f1",
+      "jobLogsApi": "https://api.github.com/repos/carstenartur/Regelsuche/actions/jobs/138192095093/logs",
+      "retention": "Complete decoded API response hashed during verification; selected checkout and failure lines retained in rejected-sdk-checkout-log.txt."
+    },
+    "runId": 45318827395,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45318827395",
+    "runAttempt": 1,
+    "runStatusAtInspection": "in_progress",
+    "runConclusionAtInspection": null,
+    "jobId": 138192095093,
+    "jobConclusion": "failure",
+    "artifactId": 14885923074,
+    "artifactName": "repository-verification",
+    "downloadedZipSha256": "f95416f94f3102ea949e8a644769ee549fc1afcb6d5c902d001bd94a4d0d3622",
+    "apiDigestMatchesDownloadedZip": true,
+    "reports": [
+      {
+        "path": "rejected-sdk-check.json",
+        "bytes": 10206,
+        "sha256": "7e41ec475f2f35f0bb55bcd2bcd3acb838b29da979e8808a6cb0c55527dda533"
+      },
+      {
+        "path": "rejected-sdk-complexity.json",
+        "bytes": 20806,
+        "sha256": "c114bf6c302bf58435ae8d8af0c8343b2f94ce9ee7908b77bb2733d131cb7244"
+      },
+      {
+        "path": "rejected-sdk-metrics-snapshot.json",
+        "bytes": 350,
+        "sha256": "3ad79125d1e37ce03233618f4b939ff91a1a07e6164b207a9e8e7d48b63e6c3a"
+      },
+      {
+        "path": "rejected-sdk-trend.json",
+        "bytes": 2203,
+        "sha256": "ef5b5c46c6694a6355bb9f81aa98c58ed23fb05c8161045fefc62091a5669224"
+      }
+    ],
+    "claimBoundary": "The Gradle authority and native trend rejected this measurement. Other source jobs were still running when inspected; no overall failure or acceptance is inferred. These measurements supply no reference values."
+  },
+  "unchangedTrendReplay": {
+    "inputs": "Original retained complexity and check reports; unchanged v0.1.10 trend implementation and thresholds.",
+    "oldBaseline": {
+      "estimatedContextTokens": 861185,
+      "conceptRadius": 119,
+      "aiContextDebt": 13.65
+    },
+    "acceptedBaseline": {
+      "estimatedContextTokens": 876100,
+      "conceptRadius": 121,
+      "aiContextDebt": 13.52
+    },
+    "rejectedMeasurement": {
+      "estimatedContextTokens": 876785,
+      "conceptRadius": 121,
+      "aiContextDebt": 13.51
+    },
+    "originalRejectedTrendReproducedByteForByte": true,
+    "acceptedMainAgainstPrevious": {
+      "passed": true,
+      "tokenIncrease": 14915.0,
+      "radiusIncrease": 2.0
+    },
+    "rejectedAgainstPrevious": {
+      "passed": false,
+      "tokenIncrease": 15600.0
+    },
+    "rejectedAgainstAccepted": {
+      "passed": true,
+      "tokenIncrease": 685.0,
+      "radiusIncrease": 0.0
+    },
+    "replayReport": {
+      "path": "replayed-sdk-trend.json",
+      "bytes": 2041,
+      "sha256": "fc851e6580d55a08fb812356f6e66e16a6f588e6c6d65b5b6490130568d76da1"
+    },
+    "claimBoundary": "A native trend replay over retained measurements is not a new candidate extraction or a complete candidate CI qualification."
+  }
+}
