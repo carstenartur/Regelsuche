@@ -1,6 +1,6 @@
-# AI Knowledge reference from accepted main f183aedd
+# AI Knowledge evidence for accepted main f183aedd
 
-This reference comes exclusively from accepted main
+The reference comes exclusively from accepted main
 `f183aedd1ff2ab061ed903559b96a11d28974e7f`, tree
 `c5764e9bdb462df4ac4d92a06532c169d96f68cb`.
 [Original main CI 45290302102](https://github.com/carstenartur/Regelsuche/actions/runs/45290302102)
@@ -46,7 +46,7 @@ JSON reports and delegates projection, trend decisions and serialization to thos
 classes. It obtains all trend thresholds from the retained native check; it does
 not build a snapshot from a chosen subset of metrics.
 
-[Provenance](provenance.json) binds the source, original CI, artifact and native
+[Supplemental provenance](supplemental-provenance.json) binds the source, original CI, artifact and native
 report hashes, unchanged policy files, released extractor sources and driver.
 The [projection verification](projection-verification.json) also records that the
 same original implementation reproduces the preceding 9d1d4ac snapshot byte for
@@ -113,3 +113,13 @@ The driver performs no repository scan. It projects original reports using the
 pinned native semantics. A successful replay therefore establishes only that
 projection and comparison, while the accepted predecessor's qualification comes
 from its independently checked complete original main CI.
+
+## Concurrent integration
+
+PR #1375 independently landed the same accepted-main snapshot before this
+supplement was integrated. The active reference and its original
+[provenance](provenance.json) remain byte-for-byte unchanged from main
+`310bf41230ecfc51a2cd85bdc2b711a8da2de6fc`. This change adds retained native
+reports, source verification and the SDK rejection/replay evidence; it does
+not advance the reference a second time. The supplemental record preserves
+the complete independent verification conducted for this work.
