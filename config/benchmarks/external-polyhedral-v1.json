@@ -1,0 +1,126 @@
+{
+  "schema": "regelsuche.external-polyhedral/v1",
+  "repository": "https://github.com/lnarmour/max-simplification-artifact",
+  "revision": "d91815edbfb0463c1b195173dbff46a4a2e52f39",
+  "paper": "Maximal Simplification of Polyhedral Reductions (POPL 2025), successor to arXiv:2411.17498v1",
+  "toolHashes": {
+    "alpha.glue.v1.jar": "2e50fef4e42088977a94aec402a7f9fbe3438dbd6619a6fe550e9da240b05044",
+    "alpha.glue.v2.jar": "d89190ef093b9fb76c4b3ce8348d4755d96333a838f3adc7b015a782fa13192a"
+  },
+  "arms": [
+    "REGELSUCHE_ORDERED_PREFIX",
+    "ORIGINAL_ALPHA_COMPILER"
+  ],
+  "repetitions": 1,
+  "limits": {
+    "synthesisSeconds": 30,
+    "compileSeconds": 15,
+    "executionSeconds": 5,
+    "javaHeapMiB": 512,
+    "nativeWork": 1000000,
+    "nativeTerms": 128,
+    "maxStates": 4,
+    "maxOutputBytes": 1048576
+  },
+  "rowCounts": [
+    2,
+    3,
+    8,
+    20
+  ],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "rowFormula": "((index*17+seed*7)%19)-9",
+  "compilerOptions": [
+    "-std=c11",
+    "-O2",
+    "-fsanitize=undefined",
+    "-fno-sanitize-recover=all"
+  ],
+  "originalOptions": [
+    "-s",
+    "--num-simplifications",
+    "1",
+    "--try-splitting",
+    "-d",
+    "long"
+  ],
+  "selection": "All seven .alpha files in upstream inputs/, plus three separately labelled controls. No selection by measured result.",
+  "developmentExposure": "Original prefix_sum compiler smoke was run before freeze. All sources are public. This is not a holdout or independent external evaluation.",
+  "sharedFragment": "Ordered prefix sums of an integer polynomial over one or more strictly increasing row indices, with X and Y each declared on 0..N. max, non-prefix domains, multiple output indices and variable denominators remain explicit unsupported cases.",
+  "cases": [
+    {
+      "id": "example_3d_max",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/example_3d_max.alpha",
+      "sha256": "6524d5b40a9c37f8841c7f935b1a8b69b491a2ae959309f5b73fc21574d29c40",
+      "source": "// A 3D reduction\naffine example_3d_max [N]->{ : 0<N }\ninputs \n  X : {[k] : 0<=k<=N}\noutputs\n  Y : {[i,j] : j>=N-i and j>=2i-2N and 2j<=2N+i}\nlet\n  Y[i,j] = reduce(max, [k], {: 0<=k<=2N-2i+j and k<=2N+i-2j and k<=i+j-N} : X[k]);\n."
+    },
+    {
+      "id": "example_3d_sum",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/example_3d_sum.alpha",
+      "sha256": "9a41aa31529ba38a2a6a83a4b05f034bf092b61c03d8851c6c3e18238fb621a6",
+      "source": "// A 3D reduction\naffine example_3d_sum [N]->{ : 0<N }\ninputs \n  X : {[k] : 0<=k<=N}\noutputs\n  Y : {[i,j] : j>=N-i and j>=2i-2N and 2j<=2N+i}\nlet\n  Y[i,j] = reduce(+, [k], {: 0<=k<=2N-2i+j and k<=2N+i-2j and k<=i+j-N} : X[k]);\n."
+    },
+    {
+      "id": "example_4d",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/example_4d.alpha",
+      "sha256": "02dd69f8c990cfcd48bdaa6f94767ac0d7b048299be729bd7ea8196c38c5db04",
+      "source": "// A reduction with a 4-dimensional body, 2-dimensional accumulation and 2-dimensional reuse\naffine example_4d [N]->{ : 10<N }\ninputs \n  X : {[i,j] : 0<=i<=j<2N}\noutputs\n  Y : {[i,j] : 0<=i<=j<N}\nlet\n  Y[i,j] = reduce(max, [k,l], {: i<=k<=2i and i+j<=l<=2j} : X[k,l]);\n."
+    },
+    {
+      "id": "increasing_max_filter",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/increasing_max_filter.alpha",
+      "sha256": "1c1df302b9f11de153ed45fe0a4cb04c14ecbe2c9cc8528e181aa378e70e59a6",
+      "source": "// Sliding and increasing max filter (Section 2.3)\naffine increasing_max_filter [N]->{:0<N}\ninputs\n  X : {[i] : 0<=i<=2N}\noutputs\n  Y : {[i] : 0<=i<=N}\nlet\n  Y[i] = reduce(max, [j], {: i<=j<=2i} : X[j]);\n."
+    },
+    {
+      "id": "prefix_max",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/prefix_max.alpha",
+      "sha256": "fe1845458ac060ff98ba7a446fe527b2544c8620f6c0db6a4f9e2febb8f7a309",
+      "source": "// Simple prefix max (Section 2.2)\naffine prefix_max [N]->{:0<N}\ninputs\n  X : {[i] : 0<=i<=N}\noutputs\n  Y : {[i] : 0<=i<=N}\nlet\n  Y[i] = reduce(max, [j], {: 0<=j<=i} : X[j]);\n."
+    },
+    {
+      "id": "prefix_sum",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/prefix_sum.alpha",
+      "sha256": "1d6f1e81bebd16c63e1dfb5a97016b02fb8184926e4bef6e999f29f35360f79c",
+      "source": "// Simple prefix sum (Section 2.1)\naffine prefix_sum [N]->{:0<N}\ninputs\n  X : {[i] : 0<=i<=N}\noutputs\n  Y : {[i] : 0<=i<=N}\nlet\n  Y[i] = reduce(+, [j], {: 0<=j<=i} : X[j]);\n."
+    },
+    {
+      "id": "working_example",
+      "origin": "UPSTREAM_COMPLETE_INVENTORY",
+      "path": "inputs/working_example.alpha",
+      "sha256": "8388601a7b7328b9b87b722864c39094a74bf03ee3771d7d32c9fa274a6d255f",
+      "source": "// The 3D working example (Section 3.3)\naffine working_example [N]->{ : 0<N }\ninputs \n  X : {[k] : 0<=k<=N}\noutputs\n  Y : {[i] : 0<=i<=N}\nlet\n  Y[i] = reduce(+, [j,k], {: i<=N and 0<=j and 0<=k and k<=i-j} : X[k]);\n."
+    },
+    {
+      "id": "prefix_polynomial",
+      "origin": "PROJECT_AUTHORED_CONTROL",
+      "path": null,
+      "sha256": "3bb8eec1523f4d8141616e12a09158cdac13fcf89c373b2352080b3bd6971022",
+      "source": "affine prefix_polynomial [N]->{:0<N}\ninputs\n X : {[i] : 0<=i<=N}\noutputs\n Y : {[i] : 0<=i<=N}\nlet\n Y[i] = reduce(+, [j], {: 0<=j<=i} : X[j]*X[j]+3*X[j]);\n.\n"
+    },
+    {
+      "id": "pair_prefix_product",
+      "origin": "PROJECT_AUTHORED_CONTROL",
+      "path": null,
+      "sha256": "f08ec9721f98685796c8c9bdf869112bb41afa3868d55c976c5e8fa6e42ee469",
+      "source": "affine pair_prefix_product [N]->{:0<N}\ninputs\n X : {[i] : 0<=i<=N}\noutputs\n Y : {[i] : 0<=i<=N}\nlet\n Y[i] = reduce(+, [j,k], {: 0<=j<k<=i} : X[j]*X[k]);\n.\n"
+    },
+    {
+      "id": "variable_denominator",
+      "origin": "PROJECT_AUTHORED_CONTROL",
+      "path": null,
+      "sha256": "47f2ee2cbe5bec0461086f6f38e804c7f79855e416cfed4b428fcbc96a7dc160",
+      "source": "affine variable_denominator [N]->{:0<N}\ninputs\n X : {[i] : 0<=i<=N}\noutputs\n Y : {[i] : 0<=i<=N}\nlet\n Y[i] = reduce(+, [j], {: 0<=j<=i} : 1/X[j]);\n.\n"
+    }
+  ]
+}

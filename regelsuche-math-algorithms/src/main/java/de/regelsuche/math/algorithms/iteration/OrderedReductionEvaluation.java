@@ -23,6 +23,17 @@ final class OrderedReductionEvaluation {
 
     static Evaluation evaluate(OrderedReduction source, OrderedReductionPlan plan, List<? extends List<BigInteger>> rows,
             int width, IterationLimits limits, BooleanSupplier cancellation) {
+        return evaluate(source, plan, rows, width, false, limits, cancellation);
+    }
+
+    static Evaluation evaluatePrefixes(OrderedReduction source, OrderedReductionPlan plan,
+            List<? extends List<BigInteger>> rows, IterationLimits limits, BooleanSupplier cancellation) {
+        return evaluate(source, plan, rows, 0, true, limits, cancellation);
+    }
+
+    private static Evaluation evaluate(OrderedReduction source, OrderedReductionPlan plan,
+            List<? extends List<BigInteger>> rows, int width, boolean prefixes,
+            IterationLimits limits, BooleanSupplier cancellation) {
         var work = new Work(limits, cancellation, PairReduction.MAX_DEGREE);
         try {
             work.charge(1);
@@ -33,7 +44,7 @@ final class OrderedReductionEvaluation {
                 data.add(RowMoments.values(row, source.columnCount(), work));
             }
             var indexes = new OrderedSummaries(data, work);
-            var sums = width == 0 ? List.of(chains(plan, data, indexes, work))
+            var sums = width == 0 ? chains(plan, data, indexes, prefixes, work)
                 : windows(plan, data, width, indexes, work);
             return new Evaluation(sums, data.size(), indexes.accesses(), work.used());
         } catch (Unavailable unavailable) {
@@ -41,7 +52,8 @@ final class OrderedReductionEvaluation {
         }
     }
 
-    private static BigInteger chains(OrderedReductionPlan plan, List<BigInteger[]> rows, OrderedSummaries indexes, Work work) {
+    private static List<BigInteger> chains(OrderedReductionPlan plan, List<BigInteger[]> rows,
+            OrderedSummaries indexes, boolean prefixes, Work work) {
         var states = new LinkedHashMap<List<Moment>, Prefix>();
         for (var term : plan.terms()) {
             Prefix parent = null;
@@ -60,6 +72,7 @@ final class OrderedReductionEvaluation {
         }
         var factors = states.values().stream().map(node -> node.factor).distinct().toList();
         BigInteger total = BigInteger.ZERO;
+        var output = new ArrayList<BigInteger>();
         for (var row : rows) {
             work.charge(1);
             var products = products(row, factors, work);
@@ -79,8 +92,12 @@ final class OrderedReductionEvaluation {
             for (var node : states.values()) {
                 if (node.summary != null) node.summary.add(row, node.current);
             }
+            if (prefixes) {
+                work.charge(1);
+                output.add(total);
+            }
         }
-        return total;
+        return prefixes ? output : List.of(total);
     }
 
     private static final class Prefix {

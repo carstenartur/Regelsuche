@@ -34,7 +34,7 @@ public record OrderedReductionPlan(List<Term> terms, List<Lookup> lookups, Optio
     public record Term(BigInteger coefficient, List<Moment> factors) {
         public Term {
             if (coefficient.signum() == 0 || coefficient.abs().bitLength() > FiniteIteration.MAX_COEFFICIENT_BITS
-                    || factors.size() < 2 || factors.size() > OrderedReduction.MAX_ARITY) {
+                    || factors.isEmpty() || factors.size() > OrderedReduction.MAX_ARITY) {
                 throw new IllegalArgumentException("INVALID_ORDERED_TERM");
             }
             factors = List.copyOf(factors);
@@ -163,6 +163,13 @@ public record OrderedReductionPlan(List<Term> terms, List<Lookup> lookups, Optio
                 BooleanSupplier cancellation) {
             if (plan.eviction().isPresent()) throw new IllegalArgumentException("WINDOW_WIDTH_REQUIRED");
             return OrderedReductionEvaluation.evaluate(source, plan, rows, 0, limits, cancellation);
+        }
+
+        /** Returns the source's tuple sum for each nonempty prefix, in input order. */
+        public Evaluation evaluatePrefixes(List<? extends List<BigInteger>> rows, IterationLimits limits,
+                BooleanSupplier cancellation) {
+            if (plan.eviction().isPresent()) throw new IllegalArgumentException("PREFIX_REQUIRES_NONWINDOW_PLAN");
+            return OrderedReductionEvaluation.evaluatePrefixes(source, plan, rows, limits, cancellation);
         }
 
         /** Returns one sum per complete window, in input order. */
