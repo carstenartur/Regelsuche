@@ -15,6 +15,8 @@ import de.regelsuche.polynomial.ExactFactorizationExpressionRenderer;
 import de.regelsuche.polynomial.ExactParsedFactorizationPipeline;
 import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
 import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.retention.RetainedOperation;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -123,8 +125,55 @@ final class PolynomialSimplificationPrograms {
         return List.of(new ExpressionParser().parseExactTerm(result).expression());
     }
 
+    /** A single root attempt for a caller that has already traversed the typed subtrees. */
+    static List<Expr> factorRoot(Expr source, long maximumWork, LongConsumer work) {
+        var budget = new RootFactorBudget(maximumWork, work);
+        budget.charge(1);
+        if (!(source instanceof BinaryExpr binary)
+                || binary.operator() != BinaryOperator.ADD && binary.operator() != BinaryOperator.SUB
+                || hasMultiplePolynomialVariables(source, budget::charge)) return List.of();
+        var parser = new ExpressionParser();
+        var parsed = StructuralExpansionRules.observe(() -> parser.parseExactTerm(ExpressionFormatter.format(source)),
+            budget.remainingOpaqueWorkUnits());
+        budget.charge(Math.min(parsed.work(), budget.remainingOpaqueWorkUnits()));
+        long remaining = budget.remainingOpaqueWorkUnits();
+        if (parsed.exhausted() || remaining < 128) return List.of();
+        var view = new ExactParsedUnivariatePolynomialView(new ExactParsedUnivariatePolynomialView.Budget(
+            16, 256, 64, (int) Math.min(remaining / 2, 1_000)));
+        var policy = new ExactParsedFactorizationPipeline.Policy(new FactorizationRequest.StructuralLimits(1, 16, 64, 256),
+            8, remaining, FactorizationRequest.EvidenceRequirement.VERIFIED_DECOMPOSITION);
+        var factor = new ExactParsedFactorizationPipeline(view, policy, budget)
+            .factor(parsed.value(), NativeUnivariateFactorizationEngine.boundedRationals());
+        if (!factor.executed() || !factor.report().orElseThrow().successful()) return List.of();
+        var renderer = new ExactFactorizationExpressionRenderer(new ExactFactorizationExpressionRenderer.Policy(
+            16, 64, 16, 256, 4096, 20_000));
+        var result = new ExactFactorizationTransformationPipeline(renderer, parser, view, budget)
+            .transformRoot(parsed.value(), factor);
+        return result.transformed() ? List.of(result.reparsed().orElseThrow().expression()) : List.of();
+    }
+
+    private static final class RootFactorBudget implements PolynomialWorkAuthority {
+        private final LongConsumer work;
+        private long remaining;
+
+        RootFactorBudget(long maximumWork, LongConsumer work) {
+            remaining = maximumWork;
+            this.work = work;
+        }
+
+        void charge(long units) {
+            if (units > remaining) throw new LimitReached();
+            work.accept(units);
+            remaining -= units;
+        }
+
+        @Override public void consume(PolynomialWorkLedger ledger) { charge(ledger.totalWorkUnits()); }
+        @Override public void consume(String stage, long units) { charge(units); }
+        @Override public long remainingOpaqueWorkUnits() { return remaining; }
+    }
+
     /** Distinct indeterminates in additive or multiplicative operands cannot merge in the univariate view. */
-    private static boolean hasMultiplePolynomialVariables(Expr source, ProcedureWork work) {
+    private static boolean hasMultiplePolynomialVariables(Expr source, LongConsumer work) {
         var pending = new ArrayDeque<Expr>();
         pending.push(source);
         String first = null;
@@ -146,7 +195,7 @@ final class PolynomialSimplificationPrograms {
     }
 
     /** Shorter exact scalar placement, without creating any variable denominator. */
-    private static Expr compact(Expr expression) {
+    static Expr compact(Expr expression) {
         RetainedOperation.work(1);
         if (!(expression instanceof BinaryExpr binary)) return expression;
         Expr left = compact(binary.left()), right = compact(binary.right());

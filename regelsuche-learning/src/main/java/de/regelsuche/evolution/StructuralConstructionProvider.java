@@ -24,22 +24,48 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private final StructuralConstructionPrograms.Operation operation;
     private final Descriptor descriptor;
+    private final long proposalLimit;
+    private final boolean sharedArithmetic;
 
     StructuralConstructionProvider(StructuralConstructionPrograms.Operation operation) {
+        this(operation, 0, false);
+    }
+
+    StructuralConstructionProvider(StructuralConstructionPrograms.Operation operation, long proposalLimit,
+            boolean sharedArithmetic) {
         this.operation = java.util.Objects.requireNonNull(operation);
+        this.proposalLimit = proposalLimit;
+        this.sharedArithmetic = sharedArithmetic;
         descriptor = new Descriptor(REVISION + ":" + operation.name(), "structural-construction",
             SearchMove.SourceKind.PREPARATION, SearchMove.ProofStrength.VERIFIED, List.of(),
             SearchMove.ValueEvidence.UNKNOWN, SchematicProofPlan.hash(REVISION + ":" + operation.name()));
     }
     @Override public Descriptor descriptor() { return descriptor; }
 
+    boolean isDirectPolynomial() { return operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_DIRECT; }
+
+    StructuralConstructionProvider forBudget(de.regelsuche.search.moves.MoveSearch.Budget budget) {
+        long paidProposal = budget.totalWork() - budget.totalWork() / 3;
+        return new StructuralConstructionProvider(operation, Math.min(paidProposal, budget.maxTheoryWork()), sharedArithmetic);
+    }
+
+    private StructuralConstructionPrograms.Report generate(de.regelsuche.ast.Expr source) {
+        if (!isDirectPolynomial()) return StructuralConstructionPrograms.generate(operation, source);
+        var result = DirectPolynomialPortfolio.propose(source, proposalLimit, sharedArithmetic);
+        if (result.expression() == source) return new StructuralConstructionPrograms.Report(List.of(), result.work());
+        long[] work = {result.work()};
+        String text = ExpressionFormatter.formatMeasured(result.expression(), count -> work[0] = Math.addExact(work[0], count));
+        return new StructuralConstructionPrograms.Report(List.of(text), work[0]);
+    }
+
     @Override public Batch candidates(MoveState state, MoveContext context) {
-        if (operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER && state.searchDepth() != 0) {
+        if ((operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER || isDirectPolynomial())
+                && state.searchDepth() != 0) {
             // Its endpoint depends only on the polynomial, so equivalent later states add no candidates.
             return new Batch(List.of(), TransformationWorkMetrics.ZERO, true);
         }
         var source = CODEC.decodeExpression(state.expression());
-        var generated = StructuralConstructionPrograms.generate(operation, source);
+        var generated = generate(source);
         long[] work = {generated.work()};
         java.util.function.LongConsumer account = units -> work[0] = Math.addExact(work[0], units);
         var exact = operation == StructuralConstructionPrograms.Operation.BINARY_QUARTIC
@@ -55,6 +81,7 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
                 || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_COMMON_FACTOR
                 || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_UNIVARIATE_FACTOR
                 || operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER
+                || isDirectPolynomial()
             ? ExactPolynomialAnalysis.withProductWork(account) : new ExactPolynomialAnalysis(account);
         String input = ExpressionFormatter.format(source); work[0] = Math.addExact(work[0], input.length());
         var proofs = new ArrayList<Transformation>();
@@ -95,6 +122,7 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
 
     TypedMoveSearch.Verifier verifier() {
         switch (operation) {
+            case POLYNOMIAL_DIRECT -> { return this::verifyDirect; }
             case POLYNOMIAL_HORNER, POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED,
                  POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR -> { return this::verifyPolynomial; }
             default -> { }
@@ -111,11 +139,30 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         };
     }
 
+    private MoveVerifier.Verification verifyDirect(TypedMoveSearch.State source, SearchMove move,
+            TypedMoveSearch.Context context) {
+        var domainWork = new CheckedSchemaSupport.Work();
+        try {
+            StructuralCheckedDomain.inspect(source.expression(), domainWork);
+            domainWork.add(move.targetExpression().length());
+            StructuralCheckedDomain.inspect(CODEC.decodeExpression(move.targetExpression()), domainWork);
+        } catch (IllegalArgumentException outsideDomain) {
+            return new MoveVerifier.Verification(false, Math.max(1, domainWork.units), List.of(), "DIRECT_DOMAIN_REJECTED");
+        }
+        var replay = verifyPolynomial(source, move, context);
+        long total = Math.addExact(domainWork.units, replay.work());
+        if (!replay.accepted()) return new MoveVerifier.Verification(false, total, List.of(), replay.reason());
+        var receipts = new ArrayList<>(replay.receipts());
+        receipts.add("exact-polynomial-step/v1");
+        return new MoveVerifier.Verification(true, total, receipts, "REPLAY_AND_EXACT_POLYNOMIAL_STEP_VERIFIED");
+    }
+
     private MoveVerifier.Verification verifyPolynomial(TypedMoveSearch.State source, SearchMove move,
             TypedMoveSearch.Context context) {
         long[] work = {1};
         try {
-            if ((operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER && source.searchDepth() != 0)
+            if (((operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER || isDirectPolynomial())
+                    && source.searchDepth() != 0)
                     || !move.ruleId().equals(descriptor.id())
                     || !(move.provenance() instanceof de.regelsuche.transform.TransformationProvenance.ExactTheoryStep theory)
                     || !theory.evidence().issuedFrom(VerifiedConstruction.class)) {

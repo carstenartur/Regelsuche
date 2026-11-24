@@ -17,6 +17,7 @@ from .run_schema import (AccountedSession, CPU_SCOPE, _file_inventory, _java_pro
 from .run_typed import natural
 
 DIRECT = 'POLYNOMIAL_DIRECT_V1'
+OBJECTIVE = 'EXACT_POLYNOMIAL_SURFACE'
 ORIGINAL = 'NATIVE_BASE'
 REFERENCE = 'SYMPY_PORTFOLIO'
 PROFILES = [ORIGINAL, DIRECT, REFERENCE]
@@ -38,7 +39,9 @@ def direct_setup(response):
             and response['modelHash'] == digest and response['settings'] == SETTINGS
             and response['trainingWork'] == 0 and response['learnedPrograms'] == 0,
             'direct profile setup differs from the declared source-only contract')
-    require(json.loads(model)['constructionProfile'] == DIRECT, 'model names a different construction profile')
+    declaration = json.loads(model)
+    require(declaration['constructionProfile'] == DIRECT and declaration['objective'] == OBJECTIVE,
+            'model names a different construction profile or objective')
     return digest
 
 
@@ -102,7 +105,7 @@ def direct_sequence(protocol, repetition, command, output):
 
 def comparison_protocol(path):
     protocol = native.load_protocol(path)
-    return dict(protocol, profiles=PROFILES, directSettings=SETTINGS,
+    return dict(protocol, profiles=PROFILES, directSettings=SETTINGS, directObjective=OBJECTIVE,
                 claim='PUBLIC_DEVELOPMENT_EXTENSION_OF_FROZEN_NATIVE_INPUTS')
 
 
@@ -204,8 +207,8 @@ def verify(output):
         else:
             native.check_response(profile, row['source'], response, model, protocol['workBudget'])
             native._audit(row['source'], response)
-    return {profile: dict(quality={k:v for k,v in quality.get(profile, {}).items() if k != 'pairs'},
-                          medians={key:statistics.median(s[key] for s in observations) for key in observations[0]},
+    return {profile: dict(quality={key: value for key, value in quality.get(profile, {}).items() if key != 'pairs'},
+                          medians={key: statistics.median(s[key] for s in observations) for key in observations[0]},
                           observations=observations) for profile, observations in resources.items()}
 
 

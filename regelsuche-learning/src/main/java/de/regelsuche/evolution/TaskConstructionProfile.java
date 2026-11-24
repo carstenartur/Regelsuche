@@ -18,15 +18,18 @@ public enum TaskConstructionProfile {
     /** Exact rational-polynomial simplification through the shared typed frontier. */
     POLYNOMIAL_SIMPLIFICATION_V1,
     /** Cost-selected sparse Horner representation with independently replayed polynomial equivalence. */
-    POLYNOMIAL_HORNER_V1;
+    POLYNOMIAL_HORNER_V1,
+    /** Metered bottom-up exact polynomial proposals with a checked frontier and final replay. */
+    POLYNOMIAL_DIRECT_V1;
 
     boolean requiresExactPolynomialSteps() {
         return this == STRUCTURAL_SQUARE_V1 || this == STRUCTURAL_EXPANSION_V1 || this == STRUCTURAL_EXPANSION_BRIDGE_V1
-            || this == POLYNOMIAL_SIMPLIFICATION_V1 || this == POLYNOMIAL_HORNER_V1;
+            || this == POLYNOMIAL_SIMPLIFICATION_V1 || this == POLYNOMIAL_HORNER_V1 || this == POLYNOMIAL_DIRECT_V1;
     }
 
     CheckedSchemaTaskSolver attach(CheckedSchemaTaskSolver solver) {
         if (this == NONE) return solver;
+        if (this == POLYNOMIAL_DIRECT_V1) return solver.withDirectPolynomial(false);
         if (this == POLYNOMIAL_HORNER_V1) return solver.withConstructions(java.util.List.of(
             StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER), false).withExactPolynomialSteps();
         if (this == POLYNOMIAL_SIMPLIFICATION_V1) return solver.withConstructions(java.util.List.of(

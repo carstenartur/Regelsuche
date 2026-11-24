@@ -149,6 +149,13 @@ public final class CheckedSchemaTaskSolver {
             expansionRulesAttached, expansionBridgesForOtherGoals);
     }
 
+    CheckedSchemaTaskSolver withDirectPolynomial(boolean sharedArithmetic) {
+        var provider = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.POLYNOMIAL_DIRECT,
+            0, sharedArithmetic);
+        var direct = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());
+        return new CheckedSchemaTaskSolver(direct, preparation, false, true, false, false);
+    }
+
     CheckedSchemaTaskSolver withExpansionRules(boolean bridgesForOtherGoals) {
         return new CheckedSchemaTaskSolver(StructuralExpansionRules.attach(session, preparation != null), preparation,
             breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals);
@@ -184,8 +191,12 @@ public final class CheckedSchemaTaskSolver {
 
     /** Source-only arithmetic minimization with the same frontier, paid objective and final replay. */
     public TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions, MoveSearch.Budget budget) {
-        var task = new Task(source, assumptions,
-            new Goal(state -> TypedPolynomialSurfaceCost.evaluate(state.expression()), Long.MIN_VALUE), budget);
+        return simplify(source, assumptions, budget, state -> TypedPolynomialSurfaceCost.evaluate(state.expression()));
+    }
+
+    TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions,
+            MoveSearch.Budget budget, TypedSourceOnlySearch.Objective objective) {
+        var task = new Task(source, assumptions, new Goal(objective, Long.MIN_VALUE), budget);
         var prepared = prepare(task);
         return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
             () -> new TypedSourceOnlySearch().search(problem(task), prepared.objective()));
@@ -244,9 +255,10 @@ public final class CheckedSchemaTaskSolver {
         return new TypedMoveSearch.Problem(task.source(),
             TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),
             providersFor(task), policyFor(task),
-            exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective())
+            directPolynomial().isEmpty()
+                    && (exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
                 ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -> 0,
-            MoveSearch.Mode.FAST, preparation == null ? MoveSearch.Scheduling.STAGED
+            MoveSearch.Mode.FAST, preparation == null || directPolynomial().isPresent() ? MoveSearch.Scheduling.STAGED
                 : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),
             (state, context) -> {
                 var size = NativeNodeCountObjective.INSTANCE.evaluate(state);
@@ -256,9 +268,17 @@ public final class CheckedSchemaTaskSolver {
     }
 
     private List<MoveProvider> providersFor(Task task) {
+        var direct = directPolynomial();
+        if (direct.isPresent()) return List.of(direct.orElseThrow().forBudget(task.budget()));
         if (!expansionRulesAttached || expansionBridgesForOtherGoals
                 || task.goal().objective() == StructuralTaskObjective.EXPANDED_POLYNOMIAL) return session.providers();
         return session.providers().stream().filter(provider -> !StructuralExpansionRules.isExpansionProvider(provider.descriptor())).toList();
+    }
+
+    private Optional<StructuralConstructionProvider> directPolynomial() {
+        if (session.providers().size() == 1 && session.providers().getFirst() instanceof StructuralConstructionProvider provider
+                && provider.isDirectPolynomial()) return Optional.of(provider);
+        return Optional.empty();
     }
 
     private KnowledgeFirst policyFor(Task task) {

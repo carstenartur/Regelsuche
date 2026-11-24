@@ -28,7 +28,7 @@ final class StructuralConstructionPrograms {
         BINARY_QUARTIC, RESIDUAL_EXPANDED, AUXILIARY_COMPLEMENT, AUXILIARY_FACTOR, RECOGNIZE_SQUARE,
         RATIONAL_EXPOSE_SQUARE, RECOGNIZE_RATIONAL_SQUARE, RECOGNIZE_METERED_SQUARE,
         POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR,
-        POLYNOMIAL_HORNER }
+        POLYNOMIAL_HORNER, POLYNOMIAL_DIRECT }
     record Report(List<String> candidates, long work) { Report { candidates = List.copyOf(candidates); } }
     private static final long LIMIT = 100_000;
     private StructuralConstructionPrograms() { }
@@ -65,6 +65,7 @@ final class StructuralConstructionPrograms {
                 case POLYNOMIAL_CANONICAL, POLYNOMIAL_EXPANDED, POLYNOMIAL_COMMON_FACTOR, POLYNOMIAL_UNIVARIATE_FACTOR ->
                     PolynomialSimplificationPrograms.generate(operation, source, LIMIT - work.units, work::add);
                 case POLYNOMIAL_HORNER -> throw new IllegalStateException("Horner handled before legacy generation");
+                case POLYNOMIAL_DIRECT -> throw new IllegalStateException("direct portfolio requires a request budget");
             };
             return new Report(candidates, work.units);
         } catch (Limit | IllegalArgumentException unsupported) {
