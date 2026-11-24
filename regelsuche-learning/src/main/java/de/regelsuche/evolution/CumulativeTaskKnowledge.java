@@ -241,6 +241,16 @@ public final class CumulativeTaskKnowledge {
         return automatic(id, task, routes, knowledgeGoals, baseline, learned);
     }
 
+    /** Session bookkeeping shares the original query budget; a retained proposal grants no proof authority. */
+    Execution solveInSession(CheckedSchemaTaskSolver.Task task, Strategy strategy, long lookupWork, RetainedTaskPath path) {
+        Objects.requireNonNull(task, "task"); Objects.requireNonNull(strategy, "strategy");
+        if (lookupWork < 0) throw new IllegalArgumentException("negative query lookup work");
+        if (constructionProfile.requiresExactPolynomialSteps() || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
+            StructuralCheckedDomain.requireUnobserved();
+        var selected = strategy == Strategy.AUTOMATIC ? route(task, routes, knowledgeGoals) : new Routing(strategy, 0);
+        return run(id, task, selected.strategy(), Math.addExact(selected.work(), lookupWork), baseline, learned, path);
+    }
+
     /** Bounded alternative output uses the same frozen library, routing and strict task checks as solve. */
     public Exploration explore(CheckedSchemaTaskSolver.Task task, Strategy strategy,
             long reserveWork, int maximumAlternatives) {
@@ -292,6 +302,11 @@ public final class CumulativeTaskKnowledge {
 
     private static Execution run(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
             long selectionWork, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned) {
+        return run(generationId, task, selected, selectionWork, baseline, learned, null);
+    }
+
+    private static Execution run(String generationId, CheckedSchemaTaskSolver.Task task, Strategy selected,
+            long selectionWork, CheckedSchemaTaskSolver baseline, CheckedSchemaTaskSolver learned, RetainedTaskPath path) {
         if (selectionWork >= task.budget().totalWork()) return new Execution(generationId, task, selected, selectionWork, null);
         var remaining = task.budget();
         if (selectionWork > 0) remaining = new MoveSearch.Budget(remaining.maxPrimitiveSteps(), remaining.maxSearchDepth(),
@@ -299,7 +314,8 @@ public final class CumulativeTaskKnowledge {
         var actual = new CheckedSchemaTaskSolver.Task(task.source(), task.assumptions(), task.goal(), remaining);
         CheckedSchemaTaskSolver.Solution solution;
         try {
-            solution = (selected == Strategy.BASELINE ? baseline : learned).solve(actual);
+            var solver = selected == Strategy.BASELINE ? baseline : learned;
+            solution = path == null ? solver.solve(actual) : solver.replay(actual, path);
         } catch (CheckedSchemaTaskSolver.UnsupportedTaskException unsupported) {
             throw unsupported.withRoutingWork(selectionWork);
         }

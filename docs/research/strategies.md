@@ -284,6 +284,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`TaskKnowledgeSelfImprover.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java#L17) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeSelfImprover.java | public final class TaskKnowledgeSelfImprover { -->
 - [`TaskKnowledgeSelfImproverTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeSelfImproverTest.java#L7) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeSelfImproverTest.java | class TaskKnowledgeSelfImproverTest { -->
 
+## Geprüfte Pfadkandidaten für wiederholte Aufgaben
+
+- **Hypothese.** Bei exakt wiederholten Aufgaben derselben unveränderlichen Wissensgeneration kann ein begrenzter Pfadkandidat erneute Vorschlagsarbeit vermeiden; Prüfung, Final-Replay und Gesamtaufwand bleiben bezahlt.
+- **Umsetzungsstand.** Die optionale `TaskKnowledgeQuerySession` bindet Quelle, Annahmen, Built-in-Ziel, alle Budgetdimensionen und Strategie. Erst eine zweite erfolgreiche Beobachtung erlaubt volle Pfadaufnahme; spätere Treffer werden vom bestehenden Verifier und im Final-Replay neu geprüft. Beobachtungen und Pfade teilen dieselben LRU- und Zeichengrenzen.
+- **Befund.** Der erste öffentliche Entwicklungsversuch sparte 3,87 % volle logische Arbeit bei Wiederholung, verursachte aber 56,21 % Zusatzarbeit bei neuen Quellen. Die darauf entwickelte V2 erreicht −3,33 % bei Wiederholung, +0,22 % beim Kaltstart und +0,65 % bei neuen Quellen. Je Version wurden 1.584 Ergebnisse und 5.742 Beweiskanten unabhängig exakt geprüft. V2 spart in keinem der drei Wiederholungspaare gleichzeitig Wandzeit und CPU. [Protokolle, negative Ergebnisse und Reproduktion](task-query-reuse-2026-11-24/README.md)
+- **Folgerung.** Als optionalen Pfad für beobachtete Wiederholungen verwenden. Die Messung begründet keine allgemeine Aktivierung, keinen bestätigten Laufzeit-Payback und keinen Lerntransfer. Der bisherige gemischte Adoptionsbefund bleibt unverändert negativ.
+
+- [`TaskKnowledgeQuerySession.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeQuerySession.java#L20) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskKnowledgeQuerySession.java | public final class TaskKnowledgeQuerySession implements AutoCloseable { -->
+- [`TaskKnowledgeQuerySessionTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeQuerySessionTest.java#L11) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskKnowledgeQuerySessionTest.java | class TaskKnowledgeQuerySessionTest { -->
+
 ## Automatische Wahl bewiesener Rekurrenzgesetze
 
 - **Hypothese.** Der bestehende Wissenskatalog kann einen passenden Beweis für neue Übergänge wählen und gegenüber der direkten Suche Arbeit sparen.

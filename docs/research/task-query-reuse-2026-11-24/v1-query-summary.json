@@ -1,0 +1,866 @@
+{
+  "comparisons": [
+    {
+      "observedBothResourcePayback": true,
+      "observedCpuSavingsNanos": 1630000000,
+      "observedWallSavingsNanos": 2238774079,
+      "observedWorkSavings": -4365,
+      "qualityNonRegressing": true,
+      "repetition": 0,
+      "scenario": "COLD_ONE"
+    },
+    {
+      "observedBothResourcePayback": false,
+      "observedCpuSavingsNanos": -510000000,
+      "observedWallSavingsNanos": 406205,
+      "observedWorkSavings": 4815,
+      "qualityNonRegressing": true,
+      "repetition": 0,
+      "scenario": "REPEATED_SIXTEEN"
+    },
+    {
+      "observedBothResourcePayback": true,
+      "observedCpuSavingsNanos": 500000000,
+      "observedWallSavingsNanos": 367112235,
+      "observedWorkSavings": -69968,
+      "qualityNonRegressing": true,
+      "repetition": 0,
+      "scenario": "DISTINCT_SIXTEEN"
+    },
+    {
+      "observedBothResourcePayback": false,
+      "observedCpuSavingsNanos": -220000000,
+      "observedWallSavingsNanos": -260576855,
+      "observedWorkSavings": -4365,
+      "qualityNonRegressing": true,
+      "repetition": 1,
+      "scenario": "COLD_ONE"
+    },
+    {
+      "observedBothResourcePayback": true,
+      "observedCpuSavingsNanos": 970000000,
+      "observedWallSavingsNanos": 551015185,
+      "observedWorkSavings": 4815,
+      "qualityNonRegressing": true,
+      "repetition": 1,
+      "scenario": "REPEATED_SIXTEEN"
+    },
+    {
+      "observedBothResourcePayback": false,
+      "observedCpuSavingsNanos": 60000000,
+      "observedWallSavingsNanos": -64285971,
+      "observedWorkSavings": -69968,
+      "qualityNonRegressing": true,
+      "repetition": 1,
+      "scenario": "DISTINCT_SIXTEEN"
+    },
+    {
+      "observedBothResourcePayback": true,
+      "observedCpuSavingsNanos": 70000000,
+      "observedWallSavingsNanos": 11180045,
+      "observedWorkSavings": -4365,
+      "qualityNonRegressing": true,
+      "repetition": 2,
+      "scenario": "COLD_ONE"
+    },
+    {
+      "observedBothResourcePayback": true,
+      "observedCpuSavingsNanos": 90000000,
+      "observedWallSavingsNanos": 37095203,
+      "observedWorkSavings": 4815,
+      "qualityNonRegressing": true,
+      "repetition": 2,
+      "scenario": "REPEATED_SIXTEEN"
+    },
+    {
+      "observedBothResourcePayback": false,
+      "observedCpuSavingsNanos": 60000000,
+      "observedWallSavingsNanos": -1309737,
+      "observedWorkSavings": -69968,
+      "qualityNonRegressing": true,
+      "repetition": 2,
+      "scenario": "DISTINCT_SIXTEEN"
+    }
+  ],
+  "revision": "regelsuche.task-query-reuse/v1",
+  "studyPaidBeforeSerialization": {
+    "cpuNanos": 17400000000,
+    "wallNanos": 10202848897
+  },
+  "arms": [
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 22602,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 3390000000,
+        "wallNanos": 2914682791
+      },
+      "profile": "PERSISTENT",
+      "repetition": 0,
+      "scenario": "COLD_ONE",
+      "setupCost": {
+        "cpuNanos": 3030000000,
+        "wallNanos": 2679587580
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 8,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 2976,
+        "misses": 0,
+        "queries": 8,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 26967,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1760000000,
+        "wallNanos": 675908712
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 0,
+      "scenario": "COLD_ONE",
+      "setupCost": {
+        "cpuNanos": 1420000000,
+        "wallNanos": 544492764
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 6,
+        "bypasses": 0,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 7341,
+        "misses": 8,
+        "queries": 8,
+        "retainedCharacters": 65986,
+        "retainedQueries": 6
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 119667,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 2320000000,
+        "wallNanos": 1000816880
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 0,
+      "scenario": "REPEATED_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 470000000,
+        "wallNanos": 190703575
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 6,
+        "bypasses": 0,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 90,
+        "knownWork": 42801,
+        "misses": 38,
+        "queries": 128,
+        "retainedCharacters": 65986,
+        "retainedQueries": 6
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 124482,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1810000000,
+        "wallNanos": 1001223085
+      },
+      "profile": "PERSISTENT",
+      "repetition": 0,
+      "scenario": "REPEATED_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 310000000,
+        "wallNanos": 173689460
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 128,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 47616,
+        "misses": 0,
+        "queries": 128,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 124482,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1700000000,
+        "wallNanos": 928394489
+      },
+      "profile": "PERSISTENT",
+      "repetition": 0,
+      "scenario": "DISTINCT_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 400000000,
+        "wallNanos": 200435915
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 128,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 47616,
+        "misses": 0,
+        "queries": 128,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 194450,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1200000000,
+        "wallNanos": 561282254
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 0,
+      "scenario": "DISTINCT_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 130000000,
+        "wallNanos": 74423108
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 96,
+        "bypasses": 0,
+        "evictions": 64,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 117584,
+        "misses": 128,
+        "queries": 128,
+        "retainedCharacters": 365273,
+        "retainedQueries": 32
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 26967,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 420000000,
+        "wallNanos": 351251196
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 1,
+      "scenario": "COLD_ONE",
+      "setupCost": {
+        "cpuNanos": 330000000,
+        "wallNanos": 249218702
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 6,
+        "bypasses": 0,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 7341,
+        "misses": 8,
+        "queries": 8,
+        "retainedCharacters": 65986,
+        "retainedQueries": 6
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 22602,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 200000000,
+        "wallNanos": 90674341
+      },
+      "profile": "PERSISTENT",
+      "repetition": 1,
+      "scenario": "COLD_ONE",
+      "setupCost": {
+        "cpuNanos": 170000000,
+        "wallNanos": 79483600
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 8,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 2976,
+        "misses": 0,
+        "queries": 8,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 124482,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 1480000000,
+        "wallNanos": 773078171
+      },
+      "profile": "PERSISTENT",
+      "repetition": 1,
+      "scenario": "REPEATED_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 100000000,
+        "wallNanos": 46270631
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 128,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 47616,
+        "misses": 0,
+        "queries": 128,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 119667,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 510000000,
+        "wallNanos": 222062986
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 1,
+      "scenario": "REPEATED_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 120000000,
+        "wallNanos": 58502438
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 6,
+        "bypasses": 0,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 90,
+        "knownWork": 42801,
+        "misses": 38,
+        "queries": 128,
+        "retainedCharacters": 65986,
+        "retainedQueries": 6
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 194450,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 460000000,
+        "wallNanos": 330011488
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 1,
+      "scenario": "DISTINCT_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 80000000,
+        "wallNanos": 56877891
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 96,
+        "bypasses": 0,
+        "evictions": 64,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 117584,
+        "misses": 128,
+        "queries": 128,
+        "retainedCharacters": 365273,
+        "retainedQueries": 32
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 124482,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 520000000,
+        "wallNanos": 265725517
+      },
+      "profile": "PERSISTENT",
+      "repetition": 1,
+      "scenario": "DISTINCT_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 80000000,
+        "wallNanos": 38528067
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 128,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 47616,
+        "misses": 0,
+        "queries": 128,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 22602,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 150000000,
+        "wallNanos": 91388570
+      },
+      "profile": "PERSISTENT",
+      "repetition": 2,
+      "scenario": "COLD_ONE",
+      "setupCost": {
+        "cpuNanos": 110000000,
+        "wallNanos": 72006733
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 8,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 2976,
+        "misses": 0,
+        "queries": 8,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 26967,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 80000000,
+        "wallNanos": 80208525
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 2,
+      "scenario": "COLD_ONE",
+      "setupCost": {
+        "cpuNanos": 60000000,
+        "wallNanos": 69459514
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 6,
+        "bypasses": 0,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 7341,
+        "misses": 8,
+        "queries": 8,
+        "retainedCharacters": 65986,
+        "retainedQueries": 6
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 119667,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 260000000,
+        "wallNanos": 172297638
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 2,
+      "scenario": "REPEATED_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 60000000,
+        "wallNanos": 30379103
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 6,
+        "bypasses": 0,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 90,
+        "knownWork": 42801,
+        "misses": 38,
+        "queries": 128,
+        "retainedCharacters": 65986,
+        "retainedQueries": 6
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 124482,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 350000000,
+        "wallNanos": 209392841
+      },
+      "profile": "PERSISTENT",
+      "repetition": 2,
+      "scenario": "REPEATED_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 60000000,
+        "wallNanos": 35081932
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 128,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 47616,
+        "misses": 0,
+        "queries": 128,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 124482,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 410000000,
+        "wallNanos": 246300011
+      },
+      "profile": "PERSISTENT",
+      "repetition": 2,
+      "scenario": "DISTINCT_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 60000000,
+        "wallNanos": 24800713
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 0,
+        "bypasses": 128,
+        "evictions": 0,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 47616,
+        "misses": 0,
+        "queries": 128,
+        "retainedCharacters": 0,
+        "retainedQueries": 0
+      }
+    },
+    {
+      "accountingComplete": true,
+      "acquisition": [
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:03cb010647f92bb63b01e2a3913062404d65f629456226a05789c93ca58fe2ee",
+          "work": 3600
+        },
+        {
+          "decision": "PROMOTED",
+          "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+          "work": 6938
+        }
+      ],
+      "failure": "",
+      "generationId": "sha256:a871b69267d8a7014a65af53a8eccfb473760f66751c3642896aae8d01a4ea75",
+      "knownWork": 194450,
+      "paidIncludingSetupAndAudit": {
+        "cpuNanos": 350000000,
+        "wallNanos": 247609748
+      },
+      "profile": "RETAINED_PATH",
+      "repetition": 2,
+      "scenario": "DISTINCT_SIXTEEN",
+      "setupCost": {
+        "cpuNanos": 80000000,
+        "wallNanos": 40403023
+      },
+      "setupWork": 15810,
+      "statistics": {
+        "accountingComplete": true,
+        "admissions": 96,
+        "bypasses": 0,
+        "evictions": 64,
+        "failures": 0,
+        "hits": 0,
+        "knownWork": 117584,
+        "misses": 128,
+        "queries": 128,
+        "retainedCharacters": 365273,
+        "retainedQueries": 32
+      }
+    }
+  ]
+}

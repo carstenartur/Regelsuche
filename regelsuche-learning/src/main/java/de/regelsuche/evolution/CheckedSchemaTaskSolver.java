@@ -169,6 +169,19 @@ public final class CheckedSchemaTaskSolver {
         return new Solution(task, result, prepared.checkedSteps());
     }
 
+    /** A retained path replaces proposal generation only; both verification passes remain fresh. */
+    Solution replay(Task task, RetainedTaskPath path) {
+        var prepared = prepare(task);
+        var original = problem(task);
+        var replay = new TypedMoveSearch.Problem(original.source(), original.context(), List.of(path),
+            TypedMoveSearch.Policy.INVENTORY_ORDER, original.verifier(), original.stateScore(), original.mode(),
+            MoveSearch.Scheduling.STAGED, original.budget(), original.stateValue());
+        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
+            () -> new TypedSourceOnlySearch().searchUntil(replay, prepared.objective(),
+                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
+        return new Solution(task, result, prepared.checkedSteps());
+    }
+
     /** Source-only arithmetic minimization with the same frontier, paid objective and final replay. */
     public TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions, MoveSearch.Budget budget) {
         var task = new Task(source, assumptions,

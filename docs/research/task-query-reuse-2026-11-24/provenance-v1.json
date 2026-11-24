@@ -1,0 +1,31 @@
+{
+  "revision": "regelsuche.task-query-reuse-v1-provenance-clarification/v1",
+  "recordedOn": "2026-11-24",
+  "historicalReceipt": {
+    "file": "v1-reproduction.json",
+    "sha256": "c3d38ce7e8e9a7dad585eb201198f8c9aed92fcf9ce62e609776f0180500367d",
+    "claimedMainSourceAndPomSha256": "8e46c0162161431b087eee458f55aad2ce5d951b5a78fb82464ec3d0e4513abe",
+    "originalHashRecipeRecovered": false,
+    "measurementSourceBindingConfirmed": false,
+    "limit": "The original file selection and byte-encoding recipe were not retained. The historical hash has not been independently reproduced; this clarification does not replace or reinterpret it."
+  },
+  "retainedDevelopmentSnapshot": {
+    "commit": "e3c643a8dd866572aa3cb762d994fed9aacae676",
+    "tree": "5d04c154a64874f2e894a272e79b6bccc91f5c12",
+    "sourceFileCount": 2075,
+    "sourceSha256": "e0d571a27646e2eac637814909c8394d5aa9c0e3ea5839e47e66ebe3a0bc405a",
+    "algorithm": "Select git ls-tree -r --name-only paths from this commit where ((/src/main/ is in path and path ends with .java) or path ends with pom.xml). Sort relative paths lexicographically. SHA256 over each UTF-8 path, one NUL byte, exact Git blob bytes, one NUL byte, in that order.",
+    "meaning": "Reproducible identity of the preserved V1 development snapshot, computed after review. It does not prove that the unrecorded original hash recipe selected these bytes at measurement time."
+  },
+  "availableBundle": {
+    "file": "source-history.bundle",
+    "sha256": "b4833417ed3c49b5e2e080df55bec630da28d9d70833c3b61fa6f3ca5ee61543",
+    "bytes": 366358,
+    "requiresBaseCommit": "f183aedd1ff2ab061ed903559b96a11d28974e7f"
+  },
+  "unchangedMeasurementArtifacts": {
+    "reportSha256": "6fe69d3cd98559b113adc3214ff66193bedfadb36a55ced4fe653126e088e0b9",
+    "stdoutSha256": "40d2fdf026e25467d17de7abad646674b7ab5f6067b287dbf5ac6810da6ff284",
+    "matchHistoricalReceipt": true
+  }
+}

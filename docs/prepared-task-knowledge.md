@@ -6,6 +6,47 @@ batch learner and adds measured adoption decisions. They use the existing typed
 search frontier, schema proofs and primitive fallback. No additional mathematical
 procedure or query-answer cache is installed.
 
+For explicitly repeated requests, the separate `TaskKnowledgeQuerySession`
+retains successful selected paths as proposals. It is opt-in and does not change
+the APIs above. A first success retains a bounded observation key; a second
+successful occurrence may retain its path. Later hits execute the regular
+candidate verifier and the complete independent selected-path replay again.
+
+```java
+try (var queries = new TaskKnowledgeQuerySession(preparedKnowledge, 32, 4_000_000)) {
+    var result = queries.solve(task, CumulativeTaskKnowledge.Strategy.AUTOMATIC);
+    if (result.solved()) {
+        var proof = result.execution().solution().orElseThrow().evidence();
+        // Fresh verified output and witness from this invocation.
+    }
+    long paidQueryWork = result.totalWork();
+}
+```
+
+One immutable generation owns the query session. Keys include exact typed source
+identity, normalized assumptions, the built-in goal and threshold, all six query
+budget fields and the requested strategy. Arbitrary objective callbacks always
+run fresh. A retained path never supplies an unsolved-result or impossibility
+certificate. Misses perform ordinary search; hits replace proposal generation
+only, with a deliberately incomplete successor relation. No unsuccessful replay
+silently restarts with an additional budget.
+
+Observation keys and full paths share the configured LRU capacity and retained
+logical-character limit. A first observation reuses the normal solver's existing
+canonical source document to conservatively bound its key; it does not traverse
+the full witness graph. Full path admission pays the existing `RetainedGraph`
+footprint traversal, replacement and eviction. Over-budget atomic preparation
+remains paid and cannot admit the path. `Query.totalWork()` includes retention;
+`Query.solved()` also checks that enclosing total. Its embedded execution reports
+the solver's narrower scope and must not replace the enclosing query decision.
+Disabled capacity preserves the original persistent solver's work contract.
+Closing the session drops retained observations and paths.
+
+The [public comparison and limits](research/task-query-reuse-2026-11-24/README.md)
+distinguish repeated-query reuse from learning transfer and include cold and
+distinct-source controls. The existing `TaskKnowledgeSession` still only reuses
+verified generations and never performs this query retention implicitly.
+
 ## Reusing a verified generation
 
 ```java
@@ -66,9 +107,11 @@ tests, never by the runtime experiment.
 
 The exact adoption gate rejects an individual solution/score regression or an
 incomplete sample. Predicted average savings over `expectedFutureQueries` must
-exceed **all actually paid formation and evaluation costs of the current attempt**
-in both elapsed time and CPU. Earlier rejected attempts remain paid in the whole
-cycle's `Result`; this incremental gate does not prove their repayment.
+exceed **all actually paid formation and evaluation costs of the improvement run**
+in both elapsed time and CPU, including earlier rejected attempts and intervening
+controller work. Explicit `LEGACY_ATTEMPT` scope preserves historical per-attempt
+selection for old studies. `Attempt.paid` remains incremental;
+`Attempt.adoptionCost` states the actual cumulative or legacy cost used by the gate.
 Large horizons/products use exact integer arithmetic. The horizon is a
 caller-supplied forecast; adoption predicts savings, not a measured guarantee.
 An independent complete stream is necessary to demonstrate actual amortization.
