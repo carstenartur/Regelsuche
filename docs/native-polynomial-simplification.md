@@ -35,6 +35,16 @@ select `TaskConstructionProfile.POLYNOMIAL_HORNER_V1`. The
 [original Enumo comparison](../research/benchmarks/enumo-horner-v2/README.md)
 uses the common arithmetic grammar, which expresses powers through products.
 
+For a single whole-source candidate in that common grammar, pass
+`TaskConstructionProfile.POLYNOMIAL_HORNER_ROOT_V1` to
+`newTaskSolverWithProfile`. Its `simplify` method accepts sums, differences,
+products and divisions by nonzero constant expressions over exact rational
+scalars. Write powers as repeated multiplication for this profile. The solver
+charges one bounded Horner proposal and verifies and replays it only if its
+operator count improves. An equal-cost source stays unchanged. The
+[five-arm replay](../research/benchmarks/enumo-horner-v2/README.md#root-only-horner-follow-up)
+compares this profile with the mixed frontier and original Enumo.
+
 Use `newTaskSolverWithProfile(model, profile)` to prepare proved schemata with
 the same native fallback. Existing `CumulativeTaskKnowledge.empty(genome, profile)`
 also stores and restores the profile and can use it for declared task goals and

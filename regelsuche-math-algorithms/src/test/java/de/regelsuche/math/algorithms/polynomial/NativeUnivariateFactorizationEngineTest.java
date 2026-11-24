@@ -86,6 +86,41 @@ class NativeUnivariateFactorizationEngineTest {
     }
 
     @Test
+    void refinesNestedFactorsWithMultiplicitiesAndPreservesTheScalar() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithRefinement(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var source = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(8), ExactRational.integer(6),
+            Monomial.of(4), ExactRational.integer(-12),
+            Monomial.of(0), ExactRational.integer(6)));
+        var result = FactorizationVerifier.execute(engine, FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, WORK));
+        assertTrue(result.successful(), result.detailCode());
+        assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+        var candidate = result.candidates().getFirst();
+        assertEquals(ExactRational.integer(6), candidate.unit());
+        assertEquals(List.of(1, 1, 2),
+            candidate.factors().stream().map(factor -> factor.polynomial().degree(0)).sorted().toList());
+        assertTrue(candidate.factors().stream().allMatch(factor -> factor.multiplicity() == 2));
+        assertTrue(result.work().units("native-rational-refinement.factor-visits") >= 2);
+        assertTrue(result.work().units("verify.product-comparisons") >= 3);
+    }
+
+    @Test
+    void aTightSharedBudgetKeepsThePreviouslyAvailableExactSplit() {
+        var engine = NativeUnivariateFactorizationEngine.rationalsWithRefinement(
+            NativeUnivariateFactorizationPolicy.boundedDefaults());
+        var source = new SparsePolynomial<>(rationalRing, Map.of(
+            Monomial.of(8), ExactRational.ONE, Monomial.of(0), ExactRational.NEGATIVE_ONE));
+        var request = FactorizationRequest.verifiedDecomposition(source, LIMITS, 1, 30);
+        var result = FactorizationVerifier.execute(engine, request);
+        assertTrue(result.successful(), result.detailCode());
+        assertTrue(result.work().within(30));
+        assertEquals(List.of(4, 4), result.candidates().getFirst().factors().stream()
+            .map(factor -> factor.polynomial().degree(0)).sorted().toList());
+        assertEquals(FactorizationVerifier.ClaimStrength.VERIFIED_DECOMPOSITION, result.claimStrength());
+    }
+
+    @Test
     void completelyFactorsGeneralIntegerPolynomial() {
         SparsePolynomial<BigInteger> xMinusOne = integer(-1, 1);
         SparsePolynomial<BigInteger> xPlusTwo = integer(2, 1);

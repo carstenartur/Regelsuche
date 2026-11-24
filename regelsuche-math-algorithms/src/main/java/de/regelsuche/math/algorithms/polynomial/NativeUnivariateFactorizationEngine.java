@@ -47,6 +47,15 @@ public final class NativeUnivariateFactorizationEngine<C>
         return new RationalFactorizationFastPath(policy);
     }
 
+    /**
+     * Refines verified rational decompositions under the original request budget.
+     * Unsplit factors remain in the product without an irreducibility claim.
+     */
+    public static FactorizationEngine<ExactRational> rationalsWithRefinement(
+            NativeUnivariateFactorizationPolicy policy) {
+        return new RationalFactorizationRefinement(policy);
+    }
+
     public static NativeUnivariateFactorizationEngine<BigInteger>
             boundedIntegers() {
         return integers(

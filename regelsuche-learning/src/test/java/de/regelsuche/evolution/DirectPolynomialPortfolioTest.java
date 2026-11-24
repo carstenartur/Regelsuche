@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.equivalence.SparsePolynomialForms;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.MoveSearch;
@@ -16,6 +17,30 @@ import org.junit.jupiter.api.Test;
 class DirectPolynomialPortfolioTest {
     private static final String INPUT = "(2*u+11)*w+(3*v+7)*w";
     private static final MoveSearch.Budget FULL = new MoveSearch.Budget(9, 9, 16_384, 256, 16_384, 24);
+
+    @Test
+    void polynomialSupportLowerBoundFitsTheActualArithmeticTrees() {
+        var leaves = List.of("0", "1", "3", "x", "y", "z");
+        var parser = new ExpressionParser();
+        for (String left : leaves) {
+            for (String right : leaves) {
+                for (String op : List.of("+", "-", "*")) {
+                    String term = "(" + left + op + right + ")";
+                    for (String source : List.of(term, term + "*w", term + "+z", term + "^3", term + "/3")) {
+                        var expression = parser.parseTerm(source);
+                        long bound = SparsePolynomialForms.proposeWithSurfaceBound(expression, false,
+                            units -> { }, ignored -> { });
+                        assertTrue(bound <= TypedPolynomialSurfaceCost.evaluate(expression).value(), source);
+                    }
+                }
+            }
+        }
+        for (String source : List.of("x^2+x", "2*x^6", "x^3+1", "2*x+3", "u*u+v")) {
+            var expression = parser.parseTerm(source);
+            assertEquals(2, SparsePolynomialForms.proposeWithSurfaceBound(expression, false,
+                units -> { }, ignored -> { }), source);
+        }
+    }
 
     @Test
     void ordinaryOptInUsesOnePaidAndIndependentlyReplayedConstruction() {
@@ -71,6 +96,38 @@ class DirectPolynomialPortfolioTest {
         assertTrue((Boolean) result.get("internalWorkWithinBudget"));
         assertEquals(1, ((List<?>) result.get("witness")).size());
         new ExactPolynomialAnalysis().requireEquivalent(source, (String) result.get("output"));
+    }
+
+    @Test
+    void carefullyKeepsTerminatingFractionsOnTheIntegerRatioWire() {
+        var worker = new TypedExternalPolynomialComparisonWorker();
+        worker.initialize("POLYNOMIAL_DIRECT_V1");
+        for (String scale : List.of("3/8", "-7/16")) {
+            String source = "((m+n)*(m-n)+n*n)*(" + scale + ")";
+            var result = worker.run("POLYNOMIAL_DIRECT_V1", source);
+            var output = (String) result.get("output");
+            assertTrue(output.contains("/"));
+            assertFalse(output.contains("."));
+            assertTrue((Boolean) result.get("internalWorkWithinBudget"));
+            assertEquals(1, ((List<?>) result.get("witness")).size());
+            new ExactPolynomialAnalysis().requireEquivalent(source, output);
+        }
+    }
+
+    @Test
+    void oversizedGeneratedLiteralDoesNotReplaceTheIncumbentOrBreakExport() {
+        String source = "1" + "0".repeat(76) + "^16+x";
+        var parsed = new ExpressionParser().parseTerm(source);
+        var direct = solver().simplify(parsed, List.of(), FULL);
+        assertEquals(parsed, direct.incumbent().expression());
+        assertTrue(direct.witness().isEmpty());
+        assertTrue(direct.withinBudget());
+        var worker = new TypedExternalPolynomialComparisonWorker();
+        worker.initialize("POLYNOMIAL_DIRECT_V1");
+        var result = worker.run("POLYNOMIAL_DIRECT_V1", source);
+        assertEquals(parsed, new ExpressionParser().parseTerm((String) result.get("output")));
+        assertTrue(((List<?>) result.get("witness")).isEmpty());
+        assertTrue((Boolean) result.get("internalWorkWithinBudget"));
     }
 
     private static CheckedSchemaTaskSolver solver() {

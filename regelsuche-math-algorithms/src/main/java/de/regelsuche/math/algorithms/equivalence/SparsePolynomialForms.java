@@ -21,18 +21,64 @@ public final class SparsePolynomialForms {
     private SparsePolynomialForms() {}
 
     public static void propose(Expr source, boolean sharedArithmetic, LongConsumer work, Consumer<Expr> output) {
+        propose(source, sharedArithmetic, work, output, false);
+    }
+
+    /** Proposes the same forms and returns a lower bound for binary arithmetic tree size. */
+    public static int proposeWithSurfaceBound(Expr source, boolean sharedArithmetic, LongConsumer work, Consumer<Expr> output) {
+        return propose(source, sharedArithmetic, work, output, true);
+    }
+
+    private static int propose(Expr source, boolean sharedArithmetic, LongConsumer work,
+            Consumer<Expr> output, boolean needBound) {
         var form = new ExactResidualPolynomialArithmetic(work, true).project(source);
         var variables = form.variables().stream().sorted().toList();
         var terms = form.terms();
-        if (variables.size() > ExactPolynomialAnalysis.MAX_VARIABLES || terms.size() > MAX_TERMS) return;
+        if (variables.size() > ExactPolynomialAnalysis.MAX_VARIABLES || terms.size() > MAX_TERMS) return 0;
         for (var scalar : terms.values()) {
             work.accept(1);
-            if (!bounded(scalar)) return;
+            if (!bounded(scalar)) return 0;
         }
         var generator = new Generator(sharedArithmetic, work, output);
         generator.commonContent(terms);
         if (variables.size() == 1) generator.binomialPower(variables.getFirst(), form);
         if (terms.size() >= 4) generator.separable(variables, terms);
+        return needBound ? surfaceLowerBound(terms, variables, work) : 0;
+    }
+
+    private static int surfaceLowerBound(Map<Monomial, Rational> terms, List<String> variables, LongConsumer work) {
+        int count = variables.size();
+        if (count == 0) return 0;
+        if (count == 1) {
+            // A single operation on leaves yields a monomial, or x+c / c-x with linear coefficient ±1.
+            String variable = variables.getFirst();
+            if (terms.size() > 2) return 2;
+            for (var term : terms.entrySet()) {
+                work.accept(1);
+                int exponent = term.getKey().exponentOf(variable);
+                var coefficient = term.getValue();
+                if (exponent == 0) continue;
+                if (terms.size() == 1) {
+                    if (exponent == 1) return coefficient.isOne() ? 0 : 1;
+                    return coefficient.isOne() ? 1 : 2;
+                }
+                return exponent == 1 && (coefficient.isOne() || coefficient.isNegativeOne())
+                    && terms.containsKey(Monomial.constant()) ? 1 : 2;
+            }
+            return 0;
+        }
+        // With exactly count-1 binary nodes every leaf must be a different essential variable.
+        // A polynomial in that read-once tree can only use +, -, *: an exponent or a
+        // divisor in the admitted grammar must be constant. Its expansion has no constant,
+        // has only signed unit coefficients, and no variable occurs twice in a monomial.
+        for (var term : terms.entrySet()) {
+            var powers = term.getKey().powers();
+            work.accept(1L + powers.size());
+            var coefficient = term.getValue();
+            if (powers.isEmpty() || !(coefficient.isOne() || coefficient.isNegativeOne())
+                    || powers.values().stream().anyMatch(exponent -> exponent > 1)) return count;
+        }
+        return count - 1;
     }
 
     private static final class Generator {

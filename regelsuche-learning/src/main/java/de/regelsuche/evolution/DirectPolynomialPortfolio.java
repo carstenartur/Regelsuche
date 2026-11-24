@@ -22,13 +22,17 @@ final class DirectPolynomialPortfolio {
     private static final long MAX_FACTOR_WORK = 3_000;
     private static final long MAX_PROPOSAL_WORK = 12_288;
     private static final NumberExpr ZERO = new NumberExpr(0);
+    private static final CheckedLearnedSchemaModel.Bounds DOMAIN = CheckedLearnedSchemaModel.Bounds.defaults();
+    private static final Candidate OUTSIDE_DOMAIN = new Candidate(null, 0, 0);
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final HashMap<Expr, Expr> results = new HashMap<>();
     private final IdentityHashMap<Expr, TypedSourceOnlySearch.Score> scores = new IdentityHashMap<>();
+    private final IdentityHashMap<Expr, Candidate> candidates = new IdentityHashMap<>();
     private final long limit;
     private final boolean sharedArithmetic;
     private long work;
     private Expr incumbent;
+    private int lowerBound;
 
     record Result(Expr expression, long work) {}
 
@@ -44,10 +48,11 @@ final class DirectPolynomialPortfolio {
             for (int round = 0; round < MAX_ROUNDS; round++) {
                 var before = portfolio.incumbent;
                 portfolio.considerSparseRoot(before);
+                if (portfolio.score(portfolio.incumbent).value() <= portfolio.lowerBound) break;
                 portfolio.rewrite(before, true);
                 if (portfolio.incumbent == before) break;
             }
-        } catch (Exhausted exhausted) {
+        } catch (Exhausted | Optimum exhausted) {
             // A completed root proposal can still be checked against the original source.
         }
         return new Result(portfolio.incumbent, portfolio.work);
@@ -61,7 +66,9 @@ final class DirectPolynomialPortfolio {
             charge(units);
         };
         try {
-            SparsePolynomialForms.propose(source, sharedArithmetic, local, candidate -> select(incumbent, candidate, true));
+            lowerBound = SparsePolynomialForms.proposeWithSurfaceBound(source, sharedArithmetic, local,
+                candidate -> select(incumbent, candidate, true));
+            if (score(incumbent).value() <= lowerBound) return;
             if (score(incumbent).value() > 1 && (incumbent == source || sharedArithmetic)) {
                 SparsePolynomialHorner.propose(source, local).ifPresent(candidate -> select(incumbent, candidate, true));
             }
@@ -191,9 +198,80 @@ final class DirectPolynomialPortfolio {
     }
 
     private Expr select(Expr first, Expr second, boolean atRoot) {
-        if (first == second || score(second).value() >= score(first).value()) return first;
-        if (atRoot && score(second).value() < score(incumbent).value()) incumbent = second;
-        return second;
+        if (first == second) return first;
+        var candidate = candidate(second);
+        if (candidate == OUTSIDE_DOMAIN || score(candidate.expression()).value() >= score(first).value()) return first;
+        if (atRoot && score(candidate.expression()).value() < score(incumbent).value()) {
+            incumbent = candidate.expression();
+            if (score(incumbent).value() <= lowerBound) throw new Optimum();
+        }
+        return candidate.expression();
+    }
+
+    private record Candidate(Expr expression, int nodes, int depth) {}
+
+    private Candidate candidate(Expr source) {
+        charge(1);
+        var cached = candidates.get(source);
+        if (cached != null) return cached;
+        var result = switch (source) {
+            case NumberExpr number -> literal(number);
+            case BinaryExpr binary -> binary(binary);
+            case de.regelsuche.ast.VariableExpr variable -> new Candidate(variable, 1, 0);
+            default -> OUTSIDE_DOMAIN;
+        };
+        candidates.put(source, result);
+        return result;
+    }
+
+    private Candidate literal(NumberExpr number) {
+        var value = number.value();
+        charge(1);
+        if (value.numerator().abs().bitLength() > DOMAIN.maximumCoefficientBits()
+                || value.denominator().bitLength() > DOMAIN.maximumCoefficientBits()) return OUTSIDE_DOMAIN;
+        if (value.isInteger()) return new Candidate(number, 1, 0);
+        // The ordinary exact replay wire uses explicit integer ratios, including terminating decimals.
+        charge(3);
+        return new Candidate(new BinaryExpr(new NumberExpr(ExactRational.integer(value.numerator())),
+            BinaryOperator.DIV, new NumberExpr(ExactRational.integer(value.denominator()))), 3, 1);
+    }
+
+    private Candidate binary(BinaryExpr source) {
+        var left = candidate(source.left());
+        var right = candidate(source.right());
+        if (left == OUTSIDE_DOMAIN || right == OUTSIDE_DOMAIN) return OUTSIDE_DOMAIN;
+        if (source.operator() == BinaryOperator.POW && !admissibleExponent(right.expression())) return OUTSIDE_DOMAIN;
+        if (source.operator() == BinaryOperator.DIV) {
+            if (source.right() instanceof NumberExpr denominator && !denominator.value().isInteger()) {
+                return divideByRatio(left, denominator.value());
+            }
+            if (!(right.expression() instanceof NumberExpr denominator) || denominator.value().isZero())
+                return OUTSIDE_DOMAIN;
+        }
+        return joined(source, left, source.operator(), right);
+    }
+
+    private static boolean admissibleExponent(Expr expression) {
+        return expression instanceof NumberExpr number && number.value().isInteger() && number.value().signum() >= 0
+            && number.value().numerator().compareTo(java.math.BigInteger.valueOf(DOMAIN.maximumExponent())) <= 0;
+    }
+
+    private Candidate divideByRatio(Candidate left, ExactRational divisor) {
+        charge(2);
+        var numerator = new Candidate(new NumberExpr(ExactRational.integer(divisor.numerator())), 1, 0);
+        var denominator = new Candidate(new NumberExpr(ExactRational.integer(divisor.denominator())), 1, 0);
+        var scaled = joined(null, left, BinaryOperator.MUL, denominator);
+        return scaled == OUTSIDE_DOMAIN ? scaled : joined(null, scaled, BinaryOperator.DIV, numerator);
+    }
+
+    private Candidate joined(BinaryExpr original, Candidate left, BinaryOperator operator, Candidate right) {
+        int nodes = 1 + left.nodes() + right.nodes();
+        int depth = 1 + Math.max(left.depth(), right.depth());
+        if (nodes > DOMAIN.maximumExpressionNodes() || depth > DOMAIN.maximumDepth()) return OUTSIDE_DOMAIN;
+        if (original != null && left.expression() == original.left() && right.expression() == original.right())
+            return new Candidate(original, nodes, depth);
+        charge(1);
+        return new Candidate(new BinaryExpr(left.expression(), operator, right.expression()), nodes, depth);
     }
 
     private TypedSourceOnlySearch.Score score(Expr candidate) {
@@ -221,6 +299,10 @@ final class DirectPolynomialPortfolio {
     }
 
     private static final class Exhausted extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static final class Optimum extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 

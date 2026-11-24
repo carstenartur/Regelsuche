@@ -45,7 +45,8 @@ stehen in der vollständigen 20-Zeilen-Matrix.
 
 Jeder der sechs Alpha-Kandidaten stammt aus der vereinfachten Ausgabe des
 Originalcompilers. Die native Auswertung und die C-Ausführung stimmen bei
-allen 4.416 Werten mit der exakten Referenz überein. Die am Originalinventar
+allen 4.416 Werten aus 72 instrumentierten C-Ausführungen mit der exakten
+Referenz überein. Die am Originalinventar
 gemeinsam geprüfte Abdeckung steigt von einem auf sechs Programme. Als
 zusätzliche Kontrollen prüfen die Java-Tests umbenannte Deklarationen,
 nicht monotone Fenster, negative Maxima, alternative Binderreihenfolgen,
@@ -59,18 +60,24 @@ Eingabewerte liegt außerhalb des exakten gemeinsamen Fragments.
 
 ## Phasendiagnose
 
-Ein Durchlauf mit Java 25.0.5, GCC 14.2 und Linux amd64. Alle Zeiten sind in Sekunden.
+Der Lauf vom 24. November 2026 endete um 19:19:05 Uhr MEZ. Gemessen wurde
+der saubere Regelsuche-Commit `9b862e3169a120f17265475777c13b132975bdd8`
+mit Dateibaum `d78d5aafd5ba6fa5239a08a0298877ade274d2b2` nach der Korrektur
+der Eingabebudgetierung. Der Lauf nutzte Java 25.0.5, GCC 14.2 und drei
+zugewiesene CPUs unter Linux amd64. Arbeitswerte, berechnete Ausgaben und
+die 20 Klassifikationen stimmen mit dem vorherigen Entwicklungsdurchlauf
+überein. Alle Zeiten sind in Sekunden.
 
 | Originalprogramm | Native Anfrage | Alpha-Codeerzeugung | C-Kompilierung | 12 C-Ausführungen |
 | --- | ---: | ---: | ---: | ---: |
-| `example_3d_max` | 0,546 | 10,773 | 1,484 | 0,118 |
-| `example_3d_sum` | 0,393 | 10,324 | 0,924 | 0,072 |
-| `increasing_max_filter` | 0,532 | 12,964 | 0,319 | 0,138 |
-| `prefix_max` | 0,362 | 12,842 | 0,334 | 0,135 |
-| `prefix_sum` | 0,456 | 13,792 | 0,252 | 0,197 |
-| `working_example` | 0,685 | 11,132 | 0,332 | 0,090 |
+| `example_3d_max` | 0,525 | 10,962 | 1,664 | 0,080 |
+| `example_3d_sum` | 0,353 | 8,545 | 0,972 | 0,072 |
+| `increasing_max_filter` | 0,355 | 9,952 | 0,170 | 0,060 |
+| `prefix_max` | 0,253 | 8,388 | 0,572 | 0,256 |
+| `prefix_sum` | 0,374 | 8,775 | 0,205 | 0,076 |
+| `working_example` | 0,560 | 12,435 | 0,589 | 0,226 |
 
-Die einmalige Prüfung von Quellen und Originalwerkzeug dauerte 0,836 Sekunden. Die gemessenen Phasen beginnen nach Download und Installation.
+Die einmalige Prüfung von Quellen und Originalwerkzeug dauerte 1,064 Sekunden. Die gemessenen Phasen beginnen nach Download und Installation.
 
 ## Reproduktion und Einordnung
 
@@ -88,12 +95,15 @@ mvn -pl regelsuche-experiments -am test \
   -DexternalAffinePolyhedralOutput=/tmp/regelsuche-affine-v2
 ```
 
-`results.json` und `manifest.json` dokumentieren die vollständige Matrix,
-Quellidentitäten, die native Vorbereitung, Prüfung und Auswertung sowie
-Codeerzeugung, Kompilierung und C-Ausführung. Die Testmethode ruft auch die
-Archivprüfung auf, die Werte anhand der ursprünglichen Quellen und der
-gespeicherten Ausgaben erneut prüft. Der [V1-Bericht](external-polyhedral-v1/README.md)
-und seine Archive bleiben für einen Replay verfügbar.
+Die vollständige Ergebnismatrix enthält die Phasenmessungen und alle
+unterstützten sowie abgelehnten Fälle. Das Roharchiv enthält die 292
+Dateien aus dem Manifest, einschließlich der Quellen, erzeugten C-Dateien,
+Prozessprotokolle und Originalausgaben. Die Archivprüfung berechnet die
+Referenzwerte aus den eingefrorenen Quellen erneut.
+[Ergebnismatrix](external-polyhedral-affine-v2/results.json.gz) ·
+[Roharchiv](external-polyhedral-affine-v2/evidence.tar.gz) ·
+[Archivprüfung ohne Originalcompiler](external-polyhedral-affine-v2/README.md#archiv-ohne-originalcompiler-prüfen) ·
+[V1-Bericht und Archiv](external-polyhedral-v1/README.md)
 
 Dieser Durchlauf ist eine öffentliche Funktions- und Abdeckungsmessung.
 Die native Zeit enthält den JVM-Start und die zwölf Auswertungen. Die

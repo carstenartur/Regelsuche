@@ -103,4 +103,29 @@ class SparseHornerSearchTest {
         assertFalse(rejected.accepted());
         assertTrue(rejected.work() > 0);
     }
+
+    @Test void ordinarySolverExposesTheSameCheckedSharedRootMode() {
+        var profile = TaskConstructionProfile.POLYNOMIAL_HORNER_ROOT_V1;
+        var solver = TypedLearnedMoveInventory.primitives(TraceStrategyTransferExample.inventory())
+            .newTaskSolverWithProfile(profile);
+        var worker = new TypedExternalPolynomialComparisonWorker();
+        worker.initialize(profile.name());
+        var budget = new MoveSearch.Budget(9, 9, 16_384, 256, 16_384, 24);
+        for (String input : List.of("7*x/(2+3)-x/(2+3)+x", "(m+m)*n-m*n+n+n")) {
+            var actual = solver.simplify(parser.parseTerm(input), List.of(), budget);
+            var external = worker.run(profile.name(), input);
+            assertTrue(actual.withinBudget());
+            assertTrue(actual.improved());
+            assertEquals(1, actual.witness().size());
+            assertTrue(actual.witness().getFirst().verification().accepted());
+            assertEquals("EXACT_CONSTRUCTION_REPLAYED", actual.witness().getFirst().verification().reason());
+            assertEquals(external.get("outputCost"), actual.outputScore());
+            assertEquals(external.get("output"), ExpressionFormatter.format(actual.incumbent().expression()));
+        }
+        for (String input : List.of("x^3", "x/(x-x+1)", "x/(2-2)")) {
+            var rejected = org.junit.jupiter.api.Assertions.assertThrows(CheckedSchemaTaskSolver.UnsupportedTaskException.class,
+                () -> solver.simplify(parser.parseTerm(input), List.of(), budget));
+            assertTrue(rejected.inspectionWork() > 0);
+        }
+    }
 }

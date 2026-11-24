@@ -150,10 +150,17 @@ public final class CheckedSchemaTaskSolver {
     }
 
     CheckedSchemaTaskSolver withDirectPolynomial(boolean sharedArithmetic) {
-        var provider = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.POLYNOMIAL_DIRECT,
-            0, sharedArithmetic);
-        var direct = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());
-        return new CheckedSchemaTaskSolver(direct, preparation, false, true, false, false);
+        return withOnlyPolynomialProvider(new StructuralConstructionProvider(
+            StructuralConstructionPrograms.Operation.POLYNOMIAL_DIRECT, 0, sharedArithmetic));
+    }
+
+    CheckedSchemaTaskSolver withRootHorner() {
+        return withOnlyPolynomialProvider(StructuralConstructionProvider.sharedHornerRoot());
+    }
+
+    private CheckedSchemaTaskSolver withOnlyPolynomialProvider(StructuralConstructionProvider provider) {
+        var standalone = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());
+        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false);
     }
 
     CheckedSchemaTaskSolver withExpansionRules(boolean bridgesForOtherGoals) {
@@ -191,7 +198,9 @@ public final class CheckedSchemaTaskSolver {
 
     /** Source-only arithmetic minimization with the same frontier, paid objective and final replay. */
     public TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions, MoveSearch.Budget budget) {
-        return simplify(source, assumptions, budget, state -> TypedPolynomialSurfaceCost.evaluate(state.expression()));
+        return simplify(source, assumptions, budget, sharedHorner()
+            ? state -> TypedPolynomialSurfaceCost.evaluateSharedArithmetic(state.expression())
+            : state -> TypedPolynomialSurfaceCost.evaluate(state.expression()));
     }
 
     TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions,
@@ -218,7 +227,7 @@ public final class CheckedSchemaTaskSolver {
         var original = task.goal().objective();
         boolean checkedSteps = exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(original);
         if (checkedSteps) StructuralCheckedDomain.requireUnobserved();
-        var sourceInspection = checkedSteps ? inspectSource(task) : new SourceInspection(0, 0);
+        var sourceInspection = checkedSteps ? inspectSource(task, sharedHorner()) : new SourceInspection(0, 0);
         long inspection = sourceInspection.work();
         TypedSourceOnlySearch.Objective objective = (breadthFirstPriority || StructuralTaskObjective.requiresExactPolynomialSteps(original))
             && original instanceof StructuralTaskObjective structural
@@ -240,10 +249,10 @@ public final class CheckedSchemaTaskSolver {
 
     private record SourceInspection(long work, int nodes) { }
 
-    private static SourceInspection inspectSource(Task task) {
+    private static SourceInspection inspectSource(Task task, boolean sharedArithmetic) {
         var work = new CheckedSchemaSupport.Work();
         try {
-            int nodes = StructuralCheckedDomain.inspect(task.source(), work);
+            int nodes = StructuralCheckedDomain.inspect(task.source(), work, sharedArithmetic);
             return new SourceInspection(work.units, nodes);
         } catch (CheckedSchemaSupport.DomainRejected unsupported) {
             throw new UnsupportedTaskException(work.units, 0, unsupported);
@@ -252,13 +261,14 @@ public final class CheckedSchemaTaskSolver {
 
     // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
     TypedMoveSearch.Problem problem(Task task) {
+        var standalone = standalonePolynomial();
         return new TypedMoveSearch.Problem(task.source(),
             TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),
-            providersFor(task), policyFor(task),
-            directPolynomial().isEmpty()
+            providersFor(task, standalone), policyFor(task),
+            standalone.isEmpty()
                     && (exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
                 ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -> 0,
-            MoveSearch.Mode.FAST, preparation == null || directPolynomial().isPresent() ? MoveSearch.Scheduling.STAGED
+            MoveSearch.Mode.FAST, preparation == null || standalone.isPresent() ? MoveSearch.Scheduling.STAGED
                 : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),
             (state, context) -> {
                 var size = NativeNodeCountObjective.INSTANCE.evaluate(state);
@@ -267,18 +277,22 @@ public final class CheckedSchemaTaskSolver {
             });
     }
 
-    private List<MoveProvider> providersFor(Task task) {
-        var direct = directPolynomial();
+    private List<MoveProvider> providersFor(Task task, Optional<StructuralConstructionProvider> standalone) {
+        var direct = standalone.filter(StructuralConstructionProvider::isDirectPolynomial);
         if (direct.isPresent()) return List.of(direct.orElseThrow().forBudget(task.budget()));
         if (!expansionRulesAttached || expansionBridgesForOtherGoals
                 || task.goal().objective() == StructuralTaskObjective.EXPANDED_POLYNOMIAL) return session.providers();
         return session.providers().stream().filter(provider -> !StructuralExpansionRules.isExpansionProvider(provider.descriptor())).toList();
     }
 
-    private Optional<StructuralConstructionProvider> directPolynomial() {
+    private Optional<StructuralConstructionProvider> standalonePolynomial() {
         if (session.providers().size() == 1 && session.providers().getFirst() instanceof StructuralConstructionProvider provider
-                && provider.isDirectPolynomial()) return Optional.of(provider);
+                && (provider.isDirectPolynomial() || provider.isSharedHorner())) return Optional.of(provider);
         return Optional.empty();
+    }
+
+    private boolean sharedHorner() {
+        return standalonePolynomial().filter(StructuralConstructionProvider::isSharedHorner).isPresent();
     }
 
     private KnowledgeFirst policyFor(Task task) {

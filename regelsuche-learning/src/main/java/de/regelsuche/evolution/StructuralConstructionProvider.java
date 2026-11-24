@@ -40,6 +40,10 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
             SearchMove.SourceKind.PREPARATION, SearchMove.ProofStrength.VERIFIED, List.of(),
             SearchMove.ValueEvidence.UNKNOWN, SchematicProofPlan.hash(REVISION + ":" + operation.name()));
     }
+
+    static StructuralConstructionProvider sharedHornerRoot() {
+        return new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER, 0, true);
+    }
     @Override public Descriptor descriptor() { return descriptor; }
 
     boolean isDirectPolynomial() { return operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_DIRECT; }
@@ -108,7 +112,7 @@ final class StructuralConstructionProvider implements TypedMoveSearch.TypedProvi
         return new Batch(proofs.stream().map(proof -> SearchMove.from(proof, descriptor, metrics.totalWorkUnits())).toList(), metrics, false);
     }
 
-    private boolean isSharedHorner() {
+    boolean isSharedHorner() {
         return operation == StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER && sharedArithmetic;
     }
 

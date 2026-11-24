@@ -124,7 +124,7 @@ public final class TypedExternalPolynomialComparisonWorker {
         var providers = profile.startsWith("LEARNED_") ? inventory.providers() : inventory.primitiveProviders();
         var verifier = inventory.verifier();
         if (profile.equals(ROOT_HORNER)) {
-            var horner = new StructuralConstructionProvider(StructuralConstructionPrograms.Operation.POLYNOMIAL_HORNER, 0, true);
+            var horner = StructuralConstructionProvider.sharedHornerRoot();
             providers = List.of(horner);
             verifier = horner.verifier();
         } else if (profile.equals(HORNER)) {
