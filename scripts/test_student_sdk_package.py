@@ -125,6 +125,28 @@ class SdkPackageTest(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             package.package(self.root, self.repo, self.version, one)
 
+    def test_maven_consumer_uses_archive_coordinates_without_changing_its_own_version(self):
+        relative = 'examples/external-consumers/hello-rule-java25/pom.xml'
+        self.write(relative, '''<project xmlns="http://maven.apache.org/POM/4.0.0">
+          <version>1.0.0</version><properties>
+            <regelsuche.groupId>io.github.carstenartur</regelsuche.groupId>
+            <regelsuche.version>0.5.3</regelsuche.version>
+            <regelsuche.repository>file:old-location</regelsuche.repository>
+          </properties><repositories><repository><id>regelsuche-sdk</id>
+            <snapshots><enabled>false</enabled></snapshots>
+          </repository></repositories></project>''')
+        source = (self.root / relative).read_bytes()
+        output = self.root / 'maven.zip'
+        package.package(self.root, self.repo, self.version, output)
+        with zipfile.ZipFile(output) as archive:
+            pom = ET.fromstring(archive.read('regelsuche-sdk-0.5.0/' + relative))
+        namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+        self.assertEqual('1.0.0', pom.findtext('m:version', namespaces=namespace))
+        self.assertEqual('0.5.0', pom.findtext('m:properties/m:regelsuche.version', namespaces=namespace))
+        self.assertEqual('file://${project.basedir}/../../../repository',
+                         pom.findtext('m:properties/m:regelsuche.repository', namespaces=namespace))
+        self.assertEqual(source, (self.root / relative).read_bytes())
+
     def test_bundle_includes_extension_example_and_lifetime_documentation(self):
         # Deliberately name the required consumer independently of package.EXAMPLES.
         base = 'examples/external-consumers/extension-runtime-java25/'

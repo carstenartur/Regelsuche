@@ -35,7 +35,7 @@ final class StudentSdkArchive {
     private static final String PINNED_EXAMPLE = "number-theory-plan-java25";
     private static final List<String> EXAMPLES = List.of("hello-rule-java25", "geometric-sequence-domain-java25",
         "finite-difference-domain-java25", "solver-adapter-java25", PINNED_EXAMPLE,
-        "extension-runtime-java25", "java-optimization-java25");
+        "extension-runtime-java25", "java-optimization-java25", "checked-math-java25");
     private static final List<String> INPUTS = List.of("LICENSE", "release.properties", "gradlew", "gradlew.bat",
         "gradle/wrapper/gradle-wrapper.jar", "gradle/wrapper/gradle-wrapper.properties",
         "scripts/create-student-discovery-domain.py", "docs/java-discovery-sdk.md", "docs/java-sdk-quickstart.md",
@@ -97,7 +97,10 @@ final class StudentSdkArchive {
         files.put("sdk-compatibility.json", canonicalJson(policy));
         addSources(root, version, files);
         files.put("README.md", utf8("# Regelsuche Java SDK " + version + "\n\n"
-            + "Start with [the 15-minute quickstart](docs/java-sdk-quickstart.md).\n\n"
+            + "Run the [six checked calculations](examples/external-consumers/checked-math-java25/README.md) with Java 25 and Maven 3.9.9+:\n\n"
+            + "```sh\nmvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify\n```\n\n"
+            + "The bundled Maven projects use this archive's SDK version without overrides.\n"
+            + "The [SDK guide](docs/java-sdk-quickstart.md) also documents the published Central release and historical archives.\n\n"
             + "Use the `repository` directory as a Maven repository; `sdk-compatibility.json`\n"
             + "records coordinates, API revisions and artifact hashes. Each public module has\n"
             + "sources and Javadoc JARs; browse `javadoc/<module>/index.html` locally.\n"));
@@ -197,6 +200,7 @@ final class StudentSdkArchive {
             for (Path file : regularFiles(source, Set.of("build", ".gradle", "target", "repository"))) {
                 String name = source.relativize(file).toString().replace(file.getFileSystem().getSeparator(), "/");
                 byte[] data = Files.readAllBytes(file);
+                if (name.equals("pom.xml")) data = StudentSdkConsumerPom.stage(file, version);
                 if (name.endsWith(".gradle") || name.endsWith(".md")) {
                     data = replace(replace(data, "0.5.0-SNAPSHOT", version), "0.4.0-SNAPSHOT", version);
                 }

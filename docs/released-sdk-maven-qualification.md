@@ -1,6 +1,8 @@
 # Released SDK Maven consumer qualification
 
-The acceptance check uses the **published SDK 0.5.2 ZIP** to qualify the three
+The acceptance check has two independent inputs: the **current published
+Central SDK 0.5.3**, consumed with the unchanged `hello-rule-java25` defaults,
+and the **historical SDK 0.5.2 ZIP**, which continues to qualify the three
 external Java examples and the data-only factorization rule package.
 
 From a checkout with JDK 25 and Maven 3.9.9 or newer in the 3.x line:
@@ -16,7 +18,35 @@ hash-bound ZIP may also be supplied via `REGELSUCHE_RELEASED_SDK_ZIP`.
 A Git-free source archive supplies its exact checkout identity via
 `REGELSUCHE_PREPARATION_REVISION`.
 
-## Inputs and isolation
+## Current Central default
+
+`ReleasedSdkConsumersIT.qualifyCurrentCentralConsumerWithUnmodifiedDefaults`
+copies the complete current `hello-rule-java25` project outside the checkout.
+It runs the documented Maven build without SDK version, namespace or repository
+overrides, using empty user/global settings and a fresh dependency cache.
+The actual two JUnit cases and the CLI result must pass. The runtime graph must
+contain the four SDK modules at `io.github.carstenartur:0.5.3`, and their bytes
+must match the published hashes retained in `released-central-sdk-0.5.3.json`.
+Missing JARs, different versions/namespaces and changed bytes reject the run.
+
+The resulting directory ends in `-central` under the evidence root below. Its
+receipt retains the release/source identity, source inputs, toolchain, commands,
+test reports, runtime hashes and CLI output. This additive check does not change
+the 0.5.2 archive URL, hashes or historical expected results.
+
+## Newly packaged SDK consumers
+
+The Student SDK archive qualification additionally extracts its actual generated
+archive into a fresh directory and runs `hello-rule-java25` and
+`checked-math-java25` through Maven `clean verify`, without SDK overrides. Each
+gets a fresh Maven cache. The latter runs six mathematical result checks and all
+six executable examples. Resolved SDK coordinates must match the archive version,
+and copied runtime JAR hashes must match its compatibility descriptor. The
+`maven-consumers.json` receipt and raw logs accompany the existing archive parity
+and Gradle-consumer evidence. This qualifies local archive consumption, not
+publication or a Sandbox source rewrite.
+
+## Historical 0.5.2 inputs and isolation
 
 The download URL is fixed to
 [regelsuche-sdk-0.5.2.zip](https://github.com/carstenartur/Regelsuche/releases/download/v0.5.2/regelsuche-sdk-0.5.2.zip).

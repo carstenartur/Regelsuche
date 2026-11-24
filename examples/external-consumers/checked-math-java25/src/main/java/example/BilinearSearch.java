@@ -1,3 +1,5 @@
+package example;
+
 import de.regelsuche.math.algorithms.algebra.BilinearProgram;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.sdk.optimization.CancellationToken;

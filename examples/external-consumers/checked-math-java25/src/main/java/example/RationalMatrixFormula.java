@@ -1,3 +1,5 @@
+package example;
+
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Inverse;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormula.Scalar;

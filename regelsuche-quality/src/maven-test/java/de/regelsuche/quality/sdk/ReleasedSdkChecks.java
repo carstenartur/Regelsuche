@@ -31,6 +31,13 @@ final class ReleasedSdkChecks {
         }
     }
 
+    static JsonNode centralRelease() throws IOException {
+        try (var input = ReleasedSdkChecks.class.getResourceAsStream("released-central-sdk-0.5.3.json")) {
+            if (input == null) throw new IOException("missing current published SDK receipt");
+            return new ObjectMapper().readTree(input);
+        }
+    }
+
     static Set<String> strings(JsonNode input) {
         var values = new TreeSet<String>();
         input.forEach(node -> values.add(node.textValue()));
@@ -91,6 +98,17 @@ final class ReleasedSdkChecks {
     }
 
     static Map<String, Object> closure(Path graph, Path dependencies, Path repository, Set<String> expected) throws IOException {
+        var hashes = new TreeMap<String, String>();
+        for (String module : expected) {
+            Path original = repository.resolve("de/regelsuche").resolve(module).resolve(ReleasedSdkArchive.VERSION)
+                .resolve(module + "-" + ReleasedSdkArchive.VERSION + ".jar");
+            hashes.put(module, ReleasedSdkArchive.digest(original));
+        }
+        return closure(graph, dependencies, "de.regelsuche", ReleasedSdkArchive.VERSION, hashes);
+    }
+
+    static Map<String, Object> closure(Path graph, Path dependencies, String group, String version,
+            Map<String, String> expectedHashes) throws IOException {
         ReleasedSdkArchive.noSymlinks(graph);
         String tgf = Files.readString(graph);
         int edges = tgf.indexOf("\n#");
@@ -120,13 +138,13 @@ final class ReleasedSdkChecks {
             String jar = parts[1] + "-" + parts[3] + ".jar";
             require(jar.equals(ReleasedSdkArchive.relative(jar).getFileName().toString()) && jars.containsKey(jar), "missing runtime JAR " + jar);
             expectedJars.add(jar);
-            if (parts[0].equals("de.regelsuche")) {
-                require(parts[3].equals(ReleasedSdkArchive.VERSION) && modules.add(parts[1]), "unreleased or duplicate SDK module");
-                Path original = repository.resolve("de/regelsuche").resolve(parts[1]).resolve(parts[3]).resolve(jar);
-                require(jars.get(jar).equals(ReleasedSdkArchive.digest(original)), "different resolved SDK JAR bytes: " + jar);
+            if (parts[1].startsWith("regelsuche-")) {
+                require(parts[0].equals(group) && parts[3].equals(version) && modules.add(parts[1]),
+                    "unreleased or duplicate SDK module");
+                require(jars.get(jar).equals(expectedHashes.get(parts[1])), "different resolved SDK JAR bytes: " + jar);
             }
         }
-        require(modules.equals(expected) && jars.keySet().equals(expectedJars), "runtime closure does not match released SDK contract");
+        require(modules.equals(expectedHashes.keySet()) && jars.keySet().equals(expectedJars), "runtime closure does not match released SDK contract");
         return Map.of("regelsucheModules", modules, "coordinates", coordinates.stream().sorted().toList(), "jarSha256", jars);
     }
 

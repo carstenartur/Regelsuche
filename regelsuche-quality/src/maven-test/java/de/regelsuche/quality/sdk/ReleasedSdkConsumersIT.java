@@ -35,6 +35,74 @@ class ReleasedSdkConsumersIT {
         "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS");
     @TempDir Path scratch;
 
+    @Test void qualifyCurrentCentralConsumerWithUnmodifiedDefaults() throws Exception {
+        Path root = Path.of(System.getProperty("regelsuche.repositoryRoot")).toRealPath();
+        Path base = root.resolve("build/reports/released-sdk-maven-consumers");
+        noSymlinks(base);
+        Files.createDirectories(base);
+        Path evidence = Files.createDirectory(base.resolve(UUID.randomUUID().toString().replace("-", "") + "-central"));
+        var summary = new LinkedHashMap<String, Object>();
+        summary.put("schema", "regelsuche.central-sdk-consumer/v1");
+        summary.put("status", "RUNNING");
+        var commands = new ArrayList<Map<String, Object>>();
+        summary.put("commands", commands);
+        Path report = evidence.resolve("qualification.json");
+        save(report, summary);
+        try {
+            require(!scratch.toRealPath().startsWith(root), "qualification scratch must be outside the repository");
+            summary.put("checkoutCommit", revision(root));
+            boolean windows = File.separatorChar == '\\';
+            String java = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString();
+            String maven = Path.of(System.getProperty("regelsuche.mavenHome"), "bin", windows ? "mvn.cmd" : "mvn").toString();
+            summary.put("toolchain", ReleasedSdkChecks.toolchain(
+                execute(List.of(maven, "--version"), root, evidence.resolve("maven-version.log"), commands),
+                execute(List.of(java, "-version"), root, evidence.resolve("java-version.log"), commands)));
+            Path work = scratch.resolve("current-central-consumer");
+            summary.put("sourceSha256", ReleasedSdkChecks.copyInputs(
+                root.resolve("examples/external-consumers/hello-rule-java25"), work));
+            ReleasedSdkChecks.requireStandalonePom(work.resolve("pom.xml"));
+            Path cache = Files.createDirectory(scratch.resolve("empty-central-cache"));
+            summary.put("cacheInitiallyEmpty", true);
+            Path settings = Files.writeString(scratch.resolve("empty-settings.xml"),
+                "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.2.0\"/>\n");
+            var arguments = new ArrayList<>(List.of(maven, "--batch-mode", "--no-transfer-progress",
+                "--settings", settings.toString(), "--global-settings", settings.toString(),
+                "-Dmaven.repo.local=" + cache, "-DskipTests=false", "-Dmaven.test.skip=false"));
+            configureMavenTransport(arguments);
+            var build = new ArrayList<>(arguments);
+            build.addAll(List.of("clean", "package"));
+            execute(build, work, evidence.resolve("maven-package.log"), commands);
+            JsonNode contract = ReleasedSdkChecks.contracts().required("hello-rule-java25");
+            summary.put("surefire", ReleasedSdkChecks.surefire(work.resolve("target/surefire-reports"),
+                ReleasedSdkChecks.strings(contract.required("tests"))));
+            summary.put("surefireReportSha256", ReleasedSdkChecks.copyInputs(
+                work.resolve("target/surefire-reports"), evidence.resolve("surefire-reports")));
+            Path graph = evidence.resolve("runtime-dependencies.tgf");
+            var tree = new ArrayList<>(arguments);
+            tree.addAll(List.of("org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree", "-Dscope=runtime",
+                "-DoutputType=tgf", "-DoutputFile=" + graph));
+            execute(tree, work, evidence.resolve("maven-runtime-tree.log"), commands);
+            JsonNode published = ReleasedSdkChecks.centralRelease();
+            summary.put("publishedSdk", published);
+            var hashes = new java.util.TreeMap<String, String>();
+            published.required("jarSha256").properties().forEach(entry -> hashes.put(entry.getKey(), entry.getValue().textValue()));
+            summary.put("runtimeClosure", ReleasedSdkChecks.closure(graph, work.resolve("target/dependency"),
+                published.required("groupId").textValue(), published.required("version").textValue(), hashes));
+            String actual = execute(List.of(java, "-cp", "target/classes" + File.pathSeparator + "target/dependency/*",
+                "example.HelloRule"), work, evidence.resolve("cli.log"), commands);
+            summary.put("stdout", actual);
+            summary.put("cliIdentity", ReleasedSdkChecks.cli(contract, actual, null));
+            summary.put("status", "PASSED");
+        } catch (Exception failure) {
+            summary.put("status", "FAILED");
+            summary.put("error", failure.toString());
+            throw failure;
+        } finally {
+            save(report, summary);
+            System.out.println("centralSdkEvidence=" + evidence);
+        }
+    }
+
     @Test void qualifyActualReleasedConsumersAndRulePackage() throws Exception {
         Path root = Path.of(System.getProperty("regelsuche.repositoryRoot")).toRealPath();
         Path base = root.resolve("build/reports/released-sdk-maven-consumers");

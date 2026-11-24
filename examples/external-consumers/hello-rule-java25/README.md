@@ -1,7 +1,39 @@
 # hello-rule-java25
 
-An independent Java 25 consumer of the **released 0.5.2 SDK**. Copy this whole
-directory anywhere; it has no dependency on a Regelsuche source checkout.
+## Current Maven Central release
+
+For this Central route, copy the complete project from an unchanged source
+checkout, for example [the v0.5.3 sources](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/hello-rule-java25).
+With JDK 25 and Maven 3.9.9+ from the 3.x line, that source POM resolves the
+published SDK 0.5.3. Run inside the copied source directory:
+
+```bash
+mvn --batch-mode --no-transfer-progress clean package
+java -cp "target/classes:target/dependency/*" example.HelloRule
+```
+
+The BOM and Plugin API use group `io.github.carstenartur`; Java imports use
+`de.regelsuche`. The command runs both tests and prints the rule, the result `x`,
+`replay=VERIFIED`, `negative=REJECTED` and `proof=AUTHOR_SUPPLIED_IDENTITY`.
+Windows uses `;` in the classpath. Maven needs network access on the first run.
+No Regelsuche source build, server or database is required.
+
+The [qualification](../../../docs/released-sdk-maven-qualification.md)
+checks the current Central default separately from the historical archive below.
+
+## From a complete SDK archive
+
+Keep the complete extracted SDK tree, including its `repository/` directory,
+and run the commands above inside `examples/external-consumers/hello-rule-java25/`.
+The packaged POM uses that archive's SDK version and finds its artifacts at
+`../../../repository`. To move the example elsewhere, retain the extracted
+repository and pass its absolute `file:` URI as `-Dregelsuche.repository=...`,
+as shown in the [archive quickstart](../../../docs/java-sdk-quickstart.md#mit-einem-vollständigen-sdk-archiv).
+
+## Archived 0.5.2 reproduction
+
+To consume the **released 0.5.2 SDK**, copy the complete source directory linked
+above anywhere; its build has no dependency on a Regelsuche source checkout.
 Download and unpack [regelsuche-sdk-0.5.2.zip](https://github.com/carstenartur/Regelsuche/releases/download/v0.5.2/regelsuche-sdk-0.5.2.zip),
 then verify its outer hash and internal `SHA256SUMS.txt` as described in the
 [quickstart](../../../docs/java-sdk-quickstart.md).
@@ -53,8 +85,8 @@ SDK root (the old `../../gradlew` path from this directory was one level short):
 
 The Gradle verification additionally checks the four expected Regelsuche runtime
 modules. This new Maven POM is maintained in source after 0.5.2; it is not claimed
-to have been present in the immutable 0.5.2 ZIP. Download/copy the current example
-for the Maven route; the released SDK binaries remain 0.5.2.
+to have been present in the immutable 0.5.2 ZIP. Use the source example linked
+above for the Maven route; the released SDK binaries remain 0.5.2.
 
 The checkout's [released Maven qualification](../../../docs/released-sdk-maven-qualification.md)
 builds this complete example outside the reactor with an empty Maven cache,

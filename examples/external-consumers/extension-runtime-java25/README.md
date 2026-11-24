@@ -8,7 +8,32 @@ For the older application rule API v1 (`de.regelsuche.plugin.RegelsuchePlugin`),
 use [hello-rule-java25](../hello-rule-java25/README.md) instead. The two interfaces
 have different packages, contracts and ServiceLoader descriptor names.
 
-## Prerequisites and released artifacts
+## Current Maven Central route
+
+Copy the complete project from an unchanged source checkout, for example
+[the v0.5.3 sources](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/extension-runtime-java25).
+With JDK 25 and Maven 3.9.9+ from the 3.x line, run inside that copied source directory:
+
+```bash
+mvn --batch-mode --no-transfer-progress clean package
+java -cp "target/classes:target/dependency/*" example.Main
+```
+
+That source POM defaults to `io.github.carstenartur:regelsuche-bom:0.5.3` and resolves
+`regelsuche-extension-runtime` from Central. Windows uses `;` in the classpath.
+The output includes `greeting=Hello Ada` and the loaded catalogue identity.
+
+## From a complete SDK archive
+
+Keep the complete extracted SDK tree, including `repository/`, and run the
+commands above inside `examples/external-consumers/extension-runtime-java25/`.
+The packaged POM binds the SDK version in that archive and resolves it from
+`../../../repository`. If you copy the example elsewhere, retain the extracted
+repository and supply its absolute `file:` URI with `-Dregelsuche.repository=...`;
+the [archive quickstart](../../../docs/java-sdk-quickstart.md#mit-einem-vollständigen-sdk-archiv)
+shows that invocation. The following recipe preserves the 0.5.2 reproduction.
+
+## Archived 0.5.2 artifacts
 
 Use **JDK 25** and the verified
 [regelsuche-sdk-0.5.2.zip from release v0.5.2](https://github.com/carstenartur/Regelsuche/releases/tag/v0.5.2).
@@ -28,8 +53,8 @@ SDK ZIP is not the distribution for this example.
 
 ## Preferred route: Maven
 
-Install Maven **3.9.9+ from the 3.x line**. Copy this whole current example directory
-anywhere, enter it and supply an absolute `file:` URI for the extracted SDK
+Install Maven **3.9.9+ from the 3.x line**. Copy the complete source directory
+linked above anywhere, enter it and supply an absolute `file:` URI for the extracted SDK
 repository:
 
 ```bash
@@ -47,7 +72,8 @@ contains the Java source, test and Gradle build, but not this new POM.
 
 The Maven repository property is `regelsuche.repository` (a URI), and the version
 property is `regelsuche.version`; both differ from the Gradle property names
-below. Version defaults to `0.5.2`. The default repository location is three
+below. The current source POM defaults to `0.5.3`; the archived command above
+explicitly selects `0.5.2`. The default repository location is three
 parents above this example, appropriate inside the extracted SDK tree; a copied
 standalone directory should use the explicit absolute override shown above.
 Maven plugins, JUnit and transitive third-party artifacts still need Central on

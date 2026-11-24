@@ -1,3 +1,5 @@
+package example;
+
 import de.regelsuche.math.algorithms.equivalence.Monomial;
 import de.regelsuche.math.algorithms.equivalence.Polynomial;
 import de.regelsuche.math.algorithms.equivalence.Rational;
