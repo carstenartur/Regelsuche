@@ -213,6 +213,37 @@ for line in sys.stdin:
             self.assertGreater(sequence['accounting']['wholeWorkerCpu']['totalNanos'], 0)
             self.assertGreater(sequence['accounting']['peakWorkerRssBytes'], 0)
             self.assertEqual(5, sequence['accounting']['reportedNativeMethodAllocatedBytes'])
+            expected = phases['training']['response']['modelHash']
+            self.assertEqual(expected, self.driver.verify_model_lifecycle(Path(directory), sequence))
+            for key in ('modelPersistence', 'modelLoad'):
+                for field, value in [('file', 'different.model.json'), ('modelHash', 'sha256:' + '0' * 64)]:
+                    broken = deepcopy(sequence)
+                    broken['phases'][key][field] = value
+                    with self.subTest(phase=key, field=field), self.assertRaises(ValueError):
+                        self.driver.verify_model_lifecycle(Path(directory), broken)
+            for key in ('training', 'modelPersistence', 'modelLoad'):
+                broken = deepcopy(sequence)
+                broken['phases'][key]['status'] = 'BLOCKED'
+                with self.subTest(incomplete=key), self.assertRaises(ValueError):
+                    self.driver.verify_model_lifecycle(Path(directory), broken)
+            model_path = Path(directory) / phases['modelPersistence']['file']
+            original = model_path.read_bytes()
+            # Matching receipt names and bytes must not authorize a renamed sequence.
+            for alias in ('BASE.n3.r1', 'BASE.n9.r0', 'LEARNED_SCHEMA.n3.r0', 'arbitrary'):
+                broken = deepcopy(sequence)
+                broken['id'] = alias
+                alias_path = Path(directory) / (alias + '.model.json')
+                alias_path.write_bytes(original)
+                for key in ('modelPersistence', 'modelLoad'):
+                    broken['phases'][key]['file'] = alias_path.name
+                with self.subTest(alias=alias), self.assertRaisesRegex(ValueError, 'sequence identity mismatch'):
+                    self.driver.verify_model_lifecycle(Path(directory), broken)
+                alias_path.unlink()
+            model_path.write_bytes(original + b' ')
+            with self.assertRaises(ValueError):
+                self.driver.verify_model_lifecycle(Path(directory), sequence)
+            model_path.write_bytes(original)
+            self.assertEqual(expected, self.driver.verify_model_lifecycle(Path(directory), sequence))
             for missing in ['training', 'restore']:
                 broken = deepcopy(sequence)
                 del broken['phases'][missing]
@@ -242,6 +273,17 @@ for line in sys.stdin:
             broken['processes'][1]['pid'] = broken['processes'][0]['pid']
             with self.assertRaises(ValueError):
                 self.driver.account_sequence(protocol, broken)
+
+    def test_sequence_identity_is_bound_even_without_a_completed_java_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for profile in ('BASE', 'SYMPY_FACTOR'):
+                sequence = {'id': f'{profile}.n3.r0', 'profile': profile, 'length': 3,
+                            'repetition': 0, 'phases': {key: {'status': 'BLOCKED'} for key in
+                                ('training', 'modelPersistence', 'modelLoad', 'restore')}}
+                self.assertIsNone(self.driver.verify_model_lifecycle(Path(directory), sequence))
+                sequence['id'] = f'{profile}.n3.r1'
+                with self.subTest(profile=profile), self.assertRaisesRegex(ValueError, 'sequence identity mismatch'):
+                    self.driver.verify_model_lifecycle(Path(directory), sequence)
 
     def test_timeout_retains_real_cpu_receipt_and_never_claims_graceful_completion(self):
         command = [sys.executable, '-u', '-c', 'import sys; print(\'{"status":"READY"}\',flush=True); sys.stdin.readline();\nwhile True: sum(i*i for i in range(1000))']

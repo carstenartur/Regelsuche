@@ -507,10 +507,14 @@ def account_sequence(protocol: dict, sequence: dict) -> dict:
                         and all(row['judgment']['valid'] for row in rows)}
 
 
+def _sequence_id(profile, length, repetition):
+    return f'{profile}.n{length}.r{repetition}'
+
+
 def run_sequence(protocol, profile, length, repetition, command, output):
     """Execute a full fresh lifecycle; never multiply a measured short run."""
     started, controller = time.perf_counter_ns(), time.process_time_ns()
-    name = f'{profile}.n{length}.r{repetition}'
+    name = _sequence_id(profile, length, repetition)
     sequence = {'id': name, 'profile': profile, 'length': length, 'repetition': repetition,
                 'configuredQueryWorkBudget': protocol['workBudget'], 'command': command, 'phases': {}, 'rows': [],
                 'processes': [], 'errors': []}
@@ -749,6 +753,41 @@ def execute(protocol_path: Path, classpath_path: Path, output: Path):
     return summary
 
 
+def verify_model_lifecycle(output: Path, sequence: dict):
+    """Bind all completed model phases before any semantic comparison.
+
+    The raw model digest remains authoritative, even when diagnostic fields
+    inside the model differ across executions. Failed phases retain their
+    original records and cannot authorize a later completed phase.
+    """
+    profile, phases = sequence['profile'], sequence['phases']
+    _require(sequence['id'] == _sequence_id(profile, sequence['length'], sequence['repetition']),
+             'sequence identity mismatch')
+    if profile.startswith('SYMPY_'):
+        return None
+    ordered = ('training', 'modelPersistence', 'modelLoad', 'restore')
+    completed = [phases[key]['status'] == 'COMPLETE' for key in ordered]
+    _require(completed == sorted(completed, reverse=True), 'model lifecycle has a completed phase after an incomplete prerequisite')
+    if not completed[0]:
+        return None
+    response = phases['training']['response']
+    model_hash = check_setup(profile, response)
+    model = response['model']
+    filename = sequence['id'] + '.model.json'
+    _require(Path(filename).name == filename, 'invalid sequence model filename')
+    for key in ('modelPersistence', 'modelLoad'):
+        phase = phases[key]
+        if phase['status'] == 'COMPLETE':
+            _require(phase['file'] == filename and phase['modelHash'] == model_hash,
+                     key + ' model identity mismatch')
+            _require((output / filename).read_bytes() == model.encode('utf-8'),
+                     key + ' model bytes mismatch')
+    if completed[3]:
+        _require(check_setup(profile, phases['restore']['response'], restored=True,
+                             expected_model=model) == model_hash, 'restore model identity mismatch')
+    return model_hash
+
+
 def verify(output: Path):
     protocol = load_protocol(output / 'protocol.json')
     manifest = _load((output / 'manifest.json').read_text(encoding='utf-8'))
@@ -778,16 +817,7 @@ def verify(output: Path):
         profile, phases = sequence['profile'], sequence['phases']
         _require(sequence['command'] == metadata['commands']['sympy' if profile.startswith('SYMPY_') else 'java'],
                  'worker command differs from the recorded runtime')
-        model_hash, model = None, None
-        if not profile.startswith('SYMPY_') and phases['training']['status'] == 'COMPLETE':
-            response = phases['training']['response']
-            model_hash = check_setup(profile, response)
-            model = response['model']
-            if phases['modelPersistence']['status'] == 'COMPLETE':
-                filename = phases['modelPersistence']['file']
-                _require(Path(filename).name == filename and (output / filename).read_bytes() == model.encode('utf-8'), 'persisted model mismatch')
-            if phases['restore']['status'] == 'COMPLETE':
-                check_setup(profile, phases['restore']['response'], restored=True, expected_model=model)
+        model_hash = verify_model_lifecycle(output, sequence)
         for row in sequence['rows']:
             _require(natural(row['transportWallNanos']) + natural(row['bindingAndPathAuditWallNanos']) == natural(row['requestWallNanos']), 'request timing partition mismatch')
             audit = check_response(profile, row['source'], row['response'], model_hash, protocol['workBudget'])
