@@ -486,19 +486,19 @@ public final class DomainDiscoveryEvidence {
         private static AttemptDisposition expectedDisposition(CounterexampleStatus counterexample,
                                                               EvaluationDisposition evaluation) {
 <span class="fc bfc" id="L488" title="All 2 branches covered.">            if (counterexample == CounterexampleStatus.NONE_FOUND) {</span>
-<span class="pc bpc" id="L489" title="2 of 5 branches missed.">                return switch (evaluation) {</span>
+<span class="pc bpc" id="L489" title="1 of 5 branches missed.">                return switch (evaluation) {</span>
 <span class="fc" id="L490">                    case CONFIRMED -&gt; AttemptDisposition.CONFIRMED;</span>
 <span class="fc" id="L491">                    case REFUTED -&gt; AttemptDisposition.REFUTED_BY_EVALUATOR;</span>
 <span class="fc" id="L492">                    case INCONCLUSIVE -&gt; AttemptDisposition.INCONCLUSIVE;</span>
-<span class="nc" id="L493">                    case UNSUPPORTED -&gt; AttemptDisposition.UNSUPPORTED;</span>
+<span class="fc" id="L493">                    case UNSUPPORTED -&gt; AttemptDisposition.UNSUPPORTED;</span>
 <span class="nc" id="L494">                    case NOT_RUN -&gt; throw new IllegalArgumentException(&quot;missing candidate evaluation&quot;);</span>
                 };
             }
 <span class="fc bfc" id="L497" title="All 2 branches covered.">            if (evaluation != EvaluationDisposition.NOT_RUN) {</span>
 <span class="fc" id="L498">                throw new IllegalArgumentException(&quot;counterexample stage prevented evaluation&quot;);</span>
             }
-<span class="pc bpc" id="L500" title="3 of 4 branches missed.">            return switch (counterexample) {</span>
-<span class="nc" id="L501">                case FOUND -&gt; AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE;</span>
+<span class="pc bpc" id="L500" title="2 of 4 branches missed.">            return switch (counterexample) {</span>
+<span class="fc" id="L501">                case FOUND -&gt; AttemptDisposition.REFUTED_BY_COUNTEREXAMPLE;</span>
 <span class="fc" id="L502">                case INCONCLUSIVE -&gt; AttemptDisposition.INCONCLUSIVE;</span>
 <span class="nc" id="L503">                case UNSUPPORTED -&gt; AttemptDisposition.UNSUPPORTED;</span>
 <span class="nc" id="L504">                case NONE_FOUND -&gt; throw new IllegalStateException(&quot;expected an evaluation&quot;);</span>

@@ -146,8 +146,8 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain&lt;Scop
 <span class="nc" id="L146">                    Map.of(&quot;proposal&quot;, dag.hash(), &quot;receiptProposal&quot;, checked.proposalHash()));</span>
             }
 <span class="fc" id="L148">            var evidence = Map.of(&quot;proposal&quot;, dag.hash(), &quot;kernelStatus&quot;, checked.status().name());</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (checked.status() == ResultStatus.UNSUPPORTED)</span>
-<span class="nc" id="L150">                return Evaluation.unsupported(checked.message(), evidence);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (checked.status() == ResultStatus.UNSUPPORTED)</span>
+<span class="fc" id="L150">                return Evaluation.unsupported(checked.message(), evidence);</span>
 <span class="fc bfc" id="L151" title="All 2 branches covered.">            if (checked.status() != ResultStatus.CONFIRMED)</span>
 <span class="fc" id="L152">                return Evaluation.inconclusive(checked.message(), evidence);</span>
 <span class="fc" id="L153">            var certificate = new Certificate(dag, checked);</span>

@@ -13,7 +13,7 @@ sealed interface LeanProofPlan permits LeanLemmaPlan, LeanDagPlan {
     String fileName();
     String material();
     String proof();
-<span class="nc" id="L16">    default String hash() { return SolverIr.sha256(material()); }</span>
+<span class="fc" id="L16">    default String hash() { return SolverIr.sha256(material()); }</span>
 <span class="fc" id="L17">    default boolean accepts(Obligation obligation) { return SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(obligation.schema()); }</span>
 <span class="nc" id="L18">    default void verifyAudit(LeanSolverBackend.AuditDocument audit) throws IOException { }</span>
 

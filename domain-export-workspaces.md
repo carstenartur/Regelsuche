@@ -130,6 +130,39 @@ Domain-Schemas. Sie behaupten keine Kompatibilität mit ausdrucksspezifischen
 Graph-, Dossier- oder Proof-Artefakten. Eine fehlende Guard- oder Proof-Struktur
 wird nicht aus einer Kandidatenmetrik erfunden.
 
+### Einzelne logische Kandidaten mit einem unabhängigen Empfänger prüfen
+
+Die Ansicht eines logischen Exports bietet bei jedem gespeicherten Versuch
+**Kandidat erneut prüfen** an. Ein Java-Consumer kann dieselbe Prüfung über
+`ScopedLogicWorkspaceCheck.check(workspace, candidateHash, receiver)` ausführen
+und stellt dafür den vertrauenswürdigen `ScopedProofExecutor` bereit. Der Abruf
+und der Import eines Workspaces starten diese Prüfung nicht.
+
+Die Web-Workbench führt die Gegenbeispielprüfung auch ohne Lean-Installation aus.
+Für die anschließende formale Prüfung verwendet sie zwei separat bereitgestellte,
+gleich gepinnte Lean-Projekte. Konfiguration über `REGELSUCHE_LEAN_PROJECT` und
+`REGELSUCHE_LEAN_REBUILD_PROJECT` oder die Java-Eigenschaften
+`regelsuche.lean.project` und `regelsuche.lean.rebuild.project`. Lean speichert
+seine Nachweise im Verzeichnis aus `regelsuche.proof.evidence`.
+
+Die Prüfung rekonstruiert den Vorschlag aus dem ursprünglichen Seed und verlangt
+den exakten Kandidatenhash, den passenden gespeicherten Zustand und seine
+akzeptierte Quellkante. Kandidat und Zustände müssen innerhalb von 4.096 Einheiten
+Graphbildung und einem Seed von höchstens 8.192 UTF-16-Codeeinheiten überprüfbar
+sein. Bis zu 256 konstante Interpretationen liefern einen getrennten
+Gegenbeispielbefund. Ein gespeicherter Zeuge gilt nur bei identischem Zeugen und
+gleicher Zahl von Versuchen als reproduziert. Der Empfänger führt die formale
+Prüfung nur nach `NONE_FOUND` aus.
+
+Das Ergebnis enthält die Run-, Workspace-, Evidenz-, Seed-, Kandidaten- und
+Zustandshashes sowie gegebenenfalls neue Kernel- und Rebuild-Quittungen. Der
+Vorschlag darf ein anderes Ziel als der Seed haben. Die Prämissen, Deklarationen,
+Theorien und Quellprovenienz bleiben exakt gebunden. Historische Quittungen
+werden während der neuen Prüfung nicht als Nachweis verwendet. Die neue Prüfung
+bewertet einen Kandidaten und gibt das Ergebnis in der laufenden Ansicht aus.
+Die Quellenansicht und gespeicherte Prüfbelege zur vollständigen historischen
+Laufwiederholung behalten ihren eigenen Vertrag.
+
 ## Unveränderlicher Speicher und begrenzte API
 
 Die bestehenden Server-Authentifizierungs- und OpenAPI-Grenzen gelten auch für
@@ -142,6 +175,7 @@ die neuen Routen unter `/api/discovery-domains/exports`:
 | `GET /{runDigest}` | Die erneut verifizierte, gespeicherte Quellenansicht |
 | `GET /{runDigest}/files/{fileName}` | Eine der vier byteidentischen Originaldateien |
 | `POST /{runDigest}/replay` | Genau `expectedWorkspaceHash` und `expectedEvidenceHash`; nur passend zur ausgewählten Quelle |
+| `POST /{runDigest}/scoped-check` | Dieselben beiden Quellhashes und der `candidateHash` eines gespeicherten logischen Versuchs. Gibt den neuen Gegenbeispiel- und gegebenenfalls formalen Prüfbefund zurück. |
 | `POST /{runDigest}/validate` | Unabhängige endliche Prüfung mit denselben zwei Quellenbindungen; eigener Validierungsbeleg |
 | `GET /{runDigest}/validate/{receiptDigest}` | Gespeicherter endlicher Validierungsbeleg mit geprüfter Quellenbindung |
 | `POST /{runDigest}/model-proof` | Bedingtes affines Modellgesetz nach Replay und endlicher Prüfung; eigener Modellbeleg |

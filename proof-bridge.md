@@ -356,13 +356,17 @@ payload is the canonical JSON of a v2 solver obligation. Formation inspects
 the declarations and premises, generates conclusions, and binds each proposed
 DAG to a new exact obligation. A comparison with a chosen endpoint can occur
 after formation. The domain accepts up to 32 declarations, 32 premises and
-65,536 formation units. It follows up to four rounds of implication chaining.
-The formation ledger counts its declared source inspections and graph work.
+65,536 formation units. It runs its original implication chaining for up to
+four rounds to preserve the proof and work bound to each previously retained
+proposal. Up to four additional rounds use conjunction projection, existential
+elimination and chained implications. The formation ledger counts its declared
+source inspections and graph work.
 
 The public finite grammar uses lexical local slots and topologically ordered
 children. It supports assumption references, implication and universal
 introduction, application, specialization, cuts, local definitions and
-unfolding, existential witnesses, conjunction, disjunction elimination,
+unfolding, existential introduction and elimination, conjunction introduction
+and projection, disjunction elimination,
 classical contradiction, equality substitution, natural induction, strong
 natural induction, normalization and checked leaf solving. A recursive use of
 the strong induction hypothesis takes both the proposed argument and its
@@ -371,6 +375,13 @@ scope and motive. An explicit hand-constructed DAG and a source-generated DAG
 enter the same receiving boundary. The source generator currently constructs
 modus ponens, universal specialization, cases, equality substitution,
 double-negation elimination, witnesses and the two natural induction forms.
+It also projects both sides of conjunctions and derives a conclusion from
+`∃ x. P(x)` and `∀ x. P(x) → Q` when the binder sort and antecedent
+match exactly and `Q` is independent of the witness. It checks this
+independence inside nested binders. The generated elimination continuation
+retains both the local witness and its property, then applies the specialized
+universal proof. The receiving kernel checks the resulting term against the
+exact closed statement.
 The graph allows up to 128 distinct nodes, 512 expanded visits and 64 locals.
 
 `new DomainDiscoveryRunner().run(campaignId, domain, seed, budget)` explores
