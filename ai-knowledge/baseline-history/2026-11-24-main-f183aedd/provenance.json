@@ -1,0 +1,102 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_ONLY",
+  "sourceCommit": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+  "sourceTree": "c5764e9bdb462df4ac4d92a06532c169d96f68cb",
+  "originalMainCI": {
+    "runId": 45290302102,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "runAttempt": 1,
+    "successfulMandatoryJobs": 13,
+    "aggregateCiCheckJobId": 138125261197,
+    "aggregateCiCheck": "success",
+    "reportPublication": "success",
+    "originalGradleJobId": 138097015309
+  },
+  "originalQualityEvidence": {
+    "artifactId": 14878535049,
+    "artifactName": "quality-acceptance-evidence",
+    "downloadedZipSha256": "2aaf9601814adfb78f3ca8bd4968aa1a4429935f053961facd6fab48c15250d5",
+    "zipIndexSha256": "7b2b305b6ed2610b65b3737b3e868ddb6ccffc4d952af26bddfb8b93f7569f0c",
+    "indexCheckoutRevision": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+    "indexCheckoutTree": "c5764e9bdb462df4ac4d92a06532c169d96f68cb",
+    "indexTrackedChangesPresent": false,
+    "indexedFilesVerified": 293,
+    "indexedFileFailures": 0,
+    "originalCheckJson": {
+      "path": "files/build/ai-knowledge/check.json",
+      "bytes": 10185,
+      "sha256": "19c199142e0ccf5fa126b4d05d5e0e593fa516cbbb03d8707a94d3524465ffee",
+      "passed": true,
+      "trendPassed": true,
+      "trendViolationCount": 0,
+      "claimFailureCount": 0
+    },
+    "originalComplexityJson": {
+      "path": "files/build/ai-knowledge/complexity.json",
+      "bytes": 20795,
+      "sha256": "e7545f345510d881d203c9b40cf64130a96538030c0cb9e397f22cadb83c4ec0"
+    },
+    "sourceBindings": [
+      {
+        "path": ".github/workflows/gradle.yml",
+        "bytes": 47725,
+        "sha256": "767e9d21204ebd7cbdbe216148d0846e19a453a4c80e49cab157586b9097c1c1",
+        "gitBlob": "ecc282dfb43f2bdba2ed5586e320ff377314eb7c"
+      },
+      {
+        "path": "ai-knowledge/complexity-baseline.json",
+        "bytes": 341,
+        "sha256": "951b3f9624a9fa16136e0b7803cd6d20b8e1ddd75f70f2bd4629d02810c4ba23",
+        "gitBlob": "6e3fc0e58268303abd904765fd10608bae25437e"
+      },
+      {
+        "path": "config/quality/complexity-hotspots.json",
+        "bytes": 7741,
+        "sha256": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4",
+        "gitBlob": "5670714ca96ec70342f7228c647687120b5757a1"
+      },
+      {
+        "path": "config/quality/coverage-policy.json",
+        "bytes": 2419,
+        "sha256": "4591f7817ba3db5830b345511a8b0c6ab8ad821e0ba87bc1d69be6cf13f84f6c",
+        "gitBlob": "0b78714844d9d07ac3e83709b695e73f4e12f914"
+      }
+    ]
+  },
+  "snapshot": {
+    "projection": "Numeric fields copied from original accepted complexity.json, preserving existing snapshot schema and context-footprint-v3 model; no separate local extractor replay claimed.",
+    "path": "metrics-snapshot.json",
+    "previousBaselinePath": "previous-baseline.json",
+    "previousReferenceEstimatedTokens": 861185,
+    "measuredAcceptedMainEstimatedTokens": 876100,
+    "delta": 14915,
+    "previousConceptRadius": 119,
+    "measuredConceptRadius": 121,
+    "contextDebt": 13.52
+  },
+  "rejectedPrEvidence": {
+    "pr": 1375,
+    "head": "27a097b701d648fa3fcb2258a1b3689ba2666e3c",
+    "runId": 45298800466,
+    "jobId": 138125832572,
+    "jobConclusion": "failure",
+    "artifactId": 14878445704,
+    "artifactName": "repository-verification",
+    "downloadedZipSha256": "041da433409e55fc8b738f96c4cbf0f440255c6e71ae884033a773717af68a9b",
+    "trendSha256": "0f83bc9b5ff2c29c40eb81556e46f8322f5c4dc3ebd3373696ae73921cc9f96d",
+    "estimatedContextTokens": 876520,
+    "previousDelta": 15335,
+    "projectedDeltaAgainstAcceptedMain": 420
+  },
+  "unchangedThresholds": {
+    "maxCognitiveDebtIncrease": 10,
+    "maxConceptRadiusIncrease": 3,
+    "maxContextTokenIncrease": 15000,
+    "failOnWarnings": false
+  },
+  "boundary": "Only the separately successful main measurement supplies reference values. All 293 indexed artifact paths, byte lengths and SHA-256 hashes and the four policy/workflow Git blob identities were checked. The rejected PR does not supply acceptance or baseline values. Fresh complete PR CI is required. No threshold, exception, or exclusion is changed."
+}
