@@ -44,6 +44,24 @@ isoliertem Suchpfad und einem strukturierten Java-Polynom. Die Tests in
 `FrozenSymPyOperationObservationTest` verwerfen unter anderem manipulierte
 Versions-, Eingabe-, Budget-, Ergebnis- und Arbeitsstufenbindungen.
 
+Ohne jede dieser drei Eigenschaften wird ausschließlich diese historische Probe
+beim regulären Testscan als nicht angefordert übersprungen. Sobald eine Eigenschaft
+gesetzt ist, auch mit leerem Wert, verlangt der Test alle drei nicht leer. Eine
+unvollständige Konfiguration oder ungültige Pfade führen zu einem sichtbaren Fehler.
+Gradle reicht genau diese explizit gesetzten Eigenschaften an seinen Testworker
+weiter. Der bestehende historische Aufruf ist damit zum Beispiel:
+
+```sh
+./gradlew :regelsuche-math-sympy:test \
+  --tests de.regelsuche.math.sympy.FrozenSymPyOperationProbeIT \
+  -Dfrozen.checkout=/path/to/checkout \
+  -Dfrozen.graalpy=/path/to/graalpy-25.1.3/bin/graalpy \
+  -Dfrozen.packages=/path/to/unpacked-pinned-wheels
+```
+
+Die reguläre SymPy-Runtime-Qualifikation benötigt diese historische Provisionierung
+nicht. Ihre Auswahl, Laufzeitpins und fachlichen Prüfungen bleiben unverändert.
+
 ## Was die 120 externen Formationszeilen tatsächlich erreichen
 
 Die öffentliche Vorprüfung verwendet den regulären Source-Parser,

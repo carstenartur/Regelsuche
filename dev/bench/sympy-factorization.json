@@ -8,56 +8,56 @@
     "measurements" : [ {
       "id" : "cpython-one-shot-end-to-end",
       "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.cpythonOneShotEndToEnd",
-      "scoreMillis" : 321.1693801666667,
-      "scoreErrorMillis" : 48.593818102895774,
+      "scoreMillis" : 342.58807188888886,
+      "scoreErrorMillis" : 89.14297713057451,
       "forks" : 1,
       "warmupIterations" : 2,
       "measurementIterations" : 3
     }, {
       "id" : "graalpy-backend-warm",
       "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyBackendWarm",
-      "scoreMillis" : 13.65848997644745,
-      "scoreErrorMillis" : 30.08200438449276,
+      "scoreMillis" : 16.489167858834247,
+      "scoreErrorMillis" : 21.033475739137806,
       "forks" : 1,
       "warmupIterations" : 2,
       "measurementIterations" : 3
     }, {
       "id" : "graalpy-end-to-end-cold",
       "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyEndToEndCold",
-      "scoreMillis" : 3814.0073216666665,
-      "scoreErrorMillis" : 4940.330007223106,
+      "scoreMillis" : 4537.399359333333,
+      "scoreErrorMillis" : 8049.562994605634,
       "forks" : 1,
       "warmupIterations" : 2,
       "measurementIterations" : 3
     }, {
       "id" : "graalpy-end-to-end-warm",
       "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.graalPyEndToEndWarm",
-      "scoreMillis" : 14.475290283359504,
-      "scoreErrorMillis" : 39.676628322815006,
+      "scoreMillis" : 16.591776146638015,
+      "scoreErrorMillis" : 18.05636667461926,
       "forks" : 1,
       "warmupIterations" : 2,
       "measurementIterations" : 3
     }, {
       "id" : "native-backend-warm",
       "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.nativeBackendWarm",
-      "scoreMillis" : 0.10723020646962433,
-      "scoreErrorMillis" : 0.001698392199218861,
+      "scoreMillis" : 0.1158877910917517,
+      "scoreErrorMillis" : 0.10590561914280563,
       "forks" : 1,
       "warmupIterations" : 2,
       "measurementIterations" : 3
     }, {
       "id" : "native-end-to-end-warm",
       "benchmark" : "de.regelsuche.math.sympy.SymPyFactorizationBenchmarks.nativeEndToEndWarm",
-      "scoreMillis" : 0.1250851671370969,
-      "scoreErrorMillis" : 0.0952172530051361,
+      "scoreMillis" : 0.14290378001660653,
+      "scoreErrorMillis" : 0.3000577653506625,
       "forks" : 1,
       "warmupIterations" : 2,
       "measurementIterations" : 3
     } ],
     "ratios" : {
-      "graalpyWarmToNativeWarmEndToEnd" : 115.72347557000245,
-      "graalpyColdToWarmEndToEnd" : 263.4839956232982,
-      "cpythonOneShotToGraalpyWarmEndToEnd" : 22.18742241983751
+      "graalpyWarmToNativeWarmEndToEnd" : 116.10452952825966,
+      "graalpyColdToWarmEndToEnd" : 273.47279273971793,
+      "cpythonOneShotToGraalpyWarmEndToEnd" : 20.64806497273695
     }
   },
   "generalComparison" : {
@@ -76,41 +76,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 7.894908940744512,
-        "scoreErrorMillis" : 1.962378817542949,
+        "scoreMillis" : 10.179962144372148,
+        "scoreErrorMillis" : 3.542862118441351,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 8.74056159482859,
-        "scoreErrorMillis" : 2.7639957253329355,
+        "scoreMillis" : 10.62952139498472,
+        "scoreErrorMillis" : 3.017496730370356,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 2.034369651823529,
-        "scoreErrorMillis" : 0.3080294425510632,
+        "scoreMillis" : 2.1872285959492803,
+        "scoreErrorMillis" : 0.6985929656116722,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 1.9554599180962602,
-        "scoreErrorMillis" : 0.48334670919902295,
+        "scoreMillis" : 3.0885186710972556,
+        "scoreErrorMillis" : 0.911674128147727,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 3.8807642129677986,
-        "graalpyToNativeWarmEndToEnd" : 4.469823960052309,
-        "nativeVerifierInclusiveToBackend" : 0.9612117032632015,
-        "graalpyVerifierInclusiveToBackend" : 1.107113667862562
+        "graalpyToNativeWarmBackend" : 4.654274438083568,
+        "graalpyToNativeWarmEndToEnd" : 3.441624457205686,
+        "nativeVerifierInclusiveToBackend" : 1.4120694456981557,
+        "graalpyVerifierInclusiveToBackend" : 1.0441611908017854
       }
     }, {
       "caseId" : "z-content-mixed-degree4",
@@ -123,41 +123,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 12.975866150386357,
-        "scoreErrorMillis" : 4.451878740319847,
+        "scoreMillis" : 15.250545104583924,
+        "scoreErrorMillis" : 4.887198860816582,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 12.046401446105273,
-        "scoreErrorMillis" : 4.515656312894429,
+        "scoreMillis" : 19.38088365920095,
+        "scoreErrorMillis" : 6.15585538893573,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 3.281603752484636,
-        "scoreErrorMillis" : 0.6514395348760078,
+        "scoreMillis" : 3.9958881518593286,
+        "scoreErrorMillis" : 1.0474011993076455,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 3.5220776218037857,
-        "scoreErrorMillis" : 0.7441650108406835,
+        "scoreMillis" : 4.264265312400792,
+        "scoreErrorMillis" : 1.2778177045109897,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 3.954123388773492,
-        "graalpyToNativeWarmEndToEnd" : 3.42025438949181,
-        "nativeVerifierInclusiveToBackend" : 1.0732793741892444,
-        "graalpyVerifierInclusiveToBackend" : 0.9283697370557873
+        "graalpyToNativeWarmBackend" : 3.8165595544729363,
+        "graalpyToNativeWarmEndToEnd" : 4.544952586050389,
+        "nativeVerifierInclusiveToBackend" : 1.0671633314902933,
+        "graalpyVerifierInclusiveToBackend" : 1.2708321916555987
       }
     }, {
       "caseId" : "z-large-coefficient-degree4",
@@ -170,41 +170,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 11.82998043442461,
-        "scoreErrorMillis" : 3.2770065893388494,
+        "scoreMillis" : 15.809909901821346,
+        "scoreErrorMillis" : 6.152102634342399,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 11.221495294822413,
-        "scoreErrorMillis" : 4.484125133652509,
+        "scoreMillis" : 15.219956181729703,
+        "scoreErrorMillis" : 4.054607508137822,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 2.888497351529375,
-        "scoreErrorMillis" : 0.6892368238111235,
+        "scoreMillis" : 3.6741360136569385,
+        "scoreErrorMillis" : 0.8782601223426403,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 3.998066853013938,
-        "scoreErrorMillis" : 0.9987020475930434,
+        "scoreMillis" : 4.918170846192235,
+        "scoreErrorMillis" : 0.968327456328309,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 4.095548305821011,
-        "graalpyToNativeWarmEndToEnd" : 2.806730279250609,
-        "nativeVerifierInclusiveToBackend" : 1.3841338130004095,
-        "graalpyVerifierInclusiveToBackend" : 0.9485641465786758
+        "graalpyToNativeWarmBackend" : 4.303027934473617,
+        "graalpyToNativeWarmEndToEnd" : 3.094637550770192,
+        "nativeVerifierInclusiveToBackend" : 1.3385924821267259,
+        "graalpyVerifierInclusiveToBackend" : 0.9626845615341756
       }
     }, {
       "caseId" : "z-eisenstein-irreducible-degree5",
@@ -217,41 +217,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 7.570686461742871,
-        "scoreErrorMillis" : 1.5624952784207724,
+        "scoreMillis" : 7.955778396801,
+        "scoreErrorMillis" : 2.155092487406924,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 6.135123905656804,
-        "scoreErrorMillis" : 1.8207784801159967,
+        "scoreMillis" : 7.6958921728495655,
+        "scoreErrorMillis" : 2.3454859484907105,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 2.099654418000346,
-        "scoreErrorMillis" : 0.5495269583282064,
+        "scoreMillis" : 2.588454943087486,
+        "scoreErrorMillis" : 0.7751424265981554,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 1.990128925441611,
-        "scoreErrorMillis" : 0.5473816958236666,
+        "scoreMillis" : 2.796355950257323,
+        "scoreErrorMillis" : 0.750668381819555,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 3.605682152662526,
-        "graalpyToNativeWarmEndToEnd" : 3.082777114198979,
-        "nativeVerifierInclusiveToBackend" : 0.9478364193555985,
-        "graalpyVerifierInclusiveToBackend" : 0.8103788126294188
+        "graalpyToNativeWarmBackend" : 3.0735626355200982,
+        "graalpyToNativeWarmEndToEnd" : 2.752114648402104,
+        "nativeVerifierInclusiveToBackend" : 1.0803185729483298,
+        "graalpyVerifierInclusiveToBackend" : 0.967333652222398
       }
     }, {
       "caseId" : "z-repeated-degree6",
@@ -264,41 +264,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 12.9792989523443,
-        "scoreErrorMillis" : 4.2141221587984905,
+        "scoreMillis" : 17.03841143057054,
+        "scoreErrorMillis" : 5.779084533663273,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 12.90882586734448,
-        "scoreErrorMillis" : 3.5671923952757387,
+        "scoreMillis" : 16.88293763031903,
+        "scoreErrorMillis" : 3.2929738438577223,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 3.8796758930044297,
-        "scoreErrorMillis" : 0.6093229065553769,
+        "scoreMillis" : 3.9617250344617276,
+        "scoreErrorMillis" : 0.6659384572911831,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 4.055072370631822,
-        "scoreErrorMillis" : 0.9825295719615489,
+        "scoreMillis" : 4.97853878649559,
+        "scoreErrorMillis" : 1.301567375672708,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 3.345459597732815,
-        "graalpyToNativeWarmEndToEnd" : 3.183377431395423,
-        "nativeVerifierInclusiveToBackend" : 1.0452090541747716,
-        "graalpyVerifierInclusiveToBackend" : 0.9945703473462955
+        "graalpyToNativeWarmBackend" : 4.30075567646898,
+        "graalpyToNativeWarmEndToEnd" : 3.391143135434521,
+        "nativeVerifierInclusiveToBackend" : 1.2566593449037826,
+        "graalpyVerifierInclusiveToBackend" : 0.9908751000124015
       }
     }, {
       "caseId" : "z-sparse-cyclotomic-degree6",
@@ -311,41 +311,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 7.889389284750674,
-        "scoreErrorMillis" : 2.745897075255919,
+        "scoreMillis" : 9.409035292741859,
+        "scoreErrorMillis" : 3.24873578009652,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 9.280647422028327,
-        "scoreErrorMillis" : 2.5842322457447624,
+        "scoreMillis" : 11.252771902248734,
+        "scoreErrorMillis" : 3.698844184279051,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 3.751917909560338,
-        "scoreErrorMillis" : 1.0714382898700598,
+        "scoreMillis" : 4.59656361902709,
+        "scoreErrorMillis" : 1.6083443088224691,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 4.4241498315460195,
-        "scoreErrorMillis" : 0.6885175351603936,
+        "scoreMillis" : 5.609810619500027,
+        "scoreErrorMillis" : 1.1156019793099632,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 2.102761700795095,
-        "graalpyToNativeWarmEndToEnd" : 2.0977244838891913,
-        "nativeVerifierInclusiveToBackend" : 1.1791702105935618,
-        "graalpyVerifierInclusiveToBackend" : 1.176345479613587
+        "graalpyToNativeWarmBackend" : 2.0469716232782997,
+        "graalpyToNativeWarmEndToEnd" : 2.005909408623073,
+        "nativeVerifierInclusiveToBackend" : 1.2204357612453542,
+        "graalpyVerifierInclusiveToBackend" : 1.1959538414027564
       }
     }, {
       "caseId" : "q-linear-pair-degree2",
@@ -358,41 +358,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 10.868857788152678,
-        "scoreErrorMillis" : 3.54164005930133,
+        "scoreMillis" : 11.867048291512075,
+        "scoreErrorMillis" : 3.6789441269221994,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 11.717308851921537,
-        "scoreErrorMillis" : 2.892801849944114,
+        "scoreMillis" : 13.907668778723167,
+        "scoreErrorMillis" : 4.031893788494963,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 2.404883921282518,
-        "scoreErrorMillis" : 0.35302073377845333,
+        "scoreMillis" : 2.6889742866448367,
+        "scoreErrorMillis" : 0.8269989294910018,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 2.4918298332842337,
-        "scoreErrorMillis" : 0.5515338119612752,
+        "scoreMillis" : 3.4081014851964087,
+        "scoreErrorMillis" : 0.830533026329545,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 4.519493723570801,
-        "graalpyToNativeWarmEndToEnd" : 4.702290941142684,
-        "nativeVerifierInclusiveToBackend" : 1.0361538913509587,
-        "graalpyVerifierInclusiveToBackend" : 1.0780625784517754
+        "graalpyToNativeWarmBackend" : 4.413224905292481,
+        "graalpyToNativeWarmEndToEnd" : 4.080767206942979,
+        "nativeVerifierInclusiveToBackend" : 1.2674355058444466,
+        "graalpyVerifierInclusiveToBackend" : 1.1719568705783938
       }
     }, {
       "caseId" : "q-eisenstein-irreducible-degree4",
@@ -405,41 +405,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 6.994944530539999,
-        "scoreErrorMillis" : 1.8704174826876199,
+        "scoreMillis" : 9.697036672661262,
+        "scoreErrorMillis" : 2.482236658320292,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 8.063964557590749,
-        "scoreErrorMillis" : 2.3039632679251687,
+        "scoreMillis" : 10.732806208305423,
+        "scoreErrorMillis" : 2.976529430030145,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 1.4808801790717823,
-        "scoreErrorMillis" : 0.29236217286266897,
+        "scoreMillis" : 2.2383895474468343,
+        "scoreErrorMillis" : 0.6410973902573189,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 2.0151220708474513,
-        "scoreErrorMillis" : 0.4704499247427942,
+        "scoreMillis" : 2.5052854127832247,
+        "scoreErrorMillis" : 0.7431677345328752,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 4.723504730088588,
-        "graalpyToNativeWarmEndToEnd" : 4.001725093606603,
-        "nativeVerifierInclusiveToBackend" : 1.360759701781229,
-        "graalpyVerifierInclusiveToBackend" : 1.1528275202731626
+        "graalpyToNativeWarmBackend" : 4.332148836078133,
+        "graalpyToNativeWarmEndToEnd" : 4.284065262002187,
+        "nativeVerifierInclusiveToBackend" : 1.1192356646057515,
+        "graalpyVerifierInclusiveToBackend" : 1.106812995620022
       }
     }, {
       "caseId" : "q-repeated-degree5",
@@ -452,41 +452,41 @@
       "measurements" : [ {
         "id" : "graalpy-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralBackendWarm",
-        "scoreMillis" : 11.51908186793102,
-        "scoreErrorMillis" : 4.105384309652344,
+        "scoreMillis" : 14.929679962842421,
+        "scoreErrorMillis" : 5.242912401883282,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "graalpy-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.graalPyGeneralEndToEndWarm",
-        "scoreMillis" : 14.03521830751548,
-        "scoreErrorMillis" : 3.3117797749063485,
+        "scoreMillis" : 16.67903285876198,
+        "scoreErrorMillis" : 5.089697303397399,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-backend-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralBackendWarm",
-        "scoreMillis" : 0.3721953040433524,
-        "scoreErrorMillis" : 0.11920418844047265,
+        "scoreMillis" : 0.5428092869968787,
+        "scoreErrorMillis" : 0.2512851533490717,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       }, {
         "id" : "native-general-end-to-end-warm",
         "benchmark" : "de.regelsuche.math.sympy.GeneralUnivariateFactorizationBenchmarks.nativeGeneralEndToEndWarm",
-        "scoreMillis" : 0.5766583861093842,
-        "scoreErrorMillis" : 0.1949971997780022,
+        "scoreMillis" : 1.0058713033950824,
+        "scoreErrorMillis" : 0.39730530176211276,
         "forks" : 3,
         "warmupIterations" : 3,
         "measurementIterations" : 5
       } ],
       "ratios" : {
-        "graalpyToNativeWarmBackend" : 30.949025263868737,
-        "graalpyToNativeWarmEndToEnd" : 24.338878347384668,
-        "nativeVerifierInclusiveToBackend" : 1.549343529713681,
-        "graalpyVerifierInclusiveToBackend" : 1.218432030298296
+        "graalpyToNativeWarmBackend" : 27.504466707711785,
+        "graalpyToNativeWarmEndToEnd" : 16.581676803449724,
+        "nativeVerifierInclusiveToBackend" : 1.8530841816655697,
+        "graalpyVerifierInclusiveToBackend" : 1.1171728329256498
       }
     } ]
   }

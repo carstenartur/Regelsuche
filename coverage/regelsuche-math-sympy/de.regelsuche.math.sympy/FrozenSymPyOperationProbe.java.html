@@ -16,7 +16,7 @@ import java.util.Objects;
  * The normal engine codec supplies the source. No study authority is created.
  */
 public final class FrozenSymPyOperationProbe {
-<span class="nc" id="L19">    private static final List&lt;String&gt; METER_FILES = List.of(</span>
+<span class="fc" id="L19">    private static final List&lt;String&gt; METER_FILES = List.of(</span>
         &quot;check-frozen-polynomial-operation-work.py&quot;, &quot;frozen_graalpy_random_work.py&quot;, &quot;frozen_sympy_coefficient_work.py&quot;,
         &quot;frozen_sympy_native_work.py&quot;, &quot;frozen_sympy_operation_work.py&quot;,
         &quot;frozen_sympy_sequence_work.py&quot;, &quot;frozen_sympy_source_patch.py&quot;);
@@ -33,12 +33,12 @@ public final class FrozenSymPyOperationProbe {
     private final Path packages;
     private final SymPyFactorizationPolicy policy;
 
-<span class="nc" id="L36">    public FrozenSymPyOperationProbe(Path checkout, Path interpreter, Path packages, SymPyFactorizationPolicy policy) {</span>
-<span class="nc" id="L37">        this.checkout = checkout.toAbsolutePath().normalize();</span>
-<span class="nc" id="L38">        this.interpreter = interpreter.toAbsolutePath().normalize();</span>
-<span class="nc" id="L39">        this.packages = packages.toAbsolutePath().normalize();</span>
-<span class="nc" id="L40">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="nc" id="L41">    }</span>
+<span class="fc" id="L36">    public FrozenSymPyOperationProbe(Path checkout, Path interpreter, Path packages, SymPyFactorizationPolicy policy) {</span>
+<span class="fc" id="L37">        this.checkout = checkout.toAbsolutePath().normalize();</span>
+<span class="fc" id="L38">        this.interpreter = interpreter.toAbsolutePath().normalize();</span>
+<span class="fc" id="L39">        this.packages = packages.toAbsolutePath().normalize();</span>
+<span class="fc" id="L40">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L41">    }</span>
 
     public FrozenSymPyOperationObservation observeIntegers(FactorizationRequest&lt;BigInteger&gt; request,
             FrozenSymPyOperationObservation.Coverage goal) throws IOException {
@@ -52,10 +52,10 @@ public final class FrozenSymPyOperationProbe {
 
     private &lt;C&gt; FrozenSymPyOperationObservation observe(FactorizationRequest&lt;C&gt; request, SymPyFactorizationCodec&lt;C&gt; codec,
             FrozenSymPyOperationObservation.Coverage goal) throws IOException {
-<span class="nc" id="L55">        request.structuralViolation().ifPresent(reason -&gt; { throw new IllegalArgumentException(reason); });</span>
-<span class="nc" id="L56">        var input = codec.encode(request);</span>
-<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (input.byteLength() &gt; policy.maxInputBytes()) throw new IllegalArgumentException(&quot;payload exceeds input policy&quot;);</span>
-<span class="nc" id="L58">        Path scripts = checkout.resolve(&quot;scripts&quot;);</span>
+<span class="pc" id="L55">        request.structuralViolation().ifPresent(reason -&gt; { throw new IllegalArgumentException(reason); });</span>
+<span class="fc" id="L56">        var input = codec.encode(request);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (input.byteLength() &gt; policy.maxInputBytes()) throw new IllegalArgumentException(&quot;payload exceeds input policy&quot;);</span>
+<span class="fc" id="L58">        Path scripts = checkout.resolve(&quot;scripts&quot;);</span>
 <span class="nc" id="L59">        String meterHash = meterHash(scripts);</span>
 <span class="nc" id="L60">        List&lt;String&gt; command = new ArrayList&lt;&gt;(List.of(interpreter.toString(), &quot;-I&quot;, &quot;-c&quot;, BOOTSTRAP, scripts.toString(),</span>
 <span class="nc" id="L61">            packages.toString(), scripts.resolve(METER_FILES.getFirst()).toString(), &quot;--checkout&quot;, checkout.toString(),</span>
@@ -72,8 +72,8 @@ public final class FrozenSymPyOperationProbe {
     }
 
     private static String meterHash(Path scripts) throws IOException {
-<span class="nc" id="L75">        StringBuilder manifest = new StringBuilder();</span>
-<span class="nc bnc" id="L76" title="All 2 branches missed.">        for (String name : METER_FILES) {</span>
+<span class="fc" id="L75">        StringBuilder manifest = new StringBuilder();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        for (String name : METER_FILES) {</span>
 <span class="nc" id="L77">            manifest.append(name).append('=').append(rawHash(Files.readAllBytes(scripts.resolve(name)))).append('\n');</span>
 <span class="nc" id="L78">        }</span>
 <span class="nc" id="L79">        return rawHash(manifest.toString().getBytes(StandardCharsets.US_ASCII));</span>
