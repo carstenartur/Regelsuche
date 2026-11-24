@@ -28,11 +28,6 @@ class MavenGradleHostRuntimeInventoryContractTest {
   // Exact lines from the authoritative gradle/*.sh scripts on main bc05c85c8976287f82b4a2eb99bcfdf38ebb6863.
   // No glob or wildcard may silently authorize new executions.
   private static final Map<String, List<String>> RETAINED_LEGACY_LINES = Map.ofEntries(
-      Map.entry("run-checked-schema-comparison.sh", List.of(
-          "schema_python=build/typed-external-polynomial-venv/bin/python",
-          "\"$schema_python\" -m external_polynomial_comparison.run_schema \\",
-          "\"$schema_python\" -m external_polynomial_comparison.run_schema \\"
-      )),
       Map.entry("run-external-polynomial-comparison.sh", List.of(
           "python3 -m venv build/external-polynomial-venv",
           "pilot_python=build/external-polynomial-venv/bin/python",

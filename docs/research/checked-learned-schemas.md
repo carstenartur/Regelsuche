@@ -310,3 +310,30 @@ This maintenance refactor changes bytecode, so the original timing table is not
 relabeled as a measurement of the final refactored binary. Subsequent CI executions
 are separate qualification runs; the primary negative archive is unchanged.
 No rule, utility choice, protocol case, budget or quality threshold was tuned.
+
+## Routine Maven authority (2026-11-24)
+
+The historical Gradle reproduction above remains the description of the original
+measurement, not a required current build path. For the routine public checked-schema
+qualification use JDK 25, Maven and Docker from a clean Git checkout:
+
+```bash
+mvn --batch-mode --no-transfer-progress -Pschema-polynomial-comparison -pl regelsuche-release -am \
+  -Dregelsuche.skipPolynomialClasspath=false verify
+```
+
+`SchemaPolynomialComparisonContainerIT` runs the same frozen protocol and its full
+independent archive verifier inside the pinned worker. Retained raw evidence, source
+proofs and execution receipts are under
+`regelsuche-release/target/reports/learned-schema-efficiency-v2/`; the extracted
+archive is in `extracted/learned-schema-efficiency-v2/`. CI requires the Maven job
+and retains its reports even on failure. The former mandatory Gradle schema driver
+is retired; the other polynomial comparisons are unaffected.
+
+The transition is based on the two complete [CI archives](https://github.com/carstenartur/Regelsuche/actions/runs/45395843479)
+from #1383 and the [full read-only verification](https://github.com/carstenartur/Regelsuche/issues/749#issuecomment-7136406933):
+36 sequences and 492 rows in both authorities, with semantic projection v1 SHA256
+`a01b67b1dc9a120d49ab8d115cda9ed3ec8794c58f8d01a9f51e63ac272cb402`.
+The original archives, protocol, proof checks and work counters remain unchanged.
+This is semantic parity, not wall-clock or memory parity, and not completion of
+all Maven-only requirements in #749.
