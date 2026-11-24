@@ -1,8 +1,10 @@
 # Geometric sequence discovery domain
 
-Dieses eigenständige Java-25-Projekt verwendet
+Für den Central-Einstieg kopiere dieses eigenständige Java-25-Projekt aus einem
+unveränderten Quellcheckout, etwa den
+[Quellen zu v0.5.3](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/geometric-sequence-domain-java25),
+an einen beliebigen Ort. Dieser Quell-POM verwendet
 `io.github.carstenartur:regelsuche-discovery-sdk:0.5.3` aus dem veröffentlichten SDK.
-Kopiere das Verzeichnis für einen eigenen Build an einen beliebigen Ort.
 
 Mit JDK 25 und Maven 3.9.9 oder neuer aus der 3.x-Linie:
 
@@ -11,9 +13,16 @@ mvn --batch-mode --no-transfer-progress clean package
 java -cp "target/classes:target/dependency/*" example.GeometricSequenceExample
 ```
 
-Der POM-Default verwendet Maven Central. In einem neu erzeugten SDK-Archiv
-bindet der Packager den POM an die dort mitgelieferte Version. Unter Windows
-trennt `;` die Classpath-Einträge.
+Dieser Quell-POM verwendet Maven Central. Unter Windows trennt `;` die
+Classpath-Einträge.
+
+In einem SDK-Archiv mit Maven-Beispielen behalte die vollständige entpackte
+Struktur einschließlich `repository/` bei und führe die Befehle im darin
+enthaltenen Beispielverzeichnis aus. Der Archiv-POM verwendet die dort
+mitgelieferte SDK-Version und `../../../repository`. Beim Kopieren des Beispiels
+an einen anderen Ort muss das entpackte Repository weiter verfügbar sein;
+übergib dessen absoluten `file:`-URI mit `-Dregelsuche.repository=...` wie im
+[Archiv-Quickstart](../../../docs/java-sdk-quickstart.md#mit-einem-vollständigen-sdk-archiv).
 
 Der Provider sucht einen ganzzahligen Multiplikator für eine geometrische
 Folge. Die Tests decken ab:

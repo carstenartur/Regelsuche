@@ -10,18 +10,28 @@ have different packages, contracts and ServiceLoader descriptor names.
 
 ## Current Maven Central route
 
-With JDK 25 and Maven 3.9.9+ from the 3.x line, copy this complete project and run:
+Copy the complete project from an unchanged source checkout, for example
+[the v0.5.3 sources](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/extension-runtime-java25).
+With JDK 25 and Maven 3.9.9+ from the 3.x line, run inside that copied source directory:
 
 ```bash
 mvn --batch-mode --no-transfer-progress clean package
 java -cp "target/classes:target/dependency/*" example.Main
 ```
 
-The POM defaults to `io.github.carstenartur:regelsuche-bom:0.5.3` and resolves
+That source POM defaults to `io.github.carstenartur:regelsuche-bom:0.5.3` and resolves
 `regelsuche-extension-runtime` from Central. Windows uses `;` in the classpath.
 The output includes `greeting=Hello Ada` and the loaded catalogue identity.
-Inside a newly generated SDK archive, the packager binds the same POM to the
-version in that archive. The following recipe preserves the 0.5.2 reproduction.
+
+## From a complete SDK archive
+
+Keep the complete extracted SDK tree, including `repository/`, and run the
+commands above inside `examples/external-consumers/extension-runtime-java25/`.
+The packaged POM binds the SDK version in that archive and resolves it from
+`../../../repository`. If you copy the example elsewhere, retain the extracted
+repository and supply its absolute `file:` URI with `-Dregelsuche.repository=...`;
+the [archive quickstart](../../../docs/java-sdk-quickstart.md#mit-einem-vollständigen-sdk-archiv)
+shows that invocation. The following recipe preserves the 0.5.2 reproduction.
 
 ## Archived 0.5.2 artifacts
 
@@ -43,8 +53,8 @@ SDK ZIP is not the distribution for this example.
 
 ## Preferred route: Maven
 
-Install Maven **3.9.9+ from the 3.x line**. Copy this whole current example directory
-anywhere, enter it and supply an absolute `file:` URI for the extracted SDK
+Install Maven **3.9.9+ from the 3.x line**. Copy the complete source directory
+linked above anywhere, enter it and supply an absolute `file:` URI for the extracted SDK
 repository:
 
 ```bash

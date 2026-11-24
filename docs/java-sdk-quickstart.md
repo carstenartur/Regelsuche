@@ -19,19 +19,23 @@ ist dies der Einstieg. Die [Verfügbarkeitsmatrix](mathematical-capabilities.md)
 trennt diesen Release von neueren Quellcode-APIs. Java-Importe verwenden weiter
 `de.regelsuche`.
 
-## Aktueller Weg: das vollständige Maven-Beispiel
+## Central: das vollständige Maven-Beispiel aus den Quellen
 
-Kopiere das vollständige Verzeichnis
-[hello-rule-java25](../examples/external-consumers/hello-rule-java25/) an einen
-beliebigen Ort. Es enthält POM, Java-Code, JUnit-Tests und die erforderliche
-ServiceLoader-Registrierung. Mit JDK 25 im kopierten Verzeichnis:
+Dieser Central-Pfad verwendet das unveränderte Consumer-Verzeichnis aus dem
+Quellcheckout. Eine fest benannte Quelle ist
+[hello-rule-java25 im Tag v0.5.3](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/hello-rule-java25).
+Kopiere dieses vollständige Quellverzeichnis an einen beliebigen Ort. Es enthält
+POM, Java-Code, JUnit-Tests und die erforderliche ServiceLoader-Registrierung.
+Wenn du diese Anleitung in einem SDK-ZIP liest, verwende für dessen mitgelieferten
+Consumer den [Archivpfad unten](#mit-einem-vollständigen-sdk-archiv).
+Mit JDK 25 im kopierten Quellverzeichnis:
 
 ```bash
 mvn --batch-mode --no-transfer-progress clean package
 java -cp "target/classes:target/dependency/*" example.HelloRule
 ```
 
-Unter Windows trennt `;` die beiden Classpath-Einträge. Der POM-Default importiert
+Unter Windows trennt `;` die beiden Classpath-Einträge. Dieser Quell-POM importiert
 `io.github.carstenartur:regelsuche-bom:0.5.3` und verwendet die Plugin-API derselben
 Version. Maven lädt die veröffentlichten Bibliotheken von Central. Die erste
 Ausführung braucht Netzwerkzugriff für Plugins und Abhängigkeiten; weder der
@@ -59,6 +63,34 @@ Die [Consumer-Qualifikation](released-sdk-maven-qualification.md) führt diesen
 aktuellen Default-Pfad mit leerem Maven-Cache und unverändertem POM aus. Sie
 prüft die tatsächlichen Tests, Runtime-Koordinaten, veröffentlichten JAR-Hashes
 und die CLI-Ausgabe zusätzlich zur historischen 0.5.2-Qualifikation.
+
+## Mit einem vollständigen SDK-Archiv
+
+In einem SDK-Archiv mit Maven-Beispielen bindet der mitgelieferte POM die
+Archivversion aus `sdk-compatibility.json`. Entpacke das vollständige Archiv und
+behalte `repository/` und `examples/` in ihrer gemeinsamen Verzeichnisstruktur.
+Aus dem Archiv-Wurzelverzeichnis:
+
+```bash
+cd examples/external-consumers/hello-rule-java25
+mvn --batch-mode --no-transfer-progress clean package
+java -cp "target/classes:target/dependency/*" example.HelloRule
+```
+
+Der POM findet die mitgelieferten Regelsuche-Artefakte unter
+`../../../repository`; seine Version kann vom Central-Release abweichen.
+Wenn du nur das Beispielverzeichnis an einen anderen Ort kopierst, behalte das
+entpackte Repository und gib dessen absoluten `file:`-URI an. Im kopierten Beispiel:
+
+```bash
+mvn --batch-mode --no-transfer-progress \
+  -Dregelsuche.repository=file:///absoluter/pfad/zum/entpackten-sdk/repository \
+  clean package
+java -cp "target/classes:target/dependency/*" example.HelloRule
+```
+
+Die SDK-Version bleibt in beiden Fällen an das Archiv gebunden. Plugins und
+Fremdabhängigkeiten benötigen beim ersten Lauf weiterhin Netzwerkzugriff.
 
 ## Neuere Mathematik aus dem Quell-SDK oder einem neuen Archiv
 
@@ -130,9 +162,9 @@ SHA-256 des vollständigen Standalone-ZIPs:
 
 ## 2. Einen unabhängigen Maven-Consumer ausführen
 
-Kopiere das aktuelle vollständige Verzeichnis
-[hello-rule-java25](../examples/external-consumers/hello-rule-java25/) an einen
-beliebigen Ort. Es enthält jetzt einen eigenständigen `pom.xml`, den Java-Code,
+Kopiere das vollständige Quellverzeichnis
+[hello-rule-java25 aus v0.5.3](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/hello-rule-java25)
+an einen beliebigen Ort. Es enthält einen eigenständigen `pom.xml`, den Java-Code,
 zwei JUnit-Tests und die ServiceLoader-Registrierung. Dieses neue POM entstand
 **nach 0.5.2** und ist nicht rückwirkend im veröffentlichten ZIP enthalten.
 Die verwendeten SDK-Binärdateien sind unverändert die veröffentlichten 0.5.2-Artefakte.
@@ -180,8 +212,9 @@ Workbench-Laufzeitkatalog. [Plugin-Index](plugin-index.md) und
 
 ## 3. Eine Discovery-Domäne untersuchen
 
-Kopiere das aktuelle [geometric-sequence-domain-java25](../examples/external-consumers/geometric-sequence-domain-java25/README.md)
-für den Maven-Build. Das POM liegt im Checkout und verwendet die SDK-Artefakte
+Kopiere das Quellverzeichnis
+[geometric-sequence-domain-java25 aus v0.5.3](https://github.com/carstenartur/Regelsuche/tree/v0.5.3/examples/external-consumers/geometric-sequence-domain-java25)
+für den Maven-Build. Die folgenden Parameter wählen ausdrücklich die SDK-Artefakte
 des veröffentlichten 0.5.2-ZIPs. Im kopierten Verzeichnis:
 
 ```bash
