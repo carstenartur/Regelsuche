@@ -1,0 +1,178 @@
+{
+  "schema": "regelsuche.ai-knowledge-source-qualification/v1",
+  "verifiedAtUtc": "2026-11-24T03:36:16.932984+00:00",
+  "runId": 45290302102,
+  "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102",
+  "event": "push",
+  "runAttempt": 1,
+  "headBranch": "main",
+  "sourceCommit": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+  "sourceTree": "c5764e9bdb462df4ac4d92a06532c169d96f68cb",
+  "status": "completed",
+  "conclusion": "success",
+  "authorityDefinition": {
+    "path": ".github/workflows/gradle.yml",
+    "job": "verification",
+    "field": "needs"
+  },
+  "mandatorySourceAuthorities": [
+    {
+      "workflowJob": "gradle-verification",
+      "name": "Checkout-local Gradle authority",
+      "jobId": 138097015309,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015309",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "jmh-verification",
+      "name": "Isolated JMH authority",
+      "jobId": 138097015448,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015448",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "sympy-runtime-verification",
+      "name": "Isolated SymPy runtime authority",
+      "jobId": 138097015558,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015558",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "maven-product-verification",
+      "name": "Complete Maven product and Docker authority",
+      "jobId": 138097015246,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015246",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "maven-git-free-verification",
+      "name": "Complete Git-free Maven lifecycle",
+      "jobId": 138097015420,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015420",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "external-polynomial-comparison",
+      "name": "External polynomial comparison",
+      "jobId": 138097015865,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015865",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "typed-external-polynomial-comparison",
+      "name": "Typed source-only learning comparison",
+      "jobId": 138097014962,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097014962",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "checked-proofs",
+      "name": "Checked Lean and SMT proof authority",
+      "jobId": 138097015525,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015525",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "native-scalar-reproduction",
+      "name": "Independent clean and pinned scalar reproduction",
+      "jobId": 138097015465,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015465",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "maven-polynomial-qualification",
+      "name": "Maven pinned polynomial pilot",
+      "jobId": 138097015614,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015614",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "maven-native-polynomial-study",
+      "name": "Maven pinned native polynomial study",
+      "jobId": 138097015619,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015619",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "maven-typed-polynomial-study",
+      "name": "Maven pinned typed polynomial study",
+      "jobId": 138097015471,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015471",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "workflowJob": "maven-student-sdk-archive-qualification",
+      "name": "Fresh Maven Student SDK archive qualification",
+      "jobId": 138097015475,
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138097015475",
+      "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "aggregate": {
+    "workflowJob": "verification",
+    "name": "Checkout-local ciCheck",
+    "jobId": 138125261197,
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138125261197",
+    "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "reportPublication": {
+    "workflowJob": "publish-pages",
+    "name": "Publish generated reports",
+    "jobId": 138125987515,
+    "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45290302102/job/138125987515",
+    "headSha": "f183aedd1ff2ab061ed903559b96a11d28974e7f",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "skippedOptionalJobs": [
+    {
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "jobId": 138097017216,
+      "conclusion": "skipped"
+    },
+    {
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "jobId": 138097017257,
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Retained JMH precision study analysis",
+      "jobId": 138097017427,
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Retained JMH precision study v2 analysis",
+      "jobId": 138097018763,
+      "conclusion": "skipped"
+    }
+  ],
+  "claimBoundary": "Original main CI qualification. No cancelled or skipped source authority substitutes for success; the four skipped jobs are optional manually selected JMH studies."
+}
