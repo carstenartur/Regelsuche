@@ -13,6 +13,7 @@ import java.util.Optional;
  * {@link ExactRationalEvidenceVerifier}.</p>
  */
 public final class ExactRationalParseEvidence {
+    private static final java.util.regex.Pattern SHA256 = java.util.regex.Pattern.compile("sha256:[0-9a-f]{64}");
     private final String domainId;
     private final ExactRationalDomain.Status status;
     private final String detailCode;
@@ -116,8 +117,8 @@ public final class ExactRationalParseEvidence {
                 "exact evidence lacks a rational value"));
         if (!"EXACT_RATIONAL_LITERAL_ACCEPTED".equals(detailCode)
                 || !canonicalValue.equals(exact.canonicalText())
-                || !valueId.matches("sha256:[0-9a-f]{64}")
-                || !certificateHash.matches("sha256:[0-9a-f]{64}")) {
+                || !SHA256.matcher(valueId).matches()
+                || !SHA256.matcher(certificateHash).matches()) {
             throw new IllegalArgumentException(
                 "exact evidence lacks canonical fields");
         }
