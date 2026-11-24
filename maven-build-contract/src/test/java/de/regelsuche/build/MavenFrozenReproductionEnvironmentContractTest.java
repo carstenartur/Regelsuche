@@ -83,18 +83,20 @@ class MavenFrozenReproductionEnvironmentContractTest {
     }
 
     @Test
-    void nativeAndTypedMavenStudiesMustPassAlongsideExistingPolynomialGates() throws IOException {
+    void allFrozenMavenStudiesMustPassAlongsideExistingPolynomialGates() throws IOException {
         var jobs = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
         var verification = jobs.required("verification");
         var reject = verification.required("steps").get(0);
         assertEquals("exit 1", reject.required("run").asText());
         for (String id : List.of("external-polynomial-comparison", "typed-external-polynomial-comparison",
-                "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-typed-polynomial-study")) {
+                "maven-polynomial-qualification", "maven-native-polynomial-study", "maven-typed-polynomial-study",
+                "maven-schema-polynomial-study")) {
             assertTrue(verification.required("needs").valueStream().anyMatch(need -> id.equals(need.asText())), id);
             assertTrue(reject.required("if").asText().contains("needs." + id + ".result != 'success'"), id);
         }
         verifyMavenStudyJob(jobs.required("maven-native-polynomial-study"), "native-polynomial-comparison", "native-polynomial-comparison");
         verifyMavenStudyJob(jobs.required("maven-typed-polynomial-study"), "typed-polynomial-comparison", "typed-external-polynomial-comparison");
+        verifyMavenStudyJob(jobs.required("maven-schema-polynomial-study"), "schema-polynomial-comparison", "learned-schema-efficiency-v2");
     }
 
     private static void verifyMavenStudyJob(com.fasterxml.jackson.databind.JsonNode study, String profile, String report) {
