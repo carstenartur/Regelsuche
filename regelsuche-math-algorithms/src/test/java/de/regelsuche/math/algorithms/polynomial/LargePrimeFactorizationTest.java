@@ -123,40 +123,58 @@ class LargePrimeFactorizationTest {
     }
 
     @Test void exhaustiveSmallFieldsMatchIndependentTrialDivision() {
+        int checkedCases = 0;
         for (int p : new int[]{2, 3}) {
             var ring = new PolynomialRing<>(PrimeField.of(p), List.of(new PolynomialVariable("x")),
                 PolynomialRing.MonomialOrder.LEXICOGRAPHIC);
             int count = p == 2 ? 64 : 81;
             for (int code = 1; code < count; code++) {
-                var coefficients = new ArrayList<BigInteger>();
-                for (int rest = code; rest > 0; rest /= p) coefficients.add(BigInteger.valueOf(rest % p));
-                var source = UnivariatePolynomialView.of(ring, coefficients).toSparsePolynomial();
-                var result = LargePrimeFactorization.factor(request(source), POLICY, () -> false);
-                assertEquals(LargePrimeFactorization.Status.COMPLETE, result.status(), result.reason());
-                var certificate = result.certificate().orElseThrow();
-                var product = SparsePolynomial.constant(ring, certificate.unit());
-                for (var item : certificate.factors()) {
-                    product = product.multiply(item.polynomial().pow(item.multiplicity()));
-                    int[] f = UnivariatePolynomialView.from(item.polynomial()).coefficients().stream()
-                        .mapToInt(BigInteger::intValueExact).toArray();
-                    for (int degree = 1, lower = p; degree <= (f.length - 1) / 2; degree++, lower *= p) {
-                        for (int divisorCode = lower; divisorCode < 2 * lower; divisorCode++) {
-                            int[] divisor = new int[degree + 1];
-                            int remaining = divisorCode;
-                            for (int i = 0; i < divisor.length; i++, remaining /= p) divisor[i] = remaining % p;
-                            int[] residue = f.clone();
-                            for (int top = residue.length - 1; top >= degree; top--) {
-                                int leading = residue[top];
-                                for (int i = 0; i <= degree; i++)
-                                    residue[top - degree + i] = Math.floorMod(residue[top - degree + i] - leading * divisor[i], p);
-                            }
-                            assertFalse(Arrays.stream(residue).allMatch(value -> value == 0), "reducible emitted factor");
-                        }
-                    }
-                }
-                assertEquals(source, product);
+                assertCompleteFactorizationByTrialDivision(polynomialFromCode(ring, code, p), p);
+                checkedCases++;
             }
         }
+        assertEquals(143, checkedCases);
+    }
+
+    private static SparsePolynomial<BigInteger> polynomialFromCode(PolynomialRing<BigInteger> ring, int code, int p) {
+        var coefficients = new ArrayList<BigInteger>();
+        for (int rest = code; rest > 0; rest /= p) coefficients.add(BigInteger.valueOf(rest % p));
+        return UnivariatePolynomialView.of(ring, coefficients).toSparsePolynomial();
+    }
+
+    private static void assertCompleteFactorizationByTrialDivision(SparsePolynomial<BigInteger> source, int p) {
+        var result = LargePrimeFactorization.factor(request(source), POLICY, () -> false);
+        assertEquals(LargePrimeFactorization.Status.COMPLETE, result.status(), result.reason());
+        var certificate = result.certificate().orElseThrow();
+        var product = SparsePolynomial.constant(source.ring(), certificate.unit());
+        for (var item : certificate.factors()) {
+            product = product.multiply(item.polynomial().pow(item.multiplicity()));
+            assertIrreducibleByTrialDivision(item.polynomial(), p);
+        }
+        assertEquals(source, product);
+    }
+
+    private static void assertIrreducibleByTrialDivision(SparsePolynomial<BigInteger> factor, int p) {
+        int[] coefficients = UnivariatePolynomialView.from(factor).coefficients().stream()
+            .mapToInt(BigInteger::intValueExact).toArray();
+        for (int degree = 1, lower = p; degree <= (coefficients.length - 1) / 2; degree++, lower *= p) {
+            for (int divisorCode = lower; divisorCode < 2 * lower; divisorCode++) {
+                assertFalse(monicDivides(coefficients, divisorCode, degree, p), "reducible emitted factor");
+            }
+        }
+    }
+
+    private static boolean monicDivides(int[] coefficients, int divisorCode, int degree, int p) {
+        int[] divisor = new int[degree + 1];
+        int remaining = divisorCode;
+        for (int i = 0; i < divisor.length; i++, remaining /= p) divisor[i] = remaining % p;
+        int[] residue = coefficients.clone();
+        for (int top = residue.length - 1; top >= degree; top--) {
+            int leading = residue[top];
+            for (int i = 0; i <= degree; i++)
+                residue[top - degree + i] = Math.floorMod(residue[top - degree + i] - leading * divisor[i], p);
+        }
+        return Arrays.stream(residue).allMatch(value -> value == 0);
     }
 
     @Test void constantsAndIrreduciblesDoNotNeedRandomSplitting() {
