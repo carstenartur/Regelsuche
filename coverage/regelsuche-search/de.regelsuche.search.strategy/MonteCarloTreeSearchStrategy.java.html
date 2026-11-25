@@ -52,7 +52,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         // This controller retains complete paths. A semantic value hash alone
         // cannot identify a continuation or its proof/assumption obligations.
 <span class="fc" id="L54">        Map&lt;SearchState, Node&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L55">        nodes.put(rootState, new Node());</span>
+<span class="fc" id="L55">        nodes.put(rootState, new Node(null));</span>
 
 <span class="fc" id="L57">        int budget = problem.heuristic().maxVisitedExpressions();</span>
 <span class="fc" id="L58">        long maxIterations = 4L * budget;</span>
@@ -74,7 +74,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
 <span class="fc" id="L74">            List&lt;SearchState&gt; children = expand(problem, selected);</span>
 <span class="fc" id="L75">            List&lt;SearchState&gt; admitted = new ArrayList&lt;&gt;();</span>
 <span class="fc bfc" id="L76" title="All 2 branches covered.">            for (SearchState child : children) {</span>
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                if (nodes.putIfAbsent(child, new Node()) == null) {</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                if (nodes.putIfAbsent(child, new Node(selectedNode)) == null) {</span>
 <span class="fc" id="L78">                    admitted.add(child);</span>
                 }
 <span class="fc" id="L80">                selectedNode.addChild(child);</span>
@@ -131,7 +131,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
             }
 <span class="fc" id="L132">            SearchState best = null;</span>
 <span class="fc" id="L133">            double bestScore = Double.NEGATIVE_INFINITY;</span>
-<span class="fc" id="L134">            int parentVisits = Math.max(node.visits, 1);</span>
+<span class="fc" id="L134">            long parentVisits = Math.max(node.visits, 1L);</span>
 <span class="fc" id="L135">            boolean anyNonTerminal = false;</span>
 <span class="fc bfc" id="L136" title="All 2 branches covered.">            for (SearchState childKey : node.children) {</span>
 <span class="fc" id="L137">                Node child = nodes.get(childKey);</span>
@@ -210,7 +210,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
     private double rollout(SearchProblem problem, SearchState start) {
 <span class="fc" id="L211">        SearchState current = start;</span>
 <span class="fc" id="L212">        double bestImprovement = current.improvement();</span>
-<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        for (int step = 0; step &lt; rolloutDepth; step++) {</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (int step = 0; step &lt; rolloutDepth; step++) {</span>
 <span class="fc" id="L214">            List&lt;Transformation&gt; options = eligibleTransformations(problem, current);</span>
 <span class="fc bfc" id="L215" title="All 2 branches covered.">            if (options.isEmpty()) {</span>
 <span class="fc" id="L216">                break;</span>
@@ -222,30 +222,35 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
     }
 
     private void backpropagate(Map&lt;SearchState, Node&gt; nodes, SearchState leaf, double reward) {
-        // This existing heuristic updates the admitted leaf's statistics only.
-        // It does not claim full ancestor backpropagation.
-<span class="fc" id="L227">        Node node = nodes.get(leaf);</span>
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (node != null) {</span>
+        // Each admitted state retains its full path, so its parent is unique.
+        // Credit the simulated outcome to every choice on that path, including
+        // the root, rather than starving ancestors of visit/reward statistics.
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (Node node = nodes.get(leaf); node != null; node = node.parent) {</span>
 <span class="fc" id="L229">            node.visits++;</span>
 <span class="fc" id="L230">            node.totalReward += reward;</span>
         }
 <span class="fc" id="L232">    }</span>
 
-<span class="fc" id="L234">    private static final class Node {</span>
-<span class="fc" id="L235">        private final List&lt;SearchState&gt; children = new ArrayList&lt;&gt;();</span>
-        private int visits;
+    private static final class Node {
+        private final Node parent;
+<span class="fc" id="L236">        private final List&lt;SearchState&gt; children = new ArrayList&lt;&gt;();</span>
+        private long visits;
         private double totalReward;
         private boolean terminal;
 
+<span class="fc" id="L241">        Node(Node parent) {</span>
+<span class="fc" id="L242">            this.parent = parent;</span>
+<span class="fc" id="L243">        }</span>
+
         void addChild(SearchState key) {
-<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (!children.contains(key)) {</span>
-<span class="fc" id="L242">                children.add(key);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            if (!children.contains(key)) {</span>
+<span class="fc" id="L247">                children.add(key);</span>
             }
-<span class="fc" id="L244">        }</span>
+<span class="fc" id="L249">        }</span>
 
         void markTerminal() {
-<span class="fc" id="L247">            terminal = true;</span>
-<span class="fc" id="L248">        }</span>
+<span class="fc" id="L252">            terminal = true;</span>
+<span class="fc" id="L253">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
