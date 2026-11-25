@@ -80,7 +80,7 @@
 **Interfaces:** Typisierte offene Pflichten, Scope, Cursor, Ressourcen und geprüfte gemeinsame Präfixe; bestehender Empfänger prüft exakte Aussage.
 - [x] RED: Zwei konkurrierende Pläne, geteilte Präfixarbeit, geänderter Binder/Annahme, Abbruch und Fortsetzung.
 - [x] GREEN: Bestehenden Residualplan als inkrementellen Provider integrieren, gemeinsame Arbeit einmal zählen, keine ungebundene Proof-Übernahme.
-- [ ] Prüfen: Bestehende logische/Residualfälle und negative Scopingkontrollen lokal bestanden; der echte Backendpfad ist für die aktuelle Integration noch in CI auszuführen.
+- [x] Bestehende Logik- und Residualfälle sowie negative Scopingkontrollen bestanden lokal. Auf dem integrierten Stand `2b6b5f0d` bestand auch die Prüfung mit echtem Backend im [Proof-Job 139231688473 des Main-Laufs 45621694631](https://github.com/carstenartur/Regelsuche/actions/runs/45621694631/job/139231688473).
 - [x] Dokumentieren und commit.
 
 ### Task 8: Dauerhafte Prüfbelege und editierbarer Zählablauf
