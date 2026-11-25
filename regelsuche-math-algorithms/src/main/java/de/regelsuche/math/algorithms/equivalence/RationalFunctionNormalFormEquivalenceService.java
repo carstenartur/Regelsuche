@@ -160,18 +160,23 @@ public final class RationalFunctionNormalFormEquivalenceService {
             throw new UnsupportedExpression(
                 "cannot parse rational expression: " + exception.getMessage());
         }
-        return convert(parsed);
+        return convert(parsed, null);
     }
 
-    private RationalFunction convert(Expr expression) {
+    /**
+     * Convert each node once. When its parent needs a nonzero value, collect the
+     * visible multiplicative factors in the same traversal. The returned rational
+     * function carries the separate guards needed to define the expression.
+     */
+    private RationalFunction convert(Expr expression, List<Polynomial> nonzeroFactors) {
         work.charge(1);
         if (expression instanceof NumberExpr number) {
-            return RationalFunction.polynomial(
+            var value = RationalFunction.polynomial(
                 work.checked(Polynomial.constant(Rational.fromExact(number.value()))));
+            return collectNumerator(value, nonzeroFactors);
         }
         if (expression instanceof VariableExpr variable) {
-            return RationalFunction.polynomial(
-                Polynomial.variable(variable.name()));
+            return collectNumerator(RationalFunction.polynomial(Polynomial.variable(variable.name())), nonzeroFactors);
         }
         if (expression instanceof FunctionExpr function) {
             throw new UnsupportedExpression(
@@ -182,34 +187,47 @@ public final class RationalFunctionNormalFormEquivalenceService {
             throw new UnsupportedExpression(
                 "unsupported rational AST node: " + expression);
         }
-        RationalFunction left = convert(binary.left());
-        if (binary.operator() == BinaryOperator.POW) {
-            int exponent = integralExponent(binary.right());
-            if (exponent == 0) {
-                if (left.numerator().isZero()) throw new UnsupportedExpression(
-                    "zero to the zero power is outside the rational evaluator");
-                var factors = RationalFunction.joined(left.denominatorFactors(),
-                    nonZeroValueFactors(binary.left()), work);
-                var one = Polynomial.constant(Rational.ONE);
-                return new RationalFunction(one, one, factors);
-            }
-            return left.pow(exponent, work);
-        }
-        RationalFunction right = convert(binary.right());
         return switch (binary.operator()) {
-            case ADD -> left.add(right, work);
-            case SUB -> left.subtract(right, work);
-            case MUL -> left.multiply(right, work);
-            case DIV -> divide(left, right, binary.right());
-            case POW -> throw new IllegalStateException(
-                "power was handled before right-side conversion");
+            case ADD, SUB -> {
+                var left = convert(binary.left(), null);
+                var right = convert(binary.right(), null);
+                var value = binary.operator() == BinaryOperator.ADD ? left.add(right, work) : left.subtract(right, work);
+                yield collectNumerator(value, nonzeroFactors);
+            }
+            case MUL -> convert(binary.left(), nonzeroFactors).multiply(convert(binary.right(), nonzeroFactors), work);
+            case DIV -> {
+                var left = convert(binary.left(), nonzeroFactors);
+                var divisorFactors = new ArrayList<Polynomial>();
+                var right = convert(binary.right(), divisorFactors);
+                yield divide(left, right, divisorFactors);
+            }
+            case POW -> {
+                int exponent = integralExponent(binary.right());
+                if (exponent > 0) yield convert(binary.left(), nonzeroFactors).pow(exponent, work);
+                var baseFactors = new ArrayList<Polynomial>();
+                var base = convert(binary.left(), baseFactors);
+                if (base.numerator().isZero()) throw new UnsupportedExpression(
+                    "zero to the zero power is outside the rational evaluator");
+                var one = Polynomial.constant(Rational.ONE);
+                yield new RationalFunction(one, one, RationalFunction.joined(base.denominatorFactors(), baseFactors, work));
+            }
         };
+    }
+
+    private RationalFunction collectNumerator(RationalFunction value, List<Polynomial> factors) {
+        var numerator = value.numerator();
+        if (factors != null && (numerator.isZero() || numerator.totalDegree() != 0)) {
+            work.cells((long) factors.size() + 1);
+            work.charge(1);
+            factors.add(numerator);
+        }
+        return value;
     }
 
     private RationalFunction divide(
         RationalFunction left,
         RationalFunction right,
-        Expr divisorExpression
+        List<Polynomial> divisorFactors
     ) {
         if (right.numerator().isZero()) {
             throw new UnsupportedExpression(
@@ -219,55 +237,13 @@ public final class RationalFunctionNormalFormEquivalenceService {
         List<Polynomial> factors = new ArrayList<>(
             left.denominatorFactors());
         factors.addAll(right.denominatorFactors());
-        var nonzero = nonZeroValueFactors(divisorExpression);
-        work.cells((long) factors.size() + nonzero.size());
-        work.charge((long) factors.size() + nonzero.size());
-        factors.addAll(nonzero);
+        work.cells((long) factors.size() + divisorFactors.size());
+        work.charge((long) factors.size() + divisorFactors.size());
+        factors.addAll(divisorFactors);
         return new RationalFunction(
             work.multiply(left.numerator(), right.denominator()),
             work.multiply(left.denominator(), right.numerator()),
             factors);
-    }
-
-    /**
-     * Returns the already visible multiplicative factors whose product being
-     * non-zero makes {@code expression} non-zero. Domain factors needed merely
-     * to define a nested rational expression are retained by {@link #convert}
-     * and are therefore not duplicated here.
-     */
-    private List<Polynomial> nonZeroValueFactors(Expr expression) {
-        work.charge(1);
-        if (expression instanceof NumberExpr number) {
-            Polynomial value = Polynomial.constant(
-                Rational.fromExact(number.value()));
-            return value.isZero() ? List.of(value) : List.of();
-        }
-        if (expression instanceof BinaryExpr binary) {
-            if (binary.operator() == BinaryOperator.MUL) {
-                List<Polynomial> factors = new ArrayList<>(
-                    nonZeroValueFactors(binary.left()));
-                var right = nonZeroValueFactors(binary.right());
-                work.cells((long) factors.size() + right.size());
-                work.charge((long) factors.size() + right.size());
-                factors.addAll(right);
-                return List.copyOf(factors);
-            }
-            if (binary.operator() == BinaryOperator.DIV) {
-                return nonZeroValueFactors(binary.left());
-            }
-            if (binary.operator() == BinaryOperator.POW) {
-                int exponent = integralExponent(binary.right());
-                return exponent == 0
-                    ? List.of()
-                    : nonZeroValueFactors(binary.left());
-            }
-        }
-        RationalFunction value = convert(expression);
-        return value.numerator().totalDegree() == 0
-            ? (value.numerator().isZero()
-                ? List.of(value.numerator())
-                : List.of())
-            : List.of(value.numerator());
     }
 
     private int integralExponent(Expr exponentExpression) {

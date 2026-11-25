@@ -135,6 +135,32 @@ class RationalFunctionPlannerTest {
     }
 
     @Test
+    void nestedZeroPowersVerifyWithinWorkProportionalToTheInput() {
+        String source = "x";
+        for (int i = 0; i < 12; i++) source = "(" + source + "+1)^0";
+        var receipt = new RationalFunctionPlanner.Certificate(source, "1", List.of("x != -1"));
+        var checked = RationalFunctionPlanner.verify(source, receipt, new IterationLimits(12_000, 4096, 5000), () -> false);
+        assertTrue(checked.valid(), checked.reason());
+    }
+
+    @Test
+    void zeroPowerGuardWalkPreservesVisibleFactorsWithoutReevaluatingNestedQuotients() {
+        String source = "x";
+        for (int i = 0; i < 10; i++) source = "((" + source + "+1)*y^2/z)^0";
+        var limits = new IterationLimits(25_000, 4096, 5000);
+        var guards = List.of("x != -1", "y != 0", "z != 0");
+        var receipt = new RationalFunctionPlanner.Certificate(source, "1", guards);
+        var checked = RationalFunctionPlanner.verify(source, receipt, limits, () -> false);
+        assertTrue(checked.valid(), checked.reason());
+        for (String omitted : guards) {
+            var incomplete = new RationalFunctionPlanner.Certificate(source, "1",
+                guards.stream().filter(guard -> !guard.equals(omitted)).toList());
+            assertEquals("MISSING_ASSUMPTION",
+                RationalFunctionPlanner.verify(source, incomplete, limits, () -> false).reason());
+        }
+    }
+
+    @Test
     void aFoldedCoefficientBeyondTheParserLiteralLimitReturnsTheSource() {
         String number = "9".repeat(600);
         String source = number + "*" + number;
