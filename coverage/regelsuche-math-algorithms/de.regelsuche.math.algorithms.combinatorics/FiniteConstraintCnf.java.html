@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteConstraintCnf.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">FiniteConstraintCnf.java</span></div><h1>FiniteConstraintCnf.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Factor;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Problem;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Count-preserving signed CNF translation, v1. Auxiliary variables are private OR-prefix values. */
+public final class FiniteConstraintCnf {
+    // Two truth-table copies (at most eight rows) plus temporary scopes and literal arrays.
+    private static final int FACTOR_SCRATCH_CELLS = 32;
+
+    private FiniteConstraintCnf() {}
+
+    /** Literals use signed one-based DIMACS identifiers. Fixed assignments use zero-based factor IDs. */
+    public record Source(int variableCount, List&lt;List&lt;Integer&gt;&gt; clauses, Map&lt;Integer, Boolean&gt; fixed) {
+<span class="fc" id="L25">        public Source {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (variableCount &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_VARIABLE_COUNT&quot;);</span>
+<span class="fc" id="L27">            var snapshot = new ArrayList&lt;List&lt;Integer&gt;&gt;(clauses.size());</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (var clause : clauses) {</span>
+<span class="fc" id="L29">                var copy = List.copyOf(clause);</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                for (int literal : copy) {</span>
+<span class="fc bfc" id="L31" title="All 4 branches covered.">                    if (literal == 0 || Math.abs((long) literal) &gt; variableCount)</span>
+<span class="fc" id="L32">                        throw new IllegalArgumentException(&quot;LITERAL_OUT_OF_RANGE&quot;);</span>
+<span class="fc" id="L33">                }</span>
+<span class="fc" id="L34">                snapshot.add(copy);</span>
+<span class="fc" id="L35">            }</span>
+<span class="fc" id="L36">            clauses = List.copyOf(snapshot);</span>
+<span class="fc" id="L37">            fixed = ImmutableIntegerMap.copyOf(fixed);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            for (int variable : fixed.keySet()) {</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">                if (variable &lt; 0 || variable &gt;= variableCount) throw new IllegalArgumentException(&quot;FIXED_OUT_OF_RANGE&quot;);</span>
+<span class="fc" id="L40">            }</span>
+<span class="fc" id="L41">        }</span>
+    }
+
+    public record Certificate(Source source, FiniteConstraintCounter.Certificate elimination) {
+<span class="fc" id="L45">        public Certificate { Objects.requireNonNull(source); Objects.requireNonNull(elimination); }</span>
+    }
+
+<span class="fc" id="L48">    public record Lowering(FiniteConstraintVerifier.Status status, Optional&lt;Problem&gt; problem, String reason, long work) {}</span>
+<span class="fc" id="L49">    public record Result(FiniteConstraintCounter.Status status, Optional&lt;BigInteger&gt; count,</span>
+            Optional&lt;Certificate&gt; certificate, String reason, long work) {}
+
+    public static Lowering lower(Source source, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L53">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L55">            var problem = translate(source, sourceCells(source, work), work);</span>
+<span class="fc" id="L56">            return new Lowering(FiniteConstraintVerifier.Status.VERIFIED, Optional.of(problem), &quot;VERIFIED&quot;, work.used());</span>
+<span class="nc" id="L57">        } catch (CertificateWork.Stop stop) {</span>
+<span class="nc" id="L58">            return new Lowering(FiniteConstraintVerifier.Status.UNAVAILABLE, Optional.empty(), stop.getMessage(), work.used());</span>
+        }
+    }
+
+    public static Result count(Source source, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L63">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L65">            long retained = sourceCells(source, work);</span>
+<span class="fc" id="L66">            Problem problem = translate(source, retained, work);</span>
+<span class="fc" id="L67">            var result = FiniteConstraintCounter.countIndexed(problem, FiniteConstraintPlanner.Strategy.MIN_DEGREE,</span>
+<span class="fc" id="L68">                work.remainingLimits(retained), cancellation);</span>
+<span class="fc" id="L69">            work.chargeCompleted(result.work());</span>
+<span class="fc" id="L70">            work.charge(0);</span>
+<span class="fc" id="L71">            return new Result(result.status(), result.count(), result.certificate().map(c -&gt; new Certificate(source, c)),</span>
+<span class="fc" id="L72">                result.reason(), work.used());</span>
+<span class="fc" id="L73">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L74">            return new Result(FiniteConstraintCounter.Status.UNAVAILABLE, Optional.empty(), Optional.empty(),</span>
+<span class="fc" id="L75">                stop.getMessage(), work.used());</span>
+        }
+    }
+
+    public static FiniteConstraintVerifier.Verification verify(Source source, Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L81">        return FiniteConstraintCnfVerifier.verify(source, certificate, limits, cancellation);</span>
+    }
+
+    static long sourceCells(Source source, CertificateWork work) {
+<span class="fc" id="L85">        long cells = 1L + source.clauses().size() + 2L * source.fixed().size();</span>
+<span class="fc" id="L86">        work.cells(cells + source.variableCount());</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var clause : source.clauses()) {</span>
+<span class="fc" id="L88">            cells += clause.size();</span>
+<span class="fc" id="L89">            work.cells(cells + source.variableCount());</span>
+<span class="fc" id="L90">            work.charge(1);</span>
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        return cells;</span>
+    }
+
+    private static Problem translate(Source source, long retained, CertificateWork work) {
+<span class="fc" id="L96">        var factors = new ArrayList&lt;Factor&gt;();</span>
+<span class="fc" id="L97">        int next = source.variableCount();</span>
+<span class="fc" id="L98">        long factorCells = 0;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (var clause : source.clauses()) {</span>
+<span class="fc" id="L100">            int remaining = clause.size();</span>
+<span class="fc" id="L101">            int position = 0;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            int left = remaining == 0 ? 0 : clause.get(position++);</span>
+            // Leave at most three inputs in the final acceptance factor.
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            while (remaining &gt; 3) {</span>
+<span class="fc" id="L105">                work.cells(retained + factorCells + next + 1L + FACTOR_SCRATCH_CELLS);</span>
+<span class="fc" id="L106">                int right = clause.get(position++);</span>
+<span class="fc" id="L107">                int output = ++next; // one-based literal for a fresh, positive prefix</span>
+<span class="fc" id="L108">                Factor gate = factor(new int[] {left, right}, output, work);</span>
+<span class="fc" id="L109">                factors.add(gate);</span>
+<span class="fc" id="L110">                factorCells += 1L + gate.variables().size() + gate.values().size();</span>
+<span class="fc" id="L111">                left = output;</span>
+<span class="fc" id="L112">                remaining--;</span>
+<span class="fc" id="L113">            }</span>
+<span class="fc" id="L114">            work.cells(retained + factorCells + next + FACTOR_SCRATCH_CELLS);</span>
+<span class="fc" id="L115">            int[] tail = new int[remaining];</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (remaining &gt; 0) tail[0] = left;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int i = 1; i &lt; remaining; i++) tail[i] = clause.get(position++);</span>
+<span class="fc" id="L118">            var last = factor(tail, 0, work);</span>
+<span class="fc" id="L119">            factors.add(last);</span>
+<span class="fc" id="L120">            factorCells += 1L + last.variables().size() + last.values().size();</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        work.cells(retained + factorCells + next + factors.size());</span>
+<span class="fc" id="L123">        work.charge(1L + factorCells + source.fixed().size());</span>
+<span class="fc" id="L124">        var problem = new Problem(next, factors, source.fixed());</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!FiniteConstraintCnfVerifier.matchesTranslation(source, problem, retained, work))</span>
+<span class="nc" id="L126">            throw new IllegalStateException(&quot;CNF_TRANSLATION_REJECTED&quot;);</span>
+<span class="fc" id="L127">        return problem;</span>
+    }
+
+    private static Factor factor(int[] literals, int output, CertificateWork work) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        int[] variables = Arrays.copyOf(literals, literals.length + (output == 0 ? 0 : 1));</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (output != 0) variables[literals.length] = output;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = 0; i &lt; variables.length; i++) variables[i] = Math.abs(variables[i]) - 1;</span>
+<span class="fc" id="L134">        List&lt;Integer&gt; scope = Arrays.stream(variables).distinct().sorted().boxed().toList();</span>
+<span class="fc" id="L135">        var values = new ArrayList&lt;BigInteger&gt;(1 &lt;&lt; scope.size());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (int row = 0; row &lt; 1 &lt;&lt; scope.size(); row++) {</span>
+<span class="fc" id="L137">            work.charge(1L + scope.size() + literals.length);</span>
+<span class="fc" id="L138">            boolean satisfied = false;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (int literal : literals) {</span>
+<span class="fc" id="L140">                int bit = scope.indexOf(Math.abs(literal) - 1);</span>
+<span class="fc bfc" id="L141" title="All 6 branches covered.">                satisfied |= ((row &amp; (1 &lt;&lt; bit)) != 0) == (literal &gt; 0);</span>
+            }
+<span class="fc bfc" id="L143" title="All 4 branches covered.">            boolean required = output == 0 || (row &amp; (1 &lt;&lt; scope.indexOf(output - 1))) != 0;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            values.add(satisfied == required ? BigInteger.ONE : BigInteger.ZERO);</span>
+        }
+<span class="fc" id="L146">        work.charge(2L * (values.size() + scope.size()));</span>
+<span class="fc" id="L147">        return new Factor(scope, values);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

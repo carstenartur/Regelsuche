@@ -94,82 +94,95 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain&lt;Scop
             }
         });
     }
+    /** Opt-in live formation for callers that pull or cancel between rules. */
+    public ScopedProofSearch.Cursor openPlans(State initial) {
+<span class="pc bpc" id="L99" title="3 of 6 branches missed.">        if (initial.proposal() != null || initial.exhausted() || initial.cumulativeWork() != 0)</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(&quot;plan cursor requires a fresh scoped source&quot;);</span>
+<span class="fc" id="L101">        return ScopedProofSearch.open(initial.context(), formationBudget);</span>
+    }
+
+    /** Independently check the exact receiving obligation, including its endpoint and all lexical binders. */
+    public Evaluation&lt;Certificate&gt; receivePlan(Obligation receiving, ScopedProofDag proposal) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!receiving.equals(proposal.obligation())) throw new IllegalArgumentException(&quot;different receiving obligation&quot;);</span>
+<span class="fc" id="L107">        return receive(proposal);</span>
+    }
+
     @Override public List&lt;TransitionOperator&lt;State&gt;&gt; operators() {
-<span class="fc" id="L98">        return List.of(new TransitionOperator&lt;&gt;() {</span>
-<span class="fc" id="L99">            public String id() { return &quot;form-scoped-consequences/v1&quot;; }</span>
+<span class="fc" id="L111">        return List.of(new TransitionOperator&lt;&gt;() {</span>
+<span class="fc" id="L112">            public String id() { return &quot;form-scoped-consequences/v1&quot;; }</span>
             public List&lt;Successor&lt;State&gt;&gt; apply(State s) {
-<span class="pc bpc" id="L101" title="1 of 4 branches missed.">                if (s.proposal()!=null || s.exhausted()) return List.of();</span>
-<span class="fc" id="L102">                var report = ScopedProofSearch.discover(s.context(),formationBudget);</span>
-<span class="fc" id="L103">                var outputs = new java.util.ArrayList&lt;Successor&lt;State&gt;&gt;();</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">                for (var p : report.proposals()) {</span>
-<span class="fc" id="L105">                    var next = new State(s.context(),p.dag(),p.formationWork(),false);</span>
-<span class="fc" id="L106">                    outputs.add(new Successor&lt;&gt;(&quot;propose-scoped-dag&quot;,next,p.formationWork(),false,List.of(),</span>
-<span class="fc" id="L107">                        Map.of(&quot;attemptedWork&quot;,Integer.toString(report.work()),&quot;formationExhausted&quot;,Boolean.toString(report.exhausted()))));</span>
-<span class="fc" id="L108">                }</span>
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                if (report.exhausted()) outputs.add(new Successor&lt;&gt;(&quot;formation-budget-exhausted&quot;,</span>
-<span class="nc" id="L110">                    new State(s.context(),null,report.work(),true),report.work(),false,List.of(),Map.of()));</span>
-<span class="fc" id="L111">                return List.copyOf(outputs);</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">                if (s.proposal()!=null || s.exhausted()) return List.of();</span>
+<span class="fc" id="L115">                var report = ScopedProofSearch.discover(s.context(),formationBudget);</span>
+<span class="fc" id="L116">                var outputs = new java.util.ArrayList&lt;Successor&lt;State&gt;&gt;();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                for (var p : report.proposals()) {</span>
+<span class="fc" id="L118">                    var next = new State(s.context(),p.dag(),p.formationWork(),false);</span>
+<span class="fc" id="L119">                    outputs.add(new Successor&lt;&gt;(&quot;propose-scoped-dag&quot;,next,p.formationWork(),false,List.of(),</span>
+<span class="fc" id="L120">                        Map.of(&quot;attemptedWork&quot;,Integer.toString(report.work()),&quot;formationExhausted&quot;,Boolean.toString(report.exhausted()))));</span>
+<span class="fc" id="L121">                }</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                if (report.exhausted()) outputs.add(new Successor&lt;&gt;(&quot;formation-budget-exhausted&quot;,</span>
+<span class="nc" id="L123">                    new State(s.context(),null,report.work(),true),report.work(),false,List.of(),Map.of()));</span>
+<span class="fc" id="L124">                return List.copyOf(outputs);</span>
             }
         });
     }
     @Override public Objective&lt;State&gt; objective() {
-<span class="fc" id="L116">        return new Objective&lt;&gt;() {</span>
-<span class="fc" id="L117">            public String id() { return &quot;replayable-proof/v1&quot;; }</span>
+<span class="fc" id="L129">        return new Objective&lt;&gt;() {</span>
+<span class="fc" id="L130">            public String id() { return &quot;replayable-proof/v1&quot;; }</span>
             public ObjectiveAssessment assess(State s) {
-<span class="fc bfc" id="L119" title="All 4 branches covered.">                return new ObjectiveAssessment(s.proposal()==null?0:1,s.proposal()!=null,</span>
-<span class="fc" id="L120">                    Map.of(&quot;formationWork&quot;,Integer.toString(s.cumulativeWork()),&quot;formationExhausted&quot;,Boolean.toString(s.exhausted())));</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">                return new ObjectiveAssessment(s.proposal()==null?0:1,s.proposal()!=null,</span>
+<span class="fc" id="L133">                    Map.of(&quot;formationWork&quot;,Integer.toString(s.cumulativeWork()),&quot;formationExhausted&quot;,Boolean.toString(s.exhausted())));</span>
             }
         };
     }
     @Override public CandidateExtractor&lt;State,ScopedProofDag&gt; candidateExtractor() {
-<span class="fc" id="L125">        return new CandidateExtractor&lt;&gt;() {</span>
-<span class="fc" id="L126">            public String id() { return &quot;scoped-plan/v1&quot;; }</span>
+<span class="fc" id="L138">        return new CandidateExtractor&lt;&gt;() {</span>
+<span class="fc" id="L139">            public String id() { return &quot;scoped-plan/v1&quot;; }</span>
             public ScopedProofDag extract(CandidateContext&lt;State&gt; c) {
-<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                if (!c.initialState().context().equals(c.currentState().context())) throw new IllegalArgumentException(&quot;different proof context&quot;);</span>
-<span class="fc" id="L129">                return Objects.requireNonNull(c.currentState().proposal(),&quot;no proof proposal&quot;);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                if (!c.initialState().context().equals(c.currentState().context())) throw new IllegalArgumentException(&quot;different proof context&quot;);</span>
+<span class="fc" id="L142">                return Objects.requireNonNull(c.currentState().proposal(),&quot;no proof proposal&quot;);</span>
             }
         };
     }
-<span class="fc" id="L133">    @Override public CounterexampleGenerator&lt;ScopedProofDag&gt; counterexampleGenerator() { return new ScopedTruthAssignments(verifier::supports); }</span>
+<span class="fc" id="L146">    @Override public CounterexampleGenerator&lt;ScopedProofDag&gt; counterexampleGenerator() { return new ScopedTruthAssignments(verifier::supports); }</span>
     @Override public CandidateEvaluator&lt;ScopedProofDag,Certificate&gt; evaluator() {
-<span class="fc" id="L135">        return new CandidateEvaluator&lt;&gt;() {</span>
-<span class="fc" id="L136">            public String id() { return &quot;independent-lean-rebuild/v1&quot;; }</span>
-<span class="fc" id="L137">            public Evaluation&lt;Certificate&gt; evaluate(ScopedProofDag dag) { return receive(dag); }</span>
+<span class="fc" id="L148">        return new CandidateEvaluator&lt;&gt;() {</span>
+<span class="fc" id="L149">            public String id() { return &quot;independent-lean-rebuild/v1&quot;; }</span>
+<span class="fc" id="L150">            public Evaluation&lt;Certificate&gt; evaluate(ScopedProofDag dag) { return receive(dag); }</span>
         };
     }
 
     private Evaluation&lt;Certificate&gt; receive(ScopedProofDag dag) {
         try {
-<span class="fc" id="L143">            var checked = verifier.verify(dag);</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (!dag.hash().equals(checked.proposalHash())) {</span>
-<span class="nc" id="L145">                return Evaluation.inconclusive(&quot;Checked proof receipt is bound to another proposal&quot;,</span>
-<span class="nc" id="L146">                    Map.of(&quot;proposal&quot;, dag.hash(), &quot;receiptProposal&quot;, checked.proposalHash()));</span>
+<span class="fc" id="L156">            var checked = verifier.verify(dag);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (!dag.hash().equals(checked.proposalHash())) {</span>
+<span class="nc" id="L158">                return Evaluation.inconclusive(&quot;Checked proof receipt is bound to another proposal&quot;,</span>
+<span class="nc" id="L159">                    Map.of(&quot;proposal&quot;, dag.hash(), &quot;receiptProposal&quot;, checked.proposalHash()));</span>
             }
-<span class="fc" id="L148">            var evidence = Map.of(&quot;proposal&quot;, dag.hash(), &quot;kernelStatus&quot;, checked.status().name());</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (checked.status() == ResultStatus.UNSUPPORTED)</span>
-<span class="fc" id="L150">                return Evaluation.unsupported(checked.message(), evidence);</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (checked.status() != ResultStatus.CONFIRMED)</span>
-<span class="fc" id="L152">                return Evaluation.inconclusive(checked.message(), evidence);</span>
-<span class="fc" id="L153">            var certificate = new Certificate(dag, checked);</span>
-<span class="fc" id="L154">            return Evaluation.confirmed(certificate, &quot;Scoped theorem checked in both pinned projects&quot;, evidence);</span>
-<span class="nc" id="L155">        } catch (RuntimeException refusal) {</span>
-<span class="nc" id="L156">            return Evaluation.inconclusive(&quot;Checked proof receiver failed: &quot; + refusal,</span>
-<span class="nc" id="L157">                Map.of(&quot;proposal&quot;, dag.hash()));</span>
+<span class="fc" id="L161">            var evidence = Map.of(&quot;proposal&quot;, dag.hash(), &quot;kernelStatus&quot;, checked.status().name());</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (checked.status() == ResultStatus.UNSUPPORTED)</span>
+<span class="fc" id="L163">                return Evaluation.unsupported(checked.message(), evidence);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (checked.status() != ResultStatus.CONFIRMED)</span>
+<span class="fc" id="L165">                return Evaluation.inconclusive(checked.message(), evidence);</span>
+<span class="fc" id="L166">            var certificate = new Certificate(dag, checked);</span>
+<span class="fc" id="L167">            return Evaluation.confirmed(certificate, &quot;Scoped theorem checked in both pinned projects&quot;, evidence);</span>
+<span class="nc" id="L168">        } catch (RuntimeException refusal) {</span>
+<span class="nc" id="L169">            return Evaluation.inconclusive(&quot;Checked proof receiver failed: &quot; + refusal,</span>
+<span class="nc" id="L170">                Map.of(&quot;proposal&quot;, dag.hash()));</span>
         }
     }
     @Override public CertificateRenderer&lt;Certificate&gt; certificateRenderer() {
-<span class="fc" id="L161">        return new CertificateRenderer&lt;&gt;() {</span>
-<span class="fc" id="L162">            public String id() { return &quot;scoped-proof-receipt/v1&quot;; }</span>
-<span class="fc" id="L163">            public CertificateRendering render(Certificate c) { return new CertificateRendering(certificateType(),&quot;text&quot;,c.canonical()); }</span>
+<span class="fc" id="L174">        return new CertificateRenderer&lt;&gt;() {</span>
+<span class="fc" id="L175">            public String id() { return &quot;scoped-proof-receipt/v1&quot;; }</span>
+<span class="fc" id="L176">            public CertificateRendering render(Certificate c) { return new CertificateRendering(certificateType(),&quot;text&quot;,c.canonical()); }</span>
         };
     }
     @Override public EvidenceAdapter&lt;State,ScopedProofDag,Certificate&gt; evidenceAdapter() {
-<span class="fc" id="L167">        return new EvidenceAdapter&lt;&gt;() {</span>
-<span class="fc" id="L168">            public String id() { return &quot;scoped-proof-evidence/v1&quot;; }</span>
+<span class="fc" id="L180">        return new EvidenceAdapter&lt;&gt;() {</span>
+<span class="fc" id="L181">            public String id() { return &quot;scoped-proof-evidence/v1&quot;; }</span>
             public DomainPayload adapt(Optional&lt;State&gt; initial,Optional&lt;ScopedProofDag&gt; candidate,Optional&lt;Certificate&gt; certificate) {
-<span class="fc" id="L170">                return new DomainPayload(domainId(),Map.of(&quot;source&quot;,initial.map(s-&gt;s.context().contentHash()).orElse(&quot;&quot;),</span>
-<span class="fc" id="L171">                    &quot;proposal&quot;,candidate.map(ScopedProofDag::hash).orElse(&quot;&quot;),&quot;kernel&quot;,certificate.map(Certificate::kernelHash).orElse(&quot;&quot;),</span>
-<span class="fc" id="L172">                    &quot;independentRebuild&quot;,certificate.map(Certificate::rebuildHash).orElse(&quot;&quot;)));</span>
+<span class="fc" id="L183">                return new DomainPayload(domainId(),Map.of(&quot;source&quot;,initial.map(s-&gt;s.context().contentHash()).orElse(&quot;&quot;),</span>
+<span class="fc" id="L184">                    &quot;proposal&quot;,candidate.map(ScopedProofDag::hash).orElse(&quot;&quot;),&quot;kernel&quot;,certificate.map(Certificate::kernelHash).orElse(&quot;&quot;),</span>
+<span class="fc" id="L185">                    &quot;independentRebuild&quot;,certificate.map(Certificate::rebuildHash).orElse(&quot;&quot;)));</span>
             }
         };
     }

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteConstraintBuckets.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">FiniteConstraintBuckets.java</span></div><h1>FiniteConstraintBuckets.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Factor;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Each live nonscalar factor is indexed once, at the first remaining variable of its scope.
+ * Increasing source and output IDs keep each bucket in the verifier's canonical order.
+ */
+final class FiniteConstraintBuckets {
+    private final List&lt;List&lt;Integer&gt;&gt; buckets;
+    private final int[] positions;
+    private long entries;
+    private final CertificateWork work;
+
+    FiniteConstraintBuckets(int variableCount, int[] order, Map&lt;Integer, Factor&gt; active,
+<span class="fc" id="L20">            long retained, CertificateWork work) {</span>
+<span class="fc" id="L21">        this.work = work;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        int size = order == null ? variableCount : order.length;</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        work.cells(retained + 2L * size + (order == null ? 0 : variableCount));</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        positions = order == null ? null : new int[variableCount];</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (order != null) {</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            for (int i = 0; i &lt; order.length; i++) {</span>
+<span class="fc" id="L27">                work.charge(1);</span>
+<span class="fc" id="L28">                positions[order[i]] = i;</span>
+            }
+        }
+<span class="fc" id="L31">        buckets = new ArrayList&lt;&gt;(size);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L33">            work.charge(1);</span>
+<span class="fc" id="L34">            buckets.add(null);</span>
+        }
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (var entry : active.entrySet()) add(entry.getKey(), entry.getValue(), retained);</span>
+<span class="fc" id="L37">    }</span>
+
+    long cells() {
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        return 2L * buckets.size() + (positions == null ? 0 : positions.length) + entries;</span>
+    }
+
+    void add(int id, Factor factor, long retained) {
+<span class="fc" id="L44">        work.charge(1);</span>
+<span class="fc" id="L45">        int first = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (int variable : factor.variables()) {</span>
+<span class="fc" id="L47">            work.charge(1);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            first = Math.min(first, positions == null ? variable : positions[variable]);</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (first == Integer.MAX_VALUE) return;</span>
+<span class="fc" id="L51">        work.cells(retained + cells() + 1);</span>
+<span class="fc" id="L52">        var inputs = buckets.get(first);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (inputs == null) {</span>
+<span class="fc" id="L54">            inputs = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L55">            buckets.set(first, inputs);</span>
+        }
+<span class="fc" id="L57">        inputs.add(id);</span>
+<span class="fc" id="L58">        entries++;</span>
+<span class="fc" id="L59">    }</span>
+
+    List&lt;Integer&gt; take(int position) {
+<span class="fc" id="L62">        work.charge(1);</span>
+<span class="fc" id="L63">        var inputs = buckets.set(position, null);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (inputs == null) return List.of();</span>
+<span class="fc" id="L65">        entries -= inputs.size();</span>
+<span class="fc" id="L66">        return inputs;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

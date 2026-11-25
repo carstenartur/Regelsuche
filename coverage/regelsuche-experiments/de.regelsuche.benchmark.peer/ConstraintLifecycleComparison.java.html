@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConstraintLifecycleComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.peer</a> &gt; <span class="el_source">ConstraintLifecycleComparison.java</span></div><h1>ConstraintLifecycleComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.peer;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Factor;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Problem;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanLearning;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanLearning.Example;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanner.Strategy;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.lang.management.ManagementFactory;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
+import java.util.function.Supplier;
+
+/** Executes the separately frozen graph-family protocol; production planners receive no family labels. */
+public final class ConstraintLifecycleComparison {
+<span class="fc" id="L32">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+<span class="fc" id="L33">    private static final List&lt;String&gt; ARMS = List.of(&quot;FIXED_MIN_FILL&quot;, &quot;FIXED_MIN_DEGREE&quot;, &quot;INDEXED_MIN_FILL&quot;, &quot;COSTED_LEARNED&quot;, &quot;FRESH_SEARCH&quot;);</span>
+    private ConstraintLifecycleComparison() {}
+
+<span class="fc" id="L36">    record Graph(String family, int a, int b, Problem problem, List&lt;List&lt;Integer&gt;&gt; edges) {</span>
+<span class="fc" id="L37">        String id() { return family + &quot;:&quot; + a + &quot;:&quot; + b; }</span>
+    }
+<span class="fc" id="L39">    private record Outcome(Optional&lt;BigInteger&gt; count, long work, String reason, String selected, int failedTrials) {}</span>
+<span class="fc" id="L40">    private record Observation&lt;T&gt;(T value, long wallNanos, long threadCpuNanos, long allocatedBytes) {}</span>
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        if (args.length != 3 || !args[2].matches(&quot;[0-9a-f]{40}&quot;))</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(&quot;expected protocol JSON, output JSON, exact source revision&quot;);</span>
+<span class="fc" id="L45">        byte[] protocolBytes = Files.readAllBytes(Path.of(args[0]));</span>
+<span class="fc" id="L46">        var protocol = JSON.readTree(protocolBytes);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (!&quot;regelsuche.constraint-lifecycle-protocol/v1&quot;.equals(protocol.path(&quot;schema&quot;).asText()))</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(&quot;unsupported lifecycle protocol&quot;);</span>
+<span class="fc" id="L49">        var trainGraphs = graphs(protocol.required(&quot;training&quot;));</span>
+<span class="fc" id="L50">        var validation = graphs(protocol.required(&quot;validation&quot;));</span>
+<span class="fc" id="L51">        var finals = graphs(protocol.required(&quot;final&quot;));</span>
+<span class="fc" id="L52">        requireDisjointFamilies(trainGraphs, validation, finals);</span>
+<span class="fc" id="L53">        int states = protocol.required(&quot;maximumStates&quot;).asInt(), timeout = protocol.required(&quot;timeoutMillis&quot;).asInt();</span>
+<span class="fc" id="L54">        long trial = protocol.required(&quot;perTrainingTrialWork&quot;).asLong();</span>
+<span class="fc" id="L55">        var trainingLimits = new IterationLimits(protocol.required(&quot;trainingMaximumWork&quot;).asLong(), states, timeout);</span>
+<span class="fc" id="L56">        var queryLimits = new IterationLimits(protocol.required(&quot;queryMaximumWork&quot;).asLong(), states, timeout);</span>
+<span class="fc" id="L57">        var examples = new ArrayList&lt;Example&gt;();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (Graph graph : trainGraphs) examples.add(new Example(hash(graph.problem().toString().getBytes(StandardCharsets.UTF_8)), graph.problem()));</span>
+<span class="fc" id="L59">        var acquisition = observe(() -&gt; FiniteConstraintPlanLearning.train(examples, trainingLimits, trial, () -&gt; false));</span>
+<span class="fc" id="L60">        var training = acquisition.value();</span>
+<span class="fc" id="L61">        var modelRows = observationRows(training.observations());</span>
+<span class="fc" id="L62">        String modelHash = modelFingerprint(training.model());</span>
+<span class="fc" id="L63">        var rows = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L64">        execute(&quot;validation&quot;, validation, 1, training.model(), queryLimits, trial,</span>
+<span class="fc" id="L65">            protocol.required(&quot;maximumProbeWork&quot;).asLong(), rows);</span>
+<span class="fc" id="L66">        execute(&quot;final&quot;, finals, protocol.required(&quot;finalRounds&quot;).asInt(), training.model(), queryLimits, trial,</span>
+<span class="fc" id="L67">            protocol.required(&quot;maximumProbeWork&quot;).asLong(), rows);</span>
+<span class="fc" id="L68">        String afterFinal = modelFingerprint(training.model());</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (!modelHash.equals(afterFinal)) throw new IllegalStateException(&quot;model changed after freeze&quot;);</span>
+<span class="fc" id="L70">        var totals = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (String arm : ARMS) {</span>
+<span class="fc" id="L72">            long validationWork = sum(rows, arm, &quot;validation&quot;, &quot;work&quot;), finalWork = sum(rows, arm, &quot;final&quot;, &quot;work&quot;);</span>
+<span class="fc" id="L73">            totals.put(arm, Map.of(&quot;validationWork&quot;, validationWork, &quot;finalWork&quot;, finalWork,</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                &quot;lifecycleWork&quot;, validationWork + finalWork + (arm.equals(&quot;COSTED_LEARNED&quot;) ? training.work() : 0),</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">                &quot;successfulQueries&quot;, rows.stream().filter(r -&gt; arm.equals(r.get(&quot;arm&quot;)) &amp;&amp; Boolean.TRUE.equals(r.get(&quot;independentCountMatches&quot;))).count()));</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        var result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L78">        result.put(&quot;schema&quot;, &quot;regelsuche.constraint-lifecycle-result/v1&quot;);</span>
+<span class="fc" id="L79">        result.put(&quot;sourceRevision&quot;, args[2]);</span>
+<span class="fc" id="L80">        result.put(&quot;protocolSha256&quot;, hash(protocolBytes));</span>
+<span class="fc" id="L81">        result.put(&quot;java&quot;, System.getProperty(&quot;java.runtime.version&quot;));</span>
+<span class="fc" id="L82">        result.put(&quot;training&quot;, modelRows);</span>
+<span class="fc" id="L83">        result.put(&quot;modelSha256BeforeValidation&quot;, modelHash);</span>
+<span class="fc" id="L84">        result.put(&quot;modelSha256AfterFinal&quot;, afterFinal);</span>
+<span class="fc" id="L85">        result.put(&quot;trainingWork&quot;, training.work());</span>
+<span class="fc" id="L86">        result.put(&quot;trainingReason&quot;, training.reason());</span>
+<span class="fc" id="L87">        result.put(&quot;trainingWallNanos&quot;, acquisition.wallNanos());</span>
+<span class="fc" id="L88">        result.put(&quot;trainingThreadCpuNanos&quot;, acquisition.threadCpuNanos());</span>
+<span class="fc" id="L89">        result.put(&quot;trainingAllocatedBytes&quot;, acquisition.allocatedBytes());</span>
+<span class="fc" id="L90">        result.put(&quot;totals&quot;, totals);</span>
+<span class="fc" id="L91">        result.put(&quot;rows&quot;, rows);</span>
+<span class="fc" id="L92">        Path output = Path.of(args[1]);</span>
+<span class="fc" id="L93">        Files.createDirectories(output.toAbsolutePath().getParent());</span>
+<span class="fc" id="L94">        JSON.writerWithDefaultPrettyPrinter().writeValue(output.toFile(), result);</span>
+<span class="fc" id="L95">        System.out.println(&quot;constraint-lifecycle/v1 rows=&quot; + rows.size() + &quot; training=&quot; + training.work() + &quot; model=&quot; + modelHash);</span>
+<span class="fc" id="L96">    }</span>
+
+    /** Read the model actually supplied to queries, including the paid acquisition; normalize map order. */
+    static String modelFingerprint(Optional&lt;FiniteConstraintPlanLearning.Model&gt; model) throws Exception {
+<span class="fc" id="L100">        Object state = model.&lt;Object&gt;map(value -&gt; Map.of(&quot;trainingWork&quot;, value.trainingWork(),</span>
+<span class="fc" id="L101">            &quot;observations&quot;, observationRows(value.observations()))).orElse(&quot;NO_MODEL&quot;);</span>
+<span class="fc" id="L102">        return hash(JSON.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsBytes(state));</span>
+    }
+
+    private static List&lt;Map&lt;String, Object&gt;&gt; observationRows(List&lt;FiniteConstraintPlanLearning.Observation&gt; observations) {
+<span class="fc" id="L106">        var rows = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (var item : observations) {</span>
+<span class="fc" id="L108">            var trials = item.trials().stream().map(t -&gt; Map.of(&quot;strategy&quot;, t.strategy().name(), &quot;status&quot;, t.status().name(),</span>
+<span class="fc" id="L109">                &quot;reason&quot;, t.reason(), &quot;work&quot;, t.work())).toList();</span>
+<span class="fc" id="L110">            rows.add(Map.of(&quot;sourceSha256&quot;, item.source(), &quot;features&quot;, item.features(), &quot;trials&quot;, trials,</span>
+<span class="fc" id="L111">                &quot;best&quot;, item.best().map(Enum::name).orElse(&quot;NONE&quot;)));</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        return rows;</span>
+    }
+
+    private static void execute(String split, List&lt;Graph&gt; graphs, int rounds,
+            Optional&lt;FiniteConstraintPlanLearning.Model&gt; model, IterationLimits limits, long trial, long probe,
+            List&lt;Map&lt;String, Object&gt;&gt; rows) {
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (rounds &lt; 1 || rounds &gt; 100) throw new IllegalArgumentException(&quot;invalid repeat count&quot;);</span>
+<span class="fc" id="L120">        var truth = graphs.stream().map(ConstraintLifecycleComparison::enumerate).toList();</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">        for (int round = 0; round &lt; rounds; round++) for (int index = 0; index &lt; graphs.size(); index++) {</span>
+<span class="fc" id="L122">            Graph graph = graphs.get(index);</span>
+<span class="fc" id="L123">            var order = new ArrayList&lt;&gt;(ARMS);</span>
+<span class="fc" id="L124">            Collections.rotate(order, (index + round) % order.size());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (String arm : order) {</span>
+<span class="fc" id="L126">                var measurement = observe(() -&gt; run(arm, graph.problem(), model, (long) rounds * graphs.size(), limits, trial, probe));</span>
+<span class="fc" id="L127">                var outcome = measurement.value();</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">                if (outcome.count().isPresent() &amp;&amp; !outcome.count().orElseThrow().equals(truth.get(index)))</span>
+<span class="nc" id="L129">                    throw new IllegalStateException(&quot;independent source enumeration disagrees&quot;);</span>
+<span class="fc" id="L130">                var row = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L131">                row.put(&quot;split&quot;, split); row.put(&quot;case&quot;, graph.id()); row.put(&quot;round&quot;, round); row.put(&quot;arm&quot;, arm);</span>
+<span class="fc" id="L132">                row.put(&quot;variableCount&quot;, graph.problem().variableCount()); row.put(&quot;factorCount&quot;, graph.edges().size());</span>
+<span class="fc" id="L133">                row.put(&quot;count&quot;, outcome.count().map(BigInteger::toString).orElse(&quot;UNAVAILABLE&quot;));</span>
+<span class="fc" id="L134">                row.put(&quot;expectedCount&quot;, truth.get(index).toString()); row.put(&quot;independentCountMatches&quot;, outcome.count().isPresent());</span>
+<span class="fc" id="L135">                row.put(&quot;work&quot;, outcome.work()); row.put(&quot;reason&quot;, outcome.reason()); row.put(&quot;selected&quot;, outcome.selected());</span>
+<span class="fc" id="L136">                row.put(&quot;failedFreshTrials&quot;, outcome.failedTrials());</span>
+<span class="fc" id="L137">                row.put(&quot;wallNanos&quot;, measurement.wallNanos()); row.put(&quot;threadCpuNanos&quot;, measurement.threadCpuNanos());</span>
+<span class="fc" id="L138">                row.put(&quot;allocatedBytes&quot;, measurement.allocatedBytes());</span>
+<span class="fc" id="L139">                rows.add(row);</span>
+<span class="fc" id="L140">            }</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    private static Outcome run(String arm, Problem problem, Optional&lt;FiniteConstraintPlanLearning.Model&gt; model,
+            long uses, IterationLimits limits, long trial, long probe) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (arm.equals(&quot;COSTED_LEARNED&quot;)) {</span>
+<span class="fc" id="L147">            var result = FiniteConstraintPlanLearning.countWithPolicy(model, problem, Strategy.MIN_FILL, uses, probe, limits, () -&gt; false);</span>
+<span class="fc" id="L148">            return new Outcome(result.value().flatMap(FiniteConstraintCounter.Result::count), result.work(), result.reason(),</span>
+<span class="fc" id="L149">                result.selectedProvider().orElse(&quot;NONE&quot;), (int) result.attempts().stream().filter(a -&gt;</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                    a.disposition() == de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Disposition.FAILED).count());</span>
+        }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (arm.equals(&quot;FRESH_SEARCH&quot;)) {</span>
+<span class="fc" id="L153">            var work = new CertificateWork(limits, () -&gt; false);</span>
+            try {
+<span class="fc" id="L155">                var trained = FiniteConstraintPlanLearning.train(List.of(new Example(&quot;current-source&quot;, problem)),</span>
+<span class="fc" id="L156">                    work.remainingLimits(), trial, () -&gt; false);</span>
+<span class="fc" id="L157">                work.chargeCompleted(trained.work());</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                Strategy chosen = trained.observations().isEmpty() ? Strategy.MIN_FILL</span>
+<span class="fc" id="L159">                    : trained.observations().getFirst().best().orElse(Strategy.MIN_FILL);</span>
+<span class="fc" id="L160">                var result = FiniteConstraintCounter.count(problem, chosen, work.remainingLimits(), () -&gt; false);</span>
+<span class="fc" id="L161">                work.chargeCompleted(result.work());</span>
+<span class="fc" id="L162">                int failed = (int) trained.observations().stream().flatMap(o -&gt; o.trials().stream())</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                    .filter(t -&gt; t.status() == FiniteConstraintCounter.Status.UNAVAILABLE).count();</span>
+<span class="fc" id="L164">                return new Outcome(result.count(), work.used(), result.reason(), chosen.name(), failed);</span>
+<span class="fc" id="L165">            } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L166">                return new Outcome(Optional.empty(), work.used(), stop.getMessage(), &quot;NONE&quot;, 0);</span>
+            }
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        Strategy strategy = arm.equals(&quot;FIXED_MIN_DEGREE&quot;) ? Strategy.MIN_DEGREE : Strategy.MIN_FILL;</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        var result = arm.equals(&quot;INDEXED_MIN_FILL&quot;) ? FiniteConstraintCounter.countIndexed(problem, strategy, limits, () -&gt; false)</span>
+<span class="fc" id="L171">            : FiniteConstraintCounter.count(problem, strategy, limits, () -&gt; false);</span>
+<span class="fc" id="L172">        return new Outcome(result.count(), result.work(), result.reason(), strategy.name(), 0);</span>
+    }
+
+    static Graph graph(String family, int a, int b) {
+<span class="fc" id="L176">        int n = graphOrder(family, a, b);</span>
+<span class="fc" id="L177">        var edges = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc bfc" id="L178" title="All 4 branches covered.">        for (int i = 0; i &lt; n; i++) for (int j = i + 1; j &lt; n; j++) {</span>
+<span class="pc bpc" id="L179" title="5 of 10 branches missed.">            boolean linked = switch (family) {</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                case &quot;path&quot; -&gt; j == i + 1;</span>
+<span class="nc bnc" id="L181" title="All 6 branches missed.">                case &quot;cycle&quot; -&gt; j == i + 1 || i == 0 &amp;&amp; j == n - 1;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                case &quot;binary_tree&quot; -&gt; (j - 1) / 2 == i;</span>
+<span class="fc" id="L183">                case &quot;complete&quot; -&gt; true;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                case &quot;star&quot; -&gt; i == 0;</span>
+<span class="nc bnc" id="L185" title="All 8 branches missed.">                case &quot;wheel&quot; -&gt; i == 0 || j == i + 1 || i == 1 &amp;&amp; j == n - 1;</span>
+<span class="nc bnc" id="L186" title="All 6 branches missed.">                case &quot;grid&quot; -&gt; i / b == j / b &amp;&amp; j == i + 1 || j == i + b;</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">                case &quot;complete_bipartite&quot; -&gt; i &lt; a &amp;&amp; j &gt;= a;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                case &quot;disconnected_triangles&quot; -&gt; i / 3 == j / 3;</span>
+<span class="nc" id="L189">                default -&gt; throw new IllegalArgumentException(&quot;unknown frozen generator&quot;);</span>
+            };
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (linked) edges.add(List.of(i, j));</span>
+        }
+<span class="fc" id="L193">        var factors = edges.stream().map(edge -&gt; new Factor(edge,</span>
+<span class="fc" id="L194">            List.of(BigInteger.ONE, BigInteger.ONE, BigInteger.ONE, BigInteger.ZERO))).toList();</span>
+<span class="fc" id="L195">        return new Graph(family, a, b, new Problem(n, factors, Map.of()), List.copyOf(edges));</span>
+    }
+
+    private static int graphOrder(String family, int a, int b) {
+<span class="pc bpc" id="L199" title="3 of 8 branches missed.">        if (a &lt; 1 || a &gt; 16 || b &lt; 0 || b &gt; 16 || !List.of(&quot;grid&quot;, &quot;complete_bipartite&quot;, &quot;disconnected_triangles&quot;,</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                &quot;path&quot;, &quot;cycle&quot;, &quot;binary_tree&quot;, &quot;complete&quot;, &quot;star&quot;, &quot;wheel&quot;).contains(family))</span>
+<span class="fc" id="L201">            throw new IllegalArgumentException(&quot;graph fixture limit&quot;);</span>
+<span class="pc bpc" id="L202" title="2 of 6 branches missed.">        if ((family.equals(&quot;grid&quot;) || family.equals(&quot;complete_bipartite&quot;)) &amp;&amp; b == 0)</span>
+<span class="nc" id="L203">            throw new IllegalArgumentException(&quot;nonempty graph dimensions required&quot;);</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        int vertices = switch (family) {</span>
+<span class="nc" id="L205">            case &quot;grid&quot; -&gt; a * b;</span>
+<span class="fc" id="L206">            case &quot;complete_bipartite&quot; -&gt; a + b;</span>
+<span class="fc" id="L207">            case &quot;disconnected_triangles&quot; -&gt; 3 * a;</span>
+<span class="fc" id="L208">            default -&gt; a;</span>
+        };
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (vertices &gt; 16) throw new IllegalArgumentException(&quot;graph fixture limit&quot;);</span>
+<span class="fc" id="L211">        return vertices;</span>
+    }
+
+    static BigInteger enumerate(Graph graph) {
+<span class="fc" id="L215">        long valid = 0;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int bits = 0; bits &lt; (1 &lt;&lt; graph.problem().variableCount()); bits++) {</span>
+<span class="fc" id="L217">            boolean accepted = true;</span>
+<span class="fc bfc" id="L218" title="All 6 branches covered.">            for (var edge : graph.edges()) if ((bits &amp; (1 &lt;&lt; edge.getFirst())) != 0 &amp;&amp; (bits &amp; (1 &lt;&lt; edge.getLast())) != 0) {</span>
+<span class="fc" id="L219">                accepted = false; break;</span>
+            }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            if (accepted) valid++;</span>
+        }
+<span class="fc" id="L223">        return BigInteger.valueOf(valid);</span>
+    }
+
+    private static List&lt;Graph&gt; graphs(JsonNode cases) {
+<span class="fc" id="L227">        var result = new ArrayList&lt;Graph&gt;();</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (var item : cases) result.add(graph(item.required(&quot;family&quot;).asText(), item.required(&quot;a&quot;).asInt(), item.required(&quot;b&quot;).asInt()));</span>
+<span class="fc" id="L229">        return List.copyOf(result);</span>
+    }
+    @SafeVarargs private static void requireDisjointFamilies(List&lt;Graph&gt;... splits) {
+<span class="fc" id="L232">        var prior = new TreeSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (var split : splits) {</span>
+<span class="fc" id="L234">            var families = new TreeSet&lt;String&gt;(); split.forEach(g -&gt; families.add(g.family()));</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (!Collections.disjoint(prior, families)) throw new IllegalArgumentException(&quot;family leaked across frozen splits&quot;);</span>
+<span class="fc" id="L236">            prior.addAll(families);</span>
+        }
+<span class="fc" id="L238">    }</span>
+    private static &lt;T&gt; Observation&lt;T&gt; observe(Supplier&lt;T&gt; action) {
+<span class="fc" id="L240">        var cpu = ManagementFactory.getThreadMXBean();</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        var allocation = cpu instanceof com.sun.management.ThreadMXBean extended &amp;&amp; extended.isThreadAllocatedMemorySupported()</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">            &amp;&amp; extended.isThreadAllocatedMemoryEnabled() ? extended : null;</span>
+<span class="pc bpc" id="L243" title="2 of 4 branches missed.">        boolean hasCpu = cpu.isCurrentThreadCpuTimeSupported() &amp;&amp; cpu.isThreadCpuTimeEnabled();</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        long id = Thread.currentThread().threadId(), bytes = allocation == null ? -1 : allocation.getThreadAllocatedBytes(id);</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        long started = System.nanoTime(), cpuStarted = hasCpu ? cpu.getCurrentThreadCpuTime() : -1;</span>
+<span class="fc" id="L246">        T value = action.get();</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        return new Observation&lt;&gt;(value, System.nanoTime() - started, hasCpu ? cpu.getCurrentThreadCpuTime() - cpuStarted : -1,</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            allocation == null ? -1 : allocation.getThreadAllocatedBytes(id) - bytes);</span>
+    }
+    private static long sum(List&lt;Map&lt;String, Object&gt;&gt; rows, String arm, String split, String field) {
+<span class="fc bfc" id="L251" title="All 4 branches covered.">        return rows.stream().filter(r -&gt; arm.equals(r.get(&quot;arm&quot;)) &amp;&amp; split.equals(r.get(&quot;split&quot;))).mapToLong(r -&gt; (long) r.get(field)).sum();</span>
+    }
+    private static String hash(byte[] bytes) throws Exception {
+<span class="fc" id="L254">        return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

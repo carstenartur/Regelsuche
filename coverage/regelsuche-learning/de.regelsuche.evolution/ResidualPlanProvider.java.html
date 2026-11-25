@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ResidualPlanProvider.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ResidualPlanProvider.java</span></div><h1>ResidualPlanProvider.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.StructuralConstructionPrograms.Work;
+import de.regelsuche.search.moves.IncrementalProviderContract.*;
+import de.regelsuche.search.moves.IncrementalProviderContract;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.RegisteredIncrementalMoveProvider;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationProvenance;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeSet;
+
+/** Finite, query-owned residual alternatives. Only a fresh source replay can issue a search edge. */
+public final class ResidualPlanProvider implements MoveVerifier {
+    private static final String ID = &quot;residual-proof-plans/v1&quot;;
+    private final MoveState state;
+    private final MoveContext context;
+    private final ResidualPlanController.Mode mode;
+    private final int mask;
+    private final long formationBudget, replayBudget;
+    private final String scope;
+    private final RegisteredIncrementalMoveProvider provider;
+
+    public ResidualPlanProvider(MoveState state, MoveContext context, ResidualPlanController.Mode mode, int mask,
+<span class="fc" id="L32">                                long formationBudget, long replayBudget) {</span>
+<span class="fc" id="L33">        this.state = Objects.requireNonNull(state);</span>
+<span class="fc" id="L34">        this.context = Objects.requireNonNull(context);</span>
+<span class="fc" id="L35">        this.mode = Objects.requireNonNull(mode);</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">        if (mask &lt; 0 || mask &gt; 7) throw new IllegalArgumentException(&quot;selector mask must be in [0,7]&quot;);</span>
+<span class="fc" id="L37">        this.mask = mask;</span>
+<span class="fc" id="L38">        this.formationBudget = Work.requireLimit(formationBudget);</span>
+<span class="fc" id="L39">        this.replayBudget = Work.requireLimit(replayBudget);</span>
+<span class="fc" id="L40">        scope = SchematicProofPlan.hash(CheckedSchemaSupport.JSON.valueToTree(List.of(ID, state.expression(),</span>
+<span class="fc" id="L41">            state.searchDepth(), state.primitiveDepth(), state.previousRule(), state.assumptions(),</span>
+<span class="fc" id="L42">            new TreeSet&lt;&gt;(state.capabilities()), state.complexityDebt(), context, mode, mask, formationBudget, replayBudget)).toString());</span>
+<span class="fc" id="L43">        var descriptor = new MoveProvider.Descriptor(ID, &quot;residual-composition&quot;, SearchMove.SourceKind.PREPARATION,</span>
+<span class="fc" id="L44">            SearchMove.ProofStrength.REPLAYABLE, List.of(), SearchMove.ValueEvidence.UNKNOWN, scope);</span>
+<span class="fc" id="L45">        var definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, ID, Kind.REGISTERED_SCHEMA, scope,</span>
+            ResidualPlanCompiler.REVISION, Transport.PARSER_TEXT, Mathematics.EXACT, null);
+<span class="fc" id="L47">        var registration = new Registration(definition, (offered, receiving, meter) -&gt; {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            if (!matches(offered, receiving)) return new Source() {</span>
+<span class="nc" id="L49">                public Optional&lt;Transformation&gt; next(long allowance) { return Optional.empty(); }</span>
+<span class="nc" id="L50">                public Status status() { return Status.EXHAUSTED; }</span>
+            };
+<span class="fc" id="L52">            return new Plans(meter);</span>
+        });
+<span class="fc" id="L54">        provider = new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));</span>
+<span class="fc" id="L55">    }</span>
+
+<span class="fc" id="L57">    public RegisteredIncrementalMoveProvider provider() { return provider; }</span>
+
+    private boolean matches(MoveState offered, MoveContext receiving) {
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        return state.equals(offered) &amp;&amp; context.equals(receiving);</span>
+    }
+
+    private final class Plans implements Source {
+        private final Meter meter;
+<span class="fc" id="L65">        private final Work work = new Work(formationBudget);</span>
+        private ResidualPlanController.Session session;
+        private ResidualPlanController.Step pending;
+        private Work replayWork;
+        private PrepaidApplication ticket;
+        private StructuralConstructionPrograms.ResidualPreparation replayPrefix;
+<span class="fc" id="L71">        private Status status = Status.READY;</span>
+        private boolean replayIncomplete;
+
+<span class="fc" id="L74">        Plans(Meter meter) { this.meter = meter; }</span>
+<span class="fc" id="L75">        @Override public Status status() { return status; }</span>
+
+        @Override public Optional&lt;Transformation&gt; next(long allowance) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (allowance == 0) { status = Status.LIMIT; return Optional.empty(); }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (pending != null) return replay(allowance);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (session == null) session = new ResidualPlanController.Session(</span>
+<span class="fc" id="L81">                normalizedSource(), mode, mask, formationBudget, work);</span>
+<span class="fc" id="L82">            boolean preparing = session.status().equals(&quot;PREPARING&quot;);</span>
+<span class="fc" id="L83">            long before = work.units();</span>
+            try {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                if (preparing) session.prepareNext();</span>
+                else {
+<span class="fc" id="L87">                    var step = session.advance();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                    if (!step.proofRoots().isEmpty()) pending = step;</span>
+                }
+            } finally {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                meter.charge(preparing ? Operation.LOAD : Operation.MATCH, work.units() - before);</span>
+            }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            status = nextStatus(work.units() - before &gt;= allowance);</span>
+<span class="fc" id="L94">            return Optional.empty();</span>
+        }
+
+        private Status nextStatus(boolean spent) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            Status continuing = spent ? Status.LIMIT : Status.READY;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (pending != null) return continuing;</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">            return switch (session.status()) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                case &quot;COMPLETE&quot; -&gt; replayIncomplete ? Status.INCONCLUSIVE : Status.EXHAUSTED;</span>
+<span class="nc" id="L102">                case &quot;UNSUPPORTED&quot; -&gt; Status.EXHAUSTED;</span>
+<span class="nc" id="L103">                case &quot;BUDGET_EXHAUSTED&quot; -&gt; Status.INCONCLUSIVE;</span>
+<span class="fc" id="L104">                default -&gt; continuing;</span>
+            };
+        }
+
+        private Optional&lt;Transformation&gt; replay(long allowance) {
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (ticket == null) {</span>
+<span class="fc" id="L110">                ticket = meter.beginPrepaidApplication();</span>
+<span class="fc" id="L111">                replayWork = new Work(replayBudget);</span>
+            }
+<span class="fc" id="L113">            long before = replayWork.units();</span>
+<span class="fc" id="L114">            Transformation candidate = null;</span>
+<span class="fc" id="L115">            boolean noEdge = false;</span>
+            try {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (replayPrefix == null) {</span>
+<span class="fc" id="L118">                    String source = normalizedSource();</span>
+<span class="fc" id="L119">                    replayWork.add(source.length() + 1L);</span>
+<span class="fc" id="L120">                    replayPrefix = new StructuralConstructionPrograms.ResidualPreparation(source, replayWork, true);</span>
+                }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                if (!replayPrefix.done) replayPrefix.advance();</span>
+                else {
+<span class="fc" id="L124">                    var checked = ResidualPlanCompiler.checkPrepared(replayPrefix.source, pending.effects(), replayPrefix.result, replayWork);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                    if (!List.of(checked.proofRoot()).equals(pending.proofRoots()))</span>
+<span class="nc" id="L126">                        throw new IllegalStateException(&quot;source replay differs from selected residual plan&quot;);</span>
+<span class="fc" id="L127">                    noEdge = state.expression().equals(checked.expression());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                    if (!noEdge) candidate = issue(checked);</span>
+                }
+<span class="fc" id="L130">            } catch (StructuralConstructionPrograms.Limit refused) {</span>
+<span class="fc" id="L131">                noEdge = true;</span>
+<span class="fc" id="L132">                replayIncomplete = true;</span>
+            } finally {
+<span class="fc" id="L134">                meter.prepay(ticket, ApplicationPhase.EVIDENCE, replayWork.units() - before);</span>
+            }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            boolean spent = replayWork.units() - before + 1 &gt;= allowance;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (noEdge) meter.abandon(ticket);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            else if (candidate != null) meter.complete(ticket, candidate.executionWork());</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            else { status = spent ? Status.LIMIT : Status.READY; return Optional.empty(); }</span>
+<span class="fc" id="L140">            ticket = null;</span>
+<span class="fc" id="L141">            pending = null;</span>
+<span class="fc" id="L142">            replayPrefix = null;</span>
+<span class="fc" id="L143">            replayWork = null;</span>
+<span class="fc" id="L144">            status = nextStatus(spent);</span>
+<span class="fc" id="L145">            return Optional.ofNullable(candidate);</span>
+        }
+
+        @Override public void close() {
+            // The managed cursor closes any open payment ticket after this callback.
+<span class="fc" id="L150">            pending = null;</span>
+<span class="fc" id="L151">            session = null;</span>
+<span class="fc" id="L152">            replayPrefix = null;</span>
+<span class="fc" id="L153">            ticket = null;</span>
+<span class="fc" id="L154">            replayWork = null;</span>
+<span class="fc" id="L155">        }</span>
+    }
+
+<span class="fc" id="L158">    private String normalizedSource() { return state.expression().strip().replaceAll(&quot;\\s+&quot;, &quot; &quot;); }</span>
+
+    private Transformation issue(ResidualPlanCompiler.Bound checked) {
+<span class="fc" id="L161">        var data = CheckedSchemaSupport.JSON.createObjectNode();</span>
+<span class="fc" id="L162">        data.put(&quot;scope&quot;, scope);</span>
+<span class="fc" id="L163">        data.put(&quot;root&quot;, checked.proofRoot());</span>
+<span class="fc" id="L164">        data.put(&quot;resolution&quot;, checked.resolution().contentHash());</span>
+<span class="fc" id="L165">        data.set(&quot;effects&quot;, CheckedSchemaSupport.JSON.valueToTree(checked.effects()));</span>
+<span class="fc" id="L166">        String json = data.toString();</span>
+<span class="fc" id="L167">        var binding = new ExactTheoryEvidence.Binding(state.expression(), checked.expression(), ID,</span>
+<span class="fc" id="L168">            SchematicProofPlan.hash(json), checked.proofRoot(), scope, checked.checkWork(), json);</span>
+<span class="fc" id="L169">        return Transformation.exactTheory(ExactTheoryEvidence.fromVerified(new Replayed(binding)));</span>
+    }
+
+    static final class Replayed {
+        final ExactTheoryEvidence.Binding binding;
+<span class="fc" id="L174">        private Replayed(ExactTheoryEvidence.Binding binding) { this.binding = binding; }</span>
+    }
+
+    /** Reconstruct the current receiver's exact source, bindings and obligations, including on repeated offers. */
+    @Override public Verification verify(MoveState offered, SearchMove move, MoveContext receiving) {
+<span class="fc" id="L179">        var work = new Work(replayBudget);</span>
+<span class="pc bpc" id="L180" title="1 of 4 branches missed.">        if (!matches(offered, receiving) || !(move.provenance() instanceof TransformationProvenance.ExactTheoryStep exact)</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">                || !exact.evidence().issuedFrom(Replayed.class) || !scope.equals(exact.evidence().binding().runArtifactId()))</span>
+<span class="fc" id="L182">            return new Verification(false, 1, List.of(), &quot;FOREIGN_RESIDUAL_SCOPE&quot;);</span>
+        try {
+<span class="fc" id="L184">            var ids = CheckedSchemaSupport.read(exact.evidence().binding().canonicalEvidenceJson()).required(&quot;effects&quot;);</span>
+<span class="fc" id="L185">            var checked = ResidualPlanCompiler.bind(offered.expression(), List.of(ids.required(0).asText(), ids.required(1).asText()), work);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (SearchMove.from(issue(checked), provider.descriptor(), move.generationCost()).equals(move))</span>
+<span class="fc" id="L187">                return new Verification(true, 1 + work.units(), List.of(checked.proofRoot()), &quot;EXACT_RESIDUAL_REPLAY&quot;);</span>
+<span class="nc" id="L188">        } catch (IllegalArgumentException refused) {</span>
+            // A rejected or exhausted reconstruction still pays its completed work.
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        return new Verification(false, 1 + work.units(), List.of(), &quot;RESIDUAL_REPLAY_REFUSED&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

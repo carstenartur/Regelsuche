@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearProgramVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearProgramVerifier.java</span></div><h1>BilinearProgramVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
 
+import de.regelsuche.math.algorithms.algebra.BilinearProductLearning.InputBases;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Cost;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Rejection;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
@@ -17,117 +18,181 @@ public final class BilinearProgramVerifier {
 
     public static Result&lt;Cost&gt; verify(Request request, BilinearProgram program,
                                       IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L20">        return BilinearProgram.run(limits, cancellation,</span>
-<span class="fc" id="L21">            work -&gt; check(request, program, request.checkInputs(work), work));</span>
+<span class="fc" id="L21">        return BilinearProgram.run(limits, cancellation,</span>
+<span class="fc" id="L22">            work -&gt; check(request, program, request.checkInputs(work), work));</span>
     }
 
     static Cost check(Request request, BilinearProgram program, long sourceCells, CertificateWork work) {
-<span class="fc" id="L25">        var tensor = request.tensor();</span>
-<span class="fc" id="L26">        int rank = program.u().size();</span>
-<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (rank &gt; request.maximumProducts()) throw new Rejection(&quot;PRODUCT_LIMIT&quot;);</span>
-<span class="pc bpc" id="L28" title="1 of 4 branches missed.">        if (program.v().size() != rank || program.w().size() != tensor.outputs().size()) {</span>
-<span class="fc" id="L29">            throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
+<span class="fc" id="L26">        var tensor = request.tensor();</span>
+<span class="fc" id="L27">        int rank = program.u().size();</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (rank &gt; request.maximumProducts()) throw new Rejection(&quot;PRODUCT_LIMIT&quot;);</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">        if (program.v().size() != rank || program.w().size() != tensor.outputs().size()) {</span>
+<span class="fc" id="L30">            throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
         }
-<span class="fc" id="L31">        work.cells(sourceCells + certificateCells(request, rank));</span>
-<span class="fc" id="L32">        checkRows(program.u(), tensor.leftSize(), work);</span>
-<span class="fc" id="L33">        checkRows(program.v(), tensor.rightSize(), work);</span>
-<span class="fc" id="L34">        checkRows(program.w(), rank, work);</span>
-<span class="fc" id="L35">        checkDictionary(program.u(), request.leftForms(), work);</span>
-<span class="fc" id="L36">        checkDictionary(program.v(), request.rightForms(), work);</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (int k = 0; k &lt; tensor.outputs().size(); k++) {</span>
-<span class="fc bfc" id="L38" title="All 2 branches covered.">            for (int i = 0; i &lt; tensor.leftSize(); i++) {</span>
-<span class="fc bfc" id="L39" title="All 2 branches covered.">                for (int j = 0; j &lt; tensor.rightSize(); j++) {</span>
-<span class="fc" id="L40">                    work.charge(1);</span>
-<span class="fc" id="L41">                    var sum = ExactRational.ZERO;</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">                    for (int p = 0; p &lt; rank; p++) {</span>
-<span class="fc" id="L43">                        var uv = work.mul(program.u().get(p).get(i), program.v().get(p).get(j));</span>
-<span class="fc" id="L44">                        sum = work.add(sum, work.mul(program.w().get(k).get(p), uv));</span>
+<span class="fc" id="L32">        work.cells(sourceCells + certificateCells(request, rank));</span>
+<span class="fc" id="L33">        checkRows(program.u(), tensor.leftSize(), work);</span>
+<span class="fc" id="L34">        checkRows(program.v(), tensor.rightSize(), work);</span>
+<span class="fc" id="L35">        checkRows(program.w(), rank, work);</span>
+<span class="fc" id="L36">        checkDictionary(program.u(), request.leftForms(), work);</span>
+<span class="fc" id="L37">        checkDictionary(program.v(), request.rightForms(), work);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int k = 0; k &lt; tensor.outputs().size(); k++) {</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            for (int i = 0; i &lt; tensor.leftSize(); i++) {</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                for (int j = 0; j &lt; tensor.rightSize(); j++) {</span>
+<span class="fc" id="L41">                    work.charge(1);</span>
+<span class="fc" id="L42">                    var sum = ExactRational.ZERO;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                    for (int p = 0; p &lt; rank; p++) {</span>
+<span class="fc" id="L44">                        var uv = work.mul(program.u().get(p).get(i), program.v().get(p).get(j));</span>
+<span class="fc" id="L45">                        sum = work.add(sum, work.mul(program.w().get(k).get(p), uv));</span>
                     }
-<span class="fc bfc" id="L46" title="All 2 branches covered.">                    if (!sum.equals(tensor.outputs().get(k).get(i * tensor.rightSize() + j))) {</span>
-<span class="fc" id="L47">                        throw new Rejection(&quot;COEFFICIENT_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                    if (!sum.equals(tensor.outputs().get(k).get(i * tensor.rightSize() + j))) {</span>
+<span class="fc" id="L48">                        throw new Rejection(&quot;COEFFICIENT_MISMATCH&quot;);</span>
                     }
                 }
             }
         }
-<span class="fc" id="L52">        return BilinearProgramSchedule.cost(program, work);</span>
+<span class="fc" id="L53">        return BilinearProgramSchedule.cost(program, work);</span>
     }
 
     private static long certificateCells(Request request, int rank) {
-<span class="fc" id="L56">        var tensor = request.tensor();</span>
-<span class="fc" id="L57">        return rank * (2L + tensor.leftSize() + tensor.rightSize())</span>
-<span class="fc" id="L58">            + tensor.outputs().size() * (1L + rank);</span>
+<span class="fc" id="L57">        var tensor = request.tensor();</span>
+<span class="fc" id="L58">        return rank * (2L + tensor.leftSize() + tensor.rightSize())</span>
+<span class="fc" id="L59">            + tensor.outputs().size() * (1L + rank);</span>
     }
 
     private static void checkRows(List&lt;List&lt;ExactRational&gt;&gt; rows, int width, CertificateWork work) {
-<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (var row : rows) {</span>
-<span class="fc" id="L63">            work.charge(1);</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (row.size() != width) throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">            for (var value : row) work.check(value);</span>
-<span class="fc" id="L66">        }</span>
-<span class="fc" id="L67">    }</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (var row : rows) {</span>
+<span class="fc" id="L64">            work.charge(1);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (row.size() != width) throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            for (var value : row) work.check(value);</span>
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">    }</span>
 
     private static void checkDictionary(List&lt;List&lt;ExactRational&gt;&gt; forms, List&lt;List&lt;ExactRational&gt;&gt; dictionary,
                                         CertificateWork work) {
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var form : forms) {</span>
-<span class="fc" id="L72">            boolean found = false;</span>
-<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (var candidate : dictionary) {</span>
-<span class="fc" id="L74">                work.charge(form.size());</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (candidate.equals(form)) {</span>
-<span class="fc" id="L76">                    found = true;</span>
-<span class="fc" id="L77">                    break;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (var form : forms) {</span>
+<span class="fc" id="L73">            boolean found = false;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            for (var candidate : dictionary) {</span>
+<span class="fc" id="L75">                work.charge(form.size());</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (candidate.equals(form)) {</span>
+<span class="fc" id="L77">                    found = true;</span>
+<span class="fc" id="L78">                    break;</span>
                 }
-<span class="fc" id="L79">            }</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (!found) throw new Rejection(&quot;FORM_OUTSIDE_DICTIONARY&quot;);</span>
-<span class="fc" id="L81">        }</span>
-<span class="fc" id="L82">    }</span>
+<span class="fc" id="L80">            }</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (!found) throw new Rejection(&quot;FORM_OUTSIDE_DICTIONARY&quot;);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
+
+    /** Replay source, changes of basis, preservation of the paired forms and weights, and all target coefficients. */
+    public static Result&lt;Cost&gt; verifyInputBases(Request source, BilinearProgram program, InputBases bases,
+            Request target, BilinearProgram transported, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L88">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L89">            long dictionaries = BilinearProgram.matrixCells(target.leftForms()) + BilinearProgram.matrixCells(target.rightForms());</span>
+<span class="fc" id="L90">            long proofCells = certificateCells(target, transported.u().size());</span>
+<span class="fc" id="L91">            long retained = checkedTransferSource(source, program, bases, target.tensor(), dictionaries + proofCells, work);</span>
+<span class="fc" id="L92">            BilinearProgram.checkEntries(target.leftForms(), work);</span>
+<span class="fc" id="L93">            BilinearProgram.checkEntries(target.rightForms(), work);</span>
+<span class="fc" id="L94">            return checkTransport(program, bases, target, transported, retained - proofCells, work);</span>
+        });
+    }
+
+    static long checkedTransferSource(Request source, BilinearProgram program, InputBases bases,
+            BilinearProgram.Tensor target, long otherCells, CertificateWork work) {
+<span class="fc" id="L100">        var tensor = source.tensor();</span>
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (tensor.leftSize() != bases.left().size() || tensor.rightSize() != bases.right().size()</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">                || tensor.leftSize() != target.leftSize() || tensor.rightSize() != target.rightSize()</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                || tensor.outputs().size() != target.outputs().size()) throw new Rejection(&quot;INPUT_BASIS_SHAPE&quot;);</span>
+<span class="fc" id="L104">        long retained = otherCells + bases.retainedCells() + source.checkInputs(work);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (tensor != target) retained += BilinearProgram.matrixCells(target.outputs());</span>
+<span class="fc" id="L106">        check(source, program, retained, work);</span>
+<span class="fc" id="L107">        retained += certificateCells(source, program.u().size());</span>
+<span class="fc" id="L108">        BilinearProgram.checkEntries(target.outputs(), work);</span>
+<span class="fc" id="L109">        requireInvertible(bases.left(), retained, work);</span>
+<span class="fc" id="L110">        requireInvertible(bases.right(), retained, work);</span>
+<span class="fc" id="L111">        return retained;</span>
+    }
+
+    private static void requireInvertible(List&lt;List&lt;ExactRational&gt;&gt; matrix, long retained, CertificateWork work) {
+<span class="fc" id="L115">        work.cells(retained + BilinearProgram.matrixCells(matrix) + 4);</span>
+<span class="fc" id="L116">        BilinearProgram.checkEntries(matrix, work);</span>
+<span class="fc" id="L117">        var copy = new ExactRational[matrix.size()][];</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.size(); row++) {</span>
+<span class="fc" id="L119">            work.charge(1L + matrix.size());</span>
+<span class="fc" id="L120">            copy[row] = matrix.get(row).toArray(ExactRational[]::new);</span>
+        }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (BilinearRankBound.determinant(copy, work).isZero()) throw new Rejection(&quot;SINGULAR_INPUT_BASIS&quot;);</span>
+<span class="fc" id="L123">    }</span>
+
+    static Cost checkTransport(BilinearProgram original, InputBases bases, Request target,
+            BilinearProgram moved, long retained, CertificateWork work) {
+<span class="fc" id="L127">        var cost = check(target, moved, retained, work);</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (moved.u().size() != original.u().size()) throw new Rejection(&quot;TRANSFER_PRODUCT_COUNT&quot;);</span>
+<span class="fc" id="L129">        work.charge(BilinearProgram.matrixCells(original.w()));</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (!original.w().equals(moved.w())) throw new Rejection(&quot;TRANSFER_OUTPUT_WEIGHTS&quot;);</span>
+<span class="fc" id="L131">        checkTransformedForms(original.u(), bases.left(), moved.u(), work);</span>
+<span class="fc" id="L132">        checkTransformedForms(original.v(), bases.right(), moved.v(), work);</span>
+<span class="fc" id="L133">        return cost;</span>
+    }
+
+    // Verify one target coordinate at a time directly by its pairing with a source form.
+    private static void checkTransformedForms(List&lt;List&lt;ExactRational&gt;&gt; original, List&lt;List&lt;ExactRational&gt;&gt; matrix,
+            List&lt;List&lt;ExactRational&gt;&gt; moved, CertificateWork work) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (int p = 0; p &lt; original.size(); p++) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            for (int j = 0; j &lt; matrix.size(); j++) {</span>
+<span class="fc" id="L141">                var value = ExactRational.ZERO;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                for (int i = 0; i &lt; matrix.size(); i++)</span>
+<span class="fc" id="L143">                    value = work.add(value, work.mul(original.get(p).get(i), matrix.get(i).get(j)));</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                if (!value.equals(moved.get(p).get(j))) throw new Rejection(&quot;TRANSFER_FORM_MISMATCH&quot;);</span>
+            }
+        }
+<span class="fc" id="L147">    }</span>
 
     /** Reuse a supplied witness with a width profile after checking every source coefficient. */
     public static Result&lt;BilinearIntegerSchedule.Plan&gt; scheduleInteger(Request request, BilinearProgram program,
             BilinearIntegerSchedule.Profile profile, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="nc" id="L87">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
-<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (profile.leftBits().size() != request.tensor().leftSize()</span>
-<span class="nc bnc" id="L89" title="All 2 branches missed.">                    || profile.rightBits().size() != request.tensor().rightSize()) {</span>
-<span class="nc" id="L90">                throw new Rejection(&quot;PROFILE_SHAPE&quot;);</span>
+<span class="nc" id="L152">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (profile.leftBits().size() != request.tensor().leftSize()</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    || profile.rightBits().size() != request.tensor().rightSize()) {</span>
+<span class="nc" id="L155">                throw new Rejection(&quot;PROFILE_SHAPE&quot;);</span>
             }
-<span class="nc" id="L92">            long source = request.checkInputs(work) + profile.retainedCells();</span>
-<span class="nc" id="L93">            check(request, program, source, work);</span>
-<span class="nc" id="L94">            long retained = source + certificateCells(request, program.u().size());</span>
-<span class="nc" id="L95">            return BilinearIntegerSchedule.plan(program, profile, retained, work);</span>
+<span class="nc" id="L157">            long source = request.checkInputs(work) + profile.retainedCells();</span>
+<span class="nc" id="L158">            check(request, program, source, work);</span>
+<span class="nc" id="L159">            long retained = source + certificateCells(request, program.u().size());</span>
+<span class="nc" id="L160">            return BilinearIntegerSchedule.plan(program, profile, retained, work);</span>
         });
     }
 
     /** Verify against the source, then execute with the same resource account. */
     public static Result&lt;List&lt;ExactRational&gt;&gt; evaluate(Request request, BilinearProgram program,
             List&lt;ExactRational&gt; x, List&lt;ExactRational&gt; y, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L102">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
-<span class="fc" id="L103">            var tensor = request.tensor();</span>
-<span class="fc" id="L104">            long inputCells = (long) tensor.leftSize() + tensor.rightSize();</span>
-<span class="fc" id="L105">            work.cells(inputCells);</span>
-<span class="fc" id="L106">            work.charge(inputCells);</span>
-<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (x.size() != tensor.leftSize() || y.size() != tensor.rightSize()) {</span>
-<span class="fc" id="L108">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+<span class="fc" id="L167">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L168">            var tensor = request.tensor();</span>
+<span class="fc" id="L169">            long inputCells = (long) tensor.leftSize() + tensor.rightSize();</span>
+<span class="fc" id="L170">            work.cells(inputCells);</span>
+<span class="fc" id="L171">            work.charge(inputCells);</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">            if (x.size() != tensor.leftSize() || y.size() != tensor.rightSize()) {</span>
+<span class="fc" id="L173">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
             }
-<span class="fc" id="L110">            var left = List.copyOf(x);</span>
-<span class="fc" id="L111">            var right = List.copyOf(y);</span>
-<span class="pc bpc" id="L112" title="2 of 4 branches missed.">            if (left.size() != tensor.leftSize() || right.size() != tensor.rightSize()) {</span>
-<span class="nc" id="L113">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+<span class="fc" id="L175">            var left = List.copyOf(x);</span>
+<span class="fc" id="L176">            var right = List.copyOf(y);</span>
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">            if (left.size() != tensor.leftSize() || right.size() != tensor.rightSize()) {</span>
+<span class="nc" id="L178">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
             }
-<span class="fc" id="L115">            long source = request.checkInputs(work);</span>
-<span class="fc" id="L116">            int rank = program.u().size();</span>
-<span class="fc" id="L117">            check(request, program, source, work);</span>
-<span class="fc" id="L118">            work.cells(source + certificateCells(request, rank) + inputCells</span>
-<span class="fc" id="L119">                + rank + tensor.outputs().size() + 3L);</span>
-<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (var value : left) work.check(value);</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (var value : right) work.check(value);</span>
-<span class="fc" id="L122">            var products = new ArrayList&lt;ExactRational&gt;(rank);</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (int p = 0; p &lt; rank; p++) {</span>
-<span class="fc" id="L124">                var a = BilinearProgramSchedule.dot(program.u().get(p), left, work);</span>
-<span class="fc" id="L125">                var b = BilinearProgramSchedule.dot(program.v().get(p), right, work);</span>
-<span class="fc" id="L126">                products.add(work.mul(a, b));</span>
+<span class="fc" id="L180">            long source = request.checkInputs(work);</span>
+<span class="fc" id="L181">            int rank = program.u().size();</span>
+<span class="fc" id="L182">            check(request, program, source, work);</span>
+<span class="fc" id="L183">            work.cells(source + certificateCells(request, rank) + inputCells</span>
+<span class="fc" id="L184">                + rank + tensor.outputs().size() + 3L);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            for (var value : left) work.check(value);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            for (var value : right) work.check(value);</span>
+<span class="fc" id="L187">            var products = new ArrayList&lt;ExactRational&gt;(rank);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (int p = 0; p &lt; rank; p++) {</span>
+<span class="fc" id="L189">                var a = BilinearProgramSchedule.dot(program.u().get(p), left, work);</span>
+<span class="fc" id="L190">                var b = BilinearProgramSchedule.dot(program.v().get(p), right, work);</span>
+<span class="fc" id="L191">                products.add(work.mul(a, b));</span>
             }
-<span class="fc" id="L128">            var values = new ArrayList&lt;ExactRational&gt;(program.w().size());</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (var weights : program.w()) values.add(BilinearProgramSchedule.dot(weights, products, work));</span>
-<span class="fc" id="L130">            return List.copyOf(values);</span>
+<span class="fc" id="L193">            var values = new ArrayList&lt;ExactRational&gt;(program.w().size());</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            for (var weights : program.w()) values.add(BilinearProgramSchedule.dot(weights, products, work));</span>
+<span class="fc" id="L195">            return List.copyOf(values);</span>
         });
     }
 }

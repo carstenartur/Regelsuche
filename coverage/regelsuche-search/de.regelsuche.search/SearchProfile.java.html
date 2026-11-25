@@ -102,18 +102,25 @@ import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
         public SearchStrategy newStrategy() {
 <span class="fc" id="L103">            return new EqualitySaturationStrategy();</span>
         }
+    },
+    /** Opt-in prepared search for explicitly state-local providers. */
+<span class="fc" id="L107">    PREPARED_QUOTIENT_DISCOVERY(new SearchHeuristic(6, 2_000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {</span>
+        @Override
+        public BestFirstSearchStrategy newStrategy() {
+<span class="fc" id="L110">            return BestFirstSearchStrategy.preparedQuotient();</span>
+        }
     };
 
     private final SearchHeuristic heuristic;
     private final TransformationGoal defaultGoal;
 
-<span class="fc" id="L110">    SearchProfile(SearchHeuristic heuristic, TransformationGoal defaultGoal) {</span>
-<span class="fc" id="L111">        this.heuristic = heuristic;</span>
-<span class="fc" id="L112">        this.defaultGoal = defaultGoal;</span>
-<span class="fc" id="L113">    }</span>
+<span class="fc" id="L117">    SearchProfile(SearchHeuristic heuristic, TransformationGoal defaultGoal) {</span>
+<span class="fc" id="L118">        this.heuristic = heuristic;</span>
+<span class="fc" id="L119">        this.defaultGoal = defaultGoal;</span>
+<span class="fc" id="L120">    }</span>
 
     public SearchHeuristic heuristic() {
-<span class="fc" id="L116">        return heuristic;</span>
+<span class="fc" id="L123">        return heuristic;</span>
     }
 
     /**
@@ -121,7 +128,7 @@ import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
      * override this with an explicit selection from the goal dropdown.
      */
     public TransformationGoal defaultGoal() {
-<span class="nc" id="L124">        return defaultGoal;</span>
+<span class="nc" id="L131">        return defaultGoal;</span>
     }
 
     public abstract SearchStrategy newStrategy();
@@ -132,7 +139,7 @@ import de.regelsuche.search.strategy.StructuralDiversitySearchStrategy;
      * profiles preserve their pre-PR behaviour so existing tests stay green.
      */
     public boolean usesTranspositionTable() {
-<span class="fc" id="L135">        return false;</span>
+<span class="fc" id="L142">        return false;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

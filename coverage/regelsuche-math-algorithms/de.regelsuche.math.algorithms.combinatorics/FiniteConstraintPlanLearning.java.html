@@ -4,12 +4,19 @@ import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Problem;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanner.Strategy;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Checked;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Estimate;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Kind;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Offer;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Offers;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.BooleanSupplier;
 
 /** Selects an ordering heuristic using the observed costs of verified counts on earlier sources. */
@@ -17,28 +24,28 @@ public final class FiniteConstraintPlanLearning {
     private FiniteConstraintPlanLearning() {}
 
     // One feature vector, observation, immutable row list, and one small outcome per heuristic.
-<span class="fc" id="L20">    private static final long OBSERVATION_CELLS = 20L + 6L * Strategy.values().length;</span>
+<span class="fc" id="L27">    private static final long OBSERVATION_CELLS = 20L + 6L * Strategy.values().length;</span>
 
     public record Example(String source, Problem problem) {
-<span class="fc" id="L23">        public Example {</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">            if (Objects.requireNonNull(source).isBlank()) throw new IllegalArgumentException(&quot;EMPTY_SOURCE&quot;);</span>
-<span class="fc" id="L25">            Objects.requireNonNull(problem);</span>
-<span class="fc" id="L26">        }</span>
+<span class="fc" id="L30">        public Example {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (Objects.requireNonNull(source).isBlank()) throw new IllegalArgumentException(&quot;EMPTY_SOURCE&quot;);</span>
+<span class="fc" id="L32">            Objects.requireNonNull(problem);</span>
+<span class="fc" id="L33">        }</span>
     }
 
     /** Logarithmic size/pressure bins and the maximum residual arity, computed from free scopes alone. */
-<span class="fc" id="L30">    public record Features(int freeSize, int factorCount, int maxArity, int meanIncidence,</span>
+<span class="fc" id="L37">    public record Features(int freeSize, int factorCount, int maxArity, int meanIncidence,</span>
             int maxForwardIncidence) {
         private int distance(Features other) {
-<span class="fc" id="L33">            return Math.abs(freeSize - other.freeSize) + Math.abs(factorCount - other.factorCount)</span>
-<span class="fc" id="L34">                + Math.abs(maxArity - other.maxArity) + Math.abs(meanIncidence - other.meanIncidence)</span>
-<span class="fc" id="L35">                + Math.abs(maxForwardIncidence - other.maxForwardIncidence);</span>
+<span class="fc" id="L40">            return Math.abs(freeSize - other.freeSize) + Math.abs(factorCount - other.factorCount)</span>
+<span class="fc" id="L41">                + Math.abs(maxArity - other.maxArity) + Math.abs(meanIncidence - other.meanIncidence)</span>
+<span class="fc" id="L42">                + Math.abs(maxForwardIncidence - other.maxForwardIncidence);</span>
         }
     }
 
-<span class="fc" id="L39">    public record Trial(Strategy strategy, FiniteConstraintCounter.Status status, String reason, long work) {}</span>
+<span class="fc" id="L46">    public record Trial(Strategy strategy, FiniteConstraintCounter.Status status, String reason, long work) {}</span>
     public record Observation(String source, Features features, List&lt;Trial&gt; trials, Optional&lt;Strategy&gt; best) {
-<span class="fc" id="L41">        public Observation { trials = List.copyOf(trials); }</span>
+<span class="fc" id="L48">        public Observation { trials = List.copyOf(trials); }</span>
     }
 
     /** A model is only created from a completed training call. Training data and outcomes are immutable. */
@@ -47,156 +54,227 @@ public final class FiniteConstraintPlanLearning {
         private final long trainingWork;
         private final long retainedCells;
 
-<span class="fc" id="L50">        private Model(List&lt;Observation&gt; observations, long trainingWork, long retainedCells) {</span>
-<span class="fc" id="L51">            this.observations = List.copyOf(observations);</span>
-<span class="fc" id="L52">            this.trainingWork = trainingWork;</span>
-<span class="fc" id="L53">            this.retainedCells = retainedCells;</span>
-<span class="fc" id="L54">        }</span>
+<span class="fc" id="L57">        private Model(List&lt;Observation&gt; observations, long trainingWork, long retainedCells) {</span>
+<span class="fc" id="L58">            this.observations = List.copyOf(observations);</span>
+<span class="fc" id="L59">            this.trainingWork = trainingWork;</span>
+<span class="fc" id="L60">            this.retainedCells = retainedCells;</span>
+<span class="fc" id="L61">        }</span>
 
-<span class="fc" id="L56">        public List&lt;Observation&gt; observations() { return observations; }</span>
-<span class="fc" id="L57">        public long trainingWork() { return trainingWork; }</span>
+<span class="fc" id="L63">        public List&lt;Observation&gt; observations() { return observations; }</span>
+<span class="fc" id="L64">        public long trainingWork() { return trainingWork; }</span>
     }
 
     public record Training(Optional&lt;Model&gt; model, List&lt;Observation&gt; observations, long work, String reason) {
-<span class="fc" id="L61">        public Training { observations = List.copyOf(observations); }</span>
+<span class="fc" id="L68">        public Training { observations = List.copyOf(observations); }</span>
     }
-<span class="fc" id="L63">    public record Decision(Strategy strategy, String trainingSource, int featureDistance) {}</span>
+<span class="fc" id="L70">    public record Decision(Strategy strategy, String trainingSource, int featureDistance) {}</span>
     /** work includes feature extraction, policy selection, counting, and certificate verification. */
-<span class="fc" id="L65">    public record Evaluation(Optional&lt;Decision&gt; decision, FiniteConstraintCounter.Result result, long work) {}</span>
+<span class="fc" id="L72">    public record Evaluation(Optional&lt;Decision&gt; decision, FiniteConstraintCounter.Result result, long work) {}</span>
 
     /** Each strategy gets the same work allowance; the whole experiment also has an outer limit. */
     public static Training train(List&lt;Example&gt; examples, IterationLimits totalLimits, long perTrialWork,
             BooleanSupplier cancellation) {
-<span class="fc" id="L70">        Objects.requireNonNull(examples);</span>
-<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (perTrialWork &lt; 1) throw new IllegalArgumentException(&quot;INVALID_TRIAL_WORK&quot;);</span>
-<span class="fc" id="L72">        var work = new CertificateWork(totalLimits, cancellation);</span>
-<span class="fc" id="L73">        var observations = new ArrayList&lt;Observation&gt;();</span>
-<span class="fc" id="L74">        long nestedWork = 0;</span>
+<span class="fc" id="L77">        Objects.requireNonNull(examples);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (perTrialWork &lt; 1) throw new IllegalArgumentException(&quot;INVALID_TRIAL_WORK&quot;);</span>
+<span class="fc" id="L79">        var work = new CertificateWork(totalLimits, cancellation);</span>
+<span class="fc" id="L80">        var observations = new ArrayList&lt;Observation&gt;();</span>
+<span class="fc" id="L81">        long nestedWork = 0;</span>
         try {
             // Retain the input/list copy, hash-set entries, size table, and all completed observations.
-<span class="fc" id="L77">            long batchCells = 8L + 7L * examples.size();</span>
-<span class="fc" id="L78">            long modelCells = 4L + OBSERVATION_CELLS * examples.size();</span>
-<span class="fc" id="L79">            work.cells(batchCells + modelCells);</span>
-<span class="fc" id="L80">            work.charge(examples.size());</span>
-<span class="fc" id="L81">            var inputs = List.copyOf(examples);</span>
-<span class="fc" id="L82">            var sizes = new long[inputs.size()];</span>
-<span class="fc" id="L83">            var sources = new HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (int i = 0; i &lt; inputs.size(); i++) {</span>
-<span class="fc" id="L85">                Example example = inputs.get(i);</span>
-<span class="fc" id="L86">                work.charge(1L + example.source().length());</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">                if (!sources.add(example.source())) throw new IllegalArgumentException(&quot;DUPLICATE_TRAINING_SOURCE&quot;);</span>
-<span class="fc" id="L88">                sizes[i] = sourceCells(example.problem(), work);</span>
-<span class="fc" id="L89">                batchCells += sizes[i];</span>
-<span class="fc" id="L90">                modelCells += example.source().length();</span>
-<span class="fc" id="L91">                work.cells(batchCells + modelCells);</span>
+<span class="fc" id="L84">            long batchCells = 8L + 7L * examples.size();</span>
+<span class="fc" id="L85">            long modelCells = 4L + OBSERVATION_CELLS * examples.size();</span>
+<span class="fc" id="L86">            work.cells(batchCells + modelCells);</span>
+<span class="fc" id="L87">            work.charge(examples.size());</span>
+<span class="fc" id="L88">            var inputs = List.copyOf(examples);</span>
+<span class="fc" id="L89">            var sizes = new long[inputs.size()];</span>
+<span class="fc" id="L90">            var sources = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (int i = 0; i &lt; inputs.size(); i++) {</span>
+<span class="fc" id="L92">                Example example = inputs.get(i);</span>
+<span class="fc" id="L93">                work.charge(1L + example.source().length());</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (!sources.add(example.source())) throw new IllegalArgumentException(&quot;DUPLICATE_TRAINING_SOURCE&quot;);</span>
+<span class="fc" id="L95">                sizes[i] = sourceCells(example.problem(), work);</span>
+<span class="fc" id="L96">                batchCells += sizes[i];</span>
+<span class="fc" id="L97">                modelCells += example.source().length();</span>
+<span class="fc" id="L98">                work.cells(batchCells + modelCells);</span>
             }
-<span class="fc" id="L93">            long retained = batchCells + modelCells;</span>
-<span class="fc" id="L94">            boolean found = false;</span>
-<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (int i = 0; i &lt; inputs.size(); i++) {</span>
-<span class="fc" id="L96">                Example example = inputs.get(i);</span>
-<span class="fc" id="L97">                Features features = features(example.problem(), retained, work);</span>
-<span class="fc" id="L98">                var trials = new ArrayList&lt;Trial&gt;();</span>
-<span class="fc" id="L99">                BigInteger reference = null;</span>
-<span class="fc" id="L100">                Trial best = null;</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">                for (var strategy : Strategy.values()) {</span>
-<span class="fc" id="L102">                    work.charge(1);</span>
-<span class="fc" id="L103">                    var remaining = work.remainingLimits(retained - sizes[i]);</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">                    if (remaining.maximumWork() &lt; perTrialWork) throw new CertificateWork.Stop(&quot;TRAINING_WORK_LIMIT&quot;);</span>
-<span class="fc" id="L105">                    var result = FiniteConstraintCounter.count(example.problem(), strategy,</span>
-<span class="fc" id="L106">                        remaining.withMaximumWork(perTrialWork), cancellation);</span>
-<span class="fc" id="L107">                    nestedWork = result.work();</span>
-<span class="fc" id="L108">                    work.charge(nestedWork);</span>
-<span class="fc" id="L109">                    nestedWork = 0;</span>
-<span class="pc bpc" id="L110" title="2 of 4 branches missed.">                    if (&quot;CANCELLED&quot;.equals(result.reason()) || &quot;TIME_LIMIT&quot;.equals(result.reason()))</span>
-<span class="nc" id="L111">                        throw new CertificateWork.Stop(result.reason());</span>
-<span class="fc" id="L112">                    var trial = new Trial(strategy, result.status(), result.reason(), result.work());</span>
-<span class="fc" id="L113">                    trials.add(trial);</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">                    if (result.status() == FiniteConstraintCounter.Status.EXACT) {</span>
-<span class="fc" id="L115">                        var count = result.count().orElseThrow();</span>
-<span class="pc bpc" id="L116" title="1 of 4 branches missed.">                        if (reference != null &amp;&amp; !reference.equals(count)) throw new IllegalStateException(&quot;INCONSISTENT_COUNTS&quot;);</span>
-<span class="fc" id="L117">                        reference = count;</span>
-<span class="fc bfc" id="L118" title="All 4 branches covered.">                        if (best == null || trial.work() &lt; best.work()) best = trial;</span>
+<span class="fc" id="L100">            long retained = batchCells + modelCells;</span>
+<span class="fc" id="L101">            boolean found = false;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for (int i = 0; i &lt; inputs.size(); i++) {</span>
+<span class="fc" id="L103">                Example example = inputs.get(i);</span>
+<span class="fc" id="L104">                Features features = features(example.problem(), retained, work);</span>
+<span class="fc" id="L105">                var trials = new ArrayList&lt;Trial&gt;();</span>
+<span class="fc" id="L106">                BigInteger reference = null;</span>
+<span class="fc" id="L107">                Trial best = null;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                for (var strategy : Strategy.values()) {</span>
+<span class="fc" id="L109">                    work.charge(1);</span>
+<span class="fc" id="L110">                    var remaining = work.remainingLimits(retained - sizes[i]);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                    if (remaining.maximumWork() &lt; perTrialWork) throw new CertificateWork.Stop(&quot;TRAINING_WORK_LIMIT&quot;);</span>
+<span class="fc" id="L112">                    var result = FiniteConstraintCounter.count(example.problem(), strategy,</span>
+<span class="fc" id="L113">                        remaining.withMaximumWork(perTrialWork), cancellation);</span>
+<span class="fc" id="L114">                    nestedWork = result.work();</span>
+<span class="fc" id="L115">                    work.charge(nestedWork);</span>
+<span class="fc" id="L116">                    nestedWork = 0;</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">                    if (&quot;CANCELLED&quot;.equals(result.reason()) || &quot;TIME_LIMIT&quot;.equals(result.reason()))</span>
+<span class="nc" id="L118">                        throw new CertificateWork.Stop(result.reason());</span>
+<span class="fc" id="L119">                    var trial = new Trial(strategy, result.status(), result.reason(), result.work());</span>
+<span class="fc" id="L120">                    trials.add(trial);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                    if (result.status() == FiniteConstraintCounter.Status.EXACT) {</span>
+<span class="fc" id="L122">                        var count = result.count().orElseThrow();</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">                        if (reference != null &amp;&amp; !reference.equals(count)) throw new IllegalStateException(&quot;INCONSISTENT_COUNTS&quot;);</span>
+<span class="fc" id="L124">                        reference = count;</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">                        if (best == null || trial.work() &lt; best.work()) best = trial;</span>
                     }
                 }
-<span class="fc bfc" id="L121" title="All 2 branches covered.">                found |= best != null;</span>
-<span class="fc" id="L122">                observations.add(new Observation(example.source(), features, trials, Optional.ofNullable(best).map(Trial::strategy)));</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                found |= best != null;</span>
+<span class="fc" id="L129">                observations.add(new Observation(example.source(), features, trials, Optional.ofNullable(best).map(Trial::strategy)));</span>
             }
-<span class="fc" id="L124">            work.charge(observations.size());</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (!found) return new Training(Optional.empty(), observations, work.used(), &quot;NO_VERIFIED_TRAINING_TRIAL&quot;);</span>
-<span class="fc" id="L126">            var model = new Model(observations, work.used(), modelCells);</span>
-<span class="fc" id="L127">            return new Training(Optional.of(model), observations, work.used(), &quot;TRAINED&quot;);</span>
-<span class="fc" id="L128">        } catch (CertificateWork.Stop stop) {</span>
-<span class="fc" id="L129">            return new Training(Optional.empty(), observations, work.used() + nestedWork, stop.getMessage());</span>
+<span class="fc" id="L131">            work.charge(observations.size());</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (!found) return new Training(Optional.empty(), observations, work.used(), &quot;NO_VERIFIED_TRAINING_TRIAL&quot;);</span>
+<span class="fc" id="L133">            var model = new Model(observations, work.used(), modelCells);</span>
+<span class="fc" id="L134">            return new Training(Optional.of(model), observations, work.used(), &quot;TRAINED&quot;);</span>
+<span class="fc" id="L135">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L136">            return new Training(Optional.empty(), observations, work.used() + nestedWork, stop.getMessage());</span>
         }
     }
 
     /** The first closest successful training source breaks ties. Each evaluation performs a fresh verified count. */
     public static Evaluation count(Model model, Problem problem, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L135">        Objects.requireNonNull(model);</span>
-<span class="fc" id="L136">        Objects.requireNonNull(problem);</span>
-<span class="fc" id="L137">        var work = new CertificateWork(limits, cancellation);</span>
-<span class="fc" id="L138">        Decision decision = null;</span>
-<span class="fc" id="L139">        long nestedWork = 0;</span>
+<span class="fc" id="L142">        Objects.requireNonNull(model);</span>
+<span class="fc" id="L143">        Objects.requireNonNull(problem);</span>
+<span class="fc" id="L144">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L145">        Decision decision = null;</span>
+<span class="fc" id="L146">        long nestedWork = 0;</span>
         try {
-<span class="fc" id="L141">            Features features = features(problem, model.retainedCells + sourceCells(problem, work), work);</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (Observation observation : model.observations()) {</span>
-<span class="fc" id="L143">                work.charge(1);</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                if (observation.best().isEmpty()) continue;</span>
-<span class="fc" id="L145">                work.charge(5);</span>
-<span class="fc" id="L146">                int distance = features.distance(observation.features());</span>
-<span class="fc bfc" id="L147" title="All 4 branches covered.">                if (decision == null || distance &lt; decision.featureDistance())</span>
-<span class="fc" id="L148">                    decision = new Decision(observation.best().orElseThrow(), observation.source(), distance);</span>
-<span class="fc" id="L149">            }</span>
-<span class="fc" id="L150">            var result = FiniteConstraintCounter.count(problem, Objects.requireNonNull(decision).strategy(),</span>
-<span class="fc" id="L151">                work.remainingLimits(model.retainedCells), cancellation);</span>
-<span class="fc" id="L152">            nestedWork = result.work();</span>
-<span class="fc" id="L153">            work.charge(nestedWork);</span>
-<span class="fc" id="L154">            return new Evaluation(Optional.of(decision), result, work.used());</span>
-<span class="fc" id="L155">        } catch (CertificateWork.Stop stop) {</span>
-<span class="fc" id="L156">            var unavailable = new FiniteConstraintCounter.Result(FiniteConstraintCounter.Status.UNAVAILABLE,</span>
-<span class="fc" id="L157">                Optional.empty(), Optional.empty(), stop.getMessage(), nestedWork);</span>
-<span class="fc" id="L158">            return new Evaluation(Optional.ofNullable(decision), unavailable, work.used() + nestedWork);</span>
+<span class="fc" id="L148">            Features features = features(problem, model.retainedCells + sourceCells(problem, work), work);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            for (Observation observation : model.observations()) {</span>
+<span class="fc" id="L150">                work.charge(1);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                if (observation.best().isEmpty()) continue;</span>
+<span class="fc" id="L152">                work.charge(5);</span>
+<span class="fc" id="L153">                int distance = features.distance(observation.features());</span>
+<span class="fc bfc" id="L154" title="All 4 branches covered.">                if (decision == null || distance &lt; decision.featureDistance())</span>
+<span class="fc" id="L155">                    decision = new Decision(observation.best().orElseThrow(), observation.source(), distance);</span>
+<span class="fc" id="L156">            }</span>
+<span class="fc" id="L157">            var result = FiniteConstraintCounter.count(problem, Objects.requireNonNull(decision).strategy(),</span>
+<span class="fc" id="L158">                work.remainingLimits(model.retainedCells), cancellation);</span>
+<span class="fc" id="L159">            nestedWork = result.work();</span>
+<span class="fc" id="L160">            work.charge(nestedWork);</span>
+<span class="fc" id="L161">            return new Evaluation(Optional.of(decision), result, work.used());</span>
+<span class="fc" id="L162">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L163">            var unavailable = new FiniteConstraintCounter.Result(FiniteConstraintCounter.Status.UNAVAILABLE,</span>
+<span class="fc" id="L164">                Optional.empty(), Optional.empty(), stop.getMessage(), nestedWork);</span>
+<span class="fc" id="L165">            return new Evaluation(Optional.ofNullable(decision), unavailable, work.used() + nestedWork);</span>
         }
+    }
+
+    /** The free variable and input factor counts are reported even for fixed-only calls. */
+<span class="fc" id="L170">    public record Size(int freeVariables, int factors) {}</span>
+
+    /**
+     * Compare the default min-degree order with an earlier observed order. Only an identical structural
+     * feature vector with a successful fixed control can justify a probe. The learned estimate includes
+     * this lookup and the acquisition cost amortized over the caller's expected number of evaluations.
+     * The verified count and any fallback are charged at their actual work on the current source.
+     */
+    public static BoundedPlanSelection.Decision&lt;Size, FiniteConstraintCounter.Result&gt; countWithPolicy(
+            Optional&lt;Model&gt; model, Problem problem, long expectedUses, long maximumProbeWork,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L181">        return countWithPolicy(model, problem, Strategy.MIN_DEGREE, expectedUses, maximumProbeWork, limits, cancellation);</span>
+    }
+
+    /** The caller declares its fixed control before observing the new source's measured outcomes. */
+    public static BoundedPlanSelection.Decision&lt;Size, FiniteConstraintCounter.Result&gt; countWithPolicy(
+            Optional&lt;Model&gt; model, Problem problem, Strategy fixedStrategy, long expectedUses, long maximumProbeWork,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L188">        Objects.requireNonNull(fixedStrategy, &quot;fixedStrategy&quot;);</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (expectedUses &lt; 1) throw new IllegalArgumentException(&quot;INVALID_EXPECTED_USES&quot;);</span>
+<span class="fc" id="L190">        var size = new Size(problem.variableCount() - problem.fixed().size(), problem.factors().size());</span>
+<span class="fc" id="L191">        return BoundedPlanSelection.choose(size, BoundedPlanSelection.Unit.CERTIFICATE_WORK,</span>
+<span class="fc" id="L192">            model.map(Model::trainingWork).orElse(0L), maximumProbeWork, limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L193">                var fixed = countOffer(fixedStrategy, Kind.FIXED, &quot;GENERAL_ORDER&quot;, OptionalLong.empty(),</span>
+                    problem, cancellation);
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                if (model.isEmpty()) return new Offers&lt;&gt;(fixed, Optional.empty(), 0);</span>
+<span class="fc" id="L196">                Model trained = model.orElseThrow();</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (maximumProbeWork == 0) return new Offers&lt;&gt;(fixed, Optional.empty(), trained.retainedCells);</span>
+<span class="fc" id="L198">                long retained = BoundedPlanSelection.TRACE_CELLS + trained.retainedCells + sourceCells(problem, work);</span>
+<span class="fc" id="L199">                var current = features(problem, retained, work);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                for (var observation : trained.observations()) {</span>
+<span class="fc" id="L201">                    work.charge(6);</span>
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">                    if (!current.equals(observation.features()) || observation.best().isEmpty()) continue;</span>
+<span class="fc" id="L203">                    Trial baseline = null;</span>
+<span class="fc" id="L204">                    Trial best = null;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                    for (var trial : observation.trials()) {</span>
+<span class="fc" id="L206">                        work.charge(1);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                        if (trial.status() != FiniteConstraintCounter.Status.EXACT) continue;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                        if (trial.strategy() == fixedStrategy) baseline = trial;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                        if (trial.strategy() == observation.best().orElseThrow()) best = trial;</span>
+<span class="fc" id="L210">                    }</span>
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">                    if (baseline == null || best == null) continue;</span>
+<span class="fc" id="L212">                    fixed = countOffer(fixedStrategy, Kind.FIXED, observation.source(),</span>
+<span class="fc" id="L213">                        OptionalLong.of(baseline.work()), problem, cancellation);</span>
+<span class="fc" id="L214">                    long predicted = saturatedSum(best.work(), Math.ceilDiv(trained.trainingWork(), expectedUses));</span>
+<span class="fc" id="L215">                    predicted = saturatedSum(predicted, work.used());</span>
+<span class="fc" id="L216">                    var learned = countOffer(best.strategy(), Kind.LEARNED, observation.source(),</span>
+<span class="fc" id="L217">                        OptionalLong.of(predicted), problem, cancellation);</span>
+<span class="fc" id="L218">                    return new Offers&lt;&gt;(fixed, Optional.of(learned), trained.retainedCells);</span>
+                }
+<span class="fc" id="L220">                var unseen = countOffer(fixedStrategy, Kind.LEARNED, &quot;NO_MATCHING_VERIFIED_CONTROL&quot;,</span>
+<span class="fc" id="L221">                    OptionalLong.empty(), problem, cancellation);</span>
+<span class="fc" id="L222">                return new Offers&lt;&gt;(fixed, Optional.of(unseen), trained.retainedCells);</span>
+            });
+    }
+
+    private static long saturatedSum(long left, long right) {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        return left &gt; Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;</span>
+    }
+
+    private static Offer&lt;FiniteConstraintCounter.Result&gt; countOffer(Strategy strategy, Kind kind, String evidence,
+            OptionalLong estimate, Problem problem, BooleanSupplier cancellation) {
+<span class="fc" id="L232">        return new Offer&lt;&gt;(new Estimate(strategy.name(), kind, evidence, estimate), allowance -&gt; {</span>
+<span class="fc" id="L233">            var result = FiniteConstraintCounter.count(problem, strategy, allowance, cancellation);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            var exact = result.status() == FiniteConstraintCounter.Status.EXACT ? Optional.of(result)</span>
+<span class="fc" id="L235">                : Optional.&lt;FiniteConstraintCounter.Result&gt;empty();</span>
+<span class="fc" id="L236">            return new Checked&lt;&gt;(exact, result.reason(), result.work());</span>
+        });
     }
 
     // Source descriptors and scalar cells match the counter's input accounting; values are never inspected.
     private static long sourceCells(Problem problem, CertificateWork work) {
-<span class="fc" id="L164">        long cells = problem.variableCount() + 2L * problem.fixed().size() + problem.factors().size();</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (var factor : problem.factors()) {</span>
-<span class="fc" id="L166">            work.charge(1);</span>
-<span class="fc" id="L167">            cells += factor.variables().size() + (long) factor.values().size();</span>
-<span class="fc" id="L168">        }</span>
-<span class="fc" id="L169">        return cells;</span>
+<span class="fc" id="L242">        long cells = problem.variableCount() + 2L * problem.fixed().size() + problem.factors().size();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (var factor : problem.factors()) {</span>
+<span class="fc" id="L244">            work.charge(1);</span>
+<span class="fc" id="L245">            cells += factor.variables().size() + (long) factor.values().size();</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">        return cells;</span>
     }
 
     private static Features features(Problem problem, long retained, CertificateWork work) {
-<span class="fc" id="L173">        int free = problem.variableCount() - problem.fixed().size();</span>
-<span class="fc" id="L174">        work.cells(retained + problem.variableCount());</span>
-<span class="fc" id="L175">        work.charge(1L + problem.variableCount());</span>
-<span class="fc" id="L176">        long[] forward = new long[problem.variableCount()];</span>
-<span class="fc" id="L177">        long peak = 0;</span>
-<span class="fc" id="L178">        long total = 0;</span>
-<span class="fc" id="L179">        int maxArity = 0;</span>
-<span class="fc" id="L180">        int active = 0;</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (var factor : problem.factors()) {</span>
-<span class="fc" id="L182">            work.charge(1);</span>
-<span class="fc" id="L183">            int arity = 0;</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (int i = factor.variables().size() - 1; i &gt;= 0; i--) {</span>
-<span class="fc" id="L185">                work.charge(1);</span>
-<span class="fc" id="L186">                int variable = factor.variables().get(i);</span>
-<span class="fc bfc" id="L187" title="All 2 branches covered.">                if (problem.fixed().containsKey(variable)) continue;</span>
-<span class="fc" id="L188">                forward[variable] += arity;</span>
-<span class="fc" id="L189">                peak = Math.max(peak, forward[variable]);</span>
-<span class="fc" id="L190">                arity++;</span>
+<span class="fc" id="L251">        int free = problem.variableCount() - problem.fixed().size();</span>
+<span class="fc" id="L252">        work.cells(retained + problem.variableCount());</span>
+<span class="fc" id="L253">        work.charge(1L + problem.variableCount());</span>
+<span class="fc" id="L254">        long[] forward = new long[problem.variableCount()];</span>
+<span class="fc" id="L255">        long peak = 0;</span>
+<span class="fc" id="L256">        long total = 0;</span>
+<span class="fc" id="L257">        int maxArity = 0;</span>
+<span class="fc" id="L258">        int active = 0;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        for (var factor : problem.factors()) {</span>
+<span class="fc" id="L260">            work.charge(1);</span>
+<span class="fc" id="L261">            int arity = 0;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            for (int i = factor.variables().size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L263">                work.charge(1);</span>
+<span class="fc" id="L264">                int variable = factor.variables().get(i);</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                if (problem.fixed().containsKey(variable)) continue;</span>
+<span class="fc" id="L266">                forward[variable] += arity;</span>
+<span class="fc" id="L267">                peak = Math.max(peak, forward[variable]);</span>
+<span class="fc" id="L268">                arity++;</span>
             }
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (arity &gt; 0) active++;</span>
-<span class="fc" id="L193">            maxArity = Math.max(maxArity, arity);</span>
-<span class="fc" id="L194">            total += arity;</span>
-<span class="fc" id="L195">        }</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (arity &gt; 0) active++;</span>
+<span class="fc" id="L271">            maxArity = Math.max(maxArity, arity);</span>
+<span class="fc" id="L272">            total += arity;</span>
+<span class="fc" id="L273">        }</span>
         // Factors have ordered scopes. Forward incidences estimate the pressure of the source order.
-<span class="fc" id="L197">        return new Features(bin(free), bin(active), maxArity, bin(total / Math.max(1, free)), bin(peak));</span>
+<span class="fc" id="L275">        return new Features(bin(free), bin(active), maxArity, bin(total / Math.max(1, free)), bin(peak));</span>
     }
 
-<span class="fc" id="L200">    private static int bin(long value) { return Long.SIZE - Long.numberOfLeadingZeros(value); }</span>
+<span class="fc" id="L278">    private static int bin(long value) { return Long.SIZE - Long.numberOfLeadingZeros(value); }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

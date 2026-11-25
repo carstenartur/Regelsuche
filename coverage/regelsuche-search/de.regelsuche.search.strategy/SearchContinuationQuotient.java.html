@@ -10,74 +10,80 @@ import java.util.Map;
 /** Run-local continuation labels. Semantic nodes do not own histories or notation. */
 final class SearchContinuationQuotient {
 <span class="fc" id="L12">    private record NodeKey(ValueId value, String unparsedSyntax, List&lt;String&gt; assumptions) {}</span>
-<span class="fc" id="L13">    private record Label(int depth, int expansions, boolean checked) {</span>
+<span class="fc" id="L13">    private record PreparedKey(String syntax, List&lt;String&gt; assumptions) { }</span>
+<span class="fc" id="L14">    private record Label(int depth, int expansions, boolean checked) {</span>
         static Label of(SearchState state) {
-<span class="pc bpc" id="L15" title="1 of 2 branches missed.">            return new Label(state.depth(), state.expandedStepCount(), state.transformations() != null</span>
-<span class="fc bfc" id="L16" title="All 2 branches covered.">                &amp;&amp; state.equivalencePreservingFlags().stream().allMatch(Boolean::booleanValue));</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">            return new Label(state.depth(), state.expandedStepCount(), state.transformations() != null</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">                &amp;&amp; state.equivalencePreservingFlags().stream().allMatch(Boolean::booleanValue));</span>
         }
         boolean dominates(Label other) {
-<span class="pc bpc" id="L19" title="1 of 8 branches missed.">            return depth &lt;= other.depth &amp;&amp; expansions &lt;= other.expansions &amp;&amp; (checked || !other.checked);</span>
+<span class="pc bpc" id="L20" title="1 of 8 branches missed.">            return depth &lt;= other.depth &amp;&amp; expansions &lt;= other.expansions &amp;&amp; (checked || !other.checked);</span>
         }
     }
     private final BestFirstSearchStrategy.ValueIdentitySession identity;
-<span class="fc" id="L23">    private final Map&lt;NodeKey, Map&lt;String, List&lt;Label&gt;&gt;&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L24">    private final Map&lt;String, List&lt;Transformation&gt;&gt; successors = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L24">    private final Map&lt;NodeKey, Map&lt;String, List&lt;Label&gt;&gt;&gt; nodes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L25">    private final Map&lt;Object, List&lt;Transformation&gt;&gt; successors = new LinkedHashMap&lt;&gt;();</span>
     private int retainedLabels;
     private int syntaxObservations;
     private long duplicateArrivals;
     private long successorCacheHits;
 
-<span class="fc" id="L30">    SearchContinuationQuotient(BestFirstSearchStrategy.ValueIdentitySession identity) {</span>
-<span class="fc" id="L31">        this.identity = identity;</span>
-<span class="fc" id="L32">    }</span>
+<span class="fc" id="L31">    SearchContinuationQuotient(BestFirstSearchStrategy.ValueIdentitySession identity) {</span>
+<span class="fc" id="L32">        this.identity = identity;</span>
+<span class="fc" id="L33">    }</span>
 
     private NodeKey key(SearchState state) {
-<span class="fc" id="L35">        var value = identity.arenaValue(state.expression());</span>
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        return new NodeKey(value.orElse(null), value.isPresent() ? &quot;&quot; : state.expression(), state.assumptions());</span>
+<span class="fc" id="L36">        var value = identity.arenaValue(state.expression());</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        return new NodeKey(value.orElse(null), value.isPresent() ? &quot;&quot; : state.expression(), state.assumptions());</span>
     }
 
     boolean dominated(SearchState state) {
-<span class="fc" id="L40">        var representations = nodes.get(key(state));</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        var labels = representations == null ? null : representations.get(state.expression());</span>
-<span class="fc bfc" id="L42" title="All 4 branches covered.">        if (labels == null || labels.stream().noneMatch(label -&gt; label.dominates(Label.of(state)))) return false;</span>
-<span class="fc" id="L43">        duplicateArrivals++;</span>
-<span class="fc" id="L44">        return true;</span>
+<span class="fc" id="L41">        var representations = nodes.get(key(state));</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        var labels = representations == null ? null : representations.get(state.expression());</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">        if (labels == null || labels.stream().noneMatch(label -&gt; label.dominates(Label.of(state)))) return false;</span>
+<span class="fc" id="L44">        duplicateArrivals++;</span>
+<span class="fc" id="L45">        return true;</span>
     }
 
     boolean admit(SearchState state) {
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (dominated(state)) return false;</span>
-<span class="fc" id="L49">        var representations = nodes.computeIfAbsent(key(state), ignored -&gt; new LinkedHashMap&lt;&gt;());</span>
-<span class="fc" id="L50">        var labels = representations.get(state.expression());</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (labels == null) {</span>
-<span class="fc" id="L52">            labels = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L53">            representations.put(state.expression(), labels);</span>
-<span class="fc" id="L54">            syntaxObservations++;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (dominated(state)) return false;</span>
+<span class="fc" id="L50">        var representations = nodes.computeIfAbsent(key(state), ignored -&gt; new LinkedHashMap&lt;&gt;());</span>
+<span class="fc" id="L51">        var labels = representations.get(state.expression());</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (labels == null) {</span>
+<span class="fc" id="L53">            labels = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L54">            representations.put(state.expression(), labels);</span>
+<span class="fc" id="L55">            syntaxObservations++;</span>
         }
-<span class="fc" id="L56">        Label incoming = Label.of(state);</span>
-<span class="fc" id="L57">        int before = labels.size();</span>
-<span class="fc" id="L58">        labels.removeIf(incoming::dominates);</span>
-<span class="fc" id="L59">        labels.add(incoming);</span>
-<span class="fc" id="L60">        retainedLabels += labels.size() - before;</span>
-<span class="fc" id="L61">        return true;</span>
+<span class="fc" id="L57">        Label incoming = Label.of(state);</span>
+<span class="fc" id="L58">        int before = labels.size();</span>
+<span class="fc" id="L59">        labels.removeIf(incoming::dominates);</span>
+<span class="fc" id="L60">        labels.add(incoming);</span>
+<span class="fc" id="L61">        retainedLabels += labels.size() - before;</span>
+<span class="fc" id="L62">        return true;</span>
     }
 
-    List&lt;Transformation&gt; transformations(SearchProblem problem, String expression) {
-<span class="fc" id="L65">        var retained = successors.get(expression);</span>
-<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (retained != null) {</span>
-<span class="fc" id="L67">            successorCacheHits++;</span>
-<span class="fc" id="L68">            return retained;</span>
+    List&lt;Transformation&gt; transformations(SearchProblem problem, SearchState state, boolean qualified) {
+<span class="fc" id="L66">        String expression = state.expression();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        Object key = qualified ? new PreparedKey(expression, state.assumptions()) : expression;</span>
+<span class="fc" id="L68">        var retained = successors.get(key);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (retained != null) {</span>
+<span class="fc" id="L70">            successorCacheHits++;</span>
+<span class="fc" id="L71">            return retained;</span>
         }
-<span class="fc" id="L70">        var frozen = List.copyOf(problem.transformations(expression));</span>
-<span class="fc" id="L71">        successors.put(expression, frozen);</span>
-<span class="fc" id="L72">        return frozen;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        var frozen = List.copyOf(qualified</span>
+<span class="fc" id="L74">            ? Transformation.requirePrimitiveOnly(((StateLocalTransformationEngine) problem.engine())</span>
+<span class="fc" id="L75">                .transformPrepared(expression, identity.preparedExpression(expression), state.assumptions()))</span>
+<span class="fc" id="L76">            : problem.transformations(expression));</span>
+<span class="fc" id="L77">        successors.put(key, frozen);</span>
+<span class="fc" id="L78">        return frozen;</span>
     }
 
-<span class="fc" id="L75">    int size() { return nodes.size(); }</span>
+<span class="fc" id="L81">    int size() { return nodes.size(); }</span>
 
     BestFirstSearchStrategy.QuotientMetrics metrics() {
-<span class="fc" id="L78">        return new BestFirstSearchStrategy.QuotientMetrics(nodes.size(), syntaxObservations,</span>
-<span class="fc" id="L79">            retainedLabels, duplicateArrivals, successorCacheHits, identity.internedValueCount(),</span>
-<span class="fc" id="L80">            identity.structuralBytes(), identity.digestComputations());</span>
+<span class="fc" id="L84">        return new BestFirstSearchStrategy.QuotientMetrics(nodes.size(), syntaxObservations,</span>
+<span class="fc" id="L85">            retainedLabels, duplicateArrivals, successorCacheHits, identity.internedValueCount(),</span>
+<span class="fc" id="L86">            identity.structuralBytes(), identity.digestComputations());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

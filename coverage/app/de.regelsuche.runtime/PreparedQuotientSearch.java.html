@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PreparedQuotientSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.runtime</a> &gt; <span class="el_source">PreparedQuotientSearch.java</span></div><h1>PreparedQuotientSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.runtime;
+
+import static de.regelsuche.runtime.RuntimeJson.*;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.knowledge.RuleInventoryFingerprint;
+import de.regelsuche.moves.enumerate.TreePosition;
+import de.regelsuche.parse.ExactParsedSubtermProjector;
+import de.regelsuche.parse.ExactParsedTerm;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.scoring.cost.TransformationGoal;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.SearchProfile;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.StateLocalTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
+import de.regelsuche.transform.RecognitionProfile;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Invocation-owned, explicitly qualified product search. */
+final class PreparedQuotientSearch {
+    static final String REVISION = &quot;regelsuche.product-prepared-quotient/v2&quot;;
+<span class="fc" id="L39">    static final SearchProfile PROFILE = SearchProfile.PREPARED_QUOTIENT_DISCOVERY;</span>
+    private static final int MAX_SOURCE_LENGTH = 1_024;
+    private static final int MAX_POSITION_DEPTH = 64;
+    private static final int MAX_SOURCE_NODES = 512;
+    private static final int MAX_AST_GROWTH = 12;
+<span class="fc" id="L44">    enum Arm { APPLICATION_HISTORY, LEGACY_QUOTIENT, PREPARED_QUOTIENT }</span>
+
+    private PreparedQuotientSearch() { }
+
+    static String run(String source, TransformationGoal goal, Map&lt;String, ?&gt; options) {
+<span class="fc" id="L49">        return run(source, goal, options, Arm.PREPARED_QUOTIENT);</span>
+    }
+
+    /** Same bound invocation with alternative identities for the cost comparison. */
+    static String run(String source, TransformationGoal goal, Map&lt;String, ?&gt; options, Arm arm) {
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (source.length() &gt; MAX_SOURCE_LENGTH || source.isBlank()) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;prepared quotient requires a term of at most &quot; + MAX_SOURCE_LENGTH + &quot; code units&quot;);</span>
+        }
+<span class="fc" id="L57">        var parser = new ExpressionParser();</span>
+<span class="fc" id="L58">        var parsed = parser.parseExactTerm(source);</span>
+<span class="fc" id="L59">        var context = Context.read(options, parsed.expression());</span>
+<span class="fc" id="L60">        var projection = ExactParsedSubtermProjector.withParserOccurrenceReuse(</span>
+            new ExactParsedSubtermProjector.Policy(MAX_POSITION_DEPTH, MAX_SOURCE_LENGTH, MAX_SOURCE_NODES,
+<span class="fc" id="L62">                MAX_SOURCE_LENGTH, MAX_SOURCE_LENGTH * 4, 1_000_000L), PolynomialWorkAuthority.unbounded())</span>
+<span class="fc" id="L63">            .project(parsed, context.position.path(), context.position.text());</span>
+<span class="fc" id="L64">        var rules = qualifiedRules();</span>
+<span class="fc" id="L65">        var evidence = fields(&quot;revision&quot;, REVISION, &quot;provider&quot;, &quot;FIRST_PARTY_INDEXED_AST&quot;,</span>
+<span class="fc" id="L66">            &quot;ruleInventory&quot;, RuleInventoryFingerprint.contentHash(rules),</span>
+<span class="fc" id="L67">            &quot;assumptions&quot;, context.assumptions, &quot;position&quot;, context.position.pathKey(),</span>
+<span class="fc" id="L68">            &quot;budget&quot;, context.budget, &quot;goal&quot;, goal.name(), &quot;projectionCertificate&quot;, projection.certificateHash(),</span>
+<span class="fc" id="L69">            &quot;rootSourceHash&quot;, projection.rootSourceHash(), &quot;identity&quot;, arm.name());</span>
+<span class="fc" id="L70">        evidence.put(&quot;sourceBinding&quot;, hash(canonical(evidence)));</span>
+<span class="fc" id="L71">        evidence.put(&quot;status&quot;, projection.status().name());</span>
+<span class="fc" id="L72">        evidence.put(&quot;detail&quot;, projection.detailCode());</span>
+<span class="fc" id="L73">        evidence.put(&quot;actualPositionText&quot;, projection.actualFormattedText());</span>
+<span class="fc" id="L74">        evidence.put(&quot;selectedRange&quot;, projection.selectedRange());</span>
+<span class="fc" id="L75">        evidence.put(&quot;work&quot;, fields(&quot;projectionWorkUnits&quot;, projection.work().totalWorkUnits()));</span>
+<span class="fc" id="L76">        var response = fields(&quot;profile&quot;, PROFILE.name(), &quot;goal&quot;, goal.name(), &quot;inputType&quot;, &quot;TERM&quot;,</span>
+<span class="fc" id="L77">            &quot;expression&quot;, source, &quot;successes&quot;, 0, &quot;bestExpression&quot;, null, &quot;continuation&quot;, evidence);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (!projection.successful()) return canonical(response);</span>
+
+<span class="fc" id="L80">        var term = projection.projected().orElseThrow();</span>
+<span class="fc" id="L81">        var provider = new CountedProvider(rules, context.budget.maxCandidatesPerState());</span>
+<span class="fc" id="L82">        var problem = new SearchProblem(term.source(), provider, new ExpressionScorer(),</span>
+<span class="fc" id="L83">            new ExpressionCanonicalizer(), context.budget).withObjective(goal);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        var prepared = arm == Arm.PREPARED_QUOTIENT</span>
+<span class="fc" id="L85">            ? BestFirstSearchStrategy.preparedQuotient().searchPrepared(problem, term, context.assumptions) : null;</span>
+<span class="fc bfc" id="L86" title="All 3 branches covered.">        var execution = switch (arm) {</span>
+<span class="fc" id="L87">            case PREPARED_QUOTIENT -&gt; prepared.execution();</span>
+<span class="fc" id="L88">            case APPLICATION_HISTORY -&gt; new BestFirstSearchStrategy(BestFirstSearchStrategy.IdentityPolicy.APPLICATION_HISTORY_V1,</span>
+<span class="fc" id="L89">                BestFirstSearchStrategy.TieOrder.SYNTAX_V1).searchWithExecutionDiagnostics(problem);</span>
+<span class="fc" id="L90">            case LEGACY_QUOTIENT -&gt; new BestFirstSearchStrategy(BestFirstSearchStrategy.IdentityPolicy.CONTINUATION_QUOTIENT_V1,</span>
+<span class="fc" id="L91">                BestFirstSearchStrategy.TieOrder.SYNTAX_V1).searchWithExecutionDiagnostics(problem);</span>
+        };
+<span class="fc" id="L93">        var search = execution.search();</span>
+<span class="fc" id="L94">        int sourceScore = problem.scorer().score(term.source()).weightedTotal();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        var improvements = search.states().stream().filter(state -&gt; state.depth() != 0</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            &amp;&amp; state.score().weightedTotal() &lt; sourceScore).toList();</span>
+<span class="fc" id="L97">        var best = improvements.stream().min(Comparator.comparingInt((SearchState state) -&gt; state.score().weightedTotal())</span>
+<span class="fc" id="L98">            .thenComparingInt(SearchState::depth).thenComparing(SearchState::expression)).orElse(null);</span>
+
+<span class="fc" id="L100">        evidence.put(&quot;quotient&quot;, execution.quotient());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        evidence.put(&quot;bestRules&quot;, best == null ? List.of() : best.appliedRuleIds());</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        boolean stateBudgetExhausted = prepared == null ? search.states().size() == context.budget.maxVisitedExpressions()</span>
+<span class="fc" id="L103">            : prepared.stateBudgetExhausted();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        evidence.put(&quot;status&quot;, stateBudgetExhausted ? &quot;STATE_BUDGET&quot;</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">            : best != null ? &quot;EXECUTED&quot; : prepared == null ? &quot;NO_IMPROVEMENT&quot; : &quot;EXHAUSTED&quot;);</span>
+<span class="fc" id="L106">        var replay = new AstRewriteTransformationEngine(rules, MAX_AST_GROWTH, context.budget.maxCandidatesPerState());</span>
+<span class="fc" id="L107">        Replay checked = verify(best, term, context.assumptions, replay, parser);</span>
+<span class="fc" id="L108">        String rewritten = null;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (checked.replacement != null) {</span>
+<span class="fc" id="L110">            var applied = context.position.replaceAt(parsed.expression(), checked.replacement);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (applied.selectedSubtree().orElseThrow() != term.expression()) {</span>
+<span class="nc" id="L112">                throw new IllegalStateException(&quot;replay selected a different source occurrence&quot;);</span>
+            }
+<span class="fc" id="L114">            rewritten = renderReplacement(parser, source, projection.selectedRange().orElseThrow(),</span>
+<span class="fc" id="L115">                applied.rewrittenRoot().orElseThrow(), best.expression());</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (rewritten == null) evidence.put(&quot;detail&quot;, &quot;REPLACEMENT_TEXT_MISMATCH&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        evidence.put(&quot;replay&quot;, best == null ? &quot;NO_CANDIDATE&quot; : rewritten == null ? &quot;REJECTED&quot; : &quot;VERIFIED_PRIMITIVE_REPLAY&quot;);</span>
+<span class="fc" id="L119">        evidence.put(&quot;work&quot;, fields(&quot;projectionWorkUnits&quot;, projection.work().totalWorkUnits(),</span>
+<span class="fc" id="L120">            &quot;visitedStates&quot;, search.metrics().exploredStates(), &quot;expandedStates&quot;, search.metrics().expandedStates(),</span>
+<span class="fc" id="L121">            &quot;providerCalls&quot;, provider.calls, &quot;ruleAttempts&quot;, provider.ruleAttempts,</span>
+<span class="fc" id="L122">            &quot;rewriteNodeVisits&quot;, provider.nodeVisits, &quot;providerProposals&quot;, provider.proposals,</span>
+<span class="fc" id="L123">            &quot;generatedTransformations&quot;, search.metrics().generatedTransformations(),</span>
+<span class="fc" id="L124">            &quot;replayCalls&quot;, checked.calls, &quot;replayProposals&quot;, checked.proposals));</span>
+<span class="fc" id="L125">        response.put(&quot;successes&quot;, improvements.size());</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (rewritten != null) {</span>
+<span class="fc" id="L127">            response.put(&quot;bestExpression&quot;, rewritten);</span>
+<span class="fc" id="L128">            response.put(&quot;improvement&quot;, sourceScore - best.score().weightedTotal());</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        } else if (best != null) {</span>
+<span class="nc" id="L130">            evidence.put(&quot;status&quot;, &quot;REPLAY_REJECTED&quot;);</span>
+        }
+<span class="fc" id="L132">        return canonical(response);</span>
+    }
+
+    private static String renderReplacement(ExpressionParser parser, String source,
+            ExactParsedTerm.SourceRange range, Expr rewrittenRoot, String replacement) {
+<span class="fc" id="L137">        String formatted = ExpressionFormatter.format(rewrittenRoot);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (reparsesAs(parser, formatted, rewrittenRoot)) return formatted;</span>
+
+        // Keep the verified replacement and the source outside its range intact.
+<span class="fc" id="L141">        String spliced = source.substring(0, range.startInclusive()) + &quot;(&quot; + replacement + &quot;)&quot;</span>
+<span class="fc" id="L142">            + source.substring(range.endExclusive());</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        return reparsesAs(parser, spliced, rewrittenRoot) ? spliced : null;</span>
+    }
+
+    private static boolean reparsesAs(ExpressionParser parser, String text, Expr expected) {
+        try {
+<span class="fc" id="L148">            return parser.parseTerm(text).equals(expected);</span>
+<span class="nc" id="L149">        } catch (IllegalArgumentException invalid) {</span>
+<span class="nc" id="L150">            return false;</span>
+        }
+    }
+
+    private static List&lt;RewriteRule&gt; qualifiedRules() {
+<span class="fc" id="L155">        return AstRewriteTransformationEngine.defaultRules().stream()</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            .filter(rule -&gt; rule.getClass() == PatternRewriteRule.class)</span>
+<span class="fc" id="L157">            .filter(rule -&gt; preservesBindings((PatternRewriteRule) rule)).toList();</span>
+    }
+
+    private static boolean preservesBindings(PatternRewriteRule rule) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (!rule.recognitionProfile().equals(RecognitionProfile.exact())) return false;</span>
+<span class="fc" id="L162">        var before = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L163">        var after = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L164">        placeholders(rule.source(), before);</span>
+<span class="fc" id="L165">        placeholders(rule.target(), after);</span>
+<span class="fc" id="L166">        return before.equals(after);</span>
+    }
+
+    private static void placeholders(PatternExpr pattern, Set&lt;String&gt; names) {
+<span class="pc bpc" id="L170" title="1 of 4 branches missed.">        switch (pattern) {</span>
+<span class="fc" id="L171">            case PatternExpr.Placeholder variable -&gt; names.add(variable.name());</span>
+<span class="fc" id="L172">            case PatternExpr.Operation operation -&gt; {</span>
+<span class="fc" id="L173">                placeholders(operation.left(), names);</span>
+<span class="fc" id="L174">                placeholders(operation.right(), names);</span>
+<span class="fc" id="L175">            }</span>
+<span class="nc" id="L176">            case PatternExpr.Function function -&gt; function.arguments().forEach(argument -&gt; placeholders(argument, names));</span>
+            default -&gt; { }
+        }
+<span class="fc" id="L179">    }</span>
+
+<span class="fc" id="L181">    private record Context(TreePosition position, List&lt;String&gt; assumptions, SearchHeuristic budget) {</span>
+        private static Context read(Map&lt;String, ?&gt; options, Expr root) {
+<span class="fc" id="L183">            only(options, &quot;position&quot;, &quot;assumptions&quot;, &quot;budget&quot;);</span>
+<span class="fc" id="L184">            var assumptions = strings(options, &quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L185" title="3 of 6 branches missed.">            if (assumptions.size() &gt; 64 || assumptions.stream().anyMatch(value -&gt; value.length() &gt; 256)) {</span>
+<span class="nc" id="L186">                throw new IllegalArgumentException(&quot;prepared quotient assumptions exceed their representation limits&quot;);</span>
+            }
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            var position = options.containsKey(&quot;position&quot;) ? readPosition(object(options.get(&quot;position&quot;)))</span>
+<span class="fc" id="L189">                : new TreePosition(List.of(), ExpressionFormatter.format(root));</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            var limits = options.containsKey(&quot;budget&quot;) ? object(options.get(&quot;budget&quot;)) : Map.&lt;String, Object&gt;of();</span>
+<span class="fc" id="L191">            only(limits, &quot;maxDepth&quot;, &quot;maxVisitedExpressions&quot;, &quot;maxExpandingSteps&quot;, &quot;maxCandidatesPerState&quot;);</span>
+<span class="fc" id="L192">            var maximum = PROFILE.heuristic();</span>
+<span class="fc" id="L193">            var budget = new SearchHeuristic(integer(limits, &quot;maxDepth&quot;, maximum.maxDepth(), 0, maximum.maxDepth()),</span>
+<span class="fc" id="L194">                integer(limits, &quot;maxVisitedExpressions&quot;, maximum.maxVisitedExpressions(), 1, maximum.maxVisitedExpressions()),</span>
+<span class="fc" id="L195">                maximum.significantImprovementThreshold(), integer(limits, &quot;maxExpandingSteps&quot;, maximum.maxExpandingSteps(), 0, maximum.maxExpandingSteps()),</span>
+<span class="fc" id="L196">                integer(limits, &quot;maxCandidatesPerState&quot;, maximum.maxCandidatesPerState(), 1, maximum.maxCandidatesPerState()),</span>
+<span class="fc" id="L197">                maximum.beamWidth());</span>
+<span class="fc" id="L198">            return new Context(position, AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions(), budget);</span>
+        }
+
+        private static TreePosition readPosition(Map&lt;String, ?&gt; position) {
+<span class="fc" id="L202">            only(position, &quot;path&quot;, &quot;text&quot;);</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">            if (!(position.get(&quot;path&quot;) instanceof List&lt;?&gt; path) || path.size() &gt; MAX_POSITION_DEPTH) {</span>
+<span class="nc" id="L204">                throw new IllegalArgumentException(&quot;position requires a bounded path array&quot;);</span>
+            }
+<span class="fc" id="L206">            var indices = path.stream().map(Context::readIndex).toList();</span>
+<span class="fc" id="L207">            String snapshot = text(position, &quot;text&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">            if (snapshot.length() &gt; MAX_SOURCE_LENGTH * 4 || snapshot.isBlank()) {</span>
+<span class="nc" id="L209">                throw new IllegalArgumentException(&quot;position requires bounded formatter text&quot;);</span>
+            }
+<span class="fc" id="L211">            return new TreePosition(indices, snapshot);</span>
+        }
+
+        private static int readIndex(Object value) {
+<span class="pc bpc" id="L215" title="3 of 4 branches missed.">            if (!(value instanceof Integer || value instanceof Long)) {</span>
+<span class="nc" id="L216">                throw new IllegalArgumentException(&quot;position index must be an integer&quot;);</span>
+            }
+<span class="fc" id="L218">            long index = ((Number) value).longValue();</span>
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">            if (index &lt; 0 || index &gt; Integer.MAX_VALUE) throw new IllegalArgumentException(&quot;position index outside bounds&quot;);</span>
+<span class="fc" id="L220">            return (int) index;</span>
+        }
+    }
+
+    private static final class CountedProvider implements StateLocalTransformationEngine {
+        private final PreparedAstRewriteTransformationEngine engine;
+        private long calls, proposals, ruleAttempts, nodeVisits;
+
+<span class="fc" id="L228">        private CountedProvider(List&lt;RewriteRule&gt; rules, int candidates) {</span>
+<span class="fc" id="L229">            engine = new PreparedAstRewriteTransformationEngine(rules, MAX_AST_GROWTH, candidates).withRuleIndex();</span>
+<span class="fc" id="L230">        }</span>
+
+        @Override
+        public List&lt;Transformation&gt; transformPrepared(String source, Expr parsed, List&lt;String&gt; assumptions) {
+<span class="fc" id="L234">            calls++;</span>
+<span class="fc" id="L235">            var result = engine.transformPreparedStructurally(parsed);</span>
+<span class="fc" id="L236">            proposals += result.transformations().size();</span>
+<span class="fc" id="L237">            ruleAttempts += result.ruleAttempts();</span>
+<span class="fc" id="L238">            nodeVisits += result.nodeVisits();</span>
+<span class="fc" id="L239">            return result.transformations();</span>
+        }
+    }
+
+<span class="fc" id="L243">    private record Replay(Expr replacement, long calls, long proposals) { }</span>
+
+    private static Replay verify(SearchState best, ExactParsedTerm source, List&lt;String&gt; assumptions,
+            AstRewriteTransformationEngine reference, ExpressionParser parser) {
+<span class="pc bpc" id="L247" title="2 of 6 branches missed.">        if (best == null || !best.path().getFirst().equals(source.source()) || !best.assumptions().equals(assumptions)) {</span>
+<span class="fc" id="L248">            return new Replay(null, 0, 0);</span>
+        }
+<span class="fc" id="L250">        Expr current = source.expression();</span>
+<span class="fc" id="L251">        long proposals = 0;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (int index = 0; index &lt; best.transformations().size(); index++) {</span>
+<span class="fc" id="L253">            var alternatives = reference.transformStructurally(current);</span>
+<span class="fc" id="L254">            proposals += alternatives.size();</span>
+<span class="fc" id="L255">            var recorded = best.transformations().get(index);</span>
+<span class="fc" id="L256">            Expr next = alternatives.stream().filter(alternative -&gt; alternative.transformation().equals(recorded))</span>
+<span class="fc" id="L257">                .map(AstRewriteTransformationEngine.GeneratedAstTransformation::result).findFirst().orElse(null);</span>
+<span class="pc bpc" id="L258" title="2 of 4 branches missed.">            if (next == null || !reparsesAs(parser, best.path().get(index + 1), next)) {</span>
+<span class="nc" id="L259">                return new Replay(null, index + 1L, proposals);</span>
+            }
+<span class="fc" id="L261">            current = next;</span>
+        }
+<span class="fc" id="L263">        return new Replay(current, best.transformations().size(), proposals);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

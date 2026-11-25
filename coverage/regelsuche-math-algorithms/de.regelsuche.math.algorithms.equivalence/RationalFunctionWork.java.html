@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalFunctionWork.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">RationalFunctionWork.java</span></div><h1>RationalFunctionWork.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Optional per-invocation bounds around the existing exact polynomial operations. */
+final class RationalFunctionWork {
+    private static final int MAX_TERMS = 512;
+    private static final int MAX_DEGREE = 128;
+    private static final int MAX_BITS = 4096;
+    private final CertificateWork work;
+
+<span class="fc" id="L15">    RationalFunctionWork(CertificateWork work) { this.work = work; }</span>
+
+<span class="fc bfc" id="L17" title="All 2 branches covered.">    void charge(long units) { if (work != null) work.charge(units); }</span>
+
+    void source(String text) {
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (work == null) return;</span>
+<span class="fc" id="L21">        charge(0);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (text.length() &gt; 16_384) throw new CertificateWork.Stop(&quot;SOURCE_LIMIT&quot;);</span>
+<span class="fc" id="L23">        charge(text.length());</span>
+<span class="fc" id="L24">        int structure = 0;</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">            if (&quot;+-*/^(),&quot;.indexOf(text.charAt(i)) &gt;= 0 &amp;&amp; ++structure &gt; 256)</span>
+<span class="nc" id="L27">                throw new CertificateWork.Stop(&quot;SYNTAX_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L29">    }</span>
+
+    List&lt;String&gt; admitAssumptions(List&lt;String&gt; raw) {
+<span class="fc" id="L32">        int count = raw.size();</span>
+<span class="fc" id="L33">        cells(count);</span>
+<span class="fc" id="L34">        charge(count);</span>
+<span class="fc" id="L35">        var admitted = new ArrayList&lt;String&gt;(count);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (String assumption : raw) {</span>
+<span class="fc" id="L37">            source(Objects.requireNonNull(assumption, &quot;assumption&quot;));</span>
+<span class="fc" id="L38">            admitted.add(assumption);</span>
+<span class="fc" id="L39">        }</span>
+<span class="fc" id="L40">        charge(admitted.size());</span>
+<span class="fc" id="L41">        return List.copyOf(admitted);</span>
+    }
+
+    void cells(long count) {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (work != null) {</span>
+<span class="fc" id="L46">            work.cells(count);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (count &gt; 4096) throw new CertificateWork.Stop(&quot;RATIONAL_STATE_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L49">    }</span>
+
+    Polynomial checked(Polynomial value) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (work == null) return value;</span>
+<span class="fc" id="L53">        cells(value.termCount());</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (value.termCount() &gt; MAX_TERMS || value.totalDegree() &gt; MAX_DEGREE)</span>
+<span class="nc" id="L55">            throw new CertificateWork.Stop(&quot;POLYNOMIAL_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L56">        bits(value);</span>
+<span class="fc" id="L57">        return value;</span>
+    }
+
+    private int bits(Polynomial value) {
+<span class="fc" id="L61">        int maximum = 0;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (var coefficient : value.terms().values()) {</span>
+<span class="fc" id="L63">            charge(1);</span>
+<span class="fc" id="L64">            int n = Math.max(coefficient.numerator().abs().bitLength(), coefficient.denominator().bitLength());</span>
+<span class="fc" id="L65">            requireBits(n);</span>
+<span class="fc" id="L66">            charge(1L + n / Long.SIZE);</span>
+<span class="fc" id="L67">            maximum = Math.max(maximum, n);</span>
+<span class="fc" id="L68">        }</span>
+<span class="fc" id="L69">        return maximum;</span>
+    }
+
+    private void requireBits(long n) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (n &gt; MAX_BITS) throw new CertificateWork.Stop(&quot;COEFFICIENT_BIT_LIMIT&quot;);</span>
+<span class="fc" id="L74">    }</span>
+
+    Polynomial add(Polynomial left, Polynomial right, boolean subtract) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (work != null) {</span>
+<span class="fc" id="L78">            charge(1L + left.termCount() + right.termCount());</span>
+<span class="fc" id="L79">            cells((long) left.termCount() + right.termCount());</span>
+<span class="fc" id="L80">            requireBits((long) bits(left) + bits(right) + 1);</span>
+        }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        return checked(subtract ? left.subtract(right) : left.add(right));</span>
+    }
+
+    Polynomial multiply(Polynomial left, Polynomial right) {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (work != null) {</span>
+<span class="fc" id="L87">            long products = (long) left.termCount() * right.termCount();</span>
+<span class="fc" id="L88">            charge(1 + products);</span>
+<span class="fc" id="L89">            cells(products);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if ((long) left.totalDegree() + right.totalDegree() &gt; MAX_DEGREE)</span>
+<span class="nc" id="L91">                throw new CertificateWork.Stop(&quot;POLYNOMIAL_DEGREE_LIMIT&quot;);</span>
+<span class="fc" id="L92">            requireBits(Math.max(1, Math.min(left.termCount(), right.termCount()))</span>
+<span class="fc" id="L93">                * (1L + bits(left) + bits(right)));</span>
+        }
+<span class="fc" id="L95">        return checked(left.multiply(right));</span>
+    }
+
+    Polynomial power(Polynomial base, int exponent) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (work == null) return base.pow(exponent);</span>
+<span class="fc" id="L100">        Polynomial result = Polynomial.constant(Rational.ONE);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        while (exponent != 0) {</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if ((exponent &amp; 1) != 0) result = multiply(result, base);</span>
+<span class="fc" id="L103">            exponent &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (exponent != 0) base = multiply(base, base);</span>
+        }
+<span class="fc" id="L106">        return result;</span>
+    }
+
+    Polynomial monic(Polynomial value) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (work == null) return value.monic(new GradedReverseLexOrder());</span>
+<span class="fc" id="L111">        checked(value);</span>
+<span class="fc" id="L112">        charge(value.termCount());</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (value.isZero()) return value;</span>
+<span class="fc" id="L114">        var leading = value.leadingTerm(new GradedReverseLexOrder()).orElseThrow().coefficient();</span>
+<span class="fc" id="L115">        return multiply(value, Polynomial.constant(Rational.ONE.divide(leading)));</span>
+    }
+
+    String text(Polynomial value) {
+<span class="fc" id="L119">        checked(value);</span>
+<span class="fc" id="L120">        charge(1L + value.termCount() * (1L + value.totalDegree()));</span>
+<span class="fc" id="L121">        return value.toCanonicalString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteConstraintSdk.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.combinatorics</a> &gt; <span class="el_source">FiniteConstraintSdk.java</span></div><h1>FiniteConstraintSdk.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.combinatorics;
 
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCnf;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCnfVerifier;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanLearning;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanner;
@@ -15,31 +17,77 @@ public final class FiniteConstraintSdk {
 
     public static FiniteConstraintCounter.Result count(FiniteConstraintCounter.Problem problem,
             OptimizationBudget budget, CancellationToken cancellation) {
-<span class="fc" id="L18">        return FiniteConstraintCounter.count(problem, limits(budget), cancellation::isCancelled);</span>
+<span class="fc" id="L20">        return FiniteConstraintCounter.count(problem, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static FiniteConstraintCounter.Result count(FiniteConstraintCounter.Problem problem,
             FiniteConstraintPlanner.Strategy strategy, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="fc" id="L23">        return FiniteConstraintCounter.count(problem, strategy, limits(budget), cancellation::isCancelled);</span>
+<span class="fc" id="L25">        return FiniteConstraintCounter.count(problem, strategy, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static FiniteConstraintCounter.Result countIndexed(FiniteConstraintCounter.Problem problem,
+            FiniteConstraintPlanner.Strategy strategy, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L30">        return FiniteConstraintCounter.countIndexed(problem, strategy, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static FiniteConstraintCnf.Lowering lowerCnf(FiniteConstraintCnf.Source source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L35">        return FiniteConstraintCnf.lower(source, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static FiniteConstraintVerifier.Verification verifyCnfLowering(FiniteConstraintCnf.Source source,
+            FiniteConstraintCounter.Problem problem, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L40">        return FiniteConstraintCnfVerifier.verifyLowering(source, problem, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static FiniteConstraintCnf.Result countCnf(FiniteConstraintCnf.Source source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L45">        return FiniteConstraintCnf.count(source, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static FiniteConstraintVerifier.Verification verifyCnf(FiniteConstraintCnf.Source source,
+            FiniteConstraintCnf.Certificate certificate, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L50">        return FiniteConstraintCnf.verify(source, certificate, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static FiniteConstraintPlanLearning.Training train(List&lt;FiniteConstraintPlanLearning.Example&gt; examples,
             OptimizationBudget budget, long perTrialWork, CancellationToken cancellation) {
-<span class="fc" id="L28">        return FiniteConstraintPlanLearning.train(examples, limits(budget), perTrialWork, cancellation::isCancelled);</span>
+<span class="fc" id="L55">        return FiniteConstraintPlanLearning.train(examples, limits(budget), perTrialWork, cancellation::isCancelled);</span>
     }
 
     public static FiniteConstraintPlanLearning.Evaluation count(FiniteConstraintPlanLearning.Model model,
             FiniteConstraintCounter.Problem problem, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="fc" id="L33">        return FiniteConstraintPlanLearning.count(model, problem, limits(budget), cancellation::isCancelled);</span>
+<span class="fc" id="L60">        return FiniteConstraintPlanLearning.count(model, problem, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static FiniteConstraintVerifier.Verification verify(FiniteConstraintCounter.Problem problem,
             FiniteConstraintCounter.Certificate certificate, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="fc" id="L38">        return FiniteConstraintVerifier.verify(problem, certificate, limits(budget), cancellation::isCancelled);</span>
+<span class="fc" id="L65">        return FiniteConstraintVerifier.verify(problem, certificate, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    /** Count with a costed learned-order probe and a fixed min-degree fallback. */
+    public static de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Decision&lt;
+            FiniteConstraintPlanLearning.Size, FiniteConstraintCounter.Result&gt; countWithPolicy(
+            java.util.Optional&lt;FiniteConstraintPlanLearning.Model&gt; model, FiniteConstraintCounter.Problem problem,
+            long expectedUses, long maximumProbeWork, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        long probe = budget.maximumCandidates() == 1 ? Math.min(0, maximumProbeWork) : maximumProbeWork;</span>
+<span class="fc" id="L74">        return FiniteConstraintPlanLearning.countWithPolicy(model, problem, expectedUses, probe,</span>
+<span class="fc" id="L75">            limits(budget), cancellation::isCancelled);</span>
+    }
+
+    /** Compare with the caller's explicitly selected fixed elimination policy. */
+    public static de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Decision&lt;
+            FiniteConstraintPlanLearning.Size, FiniteConstraintCounter.Result&gt; countWithPolicy(
+            java.util.Optional&lt;FiniteConstraintPlanLearning.Model&gt; model, FiniteConstraintCounter.Problem problem,
+            FiniteConstraintPlanner.Strategy fixedControl, long expectedUses, long maximumProbeWork,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        long probe = budget.maximumCandidates() == 1 ? Math.min(0, maximumProbeWork) : maximumProbeWork;</span>
+<span class="nc" id="L85">        return FiniteConstraintPlanLearning.countWithPolicy(model, problem, fixedControl, expectedUses, probe,</span>
+<span class="nc" id="L86">            limits(budget), cancellation::isCancelled);</span>
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="fc" id="L42">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L90">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -5,6 +5,8 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.equivalence.RationalFunctionPlanner;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.parse.ExpressionParser;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -16,236 +18,271 @@ import java.util.Map;
 
 /** Explicit rational-polynomial projection; never an IEEE equivalence claim. */
 public final class FpcorePolynomialCorpus {
-<span class="fc" id="L19">    public enum Status { SUPPORTED, UNSUPPORTED }</span>
-<span class="fc" id="L20">    public record Entry(int ordinal, String name, String source, Status status, String detail) { }</span>
+<span class="fc" id="L21">    public enum Status { SUPPORTED, UNSUPPORTED }</span>
+<span class="fc" id="L22">    public record Entry(int ordinal, String name, String source, Status status, String detail) { }</span>
     private FpcorePolynomialCorpus() { }
 
     /** Every top-level program produces a row, including unsupported bodies. */
     public static List&lt;Entry&gt; read(String text) {
-<span class="fc" id="L25">        var parser = new Reader(text);</span>
-<span class="fc" id="L26">        var entries = new ArrayList&lt;Entry&gt;();</span>
-<span class="fc bfc" id="L27" title="All 2 branches covered.">        while (parser.hasNext()) {</span>
-<span class="fc" id="L28">            Form program = form(parser.read(0));</span>
-<span class="pc bpc" id="L29" title="2 of 4 branches missed.">            if (program.values().size() &lt; 3 || !atom(program.values().getFirst()).equals(&quot;FPCore&quot;)) {</span>
-<span class="nc" id="L30">                throw new IllegalArgumentException(&quot;expected a complete FPCore program&quot;);</span>
-            }
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            int variablesAt = program.values().get(1) instanceof Form ? 1 : 2;</span>
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            String name = variablesAt == 2 ? atom(program.values().get(1)) : &quot;program-&quot; + (entries.size() + 1);</span>
-<span class="fc bfc" id="L34" title="All 2 branches covered.">            for (int index = variablesAt + 1; index &lt; program.values().size() - 1; index += 2) {</span>
-<span class="pc bpc" id="L35" title="1 of 2 branches missed.">                if (index + 1 &gt;= program.values().size() - 1) throw new IllegalArgumentException(&quot;unpaired FPCore metadata&quot;);</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">                if (atom(program.values().get(index)).equals(&quot;:name&quot;)) name = atom(program.values().get(index + 1));</span>
-            }
-<span class="fc" id="L38">            int ordinal = entries.size() + 1;</span>
-            try {
-<span class="fc" id="L40">                Form variables = form(program.values().get(variablesAt));</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">                if (variables.values().size() &gt; 4) throw new IllegalArgumentException(&quot;VARIABLE_LIMIT&quot;);</span>
-<span class="fc" id="L42">                var environment = new LinkedHashMap&lt;String, String&gt;();</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">                for (Node variable : variables.values()) {</span>
-<span class="fc" id="L44">                    String symbol = atom(variable);</span>
-<span class="pc bpc" id="L45" title="2 of 4 branches missed.">                    if (!symbol.matches(&quot;[A-Za-z][A-Za-z0-9_]*&quot;) || environment.putIfAbsent(symbol, symbol) != null) {</span>
-<span class="nc" id="L46">                        throw new IllegalArgumentException(&quot;VARIABLE_DECLARATION_UNSUPPORTED&quot;);</span>
-                    }
-<span class="fc" id="L48">                }</span>
-<span class="fc" id="L49">                String source = expand(program.values().getLast(), environment);</span>
-<span class="fc" id="L50">                var parsed = new ExpressionParser().parseExactTerm(source);</span>
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                if (nodes(parsed.expression()) &gt; 256) throw new IllegalArgumentException(&quot;AST_NODE_LIMIT&quot;);</span>
-<span class="fc" id="L52">                new ExactPolynomialAnalysis().normalForm(source);</span>
-<span class="fc" id="L53">                entries.add(new Entry(ordinal, name, source, Status.SUPPORTED, &quot;EXACT_RATIONAL_PROJECTION&quot;));</span>
-<span class="fc" id="L54">            } catch (IllegalArgumentException | ArithmeticException unsupported) {</span>
-<span class="fc" id="L55">                entries.add(new Entry(ordinal, name, &quot;&quot;, Status.UNSUPPORTED,</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">                    unsupported.getMessage() == null ? unsupported.getClass().getSimpleName() : unsupported.getMessage()));</span>
-<span class="fc" id="L57">            }</span>
-<span class="fc" id="L58">        }</span>
-<span class="fc" id="L59">        return List.copyOf(entries);</span>
+<span class="fc" id="L27">        return read(text, false);</span>
     }
+
+    /** Separate bounded rational-domain projection; historical polynomial admission is unchanged. */
+    public static List&lt;Entry&gt; readRational(String text) {
+<span class="fc" id="L32">        return read(text, true);</span>
+    }
+
+    private static List&lt;Entry&gt; read(String text, boolean rational) {
+<span class="fc" id="L36">        var parser = new Reader(text);</span>
+<span class="fc" id="L37">        var entries = new ArrayList&lt;Entry&gt;();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        while (parser.hasNext()) {</span>
+<span class="fc" id="L39">            entries.add(readProgram(form(parser.read(0)), entries.size() + 1, rational));</span>
+        }
+<span class="fc" id="L41">        return List.copyOf(entries);</span>
+    }
+
+    private static Entry readProgram(Form program, int ordinal, boolean rational) {
+<span class="fc" id="L45">        var values = program.values();</span>
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (values.size() &lt; 3 || !atom(values.getFirst()).equals(&quot;FPCore&quot;)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;expected a complete FPCore program&quot;);</span>
+        }
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        int variablesAt = values.get(1) instanceof Form ? 1 : 2;</span>
+<span class="fc" id="L50">        String name = programName(values, variablesAt, ordinal);</span>
+        try {
+<span class="fc" id="L52">            var environment = variableEnvironment(form(values.get(variablesAt)));</span>
+<span class="fc" id="L53">            String source = expand(values.getLast(), environment, rational);</span>
+<span class="fc" id="L54">            validateProjection(source, rational);</span>
+<span class="fc" id="L55">            return new Entry(ordinal, name, source, Status.SUPPORTED,</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                rational ? &quot;EXACT_RATIONAL_DOMAIN_PROJECTION&quot; : &quot;EXACT_RATIONAL_PROJECTION&quot;);</span>
+<span class="fc" id="L57">        } catch (IllegalArgumentException | ArithmeticException unsupported) {</span>
+<span class="fc" id="L58">            String detail = unsupported.getMessage();</span>
+<span class="fc" id="L59">            return new Entry(ordinal, name, &quot;&quot;, Status.UNSUPPORTED,</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">                detail == null ? unsupported.getClass().getSimpleName() : detail);</span>
+        }
+    }
+
+    private static String programName(List&lt;Node&gt; values, int variablesAt, int ordinal) {
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        String name = variablesAt == 2 ? atom(values.get(1)) : &quot;program-&quot; + ordinal;</span>
+<span class="fc" id="L66">        int bodyAt = values.size() - 1;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (int index = variablesAt + 1; index &lt; bodyAt; index += 2) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (index + 1 &gt;= bodyAt) throw new IllegalArgumentException(&quot;unpaired FPCore metadata&quot;);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (atom(values.get(index)).equals(&quot;:name&quot;)) name = atom(values.get(index + 1));</span>
+        }
+<span class="fc" id="L71">        return name;</span>
+    }
+
+    private static Map&lt;String, String&gt; variableEnvironment(Form variables) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (variables.values().size() &gt; 4) throw new IllegalArgumentException(&quot;VARIABLE_LIMIT&quot;);</span>
+<span class="fc" id="L76">        var environment = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (Node variable : variables.values()) {</span>
+<span class="fc" id="L78">            String symbol = atom(variable);</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">            if (!symbol.matches(&quot;[A-Za-z][A-Za-z0-9_]*&quot;) || environment.putIfAbsent(symbol, symbol) != null) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(&quot;VARIABLE_DECLARATION_UNSUPPORTED&quot;);</span>
+            }
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        return environment;</span>
+    }
+
+    private static void validateProjection(String source, boolean rational) {
+<span class="fc" id="L87">        var parsed = new ExpressionParser().parseExactTerm(source);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (nodes(parsed.expression()) &gt; 256) throw new IllegalArgumentException(&quot;AST_NODE_LIMIT&quot;);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (rational) {</span>
+<span class="fc" id="L90">            var admitted = RationalFunctionPlanner.simplify(source, List.of(),</span>
+<span class="fc" id="L91">                new IterationLimits(2_000_000, 20_000, 5_000), () -&gt; false);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (admitted.status() == RationalFunctionPlanner.Status.UNAVAILABLE)</span>
+<span class="fc" id="L93">                throw new IllegalArgumentException(admitted.reason());</span>
+<span class="fc" id="L94">        } else {</span>
+<span class="fc" id="L95">            new ExactPolynomialAnalysis().normalForm(source);</span>
+        }
+<span class="fc" id="L97">    }</span>
 
     /** The bridge receives only the selected source; it does not receive corpus metadata. */
     public static String toPrefix(String source) {
-<span class="fc" id="L64">        var parsed = new ExpressionParser().parseExactTerm(source);</span>
-<span class="fc" id="L65">        return prefix(parsed.expression(), parsed);</span>
+<span class="fc" id="L101">        var parsed = new ExpressionParser().parseExactTerm(source);</span>
+<span class="fc" id="L102">        return prefix(parsed.expression(), parsed);</span>
     }
 
     public static String fromPrefix(String source) {
-<span class="fc" id="L69">        var reader = new Reader(source);</span>
-<span class="fc" id="L70">        Node node = reader.read(0);</span>
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (reader.hasNext()) throw new IllegalArgumentException(&quot;trailing peer expression&quot;);</span>
-<span class="fc" id="L72">        var variables = new HashMap&lt;String, String&gt;();</span>
-<span class="fc" id="L73">        collectVariables(node, variables);</span>
-<span class="fc" id="L74">        return expand(node, variables);</span>
+<span class="fc" id="L106">        var reader = new Reader(source);</span>
+<span class="fc" id="L107">        Node node = reader.read(0);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (reader.hasNext()) throw new IllegalArgumentException(&quot;trailing peer expression&quot;);</span>
+<span class="fc" id="L109">        var variables = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L110">        collectVariables(node, variables);</span>
+<span class="fc" id="L111">        return expand(node, variables, false);</span>
     }
 
     private static void collectVariables(Node node, Map&lt;String, String&gt; result) {
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (node instanceof Atom value) {</span>
-<span class="fc bfc" id="L79" title="All 4 branches covered.">            if (!value.quoted() &amp;&amp; value.value().matches(&quot;[A-Za-z][A-Za-z0-9_]*&quot;)) result.put(value.value(), value.value());</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (node instanceof Atom value) {</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">            if (!value.quoted() &amp;&amp; value.value().matches(&quot;[A-Za-z][A-Za-z0-9_]*&quot;)) result.put(value.value(), value.value());</span>
         } else {
-<span class="fc" id="L81">            var children = form(node).values();</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int i = 1; i &lt; children.size(); i++) collectVariables(children.get(i), result);</span>
+<span class="fc" id="L118">            var children = form(node).values();</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            for (int i = 1; i &lt; children.size(); i++) collectVariables(children.get(i), result);</span>
         }
-<span class="fc" id="L84">    }</span>
+<span class="fc" id="L121">    }</span>
 
     private static String prefix(Expr expression, de.regelsuche.parse.ExactParsedTerm parsed) {
-<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) return variable.name();</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L89">            var value = parsed.literalFor(number).map(de.regelsuche.parse.ExactParsedTerm.LiteralOccurrence::exactValue)</span>
-<span class="fc" id="L90">                .orElse(de.regelsuche.scalar.ExactRational.ZERO);</span>
-<span class="fc" id="L91">            return value.toString();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) return variable.name();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L126">            var value = parsed.literalFor(number).map(de.regelsuche.parse.ExactParsedTerm.LiteralOccurrence::exactValue)</span>
+<span class="fc" id="L127">                .orElse(de.regelsuche.scalar.ExactRational.ZERO);</span>
+<span class="fc" id="L128">            return value.toString();</span>
         }
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc bfc" id="L94" title="All 5 branches covered.">            String operator = switch (binary.operator()) {</span>
-<span class="fc" id="L95">                case ADD -&gt; &quot;+&quot;; case SUB -&gt; &quot;-&quot;; case MUL -&gt; &quot;*&quot;; case DIV -&gt; &quot;/&quot;;</span>
-<span class="fc" id="L96">                default -&gt; throw new IllegalArgumentException(&quot;peer operator unsupported&quot;);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L131" title="All 5 branches covered.">            String operator = switch (binary.operator()) {</span>
+<span class="fc" id="L132">                case ADD -&gt; &quot;+&quot;; case SUB -&gt; &quot;-&quot;; case MUL -&gt; &quot;*&quot;; case DIV -&gt; &quot;/&quot;;</span>
+<span class="fc" id="L133">                default -&gt; throw new IllegalArgumentException(&quot;peer operator unsupported&quot;);</span>
             };
-<span class="fc" id="L98">            return &quot;(&quot; + operator + &quot; &quot; + prefix(binary.left(), parsed) + &quot; &quot; + prefix(binary.right(), parsed) + &quot;)&quot;;</span>
+<span class="fc" id="L135">            return &quot;(&quot; + operator + &quot; &quot; + prefix(binary.left(), parsed) + &quot; &quot; + prefix(binary.right(), parsed) + &quot;)&quot;;</span>
         }
-<span class="nc" id="L100">        throw new IllegalArgumentException(&quot;peer expression unsupported&quot;);</span>
+<span class="nc" id="L137">        throw new IllegalArgumentException(&quot;peer expression unsupported&quot;);</span>
     }
 
     private static int nodes(Expr expression) {
-<span class="fc bfc" id="L104" title="All 2 branches covered.">        return expression instanceof BinaryExpr binary ? 1 + nodes(binary.left()) + nodes(binary.right()) : 1;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        return expression instanceof BinaryExpr binary ? 1 + nodes(binary.left()) + nodes(binary.right()) : 1;</span>
     }
 
-    private static String expand(Node node, Map&lt;String, String&gt; environment) {
-<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (node instanceof Atom value) {</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (value.quoted()) throw new IllegalArgumentException(&quot;STRING_EXPRESSION_UNSUPPORTED&quot;);</span>
-<span class="fc" id="L110">            String bound = environment.get(value.value());</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (bound != null) return bound;</span>
-<span class="fc" id="L112">            return number(value.value());</span>
+    private static String expand(Node node, Map&lt;String, String&gt; environment, boolean rational) {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (node instanceof Atom value) {</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (value.quoted()) throw new IllegalArgumentException(&quot;STRING_EXPRESSION_UNSUPPORTED&quot;);</span>
+<span class="fc" id="L147">            String bound = environment.get(value.value());</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (bound != null) return bound;</span>
+<span class="fc" id="L149">            return number(value.value());</span>
         }
-<span class="fc" id="L114">        List&lt;Node&gt; values = form(node).values();</span>
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (values.isEmpty()) throw new IllegalArgumentException(&quot;EMPTY_EXPRESSION&quot;);</span>
-<span class="fc" id="L116">        String operator = atom(values.getFirst());</span>
-<span class="fc bfc" id="L117" title="All 4 branches covered.">        if (operator.equals(&quot;let&quot;) || operator.equals(&quot;let*&quot;)) {</span>
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (values.size() != 3) throw new IllegalArgumentException(&quot;LET_ARITY&quot;);</span>
-<span class="fc" id="L119">            var nested = new HashMap&lt;&gt;(environment);</span>
-<span class="fc" id="L120">            var names = new java.util.HashSet&lt;String&gt;();</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (Node binding : form(values.get(1)).values()) {</span>
-<span class="fc" id="L122">                var pair = form(binding).values();</span>
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                if (pair.size() != 2) throw new IllegalArgumentException(&quot;BINDING_ARITY&quot;);</span>
-<span class="fc" id="L124">                String name = atom(pair.getFirst());</span>
-<span class="pc bpc" id="L125" title="2 of 4 branches missed.">                if (!name.matches(&quot;[A-Za-z][A-Za-z0-9_*]*&quot;) || !names.add(name)) {</span>
-<span class="nc" id="L126">                    throw new IllegalArgumentException(&quot;BINDING_NAME&quot;);</span>
+<span class="fc" id="L151">        List&lt;Node&gt; values = form(node).values();</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (values.isEmpty()) throw new IllegalArgumentException(&quot;EMPTY_EXPRESSION&quot;);</span>
+<span class="fc" id="L153">        String operator = atom(values.getFirst());</span>
+<span class="fc bfc" id="L154" title="All 4 branches covered.">        if (operator.equals(&quot;let&quot;) || operator.equals(&quot;let*&quot;)) {</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (values.size() != 3) throw new IllegalArgumentException(&quot;LET_ARITY&quot;);</span>
+<span class="fc" id="L156">            var nested = new HashMap&lt;&gt;(environment);</span>
+<span class="fc" id="L157">            var names = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            for (Node binding : form(values.get(1)).values()) {</span>
+<span class="fc" id="L159">                var pair = form(binding).values();</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                if (pair.size() != 2) throw new IllegalArgumentException(&quot;BINDING_ARITY&quot;);</span>
+<span class="fc" id="L161">                String name = atom(pair.getFirst());</span>
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">                if (!name.matches(&quot;[A-Za-z][A-Za-z0-9_*]*&quot;) || !names.add(name)) {</span>
+<span class="nc" id="L163">                    throw new IllegalArgumentException(&quot;BINDING_NAME&quot;);</span>
                 }
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                nested.put(name, expand(pair.get(1), operator.equals(&quot;let*&quot;) ? nested : environment));</span>
-<span class="fc" id="L129">            }</span>
-<span class="fc" id="L130">            return expand(values.get(2), nested);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                nested.put(name, expand(pair.get(1), operator.equals(&quot;let*&quot;) ? nested : environment, rational));</span>
+<span class="fc" id="L166">            }</span>
+<span class="fc" id="L167">            return expand(values.get(2), nested, rational);</span>
         }
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (!List.of(&quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;/&quot;, &quot;~&quot;).contains(operator)) {</span>
-<span class="fc" id="L133">            throw new IllegalArgumentException(&quot;OPERATOR_UNSUPPORTED:&quot; + operator);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (!List.of(&quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;/&quot;, &quot;~&quot;).contains(operator)) {</span>
+<span class="fc" id="L170">            throw new IllegalArgumentException(&quot;OPERATOR_UNSUPPORTED:&quot; + operator);</span>
         }
-<span class="pc bpc" id="L135" title="1 of 6 branches missed.">        if ((operator.equals(&quot;-&quot;) || operator.equals(&quot;~&quot;)) &amp;&amp; values.size() == 2) {</span>
-<span class="fc" id="L136">            return bounded(&quot;(-&quot; + expand(values.get(1), environment) + &quot;)&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 6 branches missed.">        if ((operator.equals(&quot;-&quot;) || operator.equals(&quot;~&quot;)) &amp;&amp; values.size() == 2) {</span>
+<span class="fc" id="L173">            return bounded(&quot;(-&quot; + expand(values.get(1), environment, rational) + &quot;)&quot;);</span>
         }
-<span class="pc bpc" id="L138" title="2 of 4 branches missed.">        if (values.size() != 3 || operator.equals(&quot;~&quot;)) throw new IllegalArgumentException(&quot;OPERATOR_ARITY&quot;);</span>
-<span class="fc" id="L139">        String left = expand(values.get(1), environment);</span>
-<span class="fc" id="L140">        String right = expand(values.get(2), environment);</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (operator.equals(&quot;/&quot;)) {</span>
-<span class="fc" id="L142">            Expr denominator = new ExpressionParser().parseExactTerm(right).expression();</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (hasVariable(denominator)) throw new IllegalArgumentException(&quot;VARIABLE_DENOMINATOR&quot;);</span>
-<span class="fc" id="L144">            new ExactPolynomialAnalysis().normalForm(&quot;1/(&quot; + right + &quot;)&quot;);</span>
+<span class="pc bpc" id="L175" title="2 of 4 branches missed.">        if (values.size() != 3 || operator.equals(&quot;~&quot;)) throw new IllegalArgumentException(&quot;OPERATOR_ARITY&quot;);</span>
+<span class="fc" id="L176">        String left = expand(values.get(1), environment, rational);</span>
+<span class="fc" id="L177">        String right = expand(values.get(2), environment, rational);</span>
+<span class="fc bfc" id="L178" title="All 4 branches covered.">        if (operator.equals(&quot;/&quot;) &amp;&amp; !rational) {</span>
+<span class="fc" id="L179">            Expr denominator = new ExpressionParser().parseExactTerm(right).expression();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (hasVariable(denominator)) throw new IllegalArgumentException(&quot;VARIABLE_DENOMINATOR&quot;);</span>
+<span class="fc" id="L181">            new ExactPolynomialAnalysis().normalForm(&quot;1/(&quot; + right + &quot;)&quot;);</span>
         }
-<span class="fc" id="L146">        return bounded(&quot;(&quot; + left + operator + right + &quot;)&quot;);</span>
+<span class="fc" id="L183">        return bounded(&quot;(&quot; + left + operator + right + &quot;)&quot;);</span>
     }
 
     private static boolean hasVariable(Expr expression) {
-<span class="fc bfc" id="L150" title="All 4 branches covered.">        return expression instanceof VariableExpr || expression instanceof BinaryExpr binary</span>
-<span class="fc bfc" id="L151" title="All 4 branches covered.">            &amp;&amp; (hasVariable(binary.left()) || hasVariable(binary.right()));</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">        return expression instanceof VariableExpr || expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">            &amp;&amp; (hasVariable(binary.left()) || hasVariable(binary.right()));</span>
     }
 
     private static String number(String token) {
-<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (token.length() &gt; 96) throw new IllegalArgumentException(&quot;LITERAL_LENGTH_LIMIT&quot;);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (token.length() &gt; 96) throw new IllegalArgumentException(&quot;LITERAL_LENGTH_LIMIT&quot;);</span>
         BigInteger numerator;
         BigInteger denominator;
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (token.matches(&quot;-?[0-9]+/[0-9]+&quot;)) {</span>
-<span class="fc" id="L159">            String[] pieces = token.split(&quot;/&quot;, -1);</span>
-<span class="fc" id="L160">            numerator = new BigInteger(pieces[0]); denominator = new BigInteger(pieces[1]);</span>
-<span class="fc" id="L161">        } else {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (token.matches(&quot;-?[0-9]+/[0-9]+&quot;)) {</span>
+<span class="fc" id="L196">            String[] pieces = token.split(&quot;/&quot;, -1);</span>
+<span class="fc" id="L197">            numerator = new BigInteger(pieces[0]); denominator = new BigInteger(pieces[1]);</span>
+<span class="fc" id="L198">        } else {</span>
             BigDecimal value;
-<span class="fc" id="L163">            try { value = new BigDecimal(token); }</span>
-<span class="fc" id="L164">            catch (NumberFormatException unsupported) { throw new IllegalArgumentException(&quot;UNBOUND_OR_UNSUPPORTED_ATOM:&quot; + token); }</span>
-<span class="pc bpc" id="L165" title="2 of 4 branches missed.">            if (Math.abs((long) value.scale()) &gt; 100 || value.precision() &gt; 64) {</span>
-<span class="nc" id="L166">                throw new IllegalArgumentException(&quot;LITERAL_SCALE_LIMIT&quot;);</span>
+<span class="fc" id="L200">            try { value = new BigDecimal(token); }</span>
+<span class="fc" id="L201">            catch (NumberFormatException unsupported) { throw new IllegalArgumentException(&quot;UNBOUND_OR_UNSUPPORTED_ATOM:&quot; + token); }</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">            if (Math.abs((long) value.scale()) &gt; 100 || value.precision() &gt; 64) {</span>
+<span class="nc" id="L203">                throw new IllegalArgumentException(&quot;LITERAL_SCALE_LIMIT&quot;);</span>
             }
-<span class="fc" id="L168">            numerator = value.unscaledValue();</span>
-<span class="fc" id="L169">            denominator = BigInteger.TEN.pow(Math.max(0, value.scale()));</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (value.scale() &lt; 0) numerator = numerator.multiply(BigInteger.TEN.pow(-value.scale()));</span>
+<span class="fc" id="L205">            numerator = value.unscaledValue();</span>
+<span class="fc" id="L206">            denominator = BigInteger.TEN.pow(Math.max(0, value.scale()));</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (value.scale() &lt; 0) numerator = numerator.multiply(BigInteger.TEN.pow(-value.scale()));</span>
         }
-<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (denominator.signum() == 0) throw new IllegalArgumentException(&quot;ZERO_DENOMINATOR&quot;);</span>
-<span class="fc" id="L173">        BigInteger divisor = numerator.gcd(denominator);</span>
-<span class="fc" id="L174">        numerator = numerator.divide(divisor); denominator = denominator.divide(divisor);</span>
-<span class="fc" id="L175">        requireWorkerLiteral(numerator); requireWorkerLiteral(denominator);</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        return denominator.equals(BigInteger.ONE) ? numerator.toString() : &quot;(&quot; + numerator + &quot;/&quot; + denominator + &quot;)&quot;;</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (denominator.signum() == 0) throw new IllegalArgumentException(&quot;ZERO_DENOMINATOR&quot;);</span>
+<span class="fc" id="L210">        BigInteger divisor = numerator.gcd(denominator);</span>
+<span class="fc" id="L211">        numerator = numerator.divide(divisor); denominator = denominator.divide(divisor);</span>
+<span class="fc" id="L212">        requireWorkerLiteral(numerator); requireWorkerLiteral(denominator);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        return denominator.equals(BigInteger.ONE) ? numerator.toString() : &quot;(&quot; + numerator + &quot;/&quot; + denominator + &quot;)&quot;;</span>
     }
 
     private static void requireWorkerLiteral(BigInteger integer) {
-<span class="fc" id="L180">        BigInteger magnitude = integer.abs();</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (magnitude.bitLength() &gt; 63) {</span>
-<span class="fc" id="L182">            throw new IllegalArgumentException(&quot;LITERAL_NOT_EXACT_IN_BOTH_WORKER_BRIDGES&quot;);</span>
+<span class="fc" id="L217">        BigInteger magnitude = integer.abs();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (magnitude.bitLength() &gt; 63) {</span>
+<span class="fc" id="L219">            throw new IllegalArgumentException(&quot;LITERAL_NOT_EXACT_IN_BOTH_WORKER_BRIDGES&quot;);</span>
         }
-<span class="fc" id="L184">    }</span>
+<span class="fc" id="L221">    }</span>
 
     private static String bounded(String source) {
-<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (source.length() &gt; 2048) throw new IllegalArgumentException(&quot;SOURCE_LENGTH_LIMIT&quot;);</span>
-<span class="fc" id="L188">        return source;</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (source.length() &gt; 2048) throw new IllegalArgumentException(&quot;SOURCE_LENGTH_LIMIT&quot;);</span>
+<span class="fc" id="L225">        return source;</span>
     }
 
     private sealed interface Node permits Atom, Form { }
-<span class="fc" id="L192">    private record Atom(String value, boolean quoted) implements Node { }</span>
-<span class="fc" id="L193">    private record Form(List&lt;Node&gt; values) implements Node { }</span>
+<span class="fc" id="L229">    private record Atom(String value, boolean quoted) implements Node { }</span>
+<span class="fc" id="L230">    private record Form(List&lt;Node&gt; values) implements Node { }</span>
     private static String atom(Node node) {
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (node instanceof Atom value) return value.value();</span>
-<span class="nc" id="L196">        throw new IllegalArgumentException(&quot;expected atom&quot;);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (node instanceof Atom value) return value.value();</span>
+<span class="nc" id="L233">        throw new IllegalArgumentException(&quot;expected atom&quot;);</span>
     }
     private static Form form(Node node) {
-<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (node instanceof Form value) return value;</span>
-<span class="nc" id="L200">        throw new IllegalArgumentException(&quot;expected list&quot;);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (node instanceof Form value) return value;</span>
+<span class="nc" id="L237">        throw new IllegalArgumentException(&quot;expected list&quot;);</span>
     }
 
     private static final class Reader {
         private final String text;
         private int at;
-<span class="fc" id="L206">        Reader(String text) {</span>
-<span class="pc bpc" id="L207" title="2 of 4 branches missed.">            if (text == null || text.length() &gt; 1_000_000) throw new IllegalArgumentException(&quot;document length limit&quot;);</span>
-<span class="fc" id="L208">            this.text = text;</span>
-<span class="fc" id="L209">        }</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">        boolean hasNext() { skip(); return at &lt; text.length(); }</span>
+<span class="fc" id="L243">        Reader(String text) {</span>
+<span class="pc bpc" id="L244" title="2 of 4 branches missed.">            if (text == null || text.length() &gt; 1_000_000) throw new IllegalArgumentException(&quot;document length limit&quot;);</span>
+<span class="fc" id="L245">            this.text = text;</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        boolean hasNext() { skip(); return at &lt; text.length(); }</span>
         Node read(int depth) {
-<span class="pc bpc" id="L212" title="2 of 4 branches missed.">            if (depth &gt; 128 || !hasNext()) throw new IllegalArgumentException(&quot;incomplete or excessively nested expression&quot;);</span>
-<span class="fc" id="L213">            char first = text.charAt(at++);</span>
-<span class="fc bfc" id="L214" title="All 4 branches covered.">            if (first == '(' || first == '[') {</span>
-<span class="fc bfc" id="L215" title="All 2 branches covered.">                char close = first == '(' ? ')' : ']';</span>
-<span class="fc" id="L216">                var children = new ArrayList&lt;Node&gt;();</span>
-<span class="fc bfc" id="L217" title="All 4 branches covered.">                while (hasNext() &amp;&amp; text.charAt(at) != close) children.add(read(depth + 1));</span>
-<span class="fc bfc" id="L218" title="All 2 branches covered.">                if (!hasNext()) throw new IllegalArgumentException(&quot;unclosed expression&quot;);</span>
-<span class="fc" id="L219">                at++;</span>
-<span class="fc" id="L220">                return new Form(List.copyOf(children));</span>
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">            if (depth &gt; 128 || !hasNext()) throw new IllegalArgumentException(&quot;incomplete or excessively nested expression&quot;);</span>
+<span class="fc" id="L250">            char first = text.charAt(at++);</span>
+<span class="fc bfc" id="L251" title="All 4 branches covered.">            if (first == '(' || first == '[') {</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                char close = first == '(' ? ')' : ']';</span>
+<span class="fc" id="L253">                var children = new ArrayList&lt;Node&gt;();</span>
+<span class="fc bfc" id="L254" title="All 4 branches covered.">                while (hasNext() &amp;&amp; text.charAt(at) != close) children.add(read(depth + 1));</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                if (!hasNext()) throw new IllegalArgumentException(&quot;unclosed expression&quot;);</span>
+<span class="fc" id="L256">                at++;</span>
+<span class="fc" id="L257">                return new Form(List.copyOf(children));</span>
             }
-<span class="pc bpc" id="L222" title="2 of 4 branches missed.">            if (first == ')' || first == ']') throw new IllegalArgumentException(&quot;unmatched delimiter&quot;);</span>
-<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (first == '&quot;') {</span>
-<span class="fc" id="L224">                var value = new StringBuilder();</span>
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                while (at &lt; text.length()) {</span>
-<span class="fc" id="L226">                    char next = text.charAt(at++);</span>
-<span class="fc bfc" id="L227" title="All 2 branches covered.">                    if (next == '&quot;') return new Atom(value.toString(), true);</span>
-<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                    if (next == '\\') {</span>
-<span class="nc bnc" id="L229" title="All 2 branches missed.">                        if (at == text.length()) break;</span>
-<span class="nc" id="L230">                        next = text.charAt(at++);</span>
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">            if (first == ')' || first == ']') throw new IllegalArgumentException(&quot;unmatched delimiter&quot;);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">            if (first == '&quot;') {</span>
+<span class="fc" id="L261">                var value = new StringBuilder();</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                while (at &lt; text.length()) {</span>
+<span class="fc" id="L263">                    char next = text.charAt(at++);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">                    if (next == '&quot;') return new Atom(value.toString(), true);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    if (next == '\\') {</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                        if (at == text.length()) break;</span>
+<span class="nc" id="L267">                        next = text.charAt(at++);</span>
                     }
-<span class="fc" id="L232">                    value.append(next);</span>
-<span class="fc" id="L233">                }</span>
-<span class="nc" id="L234">                throw new IllegalArgumentException(&quot;unclosed string&quot;);</span>
+<span class="fc" id="L269">                    value.append(next);</span>
+<span class="fc" id="L270">                }</span>
+<span class="nc" id="L271">                throw new IllegalArgumentException(&quot;unclosed string&quot;);</span>
             }
-<span class="fc" id="L236">            int start = at - 1;</span>
-<span class="fc bfc" id="L237" title="All 4 branches covered.">            while (at &lt; text.length() &amp;&amp; !Character.isWhitespace(text.charAt(at))</span>
-<span class="fc bfc" id="L238" title="All 2 branches covered.">                    &amp;&amp; &quot;()[];&quot;.indexOf(text.charAt(at)) &lt; 0) at++;</span>
-<span class="fc" id="L239">            return new Atom(text.substring(start, at), false);</span>
+<span class="fc" id="L273">            int start = at - 1;</span>
+<span class="fc bfc" id="L274" title="All 4 branches covered.">            while (at &lt; text.length() &amp;&amp; !Character.isWhitespace(text.charAt(at))</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                    &amp;&amp; &quot;()[];&quot;.indexOf(text.charAt(at)) &lt; 0) at++;</span>
+<span class="fc" id="L276">            return new Atom(text.substring(start, at), false);</span>
         }
         private void skip() {
-<span class="fc bfc" id="L242" title="All 2 branches covered.">            while (at &lt; text.length()) {</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">                if (Character.isWhitespace(text.charAt(at))) at++;</span>
-<span class="fc bfc" id="L244" title="All 2 branches covered.">                else if (text.charAt(at) == ';') {</span>
-<span class="pc bpc" id="L245" title="1 of 4 branches missed.">                    while (at &lt; text.length() &amp;&amp; text.charAt(at) != '\n') at++;</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            while (at &lt; text.length()) {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">                if (Character.isWhitespace(text.charAt(at))) at++;</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                else if (text.charAt(at) == ';') {</span>
+<span class="pc bpc" id="L282" title="1 of 4 branches missed.">                    while (at &lt; text.length() &amp;&amp; text.charAt(at) != '\n') at++;</span>
                 } else break;
             }
-<span class="fc" id="L248">        }</span>
+<span class="fc" id="L285">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

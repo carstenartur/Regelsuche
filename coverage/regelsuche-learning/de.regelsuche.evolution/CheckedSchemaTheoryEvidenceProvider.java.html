@@ -11,62 +11,63 @@ import java.util.Optional;
 <span class="fc" id="L11">public final class CheckedSchemaTheoryEvidenceProvider implements ExactTheoryEvidenceProvider,RetainedGraph.View {</span>
 <span class="fc" id="L12">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
     @Override public Optional&lt;ExactTheoryEvidence.Binding&gt; bind(Object value) {
-<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (value instanceof StructuralConstructionProvider.VerifiedConstruction construction)</span>
-<span class="fc" id="L15">            return Optional.of(construction.binding());</span>
-<span class="fc bfc" id="L16" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
-<span class="fc" id="L17">        Object[] pending = new Object[1];</span>
-<span class="fc" id="L18">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
-<span class="fc" id="L19">        Throwable primary = null;</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (value instanceof ResidualPlanProvider.Replayed replay) return Optional.of(replay.binding);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if (value instanceof StructuralConstructionProvider.VerifiedConstruction construction)</span>
+<span class="fc" id="L16">            return Optional.of(construction.binding());</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
+<span class="fc" id="L18">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L19">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
+<span class="fc" id="L20">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L21">            var binding = application.binding();</span>
-<span class="fc" id="L22">            pending[0] = binding;</span>
-<span class="fc" id="L23">            RetainedOperation.work(1);</span>
-<span class="fc" id="L24">            return RetainedOperation.produced(Optional.of(binding));</span>
-<span class="fc" id="L25">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L26">            primary = failure;</span>
-<span class="fc" id="L27">            observeFailure(failure);</span>
-<span class="fc" id="L28">            throw failure;</span>
+<span class="fc" id="L22">            var binding = application.binding();</span>
+<span class="fc" id="L23">            pending[0] = binding;</span>
+<span class="fc" id="L24">            RetainedOperation.work(1);</span>
+<span class="fc" id="L25">            return RetainedOperation.produced(Optional.of(binding));</span>
+<span class="fc" id="L26">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L27">            primary = failure;</span>
+<span class="fc" id="L28">            observeFailure(failure);</span>
+<span class="fc" id="L29">            throw failure;</span>
         } finally {
-<span class="fc" id="L30">            closeFrame(retained, primary);</span>
+<span class="fc" id="L31">            closeFrame(retained, primary);</span>
         }
     }
     @Override public Optional&lt;NativeExactTheoryEvidence.Binding&gt; bindNative(Object value) {
-<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
-<span class="fc" id="L35">        Object[] pending = new Object[1];</span>
-<span class="fc" id="L36">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
-<span class="fc" id="L37">        Throwable primary = null;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication application)) return Optional.empty();</span>
+<span class="fc" id="L36">        Object[] pending = new Object[1];</span>
+<span class="fc" id="L37">        var retained = RetainedOperation.retainCompleted(1, application, pending);</span>
+<span class="fc" id="L38">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L39">            var binding = application.nativeBinding();</span>
-<span class="fc" id="L40">            pending[0] = binding;</span>
-<span class="fc" id="L41">            RetainedOperation.work(1);</span>
-<span class="fc" id="L42">            return RetainedOperation.produced(Optional.of(binding));</span>
-<span class="fc" id="L43">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L44">            primary = failure;</span>
-<span class="fc" id="L45">            observeFailure(failure);</span>
-<span class="fc" id="L46">            throw failure;</span>
+<span class="fc" id="L40">            var binding = application.nativeBinding();</span>
+<span class="fc" id="L41">            pending[0] = binding;</span>
+<span class="fc" id="L42">            RetainedOperation.work(1);</span>
+<span class="fc" id="L43">            return RetainedOperation.produced(Optional.of(binding));</span>
+<span class="fc" id="L44">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L45">            primary = failure;</span>
+<span class="fc" id="L46">            observeFailure(failure);</span>
+<span class="fc" id="L47">            throw failure;</span>
         } finally {
-<span class="fc" id="L48">            closeFrame(retained, primary);</span>
+<span class="fc" id="L49">            closeFrame(retained, primary);</span>
         }
     }
 
     private static void observeFailure(Throwable failure) {
-<span class="fc" id="L53">        try { RetainedOperation.checkpoint(); }</span>
-<span class="nc" id="L54">        catch (RuntimeException | Error observation) {</span>
-<span class="nc bnc" id="L55" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
-<span class="fc" id="L56">        }</span>
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L54">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L55">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">    }</span>
 
     private static void closeFrame(RetainedOperation.Frame frame, Throwable primary) {
-<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (frame == null) return;</span>
-<span class="fc" id="L61">        try { frame.close(); }</span>
-<span class="fc" id="L62">        catch (RuntimeException | Error cleanup) {</span>
-<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L65">        }</span>
-<span class="fc" id="L66">    }</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (frame == null) return;</span>
+<span class="fc" id="L62">        try { frame.close(); }</span>
+<span class="fc" id="L63">        catch (RuntimeException | Error cleanup) {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">    }</span>
     @Override public Object exportNative(Object value) {
-<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if(!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication))throw new IllegalArgumentException(&quot;private checked application required&quot;);</span>
-<span class="fc" id="L69">        return value;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if(!(value instanceof CheckedLearnedSchemaModel.VerifiedApplication))throw new IllegalArgumentException(&quot;private checked application required&quot;);</span>
+<span class="fc" id="L70">        return value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

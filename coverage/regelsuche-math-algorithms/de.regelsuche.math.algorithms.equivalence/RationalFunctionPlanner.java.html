@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalFunctionPlanner.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">RationalFunctionPlanner.java</span></div><h1>RationalFunctionPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/**
+ * Source-bound rational simplification over the existing exact polynomial representation.
+ * Cancellation uses exact polynomial division by visible source divisors. The independent
+ * normal-form receiver re-parses both expressions and all assumptions before certification.
+ * A cancelled divisor remains a required condition of the original expression.
+ */
+public final class RationalFunctionPlanner {
+<span class="fc" id="L23">    private static final GradedReverseLexOrder ORDER = new GradedReverseLexOrder();</span>
+    private RationalFunctionPlanner() {}
+
+    public static Result simplify(String source, List&lt;String&gt; assumptions, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L28">        Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L29">        Objects.requireNonNull(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L30">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L31">        String candidate = source;</span>
+<span class="fc" id="L32">        List&lt;String&gt; conditions = List.of();</span>
+        try {
+<span class="fc" id="L34">            work.charge(0);</span>
+<span class="fc" id="L35">            var producer = new RationalFunctionNormalFormEquivalenceService(work);</span>
+<span class="fc" id="L36">            var arithmetic = producer.arithmetic();</span>
+<span class="fc" id="L37">            assumptions = arithmetic.admitAssumptions(assumptions);</span>
+<span class="fc" id="L38">            var projected = producer.parse(source);</span>
+<span class="fc" id="L39">            conditions = producer.requiredFactorKeys(projected).stream()</span>
+<span class="fc" id="L40">                .map(factor -&gt; factor + &quot; != 0&quot;).toList();</span>
+<span class="fc" id="L41">            Polynomial numerator = projected.numerator(), denominator = projected.denominator();</span>
+<span class="fc" id="L42">            var divisors = new ArrayList&lt;&gt;(projected.denominatorFactors());</span>
+<span class="fc" id="L43">            divisors.add(denominator);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for (var divisor : divisors) {</span>
+<span class="fc" id="L45">                work.charge(1);</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">                if (divisor.isZero() || divisor.totalDegree() == 0) continue;</span>
+                // Repeated factors are handled without factoring an arbitrary sum.
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                while (denominator.totalDegree() &gt;= divisor.totalDegree()) {</span>
+<span class="fc" id="L49">                    var reducedDenominator = divideExactly(denominator, divisor, arithmetic);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                    if (reducedDenominator.isEmpty()) break;</span>
+<span class="fc" id="L51">                    var reducedNumerator = divideExactly(numerator, divisor, arithmetic);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                    if (reducedNumerator.isEmpty()) break;</span>
+<span class="fc" id="L53">                    numerator = reducedNumerator.orElseThrow();</span>
+<span class="fc" id="L54">                    denominator = reducedDenominator.orElseThrow();</span>
+<span class="fc" id="L55">                }</span>
+<span class="fc" id="L56">            }</span>
+            // Normalize a constant scale without introducing a new domain restriction.
+<span class="fc" id="L58">            var leading = denominator.leadingTerm(ORDER).orElseThrow().coefficient();</span>
+<span class="fc" id="L59">            var scale = Polynomial.constant(Rational.ONE.divide(leading));</span>
+<span class="fc" id="L60">            numerator = arithmetic.multiply(numerator, scale);</span>
+<span class="fc" id="L61">            denominator = arithmetic.multiply(denominator, scale);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            candidate = denominator.equals(Polynomial.constant(Rational.ONE))</span>
+<span class="fc" id="L63">                ? arithmetic.text(numerator)</span>
+<span class="fc" id="L64">                : &quot;(&quot; + arithmetic.text(numerator) + &quot;)/(&quot; + arithmetic.text(denominator) + &quot;)&quot;;</span>
+<span class="fc" id="L65">            arithmetic.source(candidate);</span>
+<span class="fc" id="L66">            var parser = new ExpressionParser();</span>
+            try {
+<span class="fc" id="L68">                if (operations(parser.parseTerm(candidate), arithmetic)</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                        &gt; operations(parser.parseTerm(source), arithmetic)) candidate = source;</span>
+<span class="fc" id="L70">            } catch (ExpressionParser.Diagnostic unrepresentableLiteral) {</span>
+                // Exact folding can produce a literal larger than the input grammar admits.
+<span class="fc" id="L72">                candidate = source;</span>
+<span class="fc" id="L73">            }</span>
+            // The proposal must work on the complete original domain. The receiver
+            // deliberately does not infer arbitrary factorizations of new divisors.
+            // Retain the source if its conditions cannot authorize the new syntax.
+<span class="fc" id="L77">            var domainCheck = new RationalFunctionNormalFormEquivalenceService(work)</span>
+<span class="fc" id="L78">                .evaluateOnSourceDomain(source, candidate, conditions);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (!domainCheck.equivalent()) candidate = source;</span>
+<span class="fc" id="L80">            var receipt = new Certificate(source, candidate, assumptions);</span>
+<span class="fc" id="L81">            var evaluation = new RationalFunctionNormalFormEquivalenceService(work)</span>
+<span class="fc" id="L82">                .evaluateOnSourceDomain(source, candidate, assumptions);</span>
+<span class="fc" id="L83">            work.charge(0);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (evaluation.equivalent()) return new Result(Status.VERIFIED, source, candidate,</span>
+<span class="fc" id="L85">                conditions, Optional.of(receipt), work.used(), &quot;EXACT_RATIONAL_IDENTITY&quot;);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (evaluation.status() == RationalFunctionNormalFormEquivalenceService.Status.MISSING_ASSUMPTION)</span>
+<span class="fc" id="L87">                return new Result(Status.REQUIRES_ASSUMPTIONS, source, candidate, conditions,</span>
+<span class="fc" id="L88">                    Optional.empty(), work.used(), &quot;ORIGINAL_DOMAIN_NOT_DECLARED&quot;);</span>
+<span class="nc" id="L89">            return new Result(Status.UNAVAILABLE, source, candidate, conditions, Optional.empty(),</span>
+<span class="nc" id="L90">                work.used(), evaluation.detail());</span>
+<span class="fc" id="L91">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L92">            return new Result(Status.UNAVAILABLE, source, candidate, conditions, Optional.empty(), work.used(), stop.getMessage());</span>
+<span class="fc" id="L93">        } catch (RationalFunctionNormalFormEquivalenceService.UnsupportedExpression unsupported) {</span>
+<span class="fc" id="L94">            return new Result(Status.UNAVAILABLE, source, candidate, conditions, Optional.empty(), work.used(), unsupported.getMessage());</span>
+        }
+    }
+
+    public static Verification verify(String expectedSource, Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L100">        Objects.requireNonNull(expectedSource, &quot;expectedSource&quot;);</span>
+<span class="fc" id="L101">        Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L102">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L104">            work.charge(0);</span>
+<span class="fc" id="L105">            work.charge(Math.max(expectedSource.length(), certificate.source().length()));</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (!expectedSource.equals(certificate.source()))</span>
+<span class="fc" id="L107">                return new Verification(false, &quot;SOURCE_MISMATCH&quot;, work.used());</span>
+<span class="fc" id="L108">            var checker = new RationalFunctionNormalFormEquivalenceService(work);</span>
+<span class="fc" id="L109">            var assumptions = checker.arithmetic().admitAssumptions(certificate.assumptions());</span>
+<span class="fc" id="L110">            var result = checker.evaluateOnSourceDomain(expectedSource, certificate.candidate(), assumptions);</span>
+<span class="fc" id="L111">            work.charge(0);</span>
+<span class="fc" id="L112">            return new Verification(result.equivalent(), result.status().name(), work.used());</span>
+<span class="fc" id="L113">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L114">            return new Verification(false, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    private static Optional&lt;Polynomial&gt; divideExactly(Polynomial dividend, Polynomial divisor,
+            RationalFunctionWork arithmetic) {
+<span class="fc" id="L120">        Polynomial quotient = Polynomial.zero(), current = dividend;</span>
+<span class="fc" id="L121">        var leadingDivisor = divisor.leadingTerm(ORDER).orElseThrow();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        while (!current.isZero()) {</span>
+<span class="fc" id="L123">            arithmetic.charge(1L + current.termCount() + divisor.termCount());</span>
+<span class="fc" id="L124">            var leading = current.leadingTerm(ORDER).orElseThrow();</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (!leadingDivisor.monomial().divides(leading.monomial())) return Optional.empty();</span>
+<span class="fc" id="L126">            var term = arithmetic.checked(Polynomial.term(</span>
+<span class="fc" id="L127">                leading.monomial().divideBy(leadingDivisor.monomial()),</span>
+<span class="fc" id="L128">                leading.coefficient().divide(leadingDivisor.coefficient())));</span>
+<span class="fc" id="L129">            quotient = arithmetic.add(quotient, term, false);</span>
+<span class="fc" id="L130">            current = arithmetic.add(current, arithmetic.multiply(term, divisor), true);</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">        return Optional.of(quotient);</span>
+    }
+
+    /** Saturated expanded arithmetic cost; a power spelling cannot manufacture an improvement. */
+    private static long operations(Expr expression, RationalFunctionWork work) {
+<span class="fc" id="L137">        work.charge(1);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) return 0;</span>
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        if (binary.operator() == BinaryOperator.POW &amp;&amp; binary.right() instanceof NumberExpr exponent) {</span>
+<span class="fc" id="L140">            int power = exponent.value().intValueExact();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            return power == 0 ? 0 : Math.min(1_000_000_000L,</span>
+<span class="fc" id="L142">                power * operations(binary.left(), work) + power - 1);</span>
+        }
+<span class="fc" id="L144">        return Math.min(1_000_000_000L, 1 + operations(binary.left(), work) + operations(binary.right(), work));</span>
+    }
+
+<span class="fc" id="L147">    public enum Status { VERIFIED, REQUIRES_ASSUMPTIONS, UNAVAILABLE }</span>
+
+    /** A claim, never self-authorizing; verify against the expected original source. */
+    public record Certificate(String source, String candidate, List&lt;String&gt; assumptions) {
+<span class="fc" id="L151">        public Certificate {</span>
+<span class="fc" id="L152">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L153">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L154">            assumptions = List.copyOf(Objects.requireNonNull(assumptions, &quot;assumptions&quot;));</span>
+<span class="fc" id="L155">        }</span>
+    }
+
+    public record Result(Status status, String source, String candidate, List&lt;String&gt; requiredConditions,
+            Optional&lt;Certificate&gt; certificate, long work, String reason) {
+<span class="fc" id="L160">        public Result {</span>
+<span class="fc" id="L161">            Objects.requireNonNull(status);</span>
+<span class="fc" id="L162">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L163">            Objects.requireNonNull(candidate);</span>
+<span class="fc" id="L164">            requiredConditions = List.copyOf(requiredConditions);</span>
+<span class="fc" id="L165">            Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L166">            Objects.requireNonNull(reason);</span>
+<span class="fc" id="L167">        }</span>
+    }
+
+<span class="fc" id="L170">    public record Verification(boolean valid, String reason, long work) {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

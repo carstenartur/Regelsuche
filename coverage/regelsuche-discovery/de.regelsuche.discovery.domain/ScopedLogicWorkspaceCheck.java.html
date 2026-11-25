@@ -10,8 +10,10 @@ import de.regelsuche.discovery.domain.ScopedLogicDiscoveryDomain.Certificate;
 import de.regelsuche.discovery.domain.ScopedLogicDiscoveryDomain.State;
 import de.regelsuche.solver.ir.ScopedProofDag;
 import de.regelsuche.solver.ir.ScopedProofExecutor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /** Reconstructs one retained logical candidate before asking the configured receiver to check it afresh. */
 public final class ScopedLogicWorkspaceCheck {
@@ -21,10 +23,13 @@ public final class ScopedLogicWorkspaceCheck {
 
     private ScopedLogicWorkspaceCheck() { }
 
-<span class="fc" id="L24">    public enum RetainedWitness { NOT_RECORDED, REPRODUCED, DIFFERS }</span>
+<span class="fc" id="L26">    public enum RetainedWitness { NOT_RECORDED, REPRODUCED, DIFFERS }</span>
 
-<span class="fc" id="L26">    public record Source(String runId, String workspaceHash, String evidenceHash, String seedHash,</span>
+<span class="fc" id="L28">    public record Source(String runId, String workspaceHash, String evidenceHash, String seedHash,</span>
             String candidateHash, String stateHash) { }
+
+<span class="fc" id="L31">    public record Inspection(Source source, ScopedProofDag proposal, CounterexampleResult counterexample,</span>
+            RetainedWitness retainedWitness) {}
 
     public static final class Result {
         private final Source source;
@@ -34,19 +39,19 @@ public final class ScopedLogicWorkspaceCheck {
         private final Optional&lt;Evaluation&lt;Certificate&gt;&gt; freshProof;
 
         private Result(Source source, ScopedProofDag proposal, CounterexampleResult counterexample,
-<span class="fc" id="L37">                RetainedWitness retainedWitness, Optional&lt;Evaluation&lt;Certificate&gt;&gt; freshProof) {</span>
-<span class="fc" id="L38">            this.source = source;</span>
-<span class="fc" id="L39">            this.proposal = proposal;</span>
-<span class="fc" id="L40">            this.counterexample = counterexample;</span>
-<span class="fc" id="L41">            this.retainedWitness = retainedWitness;</span>
-<span class="fc" id="L42">            this.freshProof = freshProof;</span>
-<span class="fc" id="L43">        }</span>
+<span class="fc" id="L42">                RetainedWitness retainedWitness, Optional&lt;Evaluation&lt;Certificate&gt;&gt; freshProof) {</span>
+<span class="fc" id="L43">            this.source = source;</span>
+<span class="fc" id="L44">            this.proposal = proposal;</span>
+<span class="fc" id="L45">            this.counterexample = counterexample;</span>
+<span class="fc" id="L46">            this.retainedWitness = retainedWitness;</span>
+<span class="fc" id="L47">            this.freshProof = freshProof;</span>
+<span class="fc" id="L48">        }</span>
 
-<span class="fc" id="L45">        public Source source() { return source; }</span>
-<span class="fc" id="L46">        public ScopedProofDag proposal() { return proposal; }</span>
-<span class="fc" id="L47">        public CounterexampleResult counterexample() { return counterexample; }</span>
-<span class="fc" id="L48">        public RetainedWitness retainedWitness() { return retainedWitness; }</span>
-<span class="fc" id="L49">        public Optional&lt;Evaluation&lt;Certificate&gt;&gt; freshProof() { return freshProof; }</span>
+<span class="fc" id="L50">        public Source source() { return source; }</span>
+<span class="fc" id="L51">        public ScopedProofDag proposal() { return proposal; }</span>
+<span class="fc" id="L52">        public CounterexampleResult counterexample() { return counterexample; }</span>
+<span class="fc" id="L53">        public RetainedWitness retainedWitness() { return retainedWitness; }</span>
+<span class="fc" id="L54">        public Optional&lt;Evaluation&lt;Certificate&gt;&gt; freshProof() { return freshProof; }</span>
     }
 
     /**
@@ -54,58 +59,72 @@ public final class ScopedLogicWorkspaceCheck {
      * The caller supplies the trusted receiver. Read-only workspace imports never call it.
      */
     public static Result check(DomainExportWorkspace workspace, String candidateHash, ScopedProofExecutor receiver) {
-<span class="fc" id="L57">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
-<span class="fc" id="L58">        Objects.requireNonNull(receiver, &quot;receiver&quot;);</span>
-<span class="fc" id="L59">        DomainCanonical.requireSha256(candidateHash, &quot;candidateHash&quot;);</span>
-<span class="fc" id="L60">        var evidence = workspace.evidence();</span>
-<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (!workspace.scopedLogicDomain() || evidence.seed().payload().length() &gt; MAX_SOURCE_CHARACTERS) {</span>
-<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;outside bounded scoped workspace check&quot;);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(receiver, &quot;receiver&quot;);</span>
+<span class="fc" id="L63">        var domain = new ScopedLogicDiscoveryDomain(receiver, MAX_FORMATION_WORK);</span>
+<span class="fc" id="L64">        var inspected = inspect(workspace, candidateHash, receiver::supports, domain);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        Optional&lt;Evaluation&lt;Certificate&gt;&gt; proof = inspected.counterexample().status() == CounterexampleStatus.NONE_FOUND</span>
+<span class="fc" id="L66">            ? Optional.of(domain.evaluator().evaluate(inspected.proposal())) : Optional.empty();</span>
+<span class="fc" id="L67">        return new Result(inspected.source(), inspected.proposal(), inspected.counterexample(), inspected.retainedWitness(), proof);</span>
+    }
+
+    /** Reconstructs the candidate and checks its finite interpretation independently of historical proof execution. */
+    public static Inspection inspect(DomainExportWorkspace workspace, String candidateHash, Predicate&lt;Obligation&gt; supports) {
+<span class="nc" id="L72">        var formation = new ScopedLogicDiscoveryDomain(dag -&gt; {</span>
+<span class="nc" id="L73">            throw new IllegalStateException(&quot;source inspection cannot execute a proof&quot;);</span>
+        }, MAX_FORMATION_WORK);
+<span class="nc" id="L75">        return inspect(workspace, candidateHash, supports, formation);</span>
+    }
+
+    private static Inspection inspect(DomainExportWorkspace workspace, String candidateHash, Predicate&lt;Obligation&gt; supports,
+            ScopedLogicDiscoveryDomain domain) {
+<span class="fc" id="L80">        Objects.requireNonNull(workspace, &quot;workspace&quot;);</span>
+<span class="fc" id="L81">        DomainCanonical.requireSha256(candidateHash, &quot;candidateHash&quot;);</span>
+<span class="fc" id="L82">        var evidence = workspace.evidence();</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">        if (!workspace.scopedLogicDomain() || evidence.seed().payload().length() &gt; MAX_SOURCE_CHARACTERS) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;outside bounded scoped workspace check&quot;);</span>
         }
-<span class="fc" id="L64">        var attempts = evidence.candidateAttempts().stream().filter(row -&gt; row.candidateHash().equals(candidateHash)).toList();</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (attempts.size() != 1) throw new IllegalArgumentException(&quot;expected one retained scoped candidate attempt&quot;);</span>
+<span class="fc" id="L86">        var attempts = evidence.candidateAttempts().stream().filter(row -&gt; row.candidateHash().equals(candidateHash)).toList();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (attempts.size() != 1) throw new IllegalArgumentException(&quot;expected one retained scoped candidate attempt&quot;);</span>
 
-<span class="fc" id="L67">        var domain = new ScopedLogicDiscoveryDomain(receiver, MAX_FORMATION_WORK);</span>
-<span class="fc" id="L68">        var initial = domain.generator().generate(evidence.seed()).getFirst();</span>
-<span class="fc" id="L69">        var codec = domain.stateCodec();</span>
-<span class="fc" id="L70">        String initialHash = codec.contentHash(initial);</span>
-<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        boolean matchesInitial = evidence.states().stream().anyMatch(row -&gt; row.depth() == 0 &amp;&amp; !row.candidateReady()</span>
-<span class="pc bpc" id="L72" title="3 of 6 branches missed.">            &amp;&amp; row.parentStateHash().isEmpty() &amp;&amp; row.actionId().isEmpty() &amp;&amp; row.stateHash().equals(initialHash)</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            &amp;&amp; row.canonicalState().equals(codec.canonicalForm(initial)));</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (!matchesInitial) throw new IllegalArgumentException(&quot;retained initial state differs from the scoped seed&quot;);</span>
+<span class="fc" id="L89">        var initial = domain.generator().generate(evidence.seed()).getFirst();</span>
+<span class="fc" id="L90">        var codec = domain.stateCodec();</span>
+<span class="fc" id="L91">        String initialHash = codec.contentHash(initial);</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">        boolean matchesInitial = evidence.states().stream().anyMatch(row -&gt; row.depth() == 0 &amp;&amp; !row.candidateReady()</span>
+<span class="pc bpc" id="L93" title="3 of 6 branches missed.">            &amp;&amp; row.parentStateHash().isEmpty() &amp;&amp; row.actionId().isEmpty() &amp;&amp; row.stateHash().equals(initialHash)</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            &amp;&amp; row.canonicalState().equals(codec.canonicalForm(initial)));</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!matchesInitial) throw new IllegalArgumentException(&quot;retained initial state differs from the scoped seed&quot;);</span>
 
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        var proposal = domain.operators().getFirst().apply(initial).stream().filter(step -&gt; step.state().proposal() != null)</span>
-<span class="fc" id="L77">            .filter(step -&gt; domain.candidateCodec().contentHash(step.state().proposal()).equals(candidateHash))</span>
-<span class="pc" id="L78">            .findFirst().orElseThrow(() -&gt; new IllegalArgumentException(&quot;cannot reconstruct scoped candidate within formation bound&quot;));</span>
-<span class="fc" id="L79">        var candidateState = retainedState(evidence, domain, initialHash, proposal);</span>
-<span class="fc" id="L80">        ScopedProofDag dag = proposal.state().proposal();</span>
-<span class="fc" id="L81">        var counterexample = domain.counterexampleGenerator().search(dag, MAX_COUNTEREXAMPLE_ATTEMPTS);</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">        Optional&lt;Evaluation&lt;Certificate&gt;&gt; proof = counterexample.status() == CounterexampleStatus.NONE_FOUND</span>
-<span class="fc" id="L83">            ? Optional.of(domain.evaluator().evaluate(dag)) : Optional.empty();</span>
-<span class="fc" id="L84">        var source = new Source(workspace.runId(), workspace.contentHash(), evidence.contentHash(), evidence.seed().contentHash(),</span>
-<span class="fc" id="L85">            candidateHash, candidateState.stateHash());</span>
-<span class="fc" id="L86">        return new Result(source, dag, counterexample, witness(attempts.getFirst(), counterexample), proof);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        var proposal = domain.operators().getFirst().apply(initial).stream().filter(step -&gt; step.state().proposal() != null)</span>
+<span class="fc" id="L98">            .filter(step -&gt; domain.candidateCodec().contentHash(step.state().proposal()).equals(candidateHash))</span>
+<span class="pc" id="L99">            .findFirst().orElseThrow(() -&gt; new IllegalArgumentException(&quot;cannot reconstruct scoped candidate within formation bound&quot;));</span>
+<span class="fc" id="L100">        var candidateState = retainedState(evidence, domain, initialHash, proposal);</span>
+<span class="fc" id="L101">        ScopedProofDag dag = proposal.state().proposal();</span>
+<span class="fc" id="L102">        var counterexample = new ScopedTruthAssignments(supports).search(dag, MAX_COUNTEREXAMPLE_ATTEMPTS);</span>
+<span class="fc" id="L103">        var source = new Source(workspace.runId(), workspace.contentHash(), evidence.contentHash(), evidence.seed().contentHash(),</span>
+<span class="fc" id="L104">            candidateHash, candidateState.stateHash());</span>
+<span class="fc" id="L105">        return new Inspection(source, dag, counterexample, witness(attempts.getFirst(), counterexample));</span>
     }
 
     private static StateTrace retainedState(DomainDiscoveryEvidence evidence, ScopedLogicDiscoveryDomain domain,
             String initialHash, Successor&lt;State&gt; proposal) {
-<span class="fc" id="L91">        String stateHash = domain.stateCodec().contentHash(proposal.state());</span>
-<span class="fc" id="L92">        String canonicalState = domain.stateCodec().canonicalForm(proposal.state());</span>
-<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        var retained = evidence.states().stream().filter(row -&gt; row.depth() == 1 &amp;&amp; row.candidateReady()</span>
-<span class="pc bpc" id="L94" title="2 of 4 branches missed.">            &amp;&amp; row.stateHash().equals(stateHash) &amp;&amp; row.canonicalState().equals(canonicalState)</span>
-<span class="pc bpc" id="L95" title="2 of 4 branches missed.">            &amp;&amp; row.parentStateHash().equals(initialHash) &amp;&amp; row.actionId().equals(proposal.actionId())).findFirst()</span>
-<span class="pc" id="L96">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;retained scoped candidate state differs from reconstructed proposal&quot;));</span>
-<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        boolean accepted = evidence.transitions().stream().anyMatch(edge -&gt; edge.accepted() &amp;&amp; edge.cost() == proposal.cost()</span>
-<span class="pc bpc" id="L98" title="2 of 4 branches missed.">            &amp;&amp; edge.actionId().equals(proposal.actionId()) &amp;&amp; edge.fromStateHash().equals(initialHash)</span>
-<span class="pc bpc" id="L99" title="2 of 4 branches missed.">            &amp;&amp; edge.toStateHash().equals(stateHash) &amp;&amp; edge.semanticsPreserving() == proposal.semanticsPreserving()</span>
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            &amp;&amp; edge.assumptions().equals(proposal.assumptions()));</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!accepted) throw new IllegalArgumentException(&quot;scoped candidate has no matching retained transition&quot;);</span>
-<span class="fc" id="L102">        return retained;</span>
+<span class="fc" id="L110">        String stateHash = domain.stateCodec().contentHash(proposal.state());</span>
+<span class="fc" id="L111">        String canonicalState = domain.stateCodec().canonicalForm(proposal.state());</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">        var retained = evidence.states().stream().filter(row -&gt; row.depth() == 1 &amp;&amp; row.candidateReady()</span>
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">            &amp;&amp; row.stateHash().equals(stateHash) &amp;&amp; row.canonicalState().equals(canonicalState)</span>
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">            &amp;&amp; row.parentStateHash().equals(initialHash) &amp;&amp; row.actionId().equals(proposal.actionId())).findFirst()</span>
+<span class="pc" id="L115">            .orElseThrow(() -&gt; new IllegalArgumentException(&quot;retained scoped candidate state differs from reconstructed proposal&quot;));</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        boolean accepted = evidence.transitions().stream().anyMatch(edge -&gt; edge.accepted() &amp;&amp; edge.cost() == proposal.cost()</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">            &amp;&amp; edge.actionId().equals(proposal.actionId()) &amp;&amp; edge.fromStateHash().equals(initialHash)</span>
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">            &amp;&amp; edge.toStateHash().equals(stateHash) &amp;&amp; edge.semanticsPreserving() == proposal.semanticsPreserving()</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            &amp;&amp; edge.assumptions().equals(proposal.assumptions()));</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!accepted) throw new IllegalArgumentException(&quot;scoped candidate has no matching retained transition&quot;);</span>
+<span class="fc" id="L121">        return retained;</span>
     }
 
     private static RetainedWitness witness(CandidateAttempt attempt, CounterexampleResult result) {
-<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (attempt.counterexampleStatus() != CounterexampleStatus.FOUND) return RetainedWitness.NOT_RECORDED;</span>
-<span class="pc bpc" id="L107" title="3 of 4 branches missed.">        return result.status() == CounterexampleStatus.FOUND &amp;&amp; attempt.counterexampleWitness().equals(result.witness())</span>
-<span class="pc bnc" id="L108" title="All 2 branches missed.">            &amp;&amp; attempt.counterexampleAttempts() == result.attempts() ? RetainedWitness.REPRODUCED : RetainedWitness.DIFFERS;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (attempt.counterexampleStatus() != CounterexampleStatus.FOUND) return RetainedWitness.NOT_RECORDED;</span>
+<span class="pc bpc" id="L126" title="3 of 4 branches missed.">        return result.status() == CounterexampleStatus.FOUND &amp;&amp; attempt.counterexampleWitness().equals(result.witness())</span>
+<span class="pc bnc" id="L127" title="All 2 branches missed.">            &amp;&amp; attempt.counterexampleAttempts() == result.attempts() ? RetainedWitness.REPRODUCED : RetainedWitness.DIFFERS;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

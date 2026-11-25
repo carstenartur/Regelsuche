@@ -18,6 +18,9 @@ flowchart TD
     app --> persistenceHibernate
     app --> portfolio
     app --> search
+    app --> optimizationSdk[regelsuche-optimization-sdk]
+    optimizationSdk --> search
+    optimizationSdk --> math
     app --> mathSympy
     app --> extensionRuntime
     app --> extensionApi
@@ -162,6 +165,11 @@ Details stehen unter
 - Abgeleitete Suchindizes sind keine Autorität für mathematische Evidence.
 
 ### CLI und Anwendung
+
+Die editierbare CNF-Zählung in `:app` ruft `FiniteConstraintSdk.countCnf` aus
+`:regelsuche-optimization-sdk` auf. So verwenden Web-Workbench und externe
+Java-Aufrufer denselben Vertrag für Budget, Abbruch und Zertifikat. Die
+direkten Projektabhängigkeiten des SDK sind Search und Math Algorithms.
 
 - `:regelsuche-cli` bleibt frei von Fachmodulabhängigkeiten und stellt
   wiederverwendbare Parsing-/Command-Primitiven bereit.

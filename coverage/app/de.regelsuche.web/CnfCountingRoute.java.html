@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CnfCountingRoute.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">CnfCountingRoute.java</span></div><h1>CnfCountingRoute.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import com.sun.net.httpserver.HttpExchange;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCnf;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
+
+/** One bounded live request per server. The caller's random request ID addresses cancellation. */
+<span class="fc" id="L10">final class CnfCountingRoute {</span>
+    static final String BASE = &quot;/api/certificate-demos/cnf/&quot;;
+<span class="fc" id="L12">    private enum Phase { COUNTING, CANCELLATION_REQUESTED, SENDING_RESPONSE }</span>
+
+<span class="fc" id="L14">    private record Job(String id, AtomicReference&lt;Phase&gt; phase) {</span>
+        boolean requestCancellation() {
+<span class="pc bpc" id="L16" title="2 of 4 branches missed.">            return phase.getAndUpdate(current -&gt; current == Phase.COUNTING ? Phase.CANCELLATION_REQUESTED : current)</span>
+                != Phase.SENDING_RESPONSE;
+        }
+
+<span class="pc bpc" id="L20" title="1 of 2 branches missed.">        boolean cancelled() { return phase.get() == Phase.CANCELLATION_REQUESTED; }</span>
+    }
+<span class="fc" id="L22">    private final AtomicReference&lt;Job&gt; active = new AtomicReference&lt;&gt;();</span>
+
+    void handle(HttpExchange exchange, String suffix, int maxBytes) throws IOException {
+<span class="fc" id="L25">        String[] path = suffix.split(&quot;/&quot;, -1);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!path[0].matches(&quot;[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}&quot;)) {</span>
+<span class="nc" id="L27">            send(exchange, 400, &quot;text/plain&quot;, &quot;Ungültige Auftragskennung.&quot;); return;</span>
+        }
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">        if (path.length == 2 &amp;&amp; path[1].equals(&quot;cancel&quot;)) {</span>
+<span class="fc" id="L30">            var job = active.get();</span>
+<span class="pc bpc" id="L31" title="3 of 6 branches missed.">            if (job == null || !job.id().equals(path[0]) || !job.requestCancellation())</span>
+<span class="fc" id="L32">                send(exchange, 404, &quot;text/plain&quot;, &quot;Kein laufender Auftrag.&quot;);</span>
+            else {
+<span class="nc" id="L34">                send(exchange, 202, &quot;application/json&quot;, &quot;{\&quot;status\&quot;:\&quot;CANCELLATION_REQUESTED\&quot;}&quot;);</span>
+            }
+<span class="fc" id="L36">            return;</span>
+        }
+        CnfCountingWorkbench.Request request;
+        try {
+<span class="fc" id="L40">            request = CnfCountingWorkbench.read(new StreamingJsonRequestBody(Math.min(32_768, maxBytes)).readObject(exchange));</span>
+<span class="fc" id="L41">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L42">            send(exchange, 400, &quot;text/plain&quot;, invalid.getMessage()); return;</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        var job = new Job(path[0], new AtomicReference&lt;&gt;(Phase.COUNTING));</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (!active.compareAndSet(null, job)) {</span>
+<span class="fc" id="L46">            send(exchange, 429, &quot;text/plain&quot;, &quot;Ein Zählauftrag wird noch verarbeitet.&quot;); return;</span>
+        }
+        try {
+<span class="fc" id="L49">            Thread.startVirtualThread(() -&gt; finish(exchange, request, job));</span>
+<span class="nc" id="L50">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L51">            active.compareAndSet(job, null); throw failure;</span>
+<span class="fc" id="L52">        }</span>
+<span class="fc" id="L53">    }</span>
+
+    private void finish(HttpExchange exchange, CnfCountingWorkbench.Request request, Job job) {
+        try {
+            FiniteConstraintCnf.Result result;
+<span class="fc" id="L58">            try { result = request.count(job::cancelled); }</span>
+<span class="fc" id="L59">            finally { job.phase().set(Phase.SENDING_RESPONSE); }</span>
+<span class="fc" id="L60">            send(exchange, 200, &quot;application/json&quot;, CnfCountingWorkbench.report(result));</span>
+<span class="nc" id="L61">        } catch (IOException disconnected) {</span>
+<span class="nc" id="L62">            exchange.close();</span>
+<span class="nc" id="L63">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L64">            try { send(exchange, 500, &quot;text/plain&quot;, &quot;Zählung fehlgeschlagen.&quot;); }</span>
+<span class="nc" id="L65">            catch (IOException disconnected) { exchange.close(); }</span>
+<span class="fc" id="L66">        } finally { active.compareAndSet(job, null); }</span>
+<span class="fc" id="L67">    }</span>
+
+    private static void send(HttpExchange exchange, int status, String type, String text) throws IOException {
+<span class="fc" id="L70">        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L71">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, type + &quot;; charset=utf-8&quot;);</span>
+<span class="fc" id="L72">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L73">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L74">        try (var output = exchange.getResponseBody()) { output.write(bytes); }</span>
+<span class="fc" id="L75">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

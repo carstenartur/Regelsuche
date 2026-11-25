@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalFunctionsForeignComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark.peer</a> &gt; <span class="el_source">RationalFunctionsForeignComparison.java</span></div><h1>RationalFunctionsForeignComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark.peer;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.math.algorithms.equivalence.RationalFunctionPlanner;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.parse.ExpressionParser;
+import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** A separate, complete foreign inventory; never changes the frozen Enumo grammar or results. */
+public final class RationalFunctionsForeignComparison {
+<span class="fc" id="L24">    private static final IterationLimits LIMITS = new IterationLimits(2_000_000, 20_000, 5_000);</span>
+<span class="fc" id="L25">    private static final List&lt;String&gt; CORPORA = List.of(</span>
+        &quot;research/benchmarks/enumo-public-v1/rosa.fpcore&quot;,
+        &quot;research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore&quot;,
+        &quot;research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore&quot;);
+    private RationalFunctionsForeignComparison() {}
+
+    public static void main(String[] args) throws Exception {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (args.length != 2) throw new IllegalArgumentException(&quot;expected checkout and JSON output path&quot;);</span>
+<span class="fc" id="L33">        Path checkout = Path.of(args[0]), output = Path.of(args[1]);</span>
+<span class="fc" id="L34">        var rows = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L35">        var sources = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        for (var relative : CORPORA) {</span>
+<span class="fc" id="L37">            var bytes = Files.readAllBytes(checkout.resolve(relative));</span>
+<span class="fc" id="L38">            String text = new String(bytes, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L39">            long inventoryStart = System.nanoTime();</span>
+<span class="fc" id="L40">            var polynomial = FpcorePolynomialCorpus.read(text);</span>
+<span class="fc" id="L41">            var rational = FpcorePolynomialCorpus.readRational(text);</span>
+<span class="fc" id="L42">            sources.add(Map.of(&quot;path&quot;, relative, &quot;sha256&quot;, hash(bytes), &quot;programs&quot;, rational.size(),</span>
+<span class="fc" id="L43">                &quot;inventoryWallNanos&quot;, System.nanoTime() - inventoryStart));</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            for (int index = 0; index &lt; rational.size(); index++) {</span>
+<span class="fc" id="L45">                var entry = rational.get(index);</span>
+<span class="fc" id="L46">                var row = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L47">                row.put(&quot;corpus&quot;, relative);</span>
+<span class="fc" id="L48">                row.put(&quot;ordinal&quot;, entry.ordinal());</span>
+<span class="fc" id="L49">                row.put(&quot;name&quot;, entry.name());</span>
+<span class="fc" id="L50">                row.put(&quot;polynomialStatus&quot;, polynomial.get(index).status().name());</span>
+<span class="fc" id="L51">                row.put(&quot;status&quot;, entry.status().name());</span>
+<span class="fc" id="L52">                row.put(&quot;detail&quot;, entry.detail());</span>
+<span class="fc" id="L53">                row.put(&quot;source&quot;, entry.source());</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (entry.status() == FpcorePolynomialCorpus.Status.SUPPORTED) measure(entry.source(), row);</span>
+<span class="fc" id="L55">                rows.add(row);</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        var report = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L59">        report.put(&quot;schema&quot;, &quot;regelsuche.rational-foreign/v1&quot;);</span>
+<span class="fc" id="L60">        report.put(&quot;semantics&quot;, &quot;exact rational functions on explicitly retained original domains; no IEEE754 claim&quot;);</span>
+<span class="fc" id="L61">        report.put(&quot;java&quot;, System.getProperty(&quot;java.runtime.version&quot;));</span>
+<span class="fc" id="L62">        report.put(&quot;limits&quot;, LIMITS);</span>
+<span class="fc" id="L63">        report.put(&quot;sources&quot;, sources);</span>
+<span class="fc" id="L64">        report.put(&quot;rows&quot;, rows);</span>
+<span class="fc" id="L65">        Files.createDirectories(output.toAbsolutePath().getParent());</span>
+<span class="fc" id="L66">        new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(output.toFile(), report);</span>
+<span class="fc" id="L67">        System.out.println(&quot;rational-foreign/v1 rows=&quot; + rows.size() + &quot; admitted=&quot;</span>
+<span class="fc" id="L68">            + rows.stream().filter(row -&gt; &quot;SUPPORTED&quot;.equals(row.get(&quot;status&quot;))).count());</span>
+<span class="fc" id="L69">    }</span>
+
+    private static void measure(String source, Map&lt;String, Object&gt; row) throws Exception {
+<span class="fc" id="L72">        var cpu = ManagementFactory.getThreadMXBean();</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        boolean cpuAvailable = cpu.isCurrentThreadCpuTimeSupported() &amp;&amp; cpu.isThreadCpuTimeEnabled();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        long wallStart = System.nanoTime(), cpuStart = cpuAvailable ? cpu.getCurrentThreadCpuTime() : -1;</span>
+        // Acquiring the original domain is included; it is not free training or an oracle answer.
+<span class="fc" id="L76">        var discovery = RationalFunctionPlanner.simplify(source, List.of(), LIMITS, () -&gt; false);</span>
+<span class="fc" id="L77">        var proposal = RationalFunctionPlanner.simplify(source, discovery.requiredConditions(), LIMITS, () -&gt; false);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        long measuredCpu = cpuAvailable ? cpu.getCurrentThreadCpuTime() - cpuStart : -1;</span>
+<span class="fc" id="L79">        row.put(&quot;wallNanos&quot;, System.nanoTime() - wallStart);</span>
+<span class="fc" id="L80">        row.put(&quot;threadCpuNanos&quot;, measuredCpu);</span>
+<span class="fc" id="L81">        row.put(&quot;work&quot;, Math.addExact(discovery.work(), proposal.work()));</span>
+<span class="fc" id="L82">        row.put(&quot;sourceSha256&quot;, hash(source.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="fc" id="L83">        row.put(&quot;requiredConditions&quot;, discovery.requiredConditions());</span>
+<span class="fc" id="L84">        row.put(&quot;candidate&quot;, proposal.candidate());</span>
+<span class="fc" id="L85">        row.put(&quot;proposalStatus&quot;, proposal.status().name());</span>
+<span class="fc" id="L86">        row.put(&quot;proposalReason&quot;, proposal.reason());</span>
+<span class="fc" id="L87">        row.put(&quot;sourceOperations&quot;, operations(new ExpressionParser().parseExactTerm(source).expression()));</span>
+<span class="fc" id="L88">        row.put(&quot;candidateOperations&quot;, operations(new ExpressionParser().parseExactTerm(proposal.candidate()).expression()));</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        var replay = proposal.certificate().isPresent() ? RationalFunctionPlanner.verify(source,</span>
+<span class="pc" id="L90">            proposal.certificate().orElseThrow(), LIMITS, () -&gt; false) : null;</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">        boolean verified = replay != null &amp;&amp; replay.valid();</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        row.put(&quot;replayWork&quot;, replay == null ? 0 : replay.work());</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        row.put(&quot;totalWorkIncludingReplay&quot;, Math.addExact(discovery.work() + proposal.work(), replay == null ? 0 : replay.work()));</span>
+<span class="fc" id="L94">        row.put(&quot;totalWallNanosIncludingReplay&quot;, System.nanoTime() - wallStart);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        row.put(&quot;totalThreadCpuNanosIncludingReplay&quot;, cpuAvailable ? cpu.getCurrentThreadCpuTime() - cpuStart : -1);</span>
+<span class="fc" id="L96">        row.put(&quot;independentlyReplayed&quot;, verified);</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (proposal.status() == RationalFunctionPlanner.Status.VERIFIED &amp;&amp; !verified)</span>
+<span class="nc" id="L98">            throw new IllegalStateException(&quot;fresh rational certificate did not replay&quot;);</span>
+<span class="fc" id="L99">    }</span>
+
+    /** Integer powers count their expanded multiply cost; surface spelling cannot create a saving. */
+    static int operations(Expr expression) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!(expression instanceof BinaryExpr binary)) return 0;</span>
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">        if (binary.operator() == BinaryOperator.POW &amp;&amp; binary.right() instanceof NumberExpr exponent</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">                &amp;&amp; exponent.value().isInteger() &amp;&amp; exponent.value().signum() &gt;= 0) {</span>
+<span class="fc" id="L106">            int power = exponent.value().intValueExact();</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            return power == 0 ? 0 : Math.addExact(Math.multiplyExact(power, operations(binary.left())), power - 1);</span>
+        }
+<span class="fc" id="L109">        return Math.addExact(1, Math.addExact(operations(binary.left()), operations(binary.right())));</span>
+    }
+
+    private static String hash(byte[] bytes) throws Exception {
+<span class="fc" id="L113">        return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
