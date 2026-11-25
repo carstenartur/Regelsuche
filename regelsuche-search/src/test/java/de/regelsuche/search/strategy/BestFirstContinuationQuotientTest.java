@@ -127,7 +127,7 @@ class BestFirstContinuationQuotientTest {
         var strategy = BestFirstSearchStrategy.preparedQuotient();
         var problem = new SearchProblem(bound.source(), engine, new ExpressionScorer(), new ExpressionCanonicalizer(),
             new SearchHeuristic(2, 20, 1));
-        var states = strategy.searchPrepared(problem, bound, List.of("x≠0")).search().states();
+        var states = strategy.searchPrepared(problem, bound, List.of("x≠0")).execution().search().states();
         assertEquals(List.of("x != 0"), states.getFirst().assumptions());
         assertThrows(IllegalArgumentException.class, () -> strategy.searchPrepared(problem,
             new ExpressionParser().parseExactTerm("x"), List.of()));

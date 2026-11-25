@@ -77,6 +77,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     public record ExecutionDiagnostics(GoalSearchResult search, IdentityPolicy policy, TieOrder tieOrder,
             QuotientMetrics quotient) {}
 
+    /** Reports whether pending states were left when the visited-state cap stopped the run. */
+    public record PreparedExecutionDiagnostics(ExecutionDiagnostics execution, boolean stateBudgetExhausted) { }
+
     @Override
     public List<SearchState> search(SearchProblem problem) {
         return searchWithDiagnostics(problem).states();
@@ -92,11 +95,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     /** Policy-bound diagnostics; the historical GoalSearchResult format is unchanged. */
     public ExecutionDiagnostics searchWithExecutionDiagnostics(SearchProblem problem) {
-        return execute(problem, null, List.of());
+        return execute(problem, null, List.of()).execution();
     }
 
     /** Starts the qualified search with an already bound source and its initial assumptions. */
-    public ExecutionDiagnostics searchPrepared(SearchProblem problem, ExactParsedTerm source, List<String> assumptions) {
+    public PreparedExecutionDiagnostics searchPrepared(SearchProblem problem, ExactParsedTerm source, List<String> assumptions) {
         Objects.requireNonNull(problem, "problem");
         Objects.requireNonNull(source, "source");
         if (!preparedQuotient || !problem.rootExpression().equals(source.source())) {
@@ -105,7 +108,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return execute(problem, source, List.copyOf(assumptions));
     }
 
-    private ExecutionDiagnostics execute(SearchProblem problem, ExactParsedTerm source, List<String> assumptions) {
+    private PreparedExecutionDiagnostics execute(SearchProblem problem, ExactParsedTerm source, List<String> assumptions) {
         Objects.requireNonNull(problem, "problem");
         if (preparedQuotient && !(problem.engine() instanceof StateLocalTransformationEngine)) {
             throw new IllegalArgumentException("prepared quotient requires an explicitly state-local transformation provider");
@@ -130,7 +133,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             var metrics = frame.quotient() == null
                 ? new QuotientMetrics(0, 0, 0, 0, 0, identity.internedValueCount(), identity.structuralBytes(), identity.digestComputations())
                 : frame.quotient().metrics();
-            return new ExecutionDiagnostics(GoalSearchResult.from(problem, frame, rootState), identityPolicy, tieOrder, metrics);
+            var execution = new ExecutionDiagnostics(GoalSearchResult.from(problem, frame, rootState), identityPolicy, tieOrder, metrics);
+            boolean stateBudgetExhausted = !frame.frontier().isEmpty()
+                && frame.explored().size() >= problem.heuristic().maxVisitedExpressions()
+                && !stoppedAtTarget(frame);
+            return new PreparedExecutionDiagnostics(execution, stateBudgetExhausted);
         }
     }
 
@@ -187,7 +194,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     private boolean shouldContinue(SearchProblem problem, SearchFrame frame) {
         return !frame.frontier().isEmpty()
             && frame.explored().size() < problem.heuristic().maxVisitedExpressions()
-            && !(frame.target().stopWhenReached() && frame.progress().reachedState != null);
+            && !stoppedAtTarget(frame);
+    }
+
+    private static boolean stoppedAtTarget(SearchFrame frame) {
+        return frame.target().stopWhenReached() && frame.progress().reachedState != null;
     }
 
     private void processNextState(SearchProblem problem, SearchFrame frame) {

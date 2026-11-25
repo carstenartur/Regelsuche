@@ -8,6 +8,7 @@ import de.regelsuche.export.DefaultTransformationExportService;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.json.JsonReader;
+import de.regelsuche.parse.ExpressionParser;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -44,6 +45,15 @@ class PreparedQuotientSearchApiTest {
     }
 
     @Test
+    void replacementTextPreservesTheUntouchedRightAssociatedSibling() throws IOException {
+        var result = search("pair(x+0,a+(b+c))", "\"position\":{\"path\":[0],\"text\":\"x + 0\"}");
+        var parser = new ExpressionParser();
+
+        assertEquals("VERIFIED_PRIMITIVE_REPLAY", continuation(result).get("replay"));
+        assertEquals(parser.parseTerm("pair(x,a+(b+c))"), parser.parseTerm((String) result.get("bestExpression")));
+    }
+
+    @Test
     void keepsSourceSyntaxAndAssumptionsInTheProductBinding() throws IOException {
         var first = continuation(search("x+0", "\"assumptions\":[\"x>0\"]"));
         var opposite = continuation(search("x+0", "\"assumptions\":[\"x<0\"]"));
@@ -58,12 +68,15 @@ class PreparedQuotientSearchApiTest {
     void staleAndInsufficientBudgetResultsCarryNoReplacement() throws IOException {
         var stale = search("pair(x+0,y+0)", "\"position\":{\"path\":[1],\"text\":\"x + 0\"}");
         var budget = search("x+0", "\"budget\":{\"maxVisitedExpressions\":1}");
+        var exhausted = search("x", "\"budget\":{\"maxVisitedExpressions\":1}");
         var complete = search("x+0", "");
 
         assertEquals(null, stale.get("bestExpression"));
         assertEquals("POSITION_STALE", continuation(stale).get("status"));
         assertEquals(null, budget.get("bestExpression"));
         assertEquals("STATE_BUDGET", continuation(budget).get("status"));
+        assertEquals(null, exhausted.get("bestExpression"));
+        assertEquals("EXHAUSTED", continuation(exhausted).get("status"));
         assertEquals("x", complete.get("bestExpression"));
         assertNotEquals(continuation(budget).get("sourceBinding"), continuation(complete).get("sourceBinding"));
     }

@@ -29,8 +29,12 @@ Platzhalterbestand und einen vorbereiteten Regelindex. Die Nachfolgerbindung
 enthält exakte Syntax und normalisierte Annahmen. Weniger verbleibende Tiefe
 oder Expansionsschritte darf einen besser ausgestatteten Pfad nicht verdrängen.
 Der Referenzmatcher rechnet den gewählten Pfad mit der gebundenen Regelmenge
-nach, bevor der Ersatz für das ursprüngliche Vorkommen ausgegeben wird.
-Der Status beschreibt die konkrete begrenzte Suche. Die Ergebnisse werden
+nach. Die Ausgabe muss beim erneuten Parsen dieselbe Baumstruktur wie der
+berechnete Ersatz ergeben. Falls der Formatter eine Gruppierung außerhalb
+der Fundstelle auflöst, übernimmt die Ausgabe dort den ursprünglichen
+Quelltext und prüft den vollständigen Baum erneut. `STATE_BUDGET` bedeutet,
+dass beim Erreichen der Zustandsgrenze noch Einträge vorgemerkt waren.
+`EXHAUSTED` bezeichnet eine abgearbeitete Suche ohne Verbesserung. Die Ergebnisse werden
 als Antwort des expliziten Profils ausgegeben. Die früheren Suchprofile und
 der native Suchendpunkt behalten ihre bisherigen Aufrufverträge.
 
@@ -62,23 +66,23 @@ Expansionsbudget das Ziel und beobachtet einen echten Nachfolgertreffer.
 
 | Variante | CPU-Zeit in ms | Wandzeit in ms | Allokierte Bytes |
 | --- | ---: | ---: | ---: |
-| Anwendungshistorie | 16,596 | 16,574 | 9.578.560 |
-| Früherer Quotient | 16,340 | 16,417 | 9.173.024 |
-| Vorbereiteter Quotient | 16,075 | 16,084 | 9.146.304 |
+| Anwendungshistorie | 16,730 | 16,733 | 9.613.136 |
+| Früherer Quotient | 16,044 | 16,197 | 9.200.056 |
+| Vorbereiteter Quotient | 16,440 | 16,492 | 9.173.336 |
 
 Die Tabelle summiert die Medianwerte pro Fall. Je Fall und Variante gab
 es in einer JVM sechs Aufwärm- und 15 Messaufrufe mit rotierender
 Variantenreihenfolge. `ThreadMXBean` erfasste CPU-Zeit und allokierte Bytes
 auf dem ausführenden Thread. `System.nanoTime()` erfasste die Wandzeit.
 Die Messung umfasst die Produktadapter-Methode mit Parsen, Projektion,
-Suche, Nachrechnung und Antwortaufbau. HTTP-Transport und Einlesen der
+Suche, Nachrechnung, Prüfung des vollständigen Ausgabetexts und Antwortaufbau. HTTP-Transport und Einlesen der
 Antwort folgen außerhalb der Zeitmessung. JaCoCo war für diesen Lauf
 deaktiviert. Die Fallwerte schwanken in beide Richtungen. Vergleiche über
 mehrere JVMs und andere Eingabefamilien sind offen.
 
 [Vollständige Fallwerte](measurements.tsv) aus Temurin 25.0.5+8 auf Linux
 x86-64 mit AMD EPYC 9V74. SHA-256 der Datei
-`58e35899f6298e3bb1697e3989f34a3ea1f902007b3924b623d641cf1c1dbeaa`.
+`7bfe63faaabbf1463c7a8ede232cad7af02aa1175648c17047e15097be173761`.
 
 ```sh
 mvn -pl app -am -Dtest=PreparedQuotientProductComparisonTest \
@@ -88,4 +92,5 @@ mvn -pl app -am -Dtest=PreparedQuotientProductComparisonTest \
 Die Fallwerte landen in `app/target/prepared-quotient-product-v1/measurements.tsv`.
 Die API-Tests prüfen vertauschte gleichwertige Syntax, unterschiedliche
 Annahmen, zwei gleiche Teilbäume an verschiedenen Pfaden, einen veralteten
-Formatterstand und ein knappes Zustandsbudget.
+Formatterstand, einen rechten gruppierten Nachbarterm und beide Stopps an
+einer Zustandsgrenze von eins.

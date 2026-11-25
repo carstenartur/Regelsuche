@@ -8,6 +8,7 @@ import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.knowledge.RuleInventoryFingerprint;
 import de.regelsuche.moves.enumerate.TreePosition;
 import de.regelsuche.parse.ExactParsedSubtermProjector;
+import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.polynomial.PolynomialWorkAuthority;
@@ -80,8 +81,10 @@ final class PreparedQuotientSearch {
         var provider = new CountedProvider(rules, context.budget.maxCandidatesPerState());
         var problem = new SearchProblem(term.source(), provider, new ExpressionScorer(),
             new ExpressionCanonicalizer(), context.budget).withObjective(goal);
+        var prepared = arm == Arm.PREPARED_QUOTIENT
+            ? BestFirstSearchStrategy.preparedQuotient().searchPrepared(problem, term, context.assumptions) : null;
         var execution = switch (arm) {
-            case PREPARED_QUOTIENT -> BestFirstSearchStrategy.preparedQuotient().searchPrepared(problem, term, context.assumptions);
+            case PREPARED_QUOTIENT -> prepared.execution();
             case APPLICATION_HISTORY -> new BestFirstSearchStrategy(BestFirstSearchStrategy.IdentityPolicy.APPLICATION_HISTORY_V1,
                 BestFirstSearchStrategy.TieOrder.SYNTAX_V1).searchWithExecutionDiagnostics(problem);
             case LEGACY_QUOTIENT -> new BestFirstSearchStrategy(BestFirstSearchStrategy.IdentityPolicy.CONTINUATION_QUOTIENT_V1,
@@ -96,11 +99,24 @@ final class PreparedQuotientSearch {
 
         evidence.put("quotient", execution.quotient());
         evidence.put("bestRules", best == null ? List.of() : best.appliedRuleIds());
-        evidence.put("status", search.states().size() == context.budget.maxVisitedExpressions() ? "STATE_BUDGET"
-            : best == null ? "NO_IMPROVEMENT" : "EXECUTED");
+        boolean stateBudgetExhausted = prepared == null ? search.states().size() == context.budget.maxVisitedExpressions()
+            : prepared.stateBudgetExhausted();
+        evidence.put("status", stateBudgetExhausted ? "STATE_BUDGET"
+            : best != null ? "EXECUTED" : prepared == null ? "NO_IMPROVEMENT" : "EXHAUSTED");
         var replay = new AstRewriteTransformationEngine(rules, MAX_AST_GROWTH, context.budget.maxCandidatesPerState());
         Replay checked = verify(best, term.source(), context.assumptions, replay);
-        evidence.put("replay", best == null ? "NO_CANDIDATE" : checked.valid ? "VERIFIED_PRIMITIVE_REPLAY" : "REJECTED");
+        String rewritten = null;
+        if (checked.valid) {
+            Expr replacement = parser.parseTerm(best.expression());
+            var applied = context.position.replaceAt(parsed.expression(), replacement);
+            if (applied.selectedSubtree().orElseThrow() != term.expression()) {
+                throw new IllegalStateException("replay selected a different source occurrence");
+            }
+            rewritten = renderReplacement(parser, source, projection.selectedRange().orElseThrow(),
+                applied.rewrittenRoot().orElseThrow(), best.expression());
+            if (rewritten == null) evidence.put("detail", "REPLACEMENT_TEXT_MISMATCH");
+        }
+        evidence.put("replay", best == null ? "NO_CANDIDATE" : rewritten == null ? "REJECTED" : "VERIFIED_PRIMITIVE_REPLAY");
         evidence.put("work", fields("projectionWorkUnits", projection.work().totalWorkUnits(),
             "visitedStates", search.metrics().exploredStates(), "expandedStates", search.metrics().expandedStates(),
             "providerCalls", provider.calls, "ruleAttempts", provider.ruleAttempts,
@@ -108,18 +124,32 @@ final class PreparedQuotientSearch {
             "generatedTransformations", search.metrics().generatedTransformations(),
             "replayCalls", checked.calls, "replayProposals", checked.proposals));
         response.put("successes", improvements.size());
-        if (best != null && checked.valid) {
-            Expr replacement = parser.parseTerm(best.expression());
-            var applied = context.position.replaceAt(parsed.expression(), replacement);
-            if (applied.selectedSubtree().orElseThrow() != term.expression()) {
-                throw new IllegalStateException("replay selected a different source occurrence");
-            }
-            response.put("bestExpression", ExpressionFormatter.format(applied.rewrittenRoot().orElseThrow()));
+        if (rewritten != null) {
+            response.put("bestExpression", rewritten);
             response.put("improvement", sourceScore - best.score().weightedTotal());
         } else if (best != null) {
             evidence.put("status", "REPLAY_REJECTED");
         }
         return canonical(response);
+    }
+
+    private static String renderReplacement(ExpressionParser parser, String source,
+            ExactParsedTerm.SourceRange range, Expr rewrittenRoot, String replacement) {
+        String formatted = ExpressionFormatter.format(rewrittenRoot);
+        if (reparsesAs(parser, formatted, rewrittenRoot)) return formatted;
+
+        // Formatting can drop association outside the selected subtree. Keep that source intact.
+        String spliced = source.substring(0, range.startInclusive()) + "(" + replacement + ")"
+            + source.substring(range.endExclusive());
+        return reparsesAs(parser, spliced, rewrittenRoot) ? spliced : null;
+    }
+
+    private static boolean reparsesAs(ExpressionParser parser, String text, Expr expected) {
+        try {
+            return parser.parseTerm(text).equals(expected);
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
     }
 
     private static List<RewriteRule> qualifiedRules() {
