@@ -11,11 +11,39 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class FiniteConstraintPlanLearningTest {
     private static final IterationLimits LIMITS = new IterationLimits(4_000_000, 200_000, 10_000);
     private static final long TRIAL = 700_000;
+
+    @Test void costedCountingUsesFixedUnlessPriorTrialsCanRepayTraining() {
+        var chain = problem(7, false, 1, Map.of());
+        var model = FiniteConstraintPlanLearning.train(List.of(new Example("provenance", chain)),
+            LIMITS, TRIAL, () -> false).model().orElseThrow();
+        var hint = Optional.of(model);
+        var fixed = FiniteConstraintPlanLearning.countWithPolicy(hint, chain, 1, TRIAL, LIMITS, () -> false);
+        var learned = FiniteConstraintPlanLearning.countWithPolicy(hint, chain, 1000, TRIAL, LIMITS, () -> false);
+        assertEquals("MIN_DEGREE", fixed.selectedProvider().orElseThrow());
+        assertEquals("ASCENDING", learned.selectedProvider().orElseThrow());
+        var expected = FiniteConstraintCounter.count(chain, LIMITS, () -> false);
+        assertEquals(expected.count(), learned.value().orElseThrow().count());
+        assertEquals(model.trainingWork(), learned.priorWork());
+        var fallback = FiniteConstraintPlanLearning.countWithPolicy(hint, chain, 1000, 100, LIMITS, () -> false);
+        assertEquals("MIN_DEGREE", fallback.selectedProvider().orElseThrow());
+        assertEquals("WORK_LIMIT", fallback.attempts().getFirst().reason());
+        assertTrue(fallback.attempts().getFirst().work() > 0);
+        assertEquals(expected.work(), fallback.attempts().getLast().work());
+        assertEquals(fallback.work(), fallback.preparationWork() + fallback.attempts().stream().mapToLong(a -> a.work()).sum());
+
+        var cancelled = FiniteConstraintPlanLearning.countWithPolicy(hint, chain, 1000, TRIAL, LIMITS, () -> true);
+        assertEquals("CANCELLED", cancelled.reason());
+        assertTrue(cancelled.value().isEmpty());
+        var unknown = FiniteConstraintPlanLearning.countWithPolicy(hint, problem(18, true, 1, Map.of()),
+            1000, TRIAL, LIMITS, () -> false);
+        assertEquals("MIN_DEGREE", unknown.selectedProvider().orElseThrow());
+    }
 
     @Test void trainingOutcomesSelectDifferentHeuristicsOnUnseenConditionedAndWeightedSources() {
         var training = FiniteConstraintPlanLearning.train(List.of(

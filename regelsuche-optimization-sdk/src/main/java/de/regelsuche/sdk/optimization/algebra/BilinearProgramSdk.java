@@ -9,11 +9,13 @@ import de.regelsuche.math.algorithms.algebra.BilinearRankBound;
 import de.regelsuche.math.algorithms.algebra.BilinearProgramSearch;
 import de.regelsuche.math.algorithms.algebra.BilinearProgramVerifier;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection;
 import de.regelsuche.scalar.ExactRational;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Optional;
 
 /** SDK entry points for bounded rational tensor-program search, checking and execution. */
 public final class BilinearProgramSdk {
@@ -25,6 +27,16 @@ public final class BilinearProgramSdk {
             OptimizationBudget budget, CancellationToken cancellation) {
         return BilinearIntegerPortfolio.select(tensor, maximumProducts, maximumSubsets, budget.maximumCandidates(),
             profile, limits(budget), cancellation::isCancelled);
+    }
+
+    /** Select a directly checked integer plan or replay a supplied acquisition at matching operand widths. */
+    public static BoundedPlanSelection.Decision<BilinearIntegerSchedule.Profile, BilinearIntegerPortfolio.Candidate>
+            selectIntegerWithReuse(BilinearProgram.Tensor tensor, BilinearIntegerSchedule.Profile profile,
+                BilinearIntegerPortfolio.Objective objective, Optional<BilinearIntegerPortfolio.Reuse> reuse, long maximumProbeWork,
+                OptimizationBudget budget, CancellationToken cancellation) {
+        long probe = budget.maximumCandidates() == 1 ? Math.min(0, maximumProbeWork) : maximumProbeWork;
+        return BilinearIntegerPortfolio.selectWithReuse(tensor, profile, objective, reuse, probe,
+            limits(budget), cancellation::isCancelled);
     }
 
     public static BilinearProgram.Result<BilinearProductLearning.Basis> trainProducts(String sourceId,

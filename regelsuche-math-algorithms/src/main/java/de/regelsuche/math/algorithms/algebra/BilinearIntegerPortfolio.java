@@ -8,12 +8,20 @@ import de.regelsuche.math.algorithms.algebra.BilinearProgram.Tensor;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Witness;
 import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Checked;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Estimate;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Kind;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Offer;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Offers;
 import de.regelsuche.scalar.ExactRational;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.BooleanSupplier;
 
 /** Select a checked integer schedule by its estimated cost at the requested operand widths. */
@@ -38,6 +46,112 @@ public final class BilinearIntegerPortfolio {
             throw new IllegalArgumentException("INVALID_PORTFOLIO_LIMIT");
         return BilinearProgram.run(limits, cancellation, work ->
             new Search(tensor, profile, maximumProducts, maximumSubsets, maximumCandidates, work).run());
+    }
+
+    /** A previously checked candidate with the charged work of acquiring it. Its old certificate is only a hint. */
+    public record Reuse(Candidate candidate, long acquisitionWork) {
+        public Reuse {
+            Objects.requireNonNull(candidate);
+            if (acquisitionWork < 0) throw new IllegalArgumentException("NEGATIVE_ACQUISITION_WORK");
+        }
+        public static Reuse from(Result<Selection> selection) {
+            return new Reuse(selection.value().orElseThrow().selected(), selection.work());
+        }
+    }
+
+    public enum Objective {
+        LIMB_WORK, NO_ALLOCATION_INCREASE;
+
+        private boolean permits(BilinearIntegerSchedule.Cost candidate, BilinearIntegerSchedule.Cost direct) {
+            return this == LIMB_WORK || (candidate.allocatedWords() <= direct.allocatedWords()
+                && candidate.allocatedObjects() <= direct.allocatedObjects());
+        }
+    }
+
+    /**
+     * Select for repeated evaluation at a given width. The fixed plan uses all live coordinate products.
+     * Only a matching width and strictly lower modeled limb work permit a probe. Both programs are
+     * checked against the current tensor. A replay recomputes its schedule and allocation requirements.
+     */
+    public static BoundedPlanSelection.Decision<Profile, Candidate> selectWithReuse(Tensor tensor, Profile profile,
+            Objective objective, Optional<Reuse> reuse, long maximumProbeWork,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        Objects.requireNonNull(objective);
+        return BoundedPlanSelection.choose(profile, BoundedPlanSelection.Unit.MODELED_LIMB_WORK,
+            reuse.map(Reuse::acquisitionWork).orElse(0L), maximumProbeWork, limits, cancellation,
+            work -> offers(tensor, profile, objective, reuse, cancellation, work));
+    }
+
+    private static Offers<Candidate> offers(Tensor tensor, Profile profile, Objective objective,
+            Optional<Reuse> reuse, BooleanSupplier cancellation, CertificateWork work) {
+        long hintCells = reuse.map(h -> retainedHint(h.candidate(), tensor, profile)).orElse(0L);
+        // Keep the hint and trace live while constructing the fixed quote.
+        var quote = BilinearProgram.run(work.remainingLimits(BoundedPlanSelection.TRACE_CELLS + hintCells),
+            cancellation, inner -> {
+                var search = new Search(tensor, profile, Integer.MAX_VALUE, 0, 1, inner);
+                search.checkSource();
+                var program = search.directProgram();
+                var plan = BilinearIntegerSchedule.plan(program, profile, search.sourceCells + Search.programCells(program), inner);
+                return new DirectQuote(program, plan);
+            });
+        work.chargeCompleted(quote.work());
+        work.charge(0);
+        if (quote.value().isEmpty()) throw new CertificateWork.Stop(quote.reason());
+        var baseline = quote.value().orElseThrow();
+        var directCost = baseline.schedule().cost();
+        var fixed = new Offer<Candidate>(new Estimate("DIRECT_COORDINATES", Kind.FIXED, objective.name(),
+            OptionalLong.of(directCost.limbWork())), allowance ->
+                checked(baseline.program(), tensor, profile, baseline, objective, false, allowance, cancellation));
+        Optional<Offer<Candidate>> alternative = reuse.map(hint -> {
+            var old = hint.candidate();
+            work.charge(profile.retainedCells());
+            boolean sameWidth = profile.equals(old.schedule().profile());
+            var cost = sameWidth ? OptionalLong.of(old.schedule().cost().limbWork()) : OptionalLong.empty();
+            Optional<String> unmet = Optional.empty();
+            if (!sameWidth) unmet = Optional.of("DIFFERENT_OPERAND_WIDTHS");
+            else if (!objective.permits(old.schedule().cost(), directCost)) unmet = Optional.of("ALLOCATION_INCREASE");
+            return new Offer<>(new Estimate("REUSED_PROGRAM", Kind.REUSED, objective.name(), cost), unmet, allowance ->
+                checked(old.witness().program(), tensor, profile, baseline, objective, true, allowance, cancellation));
+        });
+        long retained = hintCells + Search.programCells(baseline.program()) + baseline.schedule().retainedCells();
+        return new Offers<>(fixed, alternative, retained);
+    }
+
+    private record DirectQuote(BilinearProgram program, Plan schedule) {}
+
+    private static long retainedHint(Candidate candidate, Tensor tensor, Profile profile) {
+        var request = candidate.request();
+        return Search.candidateCells(candidate) + Search.formsCells(request)
+            + (tensor == request.tensor() ? 0 : BilinearProgram.matrixCells(request.tensor().outputs()))
+            + (profile == candidate.schedule().profile() ? 0 : candidate.schedule().profile().retainedCells());
+    }
+
+    private static Checked<Candidate> checked(BilinearProgram program, Tensor tensor, Profile profile, DirectQuote baseline,
+            Objective objective, boolean replay, IterationLimits limits, BooleanSupplier cancellation) {
+        var result = BilinearProgram.run(limits, cancellation, work -> {
+            long source = BilinearProgram.matrixCells(tensor.outputs()) + profile.retainedCells();
+            long cells = Search.programCells(program);
+            work.cells(source + cells + program.u().size() + (long) program.v().size());
+            checkFormWidth(program.u(), tensor.leftSize(), work);
+            checkFormWidth(program.v(), tensor.rightSize(), work);
+            work.charge(program.u().size() + (long) program.v().size());
+            var request = new Request(tensor, program.u(), program.v(), program.u().size());
+            var cost = BilinearProgramVerifier.check(request, program, source + Search.formsCells(request), work);
+            var plan = replay ? BilinearIntegerSchedule.plan(program, profile, source + Search.formsCells(request) + cells, work)
+                : baseline.schedule();
+            var directCost = baseline.schedule().cost();
+            if (replay && (plan.cost().limbWork() >= directCost.limbWork() || !objective.permits(plan.cost(), directCost)))
+                throw new BilinearProgram.Rejection("NO_VALIDATED_ADVANTAGE");
+            return new Candidate(request, new Witness(program, cost), plan);
+        });
+        return new Checked<>(result.value(), result.reason(), result.work());
+    }
+
+    private static void checkFormWidth(List<List<ExactRational>> forms, int width, CertificateWork work) {
+        for (var row : forms) {
+            work.charge(1);
+            if (row.size() != width) throw new BilinearProgram.Rejection("PROGRAM_SHAPE");
+        }
     }
 
     private static final class Search {
@@ -66,15 +180,7 @@ public final class BilinearIntegerPortfolio {
         }
 
         Selection run() {
-            work.cells(sourceCells);
-            if (profile.leftBits().size() != tensor.leftSize() || profile.rightBits().size() != tensor.rightSize())
-                throw new BilinearProgram.Rejection("PROFILE_SHAPE");
-            for (var output : tensor.outputs()) {
-                for (var value : output) {
-                    if (!work.check(value).denominator().equals(BigInteger.ONE))
-                        throw new BilinearProgram.Rejection("NON_INTEGRAL_TENSOR");
-                }
-            }
+            checkSource();
             var baseline = directProgram();
             if (baseline != null) {
                 var request = new Request(tensor, baseline.u(), baseline.v(), maximumProducts);
@@ -110,6 +216,18 @@ public final class BilinearIntegerPortfolio {
                 } while (BilinearProgramSearch.nextSubset(subset, pairs, work));
             }
             return finish(Completion.DICTIONARY_EXHAUSTED);
+        }
+
+        private void checkSource() {
+            work.cells(sourceCells);
+            if (profile.leftBits().size() != tensor.leftSize() || profile.rightBits().size() != tensor.rightSize())
+                throw new BilinearProgram.Rejection("PROFILE_SHAPE");
+            for (var output : tensor.outputs()) {
+                for (var value : output) {
+                    if (!work.check(value).denominator().equals(BigInteger.ONE))
+                        throw new BilinearProgram.Rejection("NON_INTEGRAL_TENSOR");
+                }
+            }
         }
 
         private Completion capped() {

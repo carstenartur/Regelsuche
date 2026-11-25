@@ -65,6 +65,16 @@ public final class FiniteConstraintSdk {
         return FiniteConstraintVerifier.verify(problem, certificate, limits(budget), cancellation::isCancelled);
     }
 
+    /** Count with a costed learned-order probe and a fixed min-degree fallback. */
+    public static de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Decision<
+            FiniteConstraintPlanLearning.Size, FiniteConstraintCounter.Result> countWithPolicy(
+            java.util.Optional<FiniteConstraintPlanLearning.Model> model, FiniteConstraintCounter.Problem problem,
+            long expectedUses, long maximumProbeWork, OptimizationBudget budget, CancellationToken cancellation) {
+        long probe = budget.maximumCandidates() == 1 ? Math.min(0, maximumProbeWork) : maximumProbeWork;
+        return FiniteConstraintPlanLearning.countWithPolicy(model, problem, expectedUses, probe,
+            limits(budget), cancellation::isCancelled);
+    }
+
     private static IterationLimits limits(OptimizationBudget budget) {
         return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());
     }
