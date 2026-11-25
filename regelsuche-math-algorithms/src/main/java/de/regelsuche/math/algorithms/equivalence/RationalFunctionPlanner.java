@@ -26,16 +26,17 @@ public final class RationalFunctionPlanner {
     public static Result simplify(String source, List<String> assumptions, IterationLimits limits,
             BooleanSupplier cancellation) {
         Objects.requireNonNull(source, "source");
-        assumptions = List.copyOf(Objects.requireNonNull(assumptions, "assumptions"));
+        Objects.requireNonNull(assumptions, "assumptions");
         var work = new CertificateWork(limits, cancellation);
         String candidate = source;
         List<String> conditions = List.of();
         try {
             work.charge(0);
             var producer = new RationalFunctionNormalFormEquivalenceService(work);
-            var projected = producer.parse(source);
             var arithmetic = producer.arithmetic();
-            conditions = producer.requiredFactorKeys(projected, projected).stream()
+            assumptions = arithmetic.admitAssumptions(assumptions);
+            var projected = producer.parse(source);
+            conditions = producer.requiredFactorKeys(projected).stream()
                 .map(factor -> factor + " != 0").toList();
             Polynomial numerator = projected.numerator(), denominator = projected.denominator();
             var divisors = new ArrayList<>(projected.denominatorFactors());
@@ -63,17 +64,22 @@ public final class RationalFunctionPlanner {
                 : "(" + arithmetic.text(numerator) + ")/(" + arithmetic.text(denominator) + ")";
             arithmetic.source(candidate);
             var parser = new ExpressionParser();
-            if (operations(parser.parseExactTerm(candidate).expression(), arithmetic)
-                    > operations(parser.parseExactTerm(source).expression(), arithmetic)) candidate = source;
+            try {
+                if (operations(parser.parseTerm(candidate), arithmetic)
+                        > operations(parser.parseTerm(source), arithmetic)) candidate = source;
+            } catch (ExpressionParser.Diagnostic unrepresentableLiteral) {
+                // Exact folding can produce a literal larger than the input grammar admits.
+                candidate = source;
+            }
             // The proposal must work on the complete original domain. The receiver
             // deliberately does not infer arbitrary factorizations of new divisors.
             // Retain the source if its conditions cannot authorize the new syntax.
             var domainCheck = new RationalFunctionNormalFormEquivalenceService(work)
-                .evaluate(source, candidate, conditions);
+                .evaluateOnSourceDomain(source, candidate, conditions);
             if (!domainCheck.equivalent()) candidate = source;
             var receipt = new Certificate(source, candidate, assumptions);
             var evaluation = new RationalFunctionNormalFormEquivalenceService(work)
-                .evaluate(source, candidate, assumptions);
+                .evaluateOnSourceDomain(source, candidate, assumptions);
             work.charge(0);
             if (evaluation.equivalent()) return new Result(Status.VERIFIED, source, candidate,
                 conditions, Optional.of(receipt), work.used(), "EXACT_RATIONAL_IDENTITY");
@@ -99,8 +105,9 @@ public final class RationalFunctionPlanner {
             work.charge(Math.max(expectedSource.length(), certificate.source().length()));
             if (!expectedSource.equals(certificate.source()))
                 return new Verification(false, "SOURCE_MISMATCH", work.used());
-            var result = new RationalFunctionNormalFormEquivalenceService(work).evaluate(
-                expectedSource, certificate.candidate(), certificate.assumptions());
+            var checker = new RationalFunctionNormalFormEquivalenceService(work);
+            var assumptions = checker.arithmetic().admitAssumptions(certificate.assumptions());
+            var result = checker.evaluateOnSourceDomain(expectedSource, certificate.candidate(), assumptions);
             work.charge(0);
             return new Verification(result.equivalent(), result.status().name(), work.used());
         } catch (CertificateWork.Stop stop) {

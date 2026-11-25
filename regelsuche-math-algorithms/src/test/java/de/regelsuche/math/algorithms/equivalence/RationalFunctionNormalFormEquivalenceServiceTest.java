@@ -92,6 +92,14 @@ class RationalFunctionNormalFormEquivalenceServiceTest {
     }
 
     @Test
+    void symbolicZeroPowerRequiresANonzeroBaseInTheDefaultChecker() {
+        var missing = service.evaluate("(x/y)^0", "1", List.of("y != 0"));
+        assertEquals(RationalFunctionNormalFormEquivalenceService.Status.MISSING_ASSUMPTION, missing.status());
+        assertEquals(List.of("x"), missing.missingNonZeroFactors());
+        assertConfirmed("(x/y)^0", "1", List.of("x != 0", "y != 0"));
+    }
+
+    @Test
     void zeroToZeroFailsClosed() {
         assertEquals(
             RationalFunctionNormalFormEquivalenceService.Status.UNSUPPORTED,

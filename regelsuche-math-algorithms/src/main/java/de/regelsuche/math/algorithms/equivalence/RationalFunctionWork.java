@@ -1,6 +1,9 @@
 package de.regelsuche.math.algorithms.equivalence;
 
 import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 /** Optional per-invocation bounds around the existing exact polynomial operations. */
 final class RationalFunctionWork {
@@ -23,6 +26,19 @@ final class RationalFunctionWork {
             if ("+-*/^(),".indexOf(text.charAt(i)) >= 0 && ++structure > 256)
                 throw new CertificateWork.Stop("SYNTAX_LIMIT");
         }
+    }
+
+    List<String> admitAssumptions(List<String> raw) {
+        int count = raw.size();
+        cells(count);
+        charge(count);
+        var admitted = new ArrayList<String>(count);
+        for (String assumption : raw) {
+            source(Objects.requireNonNull(assumption, "assumption"));
+            admitted.add(assumption);
+        }
+        charge(admitted.size());
+        return List.copyOf(admitted);
     }
 
     void cells(long count) {

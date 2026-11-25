@@ -15,7 +15,11 @@ Das Ergebnis enthält Quelle, Kandidat, notwendige Nichtnullbedingungen, Status,
 verbrauchte Arbeit und gegebenenfalls einen überprüfbaren Beleg. Ohne passende
 Annahmen lautet der Status `REQUIRES_ASSUMPTIONS`; es wird kein gültiger Beleg
 ausgestellt. Ein Beleg wird nur gegen die ausdrücklich angegebene erwartete
-Originalquelle geprüft. Die gekürzte Stelle von `(x^2-1)/(x-1)` bleibt bei `x=1`
+Originalquelle geprüft. Der Empfänger leitet die Domäne erneut aus dieser Quelle
+ab. Eine zusätzliche Annahme im Beleg kann einen neuen Nenner des Kandidaten
+nicht rechtfertigen. Für `A^0` müssen alle Teilterme der Basis definiert sein
+und die Basis muss ungleich null sein. Bei `(x/y)^0` sind das `x != 0` und
+`y != 0`. Die gekürzte Stelle von `(x^2-1)/(x-1)` bleibt bei `x=1`
 ausgeschlossen, obwohl das Ergebnis `x+1` dort einen Wert hätte.
 
 Alle arithmetischen Operationen, erneutes Einlesen und Prüfungen benutzen das
@@ -53,11 +57,15 @@ exakten rationalen Ausdrücke auf ihrer ausdrücklich beschriebenen Domäne.
 
 ## Feste Kontrolle und Befund
 
-Die unabhängige Kontrolle mit SymPy 1.14.0 prüft die exakte Differenz jedes
-nativen Kandidaten und dass sein Nenner auf der ursprünglichen Domäne keine
-neue ausgeschlossene Stelle einführt. Dazu werden die quadratfreien
-Nennerpolynome über den rationalen Zahlen verglichen. Alle 23 Kontrollen
-bestanden.
+Die unabhängige Kontrolle mit SymPy 1.14.0 liest den Syntaxbaum jeder Quelle
+und jedes Kandidaten vor der Kürzung. Sie sammelt die Nichtnullbedingungen
+aller Divisoren und aller Basen von Potenzen mit Exponent null, auch für
+verschachtelte Teilausdrücke. Über den rationalen Zahlen zerlegt sie die
+Bedingungspolynome in normierte irreduzible Faktoren. Drei getrennte Prüffelder
+erfassen die exakte Wertgleichheit, die vollständige Abdeckung der
+Kandidatenbedingungen durch die Quelldomäne und die Übereinstimmung der
+gemeldeten Java-Bedingungen mit den unabhängig ermittelten Quellfaktoren.
+Alle 23 Fälle bestanden jede der drei Prüfungen.
 
 Die feste Vergleichspolitik berechnet `cancel`, `factor` und
 `factor(cancel(...))` und wählt gemeinsam mit der Originalquelle den kleinsten
@@ -105,6 +113,7 @@ und den regulären Jackson-Laufzeitabhängigkeiten auf dem Klassenpfad starten:
 java -cp "$REGELSUCHE_EXPERIMENT_CLASSPATH" \
   de.regelsuche.benchmark.peer.RationalFunctionsForeignComparison \
   . research/benchmarks/rational-functions-v1/results.json
+python3 -m unittest discover -s research/benchmarks/rational-functions-v1 -p test_sympy_reference.py
 python3 research/benchmarks/rational-functions-v1/sympy_reference.py \
   research/benchmarks/rational-functions-v1/results.json \
   research/benchmarks/rational-functions-v1/sympy-reference.json

@@ -3,7 +3,9 @@ package de.regelsuche.math.algorithms.equivalence;
 import static org.junit.jupiter.api.Assertions.*;
 
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.util.AbstractList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class RationalFunctionPlannerTest {
@@ -107,6 +109,75 @@ class RationalFunctionPlannerTest {
         assertTrue(verify(result.source(), result.certificate().orElseThrow()).valid());
         assertEquals(RationalFunctionPlanner.Status.REQUIRES_ASSUMPTIONS,
             simplify(result.source(), List.of("x != -1/2")).status());
+    }
+
+    @Test
+    void aReceiptCannotAuthorizeANewCandidateHole() {
+        assertFalse(verify("x", new RationalFunctionPlanner.Certificate(
+            "x", "(x*y)/y", List.of("y != 0"))).valid());
+        assertFalse(verify("1", new RationalFunctionPlanner.Certificate(
+            "1", "y^0", List.of("y != 0"))).valid());
+    }
+
+    @Test
+    void zeroPowerRequiresADefinedNonzeroBase() {
+        var missing = simplify("x^0", List.of());
+        assertEquals(RationalFunctionPlanner.Status.REQUIRES_ASSUMPTIONS, missing.status());
+        assertEquals(List.of("x != 0"), missing.requiredConditions());
+        assertFalse(verify("x^0", new RationalFunctionPlanner.Certificate("x^0", "1", List.of())).valid());
+        assertTrue(verify("x^0", new RationalFunctionPlanner.Certificate("x^0", "1", missing.requiredConditions())).valid());
+        var nested = simplify("(x/y)^0", List.of("y != 0"));
+        assertEquals(RationalFunctionPlanner.Status.REQUIRES_ASSUMPTIONS, nested.status());
+        assertEquals(List.of("x != 0", "y != 0"), nested.requiredConditions());
+        assertEquals(RationalFunctionPlanner.Status.VERIFIED, simplify(nested.source(), nested.requiredConditions()).status());
+        assertEquals(RationalFunctionPlanner.Status.VERIFIED, simplify("2^0", List.of()).status());
+        assertEquals(RationalFunctionPlanner.Status.UNAVAILABLE, simplify("0^0", List.of()).status());
+    }
+
+    @Test
+    void aFoldedCoefficientBeyondTheParserLiteralLimitReturnsTheSource() {
+        String number = "9".repeat(600);
+        String source = number + "*" + number;
+        var result = simplify(source, List.of());
+        assertEquals(RationalFunctionPlanner.Status.VERIFIED, result.status(), result.reason());
+        assertEquals(source, result.candidate());
+        assertTrue(verify(source, result.certificate().orElseThrow()).valid());
+    }
+
+    @Test
+    void rawAssumptionsAreBoundedBeforeWhitespaceIsDiscarded() {
+        List<String> longRaw = List.of(" ".repeat(30_000) + "x != 0");
+        assertEquals("SOURCE_LIMIT", simplify("x/x", longRaw).reason());
+        assertEquals("SOURCE_LIMIT", verify("x/x", new RationalFunctionPlanner.Certificate("x/x", "1", longRaw)).reason());
+    }
+
+    @Test
+    void rawAssumptionCharactersConsumeWorkEvenIfDuplicatesOrBlank() {
+        var padded = " ".repeat(1_000) + "x != 0";
+        var result = RationalFunctionPlanner.simplify("x/x", List.of(padded, padded, " ".repeat(1_000)),
+            new IterationLimits(1_500, 20_000, 10_000), () -> false);
+        assertEquals("WORK_LIMIT", result.reason());
+    }
+
+    @Test
+    void oversizedAssumptionCountIsRejectedBeforeAnyEntryIsRead() {
+        var list = new AbstractList<String>() {
+            public int size() { return 25_000; }
+            public String get(int i) { throw new AssertionError("unadmitted entry read"); }
+        };
+        assertEquals("TERM_LIMIT", simplify("x", list).reason());
+    }
+
+    @Test
+    void cancellationDuringRawAdmissionStopsBeforeTheRestOfTheListIsCopied() {
+        var reads = new AtomicInteger();
+        var list = new AbstractList<String>() {
+            public int size() { return 100; }
+            public String get(int i) { reads.incrementAndGet(); return "x != 0"; }
+        };
+        var result = RationalFunctionPlanner.simplify("x/x", list, LIMITS, () -> reads.get() > 0);
+        assertEquals("CANCELLED", result.reason());
+        assertEquals(1, reads.get());
     }
 
     private static RationalFunctionPlanner.Result simplify(String source, List<String> assumptions) {

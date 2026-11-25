@@ -3,7 +3,6 @@ import ast
 import hashlib
 import json
 import platform
-import re
 import sys
 import time
 from pathlib import Path
@@ -14,9 +13,70 @@ if sp.__version__ != "1.14.0":
     raise SystemExit("This reference is pinned to SymPy 1.14.0")
 
 
-def parse(text):
-    names = set(re.findall(r"[A-Za-z][A-Za-z0-9_]*", text))
-    return sp.sympify(text.replace("^", "**"), locals={s: sp.Symbol(s) for s in names}, rational=True)
+def nonzero_factors(value):
+    """Irreducible monic polynomial guards, with subexpression holes already retained."""
+    numerator = sp.cancel(value).as_numer_denom()[0]
+    if numerator == 0:
+        raise ValueError("identically zero nonzero requirement")
+    symbols = sorted(numerator.free_symbols, key=str)
+    if not symbols:
+        return set()
+    polynomial = sp.Poly(numerator, *symbols, domain=sp.QQ)
+    return {factor.monic().as_expr() for factor, _ in polynomial.factor_list()[1]}
+
+
+def inspect(text):
+    """Visit the raw grammar before SymPy can erase a quotient or a zero power."""
+    source = text.strip().replace("^", "**")
+    guards = set()
+
+    def visit(node):
+        if isinstance(node, ast.Name):
+            return sp.Symbol(node.id)
+        if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+            return sp.Rational(ast.get_source_segment(source, node))
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            value = visit(node.operand)
+            return -value if isinstance(node.op, ast.USub) else value
+        if isinstance(node, ast.BinOp):
+            left, right = visit(node.left), visit(node.right)
+            if isinstance(node.op, ast.Add):
+                return left + right
+            if isinstance(node.op, ast.Sub):
+                return left - right
+            if isinstance(node.op, ast.Mult):
+                return left * right
+            if isinstance(node.op, ast.Div):
+                guards.update(nonzero_factors(right))
+                return left / right
+            if isinstance(node.op, ast.Pow) and right.is_Integer and right >= 0:
+                if right == 0:
+                    guards.update(nonzero_factors(left))
+                return left ** right
+        raise ValueError("outside rational arithmetic grammar")
+
+    return visit(ast.parse(source, mode="eval").body), guards
+
+
+def conditions_match(conditions, original_guards):
+    guards = set()
+    try:
+        for condition in conditions:
+            lhs, rhs = condition.split("!=")
+            left, left_guards = inspect(lhs)
+            right, right_guards = inspect(rhs)
+            guards.update(left_guards, right_guards, nonzero_factors(left - right))
+    except (SyntaxError, ValueError):
+        return False
+    return guards == original_guards
+
+
+def check_candidate(text, original_value, original_guards):
+    try:
+        value, guards = inspect(text)
+    except (SyntaxError, ValueError):
+        return False, False
+    return sp.cancel(original_value - value) == 0, guards <= original_guards
 
 
 def emit(expr):
@@ -56,18 +116,6 @@ def cost(text):
     return visit(ast.parse(text.replace("^", "**"), mode="eval").body)
 
 
-def on_original_domain(candidate, conditions):
-    denominator = sp.fraction(sp.cancel(candidate))[1]
-    if not denominator.free_symbols:
-        return denominator != 0
-    guards = [parse(c.split("!=")[0]) - parse(c.split("!=")[1]) for c in conditions]
-    product = sp.prod(guards)
-    symbols = sorted(product.free_symbols | denominator.free_symbols, key=str)
-    source_radical = sp.Poly(product, *symbols, domain=sp.QQ).sqf_part()
-    target_radical = sp.Poly(denominator, *symbols, domain=sp.QQ).sqf_part()
-    return source_radical.rem(target_radical).is_zero
-
-
 def main():
     source, destination = map(Path, sys.argv[1:])
     raw = source.read_bytes()
@@ -77,14 +125,19 @@ def main():
         result = {"corpus": row["corpus"], "ordinal": row["ordinal"], "name": row["name"], "status": row["status"]}
         if row["status"] == "SUPPORTED":
             started, cpu_started = time.perf_counter_ns(), time.process_time_ns()
-            expression = parse(row["source"])
-            native = parse(row["candidate"])
-            result["nativeExactAndDomainChecked"] = bool(sp.cancel(expression - native) == 0
-                and on_original_domain(native, row["requiredConditions"]))
+            try:
+                expression, original_guards = inspect(row["source"])
+            except (ValueError, SyntaxError) as error:
+                result.update(nativeExactAndDomainChecked=False, sourceDomainError=str(error))
+                rows.append(result)
+                continue
+            exact, defined = check_candidate(row["candidate"], expression, original_guards)
+            match = conditions_match(row["requiredConditions"], original_guards)
+            result.update(nativeExact=exact, nativeDefinedOnSourceDomain=defined,
+                          declaredConditionsMatchSource=match, nativeExactAndDomainChecked=exact and defined and match)
             variants = [row["source"], emit(sp.cancel(expression)), emit(sp.factor(expression)),
                         emit(sp.factor(sp.cancel(expression)))]
-            accepted = [text for text in variants if sp.cancel(expression - parse(text)) == 0
-                        and on_original_domain(parse(text), row["requiredConditions"])]
+            accepted = [text for text in variants if all(check_candidate(text, expression, original_guards))]
             best = min(accepted, key=lambda text: (cost(text), text))
             result.update(sourceSha256=row["sourceSha256"], candidate=best,
                           sourceOperations=cost(row["source"]), nativeOperations=cost(row["candidate"]),
