@@ -37,6 +37,10 @@ Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
 | Kostengebundene feste oder gelernte Planwahl | `BoundedPlanSelection` | `FiniteConstraintSdk.countWithPolicy`, `BilinearProgramSdk.selectIntegerWithReuse` | nein | Java-/SDK-Aufruf mit Auswahl- und Kostenprotokoll |
 | Rationalfunktionsvorschläge auf der Originaldomäne | `RationalFunctionPlanner` | `RationalFunctionSdk.simplify`, `verify` | nein | Java-/SDK-Aufruf mit expliziten Nichtnullbedingungen |
 | Rationaler 2×2×2-Rangnachweis und Eingabebasiswechsel | `BilinearRankBound`, `BilinearProductLearning` | `BilinearProgramSdk` | nein | ausführbare, unabhängig geprüfte Studie |
+| Exakte LP-Ausgänge und Farkas-Trägerreduktion | `LinearProgramCertificates`, `LinearProgramVerifier`, `FarkasSparsifier` | `LinearProgramSdk` | nein | Java-/SDK-Aufruf; kein allgemeiner LP-Löser |
+| Rationale Operatorreparatur und belegte Hilfsregister | `OperatorResidualPlans`, `OccupiedWorkspace` | `OperatorPlanSdk` | nein | Java-/SDK-Aufruf mit Kosten und separater Prüfung |
+| Rationale nichtkommutative Vergleiche am gemeinsamen Skalarzentrum | `RationalFormulaComparison` | `RationalFormulaSdk.compare`, `verifyComparison` | nein | Java-/SDK-Aufruf; gemeinsamer Definitionsbereich |
+| Primkörperfaktorisierung mit Vielfachheiten | `PrimeFieldMultiplicity` | `PrimeFieldFactorizationSdk` | nein | Java-/SDK-Aufruf unter der bestehenden Feld- und Arbeitsgrenze |
 | Zyklische Energie-/Kreditzertifikate | `EnergyGame`, `EnergyGameVerifier` | `EnergyGameSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
@@ -46,6 +50,11 @@ Arbeitsmenge des quadratischen Referenzverfahrens; dieser große Referenzlauf
 wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleitet.
 
 ## Verträge und Reproduktion
+
+- [LP-Zertifikate und Farkas-Reduktion](research/linear-program-certificates.md),
+  [Operatorreparatur und belegter Speicher](research/operator-residual-repair.md),
+  [rationale Formelvergleiche](research/rational-formula-realization.md),
+  [Primkörperfaktoren mit Vielfachheiten](research/prime-field-multiplicities.md).
 
 - [Exakte lokale Constraint-Zählung](research/finite-constraint-counting.md),
   [vollständiger Erwerbs-/Anfragevergleich](../research/benchmarks/constraint-lifecycle-v1/README.md),

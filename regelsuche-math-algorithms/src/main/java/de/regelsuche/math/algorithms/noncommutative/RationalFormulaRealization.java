@@ -72,12 +72,7 @@ public final class RationalFormulaRealization {
         Objects.requireNonNull(source, "source");
         var work = new RationalFormulaWork(limits, cancelled);
         try {
-            int order = order(source, 1, work);
-            var builder = new Builder(order, work);
-            Selectors selectors = builder.write(source, 0);
-            var certificate = new Certificate(source, new AffinePencil(order, Arrays.asList(builder.entries)),
-                Arrays.asList(selectors.u()), Arrays.asList(selectors.v()), builder.obligations);
-            RationalFormulaVerifier.checkStructure(source, certificate, work);
+            var certificate = build(source, work);
             work.ledger.charge(0);
             return new Result(Status.REALIZED, Optional.of(certificate), "", work.ledger.used());
         } catch (CertificateWork.Stop stopped) {
@@ -86,6 +81,16 @@ public final class RationalFormulaRealization {
         } catch (RationalFormulaVerifier.Rejected rejected) {
             return new Result(rejected.status, Optional.empty(), rejected.getMessage(), work.ledger.used());
         }
+    }
+
+    static Certificate build(RationalFormula source, RationalFormulaWork work) {
+        int order = order(source, 1, work);
+        var builder = new Builder(order, work);
+        Selectors selectors = builder.write(source, 0);
+        var certificate = new Certificate(source, new AffinePencil(order, Arrays.asList(builder.entries)),
+            Arrays.asList(selectors.u()), Arrays.asList(selectors.v()), builder.obligations);
+        RationalFormulaVerifier.checkStructure(source, certificate, work);
+        return certificate;
     }
 
     private static int order(RationalFormula source, int depth, RationalFormulaWork work) {

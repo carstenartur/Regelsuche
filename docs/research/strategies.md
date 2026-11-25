@@ -94,7 +94,7 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - [`RationalFormulaRealization.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaRealization.java#L23) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaRealization.java | public final class RationalFormulaRealization { -->
 - [`RationalFormulaVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaVerifier.java#L30) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaVerifier.java | public final class RationalFormulaVerifier { -->
 - [`RationalFormulaRealizationTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaRealizationTest.java#L35) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaRealizationTest.java | class RationalFormulaRealizationTest { -->
-- [`RationalFormulaSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/noncommutative/RationalFormulaSdk.java#L12) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/noncommutative/RationalFormulaSdk.java | public final class RationalFormulaSdk { -->
+- [`RationalFormulaSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/noncommutative/RationalFormulaSdk.java#L13) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/noncommutative/RationalFormulaSdk.java | public final class RationalFormulaSdk { -->
 
 ## Dynamische Auswertung in quadratfreien Quotientenalgebren
 
@@ -757,3 +757,47 @@ Aus diesen Einzelfällen lässt sich kein allgemeiner Suchvorteil ableiten.
 - [`PreparedQuotientSearch.java`](../../app/src/main/java/de/regelsuche/runtime/PreparedQuotientSearch.java#L37) <!-- strategy-code: app/src/main/java/de/regelsuche/runtime/PreparedQuotientSearch.java | final class PreparedQuotientSearch { -->
 - [`PreparedQuotientSearchApiTest.java`](../../app/src/test/java/de/regelsuche/web/PreparedQuotientSearchApiTest.java#L21) <!-- strategy-code: app/src/test/java/de/regelsuche/web/PreparedQuotientSearchApiTest.java | class PreparedQuotientSearchApiTest { -->
 - [`PreparedQuotientProductComparisonTest.java`](../../app/src/test/java/de/regelsuche/runtime/PreparedQuotientProductComparisonTest.java#L19) <!-- strategy-code: app/src/test/java/de/regelsuche/runtime/PreparedQuotientProductComparisonTest.java | class PreparedQuotientProductComparisonTest { -->
+
+
+## LP-Belege auf der Originalquelle prüfen und ihren Träger reduzieren
+
+- **Hypothese.** Aus den LP-Ausgabeformen der Familie 380 lässt sich ein begrenzter gemeinsamer Zertifikatsvertrag mit kleinerem Farkas-Träger gewinnen.
+- **Umsetzungsstand.** Exakte Prüfer unterscheiden Unzulässigkeit, primal-duales Optimum und zulässigen Strahl mit Einheitsgewinn. Die Trägerreduktion normiert, beseitigt Abhängigkeiten erweiterter Originalzeilen und prüft die Ausgabe erneut unter demselben Budget.
+- **Befund.** 60 fest erzeugte rationale Widersprüche bestehen separate Skalarprodukt- und Rangkontrollen. Zwei feste Reduktionen kosten 143 beziehungsweise 811 Arbeitseinheiten einschließlich beider Prüfungen; ihre bloße Eingabeprüfung kostet 44 beziehungsweise 199. Quellen-, Vorzeichen-, Dimensions-, Bit- und Ressourcengegenproben sind enthalten. [Vertrag und Reproduktion](linear-program-certificates.md)
+- **Folgerung.** Der Träger bleibt innerhalb der ursprünglichen Nichtnullpositionen und hat höchstens `rank(A)+1` Einträge. Das ist keine minimale Zeugenmenge, keine Laufzeitverbesserung und kein vollständiger LP-Löser.
+
+- [`LinearProgramCertificates.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/LinearProgramCertificates.java#L9) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/LinearProgramCertificates.java | public final class LinearProgramCertificates { -->
+- [`LinearProgramVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/LinearProgramVerifier.java#L20) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/LinearProgramVerifier.java | public final class LinearProgramVerifier { -->
+- [`FarkasSparsifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/FarkasSparsifier.java#L18) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/linalg/FarkasSparsifier.java | public final class FarkasSparsifier { -->
+- [`LinearProgramCertificatesTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/LinearProgramCertificatesTest.java#L25) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/linalg/LinearProgramCertificatesTest.java | class LinearProgramCertificatesTest { -->
+
+## Operatorreparatur mit vollständigen Anwendungskosten vergleichen
+
+- **Hypothese.** Eine exakte Korrektur weniger Eigenkoordinaten kann einen einfachen Prädiktor zu einem günstigeren endlichen Operatorplan ergänzen.
+- **Umsetzungsstand.** Die Suche prüft eine eingereichte gemeinsame rationale Eigenbasis; der separate Planprüfer expandiert `F=P+UV` auf der Originalquelle. Die Auswahl zählt beide Korrekturfaktoren und die abschließende Addition.
+- **Befund.** Für die dichte Rang-eins-Kontrolle kostet der Plan 15 statt 28 rationale Operationen pro Vektor. Bei drei konjugierten Involutionen sind es 438 statt 120; die Auswahl behält die direkte Quelle. Der belegte Hilfsspeicherplan benötigt 32 statt 14 Operationen und stellt zwei geliehene Werte für jeden Anfangszustand wieder her. [Eingaben, Kostenmodell und Gegenproben](operator-residual-repair.md)
+- **Folgerung.** Übernommen sind endliche, quellengebundene Pläne. Akquisition, Basisfindung, Bitkosten, Allokationen und vollständige Verbraucherlaufzeiten bleiben zusätzlich zu qualifizieren; die asymptotische Fourier-Aussage liefert keinen gemessenen Java-Gewinn.
+
+- [`OperatorResidualPlans.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OperatorResidualPlans.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OperatorResidualPlans.java | public final class OperatorResidualPlans { -->
+- [`OccupiedWorkspace.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OccupiedWorkspace.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OccupiedWorkspace.java | public final class OccupiedWorkspace { -->
+- [`OperatorResidualPlansTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/OperatorResidualPlansTest.java#L16) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/algebra/OperatorResidualPlansTest.java | class OperatorResidualPlansTest { -->
+
+## Rationale geordnete Formeln am gemeinsamen Skalarzentrum vergleichen
+
+- **Hypothese.** Die vorhandene affine Blockrealisierung ermöglicht einen endlichen Invarianzbeleg für rationale Formeln, sofern beide ursprünglichen Bäume an einem angegebenen Skalarzentrum definiert sind.
+- **Umsetzungsstand.** Die Suche erzeugt den erreichbaren Raum des normierten Differenzpencils. Der unabhängige Prüfer kontrolliert den Anfangsvektor, alle Abschlussbedingungen und die Nullbeobachtung direkt in den ursprünglichen Pencilkoordinaten. Ein abweichendes Wort wird als obere Dreiecksmatrix auf beiden Originalbäumen ausgewertet.
+- **Befund.** Die Push-through-Identität besitzt im Test einen vierdimensionalen invarianten Raum bei Pencilordnung 22; Aufbau, Suche und Prüfung kosten 33.184, eine frische Prüfung 11.685 Arbeitseinheiten. Für `XY` gegen `YX` entsteht ein Gegenzeuge der Ordnung drei; Kosten 6.227 beziehungsweise 3.971. Quellen-, Zentrum-, Domänen-, Invarianz- und Abbruchgegenproben sind enthalten. [Vertrag und Reproduktion](rational-formula-realization.md)
+- **Folgerung.** Der Gleichheitsbeleg gilt für alle Matrixordnungen auf dem gemeinsamen ursprünglichen Definitionsbereich. Er setzt keine Gleichheit der Domänen voraus oder durch. Ein fehlendes beziehungsweise undefiniertes Zentrum und Budgetende bleiben offen; die allgemeine Trefferliste wird nicht konstruiert.
+
+- [`RationalFormulaComparison.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaComparison.java#L21) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaComparison.java | public final class RationalFormulaComparison { -->
+- [`RationalFormulaComparisonTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaComparisonTest.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/noncommutative/RationalFormulaComparisonTest.java | class RationalFormulaComparisonTest { -->
+
+## Primkörperfaktoren samt Vielfachheiten unabhängig rekonstruieren
+
+- **Hypothese.** Der bestehende quadratfreie Berlekamp-Pfad lässt sich durch Ableitung/GGT und Frobenius-Wurzeln auf alle zulässigen Nichtnull-Eingaben erweitern.
+- **Umsetzungsstand.** Ein separater Einstieg liefert Einheit und Faktoren mit Exponenten. Der Prüfer bindet die ursprüngliche Quelle, kontrolliert die Irreduzibilität und multipliziert alles unabhängig zurück. Bestehende quadratfreie und Hensel-Schnittstellen bleiben erhalten.
+- **Befund.** Sämtliche 143 Nichtnull-Polynome über F2 bis Grad fünf beziehungsweise F3 bis Grad drei bestehen unabhängige Rekonstruktion und Probedivision. Die gemischte Grad-sieben-Kontrolle zerfällt in Vielfachheiten drei und zwei; vollständige Erzeugung/Prüfung kostet 610, erneute Prüfung 194 Arbeitseinheiten. [Vertrag, Grenzen und Reproduktion](prime-field-multiplicities.md)
+- **Folgerung.** Der begrenzte Primkörpervertrag ist erweitert. Die Feld-Enumerationsgrenze und Arbeitsgrenze bleiben wirksam; der große-Primzahl-Algorithmus aus Familie 142 und dessen Bitkomplexität werden nicht beansprucht.
+
+- [`PrimeFieldMultiplicity.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/PrimeFieldMultiplicity.java#L17) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/polynomial/PrimeFieldMultiplicity.java | public final class PrimeFieldMultiplicity { -->
+- [`PrimeFieldMultiplicityTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/polynomial/PrimeFieldMultiplicityTest.java#L9) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/polynomial/PrimeFieldMultiplicityTest.java | class PrimeFieldMultiplicityTest { -->

@@ -9,7 +9,7 @@ möglichen Anwendungen der Sammlung ausgeschöpft zu haben.
 
 ## Referenz und Beweisumfang
 
-Die feste Referenz ist
+Die Referenz des Erstaudits ist
 [`openai/math@4eaee875`](https://github.com/openai/math/tree/4eaee87548250b2682affda7d05d947c05554bae).
 Ihr [README](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/README.md)
 nennt 721 Manuskripte in 373 Familien, unterschiedliche Verifikationsstände
@@ -132,6 +132,78 @@ die Eliminationsfolge aus dem Faktorgraphen. Eine auf früheren Aufgaben trainie
 wird auf zurückgehaltenen Konfigurationsmodellen einschließlich Erwerbsaufwand verglichen.
 Die [Messung](../../research/benchmarks/constraint-planning-transfer/README.md) enthält den
 unabhängig bestätigten axTLS-Zählwert, feste heuristische Kontrollen und deren Grenzen.
+
+## Ergänzung vom 25. November 2026: geprüfte Übernahmen und zurückgestellte Teile
+
+Der Folgestand
+[`3344da59991ed94f9ba711217b29c1d760badfa6`](https://github.com/openai/math/tree/3344da59991ed94f9ba711217b29c1d760badfa6)
+enthält laut [README](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/README.md)
+730 Manuskripte in 375 Familien. Er erweitert Familie 379 und ergänzt Familie 380.
+Die folgende Prüfung umfasst alle im Folgeaudit als interessant ausgewählten
+Ansätze. Sie ist keine vollständige Beweisprüfung sämtlicher Manuskripte.
+Die Java-Tests ersetzen keinen Lean-Build; die vollständige vorgelagerte
+Formalisierung wurde in diesem Transfer nicht neu ausgeführt. Platzhalter in
+Comparator-Aufgaben wurden dabei nicht mit den eigentlichen Lösungstheoremen
+verwechselt. Der Vergleich startet bei Regelsuche `44ce67ed`.
+
+| Ansatz | Prüfung und Entscheidung | Übernommener Umfang oder konkrete Grenze |
+| --- | --- | --- |
+| 380: LP-Ausgänge und dünne Farkas-Zeugen | **Übernommen.** Exakte Originalgleichungen und Vorzeichen, danach Abhängigkeitsreduktion. | [LP-Zertifikate](linear-program-certificates.md): Unzulässigkeit, primal-duales Optimum, unbeschränkter Strahl; normalisierter Farkas-Träger innerhalb des Eingabeträgers mit höchstens `rank(A)+1` Einträgen. Kein allgemeiner LP-Löser und keine minimale Zeugenmenge. |
+| 379: Prädiktor plus exakte Reparatur | **Übernommen.** Endliche rationale Matrizen mit expliziter gemeinsamer Eigenbasis oder eingereichter Faktorisierung. | [Operatorpläne](operator-residual-repair.md): unabhängige Identität `F=P+UV` und vollständige deklarierte Vektorkosten. Dichte Rang-eins-Kontrolle: 15 statt 28 Operationen; Involutionskontrolle: 438 statt 120, daher direkte Quelle gewählt. |
+| 379: belegten Hilfsspeicher verwenden und wiederherstellen | **Übernommen.** Allgemeine endliche Scherfolgen auf drei disjunkten Wertregistern. | Derselbe [Vertrag](operator-residual-repair.md) prüft den ganzen Blockoperator für beliebige Anfangswerte. Die rechteckige Kontrolle benötigt 32 statt 14 Operationen und leiht zwei belegte Werte; kein JVM-Speicher- oder Laufzeitgewinn behauptet. |
+| 116: rationale nichtkommutative Identitäten | **Übernommen, mit Voraussetzung.** Gegebenes gemeinsames Skalarzentrum, exakter erreichbarer Unterraum, separater Invarianzprüfer. | [Rationale Formelvergleiche](rational-formula-realization.md): Gleichheit auf dem gemeinsamen Definitionsbereich für alle Matrixordnungen oder ein direkt geprüfter Dreiecksmatrix-Gegenzeuge. Fehlendes oder undefiniertes Zentrum bleibt offen. |
+| 142: vollständige Primkörperfaktorisierung | **Übernommen, begrenzt.** Vielfachheitsschichten, Ableitung/GGT und Frobenius-Wurzeln; vorhandene Berlekamp-Zerlegung bleibt der Teilerzeuger. | [Vielfachheiten](prime-field-multiplicities.md): Einheit, irreduzible Faktoren und Exponenten mit separater Produkt- und Irreduzibilitätsprüfung; alte quadratfreie und Hensel-Verträge bleiben bestehen. |
+| 378/379: endliche Constraints mit echter Greedy-Chronologie | **Im Consumer übernommen.** Die vorhandene CNF-Zählung erhält eine primzahlspezifische Übersetzung. | [Primachsenraum](https://github.com/carstenartur/primachsenraum): jede Entscheidung verwendet nur frühere Belegungen; der bekannte Gegenmodellversuch scheitert bei 86. Das liefert keine uniforme Frist. |
+| 379: Sunflowers in Sperrnachbarschaften | **Geprüft, kein stärkerer Hall-Satz.** Für disjunkte Petalen gilt exakt `t−|C|−Σ|P_i|`. | Bei durchweg nichtleeren Petalen ist die Defizienz höchstens `−|C|`. Die vier vorhandenen kleinen Graphformen behalten Defizite `1,1,0,1`. Gleiche Nachbarschaften dürfen nur unter Erhaltung der Anzahl ihrer linken Knoten zusammengefasst werden. |
+| 380: Optimierung durch höchstens zwei Zulässigkeitsaufrufe | **Zurückgestellt.** Die Reduktion setzt einen vollständigen Zulässigkeitslöser samt Zeugenrückgewinnung voraus. | Der Kern besitzt jetzt die unabhängig prüfbaren Ausgabeformen. Er besitzt noch nicht den spezifizierten stark polynomialen Orakelalgorithmus; ein weiterer Wrapper würde diese Lücke nicht schließen. |
+| 380: partiell korrekte Vorzeichen und Online-Kompression | **Voraussetzungen geprüft, nicht als generische Heuristik übernommen.** | Vorzeichentreue wird an allen gebundenen maximierenden Positionen verlangt. Jede Antwortfolge muss zu einer einzigen globalen, auch auf unbefragten Minoren definierten Belegung passen. Gewöhnliches Caching oder beliebig fehlerhafte Heuristiken erfüllen diesen Vertrag nicht. |
+| 380: Hirsch-Schranken, quadratische Programme und Spiele | **Zurückgestellt.** Die Diameteraussage setzt eine konkrete Polytopeinbettung voraus; die algorithmischen Folgerungen benötigen den vollständigen LP-Unterbau. | Kein übertragbarer Nachweis über beliebige Rewrite-Graphen oder eine Verbesserung der vorhandenen endlichen Energiezertifikate allein aus dem Titel. |
+| 116: allgemeine Trefferlisten und positive Charakteristik | **Größen und Geltungsbereich geprüft, zurückgestellt.** | Bereits `n=s=1` erzeugt in der betrachteten rationalen Konstruktion Matrixordnung 32.768 und ein dreidimensionales Gitter mit Seitenlänge 452.984.833. Die andere Charakteristik verlangt einen eigenen divisionsfreien Vertrag. Kein praktischer Consumer rechtfertigt diesen vollständigen Import. |
+| 142: großer Primmodulus in polynomialer Bitkomplexität | **Abhängigkeiten und Konstanten geprüft, zurückgestellt.** | Für unsere `int`-Primzahlen liegt bereits der riesige kleine-Primzahl-Zweig der Quelle vor. Der große Zweig benötigt Erweiterungskörper, Funktionenkörper-/Normkonstruktionen und zusätzliche analytische Voraussetzungen; die vorhandene Enumerationsgrenze bleibt explizit. |
+| 379: universelle Tensorpreise, FFT und Multiplikationsexponenten | **Endliche Bausteine geprüft, vollständiger Port zurückgestellt.** | Spektralbasis, Ausnahmekorrektur, alle Abfragen und dichte Mischungen kosten Arbeit. Ein aus dem Manuskript übernommener Stufenname ist keine einzelne billige Java-Operation. Für die bestehenden Kryptografie-Verbraucher liegt daraus kein neuer Gesamtlaufzeitgewinn vor. |
+
+Die neuen Verfahren liegen in `regelsuche-math-algorithms`; die SDK-Klassen
+delegieren. Jede erfolgreiche Suche oder Konstruktion wird gegen die gebundene
+Originalquelle nachgerechnet. Grenzen und Abbruch bleiben explizite unvollständige
+Ergebnisse. Die jeweiligen Fachseiten enthalten Testeingaben, Gegenproben,
+Kosten und Reproduktionsbefehle. Die Arbeitseinheiten verschiedener APIs sind
+keine untereinander normierten Laufzeitmessungen. Aufbau, neue Suche und Prüfung
+müssen vor einem behaupteten Verbrauchernutzen zusätzlich amortisiert werden.
+
+### Ausgeführte Integration
+
+Die lokalen vollständigen Tests der betroffenen Module umfassen 826 Tests im
+Mathematikmodul, 355 im SDK und 72 im Primachsen-Consumer: keine Fehler oder
+Fehlschläge. Ein bereits bedingter Metrikexport-Test bleibt ohne seine
+Ausgabekonfiguration übersprungen. Geänderte Java-Quellen und Tests werden
+zusätzlich mit `-Xlint:all -Werror` geprüft. Drei getrennte Fachreviews
+untersuchten LP/Chronologie, Operatorpläne sowie rationale Formeln/Primkörper.
+Eine dabei gefundene fehlende Reservierung weiterlebender Anfragezellen im
+Chronologie-Wrapper wurde mit einem zunächst fehlschlagenden Grenztest behoben.
+
+Die Bibliotheksmodule lassen sich mit Java 25 aus diesem Checkout prüfen:
+
+```sh
+mvn -B -ntp -pl regelsuche-math-algorithms,regelsuche-optimization-sdk -am test
+```
+
+Der Primachsen-Consumer hat einen separaten gepinnten Quellbuild und eigene
+Tests. Der gemeinsame lokale Lauf ersetzt keine Aussage über den gesamten
+Regelsuche-Reaktor, einen Maven-Release oder den späteren CI-/Merge-Status.
+
+Primärstellen des Folgeaudits:
+
+- [380: ausgewiesener Formalisierungsumfang](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/lean/docs/380.md),
+  [LP-Reduktion](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/Strongly-polynomial-linear-programming-November-24-2026/build/lp.tex),
+  [Vorzeichen](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/Strongly-polynomial-linear-programming-November-24-2026/build/prices.tex),
+  [Kompression](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/Strongly-polynomial-linear-programming-November-24-2026/build/compression.tex).
+- [379: ausgewiesener Formalisierungsumfang](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/lean/docs/379.md),
+  [Reparatur](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/The-logarithmic-exponent-of-finite-Fourier-transforms-November-24-2026/build/repair.tex),
+  [belegter Speicher](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/The-logarithmic-exponent-of-finite-Fourier-transforms-November-24-2026/build/layers.tex),
+  [Sunflower-Manuskript](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/An-exponential-bound-for-sunflowers-November-24-2026/build/main.tex).
+- Die Quellen, Detailrechnungen und Grenzen zu 116 und 142 stehen in
+  [rational-formula-realization.md](rational-formula-realization.md) und
+  [prime-field-multiplicities.md](prime-field-multiplicities.md).
 
 ## Verbraucher und Abschlusskriterien
 

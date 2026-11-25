@@ -4,6 +4,8 @@ import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.polynomial.PolynomialWorkSink;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 /**
  * Shared non-resettable work budget for exact polynomial algorithm stages.
@@ -12,11 +14,17 @@ import java.util.Map;
  */
 final class PolynomialWorkBudget implements PolynomialWorkSink {
     private final long limit;
+    private final BooleanSupplier cancelled;
     private final Map<String, Long> stages = new LinkedHashMap<>();
     private long total;
     private PolynomialWorkLedger snapshot;
 
     PolynomialWorkBudget(long limit) {
+        this(limit, () -> false);
+    }
+
+    PolynomialWorkBudget(long limit, BooleanSupplier cancelled) {
+        this.cancelled = Objects.requireNonNull(cancelled);
         if (limit < 1) {
             throw new IllegalArgumentException(
                 "polynomial work budget must be positive");
@@ -34,6 +42,7 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
             throw new IllegalArgumentException(
                 "polynomial work entry is invalid");
         }
+        if (cancelled.getAsBoolean()) throw new Cancelled();
         if (units == 0) {
             return;
         }
@@ -55,6 +64,10 @@ final class PolynomialWorkBudget implements PolynomialWorkSink {
             snapshot = new PolynomialWorkLedger(stages);
         }
         return snapshot;
+    }
+
+    static final class Cancelled extends RuntimeException {
+        private static final long serialVersionUID = 1L;
     }
 
     static final class LimitReached extends RuntimeException {
