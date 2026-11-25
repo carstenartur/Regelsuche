@@ -1,0 +1,38 @@
+// Check the dependency graph before execution, including the standalone coverage dry-run.
+gradle.taskGraph.whenReady { graph ->
+    if (gradle.parent != null) return
+    def root = gradle.rootProject
+    def gate = root.tasks.named('verifyCoverageRegression').get()
+    if (!graph.hasTask(gate)) throw new GradleException("Missing coverage decision task: ${gate.path}")
+
+    def predecessors = [] as Set
+    def pending = new ArrayDeque([gate])
+    while (!pending.isEmpty()) {
+        def task = pending.removeFirst()
+        graph.getDependencies(task).each { dependency ->
+            if (predecessors.add(dependency.path)) pending.addLast(dependency)
+        }
+    }
+    def policy = new groovy.json.JsonSlurper().parse(root.file('config/quality/coverage-policy.json'))
+    def producers = policy.modules.keySet().collect { ":${it}:jacocoTestReport".toString() }.sort()
+    def order = graph.allTasks*.path
+    def gatePosition = order.indexOf(gate.path)
+    def before = order.take(gatePosition) as Set
+    def delegated = root.providers.gradleProperty('separateSympyRuntimeAuthority').orNull == 'true' &&
+        System.getenv('REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY') == 'required-by-workflow'
+
+    println "Coverage graph Gradle ${gradle.gradleVersion}, mode=${delegated ? 'delegated' : 'local'}, gate=${gate.path}"
+    producers.each { path ->
+        println "  ${path} prerequisite=${predecessors.contains(path)} beforeGate=${before.contains(path)}"
+    }
+    if (delegated) {
+        def sympy = root.project(':regelsuche-math-sympy').tasks.named('jacocoTestReport').get()
+        if (sympy.enabled || predecessors.contains(sympy.path))
+            throw new GradleException("Delegated coverage requires an isolated SymPy producer: ${sympy.path}")
+    } else {
+        def missing = producers - predecessors
+        def late = producers - before
+        if (missing || late)
+            throw new GradleException("Incomplete coverage graph: missing prerequisites=${missing}, not before decision=${late}")
+    }
+}

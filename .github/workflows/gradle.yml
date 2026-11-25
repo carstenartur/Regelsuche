@@ -68,6 +68,13 @@ jobs:
           cache-dependency-path: playwright-bootstrap/pom.xml
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c
         with: { cache-cleanup: on-success }
+      - name: Check local coverage report dependencies without running the tests
+        run: |
+          set -o pipefail
+          mkdir -p build/logs
+          env -u GITHUB_SHA -u ORG_GRADLE_PROJECT_separateSympyRuntimeAuthority -u REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY \
+            ./gradlew --no-daemon --no-configuration-cache --dry-run --console=plain \
+            -I gradle/check-coverage-report-graph.init.gradle :verifyCoverageRegression 2>&1 | tee build/logs/coverage-graph-local.log
       - name: Install checkout prerequisites
         run: |
           # Chrome is preinstalled by the runner; this checkout installs no Google apt packages.
@@ -93,7 +100,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build/logs
-          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace 2>&1 | tee build/logs/ci-check.log
+          env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache -PseparateJmhAuthority=true "$REGELSUCHE_CI_TASK" --parallel --console=plain --stacktrace -I gradle/check-coverage-report-graph.init.gradle 2>&1 | tee build/logs/ci-check.log
       - name: Retain Gradle verification evidence
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
