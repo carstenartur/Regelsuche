@@ -22,6 +22,7 @@ import java.util.Objects;
 public class ExpressionParser implements RetainedGraph.View {
     @Override public void retainedReferences(RetainedGraph.Visitor v){v.requireExact(this,ExpressionParser.class);v.reference(exactRationalDomain);}
 
+    private static final ExactTermIssuer EXACT_TERM_ISSUER = new ExactTermIssuer();
     private final ExactRationalDomain exactRationalDomain;
 
     public ExpressionParser() {
@@ -96,10 +97,16 @@ public class ExpressionParser implements RetainedGraph.View {
         Expr expr = parseExpression(cursor);
         requireEnd(cursor);
         return ExactParsedTerm.parserRoot(
+            EXACT_TERM_ISSUER,
             source,
             expr,
             cursor.exactLiterals(),
             cursor.exactSourceRanges());
+    }
+
+    /** Only the parser can mark the bindings it creates as parser-issued. */
+    static final class ExactTermIssuer {
+        private ExactTermIssuer() { }
     }
 
     private static void requireEnd(Cursor cursor) {

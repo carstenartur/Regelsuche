@@ -39,7 +39,7 @@ public final class ExactParsedTerm {
     private final Map<NumberExpr, LiteralOccurrence> literalsByNode;
     private final Map<Expr, SourceRange> sourceRangesByNode;
     private final int nodeCount;
-    private final boolean parserRoot;
+    private final Provenance provenance;
 
     ExactParsedTerm(
         String source,
@@ -47,16 +47,17 @@ public final class ExactParsedTerm {
         List<LiteralOccurrence> literals,
         Map<Expr, SourceRange> sourceRanges
     ) {
-        this(source, expression, literals, sourceRanges, false);
+        this(source, expression, literals, sourceRanges, Provenance.VALIDATED);
     }
 
-    static ExactParsedTerm parserRoot(String source, Expr expression,
+    static ExactParsedTerm parserRoot(ExpressionParser.ExactTermIssuer issuer, String source, Expr expression,
             List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges) {
-        return new ExactParsedTerm(source, expression, literals, sourceRanges, true);
+        Objects.requireNonNull(issuer, "issuer");
+        return new ExactParsedTerm(source, expression, literals, sourceRanges, Provenance.PARSER_ROOT);
     }
 
     private ExactParsedTerm(String source, Expr expression,
-            List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges, boolean parserRoot) {
+            List<LiteralOccurrence> literals, Map<Expr, SourceRange> sourceRanges, Provenance provenance) {
         this.source = Objects.requireNonNull(source, "source");
         this.expression = Objects.requireNonNull(expression, "expression");
         this.literals = List.copyOf(
@@ -65,7 +66,22 @@ public final class ExactParsedTerm {
         SourceRanges validated = copyAndValidateSourceRanges(Objects.requireNonNull(sourceRanges, "sourceRanges"));
         this.sourceRangesByNode = validated.byNode();
         this.nodeCount = validated.nodeCount();
-        this.parserRoot = parserRoot;
+        this.provenance = provenance;
+    }
+
+    /** The projector's private issuer binds this slice to an already checked parser occurrence. */
+    ExactParsedTerm(ExactParsedSubtermProjector.ParserOccurrence occurrence) {
+        this.source = occurrence.source;
+        this.expression = occurrence.expression;
+        this.literals = occurrence.literals;
+        Map<NumberExpr, LiteralOccurrence> index = new IdentityHashMap<>();
+        for (LiteralOccurrence literal : literals) {
+            index.put(literal.node(), literal);
+        }
+        this.literalsByNode = Collections.unmodifiableMap(index);
+        this.sourceRangesByNode = occurrence.ranges;
+        this.nodeCount = occurrence.nodeCount;
+        this.provenance = Provenance.PARSER_PROJECTION;
     }
 
     int nodeCount() {
@@ -73,8 +89,14 @@ public final class ExactParsedTerm {
     }
 
     boolean isParserRoot() {
-        return parserRoot;
+        return provenance == Provenance.PARSER_ROOT;
     }
+
+    boolean hasParserBindings() {
+        return provenance != Provenance.VALIDATED;
+    }
+
+    private enum Provenance { VALIDATED, PARSER_ROOT, PARSER_PROJECTION }
 
     private Map<NumberExpr, LiteralOccurrence> validateAndIndexLiterals() {
         Map<NumberExpr, LiteralOccurrence> occurrences =
