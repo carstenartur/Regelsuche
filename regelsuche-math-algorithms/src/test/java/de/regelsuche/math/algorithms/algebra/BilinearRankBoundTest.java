@@ -61,6 +61,24 @@ class BilinearRankBoundTest {
             LIMITS, () -> false).value().orElseThrow().lowerBound());
     }
 
+    @Test void boundVerificationAndSearchShareOneInputScanAtTheExactWorkBoundary() {
+        var tensor = new Tensor(1, 1, List.of(row(0)));
+        var request = new BilinearProgram.Request(tensor, List.of(row(1)), List.of(row(1)), 1);
+        var bound = BilinearRankBound.computeRational(tensor, LIMITS, () -> false).value().orElseThrow();
+        var verification = BilinearRankBound.verifyRational(tensor, bound, LIMITS, () -> false);
+        var ordinary = BilinearProgramSearch.search(request, LIMITS, () -> false);
+        // Rank zero makes both searches enumerate precisely the same subsets. The two independent
+        // calls each pay for the singleton source row and its zero coefficient (two units).
+        long exact = verification.work() + ordinary.work() - 2;
+        var combined = BilinearProgramSearch.searchWithRationalBound(request, bound,
+            LIMITS.withMaximumWork(exact), () -> false);
+        assertEquals(VERIFIED, combined.status(), combined.reason());
+        assertEquals(ordinary.value(), combined.value());
+        assertEquals(exact, combined.work());
+        assertEquals("WORK_LIMIT", BilinearProgramSearch.searchWithRationalBound(request, bound,
+            LIMITS.withMaximumWork(exact - 1), () -> false).reason());
+    }
+
     @Test void forgedPencilOrWrongSourceAndLimitsCannotYieldTheStrongerBound() {
         var tensor = new Tensor(2, 2, List.of(row(1,0,0,-1), row(0,1,1,0)));
         var good = BilinearRankBound.computeRational(tensor, LIMITS, () -> false).value().orElseThrow();
