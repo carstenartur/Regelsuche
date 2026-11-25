@@ -5,8 +5,7 @@ import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -22,7 +21,7 @@ import java.util.Set;
  * <p>The MCTS variant is well suited to large transformation spaces where
  * neither a strict ordering (best-first) nor pure randomness explore all
  * promising branches. It returns the union of all explored states so the
- * surrounding {@link de.regelsuche.search.TransformationSearchService} can
+ * surrounding search service can
  * record the search graph as usual.</p>
  */
 public class MonteCarloTreeSearchStrategy implements SearchStrategy {
@@ -50,71 +49,51 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         String root = problem.rootExpression().trim().replaceAll("\\s+", " ");
         SearchState rootState = newRoot(root, problem);
 
-        Map<String, SearchState> states = new HashMap<>();
-        Map<String, Node> nodes = new HashMap<>();
-        Set<String> visitedOrder = new LinkedHashSet<>();
-        String rootKey = stateKey(rootState);
-        states.put(rootKey, rootState);
-        nodes.put(rootKey, new Node());
-        visitedOrder.add(rootKey);
+        // This controller retains complete paths. A semantic value hash alone
+        // cannot identify a continuation or its proof/assumption obligations.
+        Map<SearchState, Node> nodes = new LinkedHashMap<>();
+        nodes.put(rootState, new Node());
 
         int budget = problem.heuristic().maxVisitedExpressions();
-        int maxIterations = budget * 4;
-        int iteration = 0;
-        while (visitedOrder.size() < budget && iteration < maxIterations) {
+        long maxIterations = 4L * budget;
+        long iteration = 0;
+        while (nodes.size() < budget && iteration < maxIterations) {
             iteration++;
-            Node rootNode = nodes.get(rootKey);
-            if (rootNode != null && rootNode.terminal) {
+            if (nodes.get(rootState).terminal) {
                 break;
             }
-            String selectedKey = select(nodes, rootKey);
-            SearchState selected = states.get(selectedKey);
-            if (selected == null || selected.depth() >= problem.heuristic().maxDepth()) {
-                // Cannot expand from a depth-limited leaf; mark terminal and continue.
-                if (nodes.containsKey(selectedKey)) {
-                    nodes.get(selectedKey).markTerminal();
-                }
-                if (selectedKey.equals(rootKey)) {
-                    break;
-                }
+            SearchState selected = select(nodes, rootState);
+            Node selectedNode = nodes.get(selected);
+            if (selectedNode.terminal) {
+                continue;
+            }
+            if (selected.depth() >= problem.heuristic().maxDepth()) {
+                selectedNode.markTerminal();
                 continue;
             }
             List<SearchState> children = expand(problem, selected);
-            if (children.isEmpty()) {
-                nodes.get(selectedKey).markTerminal();
-                continue;
-            }
-            int addedThisIteration = 0;
+            List<SearchState> admitted = new ArrayList<>();
             for (SearchState child : children) {
-                String childKey = stateKey(child);
-                if (states.putIfAbsent(childKey, child) == null) {
-                    nodes.put(childKey, new Node());
-                    visitedOrder.add(childKey);
-                    addedThisIteration++;
-                    if (visitedOrder.size() >= budget) {
-                        break;
-                    }
+                if (nodes.putIfAbsent(child, new Node()) == null) {
+                    admitted.add(child);
                 }
-                nodes.get(selectedKey).addChild(childKey);
+                selectedNode.addChild(child);
+                if (nodes.size() >= budget) {
+                    break;
+                }
             }
-            if (addedThisIteration == 0) {
-                // No progress from this node — treat it as terminal so UCB
-                // does not keep selecting it forever.
-                nodes.get(selectedKey).markTerminal();
+            if (admitted.isEmpty()) {
+                selectedNode.markTerminal();
                 continue;
             }
+            // Do not roll out a candidate that was never admitted to the tree.
             for (int i = 0; i < rolloutsPerIteration; i++) {
-                SearchState pick = children.get(random.nextInt(children.size()));
+                SearchState pick = admitted.get(random.nextInt(admitted.size()));
                 double reward = rollout(problem, pick);
                 backpropagate(nodes, pick, reward);
             }
         }
-
-        List<SearchState> ordered = new ArrayList<>();
-        for (String key : visitedOrder) {
-            ordered.add(states.get(key));
-        }
-        return ordered;
+        return new ArrayList<>(nodes.keySet());
     }
 
     private SearchState newRoot(String root, SearchProblem problem) {
@@ -138,9 +117,9 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         );
     }
 
-    private String select(Map<String, Node> nodes, String rootKey) {
-        String current = rootKey;
-        java.util.Set<String> visitedInPath = new java.util.HashSet<>();
+    private SearchState select(Map<SearchState, Node> nodes, SearchState rootKey) {
+        SearchState current = rootKey;
+        Set<SearchState> visitedInPath = new java.util.HashSet<>();
         while (true) {
             if (!visitedInPath.add(current)) {
                 // Cycle or repeated descent — bail out.
@@ -150,11 +129,11 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
             if (node == null || node.children.isEmpty() || node.terminal) {
                 return current;
             }
-            String best = null;
+            SearchState best = null;
             double bestScore = Double.NEGATIVE_INFINITY;
             int parentVisits = Math.max(node.visits, 1);
             boolean anyNonTerminal = false;
-            for (String childKey : node.children) {
+            for (SearchState childKey : node.children) {
                 Node child = nodes.get(childKey);
                 if (child == null || child.terminal) {
                     continue;
@@ -181,136 +160,84 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         }
     }
 
+    private List<Transformation> eligibleTransformations(SearchProblem problem, SearchState parent) {
+        if (parent.depth() >= problem.heuristic().maxDepth()) {
+            return List.of();
+        }
+        return problem.transformations(parent.expression()).stream()
+            .filter(step -> !parent.appliedRuleApplications().contains(step.applicationKey()))
+            .filter(step -> step.kind() != RewriteKind.EXPAND
+                || parent.expandedStepCount() < problem.heuristic().maxExpandingSteps())
+            .filter(step -> !step.transformedExpression().equals(parent.expression()))
+            .limit(problem.heuristic().maxCandidatesPerState())
+            .toList();
+    }
+
     private List<SearchState> expand(SearchProblem problem, SearchState parent) {
         List<SearchState> children = new ArrayList<>();
-        for (Transformation transformation : problem.transformations(parent.expression())) {
-            if (parent.appliedRuleApplications().contains(transformation.applicationKey())) {
-                continue;
-            }
-            int expandedSteps = parent.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
-            if (expandedSteps > problem.heuristic().maxExpandingSteps()) {
-                continue;
-            }
-            String nextExpression = transformation.transformedExpression();
-            if (nextExpression.equals(parent.expression())) {
-                continue;
-            }
-            ExpressionScore nextScore = problem.scorer().score(nextExpression);
-            int improvement = parent.score().weightedTotal() - nextScore.weightedTotal();
-            Set<String> applied = new java.util.HashSet<>(parent.appliedRuleApplications());
-            applied.add(transformation.applicationKey());
-            List<String> path = new ArrayList<>(parent.path());
-            path.add(nextExpression);
-            List<String> appliedRuleIds = new ArrayList<>(parent.appliedRuleIds());
-            appliedRuleIds.add(transformation.rule());
-            List<RewriteKind> appliedRuleKinds = new ArrayList<>(parent.appliedRuleKinds());
-            appliedRuleKinds.add(transformation.kind());
-            List<Boolean> equivalenceFlags = new ArrayList<>(parent.equivalencePreservingFlags());
-            equivalenceFlags.add(transformation.equivalencePreservingByConstruction());
-            children.add(new SearchState(
-                nextExpression,
-                parent.depth() + 1,
-                nextScore,
-                path,
-                appliedRuleIds,
-                applied,
-                expandedSteps,
-                problem.canonicalizer().stableHash(nextExpression),
-                parent.expression(),
-                transformation.rule(),
-                transformation.kind(),
-                transformation.mayIncreaseComplexity(),
-                transformation.estimatedCostDelta(),
-                transformation.equivalencePreservingByConstruction(),
-                improvement,
-                appliedRuleKinds,
-                equivalenceFlags,
-                SearchState.accumulatedAssumptions(parent, transformation),
-                SearchState.extendedPath(parent, transformation)
-            ));
-            if (children.size() >= problem.heuristic().maxCandidatesPerState()) {
-                break;
-            }
+        for (Transformation transformation : eligibleTransformations(problem, parent)) {
+            children.add(childState(problem, parent, transformation));
         }
-        children.sort(Comparator.comparingInt((SearchState state) -> state.score().weightedTotal()));
+        children.sort(Comparator.comparingInt(state -> state.score().weightedTotal()));
         return children;
+    }
+
+    private SearchState childState(SearchProblem problem, SearchState parent, Transformation transformation) {
+        String nextExpression = transformation.transformedExpression();
+        ExpressionScore nextScore = problem.scorer().score(nextExpression);
+        Set<String> applied = new java.util.HashSet<>(parent.appliedRuleApplications());
+        applied.add(transformation.applicationKey());
+        List<String> path = new ArrayList<>(parent.path());
+        path.add(nextExpression);
+        List<String> appliedRuleIds = new ArrayList<>(parent.appliedRuleIds());
+        appliedRuleIds.add(transformation.rule());
+        List<RewriteKind> appliedRuleKinds = new ArrayList<>(parent.appliedRuleKinds());
+        appliedRuleKinds.add(transformation.kind());
+        List<Boolean> equivalenceFlags = new ArrayList<>(parent.equivalencePreservingFlags());
+        equivalenceFlags.add(transformation.equivalencePreservingByConstruction());
+        return new SearchState(
+            nextExpression, parent.depth() + 1, nextScore, path, appliedRuleIds, applied,
+            parent.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0),
+            problem.canonicalizer().stableHash(nextExpression), parent.expression(),
+            transformation.rule(), transformation.kind(), transformation.mayIncreaseComplexity(),
+            transformation.estimatedCostDelta(), transformation.equivalencePreservingByConstruction(),
+            parent.score().weightedTotal() - nextScore.weightedTotal(),
+            appliedRuleKinds, equivalenceFlags, SearchState.accumulatedAssumptions(parent, transformation),
+            SearchState.extendedPath(parent, transformation)
+        );
     }
 
     private double rollout(SearchProblem problem, SearchState start) {
         SearchState current = start;
         double bestImprovement = current.improvement();
         for (int step = 0; step < rolloutDepth; step++) {
-            List<Transformation> options = problem.transformations(current.expression());
+            List<Transformation> options = eligibleTransformations(problem, current);
             if (options.isEmpty()) {
                 break;
             }
-            Transformation pick = options.get(random.nextInt(options.size()));
-            String nextExpression = pick.transformedExpression();
-            if (nextExpression.equals(current.expression())) {
-                break;
-            }
-            ExpressionScore nextScore = problem.scorer().score(nextExpression);
-            int improvement = current.score().weightedTotal() - nextScore.weightedTotal();
-            bestImprovement = Math.max(bestImprovement, improvement);
-            List<String> rolloutPath = new ArrayList<>(current.path());
-            rolloutPath.add(nextExpression);
-            List<String> rolloutRules = new ArrayList<>(current.appliedRuleIds());
-            rolloutRules.add(pick.rule());
-            Set<String> rolloutApplications = new java.util.HashSet<>(current.appliedRuleApplications());
-            rolloutApplications.add(pick.applicationKey());
-            List<RewriteKind> rolloutKinds = new ArrayList<>(current.appliedRuleKinds());
-            rolloutKinds.add(pick.kind());
-            List<Boolean> rolloutFlags = new ArrayList<>(current.equivalencePreservingFlags());
-            rolloutFlags.add(pick.equivalencePreservingByConstruction());
-            current = new SearchState(
-                nextExpression,
-                current.depth() + 1,
-                nextScore,
-                rolloutPath,
-                rolloutRules,
-                rolloutApplications,
-                current.expandedStepCount() + (pick.kind() == RewriteKind.EXPAND ? 1 : 0),
-                problem.canonicalizer().stableHash(nextExpression),
-                current.expression(),
-                pick.rule(),
-                pick.kind(),
-                pick.mayIncreaseComplexity(),
-                pick.estimatedCostDelta(),
-                pick.equivalencePreservingByConstruction(),
-                improvement,
-                rolloutKinds,
-                rolloutFlags,
-                SearchState.accumulatedAssumptions(current, pick),
-                SearchState.extendedPath(current, pick)
-            );
+            current = childState(problem, current, options.get(random.nextInt(options.size())));
+            bestImprovement = Math.max(bestImprovement, current.improvement());
         }
         return bestImprovement;
     }
 
-    private void backpropagate(Map<String, Node> nodes, SearchState leaf, double reward) {
-        // Without explicit parent pointers in the cached node table we only
-        // update the leaf and its key; full backprop is implicit through UCB
-        // because expansion already added the child key to its parent's child
-        // set. Updating the leaf statistics is sufficient to bias future UCB
-        // decisions toward improving subtrees.
-        Node node = nodes.get(stateKey(leaf));
+    private void backpropagate(Map<SearchState, Node> nodes, SearchState leaf, double reward) {
+        // This existing heuristic updates the admitted leaf's statistics only.
+        // It does not claim full ancestor backpropagation.
+        Node node = nodes.get(leaf);
         if (node != null) {
             node.visits++;
             node.totalReward += reward;
         }
     }
 
-    private static String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + state.appliedRuleApplications();
-    }
-
     private static final class Node {
-        private final List<String> children = new ArrayList<>();
+        private final List<SearchState> children = new ArrayList<>();
         private int visits;
         private double totalReward;
         private boolean terminal;
 
-        void addChild(String key) {
+        void addChild(SearchState key) {
             if (!children.contains(key)) {
                 children.add(key);
             }
