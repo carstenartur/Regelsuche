@@ -90,7 +90,7 @@ final class RationalFormulaEvaluation {
         for (var obligation : certificate.obligations()) {
             int order = obligation.order() * dimension;
             ExactRational[] data = pencilSystem(obligation.offset(), obligation.order(), 0);
-            if (!reduce(data, order, order)) return OptionalInt.of(obligation.occurrence());
+            if (!reduce(data, order, order, work)) return OptionalInt.of(obligation.occurrence());
         }
         return OptionalInt.empty();
     }
@@ -106,7 +106,7 @@ final class RationalFormulaEvaluation {
                 data[(block * dimension + index) * width + order + index] = certificate.v().get(block);
             }
         }
-        if (!reduce(data, order, width)) throw new Rejected(Status.INVALID_CERTIFICATE, "SINGULAR_ROOT_PENCIL");
+        if (!reduce(data, order, width, work)) throw new Rejected(Status.INVALID_CERTIFICATE, "SINGULAR_ROOT_PENCIL");
 
         ExactRational[] value = table(dimension, dimension);
         for (int block = 0; block < blockOrder; block++) {
@@ -217,7 +217,7 @@ final class RationalFormulaEvaluation {
             }
             data[row * width + dimension + row] = ONE;
         }
-        if (!reduce(data, dimension, width)) throw new Undefined(nextOccurrence);
+        if (!reduce(data, dimension, width, work)) throw new Undefined(nextOccurrence);
         ExactRational[] value = table(dimension, dimension);
         for (int row = 0; row < dimension; row++) {
             work.ledger.charge(dimension);
@@ -227,7 +227,7 @@ final class RationalFormulaEvaluation {
     }
 
     /** Exact Gauss-Jordan elimination, with optional trailing right hand sides. */
-    private boolean reduce(ExactRational[] data, int order, int width) {
+    static boolean reduce(ExactRational[] data, int order, int width, RationalFormulaWork work) {
         for (int pivot = 0; pivot < order; pivot++) {
             int pivotRow = pivot;
             while (pivotRow < order && data[pivotRow * width + pivot].isZero()) {

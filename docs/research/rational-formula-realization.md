@@ -102,3 +102,78 @@ mvn -pl regelsuche-optimization-sdk -am \
   -Dtest=RationalFormulaRealizationTest,RationalFormulaSdkTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
+
+## Vergleich am vorgegebenen gemeinsamen Skalarpunkt
+
+`RationalFormulaSdk.compare(left, right, center, limits, token)` erwartet zwei
+rationale Formelquellen und eine `Assignment` der Ordnung eins. Alle benutzten
+Variablen brauchen einen rationalen Wert. Die beiden ursprünglichen Bäume
+müssen dort definiert sein. Der Algorithmus überprüft ihre Inversenvorkommen
+mit der konkreten Auswertung. Bei einem singulären Zentrum, einer fehlenden
+Variablen oder einem Ressourcenabbruch liefert er `INCONCLUSIVE` und leere
+Evidenz. Beispielsweise ist $(XY-YX)^{-1}$ an jedem skalaren Zentrum
+undefiniert. Der Algorithmus sucht kein anderes Zentrum.
+
+Die Blockdiagonale der beiden überprüften Pencils realisiert die Differenz
+mit dem Ausgangsselektor $u=(u_l,-u_r)$ und der gestapelten Eingangsspalte
+$v$. Seien $C=L(c)$, $L_i$ die linearen Koeffizienten und $A_i=-C^{-1}L_i$.
+Die Suche startet mit $C^{-1}v$ und erweitert die Basis durch linear
+unabhängige Spalten $A_i b$. Sie besucht höchstens so viele unabhängige
+Spalten wie die Ordnung $q$ des Differenzpencils. Jede neue Spalte speichert
+das Wort ihrer Erzeugung.
+
+* **Gleichheit.** Das Zertifikat enthält die beiden Quellrealisierungen,
+  das Zentrum und Spalten $B$. Der Prüfer bindet beide Realisierungen an die
+  erwarteten Bäume und prüft in den ursprünglichen Koordinaten exakt
+  $v\in\operatorname{im}(CB)$, $\operatorname{im}(L_iB)\subseteq
+  \operatorname{im}(CB)$ für jedes $i$ und $uB=0$. Er braucht die von der
+  Suche berechnete Inverse von $C$ dazu nicht. Für beliebige Matrizen der
+  Ordnung $d$ erhält der normierte Pencil $(C^{-1}\otimes I_d)L(X)$ den
+  Raum $\operatorname{im}(B)\otimes\mathbb Q^d$. Sind beide ursprünglichen
+  Bäume definiert, ist dieser Pencil invertierbar. Seine Einschränkung auf
+  den endlichdimensionalen invarianten Raum ist ebenfalls invertierbar.
+  Daher liegt die Lösung zum Eingang $C^{-1}v\otimes I_d$ in diesem Raum,
+  wo der Ausgang verschwindet. Das Urteil `EQUAL_ON_SHARED_DOMAIN` gilt
+  in jeder Matrixordnung auf dem gemeinsamen Definitionsbereich. Zum
+  Beispiel stimmen $(X^{-1})^{-1}$ und $X$ bei invertierbarem $X$ überein.
+* **Verschiedenheit.** Zu einem Wort $i_1\dots i_k$ mit
+  $u A_{i_1}\cdots A_{i_k}C^{-1}v\ne0$ bildet der Algorithmus Matrizen
+  der Ordnung $k+1$. Variable $j$ hat Diagonale $c_j$ und genau an den
+  Positionen $(r,r+1)$ mit $i_r=j$ eine Eins. In der endlichen
+  Dreiecksentwicklung der Resolvente isoliert der rechte obere Eintrag
+  den Wortkoeffizienten. An jedem Inversengatter bleiben die diagonalen
+  Operandenwerte des definierten Zentrums erhalten. Zur Ausgabe `DISTINCT`
+  wertet der Prüfer zusätzlich beide ursprünglichen Bäume an den gelieferten
+  Matrizen aus und vergleicht die konkreten Ergebnisse. Ein undefinierter
+  oder gleicher Matrixwert verwirft den Zeugen.
+
+`RationalFormulaSdk.verifyComparison(left, right, center, evidence, limits,
+token)` prüft die eingereichte Evidenz erneut. Er benötigt weder die
+gefundene Basisreihenfolge noch einen früheren Ergebnisstatus. Die folgende
+Messung verwendet `RationalFormulaComparisonTest`, Baumsubtraktion
+$a+((-1)b)$, das Nullzentrum sowie Arbeit/Platz/Zeit
+20.000.000/500.000/15.000 ms. Die Arbeit beinhaltet beide
+Quellrealisierungen, die konkrete Zentrumsprüfung, die Suche und die
+abschließende Evidenzprüfung. Die letzte Spalte zählt einen separaten
+Prüfaufruf. Diese Zähler sind keine Laufzeitmessungen.
+
+| Vergleich | $q$ | Evidenz | Arbeit gesamt | Erneute Prüfung |
+| --- | ---: | --- | ---: | ---: |
+| $(I-XY)^{-1}X=X(I-YX)^{-1}$ | 22 | 4 Spalten | 33.184 | 11.685 |
+| $XY$ gegen $YX$ | 8 | Zeuge der Ordnung 3 | 6.227 | 3.971 |
+
+Die universelle Trefferliste aus Familie 116 hat einen anderen
+Eingabevertrag. Für $n=s=1$ geben die Manuskriptparameter $w=2$, $B=3$,
+$\Delta=48$, $M=256$, Matrixordnung $D=M^2/2=32.768$ und
+$H=1+3(s+2)BM^3=452.984.833$. Der Generator betrachtet $H^3$ Tripel und
+filtert singuläre Ausgangsmatrizen. Bereits eine dichte Matrix dieser
+Ordnung benötigt mehr als eine Milliarde Plätze. Die Implementierung
+benutzt das gegebene Zentrum und die tatsächlichen Quelldaten. Sie
+implementiert keine universelle Trefferliste.
+[Parameter](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/Polynomial-Hitting-Lists-for-Noncommutative-Rational-Formulas-September-24-2026/build/sections/expansion.tex) · [Generator](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/Polynomial-Hitting-Lists-for-Noncommutative-Rational-Formulas-September-24-2026/build/sections/generator.tex)
+
+```sh
+mvn -pl regelsuche-optimization-sdk -am \
+  -Dtest=RationalFormulaComparisonTest,RationalFormulaComparisonSdkTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```

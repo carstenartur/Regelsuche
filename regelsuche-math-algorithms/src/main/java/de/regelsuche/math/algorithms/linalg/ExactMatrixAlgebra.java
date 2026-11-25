@@ -318,12 +318,19 @@ public final class ExactMatrixAlgebra {
     public static final class Work {
         private final int configured;
         private int consumed;
+        private final java.util.function.LongConsumer observer;
 
         public Work(int configured) {
+            this(configured, null);
+        }
+
+        /** Share arithmetic charges and interruption checks with an enclosing bounded proof. */
+        public Work(int configured, java.util.function.LongConsumer observer) {
             if (configured < 0) {
                 throw new IllegalArgumentException("work must not be negative");
             }
             this.configured = configured;
+            this.observer = observer;
         }
 
         public void consume(long units) {
@@ -333,6 +340,7 @@ public final class ExactMatrixAlgebra {
             if (units > remaining()) {
                 throw new Exhausted();
             }
+            if (observer != null) observer.accept(units);
             consumed += (int) units;
         }
 

@@ -250,7 +250,7 @@ public final class FiniteFieldFactorization {
         return gcd.isOne();
     }
 
-    private static List<UnivariatePolynomialView<BigInteger>> split(
+    static List<UnivariatePolynomialView<BigInteger>> split(
         UnivariatePolynomialView<BigInteger> source,
         BerlekampKernel.Kernel kernel,
         PrimeField field,

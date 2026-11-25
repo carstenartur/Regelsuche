@@ -2,6 +2,7 @@ package de.regelsuche.sdk.optimization.noncommutative;
 
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormula;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.Certificate;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier;
@@ -26,5 +27,15 @@ public final class RationalFormulaSdk {
                                                              Assignment assignment, IterationLimits limits,
                                                              CancellationToken cancellation) {
         return RationalFormulaVerifier.evaluate(source, certificate, assignment, limits, cancellation::isCancelled);
+    }
+
+    public static RationalFormulaComparison.Result compare(RationalFormula left, RationalFormula right, Assignment center,
+                                                           IterationLimits limits, CancellationToken cancellation) {
+        return RationalFormulaComparison.compare(left, right, center, limits, cancellation::isCancelled);
+    }
+
+    public static RationalFormulaComparison.Result verifyComparison(RationalFormula left, RationalFormula right,
+        Assignment center, RationalFormulaComparison.Evidence evidence, IterationLimits limits, CancellationToken cancellation) {
+        return RationalFormulaComparison.verify(left, right, center, evidence, limits, cancellation::isCancelled);
     }
 }
