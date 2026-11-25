@@ -46,7 +46,7 @@ class MavenParallelVerificationWorkflowContractTest {
       "de.regelsuche.quality.coverage.CoverageRegressionMain";
 
   private static final Set<String> SHOWCASE_AUTHORITIES = Set.of(
-      "gradle-verification", "jmh-verification", "sympy-runtime-verification");
+      "preflight-contracts", "gradle-verification", "jmh-verification", "sympy-runtime-verification");
   private static final Set<String> REQUIRED_ROUTINE_AUTHORITIES = Set.of(
       "maven-product-verification", GIT_FREE_AUTHORITY,
       "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction",
@@ -168,7 +168,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(jmh.contains("-PseparateJmhAuthority=true"),
         "the benchmark runner must not disable its own task graph");
     assertFalse(jmh.contains(FULL_MAVEN_COMMAND));
-    assertFalse(jmh.contains("needs:"),
+    assertTrue(jmh.contains("needs: preflight-contracts"),
         "JMH must start concurrently rather than wait for another authority");
     assertTrue(jmh.contains("name: jmh-verification"));
     assertTrue(jmh.contains("if-no-files-found: error"),
@@ -183,7 +183,7 @@ class MavenParallelVerificationWorkflowContractTest {
         "mvn --batch-mode --no-transfer-progress -Pfull -pl regelsuche-math-sympy -am verify"));
     assertFalse(sympy.contains("gradle/run-isolated-sympy-runtime-authority.sh"));
     assertFalse(sympy.contains("run-isolated-jmh-authority.sh"));
-    assertFalse(sympy.contains("needs:"),
+    assertTrue(sympy.contains("needs: preflight-contracts"),
         "SymPy must start concurrently rather than wait for JMH");
     assertFalse(sympy.contains(FULL_MAVEN_COMMAND));
     assertTrue(sympy.contains("name: sympy-runtime-verification"));
@@ -216,7 +216,7 @@ class MavenParallelVerificationWorkflowContractTest {
         "the complete checkout reactor must also run the Web Workbench image suite");
     assertFalse(maven.contains("-Pfull,web-workbench-image"),
         "Web Workbench must not rerun the upstream reactor");
-    assertFalse(maven.contains("needs:"),
+    assertTrue(maven.contains("needs: preflight-contracts"),
         "Maven must begin concurrently rather than wait for another authority");
     assertFalse(maven.contains("actions/download-artifact@"),
         "Maven must not consume another authority's output");
@@ -332,7 +332,7 @@ class MavenParallelVerificationWorkflowContractTest {
     var archive = jobs.get(GIT_FREE_AUTHORITY);
     assertNotNull(archive, "the complete Git-free lifecycle must be an independent CI job");
     assertEquals("github.event_name != 'create'", archive.required("if").asText());
-    assertFalse(archive.has("needs"), "archive verification must start in parallel with checkout verification");
+    assertEquals("preflight-contracts", archive.path("needs").asText(), "archive and checkout verification share only the fast preflight");
     assertFalse(archive.has("continue-on-error"));
     assertEquals("${{ github.sha }}", archive.required("env").required("REGELSUCHE_AUTHORITY_GITHUB_SHA").asText());
     var steps = archive.required("steps").valueStream().toList();
@@ -603,7 +603,7 @@ class MavenParallelVerificationWorkflowContractTest {
     assertEquals("github.event_name != 'create'", comparison.path("if").asText());
     assertEquals("ubuntu-22.04", comparison.path("runs-on").asText());
     assertEquals(30, comparison.path("timeout-minutes").asInt());
-    assertFalse(comparison.has("needs"),
+    assertEquals("preflight-contracts", comparison.path("needs").asText(),
         "the typed comparison must start independently of the other authorities");
     assertFalse(comparison.has("continue-on-error"));
 
