@@ -18,7 +18,11 @@ final class CnfCountingWorkbench {
     private static final ObjectMapper JSON = new ObjectMapper();
     private CnfCountingWorkbench() {}
 
-    record Request(FiniteConstraintCnf.Source source, OptimizationBudget budget) {}
+    record Request(FiniteConstraintCnf.Source source, OptimizationBudget budget) {
+        FiniteConstraintCnf.Result count(CancellationToken token) {
+            return FiniteConstraintSdk.countCnf(source, budget, token);
+        }
+    }
 
     static Request read(Map<String, Object> body) {
         if (!body.keySet().equals(Set.of("variableCount", "clauses", "fixed", "maximumWork")))
@@ -58,8 +62,7 @@ final class CnfCountingWorkbench {
         throw new IllegalArgumentException(field + ": Liste erwartet oder Größenlimit überschritten.");
     }
 
-    static String count(Request request, CancellationToken token) {
-        var result = FiniteConstraintSdk.countCnf(request.source(), request.budget(), token);
+    static String report(FiniteConstraintCnf.Result result) {
         var json = JSON.createObjectNode().put("schema", "regelsuche.cnf-count/v1")
             .put("status", result.status().name()).put("reason", result.reason()).put("work", result.work());
         result.count().ifPresent(n -> json.put("count", n.toString()));

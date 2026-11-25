@@ -76,7 +76,7 @@ final class ScopedCheckReceipts {
     private static void checkRecordedProof(JsonNode proof, CounterexampleStatus counterexample) {
         String status = proof.path("status").asText();
         if (!proof.path("backendConfigured").isBoolean()
-                || !Set.of("NOT_RUN", "CONFIRMED", "REFUTED", "UNSUPPORTED", "INCONCLUSIVE").contains(status))
+                || !Set.of("NOT_RUN", "CONFIRMED", "UNSUPPORTED", "INCONCLUSIVE").contains(status))
             throw new IllegalStateException("invalid historical proof status");
         boolean attempted = counterexample == CounterexampleStatus.NONE_FOUND;
         if (attempted == status.equals("NOT_RUN") ||

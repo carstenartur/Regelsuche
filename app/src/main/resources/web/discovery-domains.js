@@ -320,7 +320,6 @@
             };
             const proofs = {
                 CONFIRMED: 'Aussage im Lean-Kernel geprüft und in einem zweiten Projekt rekonstruiert.',
-                REFUTED: 'Die formale Prüfung hat die Aussage widerlegt.',
                 INCONCLUSIVE: 'Die Lean-Prüfung hat keinen bestätigten Beleg geliefert.',
                 UNSUPPORTED: 'Die Lean-Prüfung unterstützt diese Aussage nicht.', NOT_RUN: 'Die formale Prüfung wurde nicht ausgeführt.'
             };

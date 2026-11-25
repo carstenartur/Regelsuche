@@ -148,6 +148,27 @@ class CertificateDemoBrowserFlowTest {
         }
     }
 
+    @Test void canRetryCancellationWhenTheFirstRequestArrivesBeforeAdmission() {
+        try (var context = browser.newContext()) {
+            var page = context.newPage();
+            page.setDefaultTimeout(5_000);
+            page.navigate(app.baseUrl() + "/static/certificate-demos.html");
+            var heldCount = new AtomicReference<Route>();
+            page.route("**/api/certificate-demos/cnf/*", heldCount::set);
+            page.locator("#cnfRun").press("Enter");
+            page.waitForCondition(() -> heldCount.get() != null);
+            var cancel = page.locator("#cnfCancel");
+            var early = page.waitForResponse(r -> r.url().endsWith("/cancel"), cancel::click);
+            assertEquals(404, early.status());
+            assertThat(cancel).isEnabled();
+            var retry = page.waitForResponse(r -> r.url().endsWith("/cancel"), cancel::click);
+            assertEquals(404, retry.status());
+            heldCount.get().resume();
+            assertThat(page.locator("#cnfStatus")).containsText("Exakt 5 Belegungen");
+            assertThat(cancel).isHidden();
+        }
+    }
+
     @Test void countsEditedCnfCanBeCancelledOnTheServer() throws IOException {
         try (var context = browser.newContext()) {
             var page = context.newPage();

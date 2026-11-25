@@ -233,6 +233,11 @@ class DomainExportWorkspaceHttpTest {
             String forgedDigest = SolverIr.sha256(forgedBytes).substring(7);
             Files.writeString(receipts.resolve(forgedDigest + ".json"), forgedBytes);
             assertEquals(500, request("GET", scopedPath + "/" + forgedDigest, null).statusCode());
+            forged.putObject("proof").put("backendConfigured", true).put("status", "REFUTED");
+            String refutedBytes = forged.toString();
+            String refutedDigest = SolverIr.sha256(refutedBytes).substring(7);
+            Files.writeString(receipts.resolve(refutedDigest + ".json"), refutedBytes);
+            assertEquals(500, request("GET", scopedPath + "/" + refutedDigest, null).statusCode());
             var tamperedFile = receipts.resolve(location.substring(location.lastIndexOf('/') + 1) + ".json");
             String otherRun = previousRun.substring(7);
             String otherPath = "/" + otherRun + "/scoped-check/" + tamperedFile.getFileName().toString().substring(0, 64);

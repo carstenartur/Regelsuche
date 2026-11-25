@@ -96,6 +96,8 @@ tab's session storage and clears any previous result after an edit.
 
 The web adapter accepts up to 256 variables, 256 clauses, 4,096 total clause literals and 32 KiB of JSON.
 A request runs with its selected work limit (at most 2,000,000), 40,000 cells and a two-second SDK timeout.
-The cancel button addresses that live request's SDK cancellation token. An exact result offers the complete
+The cancel button addresses that live request's SDK cancellation token. The server admits the next
+request after it finishes sending the response or closes a failed connection. After the computation finishes,
+a cancellation request returns 404 while a new count can still receive 429 during the response write. An exact result offers the complete
 source and elimination certificate as a JSON download, with arbitrary-size weights and the count encoded as
 decimal strings. A resource or cancellation result displays the reason and work with no certificate.

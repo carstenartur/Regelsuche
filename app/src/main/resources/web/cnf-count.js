@@ -78,7 +78,10 @@ cancel.addEventListener('click', async () => {
         const response = await fetch(job + '/cancel', {method: 'POST', redirect: 'error'});
         if (active !== job) return;
         if (response.status === 202) status.textContent = 'Abbruch angefordert …';
-        else if (response.status !== 404) throw new Error('Abbruchanforderung fehlgeschlagen.');
+        else if (response.status === 404) {
+            status.textContent = 'Der Server meldet keinen laufenden Auftrag. Du kannst den Abbruch erneut anfordern.';
+            cancel.disabled = false;
+        } else throw new Error('Abbruchanforderung fehlgeschlagen.');
     } catch (error) {
         if (active === job) { status.textContent = error.message; cancel.disabled = false; }
     }
