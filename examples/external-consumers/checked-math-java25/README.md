@@ -1,6 +1,6 @@
-# Six checked mathematical calculations
+# Seven checked mathematical calculations
 
-This independent Maven project runs six existing typed SDK examples. It needs
+This independent Maven project runs seven typed SDK examples. It needs
 **JDK 25** and **Maven 3.9.9 or newer in the 3.x line**. The APIs are part of the
 current source SDK and are absent from the published 0.5.3 SDK.
 
@@ -15,7 +15,7 @@ mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify
 
 The packager binds the example POM to the archive's own SDK version. No version
 override or manually assembled classpath is needed. Maven compiles the programs,
-runs six result checks, and then executes all six calculations. Third-party
+runs seven result checks, and then executes all seven calculations. Third-party
 dependencies and Maven plugins need Central access on first use.
 
 ## From the current source checkout
@@ -46,6 +46,8 @@ Run that Java command inside this project. Windows uses `;` instead of `:`.
 | `BilinearSearch` | Search with supplied forms and discovery from coefficients alone. Joint replay of the lower and upper bounds proves three rational bilinear products suffice and are necessary. Evaluating the discovered plan gives `[8,22,15]`. The example also selects and executes integer schedules for operands bounded by 8 and 2,048 magnitude bits. Each schedule reports predicted limb work, allocated words and objects. The bounded portfolios select four and three variable products respectively. Both executions agree with direct `BigInteger` convolution, including a signed 2,048-bit input. |
 | `RationalMatrixFormula` | Original inverse remains undefined on singular `X`; defined value `[2,1,0,3]` |
 | `DynamicQuotient` | Undefined modulo `T-1`, value `2` modulo `T+1`, with checked factor coverage |
+
+| `BoundedPlanning` | Compact 62-variable OR count `4,611,686,018,427,387,903`; explicit fixed Min-Fill; rational simplification with original-domain replay, missing-assumption and extra-hole controls; matching rational rank bounds of three for complex multiplication. |
 
 The SDK verifies each source-bound certificate within its explicit budgets.
 These finite results have the assumptions in the supplied requests. A stopped

@@ -5,8 +5,14 @@ import static de.regelsuche.solver.ir.ScopedProofDag.Rule.*;
 import de.regelsuche.solver.ir.ScopedProofDag.Node;
 import de.regelsuche.solver.ir.SolverIr.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.IntConsumer;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /** Source-only finite logical formation. Premises are inspected, the supplied endpoint is never queried. */
 public final class ScopedProofSearch {
@@ -23,98 +29,181 @@ public final class ScopedProofSearch {
 
     private ScopedProofSearch(Obligation context, int limit) { this.context = context; this.limit = limit; }
     public static Report discover(Obligation source, int budget) {
+        try (var cursor = open(source, budget)) {
+            var proposals = new ArrayList<Proposal>();
+            while (!cursor.done()) cursor.next(Long.MAX_VALUE).ifPresent(proposals::add);
+            return new Report(proposals, cursor.work(), cursor.exhausted());
+        }
+    }
+
+    public static Cursor open(Obligation source, int budget) {
         if (!SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(source.schema()) || source.assumptions().size() > 32
                 || source.declarations().size() > 32 || budget < 0 || budget > 65_536)
             throw new IllegalArgumentException("outside scoped proof formation bounds");
-        var search = new ScopedProofSearch(source,budget);
-        try { search.run(); return new Report(search.proposals,search.work,false); }
-        catch (Stop exhausted) { return new Report(search.proposals,search.work,true); }
+        return new Cursor(new ScopedProofSearch(source,budget));
     }
-    private void run() {
-        for (int i = 0; i < context.assumptions().size(); i++) {
-            charge(1);
-            var premise = context.assumptions().get(i);
-            if (premise.relation() == Relation.HOLDS) facts.putIfAbsent(premise.left(),new Fact(premise.left(),List.of(premise(i))));
-        }
-        var initial = List.copyOf(facts.values());
-        for (var fact : initial) fromPremise(fact,initial);
-        for (int i = 0; i < context.declarations().size(); i++) {
-            var predicate = context.declarations().get(i);
-            if (predicate.sort() != Sort.NAT_PREDICATE) continue;
-            charge(1 + 2 * context.assumptions().size());
-            var found = NaturalInduction.propose(context,predicate);
-            if (found.isEmpty()) continue;
-            var plan = found.get();
-            int base = context.assumptions().indexOf(plan.base()), step = context.assumptions().indexOf(plan.step());
-            retain(plan.conclusion().goal().left(),List.of(premise(base),premise(step),indexed(INDUCTION,i,0,1)));
-        }
-        for (int round = 0; round < 4; round++) {
-            int before = facts.size();
-            var previous = List.copyOf(facts.values());
-            for (var fact : previous) apply(fact);
-            if (before == facts.size()) break;
-        }
-        // Retained discovery states contain the original formation work at each proposal.
-        // Run the additional rules after the original proposal prefix has been formed.
-        for (int round = 0; round < 4; round++) {
-            int before = facts.size();
-            var previous = List.copyOf(facts.values());
-            for (var fact : previous) {
-                projectConjunction(fact);
-                eliminateExistential(fact, previous);
+
+    /** Each rule application is atomic. Its completed work (including an overrun of a slice) stays paid. */
+    public static final class Cursor implements AutoCloseable {
+        private enum Stage { PREMISES, FROM_PREMISE, INDUCTION, APPLY, ELIMINATE, APPLY_NEW, END }
+        private final ScopedProofSearch search;
+        private Stage stage = Stage.PREMISES;
+        private List<Fact> roundFacts = List.of();
+        private Iterator<Runnable> alternatives = Collections.emptyIterator();
+        private int index, round, output;
+        private boolean exhausted, closed;
+
+        private Cursor(ScopedProofSearch search) { this.search = search; }
+        public int work() { return search.work; }
+        public boolean exhausted() { return exhausted; }
+        public boolean done() { return closed || stage == Stage.END && output == search.proposals.size(); }
+
+        public Optional<Proposal> next(long allowance) {
+            if (allowance < 0) throw new IllegalArgumentException("negative formation allowance");
+            if (allowance == 0 || done()) return Optional.empty();
+            int before = work();
+            try {
+                while (stage != Stage.END && output == search.proposals.size() && work() - before < allowance)
+                    advance();
+            } catch (Stop stop) {
+                stage = Stage.END;
+                exhausted = true;
             }
-            if (before == facts.size()) return;
-            for (var fact : List.copyOf(facts.values())) apply(fact);
+            return output < search.proposals.size() ? Optional.of(search.proposals.get(output++)) : Optional.empty();
         }
-    }
-    private void fromPremise(Fact fact, List<Fact> initial) {
-        if (fact.formula() instanceof Binder b && b.kind()==BinderKind.FORALL) specialize(fact,b);
-        if (fact.formula() instanceof Call c) {
-            switch (c.function()) {
-                case "or" -> cases(fact,c,initial);
-                case "eq" -> rewrite(fact,c,initial);
-                case "not" -> contradiction(fact,c);
-                default -> { }
+
+        private void start(Stage next) {
+            stage = next;
+            index = 0;
+            roundFacts = switch (next) {
+                case FROM_PREMISE, APPLY, ELIMINATE, APPLY_NEW -> List.copyOf(search.facts.values());
+                default -> List.of();
+            };
+        }
+
+        private void advance() {
+            if (alternatives.hasNext()) {
+                alternatives.next().run();
+                return;
+            }
+            switch (stage) {
+                case PREMISES -> {
+                    if (index < search.context.assumptions().size()) search.addPremise(index++);
+                    else start(Stage.FROM_PREMISE);
+                }
+                case FROM_PREMISE -> {
+                    if (index < roundFacts.size())
+                        alternatives = search.premiseRules(roundFacts.get(index++), roundFacts).iterator();
+                    else start(Stage.INDUCTION);
+                }
+                case INDUCTION -> {
+                    if (index < search.context.declarations().size()) search.induct(index++);
+                    else start(Stage.APPLY);
+                }
+                case APPLY -> {
+                    if (index < roundFacts.size()) search.apply(roundFacts.get(index++));
+                    else if (++round < 4 && roundFacts.size() != search.facts.size()) start(Stage.APPLY);
+                    else { round = 0; start(Stage.ELIMINATE); }
+                }
+                case ELIMINATE -> {
+                    if (index < roundFacts.size())
+                        alternatives = search.eliminationRules(roundFacts.get(index++), roundFacts).iterator();
+                    else start(roundFacts.size() == search.facts.size() ? Stage.END : Stage.APPLY_NEW);
+                }
+                case APPLY_NEW -> {
+                    if (index < roundFacts.size()) search.apply(roundFacts.get(index++));
+                    else start(++round < 4 ? Stage.ELIMINATE : Stage.END);
+                }
+                case END -> throw new IllegalStateException("formation ended");
             }
         }
-        for (int i=0;i<context.declarations().size();i++) {
-            charge(1);
-            var d=context.declarations().get(i);
-            if (d.sort()==Sort.NAT_PREDICATE) strongInduction(fact,d);
-            if ((d.sort()==Sort.REAL || d.sort()==Sort.NATURAL) && fact.formula().referencedSymbols().contains(d.name())) {
-                var closed = replace(fact.formula(),0,(e,depth)->e.equals(new Symbol(d.name())) ? new Bound(depth) : e);
-                retain(new Binder(BinderKind.EXISTS,d.sort(),closed),
-                    List.of(indexed(DECLARATION,i),fact.proof().getFirst(),of(WITNESS,0,1)));
-            }
+
+        @Override public void close() {
+            closed = true;
+            alternatives = Collections.emptyIterator();
+            roundFacts = List.of();
+            search.facts.clear();
+            search.proposals.clear();
         }
     }
-    private void cases(Fact input, Call disjunction, List<Fact> initial) {
-        if (disjunction.arguments().size()!=2) return;
-        var l=disjunction.arguments().getFirst(); var r=disjunction.arguments().getLast();
-        if (l.equals(r)) {
-            retain(l,List.of(input.proof().getFirst(),local(0),of(CASES,0,1,1)));
-            return;
+
+    private void addPremise(int index) {
+        charge(1);
+        var predicate = context.assumptions().get(index);
+        if (predicate.relation() == Relation.HOLDS)
+            facts.putIfAbsent(predicate.left(),new Fact(predicate.left(),List.of(premise(index))));
+    }
+
+    private void induct(int index) {
+        var predicate = context.declarations().get(index);
+        if (predicate.sort() != Sort.NAT_PREDICATE) return;
+        charge(1 + 2 * context.assumptions().size());
+        var found = NaturalInduction.propose(context,predicate);
+        if (found.isEmpty()) return;
+        var plan = found.get();
+        int base = context.assumptions().indexOf(plan.base()), step = context.assumptions().indexOf(plan.step());
+        retain(plan.conclusion().goal().left(),List.of(premise(base),premise(step),indexed(INDUCTION,index,0,1)));
+    }
+    /** Alternatives run only when pulled. Each action can retain at most one proposal. */
+    private Stream<Runnable> premiseRules(Fact fact, List<Fact> initial) {
+        Stream<Runnable> direct = Stream.empty();
+        if (fact.formula() instanceof Binder binder && binder.kind() == BinderKind.FORALL)
+            direct = declarations(index -> specialize(fact, binder, index));
+        if (fact.formula() instanceof Call call) {
+            direct = switch (call.function()) {
+                case "or" -> caseRules(fact, call, initial);
+                case "eq" -> call.arguments().size() == 2 && call.arguments().getFirst() instanceof Symbol left
+                    ? initial.stream().map(other -> () -> rewrite(fact, left, call.arguments().getLast(), other))
+                    : Stream.empty();
+                case "not" -> Stream.of(() -> contradiction(fact, call));
+                default -> Stream.empty();
+            };
         }
-        for (var f:initial) {
-            charge(1);
-            if (!(f.formula() instanceof Call arrow) || !arrow.function().equals("implies")
-                    || arrow.arguments().size()!=2 || !arrow.arguments().getFirst().equals(l)) continue;
-            var result=arrow.arguments().getLast();
-            charge(initial.size());
-            var g=initial.stream().filter(t -> t.formula().equals(call("implies",r,result))).findFirst();
-            if (g.isPresent()) retain(result,List.of(input.proof().getFirst(),f.proof().getFirst(),local(0),of(APPLY,1,2),
-                g.get().proof().getFirst(),of(APPLY,4,2),of(CASES,0,3,5)));
+        return Stream.concat(direct, declarations(index -> fromDeclaration(fact, index)));
+    }
+
+    private Stream<Runnable> declarations(IntConsumer action) {
+        return IntStream.range(0, context.declarations().size()).mapToObj(index -> () -> action.accept(index));
+    }
+
+    private void fromDeclaration(Fact fact, int index) {
+        charge(1);
+        var declaration = context.declarations().get(index);
+        if (declaration.sort() == Sort.NAT_PREDICATE) strongInduction(fact, declaration);
+        if ((declaration.sort() == Sort.REAL || declaration.sort() == Sort.NATURAL)
+                && fact.formula().referencedSymbols().contains(declaration.name())) {
+            var symbol = new Symbol(declaration.name());
+            var closed = replace(fact.formula(),0,(e,depth) -> e.equals(symbol) ? new Bound(depth) : e);
+            retain(new Binder(BinderKind.EXISTS,declaration.sort(),closed),
+                List.of(indexed(DECLARATION,index),fact.proof().getFirst(),of(WITNESS,0,1)));
         }
     }
-    private void rewrite(Fact equality,Call eq,List<Fact> initial) {
-        if (eq.arguments().size()!=2 || !(eq.arguments().getFirst() instanceof Symbol left)) return;
-        var right=eq.arguments().getLast();
-        for (var f : initial) {
-            charge(1);
-            if (!f.formula().referencedSymbols().contains(left.name())) continue;
-            var next=replace(f.formula(),0,(atom,depth)->atom.equals(left) ? right : atom);
-            retain(next,List.of(equality.proof().getFirst(),f.proof().getFirst(),of(REWRITE,0,1)));
-        }
+
+    private Stream<Runnable> caseRules(Fact input, Call disjunction, List<Fact> initial) {
+        if (disjunction.arguments().size() != 2) return Stream.empty();
+        var left = disjunction.arguments().getFirst();
+        var right = disjunction.arguments().getLast();
+        if (left.equals(right)) return Stream.of(() ->
+            retain(left,List.of(input.proof().getFirst(),local(0),of(CASES,0,1,1))));
+        return initial.stream().map(other -> () -> cases(input, left, right, other, initial));
+    }
+
+    private void cases(Fact input, Expression left, Expression right, Fact other, List<Fact> initial) {
+        charge(1);
+        if (!(other.formula() instanceof Call arrow) || !arrow.function().equals("implies")
+                || arrow.arguments().size()!=2 || !arrow.arguments().getFirst().equals(left)) return;
+        var result = arrow.arguments().getLast();
+        charge(initial.size());
+        var matching = initial.stream().filter(t -> t.formula().equals(call("implies",right,result))).findFirst();
+        if (matching.isPresent()) retain(result,List.of(input.proof().getFirst(),other.proof().getFirst(),local(0),of(APPLY,1,2),
+            matching.get().proof().getFirst(),of(APPLY,4,2),of(CASES,0,3,5)));
+    }
+
+    private void rewrite(Fact equality, Symbol left, Expression right, Fact other) {
+        charge(1);
+        if (!other.formula().referencedSymbols().contains(left.name())) return;
+        var next = replace(other.formula(),0,(atom,depth) -> atom.equals(left) ? right : atom);
+        retain(next,List.of(equality.proof().getFirst(),other.proof().getFirst(),of(REWRITE,0,1)));
     }
     private void contradiction(Fact input,Call negation) {
         if (negation.arguments().size()==1 && negation.arguments().getFirst() instanceof Call inner
@@ -145,42 +234,44 @@ public final class ScopedProofSearch {
         retain(result,nodes);
     }
 
-    private void projectConjunction(Fact fact) {
-        if (!(fact.formula() instanceof Call conjunction) || !conjunction.function().equals("and")
-                || conjunction.arguments().size() != 2 || fact.proof().size() >= 128) return;
-        var left = new ArrayList<>(fact.proof());
-        left.add(of(AND_LEFT, left.size() - 1));
-        retain(conjunction.arguments().getFirst(), left);
-        var right = new ArrayList<>(fact.proof());
-        right.add(of(AND_RIGHT, right.size() - 1));
-        retain(conjunction.arguments().getLast(), right);
+    private Stream<Runnable> eliminationRules(Fact fact, List<Fact> available) {
+        if (fact.formula() instanceof Call conjunction && conjunction.function().equals("and")
+                && conjunction.arguments().size() == 2 && fact.proof().size() < 128)
+            return Stream.of(() -> project(fact, conjunction.arguments().getFirst(), AND_LEFT),
+                             () -> project(fact, conjunction.arguments().getLast(), AND_RIGHT));
+        if (fact.formula() instanceof Binder exists && exists.kind() == BinderKind.EXISTS)
+            return available.stream().map(candidate -> () -> eliminateExistential(fact, exists, candidate));
+        return Stream.empty();
     }
 
-    private void eliminateExistential(Fact fact, List<Fact> available) {
-        if (!(fact.formula() instanceof Binder exists) || exists.kind() != BinderKind.EXISTS) return;
-        for (var candidate : available) {
-            charge(1);
-            if (!(candidate.formula() instanceof Binder universal) || universal.kind() != BinderKind.FORALL
-                    || universal.domain() != exists.domain() || !(universal.body() instanceof Call implication)
-                    || !implication.function().equals("implies") || implication.arguments().size() != 2
-                    || !implication.arguments().getFirst().equals(exists.body())) continue;
-            var conclusion = implication.arguments().getLast();
-            if (facts.containsKey(conclusion) || usesBinder(conclusion, 0)
-                    || fact.proof().size() + candidate.proof().size() + 5 > 128) continue;
-            var nodes = new ArrayList<>(fact.proof());
-            int source = nodes.size() - 1;
-            int rule = appendProof(nodes, candidate);
-            int witness = nodes.size();
-            nodes.add(local(1));
-            int specialized = nodes.size();
-            nodes.add(of(SPECIALIZE, rule, witness));
-            int hypothesis = nodes.size();
-            nodes.add(local(0));
-            int continuation = nodes.size();
-            nodes.add(of(APPLY, specialized, hypothesis));
-            nodes.add(of(EXISTS_ELIM, source, continuation));
-            retain(conclusion, nodes);
-        }
+    private void project(Fact fact, Expression side, ScopedProofDag.Rule rule) {
+        var proof = new ArrayList<>(fact.proof());
+        proof.add(of(rule, proof.size() - 1));
+        retain(side, proof);
+    }
+
+    private void eliminateExistential(Fact fact, Binder exists, Fact candidate) {
+        charge(1);
+        if (!(candidate.formula() instanceof Binder universal) || universal.kind() != BinderKind.FORALL
+                || universal.domain() != exists.domain() || !(universal.body() instanceof Call implication)
+                || !implication.function().equals("implies") || implication.arguments().size() != 2
+                || !implication.arguments().getFirst().equals(exists.body())) return;
+        var conclusion = implication.arguments().getLast();
+        if (facts.containsKey(conclusion) || usesBinder(conclusion, 0)
+                || fact.proof().size() + candidate.proof().size() + 5 > 128) return;
+        var nodes = new ArrayList<>(fact.proof());
+        int source = nodes.size() - 1;
+        int rule = appendProof(nodes, candidate);
+        int witness = nodes.size();
+        nodes.add(local(1));
+        int specialized = nodes.size();
+        nodes.add(of(SPECIALIZE, rule, witness));
+        int hypothesis = nodes.size();
+        nodes.add(local(0));
+        int continuation = nodes.size();
+        nodes.add(of(APPLY, specialized, hypothesis));
+        nodes.add(of(EXISTS_ELIM, source, continuation));
+        retain(conclusion, nodes);
     }
 
     /** A nested lexical binder increments the index of the eliminated witness. */
@@ -202,15 +293,13 @@ public final class ScopedProofSearch {
         }
         return nodes.size() - 1;
     }
-    private void specialize(Fact fact, Binder binder) {
-        for (int i = 0; i < context.declarations().size(); i++) {
-            charge(1);
-            var declaration = context.declarations().get(i);
-            if (declaration.sort() == binder.domain()) {
-                Expression argument = new Symbol(declaration.name());
-                retain(replace(binder.body(),0,(e,depth) -> e instanceof Bound b && b.index()==depth ? argument : e),
-                    List.of(fact.proof().getFirst(),indexed(DECLARATION,i),of(SPECIALIZE,0,1)));
-            }
+    private void specialize(Fact fact, Binder binder, int index) {
+        charge(1);
+        var declaration = context.declarations().get(index);
+        if (declaration.sort() == binder.domain()) {
+            Expression argument = new Symbol(declaration.name());
+            retain(replace(binder.body(),0,(e,depth) -> e instanceof Bound b && b.index()==depth ? argument : e),
+                List.of(fact.proof().getFirst(),indexed(DECLARATION,index),of(SPECIALIZE,0,1)));
         }
     }
 

@@ -71,6 +71,17 @@ public final class FiniteConstraintCounter {
     /** Count in the selected order, including planning and independent replay in the work budget. */
     public static Result count(Problem problem, FiniteConstraintPlanner.Strategy strategy,
             IterationLimits limits, BooleanSupplier cancellation) {
+        return count(problem, strategy, limits, cancellation, false);
+    }
+
+    /** Incidence-indexed v1 profile. The elimination order and certificate format are unchanged. */
+    public static Result countIndexed(Problem problem, FiniteConstraintPlanner.Strategy strategy,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        return count(problem, strategy, limits, cancellation, true);
+    }
+
+    private static Result count(Problem problem, FiniteConstraintPlanner.Strategy strategy,
+            IterationLimits limits, BooleanSupplier cancellation, boolean indexed) {
         Objects.requireNonNull(problem);
         Objects.requireNonNull(strategy);
         var work = new CertificateWork(limits, cancellation);
@@ -80,7 +91,7 @@ public final class FiniteConstraintCounter {
             var history = new ArrayList<Factor>();
             retained = condition(problem, active, history, retained, work);
             var steps = new ArrayList<Step>();
-            retained = eliminate(problem, active, history, steps, strategy, retained, work);
+            retained = eliminate(problem, active, history, steps, strategy, indexed, retained, work);
             BigInteger total = BigInteger.ONE;
             for (Factor factor : active.values()) total = FiniteConstraintSupport.multiply(total, factor.values().get(0), work);
             Optional<Map<Integer, Boolean>> witness = findWitness(problem, total, history, steps, retained, work);
@@ -88,7 +99,7 @@ public final class FiniteConstraintCounter {
             work.charge(steps.size());
             var certificate = new Certificate(problem, steps, total, witness);
             var verification = FiniteConstraintVerifier.verify(problem, certificate, work.remainingLimits(), cancellation);
-            work.charge(verification.work());
+            work.chargeCompleted(verification.work());
             if (verification.status() == FiniteConstraintVerifier.Status.UNAVAILABLE) throw new CertificateWork.Stop(verification.reason());
             if (!verification.valid()) throw new IllegalStateException("COUNT_CERTIFICATE_REJECTED: " + verification.reason());
             work.charge(0);
@@ -132,23 +143,32 @@ public final class FiniteConstraintCounter {
     }
 
     private static long eliminate(Problem problem, Map<Integer, Factor> active, List<Factor> history,
-            List<Step> steps, FiniteConstraintPlanner.Strategy strategy, long retained, CertificateWork work) {
+            List<Step> steps, FiniteConstraintPlanner.Strategy strategy, boolean indexed, long retained, CertificateWork work) {
         // The historical order needs no auxiliary graph or order array.
         int[] order = strategy == FiniteConstraintPlanner.Strategy.ASCENDING ? null
             : FiniteConstraintPlanner.order(problem, active.values(), strategy, retained, work);
         int variables = order == null ? problem.variableCount() : order.length;
         long orderCells = order == null ? 0 : order.length;
         retained += orderCells;
+        var buckets = indexed ? new FiniteConstraintBuckets(problem.variableCount(), order, active, retained, work) : null;
         for (int position = 0; position < variables; position++) {
             work.charge(1);
             int variable = order == null ? position : order[position];
             if (problem.fixed().containsKey(variable)) continue;
-            var inputs = new ArrayList<Integer>();
+            var inputs = buckets == null ? new ArrayList<Integer>() : buckets.take(position);
             var union = new TreeSet<Integer>();
-            collectInputs(variable, active, inputs, union, retained, work);
+            long indexCells = buckets == null ? 0 : buckets.cells();
+            if (buckets == null) {
+                collectInputs(variable, active, inputs, union, retained, work);
+            } else {
+                for (int id : inputs) {
+                    work.charge(1);
+                    addScope(variable, active.get(id), union, retained + indexCells + inputs.size(), work);
+                }
+            }
             int size = FiniteConstraintSupport.tableSize(union.size(), work);
             retained += size + union.size() + inputs.size() + 3L;
-            work.cells(retained + size + union.size() + inputs.size());
+            work.cells(retained + indexCells + size + union.size() + inputs.size());
             work.charge(union.size());
             var scope = List.copyOf(union);
             Factor output = sumOut(variable, inputs, scope, active, size, work);
@@ -156,6 +176,7 @@ public final class FiniteConstraintCounter {
                 work.charge(1);
                 active.remove(id);
             }
+            if (buckets != null) buckets.add(history.size(), output, retained);
             active.put(history.size(), output); history.add(output);
             steps.add(new Step(variable, inputs, output));
             work.charge(0);
@@ -170,14 +191,19 @@ public final class FiniteConstraintCounter {
             if (entry.getValue().variables().contains(variable)) {
                 work.cells(retained + inputs.size() + union.size() + 1L);
                 inputs.add(entry.getKey());
-                for (int member : entry.getValue().variables()) {
-                    work.charge(1);
-                    if (member != variable && !union.contains(member)) {
-                        FiniteConstraintSupport.requireWidth(union.size() + 1);
-                        work.cells(retained + inputs.size() + union.size() + 1L);
-                        union.add(member);
-                    }
-                }
+                addScope(variable, entry.getValue(), union, retained + inputs.size(), work);
+            }
+        }
+    }
+
+    private static void addScope(int variable, Factor factor, TreeSet<Integer> union, long retained,
+            CertificateWork work) {
+        for (int member : factor.variables()) {
+            work.charge(1);
+            if (member != variable && !union.contains(member)) {
+                FiniteConstraintSupport.requireWidth(union.size() + 1);
+                work.cells(retained + union.size() + 1L);
+                union.add(member);
             }
         }
     }

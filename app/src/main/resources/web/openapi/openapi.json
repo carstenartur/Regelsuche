@@ -431,182 +431,24 @@
                   "type": "string",
                   "pattern": "^sha256:[0-9a-f]{64}$"
                 }
+              },
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Adresse des gespeicherten Belegs"
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "SHA-256 der unveränderten Belegbytes in Anführungszeichen"
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "schema",
-                    "source",
-                    "obligationHash",
-                    "proposalHash",
-                    "counterexample",
-                    "retainedWitness",
-                    "proof"
-                  ],
-                  "properties": {
-                    "schema": {
-                      "type": "string",
-                      "const": "regelsuche.scoped-workspace-candidate-check/v1"
-                    },
-                    "source": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "runId",
-                        "workspaceHash",
-                        "evidenceHash",
-                        "seedHash",
-                        "candidateHash",
-                        "stateHash"
-                      ],
-                      "properties": {
-                        "runId": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        },
-                        "workspaceHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        },
-                        "evidenceHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        },
-                        "seedHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        },
-                        "candidateHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        },
-                        "stateHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        }
-                      }
-                    },
-                    "obligationHash": {
-                      "type": "string",
-                      "pattern": "^sha256:[0-9a-f]{64}$"
-                    },
-                    "proposalHash": {
-                      "type": "string",
-                      "pattern": "^sha256:[0-9a-f]{64}$"
-                    },
-                    "counterexample": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "status",
-                        "attempts",
-                        "witness",
-                        "metrics"
-                      ],
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "FOUND",
-                            "NONE_FOUND",
-                            "INCONCLUSIVE",
-                            "UNSUPPORTED"
-                          ]
-                        },
-                        "attempts": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 256
-                        },
-                        "witness": {
-                          "type": "string"
-                        },
-                        "metrics": {
-                          "type": "object",
-                          "additionalProperties": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    "retainedWitness": {
-                      "type": "string",
-                      "enum": [
-                        "NOT_RECORDED",
-                        "REPRODUCED",
-                        "DIFFERS"
-                      ]
-                    },
-                    "proof": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "backendConfigured",
-                        "status"
-                      ],
-                      "properties": {
-                        "backendConfigured": {
-                          "type": "boolean"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "NOT_RUN",
-                            "CONFIRMED",
-                            "REFUTED",
-                            "INCONCLUSIVE",
-                            "UNSUPPORTED"
-                          ]
-                        },
-                        "kernelHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        },
-                        "rebuildHash": {
-                          "type": "string",
-                          "pattern": "^sha256:[0-9a-f]{64}$"
-                        }
-                      },
-                      "if": {
-                        "properties": {
-                          "status": {
-                            "const": "CONFIRMED"
-                          }
-                        }
-                      },
-                      "then": {
-                        "required": [
-                          "kernelHash",
-                          "rebuildHash"
-                        ],
-                        "properties": {
-                          "backendConfigured": {
-                            "const": true
-                          }
-                        }
-                      },
-                      "else": {
-                        "not": {
-                          "anyOf": [
-                            {
-                              "required": [
-                                "kernelHash"
-                              ]
-                            },
-                            {
-                              "required": [
-                                "rebuildHash"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/ScopedCandidateReceipt"
                 }
               }
             }
@@ -631,6 +473,89 @@
           },
           "500": {
             "description": "Technischer Fehler bei der Kandidatenprüfung (SCOPED_CHECK_FAILED) oder beim Quellenzugriff (DOMAIN_EXPORT_REPOSITORY_FAILURE)"
+          }
+        }
+      }
+    },
+    "/api/discovery-domains/exports/{runDigest}/scoped-check/{receiptDigest}": {
+      "get": {
+        "tags": [
+          "Plugins"
+        ],
+        "operationId": "loadScopedCandidateReceipt",
+        "summary": "Historischen Beleg einer logischen Kandidatenprüfung öffnen",
+        "description": "Prüft die gespeicherten Bytes und die Bindung an Lauf, Workspace, Evidence, Seed, Zustand und Kandidat. Der historische Backendstatus bleibt erhalten.",
+        "x-regelsuche-context": "/api/discovery-domains",
+        "parameters": [
+          {
+            "name": "runDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          {
+            "name": "receiptDigest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unveränderte historische Belegbytes",
+            "headers": {
+              "X-Regelsuche-Run-Id": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "SHA-256 der unveränderten Belegbytes in Anführungszeichen"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScopedCandidateReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestJson"
+          },
+          "404": {
+            "description": "Export oder Prüfbeleg fehlt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "description": "Gespeicherte Quelle oder Beleg ungültig",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           }
         }
       }
@@ -1375,6 +1300,116 @@
                 }
               }
             }
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      }
+    },
+    "/api/certificate-demos/cnf/{requestId}": {
+      "post": {
+        "tags": [
+          "Analysis"
+        ],
+        "x-regelsuche-context": "/api/certificate-demos",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
+            }
+          }
+        ],
+        "summary": "Eine eigene CNF exakt zählen",
+        "operationId": "countSignedCnf",
+        "description": "Vorzeichenbehaftete 1-basierte Klausel- und Fixliterale. Insgesamt maximal 4096 Klauselliterale, 32768 Transportbytes, 40000 Zustandszellen und 2 Sekunden Rechenzeit. Gewichte und Anzahl sind im Beleg Dezimalstrings.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CnfCountRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Exakter Beleg oder Ressourcenende",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CnfCountResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestText"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "description": "Zähler belegt"
+          },
+          "500": {
+            "description": "Zählung fehlgeschlagen"
+          }
+        }
+      }
+    },
+    "/api/certificate-demos/cnf/{requestId}/cancel": {
+      "post": {
+        "tags": [
+          "Analysis"
+        ],
+        "x-regelsuche-context": "/api/certificate-demos",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
+            }
+          }
+        ],
+        "summary": "Eine laufende CNF-Zählung abbrechen",
+        "operationId": "cancelSignedCnf",
+        "responses": {
+          "202": {
+            "description": "Abbruch angefordert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "CANCELLATION_REQUESTED"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestText"
+          },
+          "404": {
+            "description": "Auftrag nicht aktiv"
           },
           "405": {
             "$ref": "#/components/responses/MethodNotAllowed"
@@ -2825,6 +2860,446 @@
       "Unavailable": {"description": "Funktion ist in der aktuellen Konfiguration deaktiviert oder nicht verfügbar"}
     },
     "schemas": {
+      "ScopedCandidateReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "source",
+          "obligationHash",
+          "proposalHash",
+          "counterexample",
+          "retainedWitness",
+          "proof"
+        ],
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "regelsuche.scoped-workspace-candidate-check/v1"
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "runId",
+              "workspaceHash",
+              "evidenceHash",
+              "seedHash",
+              "candidateHash",
+              "stateHash"
+            ],
+            "properties": {
+              "runId": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "workspaceHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "evidenceHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "seedHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "candidateHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "stateHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          },
+          "obligationHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "proposalHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "counterexample": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "attempts",
+              "witness",
+              "metrics"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "FOUND",
+                  "NONE_FOUND",
+                  "INCONCLUSIVE",
+                  "UNSUPPORTED"
+                ]
+              },
+              "attempts": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 256
+              },
+              "witness": {
+                "type": "string"
+              },
+              "metrics": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "retainedWitness": {
+            "type": "string",
+            "enum": [
+              "NOT_RECORDED",
+              "REPRODUCED",
+              "DIFFERS"
+            ]
+          },
+          "proof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "backendConfigured",
+              "status"
+            ],
+            "properties": {
+              "backendConfigured": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_RUN",
+                  "CONFIRMED",
+                  "INCONCLUSIVE",
+                  "UNSUPPORTED"
+                ]
+              },
+              "kernelHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              "rebuildHash": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            },
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CONFIRMED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "kernelHash",
+                "rebuildHash"
+              ],
+              "properties": {
+                "backendConfigured": {
+                  "const": true
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "kernelHash"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "rebuildHash"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "CnfCountRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "variableCount",
+          "clauses",
+          "fixed",
+          "maximumWork"
+        ],
+        "properties": {
+          "variableCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256
+          },
+          "clauses": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "type": "array",
+              "maxItems": 4096,
+              "items": {
+                "type": "integer",
+                "minimum": -256,
+                "maximum": 256,
+                "not": {
+                  "const": 0
+                }
+              }
+            }
+          },
+          "fixed": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "type": "integer",
+              "minimum": -256,
+              "maximum": 256,
+              "not": {
+                "const": 0
+              }
+            }
+          },
+          "maximumWork": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000000
+          }
+        }
+      },
+      "CnfFactor": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "variables",
+          "values"
+        ],
+        "properties": {
+          "variables": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            }
+          }
+        }
+      },
+      "CnfCountResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "status",
+          "reason",
+          "work"
+        ],
+        "properties": {
+          "schema": {
+            "const": "regelsuche.cnf-count/v1"
+          },
+          "status": {
+            "enum": [
+              "EXACT",
+              "UNAVAILABLE"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "work": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "certificate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "elimination"
+            ],
+            "properties": {
+              "source": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "variableCount",
+                  "clauses",
+                  "fixed"
+                ],
+                "properties": {
+                  "variableCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 256
+                  },
+                  "clauses": {
+                    "type": "array",
+                    "maxItems": 256,
+                    "items": {
+                      "type": "array",
+                      "maxItems": 4096,
+                      "items": {
+                        "type": "integer",
+                        "minimum": -256,
+                        "maximum": 256,
+                        "not": {
+                          "const": 0
+                        }
+                      }
+                    }
+                  },
+                  "fixed": {
+                    "type": "object",
+                    "propertyNames": {
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "elimination": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source",
+                  "steps",
+                  "total"
+                ],
+                "properties": {
+                  "source": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "variableCount",
+                      "factors",
+                      "fixed"
+                    ],
+                    "properties": {
+                      "variableCount": {
+                        "type": "integer"
+                      },
+                      "factors": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/CnfFactor"
+                        }
+                      },
+                      "fixed": {
+                        "type": "object",
+                        "propertyNames": {
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "additionalProperties": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "variable",
+                        "inputs",
+                        "output"
+                      ],
+                      "properties": {
+                        "variable": {
+                          "type": "integer"
+                        },
+                        "inputs": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer"
+                          }
+                        },
+                        "output": {
+                          "$ref": "#/components/schemas/CnfFactor"
+                        }
+                      }
+                    }
+                  },
+                  "total": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]*)$"
+                  },
+                  "witness": {
+                    "type": "object",
+                    "propertyNames": {
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "additionalProperties": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "status": {
+                "const": "EXACT"
+              }
+            },
+            "required": [
+              "count",
+              "certificate"
+            ]
+          },
+          {
+            "properties": {
+              "status": {
+                "const": "UNAVAILABLE"
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "count"
+                  ]
+                },
+                {
+                  "required": [
+                    "certificate"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
       "CertificateDemoUnavailable": {
         "type": "object",
         "additionalProperties": false,
@@ -3304,8 +3779,25 @@
         "properties": {
           "expression": {"type": "string"},
           "type": {"type": "string", "enum": ["TERM", "EQUATION", "SYSTEM"], "default": "TERM"},
-          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "QUOTIENT_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION"], "default": "FAST_SIMPLIFY"},
-          "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "NUMERICALLY_STABLE", "PROOF_FRIENDLY", "TEACHING_FRIENDLY", "DIDAKTIK"]}
+          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "QUOTIENT_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION", "PREPARED_QUOTIENT_DISCOVERY"], "default": "FAST_SIMPLIFY"},
+          "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "NUMERICALLY_STABLE", "PROOF_FRIENDLY", "TEACHING_FRIENDLY", "DIDAKTIK"]},
+          "continuation": {
+            "type": "object", "additionalProperties": false,
+            "description": "Options for PREPARED_QUOTIENT_DISCOVERY on a term.",
+            "properties": {
+              "assumptions": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 256}},
+              "position": {"type": "object", "additionalProperties": false, "required": ["path", "text"], "properties": {
+                "path": {"type": "array", "maxItems": 64, "items": {"type": "integer", "minimum": 0, "maximum": 2147483647}},
+                "text": {"type": "string", "minLength": 1, "maxLength": 4096}
+              }},
+              "budget": {"type": "object", "additionalProperties": false, "properties": {
+                "maxDepth": {"type": "integer", "minimum": 0, "maximum": 6},
+                "maxVisitedExpressions": {"type": "integer", "minimum": 1, "maximum": 2000},
+                "maxExpandingSteps": {"type": "integer", "minimum": 0, "maximum": 6},
+                "maxCandidatesPerState": {"type": "integer", "minimum": 1, "maximum": 80}
+              }}
+            }
+          }
         }
       },
       "SearchResult": {
@@ -3318,7 +3810,8 @@
           "expression": {"type": "string"},
           "successes": {"type": "integer", "minimum": 0},
           "bestExpression": {"type": ["string", "null"]},
-          "improvement": {"type": "integer"}
+          "improvement": {"type": "integer"},
+          "continuation": {"type": "object", "description": "Source binding, budget, observed work and primitive replay status for the prepared profile."}
         }
       },
       "DiscoveryRequest": {"type": "object", "properties": {"min": {"type": "integer", "default": 1}, "max": {"type": "integer", "default": 3}}},

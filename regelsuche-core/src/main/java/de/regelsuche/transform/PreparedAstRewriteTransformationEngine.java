@@ -144,11 +144,40 @@ public final class PreparedAstRewriteTransformationEngine
             return List.of();
         }
 
-        String formattedInput = ExpressionFormatter.format(root);
+        return transformParsed(root, null, false);
+    }
+
+    /** Uses a source AST already prepared by the owning search. */
+    public PreparedTransformations transformPrepared(Expr root) {
+        return transformPrepared(root, false);
+    }
+
+    /** Uses precise binary grouping for the syntax of successor states. */
+    public PreparedTransformations transformPreparedStructurally(Expr root) {
+        return transformPrepared(root, true);
+    }
+
+    private PreparedTransformations transformPrepared(Expr root, boolean preserveStructure) {
+        AstRewriteTransport.requireBounded(root);
+        var work = new RewriteWork();
+        return new PreparedTransformations(transformParsed(root, work, preserveStructure), work.nodeVisits, work.ruleAttempts);
+    }
+
+    public record PreparedTransformations(List<Transformation> transformations, long nodeVisits, long ruleAttempts) {
+        public PreparedTransformations { transformations = List.copyOf(transformations); }
+    }
+
+    private static final class RewriteWork {
+        long nodeVisits;
+        long ruleAttempts;
+    }
+
+    private List<Transformation> transformParsed(Expr root, RewriteWork work, boolean preserveStructure) {
+        String formattedInput = format(root, preserveStructure);
         int originalSize = canonicalAstNodeCount(root);
         Set<Transformation> transformations = new LinkedHashSet<>();
-        for (RewriteResult result : rewriteEverywhere(root)) {
-            String formatted = ExpressionFormatter.format(result.expression());
+        for (RewriteResult result : rewriteEverywhere(root, true, work)) {
+            String formatted = format(result.expression(), preserveStructure);
             if (formatted.equals(formattedInput)) {
                 continue;
             }
@@ -178,6 +207,10 @@ public final class PreparedAstRewriteTransformationEngine
         return new ArrayList<>(transformations);
     }
 
+    private static String format(Expr expression, boolean preserveStructure) {
+        return preserveStructure ? ExpressionFormatter.formatStructure(expression) : ExpressionFormatter.format(expression);
+    }
+
     /** Typed sibling of the historical string path; called only by the opt-in transport. */
     List<AstRewriteTransport.Step> transformAst(Expr root) {
         AstRewriteTransport.requireBounded(root);
@@ -187,7 +220,7 @@ public final class PreparedAstRewriteTransformationEngine
         var retained = RetainedOperation.retainCompleted(2, this, root, steps, pending);
         Throwable primary = null;
         try {
-            var rewritten = rewriteEverywhere(root, false);
+            var rewritten = rewriteEverywhere(root, false, null);
             pending[0] = rewritten;
             RetainedOperation.checkpoint();
             for (RewriteResult result : rewritten) {
@@ -244,16 +277,14 @@ public final class PreparedAstRewriteTransformationEngine
         } finally { release(retained, primary); }
     }
 
-    private List<RewriteResult> rewriteEverywhere(Expr subtree) {
-        return rewriteEverywhere(subtree, true);
-    }
-
-    private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash) {
+    private List<RewriteResult> rewriteEverywhere(Expr subtree, boolean retainLegacyHash, RewriteWork work) {
+        if (work != null) work.nodeVisits++;
         List<RewriteResult> results = retainLegacyHash ? new ArrayList<>() : null;
         RetainedOperation.Frame owned = null;
         try {
             String subtreeHash = null;
             for (RewriteRule rule : ruleIndex == null ? rules : ruleIndex.candidates(subtree)) {
+                if (work != null) work.ruleAttempts++;
                 Expr rewritten = applyIfMatched(rule, subtree);
                 if (!retainLegacyHash && rewritten != null) AstRewriteTransport.requireBounded(rewritten);
                 if (rewritten == null || rewritten.equals(subtree)) continue;
@@ -268,9 +299,9 @@ public final class PreparedAstRewriteTransformationEngine
                 }
             }
             if (subtree instanceof BinaryExpr binaryExpr) {
-                results = rewriteBinaryChildren(binaryExpr, retainLegacyHash, results);
+                results = rewriteBinaryChildren(binaryExpr, retainLegacyHash, results, work);
             } else if (subtree instanceof FunctionExpr functionExpr) {
-                results = rewriteFunctionArguments(functionExpr, retainLegacyHash, results);
+                results = rewriteFunctionArguments(functionExpr, retainLegacyHash, results, work);
             }
             return results == null ? List.of() : results;
         } catch (RuntimeException | Error failure) {
@@ -284,10 +315,10 @@ public final class PreparedAstRewriteTransformationEngine
     }
 
     private List<RewriteResult> rewriteBinaryChildren(BinaryExpr binaryExpr, boolean retainLegacyHash,
-            List<RewriteResult> results) {
+            List<RewriteResult> results, RewriteWork work) {
         RetainedOperation.Frame owned = null;
         try {
-            var leftRewrites = rewriteEverywhere(binaryExpr.left(), retainLegacyHash);
+            var leftRewrites = rewriteEverywhere(binaryExpr.left(), retainLegacyHash, work);
             if (results == null && !leftRewrites.isEmpty()) {
                 results = new ArrayList<>();
                 owned = RetainedOperation.retainCompleted(1, results, leftRewrites);
@@ -301,7 +332,7 @@ public final class PreparedAstRewriteTransformationEngine
                     if (!retainLegacyHash) completed(1);
                 }
             }
-            var rightRewrites = rewriteEverywhere(binaryExpr.right(), retainLegacyHash);
+            var rightRewrites = rewriteEverywhere(binaryExpr.right(), retainLegacyHash, work);
             if (results == null && !rightRewrites.isEmpty()) {
                 results = new ArrayList<>();
                 owned = RetainedOperation.retainCompleted(1, results, rightRewrites);
@@ -327,12 +358,12 @@ public final class PreparedAstRewriteTransformationEngine
     }
 
     private List<RewriteResult> rewriteFunctionArguments(FunctionExpr functionExpr, boolean retainLegacyHash,
-            List<RewriteResult> results) {
+            List<RewriteResult> results, RewriteWork work) {
         RetainedOperation.Frame owned = null;
         try {
             List<Expr> arguments = functionExpr.arguments();
             for (int index = 0; index < arguments.size(); index++) {
-                var argumentRewrites = rewriteEverywhere(arguments.get(index), retainLegacyHash);
+                var argumentRewrites = rewriteEverywhere(arguments.get(index), retainLegacyHash, work);
                 if (results == null && !argumentRewrites.isEmpty()) {
                     results = new ArrayList<>();
                     owned = RetainedOperation.retainCompleted(1, results, argumentRewrites);

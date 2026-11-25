@@ -19,8 +19,25 @@ public final class BilinearProgramSearch {
         return BilinearProgram.run(limits, cancellation, work -> find(request, 0, 0, work));
     }
 
+    /** Verify the supplied lower bound on this source before skipping any product counts. */
+    public static Result<Witness> searchWithRationalBound(Request request, BilinearRankBound.RationalCertificate proof,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        return BilinearProgram.run(limits, cancellation, work -> {
+            long sourceCells = request.checkInputs(work);
+            int lower = BilinearRankBound.verifyRational(request.tensor(), proof, sourceCells, work);
+            if (lower > request.maximumProducts()) throw new CertificateWork.Stop("PRODUCT_LIMIT_BELOW_BOUND");
+            long retained = proof.extraCells() + proof.minor().retainedCells();
+            if (proof.minor().source() != request.tensor())
+                retained += BilinearProgram.matrixCells(proof.minor().source().outputs());
+            return findChecked(request, lower, sourceCells + retained, work);
+        });
+    }
+
     static Witness find(Request request, int minimumRank, long additionalRetained, CertificateWork work) {
-        long sourceCells = request.checkInputs(work) + additionalRetained;
+        return findChecked(request, minimumRank, request.checkInputs(work) + additionalRetained, work);
+    }
+
+    private static Witness findChecked(Request request, int minimumRank, long sourceCells, CertificateWork work) {
         work.cells(sourceCells);
         long pairs = (long) request.leftForms().size() * request.rightForms().size();
         int dimension = request.tensor().outputs().getFirst().size();

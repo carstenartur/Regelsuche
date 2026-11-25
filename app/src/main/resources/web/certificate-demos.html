@@ -7,13 +7,14 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="certificate-demos.css">
     <script type="module" src="certificate-demos.js"></script>
+    <script type="module" src="cnf-count.js"></script>
 </head>
 <body class="certificate-demo-page">
 <header>
     <div class="brand">
         <a href="/">← Regelsuche Workbench</a>
         <h1>Exakte Rechennachweise</h1>
-        <p>Berechne ein größtes Matching oder prüfe, wann sich Montgomery-Reduktionen zusammenfassen lassen.</p>
+        <p>Zähle Belegungen einer booleschen Formel, berechne ein größtes Matching oder prüfe einen Montgomery-Plan.</p>
     </div>
 </header>
 <main>
@@ -94,6 +95,29 @@
             <p class="hint"><code>M(t) = (t − u · q) / R</code> mit dem vorzeichenbehafteten Niederwort <code>u</code> von <code>t · q⁻¹</code>.</p>
             <p class="hint"><strong>Beobachtung</strong> <span id="montgomeryObservation"></span> für alle Werte in den angegebenen Intervallen. Die Operationszahlen zählen Reduktionen in den Plänen. Die Laufzeit hängt von Implementierung und Hardware ab.</p>
         </div>
+    </section>
+    <section class="card certificate-demo" aria-labelledby="cnfTitle">
+        <h2 id="cnfTitle">Belegungen einer CNF zählen</h2>
+        <form id="cnfForm">
+            <fieldset id="cnfFields">
+                <label for="cnfVariableCount">Anzahl der Variablen (0–256)</label>
+                <input id="cnfVariableCount" type="number" min="0" max="256" value="3" required>
+                <label for="cnfClauses">Klauseln</label>
+                <p id="cnfHelp">Eine Klausel pro Zeile, zum Beispiel <code>1 -2</code> für „Variable 1 oder nicht Variable 2“.
+                    Leere Zeilen werden übersprungen. Eine einzelne <code>0</code> bezeichnet eine leere, immer falsche Klausel.</p>
+                <textarea id="cnfClauses" aria-describedby="cnfHelp" rows="4" maxlength="25000" spellcheck="false">-1 -2
+-2 -3</textarea>
+                <label for="cnfFixed">Festgelegte Variablen</label>
+                <input id="cnfFixed" type="text" maxlength="1800" placeholder="Zum Beispiel 1 -3" aria-describedby="cnfFixedHelp">
+                <p id="cnfFixedHelp">Positive Nummern setzen eine Variable auf wahr, negative auf falsch.</p>
+                <label for="cnfWork">Arbeitsbudget (1–2.000.000)</label>
+                <input id="cnfWork" type="number" min="1" max="2000000" value="500000" required>
+            </fieldset>
+            <button id="cnfRun" class="primary" disabled>Belegungen zählen</button>
+            <button id="cnfCancel" type="button" hidden>Berechnung abbrechen</button>
+        </form>
+        <p id="cnfStatus" class="status" role="status"></p>
+        <a id="cnfDownload" download="cnf-zaehlbeleg.json" hidden>Geprüften Zählbeleg herunterladen</a>
     </section>
 </main>
 </body>

@@ -365,6 +365,7 @@ class WebWorkbenchServerRequestLimitTest {
             new Endpoint("/api/representations/solve", "/api/representations/solve", ""),
             new Endpoint("/api/representations/solve/replay", "/api/representations/solve/replay", ""),
             new Endpoint("/api/representations", "/api/representations", ""),
+            new Endpoint("/api/certificate-demos/cnf/{requestId}", "/api/certificate-demos/cnf/4a5279ef-126b-4738-b003-7da8f3e72314", ""),
             new Endpoint("/api/pair-reductions", "/api/pair-reductions", ""),
             new Endpoint("/api/representations/replay", "/api/representations/replay", ""),
             new Endpoint("/api/inspect/formula", "/api/inspect/formula", "\"expression\":\"x\""),

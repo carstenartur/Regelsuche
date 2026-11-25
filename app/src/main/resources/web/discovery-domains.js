@@ -211,7 +211,7 @@
             button.setAttribute('aria-current', String(button.dataset.domainExport === selected?.runId));
         }
     }
-    function show(view) {
+    function show(view, restored) {
         selected = view;
         const source = view.evidence;
         const scopedLogic = view.domainId === 'scoped-logic' && view.domainRevision === 'v1';
@@ -250,6 +250,8 @@
                 const result = node('div');
                 button.addEventListener('click', () => recheckScopedCandidate(view, attempt.candidateHash, button, message, result));
                 item.append(button, message, result);
+                if (restored?.candidate === attempt.candidateHash.slice(7))
+                    recheckScopedCandidate(view, attempt.candidateHash, button, message, result, restored.digest);
             }
             item.append(disclosure('Gespeicherter Kandidatenversuch', attempt)); attempts.append(item);
         }
@@ -285,17 +287,19 @@
         proofPanel.hidden = !sequence;
         proofButton.disabled = !sequence;
         proofStatus.textContent = 'Noch kein Modellgesetz für diese Auswahl geprüft.';
-        history.replaceState(null, '', `#export=${view.runId.slice(7)}`);
+        if (!restored) history.replaceState(null, '', `#export=${view.runId.slice(7)}`);
         status.textContent = 'Originalexport geladen. Die gespeicherte Quellenidentität bleibt unverändert.';
         markSelection();
     }
-    async function recheckScopedCandidate(view, candidateHash, button, message, output) {
+    async function recheckScopedCandidate(view, candidateHash, button, message, output, digest) {
         if (selected !== view || button.disabled || !hashPattern.test(candidateHash)) return;
         button.disabled = true;
         output.replaceChildren(); delete message.dataset.status;
-        message.textContent = 'Gespeicherter Kandidat wird rekonstruiert und geprüft …';
+        message.textContent = digest ? 'Gespeicherter Prüfbeleg wird geöffnet …' : 'Gespeicherter Kandidat wird rekonstruiert und geprüft …';
         try {
-            const response = await fetch(`${base}/${view.runId.slice(7)}/scoped-check`, {method: 'POST', redirect: 'error',
+            const endpoint = `${base}/${view.runId.slice(7)}/scoped-check`;
+            const response = digest ? await fetch(`${endpoint}/${digest}`, {redirect: 'error', cache: 'no-store'})
+                : await fetch(endpoint, {method: 'POST', redirect: 'error',
                 headers: {'Content-Type': 'application/json'}, body: JSON.stringify({expectedWorkspaceHash: view.contentHash,
                     expectedEvidenceHash: view.evidence.contentHash, candidateHash})});
             const report = await readResponse(response), source = report.source;
@@ -305,6 +309,10 @@
                 || source.seedHash !== view.inputHash || source.candidateHash !== candidateHash
                 || !view.evidence.states.some(state => state.candidateReady && state.stateHash === source.stateHash)
                 || response.headers.get('X-Regelsuche-Run-Id') !== view.runId) throw new Error('Fremde Prüfquelle.');
+            const tag = /^"([0-9a-f]{64})"$/.exec(response.headers.get('ETag'));
+            if (!tag || (digest && digest !== tag[1])) throw new Error('Ungültige Belegidentität.');
+            const path = `${endpoint}/${tag[1]}`;
+            if (!digest && response.headers.get('Location') !== path) throw new Error('Fremder Beleglink.');
             const {counterexample, proof, retainedWitness} = report;
             const counterexamples = {
                 FOUND: 'Gegenbeispiel gefunden.', NONE_FOUND: 'Bei diesen Versuchen wurde kein Gegenbeispiel gefunden.',
@@ -312,7 +320,6 @@
             };
             const proofs = {
                 CONFIRMED: 'Aussage im Lean-Kernel geprüft und in einem zweiten Projekt rekonstruiert.',
-                REFUTED: 'Die formale Prüfung hat die Aussage widerlegt.',
                 INCONCLUSIVE: 'Die Lean-Prüfung hat keinen bestätigten Beleg geliefert.',
                 UNSUPPORTED: 'Die Lean-Prüfung unterstützt diese Aussage nicht.', NOT_RUN: 'Die formale Prüfung wurde nicht ausgeführt.'
             };
@@ -321,27 +328,34 @@
                 || counterexample.attempts < 0 || counterexample.attempts > 256 || !Object.hasOwn(proofs, proof.status)
                 || (proof.status === 'CONFIRMED' && (!proof.backendConfigured || !hashPattern.test(proof.kernelHash)
                     || !hashPattern.test(proof.rebuildHash)))) throw new Error('Ungültiger Prüfbeleg.');
-            const proofMessage = proof.backendConfigured ? proofs[proof.status] : 'Für eine formale Prüfung sind zwei Lean-Projekte einzurichten.';
+            const proofMessage = proof.backendConfigured || proof.status === 'NOT_RUN' ? proofs[proof.status] : 'Für eine formale Prüfung sind zwei Lean-Projekte einzurichten.';
             message.textContent = proofMessage;
             message.dataset.status = proof.status;
             output.append(node('p', `${counterexamples[counterexample.status]} Versuche: ${counterexample.attempts}.`));
             if (counterexample.status === 'FOUND') output.append(node('pre', counterexample.witness));
             if (retainedWitness === 'DIFFERS') output.append(node('p', 'Der gespeicherte Zeuge konnte nicht reproduziert werden.'));
-            output.append(disclosure('Neuer Prüfbeleg mit Quellenbindung', report));
+            output.append(disclosure('Gespeicherter Prüfbeleg mit Quellenbindung', report));
+            const link = node('a', 'Prüfbeleg herunterladen');
+            link.href = path; link.download = ''; link.dataset.scopedReceipt = tag[1]; output.append(link);
+            history.replaceState(null, '', `#export=${view.runId.slice(7)}&candidate=${candidateHash.slice(7)}&check=${tag[1]}`);
         } catch (error) {
             if (selected === view) message.textContent = `Kandidatenprüfung fehlgeschlagen: ${error.message}`;
         } finally {
             if (selected === view) button.disabled = false;
         }
     }
-    async function load(runId) {
+    async function load(runId, restored) {
         const ticket = beginSelection();
         if (!hashPattern.test(runId)) { status.textContent = 'Ungültige Exportidentität im Link.'; return; }
         status.textContent = 'Gespeicherter Originalexport wird geprüft …';
         try {
             const response = await fetch(`${base}/${runId.slice(7)}`);
             const view = checkView(await readResponse(response), response, runId);
-            if (ticket === selectionEpoch) show(view);
+            if (ticket === selectionEpoch) {
+                if (restored && !view.evidence.candidateAttempts.some(a => a.candidateHash === 'sha256:' + restored.candidate))
+                    throw new Error('Der verlinkte Kandidat gehört nicht zu diesem Export.');
+                show(view, restored);
+            }
         } catch (error) { if (ticket === selectionEpoch) status.textContent = `Export konnte nicht geladen werden: ${error.message}`; }
     }
     async function refreshList() {
@@ -697,8 +711,8 @@
     element('previousDomainExports').addEventListener('click', () => { offset = Math.max(0, offset - 25); refreshList(); });
     element('nextDomainExports').addEventListener('click', () => { offset += 25; refreshList(); });
     function restoreLink() {
-        const match = /^#export=([0-9a-f]{64})$/.exec(location.hash);
-        if (match) load(`sha256:${match[1]}`);
+        const match = /^#export=([0-9a-f]{64})(?:&candidate=([0-9a-f]{64})&check=([0-9a-f]{64}))?$/.exec(location.hash);
+        if (match) load(`sha256:${match[1]}`, match[2] ? {candidate: match[2], digest: match[3]} : undefined);
         else if (location.hash) { beginSelection(); status.textContent = 'Ungültiger Exportlink.'; }
         else { beginSelection(); status.textContent = 'Einen gespeicherten Export auswählen oder vier Originaldateien importieren.'; }
     }

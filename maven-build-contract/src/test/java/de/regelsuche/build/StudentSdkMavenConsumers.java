@@ -45,7 +45,7 @@ final class StudentSdkMavenConsumers {
                     "regelsuche-search", "regelsuche-plugin-api"), 2),
                 new Consumer("checked-math-java25", "example.CheckedMathExamples", Set.of("regelsuche-core",
                     "regelsuche-egraph", "regelsuche-search", "regelsuche-math-algorithms", "regelsuche-validation",
-                    "regelsuche-optimization-sdk"), 6));
+                    "regelsuche-optimization-sdk"), 7));
             for (var spec : specs) {
                 var result = new LinkedHashMap<String, Object>();
                 consumers.put(spec.name(), result);

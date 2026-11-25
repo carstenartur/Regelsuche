@@ -412,9 +412,15 @@ public class WebWorkbenchServer {
         }
     }
 
+    private final CnfCountingRoute cnfCounting = new CnfCountingRoute();
+
     private void handleCertificateDemos(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
         String demoPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        if (demoPath.startsWith(CnfCountingRoute.BASE)) {
+            cnfCounting.handle(exchange, demoPath.substring(CnfCountingRoute.BASE.length()), securityConfig.maxRequestBytes());
+            return;
+        }
         String result = switch (demoPath) {
             case "/api/certificate-demos/hall" -> CertificateDemoWorkbench.hall();
             case "/api/certificate-demos/montgomery" -> CertificateDemoWorkbench.montgomery();
@@ -876,6 +882,23 @@ public class WebWorkbenchServer {
                 : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);
         } catch (IllegalArgumentException ex) {
             sendStatus(exchange, 400, ex.getMessage());
+            return;
+        }
+        if (profile == SearchProfile.PREPARED_QUOTIENT_DISCOVERY) {
+            if (type != InputType.TERM) {
+                sendStatus(exchange, 400, "prepared quotient requires TERM input");
+                return;
+            }
+            try {
+                var context = body.continuation() == null ? java.util.Map.<String, Object>of() : body.continuation();
+                sendJson(exchange, 200, de.regelsuche.runtime.SafeRuntimeAdapter.analyzePreparedQuotient(expression, goal, context));
+            } catch (IllegalArgumentException invalid) {
+                sendStatus(exchange, 400, invalid.getMessage());
+            }
+            return;
+        }
+        if (body.continuation() != null) {
+            sendStatus(exchange, 400, "continuation options require PREPARED_QUOTIENT_DISCOVERY");
             return;
         }
         TransformationSearchService search = new TransformationSearchService(

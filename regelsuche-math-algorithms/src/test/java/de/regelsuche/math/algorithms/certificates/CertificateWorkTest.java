@@ -8,6 +8,14 @@ import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 
 class CertificateWorkTest {
+    @Test void completedNestedWorkSurvivesCancellationAtReturn() {
+        var work = new CertificateWork(new IterationLimits(7, 10, 10_000), () -> true);
+        work.chargeCompleted(6);
+        assertThrows(CertificateWork.Stop.class, () -> work.charge(0));
+        assertThrows(CertificateWork.Stop.class, () -> work.chargeCompleted(2));
+        assertEquals(6, work.used());
+    }
+
     @Test void exhaustionDoesNotGrantAdditionalWork() {
         var work = new CertificateWork(new IterationLimits(3, 10, 10_000), () -> false);
         work.charge(2);

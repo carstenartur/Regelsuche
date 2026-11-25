@@ -39,8 +39,8 @@ the 0.5.2 archive URL, hashes or historical expected results.
 The Student SDK archive qualification additionally extracts its actual generated
 archive into a fresh directory and runs `hello-rule-java25` and
 `checked-math-java25` through Maven `clean verify`, without SDK overrides. Each
-gets a fresh Maven cache. The latter runs six mathematical result checks and all
-six executable examples. Resolved SDK coordinates must match the archive version,
+gets a fresh Maven cache. The latter runs seven mathematical result checks and all
+seven executable examples. Resolved SDK coordinates must match the archive version,
 and copied runtime JAR hashes must match its compatibility descriptor. The
 `maven-consumers.json` receipt and raw logs accompany the existing archive parity
 and Gradle-consumer evidence. This qualifies local archive consumption, not

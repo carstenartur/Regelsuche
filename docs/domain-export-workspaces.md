@@ -158,8 +158,15 @@ Das Ergebnis enthält die Run-, Workspace-, Evidenz-, Seed-, Kandidaten- und
 Zustandshashes sowie gegebenenfalls neue Kernel- und Rebuild-Quittungen. Der
 Vorschlag darf ein anderes Ziel als der Seed haben. Die Prämissen, Deklarationen,
 Theorien und Quellprovenienz bleiben exakt gebunden. Historische Quittungen
-werden während der neuen Prüfung nicht als Nachweis verwendet. Die neue Prüfung
-bewertet einen Kandidaten und gibt das Ergebnis in der laufenden Ansicht aus.
+werden während der neuen Prüfung nicht als Nachweis verwendet. Der Server speichert die vom Empfänger beobachtete Antwort unveränderlich. Die URL
+der Ansicht nennt Export, Kandidat und Beleg. Nach einem Neuladen oder Öffnen des
+Links rekonstruiert der Server Kandidat und Gegenbeispielbefund aus der Quelle und
+prüft den SHA-256 der gespeicherten Bytes. Bei einer Bestätigung archiviert er
+die beiden Manifeste des tatsächlichen Empfängers. Beim Abruf prüft er ihre
+Hashes, die Obligation im Kernelmanifest und dessen Verknüpfung mit dem
+Rebuildmanifest. Der angezeigte formale Status beschreibt
+den damaligen Lauf, einschließlich fehlender Lean-Konfiguration. Zum erneuten
+Aufruf des aktuellen Empfängers dient die Schaltfläche am Kandidaten.
 Die Quellenansicht und gespeicherte Prüfbelege zur vollständigen historischen
 Laufwiederholung behalten ihren eigenen Vertrag.
 
@@ -175,7 +182,8 @@ die neuen Routen unter `/api/discovery-domains/exports`:
 | `GET /{runDigest}` | Die erneut verifizierte, gespeicherte Quellenansicht |
 | `GET /{runDigest}/files/{fileName}` | Eine der vier byteidentischen Originaldateien |
 | `POST /{runDigest}/replay` | Genau `expectedWorkspaceHash` und `expectedEvidenceHash`; nur passend zur ausgewählten Quelle |
-| `POST /{runDigest}/scoped-check` | Dieselben beiden Quellhashes und der `candidateHash` eines gespeicherten logischen Versuchs. Gibt den neuen Gegenbeispiel- und gegebenenfalls formalen Prüfbefund zurück. |
+| `POST /{runDigest}/scoped-check` | Dieselben beiden Quellhashes und der `candidateHash` eines gespeicherten logischen Versuchs. Speichert den neuen Gegenbeispiel- und gegebenenfalls formalen Prüfbefund. `Location` nennt den Abrufpfad, `ETag` den SHA-256 der Antwortbytes. |
+| `GET /{runDigest}/scoped-check/{receiptDigest}` | Öffnet den gespeicherten Einzelbeleg und prüft seine Quellenbindung ohne Lean-Aufruf. Pro Export können bis zu 16 verschiedene Einzelbelege mit jeweils maximal 1 MiB gespeichert werden. |
 | `POST /{runDigest}/validate` | Unabhängige endliche Prüfung mit denselben zwei Quellenbindungen; eigener Validierungsbeleg |
 | `GET /{runDigest}/validate/{receiptDigest}` | Gespeicherter endlicher Validierungsbeleg mit geprüfter Quellenbindung |
 | `POST /{runDigest}/model-proof` | Bedingtes affines Modellgesetz nach Replay und endlicher Prüfung; eigener Modellbeleg |

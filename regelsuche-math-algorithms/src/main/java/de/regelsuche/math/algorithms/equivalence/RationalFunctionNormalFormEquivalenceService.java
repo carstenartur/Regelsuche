@@ -6,16 +6,19 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.input.InputRequest;
 import de.regelsuche.input.InputType;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  * Deterministic equivalence and domain audit for bounded rational functions.
@@ -39,21 +42,48 @@ public final class RationalFunctionNormalFormEquivalenceService {
         new GradedReverseLexOrder();
 
     private final ExpressionParser parser = new ExpressionParser();
+    private final RationalFunctionWork work;
+
+    public RationalFunctionNormalFormEquivalenceService() {
+        this(null);
+    }
+
+    RationalFunctionNormalFormEquivalenceService(CertificateWork work) {
+        this.work = new RationalFunctionWork(work);
+    }
+
+    RationalFunctionWork arithmetic() { return work; }
 
     public Evaluation evaluate(
         String leftExpression,
         String rightExpression,
         List<String> assumptions
     ) {
+        return evaluate(leftExpression, rightExpression, assumptions, false);
+    }
+
+    /** A simplification must remain defined everywhere its original source is defined. */
+    Evaluation evaluateOnSourceDomain(String source, String candidate, List<String> assumptions) {
+        return evaluate(source, candidate, assumptions, true);
+    }
+
+    private Evaluation evaluate(String leftExpression, String rightExpression,
+            List<String> assumptions, boolean preserveSourceDomain) {
         Objects.requireNonNull(leftExpression, "leftExpression");
         Objects.requireNonNull(rightExpression, "rightExpression");
         try {
             RationalFunction left = parse(leftExpression);
             RationalFunction right = parse(rightExpression);
-            List<String> required = requiredFactorKeys(left, right);
+            var sourceFactors = requiredFactorKeys(left);
+            var targetFactors = requiredFactorKeys(right);
+            if (preserveSourceDomain && !sourceFactors.containsAll(targetFactors)) {
+                throw new UnsupportedExpression("candidate introduces a domain restriction absent from the source");
+            }
+            sourceFactors.addAll(targetFactors);
+            List<String> required = List.copyOf(sourceFactors);
             AssumptionAudit audit = auditAssumptions(assumptions, required);
-            Polynomial crossLeft = left.crossLeft(right);
-            Polynomial crossRight = left.crossRight(right);
+            Polynomial crossLeft = left.crossLeft(right, work);
+            Polynomial crossRight = left.crossRight(right, work);
             if (!audit.unsupportedAssumptions().isEmpty()) {
                 return evaluation(
                     Status.UNSUPPORTED,
@@ -111,8 +141,8 @@ public final class RationalFunctionNormalFormEquivalenceService {
         return new Evaluation(
             status,
             equivalent,
-            crossLeft.toCanonicalString(),
-            crossRight.toCanonicalString(),
+            work.text(crossLeft),
+            work.text(crossRight),
             required,
             audit.providedFactorKeys(),
             audit.missingFactorKeys(),
@@ -120,7 +150,8 @@ public final class RationalFunctionNormalFormEquivalenceService {
             detail);
     }
 
-    private RationalFunction parse(String expression) {
+    RationalFunction parse(String expression) {
+        work.source(expression);
         Expr parsed;
         try {
             parsed = parser.parse(new InputRequest(InputType.TERM, expression))
@@ -129,17 +160,23 @@ public final class RationalFunctionNormalFormEquivalenceService {
             throw new UnsupportedExpression(
                 "cannot parse rational expression: " + exception.getMessage());
         }
-        return convert(parsed);
+        return convert(parsed, null);
     }
 
-    private RationalFunction convert(Expr expression) {
+    /**
+     * Convert each node once. When its parent needs a nonzero value, collect the
+     * visible multiplicative factors in the same traversal. The returned rational
+     * function carries the separate guards needed to define the expression.
+     */
+    private RationalFunction convert(Expr expression, List<Polynomial> nonzeroFactors) {
+        work.charge(1);
         if (expression instanceof NumberExpr number) {
-            return RationalFunction.polynomial(
-                Polynomial.constant(Rational.fromExact(number.value())));
+            var value = RationalFunction.polynomial(
+                work.checked(Polynomial.constant(Rational.fromExact(number.value()))));
+            return collectNumerator(value, nonzeroFactors);
         }
         if (expression instanceof VariableExpr variable) {
-            return RationalFunction.polynomial(
-                Polynomial.variable(variable.name()));
+            return collectNumerator(RationalFunction.polynomial(Polynomial.variable(variable.name())), nonzeroFactors);
         }
         if (expression instanceof FunctionExpr function) {
             throw new UnsupportedExpression(
@@ -150,82 +187,63 @@ public final class RationalFunctionNormalFormEquivalenceService {
             throw new UnsupportedExpression(
                 "unsupported rational AST node: " + expression);
         }
-        RationalFunction left = convert(binary.left());
-        if (binary.operator() == BinaryOperator.POW) {
-            return power(left, binary.right());
-        }
-        RationalFunction right = convert(binary.right());
         return switch (binary.operator()) {
-            case ADD -> left.add(right);
-            case SUB -> left.subtract(right);
-            case MUL -> left.multiply(right);
-            case DIV -> divide(left, right, binary.right());
-            case POW -> throw new IllegalStateException(
-                "power was handled before right-side conversion");
+            case ADD, SUB -> {
+                var left = convert(binary.left(), null);
+                var right = convert(binary.right(), null);
+                var value = binary.operator() == BinaryOperator.ADD ? left.add(right, work) : left.subtract(right, work);
+                yield collectNumerator(value, nonzeroFactors);
+            }
+            case MUL -> convert(binary.left(), nonzeroFactors).multiply(convert(binary.right(), nonzeroFactors), work);
+            case DIV -> {
+                var left = convert(binary.left(), nonzeroFactors);
+                var divisorFactors = new ArrayList<Polynomial>();
+                var right = convert(binary.right(), divisorFactors);
+                yield divide(left, right, divisorFactors);
+            }
+            case POW -> {
+                int exponent = integralExponent(binary.right());
+                if (exponent > 0) yield convert(binary.left(), nonzeroFactors).pow(exponent, work);
+                var baseFactors = new ArrayList<Polynomial>();
+                var base = convert(binary.left(), baseFactors);
+                if (base.numerator().isZero()) throw new UnsupportedExpression(
+                    "zero to the zero power is outside the rational evaluator");
+                var one = Polynomial.constant(Rational.ONE);
+                yield new RationalFunction(one, one, RationalFunction.joined(base.denominatorFactors(), baseFactors, work));
+            }
         };
+    }
+
+    private RationalFunction collectNumerator(RationalFunction value, List<Polynomial> factors) {
+        var numerator = value.numerator();
+        if (factors != null && (numerator.isZero() || numerator.totalDegree() != 0)) {
+            work.cells((long) factors.size() + 1);
+            work.charge(1);
+            factors.add(numerator);
+        }
+        return value;
     }
 
     private RationalFunction divide(
         RationalFunction left,
         RationalFunction right,
-        Expr divisorExpression
+        List<Polynomial> divisorFactors
     ) {
         if (right.numerator().isZero()) {
             throw new UnsupportedExpression(
                 "division by an identically zero rational expression");
         }
+        work.cells((long) left.denominatorFactors().size() + right.denominatorFactors().size());
         List<Polynomial> factors = new ArrayList<>(
             left.denominatorFactors());
         factors.addAll(right.denominatorFactors());
-        factors.addAll(nonZeroValueFactors(divisorExpression));
+        work.cells((long) factors.size() + divisorFactors.size());
+        work.charge((long) factors.size() + divisorFactors.size());
+        factors.addAll(divisorFactors);
         return new RationalFunction(
-            left.numerator().multiply(right.denominator()),
-            left.denominator().multiply(right.numerator()),
+            work.multiply(left.numerator(), right.denominator()),
+            work.multiply(left.denominator(), right.numerator()),
             factors);
-    }
-
-    /**
-     * Returns the already visible multiplicative factors whose product being
-     * non-zero makes {@code expression} non-zero. Domain factors needed merely
-     * to define a nested rational expression are retained by {@link #convert}
-     * and are therefore not duplicated here.
-     */
-    private List<Polynomial> nonZeroValueFactors(Expr expression) {
-        if (expression instanceof NumberExpr number) {
-            Polynomial value = Polynomial.constant(
-                Rational.fromExact(number.value()));
-            return value.isZero() ? List.of(value) : List.of();
-        }
-        if (expression instanceof BinaryExpr binary) {
-            if (binary.operator() == BinaryOperator.MUL) {
-                List<Polynomial> factors = new ArrayList<>(
-                    nonZeroValueFactors(binary.left()));
-                factors.addAll(nonZeroValueFactors(binary.right()));
-                return List.copyOf(factors);
-            }
-            if (binary.operator() == BinaryOperator.DIV) {
-                return nonZeroValueFactors(binary.left());
-            }
-            if (binary.operator() == BinaryOperator.POW) {
-                int exponent = integralExponent(binary.right());
-                return exponent == 0
-                    ? List.of()
-                    : nonZeroValueFactors(binary.left());
-            }
-        }
-        RationalFunction value = convert(expression);
-        return value.numerator().totalDegree() == 0
-            ? (value.numerator().isZero()
-                ? List.of(value.numerator())
-                : List.of())
-            : List.of(value.numerator());
-    }
-
-    private RationalFunction power(
-        RationalFunction base,
-        Expr exponentExpression
-    ) {
-        return base.pow(integralExponent(exponentExpression));
     }
 
     private int integralExponent(Expr exponentExpression) {
@@ -241,29 +259,14 @@ public final class RationalFunctionNormalFormEquivalenceService {
         return raw.intValueExact();
     }
 
-    private List<String> requiredFactorKeys(
-        RationalFunction left,
-        RationalFunction right
-    ) {
-        LinkedHashMap<String, String> factors = new LinkedHashMap<>();
-        left.denominatorFactors().forEach(factor -> addFactor(factors, factor));
-        right.denominatorFactors().forEach(factor -> addFactor(factors, factor));
-        return factors.values().stream().sorted().toList();
-    }
-
-    private void addFactor(
-        Map<String, String> factors,
-        Polynomial polynomial
-    ) {
-        if (polynomial.isZero()) {
-            throw new UnsupportedExpression(
+    SortedSet<String> requiredFactorKeys(RationalFunction expression) {
+        var factors = new TreeSet<String>();
+        for (Polynomial polynomial : expression.denominatorFactors()) {
+            if (polynomial.isZero()) throw new UnsupportedExpression(
                 "rational expression contains an identically zero divisor");
+            if (polynomial.totalDegree() > 0) factors.add(factorKey(polynomial));
         }
-        if (polynomial.totalDegree() == 0) {
-            return;
-        }
-        String key = factorKey(polynomial);
-        factors.putIfAbsent(key, key);
+        return factors;
     }
 
     private AssumptionAudit auditAssumptions(
@@ -273,21 +276,22 @@ public final class RationalFunctionNormalFormEquivalenceService {
         LinkedHashMap<String, String> provided = new LinkedHashMap<>();
         List<String> unsupported = new ArrayList<>();
         if (assumptions != null) {
-            assumptions.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(String::trim)
-                .distinct()
-                .sorted()
-                .forEach(assumption -> {
-                    Optional<Polynomial> factor = parseNonZeroAssumption(
-                        assumption);
-                    if (factor.isEmpty()) {
-                        unsupported.add(assumption);
-                    } else if (factor.orElseThrow().totalDegree() > 0) {
-                        String key = factorKey(factor.orElseThrow());
-                        provided.putIfAbsent(key, key);
-                    }
-                });
+            work.cells(assumptions.size());
+            work.charge(assumptions.size());
+            var processed = new HashSet<String>();
+            for (String raw : assumptions) {
+                work.charge(1);
+                if (raw == null || raw.isBlank()) continue;
+                String assumption = raw.trim();
+                if (!processed.add(assumption)) continue;
+                Optional<Polynomial> factor = parseNonZeroAssumption(assumption);
+                if (factor.isEmpty()) {
+                    unsupported.add(assumption);
+                } else if (factor.orElseThrow().totalDegree() > 0) {
+                    String key = factorKey(factor.orElseThrow());
+                    provided.putIfAbsent(key, key);
+                }
+            }
         }
         List<String> missing = requiredFactorKeys.stream()
             .filter(key -> !provided.containsKey(key))
@@ -315,8 +319,8 @@ public final class RationalFunctionNormalFormEquivalenceService {
             if (!left.isPolynomial() || !right.isPolynomial()) {
                 return Optional.empty();
             }
-            Polynomial difference = left.numerator()
-                .subtract(right.numerator());
+            Polynomial difference = work.add(work.multiply(left.numerator(), right.denominator()),
+                work.multiply(right.numerator(), left.denominator()), true);
             return difference.isZero()
                 ? Optional.empty()
                 : Optional.of(difference);
@@ -326,7 +330,7 @@ public final class RationalFunctionNormalFormEquivalenceService {
     }
 
     private String factorKey(Polynomial polynomial) {
-        return polynomial.monic(ORDER).toCanonicalString(ORDER);
+        return work.text(work.monic(polynomial));
     }
 
     public enum Status {
@@ -384,12 +388,12 @@ public final class RationalFunctionNormalFormEquivalenceService {
     ) {
     }
 
-    private record RationalFunction(
+    record RationalFunction(
         Polynomial numerator,
         Polynomial denominator,
         List<Polynomial> denominatorFactors
     ) {
-        private RationalFunction {
+        RationalFunction {
             Objects.requireNonNull(numerator, "numerator");
             Objects.requireNonNull(denominator, "denominator");
             denominatorFactors = List.copyOf(denominatorFactors);
@@ -407,65 +411,49 @@ public final class RationalFunctionNormalFormEquivalenceService {
         }
 
         private boolean isPolynomial() {
-            return denominator.equals(Polynomial.constant(Rational.ONE));
+            return denominator.totalDegree() == 0;
         }
 
-        private RationalFunction add(RationalFunction other) {
+        private RationalFunction add(RationalFunction other, RationalFunctionWork work) {
             return new RationalFunction(
-                numerator.multiply(other.denominator)
-                    .add(other.numerator.multiply(denominator)),
-                denominator.multiply(other.denominator),
-                joined(denominatorFactors, other.denominatorFactors));
+                work.add(work.multiply(numerator, other.denominator), work.multiply(other.numerator, denominator), false),
+                work.multiply(denominator, other.denominator),
+                joined(denominatorFactors, other.denominatorFactors, work));
         }
 
-        private RationalFunction subtract(RationalFunction other) {
+        private RationalFunction subtract(RationalFunction other, RationalFunctionWork work) {
             return new RationalFunction(
-                numerator.multiply(other.denominator)
-                    .subtract(other.numerator.multiply(denominator)),
-                denominator.multiply(other.denominator),
-                joined(denominatorFactors, other.denominatorFactors));
+                work.add(work.multiply(numerator, other.denominator), work.multiply(other.numerator, denominator), true),
+                work.multiply(denominator, other.denominator),
+                joined(denominatorFactors, other.denominatorFactors, work));
         }
 
-        private RationalFunction multiply(RationalFunction other) {
-            return new RationalFunction(
-                numerator.multiply(other.numerator),
-                denominator.multiply(other.denominator),
-                joined(denominatorFactors, other.denominatorFactors));
+        private RationalFunction multiply(RationalFunction other, RationalFunctionWork work) {
+            return new RationalFunction(work.multiply(numerator, other.numerator),
+                work.multiply(denominator, other.denominator),
+                joined(denominatorFactors, other.denominatorFactors, work));
         }
 
-        private RationalFunction pow(int exponent) {
-            if (exponent == 0) {
-                if (numerator.isZero()) {
-                    throw new UnsupportedExpression(
-                        "zero to the zero power is outside the rational evaluator");
-                }
-                return new RationalFunction(
-                    Polynomial.constant(Rational.ONE),
-                    Polynomial.constant(Rational.ONE),
-                    denominatorFactors);
-            }
+        private RationalFunction pow(int exponent, RationalFunctionWork work) {
+            work.cells((long) denominatorFactors.size() * exponent);
+            work.charge((long) denominatorFactors.size() * exponent);
             List<Polynomial> factors = new ArrayList<>();
-            for (int index = 0; index < exponent; index++) {
-                factors.addAll(denominatorFactors);
-            }
-            return new RationalFunction(
-                numerator.pow(exponent),
-                denominator.pow(exponent),
-                factors);
+            for (int index = 0; index < exponent; index++) factors.addAll(denominatorFactors);
+            return new RationalFunction(work.power(numerator, exponent), work.power(denominator, exponent), factors);
         }
 
-        private Polynomial crossLeft(RationalFunction other) {
-            return numerator.multiply(other.denominator);
+        private Polynomial crossLeft(RationalFunction other, RationalFunctionWork work) {
+            return work.multiply(numerator, other.denominator);
         }
 
-        private Polynomial crossRight(RationalFunction other) {
-            return other.numerator.multiply(denominator);
+        private Polynomial crossRight(RationalFunction other, RationalFunctionWork work) {
+            return work.multiply(other.numerator, denominator);
         }
 
-        private static List<Polynomial> joined(
-            List<Polynomial> left,
-            List<Polynomial> right
-        ) {
+        private static List<Polynomial> joined(List<Polynomial> left, List<Polynomial> right,
+                RationalFunctionWork work) {
+            work.cells((long) left.size() + right.size());
+            work.charge((long) left.size() + right.size());
             List<Polynomial> result = new ArrayList<>(left);
             result.addAll(right);
             result.sort(Comparator.comparing(Polynomial::toCanonicalString));
@@ -473,7 +461,7 @@ public final class RationalFunctionNormalFormEquivalenceService {
         }
     }
 
-    private static final class UnsupportedExpression extends RuntimeException {
+    static final class UnsupportedExpression extends RuntimeException {
         private UnsupportedExpression(String message) {
             super(message);
         }

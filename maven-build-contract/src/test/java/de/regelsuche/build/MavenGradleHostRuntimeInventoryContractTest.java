@@ -52,11 +52,13 @@ class MavenGradleHostRuntimeInventoryContractTest {
           "\"$pilot_python\" -m external_polynomial_comparison.run_native \\",
           "\"$pilot_python\" -m external_polynomial_comparison.run_native --verify \\"
       )),
-      Map.entry("run-typed-external-polynomial-comparison.sh", List.of(
+      Map.entry("test-polynomial-controllers.sh", List.of(
           "python3 -m venv build/typed-external-polynomial-venv",
           "pilot_python=build/typed-external-polynomial-venv/bin/python",
           "\"$pilot_python\" -m pip install sympy==1.14.0 mpmath==1.3.0",
-          "\"$pilot_python\" -m unittest discover -s scripts/external_polynomial_comparison -p 'test_*.py' -v",
+          "\"$pilot_python\" -m unittest discover -s scripts/external_polynomial_comparison -p 'test_*.py' -v"
+      )),
+      Map.entry("run-typed-external-polynomial-comparison.sh", List.of(
           "env -u GITHUB_SHA ./gradlew --no-daemon --no-configuration-cache --max-workers=2 \\",
           "\"$pilot_python\" - <<'PY'",
           "\"$pilot_python\" -m external_polynomial_comparison.run_typed \\",
@@ -268,12 +270,12 @@ class MavenGradleHostRuntimeInventoryContractTest {
   @Test
   void legacyLinesCannotBeDuplicatedOrReplacedByUnreviewedCommands() {
     String oldCommand = "python3 -m venv build/typed-external-polynomial-venv";
-    rejectNewRuntimeLines("run-typed-external-polynomial-comparison.sh", oldCommand);
+    rejectNewRuntimeLines("test-polynomial-controllers.sh", oldCommand);
     assertThrows(AssertionError.class,
-        () -> rejectNewRuntimeLines("run-typed-external-polynomial-comparison.sh",
+        () -> rejectNewRuntimeLines("test-polynomial-controllers.sh",
             oldCommand + "\n" + oldCommand));
     assertThrows(AssertionError.class,
-        () -> rejectNewRuntimeLines("run-typed-external-polynomial-comparison.sh",
+        () -> rejectNewRuntimeLines("test-polynomial-controllers.sh",
             "python3 -m unittest discover -s scripts -p new_suite.py -v"));
   }
 

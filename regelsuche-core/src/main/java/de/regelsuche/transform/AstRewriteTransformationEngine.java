@@ -82,12 +82,29 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             return List.of();
         }
 
+        return transformParsed(root, expression, observer, null);
+    }
+
+    /** Independently enumerates primitive rewrites and returns the actual constructed ASTs. */
+    public List<GeneratedAstTransformation> transformStructurally(Expr root) {
+        AstRewriteTransport.requireBounded(root);
+        var generated = new ArrayList<GeneratedAstTransformation>();
+        transformParsed(root, null, null, generated);
+        return List.copyOf(generated);
+    }
+
+    public record GeneratedAstTransformation(Transformation transformation, Expr result) { }
+
+    private List<Transformation> transformParsed(Expr root, String expression, Consumer<GeneratedTransformation> observer,
+            List<GeneratedAstTransformation> generated) {
+        boolean preserveStructure = generated != null;
+
         boolean observed = RetainedOperation.isObserved();
-        String formattedInput = formatState(root);
+        String formattedInput = formatState(root, preserveStructure);
         int originalSize = observed ? canonicalizer.astNodeCount(formattedInput) : -1;
         Set<Transformation> transformations = new LinkedHashSet<>();
-        for (RewriteResult result : rewriteEverywhere(root, observer == null ? null : List.of())) {
-            String formatted = formatState(result.expression());
+        for (RewriteResult result : rewriteEverywhere(root, observer == null ? null : List.of(), preserveStructure)) {
+            String formatted = formatState(result.expression(), preserveStructure);
             if (formatted.equals(formattedInput)) {
                 continue;
             }
@@ -109,10 +126,11 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 rule.descriptor().packId(),
                 rule.descriptor().license()
             );
-            if (transformations.add(transformation) && observer != null) {
-                observer.accept(new GeneratedTransformation(expression,
+            if (transformations.add(transformation)) {
+                if (observer != null) observer.accept(new GeneratedTransformation(expression,
                     new TreePosition(result.path(), result.sourceOccurrenceExpression()),
                     result.sourceOccurrenceExpression(), result.transformedOccurrenceExpression(), transformation));
+                if (generated != null) generated.add(new GeneratedAstTransformation(transformation, result.expression()));
             }
             if (transformations.size() >= maxCandidatesPerState) {
                 break;
@@ -126,16 +144,25 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         return ExpressionFormatter.format(expression);
     }
 
-    private List<RewriteResult> rewriteEverywhere(Expr subtree, List<Integer> path) {
+    private String formatState(Expr expression, boolean preserveStructure) {
+        return preserveStructure ? ExpressionFormatter.formatStructure(expression) : formatState(expression);
+    }
+
+    private String sourceHash(Expr subtree, boolean preserveStructure) {
+        String text = preserveStructure ? ExpressionFormatter.formatStructure(subtree) : ExpressionFormatter.format(subtree);
+        return canonicalizer.stableHash(text);
+    }
+
+    private List<RewriteResult> rewriteEverywhere(Expr subtree, List<Integer> path, boolean preserveStructure) {
         List<RewriteResult> results = new ArrayList<>();
         // Canonicalization can expand a polynomial. A subtree with no changed rewrite needs no key.
         String subtreeHash = RetainedOperation.isObserved()
-            ? canonicalizer.stableHash(ExpressionFormatter.format(subtree)) : null;
+            ? sourceHash(subtree, preserveStructure) : null;
         for (RewriteRule rule : rules) {
             if (rule.matches(subtree)) {
                 Expr rewritten = rule.apply(subtree);
                 if (!rewritten.equals(subtree)) {
-                    if (subtreeHash == null) subtreeHash = canonicalizer.stableHash(ExpressionFormatter.format(subtree));
+                    if (subtreeHash == null) subtreeHash = sourceHash(subtree, preserveStructure);
                     results.add(new RewriteResult(
                         rule,
                         rewritten,
@@ -148,7 +175,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         }
 
         if (subtree instanceof BinaryExpr binaryExpr) {
-            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left(), child(path, 0))) {
+            for (RewriteResult leftRewrite : rewriteEverywhere(binaryExpr.left(), child(path, 0), preserveStructure)) {
                 results.add(new RewriteResult(
                     leftRewrite.rule(),
                     new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
@@ -157,7 +184,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                     leftRewrite.sourceOccurrenceExpression(), leftRewrite.transformedOccurrenceExpression()
                 ));
             }
-            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right(), child(path, 1))) {
+            for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right(), child(path, 1), preserveStructure)) {
                 results.add(new RewriteResult(
                     rightRewrite.rule(),
                     new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),
@@ -170,7 +197,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             List<Expr> arguments = functionExpr.arguments();
             for (int index = 0; index < arguments.size(); index++) {
                 final int position = index;
-                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index), child(path, index))) {
+                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index), child(path, index), preserveStructure)) {
                     List<Expr> replaced = new ArrayList<>(arguments);
                     replaced.set(position, argRewrite.expression());
                     results.add(new RewriteResult(

@@ -96,6 +96,16 @@ Zweiterm-Faltung das Intervall $[3,3]$. Bei der komplexen Multiplikation
 über rationalen Komponenten liefert dieselbe Suche drei Produkte und
 die Abflachung eine Untergrenze von zwei.
 
+### Rationale Schranke mit Determinantenbüschel
+
+Der zusätzliche SDK-Einstieg `computeRationalRankBound` liefert den Abflachungsminor und bei passenden $2 \times 2 \times 2$-Tensoren einen zweiten Beleg. Für die beiden Ausgabematrizen $A,B$ bildet er
+
+$$q(s,t)=\det(sA+tB)=as^2+bst+ct^2.$$
+
+Hätte der Tensor höchstens zwei rationale Produkte, ließe sich die Matrix als $U\,\mathrm{diag}(l_1(s,t),l_2(s,t))\,V^T$ schreiben. Die Spalten von $U,V$ wären die jeweiligen Eingabeformen, die $l_i$ rationale lineare Formen aus den Ausgabegewichten. Damit wäre $q$ das Produkt zweier rationaler Linearformen mal einer Konstanten oder identisch null. Für $(us+vt)(ws+zt)$ ist die Diskriminante $(uz-vw)^2$. Eine rationale Diskriminante $b^2-4ac$ ohne rationale Quadratwurzel schließt folglich jede Zwei-Produkt-Zerlegung aus. Bei einem Quadrat einschließlich null verwendet die Implementierung weiterhin den Minor. Höhere Dimensionen verwenden ebenfalls den Minor.
+
+`verifyRationalRankBound` rekonstruiert den Minor und gewinnt die drei Polynomkoeffizienten nochmals aus $\det(A)$, $\det(B)$ und $\det(A+B)$. Er prüft die Diskriminante über normierten rationalen Zahlen samt Bit-, Arbeits- und Speichergrenzen. Bei der komplexen Multiplikation gilt $q=-s^2-t^2$, die Diskriminante beträgt $-4$. Der stärkere Nachweis und der ausgeführte Drei-Produkt-Plan ergeben mit `certifyRationalProductBounds` das Intervall $[3,3]$. `searchWithRationalBound` prüft einen vorgelegten Befund am aktuellen Auftrag, bevor die endliche Katalogsuche kleinere Ränge überspringt.
+
 ## Übertragung gelernter Produktformen
 
 `trainProducts` gewinnt die **Paare** linker und rechter Eingabeformen aus
@@ -114,6 +124,12 @@ Trainingsquelle. Ein Lernvergleich muss Erwerb, erfolglose Anpassungen,
 Prüfung und Rückfall zur regulären Suche mitrechnen. Das
 [Java-Benchmarkprojekt](../../research/benchmarks/bilinear-form-transfer/)
 vergleicht zusätzlich den ausführbaren Rechenplan in einem Verbraucher.
+
+### Geprüfter Wechsel der Eingabebasen
+
+`applyInputBases(sourceRequest, sourceProgram, bases, targetTensor, budget, cancellation)` übernimmt einen bereits vorliegenden Rechenplan. Der Aufrufer gibt zwei quadratische rationale Matrizen $L,R$ mit der Konvention $x_{alt}=Lx_{neu}$ und $y_{alt}=Ry_{neu}$ an. Jede frühere Zeilenform $u,v$ wird zu $uL,vR$. Reihenfolge und Ausgabegewichte bleiben Bestandteil der Behauptung. Der Kern prüft den Ausgangsplan, beide Determinanten und alle Tensorkoeffizienten des verlangten Ziels. `verifyInputBases` prüft fremde Ergebnisse mit den erwarteten Quellen, Matrizen und Zielkoeffizienten. Die ausgegebene `Transfer`-Struktur hält Ausgangsauftrag, Ausgangsprogramm, Matrizen, Zielauftrag und geprüften Zeugen zusammen. Der Aufruf berichtet auch die Arbeit eines zurückgewiesenen Transfers.
+
+Der [deterministische Vergleich mit zwei festen Kontrollen](bilinear-input-basis-study.md) verwendet sechs von den Erwerbsquellen getrennte Koordinatendarstellungen. Alle 90 Auswertungen stimmen überein; die klassische Drei-Produkt-Formel benötigt dort die geringste gezählte Ausführungsarbeit.
 
 ## Kosten des ausführbaren Programms
 

@@ -34,7 +34,7 @@ Regelsuche source build, database or web server. The current example POM imports
 dependencies on the first run. The historical 0.5.2 archive recipe remains
 available in the same guide.
 
-To explore the newer source APIs, the [six checked mathematics examples](../examples/external-consumers/checked-math-java25/README.md)
+To explore the newer source APIs, the [seven checked mathematics examples](../examples/external-consumers/checked-math-java25/README.md)
 provide one Maven command after installing the source SDK, or directly from an
 SDK archive containing the examples. They do not run against the 0.5.3 binaries.
 

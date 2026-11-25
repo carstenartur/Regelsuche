@@ -5,6 +5,8 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
+import de.regelsuche.math.algorithms.equivalence.RationalFunctionPlanner;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.parse.ExpressionParser;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -22,41 +24,76 @@ public final class FpcorePolynomialCorpus {
 
     /** Every top-level program produces a row, including unsupported bodies. */
     public static List<Entry> read(String text) {
+        return read(text, false);
+    }
+
+    /** Separate bounded rational-domain projection; historical polynomial admission is unchanged. */
+    public static List<Entry> readRational(String text) {
+        return read(text, true);
+    }
+
+    private static List<Entry> read(String text, boolean rational) {
         var parser = new Reader(text);
         var entries = new ArrayList<Entry>();
         while (parser.hasNext()) {
-            Form program = form(parser.read(0));
-            if (program.values().size() < 3 || !atom(program.values().getFirst()).equals("FPCore")) {
-                throw new IllegalArgumentException("expected a complete FPCore program");
-            }
-            int variablesAt = program.values().get(1) instanceof Form ? 1 : 2;
-            String name = variablesAt == 2 ? atom(program.values().get(1)) : "program-" + (entries.size() + 1);
-            for (int index = variablesAt + 1; index < program.values().size() - 1; index += 2) {
-                if (index + 1 >= program.values().size() - 1) throw new IllegalArgumentException("unpaired FPCore metadata");
-                if (atom(program.values().get(index)).equals(":name")) name = atom(program.values().get(index + 1));
-            }
-            int ordinal = entries.size() + 1;
-            try {
-                Form variables = form(program.values().get(variablesAt));
-                if (variables.values().size() > 4) throw new IllegalArgumentException("VARIABLE_LIMIT");
-                var environment = new LinkedHashMap<String, String>();
-                for (Node variable : variables.values()) {
-                    String symbol = atom(variable);
-                    if (!symbol.matches("[A-Za-z][A-Za-z0-9_]*") || environment.putIfAbsent(symbol, symbol) != null) {
-                        throw new IllegalArgumentException("VARIABLE_DECLARATION_UNSUPPORTED");
-                    }
-                }
-                String source = expand(program.values().getLast(), environment);
-                var parsed = new ExpressionParser().parseExactTerm(source);
-                if (nodes(parsed.expression()) > 256) throw new IllegalArgumentException("AST_NODE_LIMIT");
-                new ExactPolynomialAnalysis().normalForm(source);
-                entries.add(new Entry(ordinal, name, source, Status.SUPPORTED, "EXACT_RATIONAL_PROJECTION"));
-            } catch (IllegalArgumentException | ArithmeticException unsupported) {
-                entries.add(new Entry(ordinal, name, "", Status.UNSUPPORTED,
-                    unsupported.getMessage() == null ? unsupported.getClass().getSimpleName() : unsupported.getMessage()));
-            }
+            entries.add(readProgram(form(parser.read(0)), entries.size() + 1, rational));
         }
         return List.copyOf(entries);
+    }
+
+    private static Entry readProgram(Form program, int ordinal, boolean rational) {
+        var values = program.values();
+        if (values.size() < 3 || !atom(values.getFirst()).equals("FPCore")) {
+            throw new IllegalArgumentException("expected a complete FPCore program");
+        }
+        int variablesAt = values.get(1) instanceof Form ? 1 : 2;
+        String name = programName(values, variablesAt, ordinal);
+        try {
+            var environment = variableEnvironment(form(values.get(variablesAt)));
+            String source = expand(values.getLast(), environment, rational);
+            validateProjection(source, rational);
+            return new Entry(ordinal, name, source, Status.SUPPORTED,
+                rational ? "EXACT_RATIONAL_DOMAIN_PROJECTION" : "EXACT_RATIONAL_PROJECTION");
+        } catch (IllegalArgumentException | ArithmeticException unsupported) {
+            String detail = unsupported.getMessage();
+            return new Entry(ordinal, name, "", Status.UNSUPPORTED,
+                detail == null ? unsupported.getClass().getSimpleName() : detail);
+        }
+    }
+
+    private static String programName(List<Node> values, int variablesAt, int ordinal) {
+        String name = variablesAt == 2 ? atom(values.get(1)) : "program-" + ordinal;
+        int bodyAt = values.size() - 1;
+        for (int index = variablesAt + 1; index < bodyAt; index += 2) {
+            if (index + 1 >= bodyAt) throw new IllegalArgumentException("unpaired FPCore metadata");
+            if (atom(values.get(index)).equals(":name")) name = atom(values.get(index + 1));
+        }
+        return name;
+    }
+
+    private static Map<String, String> variableEnvironment(Form variables) {
+        if (variables.values().size() > 4) throw new IllegalArgumentException("VARIABLE_LIMIT");
+        var environment = new LinkedHashMap<String, String>();
+        for (Node variable : variables.values()) {
+            String symbol = atom(variable);
+            if (!symbol.matches("[A-Za-z][A-Za-z0-9_]*") || environment.putIfAbsent(symbol, symbol) != null) {
+                throw new IllegalArgumentException("VARIABLE_DECLARATION_UNSUPPORTED");
+            }
+        }
+        return environment;
+    }
+
+    private static void validateProjection(String source, boolean rational) {
+        var parsed = new ExpressionParser().parseExactTerm(source);
+        if (nodes(parsed.expression()) > 256) throw new IllegalArgumentException("AST_NODE_LIMIT");
+        if (rational) {
+            var admitted = RationalFunctionPlanner.simplify(source, List.of(),
+                new IterationLimits(2_000_000, 20_000, 5_000), () -> false);
+            if (admitted.status() == RationalFunctionPlanner.Status.UNAVAILABLE)
+                throw new IllegalArgumentException(admitted.reason());
+        } else {
+            new ExactPolynomialAnalysis().normalForm(source);
+        }
     }
 
     /** The bridge receives only the selected source; it does not receive corpus metadata. */
@@ -71,7 +108,7 @@ public final class FpcorePolynomialCorpus {
         if (reader.hasNext()) throw new IllegalArgumentException("trailing peer expression");
         var variables = new HashMap<String, String>();
         collectVariables(node, variables);
-        return expand(node, variables);
+        return expand(node, variables, false);
     }
 
     private static void collectVariables(Node node, Map<String, String> result) {
@@ -104,7 +141,7 @@ public final class FpcorePolynomialCorpus {
         return expression instanceof BinaryExpr binary ? 1 + nodes(binary.left()) + nodes(binary.right()) : 1;
     }
 
-    private static String expand(Node node, Map<String, String> environment) {
+    private static String expand(Node node, Map<String, String> environment, boolean rational) {
         if (node instanceof Atom value) {
             if (value.quoted()) throw new IllegalArgumentException("STRING_EXPRESSION_UNSUPPORTED");
             String bound = environment.get(value.value());
@@ -125,20 +162,20 @@ public final class FpcorePolynomialCorpus {
                 if (!name.matches("[A-Za-z][A-Za-z0-9_*]*") || !names.add(name)) {
                     throw new IllegalArgumentException("BINDING_NAME");
                 }
-                nested.put(name, expand(pair.get(1), operator.equals("let*") ? nested : environment));
+                nested.put(name, expand(pair.get(1), operator.equals("let*") ? nested : environment, rational));
             }
-            return expand(values.get(2), nested);
+            return expand(values.get(2), nested, rational);
         }
         if (!List.of("+", "-", "*", "/", "~").contains(operator)) {
             throw new IllegalArgumentException("OPERATOR_UNSUPPORTED:" + operator);
         }
         if ((operator.equals("-") || operator.equals("~")) && values.size() == 2) {
-            return bounded("(-" + expand(values.get(1), environment) + ")");
+            return bounded("(-" + expand(values.get(1), environment, rational) + ")");
         }
         if (values.size() != 3 || operator.equals("~")) throw new IllegalArgumentException("OPERATOR_ARITY");
-        String left = expand(values.get(1), environment);
-        String right = expand(values.get(2), environment);
-        if (operator.equals("/")) {
+        String left = expand(values.get(1), environment, rational);
+        String right = expand(values.get(2), environment, rational);
+        if (operator.equals("/") && !rational) {
             Expr denominator = new ExpressionParser().parseExactTerm(right).expression();
             if (hasVariable(denominator)) throw new IllegalArgumentException("VARIABLE_DENOMINATOR");
             new ExactPolynomialAnalysis().normalForm("1/(" + right + ")");

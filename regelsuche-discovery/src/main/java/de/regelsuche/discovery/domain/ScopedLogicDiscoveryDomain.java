@@ -94,6 +94,19 @@ public final class ScopedLogicDiscoveryDomain implements DiscoveryDomain<ScopedL
             }
         });
     }
+    /** Opt-in live formation for callers that pull or cancel between rules. */
+    public ScopedProofSearch.Cursor openPlans(State initial) {
+        if (initial.proposal() != null || initial.exhausted() || initial.cumulativeWork() != 0)
+            throw new IllegalArgumentException("plan cursor requires a fresh scoped source");
+        return ScopedProofSearch.open(initial.context(), formationBudget);
+    }
+
+    /** Independently check the exact receiving obligation, including its endpoint and all lexical binders. */
+    public Evaluation<Certificate> receivePlan(Obligation receiving, ScopedProofDag proposal) {
+        if (!receiving.equals(proposal.obligation())) throw new IllegalArgumentException("different receiving obligation");
+        return receive(proposal);
+    }
+
     @Override public List<TransitionOperator<State>> operators() {
         return List.of(new TransitionOperator<>() {
             public String id() { return "form-scoped-consequences/v1"; }

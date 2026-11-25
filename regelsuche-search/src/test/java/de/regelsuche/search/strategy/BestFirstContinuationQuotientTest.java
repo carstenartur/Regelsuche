@@ -2,7 +2,10 @@ package de.regelsuche.search.strategy;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
@@ -97,6 +100,68 @@ class BestFirstContinuationQuotientTest {
         assertEquals(List.of(List.of("x < 0"), List.of("x > 0")), states.stream()
             .filter(s -> s.expression().equals("z")).map(SearchState::assumptions)
             .sorted((a,b) -> a.toString().compareTo(b.toString())).toList());
+    }
+
+    @Test void assumptionSensitiveProviderRegeneratesExactlyOncePerStateContext() {
+        var provider = new ContextualProvider();
+        var result = BestFirstSearchStrategy.preparedQuotient().searchWithExecutionDiagnostics(problem(provider, 3, 3));
+
+        assertTrue(result.search().states().stream().anyMatch(state -> state.expression().equals("positiveResult")));
+        assertTrue(result.search().states().stream().anyMatch(state -> state.expression().equals("negativeResult")));
+        assertEquals(2, provider.joinCalls);
+    }
+
+    @Test void preparedQuotientRejectsAnUndeclaredProviderBeforeCallingIt() {
+        var problem = problem(source -> { throw new AssertionError("provider was called"); }, 3, 3);
+        assertThrows(IllegalArgumentException.class, () -> BestFirstSearchStrategy.preparedQuotient().search(problem));
+    }
+
+    @Test void preparedRootRetainsParserIdentityAndBindsItsExactSource() {
+        var bound = new ExpressionParser().parseExactTerm(" ((x)) ");
+        StateLocalTransformationEngine engine = (source, ast, assumptions) -> {
+            assertEquals(" ((x)) ", source);
+            assertSame(bound.expression(), ast);
+            assertEquals(List.of("x != 0"), assumptions);
+            return List.of();
+        };
+        var strategy = BestFirstSearchStrategy.preparedQuotient();
+        var problem = new SearchProblem(bound.source(), engine, new ExpressionScorer(), new ExpressionCanonicalizer(),
+            new SearchHeuristic(2, 20, 1));
+        var states = strategy.searchPrepared(problem, bound, List.of("x≠0")).execution().search().states();
+        assertEquals(List.of("x != 0"), states.getFirst().assumptions());
+        assertThrows(IllegalArgumentException.class, () -> strategy.searchPrepared(problem,
+            new ExpressionParser().parseExactTerm("x"), List.of()));
+    }
+
+    @Test void preparedQuotientPreservesNonDominatedExpansionBudget() {
+        StateLocalTransformationEngine engine = (source, ast, assumptions) -> switch (source) {
+            case "x" -> List.of(expand("short", "y"), step("long", "a"));
+            case "a" -> List.of(step("long2", "y"));
+            case "y" -> List.of(expand("finish", "z"));
+            default -> List.of();
+        };
+        var result = BestFirstSearchStrategy.preparedQuotient().searchWithExecutionDiagnostics(problem(engine, 4, 1));
+        assertEquals(List.of("x", "a", "y", "z"), result.search().states().stream()
+            .filter(s -> s.expression().equals("z")).findFirst().orElseThrow().path());
+        assertTrue(result.quotient().successorCacheHits() > 0);
+    }
+
+    private static final class ContextualProvider implements StateLocalTransformationEngine {
+        private int joinCalls;
+
+        @Override public List<Transformation> transform(String expression) {
+            return expression.equals("x")
+                ? List.of(conditional("positive", "y", "x > 0"), conditional("negative", "y", "x < 0"))
+                : List.of();
+        }
+
+        @Override public List<Transformation> transformPrepared(String expression, Expr parsed, List<String> assumptions) {
+            assertEquals(expression, ExpressionFormatter.format(parsed));
+            if (!expression.equals("y")) return transform(expression);
+            joinCalls++;
+            return assumptions.equals(List.of("x > 0")) ? List.of(step("finish", "positiveResult"))
+                : List.of(step("finish", "negativeResult"));
+        }
     }
 
     @Test void repeatedApplicationIdentifierDoesNotBlockAChangedState() {

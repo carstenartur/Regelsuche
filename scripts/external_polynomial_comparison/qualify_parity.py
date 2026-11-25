@@ -48,6 +48,20 @@ def _flip_judgment(raw):
     return canonical(rows)
 
 
+def reject_tampering(typed_model, typed_rows, native_model, native_runtime):
+    append = lambda raw: raw + b'\n'
+    _reject(typed_model, typed_parity.project_archive, 'BASE.model.json', append,
+            'model file differs from pre-query setup')
+    _reject(typed_rows, typed_parity.project_archive, 'rows.json', _flip_judgment,
+            'judgment mismatch: valid')
+    _reject(native_model, native_parity.project_archive, 'NATIVE_LEARNED-0.model.json', append,
+            'persisted model bytes differ from the acquisition receipt')
+    runtime_file = sorted(_read(native_runtime, 'runtime-inventory.json')['files'])[0]
+    _reject(native_runtime, native_parity.project_archive, 'runtime/' + runtime_file, append,
+            'retained runtime bytecode/dependency hash mismatch')
+    return ['typed-model', 'typed-judgment', 'native-model', 'native-runtime']
+
+
 def qualify(typed_left, typed_right, native_left, native_right, revision, tree):
     for directory in (typed_left, typed_right):
         _require(_read(directory, 'metadata.json')['revision'] == revision,
@@ -60,19 +74,10 @@ def qualify(typed_left, typed_right, native_left, native_right, revision, tree):
     native = native_parity.compare(native_left, native_right)
     _require(typed['rows'] == 729 and native['rows'] == 675 and native['sequences'] == 9,
              'incomplete registered comparison')
-    append = lambda raw: raw + b'\n'
-    _reject(typed_right, typed_parity.project_archive, 'BASE.model.json', append,
-            'model file differs from pre-query setup')
-    _reject(typed_left, typed_parity.project_archive, 'rows.json', _flip_judgment,
-            'judgment mismatch: valid')
-    _reject(native_right, native_parity.project_archive, 'NATIVE_LEARNED-0.model.json', append,
-            'persisted model bytes differ from the acquisition receipt')
-    runtime_file = sorted(_read(native_left, 'runtime-inventory.json')['files'])[0]
-    _reject(native_left, native_parity.project_archive, 'runtime/' + runtime_file, append,
-            'retained runtime bytecode/dependency hash mismatch')
+    controls = reject_tampering(typed_right, typed_left, native_right, native_left)
     return {'schema': 'regelsuche.polynomial-parity-qualification/v1',
             'sourceRevision': revision, 'sourceTree': tree, 'typed': typed, 'native': native,
-            'rejectedControls': ['typed-model', 'typed-judgment', 'native-model', 'native-runtime']}
+            'rejectedControls': controls}
 
 
 def main():

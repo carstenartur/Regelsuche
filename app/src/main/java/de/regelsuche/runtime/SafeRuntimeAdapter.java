@@ -131,6 +131,12 @@ public final class SafeRuntimeAdapter implements AutoCloseable {
 
     public String analyze(Map<String, ?> request) { return analyze(SafeRuntimeRequest.read(request)); }
 
+    /** Explicit product route for state-local prepared primitive search. */
+    public static String analyzePreparedQuotient(String source, de.regelsuche.scoring.cost.TransformationGoal goal,
+            Map<String, ?> options) {
+        return PreparedQuotientSearch.run(source, goal, options);
+    }
+
     public String analyze(SafeRuntimeRequest request) {
         Objects.requireNonNull(request, "request");
         var learned = learnedAuthority == null ? null : learnedAuthority.load();

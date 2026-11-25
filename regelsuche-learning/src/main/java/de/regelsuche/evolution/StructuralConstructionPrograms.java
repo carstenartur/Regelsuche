@@ -150,15 +150,54 @@ final class StructuralConstructionPrograms {
                             List<ExactPolynomialResidualComposer.Effect> effects, ExactPolynomialResidualComposer composer) { }
 
     static PreparedResidual prepareResidual(String source, Work work, boolean productWork) {
-        var exact = productWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);
-        var polynomial = exact.normalForm(source);
-        int count = polynomial.termCount();
-        if (count < 4 || count > 6 || count % 2 != 0) return null;
-        String prepared = exposeAll(polynomial.toCanonicalString(), work, productWork);
-        var composer = productWork ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);
-        var parts = composer.additiveComponents(prepared);
-        if (parts.size() != count || !allSquares(parts, work)) return null;
-        return new PreparedResidual(prepared, parts, pairedEffects(parts, composer, work), composer);
+        var preparation = new ResidualPreparation(source, work, productWork);
+        while (!preparation.done) preparation.advance();
+        return preparation.result;
+    }
+
+    /** Source-owned checked prefix. Each pull prepares the components or derives one local effect. */
+    static final class ResidualPreparation {
+        final String source;
+        final Work work;
+        final boolean productWork;
+        boolean done;
+        PreparedResidual result;
+        private String expression;
+        private ExactPolynomialResidualComposer composer;
+        private List<ExactPolynomialResidualComposer.SourceComponent> parts;
+        private final List<ExactPolynomialResidualComposer.Effect> effects = new ArrayList<>();
+        private int left, right = 1;
+        private boolean reflected;
+
+        ResidualPreparation(String source, Work work, boolean productWork) {
+            this.source = source;
+            this.work = work;
+            this.productWork = productWork;
+        }
+
+        void advance() {
+            if (done) throw new IllegalStateException("residual preparation is complete");
+            if (parts == null) {
+                var exact = productWork ? ExactPolynomialAnalysis.withProductWork(work::add) : new ExactPolynomialAnalysis(work::add);
+                var polynomial = exact.normalForm(source);
+                int count = polynomial.termCount();
+                if (count < 4 || count > 6 || count % 2 != 0) { done = true; return; }
+                expression = exposeAll(polynomial.toCanonicalString(), work, productWork);
+                composer = productWork ? ExactPolynomialResidualComposer.withProductWork(work::add) : new ExactPolynomialResidualComposer(work::add);
+                parts = composer.additiveComponents(expression);
+                done = parts.size() != count || !allSquares(parts, work);
+                return;
+            }
+            effects.add(effect(List.of(parts.get(left), parts.get(right)), reflected, left + "-" + right, composer, work));
+            reflected = !reflected;
+            if (!reflected && ++right == parts.size()) {
+                right = ++left + 1;
+                if (right == parts.size()) {
+                    result = new PreparedResidual(expression, parts, List.copyOf(effects), composer);
+                    done = true;
+                }
+            }
+        }
     }
 
     private static String exposeAll(String source, Work work, boolean includeProductWork) {
@@ -179,18 +218,6 @@ final class StructuralConstructionPrograms {
             if (!StructuralTaskObjective.isSquare(parser.parseExactTerm(part.expression()).expression())) return false;
         }
         return true;
-    }
-    private static List<ExactPolynomialResidualComposer.Effect> pairedEffects(
-            List<ExactPolynomialResidualComposer.SourceComponent> parts, ExactPolynomialResidualComposer composer, Work work) {
-        var effects = new ArrayList<ExactPolynomialResidualComposer.Effect>();
-        for (int left = 0; left < parts.size(); left++) {
-            for (int right = left + 1; right < parts.size(); right++) {
-                var pair = List.of(parts.get(left), parts.get(right));
-                effects.add(effect(pair, false, left + "-" + right, composer, work));
-                effects.add(effect(pair, true, left + "-" + right, composer, work));
-            }
-        }
-        return List.copyOf(effects);
     }
     private static ExactPolynomialResidualComposer.Effect effect(
             List<ExactPolynomialResidualComposer.SourceComponent> pair, boolean reflect, String id,
@@ -231,9 +258,12 @@ final class StructuralConstructionPrograms {
         private long units;
         Work() { limit = LIMIT; strict = false; }
         Work(long limit) {
-            if (limit < 0 || limit > LIMIT) throw new IllegalArgumentException("work limit outside the finite grammar");
-            this.limit = limit;
+            this.limit = requireLimit(limit);
             this.strict = true;
+        }
+        static long requireLimit(long limit) {
+            if (limit < 0 || limit > LIMIT) throw new IllegalArgumentException("work limit outside the finite grammar");
+            return limit;
         }
         long units() { return units; }
         void add(long count) {

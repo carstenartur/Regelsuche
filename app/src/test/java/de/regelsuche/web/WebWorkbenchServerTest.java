@@ -201,8 +201,32 @@ class WebWorkbenchServerTest {
             """).getResponseCode());
     }
 
+    @Test void countsEditedSignedCnfAndReturnsACheckedDownloadWithExactIntegers() throws IOException {
+        String path = "/api/certificate-demos/cnf/" + java.util.UUID.randomUUID();
+        String body = """
+            {"variableCount":62,"clauses":[[1,-2]],"fixed":[1],"maximumWork":1000000}
+            """;
+        var response = postJson(path, body);
+        assertEquals(200, response.getResponseCode());
+        var report = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getInputStream());
+        assertEquals("EXACT", report.path("status").asText());
+        assertEquals("2305843009213693952", report.path("count").textValue());
+        assertEquals(62, report.at("/certificate/source/variableCount").intValue());
+        assertEquals(report.path("count"), report.at("/certificate/elimination/total"));
+        assertEquals(400, postJson(path, body.replace("[1,-2]", "[0]")).getResponseCode());
+        var limited = postJson(path, body.replace("1000000", "1"));
+        var unavailable = new com.fasterxml.jackson.databind.ObjectMapper().readTree(limited.getInputStream());
+        assertEquals("UNAVAILABLE", unavailable.path("status").asText());
+        assertEquals("WORK_LIMIT", unavailable.path("reason").asText());
+        assertFalse(unavailable.has("certificate"));
+    }
+
     private HttpURLConnection postPairReduction(String request) throws IOException {
-        var connection = open("/api/pair-reductions");
+        return postJson("/api/pair-reductions", request);
+    }
+
+    private HttpURLConnection postJson(String path, String request) throws IOException {
+        var connection = open(path);
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setDoOutput(true);

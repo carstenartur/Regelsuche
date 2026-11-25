@@ -1,0 +1,784 @@
+{
+  "schema": "regelsuche.rational-fixed-reference/v1",
+  "sympy": "1.14.0",
+  "python": "3.12.14",
+  "inputSha256": "cb820486805340717e10df558b32fdd9cd64813092451087dbee91bd26a2c1be",
+  "fixedPolicy": "min(source,cancel,factor,factor(cancel)); exact equality and original domain checked",
+  "timingScope": "per row includes native audit and all fixed candidates; excludes interpreter startup/imports",
+  "rows": [
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 1,
+      "name": "doppler1",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "9a6bd3e96d201ca3e1c789365fc4f9cc6a3e80b116aa1b6c69c10f17b53ad8ec",
+      "candidate": "((-1*5*v*((3*T)+1657)))/((((3*T)+(5*u)+1657)^2))",
+      "sourceOperations": 18,
+      "nativeOperations": 18,
+      "fixedOperations": 15,
+      "variants": 4,
+      "wallNanos": 65722533,
+      "processCpuNanos": 65632807
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 2,
+      "name": "doppler2",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "9a6bd3e96d201ca3e1c789365fc4f9cc6a3e80b116aa1b6c69c10f17b53ad8ec",
+      "candidate": "((-1*5*v*((3*T)+1657)))/((((3*T)+(5*u)+1657)^2))",
+      "sourceOperations": 18,
+      "nativeOperations": 18,
+      "fixedOperations": 15,
+      "variants": 4,
+      "wallNanos": 21687259,
+      "processCpuNanos": 21690634
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 3,
+      "name": "doppler3",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "9a6bd3e96d201ca3e1c789365fc4f9cc6a3e80b116aa1b6c69c10f17b53ad8ec",
+      "candidate": "((-1*5*v*((3*T)+1657)))/((((3*T)+(5*u)+1657)^2))",
+      "sourceOperations": 18,
+      "nativeOperations": 18,
+      "fixedOperations": 15,
+      "variants": 4,
+      "wallNanos": 20087681,
+      "processCpuNanos": 20051523
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 4,
+      "name": "rigidBody1",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "90c2764b1fbf2334b6658536c20497d180ec17ae8376325565d2cfe3a323569a",
+      "candidate": "((((-(x1*x2))-((2*x2)*x3))-x1)-x3)",
+      "sourceOperations": 7,
+      "nativeOperations": 7,
+      "fixedOperations": 7,
+      "variants": 4,
+      "wallNanos": 5307455,
+      "processCpuNanos": 5308864
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 5,
+      "name": "rigidBody2",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "9796ec2032e3ecc5d5fb120b62a50ed43d1c69d6c6511fe200b0faaa57c52d4d",
+      "candidate": "((-1*x1*(x2^2)*x3)+(2*x1*x2*x3)-x2+(6*(x3^2)))",
+      "sourceOperations": 14,
+      "nativeOperations": 12,
+      "fixedOperations": 12,
+      "variants": 4,
+      "wallNanos": 8280455,
+      "processCpuNanos": 8282601
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 6,
+      "name": "jetEngine",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "2d2d28ff814a00cdf5f2085e49f183e64b498b2188926a72473759fab063bc4b",
+      "candidate": "(((6*(x1^6))-(3*(x1^5))+(8*(x1^4)*x2)+(3*(x1^4))+(12*(x1^3)*x2)-(20*(x1^3))+(6*(x1^2)*x2)+(9*(x1^2))+(8*x1*(x2^2))-(12*x1*x2)-x1-(6*x2)))/(((x1^2)+1))",
+      "sourceOperations": 63,
+      "nativeOperations": 52,
+      "fixedOperations": 52,
+      "variants": 4,
+      "wallNanos": 77541566,
+      "processCpuNanos": 77484413
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 7,
+      "name": "turbine1",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "62080766bb2f0fef5cf37f97fe6c4f22fd84196af0872a2a2dd6d061f711fe45",
+      "candidate": "(((3+(2/(r*r)))-((((1/8)*(3-(2*v)))*(((w*w)*r)*r))/(1-v)))-(9/2))",
+      "sourceOperations": 16,
+      "nativeOperations": 16,
+      "fixedOperations": 16,
+      "variants": 4,
+      "wallNanos": 35084488,
+      "processCpuNanos": 35088381
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 8,
+      "name": "turbine2",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "d6609d9a04969b2683c0d662bee778698beb51d498d5f7409ed349c1ea3c68b9",
+      "candidate": "(((6*v)-((((1/2)*v)*(((w*w)*r)*r))/(1-v)))-(5/2))",
+      "sourceOperations": 12,
+      "nativeOperations": 12,
+      "fixedOperations": 12,
+      "variants": 4,
+      "wallNanos": 20644796,
+      "processCpuNanos": 20647731
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 9,
+      "name": "turbine3",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "9d33d8209d1b98031f4c3719aea317a9dfbb571f512db6ea543968ddebc272a2",
+      "candidate": "(((3-(2/(r*r)))-((((1/8)*(1+(2*v)))*(((w*w)*r)*r))/(1-v)))-(1/2))",
+      "sourceOperations": 16,
+      "nativeOperations": 16,
+      "fixedOperations": 16,
+      "variants": 4,
+      "wallNanos": 30478569,
+      "processCpuNanos": 30418629
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 10,
+      "name": "verhulst",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "0c70704265cf3477d5bc605caec7ed6785959fb204ab1f86264b00e0c5905d13",
+      "candidate": "((444*x))/(((100*x)+111))",
+      "sourceOperations": 5,
+      "nativeOperations": 5,
+      "fixedOperations": 4,
+      "variants": 4,
+      "wallNanos": 14894185,
+      "processCpuNanos": 14896178
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 11,
+      "name": "predatorPrey",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "64364feb3f817dfd9fc90d1d5f6100287afcc7c6bab1dfd1b8ef6eba4fbc128b",
+      "candidate": "((49284*(x^2)))/(((10000*(x^2))+12321))",
+      "sourceOperations": 9,
+      "nativeOperations": 7,
+      "fixedOperations": 6,
+      "variants": 4,
+      "wallNanos": 17998198,
+      "processCpuNanos": 18001362
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 12,
+      "name": "carbonGas",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 13,
+      "name": "sine",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "f82e8084e61a5b74e119ec0fc13916cb28464ff77c47359c127cb7b32d6a9878",
+      "candidate": "((-1*x*((x^6)-(42*(x^4))+(840*(x^2))-5040)))/(5040)",
+      "sourceOperations": 18,
+      "nativeOperations": 18,
+      "fixedOperations": 17,
+      "variants": 4,
+      "wallNanos": 12653538,
+      "processCpuNanos": 12656233
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 14,
+      "name": "sqroot",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "c6314230e8aec30a09123733f465ead4f75c22deddb0208935e316e8a1d4b594",
+      "candidate": "(((-1*5*(x^4)))/(128)+((x^3))/(16)-((x^2))/(8)+(x)/(2)+1)",
+      "sourceOperations": 18,
+      "nativeOperations": 18,
+      "fixedOperations": 16,
+      "variants": 4,
+      "wallNanos": 7617364,
+      "processCpuNanos": 7559474
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 15,
+      "name": "sineOrder3",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "9e3487f3e141c4ec8acba36aff91b08e1f54eb7646d1abf20a09e00b459d07c7",
+      "candidate": "((-1*x*((6450306886639899*(x^2))-47746482927568600)))/(50000000000000000)",
+      "sourceOperations": 7,
+      "nativeOperations": 7,
+      "fixedOperations": 6,
+      "variants": 4,
+      "wallNanos": 8770050,
+      "processCpuNanos": 8772761
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 16,
+      "name": "smartRoot",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 17,
+      "name": "cav10",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 18,
+      "name": "squareRoot3",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 19,
+      "name": "squareRoot3Invalid",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 20,
+      "name": "triangle",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 21,
+      "name": "triangle1",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 22,
+      "name": "triangle2",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 23,
+      "name": "triangle3",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 24,
+      "name": "triangle4",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 25,
+      "name": "triangle5",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 26,
+      "name": "triangle6",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 27,
+      "name": "triangle7",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 28,
+      "name": "triangle8",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 29,
+      "name": "triangle9",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 30,
+      "name": "triangle10",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 31,
+      "name": "triangle11",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 32,
+      "name": "triangle12",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 33,
+      "name": "bspline3",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "27a04799710399acbec974438b13cde5bb75c26201dea4bb1e46dba0e05f4752",
+      "candidate": "((-((u*u)*u))/6)",
+      "sourceOperations": 4,
+      "nativeOperations": 4,
+      "fixedOperations": 4,
+      "variants": 4,
+      "wallNanos": 1288096,
+      "processCpuNanos": 1289400
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 34,
+      "name": "triangleSorted",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 35,
+      "name": "N Body Simulation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 36,
+      "name": "Pendulum",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-public-v1/rosa.fpcore",
+      "ordinal": 37,
+      "name": "Sine Newton",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 1,
+      "name": "intro-example-mixed",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 2,
+      "name": "delta4",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 3,
+      "name": "delta",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 4,
+      "name": "sqrt_add",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 5,
+      "name": "exp1x",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 6,
+      "name": "exp1x_32",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 7,
+      "name": "floudas",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "ed5184f020a9b78adc41f937d30edaab7ab501b4126c163643f5a3102a91bd0a",
+      "candidate": "(x1+x2)",
+      "sourceOperations": 1,
+      "nativeOperations": 1,
+      "fixedOperations": 1,
+      "variants": 4,
+      "wallNanos": 1996435,
+      "processCpuNanos": 1997805
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 8,
+      "name": "exp1x_log",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 9,
+      "name": "x_by_xy",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "5a144d79e639a5b4f4feeb6172eb506157bd1ac44b48e195f8bb582db1ca7b8b",
+      "candidate": "(x)/((x+y))",
+      "sourceOperations": 2,
+      "nativeOperations": 2,
+      "fixedOperations": 2,
+      "variants": 4,
+      "wallNanos": 6110013,
+      "processCpuNanos": 6112971
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 10,
+      "name": "hypot",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 11,
+      "name": "hypot32",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 12,
+      "name": "logexp",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 13,
+      "name": "sum",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "71734cdace208a9f953af69c1c0bf91266662d4670a2715d39a62125ca7ec3e9",
+      "candidate": "(x0+x1+x2)",
+      "sourceOperations": 8,
+      "nativeOperations": 2,
+      "fixedOperations": 2,
+      "variants": 4,
+      "wallNanos": 2582843,
+      "processCpuNanos": 2584778
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 14,
+      "name": "nonlin1",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "2abc3e4dd36f2a023b6ef0112f39241a0fbf0ee4d934bf05cdeac03ce826e6ae",
+      "candidate": "(z)/((z+1))",
+      "sourceOperations": 2,
+      "nativeOperations": 2,
+      "fixedOperations": 2,
+      "variants": 4,
+      "wallNanos": 4169651,
+      "processCpuNanos": 4171270
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 15,
+      "name": "nonlin2",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "8bb99c8f11b6da72f7817e45a356b2d7f6bae0428e3d4521df84b3ad82cef5e7",
+      "candidate": "(1)/(((x*y)+1))",
+      "sourceOperations": 7,
+      "nativeOperations": 7,
+      "fixedOperations": 3,
+      "variants": 4,
+      "wallNanos": 19325733,
+      "processCpuNanos": 19328147
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 16,
+      "name": "i4",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 17,
+      "name": "i6",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/fptaylor-extra.fpcore",
+      "ordinal": 18,
+      "name": "himmilbeau",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "7cf4df15ea835fdd2f2bae7d9d4bcadff8a055770f18f2eebd763162cbd44556",
+      "candidate": "(((((x1*x1)+x2)-11)*(((x1*x1)+x2)-11))+(((x1+(x2*x2))-7)*((x1+(x2*x2))-7)))",
+      "sourceOperations": 15,
+      "nativeOperations": 15,
+      "fixedOperations": 15,
+      "variants": 4,
+      "wallNanos": 16072227,
+      "processCpuNanos": 16007673
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 1,
+      "name": "NMSE example 3.1",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 2,
+      "name": "NMSE example 3.3",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 3,
+      "name": "NMSE example 3.4",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 4,
+      "name": "NMSE example 3.5",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 5,
+      "name": "NMSE example 3.6",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 6,
+      "name": "NMSE problem 3.3.1",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "48294afaad36e6cb9f7a26badf74237018b19c04497a4eacdb7e115339c4e095",
+      "candidate": "(-1)/(((x^2)+x))",
+      "sourceOperations": 4,
+      "nativeOperations": 4,
+      "fixedOperations": 3,
+      "variants": 4,
+      "wallNanos": 10540781,
+      "processCpuNanos": 10543097
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 7,
+      "name": "NMSE problem 3.3.2",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 8,
+      "name": "NMSE problem 3.3.3",
+      "status": "SUPPORTED",
+      "nativeExact": true,
+      "nativeDefinedOnSourceDomain": true,
+      "declaredConditionsMatchSource": true,
+      "nativeExactAndDomainChecked": true,
+      "sourceSha256": "b1dd6620c0b980bf81216323926130abe921bb1068c3aa1cf27d7416052b8fab",
+      "candidate": "(2)/(((x^3)-x))",
+      "sourceOperations": 7,
+      "nativeOperations": 7,
+      "fixedOperations": 4,
+      "variants": 4,
+      "wallNanos": 19187169,
+      "processCpuNanos": 19190361
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 9,
+      "name": "NMSE problem 3.3.4",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 10,
+      "name": "NMSE problem 3.3.5",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 11,
+      "name": "NMSE problem 3.3.6",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 12,
+      "name": "NMSE problem 3.3.7",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 13,
+      "name": "NMSE p42, positive",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 14,
+      "name": "NMSE p42, negative",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 15,
+      "name": "NMSE problem 3.2.1, positive",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 16,
+      "name": "NMSE problem 3.2.1, negative",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 17,
+      "name": "NMSE example 3.7",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 18,
+      "name": "NMSE example 3.8",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 19,
+      "name": "NMSE example 3.9",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 20,
+      "name": "NMSE example 3.10",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 21,
+      "name": "NMSE problem 3.4.1",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 22,
+      "name": "NMSE problem 3.4.2",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 23,
+      "name": "NMSE problem 3.4.3",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 24,
+      "name": "NMSE problem 3.4.4",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 25,
+      "name": "NMSE problem 3.4.5",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 26,
+      "name": "NMSE problem 3.4.6",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 27,
+      "name": "NMSE section 3.5",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "corpus": "research/benchmarks/enumo-horner-v2/transfer/hamming-ch3.fpcore",
+      "ordinal": 28,
+      "name": "NMSE section 3.11",
+      "status": "UNSUPPORTED"
+    }
+  ]
+}

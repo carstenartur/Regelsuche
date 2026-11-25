@@ -10,8 +10,10 @@ import de.regelsuche.discovery.domain.ScopedLogicDiscoveryDomain.Certificate;
 import de.regelsuche.discovery.domain.ScopedLogicDiscoveryDomain.State;
 import de.regelsuche.solver.ir.ScopedProofDag;
 import de.regelsuche.solver.ir.ScopedProofExecutor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /** Reconstructs one retained logical candidate before asking the configured receiver to check it afresh. */
 public final class ScopedLogicWorkspaceCheck {
@@ -25,6 +27,9 @@ public final class ScopedLogicWorkspaceCheck {
 
     public record Source(String runId, String workspaceHash, String evidenceHash, String seedHash,
             String candidateHash, String stateHash) { }
+
+    public record Inspection(Source source, ScopedProofDag proposal, CounterexampleResult counterexample,
+            RetainedWitness retainedWitness) {}
 
     public static final class Result {
         private final Source source;
@@ -54,8 +59,25 @@ public final class ScopedLogicWorkspaceCheck {
      * The caller supplies the trusted receiver. Read-only workspace imports never call it.
      */
     public static Result check(DomainExportWorkspace workspace, String candidateHash, ScopedProofExecutor receiver) {
-        Objects.requireNonNull(workspace, "workspace");
         Objects.requireNonNull(receiver, "receiver");
+        var domain = new ScopedLogicDiscoveryDomain(receiver, MAX_FORMATION_WORK);
+        var inspected = inspect(workspace, candidateHash, receiver::supports, domain);
+        Optional<Evaluation<Certificate>> proof = inspected.counterexample().status() == CounterexampleStatus.NONE_FOUND
+            ? Optional.of(domain.evaluator().evaluate(inspected.proposal())) : Optional.empty();
+        return new Result(inspected.source(), inspected.proposal(), inspected.counterexample(), inspected.retainedWitness(), proof);
+    }
+
+    /** Reconstructs the candidate and checks its finite interpretation independently of historical proof execution. */
+    public static Inspection inspect(DomainExportWorkspace workspace, String candidateHash, Predicate<Obligation> supports) {
+        var formation = new ScopedLogicDiscoveryDomain(dag -> {
+            throw new IllegalStateException("source inspection cannot execute a proof");
+        }, MAX_FORMATION_WORK);
+        return inspect(workspace, candidateHash, supports, formation);
+    }
+
+    private static Inspection inspect(DomainExportWorkspace workspace, String candidateHash, Predicate<Obligation> supports,
+            ScopedLogicDiscoveryDomain domain) {
+        Objects.requireNonNull(workspace, "workspace");
         DomainCanonical.requireSha256(candidateHash, "candidateHash");
         var evidence = workspace.evidence();
         if (!workspace.scopedLogicDomain() || evidence.seed().payload().length() > MAX_SOURCE_CHARACTERS) {
@@ -64,7 +86,6 @@ public final class ScopedLogicWorkspaceCheck {
         var attempts = evidence.candidateAttempts().stream().filter(row -> row.candidateHash().equals(candidateHash)).toList();
         if (attempts.size() != 1) throw new IllegalArgumentException("expected one retained scoped candidate attempt");
 
-        var domain = new ScopedLogicDiscoveryDomain(receiver, MAX_FORMATION_WORK);
         var initial = domain.generator().generate(evidence.seed()).getFirst();
         var codec = domain.stateCodec();
         String initialHash = codec.contentHash(initial);
@@ -78,12 +99,10 @@ public final class ScopedLogicWorkspaceCheck {
             .findFirst().orElseThrow(() -> new IllegalArgumentException("cannot reconstruct scoped candidate within formation bound"));
         var candidateState = retainedState(evidence, domain, initialHash, proposal);
         ScopedProofDag dag = proposal.state().proposal();
-        var counterexample = domain.counterexampleGenerator().search(dag, MAX_COUNTEREXAMPLE_ATTEMPTS);
-        Optional<Evaluation<Certificate>> proof = counterexample.status() == CounterexampleStatus.NONE_FOUND
-            ? Optional.of(domain.evaluator().evaluate(dag)) : Optional.empty();
+        var counterexample = new ScopedTruthAssignments(supports).search(dag, MAX_COUNTEREXAMPLE_ATTEMPTS);
         var source = new Source(workspace.runId(), workspace.contentHash(), evidence.contentHash(), evidence.seed().contentHash(),
             candidateHash, candidateState.stateHash());
-        return new Result(source, dag, counterexample, witness(attempts.getFirst(), counterexample), proof);
+        return new Inspection(source, dag, counterexample, witness(attempts.getFirst(), counterexample));
     }
 
     private static StateTrace retainedState(DomainDiscoveryEvidence evidence, ScopedLogicDiscoveryDomain domain,

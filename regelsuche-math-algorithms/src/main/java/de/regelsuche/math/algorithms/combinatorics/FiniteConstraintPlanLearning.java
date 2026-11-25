@@ -4,12 +4,19 @@ import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Problem;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanner.Strategy;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Checked;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Estimate;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Kind;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Offer;
+import de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Offers;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.BooleanSupplier;
 
 /** Selects an ordering heuristic using the observed costs of verified counts on earlier sources. */
@@ -157,6 +164,77 @@ public final class FiniteConstraintPlanLearning {
                 Optional.empty(), Optional.empty(), stop.getMessage(), nestedWork);
             return new Evaluation(Optional.ofNullable(decision), unavailable, work.used() + nestedWork);
         }
+    }
+
+    /** The free variable and input factor counts are reported even for fixed-only calls. */
+    public record Size(int freeVariables, int factors) {}
+
+    /**
+     * Compare the default min-degree order with an earlier observed order. Only an identical structural
+     * feature vector with a successful fixed control can justify a probe. The learned estimate includes
+     * this lookup and the acquisition cost amortized over the caller's expected number of evaluations.
+     * The verified count and any fallback are charged at their actual work on the current source.
+     */
+    public static BoundedPlanSelection.Decision<Size, FiniteConstraintCounter.Result> countWithPolicy(
+            Optional<Model> model, Problem problem, long expectedUses, long maximumProbeWork,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        return countWithPolicy(model, problem, Strategy.MIN_DEGREE, expectedUses, maximumProbeWork, limits, cancellation);
+    }
+
+    /** The caller declares its fixed control before observing the new source's measured outcomes. */
+    public static BoundedPlanSelection.Decision<Size, FiniteConstraintCounter.Result> countWithPolicy(
+            Optional<Model> model, Problem problem, Strategy fixedStrategy, long expectedUses, long maximumProbeWork,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        Objects.requireNonNull(fixedStrategy, "fixedStrategy");
+        if (expectedUses < 1) throw new IllegalArgumentException("INVALID_EXPECTED_USES");
+        var size = new Size(problem.variableCount() - problem.fixed().size(), problem.factors().size());
+        return BoundedPlanSelection.choose(size, BoundedPlanSelection.Unit.CERTIFICATE_WORK,
+            model.map(Model::trainingWork).orElse(0L), maximumProbeWork, limits, cancellation, work -> {
+                var fixed = countOffer(fixedStrategy, Kind.FIXED, "GENERAL_ORDER", OptionalLong.empty(),
+                    problem, cancellation);
+                if (model.isEmpty()) return new Offers<>(fixed, Optional.empty(), 0);
+                Model trained = model.orElseThrow();
+                if (maximumProbeWork == 0) return new Offers<>(fixed, Optional.empty(), trained.retainedCells);
+                long retained = BoundedPlanSelection.TRACE_CELLS + trained.retainedCells + sourceCells(problem, work);
+                var current = features(problem, retained, work);
+                for (var observation : trained.observations()) {
+                    work.charge(6);
+                    if (!current.equals(observation.features()) || observation.best().isEmpty()) continue;
+                    Trial baseline = null;
+                    Trial best = null;
+                    for (var trial : observation.trials()) {
+                        work.charge(1);
+                        if (trial.status() != FiniteConstraintCounter.Status.EXACT) continue;
+                        if (trial.strategy() == fixedStrategy) baseline = trial;
+                        if (trial.strategy() == observation.best().orElseThrow()) best = trial;
+                    }
+                    if (baseline == null || best == null) continue;
+                    fixed = countOffer(fixedStrategy, Kind.FIXED, observation.source(),
+                        OptionalLong.of(baseline.work()), problem, cancellation);
+                    long predicted = saturatedSum(best.work(), Math.ceilDiv(trained.trainingWork(), expectedUses));
+                    predicted = saturatedSum(predicted, work.used());
+                    var learned = countOffer(best.strategy(), Kind.LEARNED, observation.source(),
+                        OptionalLong.of(predicted), problem, cancellation);
+                    return new Offers<>(fixed, Optional.of(learned), trained.retainedCells);
+                }
+                var unseen = countOffer(fixedStrategy, Kind.LEARNED, "NO_MATCHING_VERIFIED_CONTROL",
+                    OptionalLong.empty(), problem, cancellation);
+                return new Offers<>(fixed, Optional.of(unseen), trained.retainedCells);
+            });
+    }
+
+    private static long saturatedSum(long left, long right) {
+        return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
+    private static Offer<FiniteConstraintCounter.Result> countOffer(Strategy strategy, Kind kind, String evidence,
+            OptionalLong estimate, Problem problem, BooleanSupplier cancellation) {
+        return new Offer<>(new Estimate(strategy.name(), kind, evidence, estimate), allowance -> {
+            var result = FiniteConstraintCounter.count(problem, strategy, allowance, cancellation);
+            var exact = result.status() == FiniteConstraintCounter.Status.EXACT ? Optional.of(result)
+                : Optional.<FiniteConstraintCounter.Result>empty();
+            return new Checked<>(exact, result.reason(), result.work());
+        });
     }
 
     // Source descriptors and scalar cells match the counter's input accounting; values are never inspected.

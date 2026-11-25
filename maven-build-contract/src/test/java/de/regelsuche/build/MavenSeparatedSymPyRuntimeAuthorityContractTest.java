@@ -43,8 +43,8 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
         "bash gradle/run-isolated-sympy-runtime-authority.sh"),
         "runtime tests must not remain serialized after benchmark measurement");
     assertFalse(jmh.contains("sympy-runtime-checkout"));
-    assertFalse(jmh.contains("needs:"),
-        "the benchmark authority must start independently");
+    assertTrue(jmh.contains("needs: preflight-contracts"),
+        "the benchmark authority starts independently after the fast preflight");
 
     assertTrue(sympy.contains("actions/checkout@"),
         "the runtime authority must start from a separate fresh checkout");
@@ -56,8 +56,8 @@ class MavenSeparatedSymPyRuntimeAuthorityContractTest {
     assertFalse(sympy.contains(
         "bash gradle/run-isolated-jmh-authority.sh"));
     assertFalse(sympy.contains("working-directory: sympy-runtime-checkout"));
-    assertFalse(sympy.contains("needs:"),
-        "the runtime authority must start concurrently with JMH");
+    assertTrue(sympy.contains("needs: preflight-contracts"),
+        "the runtime authority starts concurrently with JMH after the fast preflight");
     assertTrue(sympy.contains(
         "regelsuche-math-sympy/target/failsafe-reports/**"));
     assertTrue(sympy.contains(

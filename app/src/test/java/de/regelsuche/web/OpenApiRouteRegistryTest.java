@@ -40,7 +40,7 @@ class OpenApiRouteRegistryTest {
     void loadsEveryCanonicalOperationAndContext() {
         OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
 
-        assertEquals(96, registry.routes().size());
+        assertEquals(99, registry.routes().size());
         assertEquals(27, registry.contexts().size());
         assertTrue(registry.contexts().containsAll(Set.of(
             "/api/search",
@@ -94,6 +94,12 @@ class OpenApiRouteRegistryTest {
             "listInstalledDiscoveryDomains");
         assertAllowed(registry, "/api/discovery-domains", "/api/discovery-domains/run", "POST",
             "runInstalledDiscoveryDomain");
+        String counting = "/api/certificate-demos/cnf/4a5279ef-126b-4738-b003-7da8f3e72314";
+        assertAllowed(registry, "/api/certificate-demos", counting, "POST", "countSignedCnf");
+        assertAllowed(registry, "/api/certificate-demos", counting + "/cancel", "POST", "cancelSignedCnf");
+        assertAllowed(registry, "/api/discovery-domains",
+            "/api/discovery-domains/exports/" + "a".repeat(64) + "/scoped-check/" + "b".repeat(64), "GET",
+            "loadScopedCandidateReceipt");
         assertAllowed(registry, "/api/certificate-demos", "/api/certificate-demos/hall", "GET",
             "runHallDeficitDemo");
         assertAllowed(registry, "/api/certificate-demos", "/api/certificate-demos/montgomery", "GET",

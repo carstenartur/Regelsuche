@@ -193,7 +193,7 @@ class DomainExportWorkspaceBrowserTest {
             page.waitForSelector("#retainedDomainExportDetail [data-status='UNSUPPORTED']");
             assertTrue(page.locator("#retainedDomainExportDetail [role='status']").textContent().contains("zwei Lean-Projekte"));
             assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("Versuche: 4."));
-            page.getByText("Neuer Prüfbeleg mit Quellenbindung").click();
+            page.getByText("Gespeicherter Prüfbeleg mit Quellenbindung").click();
             assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("\"candidateHash\": \"" + candidateHash + "\""));
         } finally {
             if (originalSetting == null) System.clearProperty(rebuildSetting);
@@ -203,7 +203,28 @@ class DomainExportWorkspaceBrowserTest {
         assertArrayEquals(evidence.toCanonicalJson().getBytes(StandardCharsets.UTF_8), Files.readAllBytes(download.path()));
         page.reload(); waitFor(firstId);
         assertTrue(page.locator("#replayDomainExport").isDisabled());
-        assertEquals(0, page.locator("#retainedDomainExportDetail [data-status='UNSUPPORTED']").count());
+        page.waitForSelector("#retainedDomainExportDetail [data-status='UNSUPPORTED']");
+        assertTrue(page.locator("[data-scoped-receipt]").isVisible());
+        // Exercise rendering of a counterexample receipt separately from this true implication fixture.
+        String downloadPath = page.locator("[data-scoped-receipt]").getAttribute("href");
+        page.route("**" + downloadPath, route -> {
+            var actual = route.fetch();
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            try {
+                var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(actual.body());
+                var model = body.putObject("counterexample");
+                model.put("status", "FOUND").put("attempts", 2).put("witness", "p=TRUE, q=FALSE");
+                body.putObject("proof").put("status", "NOT_RUN").put("backendConfigured", false);
+                route.fulfill(new Route.FulfillOptions().setResponse(actual).setBody(body.toString()));
+            } catch (java.io.IOException invalidFixture) { throw new IllegalStateException(invalidFixture); }
+        });
+        page.reload(); waitFor(firstId);
+        page.waitForSelector("#retainedDomainExportDetail [data-status='NOT_RUN']");
+        assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("p=TRUE, q=FALSE"));
+        assertTrue(page.locator("#retainedDomainExportDetail").textContent().contains("Gegenbeispiel gefunden."));
+        page.unroute("**" + downloadPath);
+        page.reload(); waitFor(firstId);
+        page.waitForSelector("#retainedDomainExportDetail [data-status='UNSUPPORTED']");
         page.setViewportSize(390, 844);
         assertTrue((Boolean) page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
         Path screenshot = Path.of("build/reports/domain-export-ui/logical-narrow.png");

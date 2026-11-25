@@ -38,6 +38,8 @@ import java.util.TreeMap;
 public final class ExactParsedSubtermProjector {
     public static final String PROJECTOR_ID =
         "regelsuche.exact-parsed-subterm-projector/v1";
+    private static final String PARSER_OCCURRENCE_PROJECTOR_ID =
+        "regelsuche.exact-parsed-subterm-projector/parser-occurrence-reuse/v1";
     public static final int MAX_PATH_DEPTH = 4_096;
     public static final int MAX_ROOT_SOURCE_CODE_UNITS = 1_000_000;
     public static final int MAX_SUBTREE_NODES = 65_536;
@@ -47,7 +49,7 @@ public final class ExactParsedSubtermProjector {
 
     private final Policy policy;
     private final PolynomialWorkAuthority authority;
-    private final boolean reuseParserRoot;
+    private final Mode mode;
 
     public ExactParsedSubtermProjector() {
         this(Policy.boundedDefaults());
@@ -58,20 +60,30 @@ public final class ExactParsedSubtermProjector {
     }
 
     public ExactParsedSubtermProjector(Policy policy, PolynomialWorkAuthority authority) {
-        this(policy, authority, false);
+        this(policy, authority, Mode.REVALIDATE);
     }
 
     /** Reuses parser-issued evidence when the selected source is the whole parsed input. */
     public static ExactParsedSubtermProjector withParserRootReuse(Policy policy, PolynomialWorkAuthority authority) {
-        return new ExactParsedSubtermProjector(policy, authority, true);
+        return new ExactParsedSubtermProjector(policy, authority, Mode.REUSE_ROOT);
     }
 
-    private ExactParsedSubtermProjector(Policy policy, PolynomialWorkAuthority authority,
-            boolean reuseParserRoot) {
+    /**
+     * Reuses checked parser bindings for a selected occurrence, including nested and
+     * whitespace-trimmed occurrences. A term must come from the parser or this mode.
+     */
+    public static ExactParsedSubtermProjector withParserOccurrenceReuse(Policy policy,
+            PolynomialWorkAuthority authority) {
+        return new ExactParsedSubtermProjector(policy, authority, Mode.REUSE_OCCURRENCE);
+    }
+
+    private ExactParsedSubtermProjector(Policy policy, PolynomialWorkAuthority authority, Mode mode) {
         this.authority = Objects.requireNonNull(authority, "authority");
         this.policy = Objects.requireNonNull(policy, "policy");
-        this.reuseParserRoot = reuseParserRoot;
+        this.mode = mode;
     }
+
+    private enum Mode { REVALIDATE, REUSE_ROOT, REUSE_OCCURRENCE }
 
     public Policy policy() {
         return policy;
@@ -87,17 +99,18 @@ public final class ExactParsedSubtermProjector {
         String expectedFormattedText
     ) {
         Objects.requireNonNull(root, "root");
-        List<Integer> stablePath = validatePath(path);
+        boolean reuseOccurrence = mode == Mode.REUSE_OCCURRENCE;
+        List<Integer> stablePath = reuseOccurrence ? List.of() : validatePath(path);
         String expected = Objects.requireNonNull(
             expectedFormattedText,
             "expectedFormattedText");
-        if (expected.isBlank()) {
-            throw new IllegalArgumentException(
-                "expected subtree text must not be blank");
+        if (!reuseOccurrence) {
+            validateExpectedText(expected);
         }
 
-        Work work = new Work(policy.maxWorkUnits(), authority);
-        if (stablePath.size() > policy.maxPathDepth()) {
+        int pathLength = reuseOccurrence ? Objects.requireNonNull(path, "path").size() : stablePath.size();
+        Work work = new Work(policy.maxWorkUnits(), authority, reuseOccurrence);
+        if (pathLength > policy.maxPathDepth()) {
             return failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "MAX_PATH_DEPTH_EXCEEDED",
@@ -139,6 +152,16 @@ public final class ExactParsedSubtermProjector {
 
         String rootSourceHash = "";
         try {
+            if (reuseOccurrence) {
+                work.consume("projection.reused-parser-selection-validation-units", 3L * pathLength + expected.length());
+                stablePath = captureBoundedPath(path, pathLength);
+                validateExpectedText(expected);
+                work.bindSelection(stablePath, expected);
+                if (!root.hasParserBindings()) {
+                    return failure(Status.UNSUPPORTED, "PARSER_OCCURRENCE_BINDINGS_REQUIRED",
+                        stablePath, expected, "", Optional.empty(), Optional.empty(), "", "", work);
+                }
+            }
             work.consume(
                 "projection.root-source-hash-code-units",
                 Math.multiplyExact(4L, root.source().length()));
@@ -183,10 +206,11 @@ public final class ExactParsedSubtermProjector {
                 throw limit("MAX_SUBTREE_SOURCE_CODE_UNITS_EXCEEDED");
             }
 
-            boolean wholeParserRoot = reuseParserRoot && stablePath.isEmpty() && root.isParserRoot()
-                && occurrenceRange.startInclusive() == 0 && occurrenceRange.endExclusive() == root.source().length();
-            if (wholeParserRoot) {
-                return projectWholeParserRoot(root, stablePath, expected, rootSourceHash, occurrenceRange, work);
+            boolean reuseWholeTerm = stablePath.isEmpty()
+                && (reuseOccurrence || mode == Mode.REUSE_ROOT && root.isParserRoot())
+                && occurrenceRange.startInclusive() == 0 && selectedSourceLength == root.source().length();
+            if (reuseWholeTerm) {
+                return projectWholeBoundTerm(root, stablePath, expected, rootSourceHash, occurrenceRange, work);
             }
 
             Scan scan = scan(
@@ -202,12 +226,7 @@ public final class ExactParsedSubtermProjector {
             if (actual.length() > policy.maxFormattedCodeUnits()) {
                 throw limit("MAX_ACTUAL_FORMATTED_CODE_UNITS_EXCEEDED");
             }
-            work.consume(
-                "projection.staleness-text-comparison",
-                Math.addExact(
-                    (long) expected.length(),
-                    actual.length()));
-            if (!expected.equals(actual)) {
+            if (!matchesSnapshot(expected, actual, work)) {
                 return failure(
                     Status.POSITION_STALE,
                     "SELECTED_POSITION_TEXT_IS_STALE",
@@ -225,6 +244,12 @@ public final class ExactParsedSubtermProjector {
                 "projection.selected-source-code-units",
                 selectedSourceLength);
             String selectedSource = occurrenceRange.textFrom(root.source());
+            if (reuseOccurrence) {
+                work.consume("projection.reused-parser-literal-index-bindings", scan.literals().size());
+                var projected = new ExactParsedTerm(new ParserOccurrence(selectedSource, selected, scan));
+                return success(stablePath, expected, actual, rootSourceHash, occurrenceRange,
+                    scan.rangeCommitmentHash(), projected, work);
+            }
             long literalLexemeUnits = scan.literals().stream()
                 .mapToLong(literal -> literal.sourceLexeme().length())
                 .sum();
@@ -296,7 +321,7 @@ public final class ExactParsedSubtermProjector {
         }
     }
 
-    private Result projectWholeParserRoot(ExactParsedTerm root, List<Integer> path, String expected,
+    private Result projectWholeBoundTerm(ExactParsedTerm root, List<Integer> path, String expected,
             String rootSourceHash, ExactParsedTerm.SourceRange range, Work work) {
         if (root.nodeCount() > policy.maxSubtreeNodes()) {
             throw limit("MAX_SUBTREE_NODES_EXCEEDED");
@@ -307,15 +332,22 @@ public final class ExactParsedSubtermProjector {
         if (actual.length() > policy.maxFormattedCodeUnits()) {
             throw limit("MAX_ACTUAL_FORMATTED_CODE_UNITS_EXCEEDED");
         }
-        work.consume("projection.staleness-text-comparison", (long) expected.length() + actual.length());
         // Parsing fixes all range and literal bindings from the whole source. No ranges are shifted.
-        if (!expected.equals(actual)) {
+        if (!matchesSnapshot(expected, actual, work)) {
             return failure(Status.POSITION_STALE, "SELECTED_POSITION_TEXT_IS_STALE", path, expected,
                 rootSourceHash, Optional.of(actual), Optional.of(range), rootSourceHash, "", work);
         }
-        return new Result(Status.PROJECTED, "EXACT_PARSER_ROOT_REUSED", policy, path, expected,
+        String detail = mode == Mode.REUSE_OCCURRENCE ? "EXACT_PARSER_OCCURRENCE_REUSED" : "EXACT_PARSER_ROOT_REUSED";
+        return new Result(Status.PROJECTED, detail, policy, path, expected,
             Optional.of(actual), Optional.of(rootSourceHash), Optional.of(range), Optional.of(rootSourceHash),
-            Optional.of(root), work.ledger());
+            Optional.of(root), work.ledger(), work.occurrenceEvidence);
+    }
+
+    private static boolean matchesSnapshot(String expected, String actual, Work work) {
+        work.consume("projection.staleness-text-comparison", (long) expected.length() + actual.length());
+        boolean current = expected.equals(actual);
+        work.bindActualSnapshot(actual, current);
+        return current;
     }
 
     private Scan scan(
@@ -324,6 +356,7 @@ public final class ExactParsedSubtermProjector {
         ExactParsedTerm.SourceRange selectedRange,
         Work work
     ) {
+        boolean reuseOccurrence = mode == Mode.REUSE_OCCURRENCE;
         Deque<Expr> pending = new ArrayDeque<>();
         pending.push(selected);
         IdentityHashMap<Expr, Boolean> visited = new IdentityHashMap<>();
@@ -344,62 +377,23 @@ public final class ExactParsedSubtermProjector {
                 throw limit("MAX_SUBTREE_NODES_EXCEEDED");
             }
             work.consume("projection.subtree-node-visits", 1);
+            int childCount = 0;
+            if (reuseOccurrence) {
+                childCount = childCount(node);
+                if (childCount > policy.maxSubtreeNodes() - nodeCount - pending.size()) {
+                    throw limit("MAX_SUBTREE_NODES_EXCEEDED");
+                }
+            }
             commitNodeKind(commitment, node, work);
 
-            Optional<ExactParsedTerm.SourceRange> sourceRange =
-                root.sourceRangeFor(node);
-            if (sourceRange.isPresent()) {
-                ExactParsedTerm.SourceRange absolute =
-                    sourceRange.orElseThrow();
-                if (!selectedRange.contains(absolute)) {
-                    throw invariant(
-                        "SUBTREE_NODE_RANGE_ESCAPES_SELECTED_OCCURRENCE");
-                }
-                ExactParsedTerm.SourceRange shifted =
-                    new ExactParsedTerm.SourceRange(
-                        absolute.startInclusive()
-                            - selectedRange.startInclusive(),
-                        absolute.endExclusive()
-                            - selectedRange.startInclusive());
-                shiftedRanges.put(node, shifted);
-                work.consume("projection.shifted-range-bindings", 1);
-                commit(commitment, shifted.canonicalMaterial(), work);
-            } else {
-                commit(commitment, "NO_SOURCE_RANGE", work);
-            }
-
+            recordShiftedRange(root, node, selectedRange, shiftedRanges, commitment, work);
             if (node instanceof NumberExpr number) {
-                Optional<ExactParsedTerm.LiteralOccurrence> literal =
-                    root.literalFor(number);
-                if (literal.isPresent()) {
-                    ExactParsedTerm.LiteralOccurrence absolute =
-                        literal.orElseThrow();
-                    if (!selectedRange.contains(
-                            absolute.startInclusive(),
-                            absolute.endExclusive())) {
-                        throw invariant(
-                            "SUBTREE_LITERAL_ESCAPES_SELECTED_OCCURRENCE");
-                    }
-                    ExactParsedTerm.LiteralOccurrence shifted =
-                        new ExactParsedTerm.LiteralOccurrence(
-                            number,
-                            absolute.startInclusive()
-                                - selectedRange.startInclusive(),
-                            absolute.endExclusive()
-                                - selectedRange.startInclusive(),
-                            absolute.sourceLexeme(),
-                            absolute.evidence());
-                    literals.add(shifted);
-                    work.consume("projection.shifted-literal-bindings", 1);
-                    commit(
-                        commitment,
-                        absolute.evidence().certificateHash(),
-                        work);
-                } else {
-                    commit(commitment, "SYNTHETIC_NUMBER", work);
-                }
+                recordShiftedLiteral(root, number, selectedRange, literals, commitment, work);
             }
 
+            if (reuseOccurrence) {
+                work.consume("projection.reused-parser-subtree-scheduling-entries", childCount);
+            }
             if (node instanceof BinaryExpr binary) {
                 pending.push(binary.right());
                 pending.push(binary.left());
@@ -413,13 +407,65 @@ public final class ExactParsedSubtermProjector {
             }
         }
 
-        literals.sort(Comparator.comparingInt(
-            ExactParsedTerm.LiteralOccurrence::startInclusive));
+        if (reuseOccurrence) {
+            // A parser tree's children are in source order, including after rebasing.
+            work.consume("projection.reused-parser-binding-snapshot-entries", (long) shiftedRanges.size() + literals.size());
+        } else {
+            literals.sort(Comparator.comparingInt(ExactParsedTerm.LiteralOccurrence::startInclusive));
+        }
         return new Scan(
             nodeCount,
             shiftedRanges,
             List.copyOf(literals),
             commitment.finish());
+    }
+
+    private static void recordShiftedRange(ExactParsedTerm root, Expr node,
+            ExactParsedTerm.SourceRange selectedRange, Map<Expr, ExactParsedTerm.SourceRange> shiftedRanges,
+            EvidenceDigest commitment, Work work) {
+        var sourceRange = root.sourceRangeFor(node);
+        if (sourceRange.isEmpty()) {
+            commit(commitment, "NO_SOURCE_RANGE", work);
+            return;
+        }
+        var absolute = sourceRange.orElseThrow();
+        if (!selectedRange.contains(absolute)) {
+            throw invariant("SUBTREE_NODE_RANGE_ESCAPES_SELECTED_OCCURRENCE");
+        }
+        work.consume("projection.shifted-range-bindings", 1);
+        var shifted = new ExactParsedTerm.SourceRange(
+            absolute.startInclusive() - selectedRange.startInclusive(),
+            absolute.endExclusive() - selectedRange.startInclusive());
+        shiftedRanges.put(node, shifted);
+        commit(commitment, shifted.canonicalMaterial(), work);
+    }
+
+    private static void recordShiftedLiteral(ExactParsedTerm root, NumberExpr number,
+            ExactParsedTerm.SourceRange selectedRange, List<ExactParsedTerm.LiteralOccurrence> literals,
+            EvidenceDigest commitment, Work work) {
+        var literal = root.literalFor(number);
+        if (literal.isEmpty()) {
+            commit(commitment, "SYNTHETIC_NUMBER", work);
+            return;
+        }
+        var absolute = literal.orElseThrow();
+        if (!selectedRange.contains(absolute.startInclusive(), absolute.endExclusive())) {
+            throw invariant("SUBTREE_LITERAL_ESCAPES_SELECTED_OCCURRENCE");
+        }
+        work.consume("projection.shifted-literal-bindings", 1);
+        var shifted = new ExactParsedTerm.LiteralOccurrence(number,
+            absolute.startInclusive() - selectedRange.startInclusive(),
+            absolute.endExclusive() - selectedRange.startInclusive(),
+            absolute.sourceLexeme(), absolute.evidence());
+        literals.add(shifted);
+        commit(commitment, absolute.evidence().certificateHash(), work);
+    }
+
+    private static int childCount(Expr node) {
+        if (node instanceof BinaryExpr) {
+            return 2;
+        }
+        return node instanceof FunctionExpr function ? function.arguments().size() : 0;
     }
 
     private static Expr navigate(
@@ -458,6 +504,35 @@ public final class ExactParsedSubtermProjector {
                 "subterm projection path is invalid");
         }
         return stable;
+    }
+
+    private static List<Integer> captureBoundedPath(List<Integer> path, int length) {
+        List<Integer> stable = new ArrayList<>(length);
+        var entries = path.iterator();
+        for (int offset = 0; offset < length; offset++) {
+            if (!entries.hasNext()) {
+                throw new IllegalArgumentException("subterm projection path length changed");
+            }
+            int index = Objects.requireNonNull(entries.next(), "path index");
+            if (index < 0) {
+                throw new IllegalArgumentException("subterm projection path is invalid");
+            }
+            stable.add(index);
+        }
+        if (entries.hasNext()) {
+            throw new IllegalArgumentException("subterm projection path length changed");
+        }
+        return List.copyOf(stable);
+    }
+
+    private static void validateExpectedText(String expected) {
+        if (expected.isBlank()) {
+            throw new IllegalArgumentException("expected subtree text must not be blank");
+        }
+    }
+
+    private static String pathMaterial(List<Integer> path) {
+        return path.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining("."));
     }
 
     private static void commitNodeKind(
@@ -508,7 +583,7 @@ public final class ExactParsedSubtermProjector {
     ) {
         return new Result(
             Status.PROJECTED,
-            "EXACT_SUBTERM_PROJECTED",
+            mode == Mode.REUSE_OCCURRENCE ? "EXACT_PARSER_OCCURRENCE_REUSED" : "EXACT_SUBTERM_PROJECTED",
             policy,
             path,
             expected,
@@ -517,7 +592,8 @@ public final class ExactParsedSubtermProjector {
             Optional.of(selectedRange),
             Optional.of(rangeCommitmentHash),
             Optional.of(projected),
-            work.ledger());
+            work.ledger(),
+            work.occurrenceEvidence);
     }
 
     private Result failure(
@@ -552,7 +628,8 @@ public final class ExactParsedSubtermProjector {
                 ? Optional.empty()
                 : Optional.of(rangeCommitmentHash),
             projected,
-            work.ledger());
+            work.ledger(),
+            work.occurrenceEvidence);
     }
 
     private static ProjectionLimitReached limit(String detailCode) {
@@ -712,7 +789,8 @@ public final class ExactParsedSubtermProjector {
             Optional<ExactParsedTerm.SourceRange> selectedRange,
             Optional<String> rangeCommitmentHash,
             Optional<ExactParsedTerm> projected,
-            WorkLedger work
+            WorkLedger work,
+            OccurrenceEvidence occurrenceEvidence
         ) {
             this.status = Objects.requireNonNull(status, "status");
             if (detailCode == null || detailCode.isBlank()) {
@@ -757,7 +835,7 @@ public final class ExactParsedSubtermProjector {
                 throw new IllegalArgumentException(
                     "projection work exceeds policy");
             }
-            this.certificateHash = certificate();
+            this.certificateHash = certificate(occurrenceEvidence);
         }
 
         private static Optional<String> validateHash(
@@ -784,6 +862,7 @@ public final class ExactParsedSubtermProjector {
             return policy;
         }
 
+        /** The input path snapshot, or an empty list if occurrence reuse stopped before capturing it. */
         public List<Integer> path() {
             return path;
         }
@@ -824,31 +903,58 @@ public final class ExactParsedSubtermProjector {
             return status == Status.PROJECTED;
         }
 
-        private String certificate() {
+        private String certificate(OccurrenceEvidence occurrenceEvidence) {
             EvidenceDigest digest = new EvidenceDigest();
-            digest.append(PROJECTOR_ID);
+            digest.append(occurrenceEvidence == null ? PROJECTOR_ID : PARSER_OCCURRENCE_PROJECTOR_ID);
             digest.append(status.name());
             digest.append(detailCode);
             digest.append(policy.canonicalMaterial());
-            digest.append(path.stream().map(String::valueOf)
-                .collect(java.util.stream.Collectors.joining(".")));
-            digest.append(expectedFormattedText);
-            digest.append(actualFormattedText.orElse(""));
+            if (occurrenceEvidence == null) {
+                digest.append(pathMaterial(path));
+                digest.append(expectedFormattedText);
+                digest.append(actualFormattedText.orElse(""));
+            } else {
+                digest.append(occurrenceEvidence.selectionHash());
+                digest.append(occurrenceEvidence.actualSnapshot());
+            }
             digest.append(rootSourceHash.orElse(""));
             digest.append(selectedRange.map(
                 ExactParsedTerm.SourceRange::canonicalMaterial).orElse(""));
             digest.append(rangeCommitmentHash.orElse(""));
-            digest.append(projected.map(ExactParsedTerm::source).orElse(""));
-            projected.ifPresent(term -> term.literals().forEach(literal -> {
-                digest.append(Integer.toString(literal.startInclusive()));
-                digest.append(Integer.toString(literal.endExclusive()));
-                digest.append(literal.sourceLexeme());
-                digest.append(literal.evidence().certificateHash());
-            }));
+            if (occurrenceEvidence == null) {
+                digest.append(projected.map(ExactParsedTerm::source).orElse(""));
+                projected.ifPresent(term -> term.literals().forEach(literal -> {
+                    digest.append(Integer.toString(literal.startInclusive()));
+                    digest.append(Integer.toString(literal.endExclusive()));
+                    digest.append(literal.sourceLexeme());
+                    digest.append(literal.evidence().certificateHash());
+                }));
+            }
+            // In occurrence reuse, the source hash, selected range and range commitment
+            // already bind the slice and parser evidence without hashing those objects again.
             digest.append(work.canonicalMaterial());
             return digest.finish();
         }
     }
+
+    /** Only the projector can issue a slice after selecting it in a parser-bound term. */
+    static final class ParserOccurrence {
+        final String source;
+        final Expr expression;
+        final List<ExactParsedTerm.LiteralOccurrence> literals;
+        final Map<Expr, ExactParsedTerm.SourceRange> ranges;
+        final int nodeCount;
+
+        private ParserOccurrence(String source, Expr expression, Scan scan) {
+            this.source = source;
+            this.expression = expression;
+            this.literals = scan.literals();
+            this.ranges = scan.shiftedRanges();
+            this.nodeCount = scan.nodeCount();
+        }
+    }
+
+    private record OccurrenceEvidence(String selectionHash, String actualSnapshot) { }
 
     private record Scan(
         int nodeCount,
@@ -875,10 +981,33 @@ public final class ExactParsedSubtermProjector {
         private long total;
 
         private final PolynomialWorkAuthority authority;
+        private OccurrenceEvidence occurrenceEvidence;
 
-        private Work(long limit, PolynomialWorkAuthority authority) {
+        private Work(long limit, PolynomialWorkAuthority authority, boolean reuseOccurrence) {
             this.limit = limit;
             this.authority = authority;
+            this.occurrenceEvidence = reuseOccurrence ? new OccurrenceEvidence("", "") : null;
+        }
+
+        private void bindSelection(List<Integer> path, String expected) {
+            // A nonnegative int and its separator take at most 11 code units.
+            consume("projection.reused-parser-selection-hash-code-units", 4L * (11L * path.size() + expected.length()));
+            var digest = new EvidenceDigest();
+            digest.append(pathMaterial(path));
+            digest.append(expected);
+            occurrenceEvidence = new OccurrenceEvidence(digest.finish(), "");
+        }
+
+        private void bindActualSnapshot(String actual, boolean matchesExpected) {
+            if (occurrenceEvidence == null) {
+                return;
+            }
+            if (matchesExpected) {
+                occurrenceEvidence = new OccurrenceEvidence(occurrenceEvidence.selectionHash(), "MATCHED_EXPECTED");
+            } else {
+                consume("projection.reused-parser-observed-text-hash-code-units", 4L * actual.length());
+                occurrenceEvidence = new OccurrenceEvidence(occurrenceEvidence.selectionHash(), sha256(actual));
+            }
         }
 
         private void consume(String stage, long units) {

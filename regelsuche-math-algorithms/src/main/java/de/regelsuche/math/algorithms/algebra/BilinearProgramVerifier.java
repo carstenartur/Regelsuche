@@ -1,5 +1,6 @@
 package de.regelsuche.math.algorithms.algebra;
 
+import de.regelsuche.math.algorithms.algebra.BilinearProductLearning.InputBases;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Cost;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Rejection;
 import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
@@ -78,6 +79,70 @@ public final class BilinearProgramVerifier {
                 }
             }
             if (!found) throw new Rejection("FORM_OUTSIDE_DICTIONARY");
+        }
+    }
+
+    /** Replay source, changes of basis, preservation of the paired forms and weights, and all target coefficients. */
+    public static Result<Cost> verifyInputBases(Request source, BilinearProgram program, InputBases bases,
+            Request target, BilinearProgram transported, IterationLimits limits, BooleanSupplier cancellation) {
+        return BilinearProgram.run(limits, cancellation, work -> {
+            long dictionaries = BilinearProgram.matrixCells(target.leftForms()) + BilinearProgram.matrixCells(target.rightForms());
+            long proofCells = certificateCells(target, transported.u().size());
+            long retained = checkedTransferSource(source, program, bases, target.tensor(), dictionaries + proofCells, work);
+            BilinearProgram.checkEntries(target.leftForms(), work);
+            BilinearProgram.checkEntries(target.rightForms(), work);
+            return checkTransport(program, bases, target, transported, retained - proofCells, work);
+        });
+    }
+
+    static long checkedTransferSource(Request source, BilinearProgram program, InputBases bases,
+            BilinearProgram.Tensor target, long otherCells, CertificateWork work) {
+        var tensor = source.tensor();
+        if (tensor.leftSize() != bases.left().size() || tensor.rightSize() != bases.right().size()
+                || tensor.leftSize() != target.leftSize() || tensor.rightSize() != target.rightSize()
+                || tensor.outputs().size() != target.outputs().size()) throw new Rejection("INPUT_BASIS_SHAPE");
+        long retained = otherCells + bases.retainedCells() + source.checkInputs(work);
+        if (tensor != target) retained += BilinearProgram.matrixCells(target.outputs());
+        check(source, program, retained, work);
+        retained += certificateCells(source, program.u().size());
+        BilinearProgram.checkEntries(target.outputs(), work);
+        requireInvertible(bases.left(), retained, work);
+        requireInvertible(bases.right(), retained, work);
+        return retained;
+    }
+
+    private static void requireInvertible(List<List<ExactRational>> matrix, long retained, CertificateWork work) {
+        work.cells(retained + BilinearProgram.matrixCells(matrix) + 4);
+        BilinearProgram.checkEntries(matrix, work);
+        var copy = new ExactRational[matrix.size()][];
+        for (int row = 0; row < matrix.size(); row++) {
+            work.charge(1L + matrix.size());
+            copy[row] = matrix.get(row).toArray(ExactRational[]::new);
+        }
+        if (BilinearRankBound.determinant(copy, work).isZero()) throw new Rejection("SINGULAR_INPUT_BASIS");
+    }
+
+    static Cost checkTransport(BilinearProgram original, InputBases bases, Request target,
+            BilinearProgram moved, long retained, CertificateWork work) {
+        var cost = check(target, moved, retained, work);
+        if (moved.u().size() != original.u().size()) throw new Rejection("TRANSFER_PRODUCT_COUNT");
+        work.charge(BilinearProgram.matrixCells(original.w()));
+        if (!original.w().equals(moved.w())) throw new Rejection("TRANSFER_OUTPUT_WEIGHTS");
+        checkTransformedForms(original.u(), bases.left(), moved.u(), work);
+        checkTransformedForms(original.v(), bases.right(), moved.v(), work);
+        return cost;
+    }
+
+    // Verify one target coordinate at a time directly by its pairing with a source form.
+    private static void checkTransformedForms(List<List<ExactRational>> original, List<List<ExactRational>> matrix,
+            List<List<ExactRational>> moved, CertificateWork work) {
+        for (int p = 0; p < original.size(); p++) {
+            for (int j = 0; j < matrix.size(); j++) {
+                var value = ExactRational.ZERO;
+                for (int i = 0; i < matrix.size(); i++)
+                    value = work.add(value, work.mul(original.get(p).get(i), matrix.get(i).get(j)));
+                if (!value.equals(moved.get(p).get(j))) throw new Rejection("TRANSFER_FORM_MISMATCH");
+            }
         }
     }
 

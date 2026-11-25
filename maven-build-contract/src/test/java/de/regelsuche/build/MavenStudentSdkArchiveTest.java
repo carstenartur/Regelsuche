@@ -27,7 +27,7 @@ class MavenStudentSdkArchiveTest {
             String consumer = "regelsuche-sdk-0.5.4/examples/external-consumers/checked-math-java25/";
             assertNotNull(zip.getEntry(consumer + "pom.xml"), "The delivered examples need their standalone build");
             for (String name : List.of("FiniteConstraintCount", "EnergyCredits", "SosPotential", "BilinearSearch",
-                    "RationalMatrixFormula", "DynamicQuotient", "CheckedMathExamples")) {
+                    "RationalMatrixFormula", "DynamicQuotient", "BoundedPlanning", "CheckedMathExamples")) {
                 assertNotNull(zip.getEntry(consumer + "src/main/java/example/" + name + ".java"),
                     "Missing executable example: " + name);
             }

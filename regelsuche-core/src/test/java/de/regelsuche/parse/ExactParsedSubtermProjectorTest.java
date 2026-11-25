@@ -12,8 +12,14 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
 import de.regelsuche.polynomial.PolynomialWorkAuthority;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.scalar.ExactRational;
+import java.util.AbstractList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 
 class ExactParsedSubtermProjectorTest {
@@ -49,6 +55,245 @@ class ExactParsedSubtermProjectorTest {
         assertNotSame(padded, projected);
         assertEquals(root.source(), projected.source());
         assertEquals(root.rootSourceRange(), projected.rootSourceRange());
+    }
+
+    @Test
+    void reusesExactBindingsForEqualNestedOccurrencesUnderATightBudget() {
+        String occurrence = "((01 / 004.00))";
+        var parsed = parser.parseExactTerm("f(g(" + occurrence + "), g(" + occurrence + "))");
+        var policy = new ExactParsedSubtermProjector.Policy(10, 100, 10, 100, 100, 1_500);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var leftPath = List.of(0, 0);
+        var rightPath = List.of(1, 0);
+        var left = reusable.project(parsed, leftPath, "1 / 4");
+        var right = reusable.project(parsed, rightPath, "1 / 4");
+        var legacy = new ExactParsedSubtermProjector(policy).project(parsed, leftPath, "1 / 4");
+
+        assertEquals(ExactParsedSubtermProjector.Status.BUDGET_INCONCLUSIVE, legacy.status());
+        assertTrue(left.successful(), left.detailCode());
+        assertTrue(right.successful(), right.detailCode());
+        assertEquals(new ExactParsedTerm.SourceRange(4, 19), left.selectedRange().orElseThrow());
+        assertEquals(new ExactParsedTerm.SourceRange(24, 39), right.selectedRange().orElseThrow());
+        assertEquals(left.rangeCommitmentHash(), right.rangeCommitmentHash());
+        assertNotEquals(left.certificateHash(), right.certificateHash());
+        assertEquals(left.certificateHash(), reusable.project(parsed, leftPath, "1 / 4").certificateHash());
+
+        var leftTerm = left.projected().orElseThrow();
+        var rightTerm = right.projected().orElseThrow();
+        assertEquals(leftTerm.expression(), rightTerm.expression());
+        assertNotSame(leftTerm.expression(), rightTerm.expression());
+        assertTrue(leftTerm.sourceRangeFor(rightTerm.expression()).isEmpty());
+        assertTrue(leftTerm.literalFor(rightTerm.literals().getFirst().node()).isEmpty());
+        assertEquals(occurrence, leftTerm.source());
+        assertEquals(occurrence, rightTerm.source());
+        assertEquals(new ExactParsedTerm.SourceRange(0, 15), leftTerm.rootSourceRange());
+        assertEquals(List.of("01", "004.00"), leftTerm.literals().stream()
+            .map(ExactParsedTerm.LiteralOccurrence::sourceLexeme).toList());
+        var numerator = leftTerm.literals().get(0);
+        var denominator = leftTerm.literals().get(1);
+        assertEquals(2, numerator.startInclusive());
+        assertEquals(4, numerator.endExclusive());
+        assertEquals(7, denominator.startInclusive());
+        assertEquals(13, denominator.endExclusive());
+        assertEquals(ExactRational.integer(4), denominator.exactValue());
+        assertSame(parsed.literals().get(0).evidence(), numerator.evidence());
+        assertSame(parsed.literals().get(1).evidence(), denominator.evidence());
+        assertEquals(0L, left.work().units("projection.revalidation-literal-code-units"));
+
+        var again = reusable.project(leftTerm, List.of(1), "4");
+        assertTrue(again.successful(), again.detailCode());
+        assertEquals(new ExactParsedTerm.SourceRange(7, 13), again.selectedRange().orElseThrow());
+        assertEquals("004.00", again.projected().orElseThrow().source());
+        assertSame(denominator.evidence(), again.projected().orElseThrow().literals().getFirst().evidence());
+    }
+
+    @Test
+    void reusesParserBindingsWhenRootSourceHasOuterWhitespace() {
+        var parsed = parser.parseExactTerm("\t  x^2 - 01.250 \n");
+        var other = parser.parseExactTerm("   x^2 - 01.250 \t");
+        var policy = new ExactParsedSubtermProjector.Policy(10, 100, 10, 100, 100, 1_500);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var result = reusable.project(parsed, List.of(), "x ^ 2 - 1.25");
+        var sameRangeOtherSource = reusable.project(other, List.of(), "x ^ 2 - 1.25");
+
+        assertTrue(result.successful(), result.detailCode());
+        assertTrue(sameRangeOtherSource.successful(), sameRangeOtherSource.detailCode());
+        var projected = result.projected().orElseThrow();
+        assertEquals(new ExactParsedTerm.SourceRange(3, 15), result.selectedRange().orElseThrow());
+        assertEquals(result.selectedRange(), sameRangeOtherSource.selectedRange());
+        assertNotEquals(result.rootSourceHash(), sameRangeOtherSource.rootSourceHash());
+        assertNotEquals(result.certificateHash(), sameRangeOtherSource.certificateHash());
+        assertSame(parsed.expression(), projected.expression());
+        assertEquals("x^2 - 01.250", projected.source());
+        assertEquals(new ExactParsedTerm.SourceRange(0, 12), projected.rootSourceRange());
+        var decimal = projected.literals().getLast();
+        assertEquals(6, decimal.startInclusive());
+        assertEquals(12, decimal.endExclusive());
+        assertEquals("01.250", decimal.sourceLexeme());
+        assertSame(parsed.literals().getLast().evidence(), decimal.evidence());
+        assertTrue(new ExactParsedUnivariatePolynomialView().analyze(projected).supported());
+    }
+
+    @Test
+    void refusesToReuseHandAssembledBindingsEvenWithAGenuineParserNodeAndLiteral() {
+        var original = parser.parseExactTerm("01+x");
+        var sum = (BinaryExpr) original.expression();
+        var ranges = new IdentityHashMap<Expr, ExactParsedTerm.SourceRange>();
+        ranges.put(sum, new ExactParsedTerm.SourceRange(0, 4));
+        ranges.put(sum.left(), new ExactParsedTerm.SourceRange(0, 2));
+        ranges.put(sum.right(), new ExactParsedTerm.SourceRange(3, 4));
+        var forged = new ExactParsedTerm("01-y", sum, original.literals(), ranges);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(projector.policy(), PolynomialWorkAuthority.unbounded());
+
+        assertEquals(ExactParsedSubtermProjector.Status.UNSUPPORTED,
+            reusable.project(forged, List.of(1), "x").status());
+        assertEquals(ExactParsedSubtermProjector.Status.UNSUPPORTED,
+            reusable.project(forged, List.of(), "1 + x").status());
+    }
+
+    @Test
+    void rejectsStaleTextOnTheReusedPathWithoutIssuingAProjection() {
+        var original = parser.parseExactTerm("f((01 / 004.00))");
+        var policy = new ExactParsedSubtermProjector.Policy(10, 100, 10, 100, 100, 1_500);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var result = reusable.project(original, List.of(0), "1 / 5");
+
+        assertEquals(ExactParsedSubtermProjector.Status.POSITION_STALE, result.status());
+        assertEquals("1 / 4", result.actualFormattedText().orElseThrow());
+        assertEquals(new ExactParsedTerm.SourceRange(2, 15), result.selectedRange().orElseThrow());
+        assertTrue(result.rootSourceHash().isPresent());
+        assertTrue(result.rangeCommitmentHash().isPresent());
+        assertTrue(result.work().units("projection.reused-parser-observed-text-hash-code-units") > 0);
+        assertTrue(result.projected().isEmpty());
+    }
+
+    @Test
+    void admitsReuseWorkThroughTheSharedBudgetAndRetainsEarlierChargesOnFailure() {
+        var parsed = parser.parseExactTerm("f((01 / 004.00))");
+        var policy = ExactParsedSubtermProjector.Policy.boundedDefaults();
+        var baseline = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded())
+            .project(parsed, List.of(0), "1 / 4");
+        long required = baseline.work().totalWorkUnits();
+        var authority = new BoundedAuthority(required - 1);
+        var truncated = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, authority).project(parsed, List.of(0), "1 / 4");
+
+        assertTrue(baseline.successful(), baseline.detailCode());
+        assertTrue(baseline.work().units("projection.shifted-range-bindings") > 0);
+        assertTrue(baseline.work().units("projection.shifted-literal-bindings") > 0);
+        assertTrue(baseline.work().units("projection.staleness-format-code-units") > 0);
+        assertEquals(ExactParsedSubtermProjector.Status.BUDGET_INCONCLUSIVE, truncated.status());
+        assertEquals(authority.stages, truncated.work().stages());
+        assertTrue(truncated.work().totalWorkUnits() > 0);
+        assertTrue(truncated.work().within(required - 1));
+        assertTrue(truncated.projected().isEmpty());
+
+        var exact = new BoundedAuthority(required);
+        var succeeded = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, exact).project(parsed, List.of(0), "1 / 4");
+        assertTrue(succeeded.successful(), succeeded.detailCode());
+        assertEquals(baseline.work(), succeeded.work());
+        assertEquals(exact.stages, succeeded.work().stages());
+    }
+
+    @Test
+    void rejectsOversizedPathBeforeReadingCallerEntries() {
+        var policy = new ExactParsedSubtermProjector.Policy(1, 100, 10, 100, 100, 1_500);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var path = new CountingPath(100_000);
+
+        var result = reusable.project(parser.parseExactTerm("x"), path, "x");
+
+        assertEquals("MAX_PATH_DEPTH_EXCEEDED", result.detailCode());
+        assertEquals(0, path.reads);
+        assertEquals(0L, result.work().totalWorkUnits());
+    }
+
+    @Test
+    void admitsPathValidationBeforeReadingCallerEntries() {
+        var policy = new ExactParsedSubtermProjector.Policy(2, 100, 10, 100, 100, 1);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var path = new CountingPath(2);
+
+        var result = reusable.project(parser.parseExactTerm("x"), path, "x");
+
+        assertEquals(ExactParsedSubtermProjector.Status.BUDGET_INCONCLUSIVE, result.status());
+        assertEquals(0, path.reads);
+        assertEquals(0L, result.work().totalWorkUnits());
+    }
+
+    @Test
+    void boundsWhitespaceSnapshotBeforeInspectingItsCharacters() {
+        var parsed = parser.parseExactTerm("x");
+        String whitespace = " ".repeat(10_000);
+        var formattedLimit = new ExactParsedSubtermProjector.Policy(1, 100, 10, 100, 100, 100_000);
+        var workLimit = new ExactParsedSubtermProjector.Policy(1, 100, 10, 100, 10_000, 1);
+
+        var oversized = ExactParsedSubtermProjector.withParserOccurrenceReuse(formattedLimit, PolynomialWorkAuthority.unbounded())
+            .project(parsed, List.of(), whitespace);
+        var unaffordable = ExactParsedSubtermProjector.withParserOccurrenceReuse(workLimit, PolynomialWorkAuthority.unbounded())
+            .project(parsed, List.of(), whitespace);
+
+        assertEquals("MAX_EXPECTED_FORMATTED_CODE_UNITS_EXCEEDED", oversized.detailCode());
+        assertEquals("SUBTERM_PROJECTION_WORK_BUDGET_EXCEEDED", unaffordable.detailCode());
+        assertEquals(0L, oversized.work().totalWorkUnits());
+        assertEquals(0L, unaffordable.work().totalWorkUnits());
+    }
+
+    @Test
+    void detectsWideFunctionNodeLimitBeforePreparingItsChildren() {
+        var source = "outer(" + "wide".repeat(40) + "(" + "x,".repeat(256) + "y))";
+        var policy = new ExactParsedSubtermProjector.Policy(2, 1_000, 1, 1_000, 100, 4L * source.length() + 100);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+
+        var result = reusable.project(parser.parseExactTerm(source), List.of(0), "wide");
+
+        assertEquals("MAX_SUBTREE_NODES_EXCEEDED", result.detailCode());
+        assertEquals(1L, result.work().units("projection.subtree-node-visits"));
+        assertEquals(0L, result.work().units("projection.range-commitment-code-units"));
+        assertTrue(result.projected().isEmpty());
+    }
+
+    private static final class CountingPath extends AbstractList<Integer> {
+        private final int size;
+        private int reads;
+
+        private CountingPath(int size) {
+            this.size = size;
+        }
+
+        @Override
+        public Integer get(int index) {
+            Objects.checkIndex(index, size);
+            reads++;
+            return 0;
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
+    }
+
+    private static final class BoundedAuthority implements PolynomialWorkAuthority {
+        private final Map<String, Long> stages = new HashMap<>();
+        private long remaining;
+
+        private BoundedAuthority(long remaining) {
+            this.remaining = remaining;
+        }
+
+        @Override
+        public void consume(PolynomialWorkLedger work) {
+            if (work.totalWorkUnits() > remaining) {
+                throw new PolynomialWorkAuthority.LimitReached();
+            }
+            remaining -= work.totalWorkUnits();
+            work.stages().forEach((stage, units) -> stages.merge(stage, units, Math::addExact));
+        }
+
+        @Override
+        public long remainingOpaqueWorkUnits() {
+            return remaining;
+        }
     }
 
     @Test
