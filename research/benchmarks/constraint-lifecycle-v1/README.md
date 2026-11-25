@@ -100,12 +100,22 @@ und Zeit enthalten.
 
 - [Vollständige Rohdaten](results.json), einschließlich erfolgloser
   Erwerbsversuche, jeder Anfrage, ausgewählter Strategie und Einzelmessungen.
-- Gemessener Quellcommit: `5524fcaba15e86d30af922a8015ee164579aadf2`.
+- Gemessener lokaler Quellcommit: `5524fcaba15e86d30af922a8015ee164579aadf2`.
+- Veröffentlichter Commit mit exakt demselben Git-Baum:
+  [`40136cea1f464981d098b853a6e3db38191345b7`](https://github.com/carstenartur/Regelsuche/commit/40136cea1f464981d098b853a6e3db38191345b7).
 - Protokoll-SHA-256: `35c02970afa02f5fd44fee39c703f1b0baf1fb3b1c6f4baac625b3369830b0ff`.
 - Unverändertes Modell vor und nach der Auswertung:
   `38484bee7626c49eef1a61e2d5a9df1675b2fa4089aba5502b7ee0798d839b35`.
 
-Im Checkout des genannten Commits mit JDK 25 und Maven 3.9.9:
+Der GitHub-Zugang stellt Commit-Metadaten beim Übertragen neu aus. Die
+[Zuordnung der Quellstände](../../../docs/research/source-publication-2026-11-25.json)
+bindet deshalb lokale und veröffentlichte Commit-IDs an den jeweils identischen
+Git-Baum. Der Protokollstand vor der Messung ist öffentlich als
+[`0344d1131e4a42c131b76e2eacea8a62be18ea5f`](https://github.com/carstenartur/Regelsuche/commit/0344d1131e4a42c131b76e2eacea8a62be18ea5f)
+erhalten. Die ursprünglichen Revisionsangaben in den Rohdaten bleiben bestehen.
+
+Im Checkout des veröffentlichten Messquellcommits mit JDK 25 und Maven 3.9.9
+(die neue Ausgabe nennt dessen veröffentlichte Commit-ID):
 
 ```sh
 mvn -B -ntp -pl regelsuche-experiments -am install -DskipTests

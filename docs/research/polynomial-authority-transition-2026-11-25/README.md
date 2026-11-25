@@ -14,3 +14,12 @@ Die Prüfer wiesen ein verändertes Typed-Modell, ein gekipptes Typed-Urteil, ei
 Die Maven-Studien erzeugen bei jedem regulären Lauf neue Archive. Der bestehende Check **Typed source-only learning comparison** übernimmt beide Artefakte aus demselben Workflow-Lauf am auslösenden Commit. Er prüft die SHA-256-Werte der übertragenen Tar-Archive und den Abstammungsbeleg des Typed-Protokolls. Ein Netzwerk-isolierter Python-Prozess prüft die Rohdaten beider Archive einschließlich der Typed-Ableitungen und der Native-Runtime sowie aller vier Gegenproben. Die Quellkennung, der Git-Baum, die Archiv-, Manifest- und Modellprüfsummen sowie die geprüften Ergebniszahlen stehen im Artefakt `polynomial-archive-qualification-<commit>`. Der bisherige vollständige Regressionstest der Python-Controller einschließlich des Gradle-Classpath-Versuchs läuft weiterhin.
 
 Für eine erneute Gegenüberstellung der unabhängigen Host- und Maven-Archive bleibt `external_polynomial_comparison.qualify_parity` verfügbar. Die feste Paritätsaussage oben gilt für den angegebenen Commit.
+
+Die laufende Abnahme bindet außerdem jeden Bereitschaftsbeleg und die
+SymPy-Version an das eingefrorene Protokoll. Jeder Aufwärmlauf wird vor der
+Messwertprojektion gegen Profil, Modellhash, Budget und erforderlichen
+Kandidaten geprüft. Technische Fehler oder ungültige Typed-Identitäten
+verletzen wie beim ursprünglichen Produzenten die Abnahme. Die Reihenfolge
+aller Typed- und Native-Zeilen sowie der neun Native-Sequenzen muss dem
+registrierten Ausführungsplan entsprechen. Zusätzliche Gegenproben ändern
+genau diese Angaben, berechnen äußere Manifeste neu und bleiben abgewiesen.

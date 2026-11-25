@@ -95,7 +95,7 @@
 **Files:** neue datierte Forschungsprotokolle, docs/research/strategies.md, docs/getting-started.md, docs/mathematical-capabilities.md, .github/workflows/gradle.yml, maven-build-contract Tests; Release-/Consumer-Dokumentation.
 **Interfaces:** Vorab fixierte Familien, stärkste feste Baseline, gleiche Algorithmen/Budgets, gesamte gemessene Kosten; neue Messdaten neben alten.
 - [x] Entwicklungs-/Validierungs-/Finalfamilien vor Ausführung festlegen, abgelehnte Lernversuche einschließen.
-- [ ] Frühe schnelle Vertragsprüfung ausführbar vor lange CI-Jobs setzen; verbleibende doppelte Autoritäten nur nach bestehender vollständiger Archivparität ablösen.
+- [x] Frühe schnelle Vertragsprüfung ausführbar vor lange CI-Jobs setzen; verbleibende doppelte Autoritäten nur nach bestehender vollständiger Archivparität ablösen.
 - [ ] Strategieindex und Einstieg mit tatsächlichem Implementierungs-/Release-/Consumerstand synchronisieren.
 - [ ] Gesamtreview, komplette aktuelle CI und SDK-Consumer; erst dann verwalteten Releasepfad benutzen.
 
