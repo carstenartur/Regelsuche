@@ -2,6 +2,7 @@ package de.regelsuche.benchmark.peer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import de.regelsuche.math.algorithms.certificates.CertificateWork;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Factor;
@@ -57,20 +58,15 @@ public final class ConstraintLifecycleComparison {
         for (Graph graph : trainGraphs) examples.add(new Example(hash(graph.problem().toString().getBytes(StandardCharsets.UTF_8)), graph.problem()));
         var acquisition = observe(() -> FiniteConstraintPlanLearning.train(examples, trainingLimits, trial, () -> false));
         var training = acquisition.value();
-        var modelRows = new ArrayList<Map<String, Object>>();
-        for (var item : training.observations()) {
-            var trials = item.trials().stream().map(t -> Map.of("strategy", t.strategy().name(), "status", t.status().name(),
-                "reason", t.reason(), "work", t.work())).toList();
-            modelRows.add(Map.of("sourceSha256", item.source(), "features", item.features(), "trials", trials,
-                "best", item.best().map(Enum::name).orElse("NONE")));
-        }
-        String modelHash = hash(JSON.writeValueAsBytes(modelRows));
+        var modelRows = observationRows(training.observations());
+        String modelHash = modelFingerprint(training.model());
         var rows = new ArrayList<Map<String, Object>>();
         execute("validation", validation, 1, training.model(), queryLimits, trial,
             protocol.required("maximumProbeWork").asLong(), rows);
         execute("final", finals, protocol.required("finalRounds").asInt(), training.model(), queryLimits, trial,
             protocol.required("maximumProbeWork").asLong(), rows);
-        if (!modelHash.equals(hash(JSON.writeValueAsBytes(modelRows)))) throw new IllegalStateException("model changed after freeze");
+        String afterFinal = modelFingerprint(training.model());
+        if (!modelHash.equals(afterFinal)) throw new IllegalStateException("model changed after freeze");
         var totals = new LinkedHashMap<String, Object>();
         for (String arm : ARMS) {
             long validationWork = sum(rows, arm, "validation", "work"), finalWork = sum(rows, arm, "final", "work");
@@ -85,6 +81,7 @@ public final class ConstraintLifecycleComparison {
         result.put("java", System.getProperty("java.runtime.version"));
         result.put("training", modelRows);
         result.put("modelSha256BeforeValidation", modelHash);
+        result.put("modelSha256AfterFinal", afterFinal);
         result.put("trainingWork", training.work());
         result.put("trainingReason", training.reason());
         result.put("trainingWallNanos", acquisition.wallNanos());
@@ -96,6 +93,24 @@ public final class ConstraintLifecycleComparison {
         Files.createDirectories(output.toAbsolutePath().getParent());
         JSON.writerWithDefaultPrettyPrinter().writeValue(output.toFile(), result);
         System.out.println("constraint-lifecycle/v1 rows=" + rows.size() + " training=" + training.work() + " model=" + modelHash);
+    }
+
+    /** Read the model actually supplied to queries, including the paid acquisition; normalize map order. */
+    static String modelFingerprint(Optional<FiniteConstraintPlanLearning.Model> model) throws Exception {
+        Object state = model.<Object>map(value -> Map.of("trainingWork", value.trainingWork(),
+            "observations", observationRows(value.observations()))).orElse("NO_MODEL");
+        return hash(JSON.copy().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsBytes(state));
+    }
+
+    private static List<Map<String, Object>> observationRows(List<FiniteConstraintPlanLearning.Observation> observations) {
+        var rows = new ArrayList<Map<String, Object>>();
+        for (var item : observations) {
+            var trials = item.trials().stream().map(t -> Map.of("strategy", t.strategy().name(), "status", t.status().name(),
+                "reason", t.reason(), "work", t.work())).toList();
+            rows.add(Map.of("sourceSha256", item.source(), "features", item.features(), "trials", trials,
+                "best", item.best().map(Enum::name).orElse("NONE")));
+        }
+        return rows;
     }
 
     private static void execute(String split, List<Graph> graphs, int rounds,
