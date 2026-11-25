@@ -178,11 +178,19 @@ public final class FiniteConstraintPlanLearning {
     public static BoundedPlanSelection.Decision<Size, FiniteConstraintCounter.Result> countWithPolicy(
             Optional<Model> model, Problem problem, long expectedUses, long maximumProbeWork,
             IterationLimits limits, BooleanSupplier cancellation) {
+        return countWithPolicy(model, problem, Strategy.MIN_DEGREE, expectedUses, maximumProbeWork, limits, cancellation);
+    }
+
+    /** The caller declares its fixed control before observing the new source's measured outcomes. */
+    public static BoundedPlanSelection.Decision<Size, FiniteConstraintCounter.Result> countWithPolicy(
+            Optional<Model> model, Problem problem, Strategy fixedStrategy, long expectedUses, long maximumProbeWork,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        Objects.requireNonNull(fixedStrategy, "fixedStrategy");
         if (expectedUses < 1) throw new IllegalArgumentException("INVALID_EXPECTED_USES");
         var size = new Size(problem.variableCount() - problem.fixed().size(), problem.factors().size());
         return BoundedPlanSelection.choose(size, BoundedPlanSelection.Unit.CERTIFICATE_WORK,
             model.map(Model::trainingWork).orElse(0L), maximumProbeWork, limits, cancellation, work -> {
-                var fixed = countOffer(Strategy.MIN_DEGREE, Kind.FIXED, "GENERAL_ORDER", OptionalLong.empty(),
+                var fixed = countOffer(fixedStrategy, Kind.FIXED, "GENERAL_ORDER", OptionalLong.empty(),
                     problem, cancellation);
                 if (model.isEmpty()) return new Offers<>(fixed, Optional.empty(), 0);
                 Model trained = model.orElseThrow();
@@ -197,11 +205,11 @@ public final class FiniteConstraintPlanLearning {
                     for (var trial : observation.trials()) {
                         work.charge(1);
                         if (trial.status() != FiniteConstraintCounter.Status.EXACT) continue;
-                        if (trial.strategy() == Strategy.MIN_DEGREE) baseline = trial;
+                        if (trial.strategy() == fixedStrategy) baseline = trial;
                         if (trial.strategy() == observation.best().orElseThrow()) best = trial;
                     }
                     if (baseline == null || best == null) continue;
-                    fixed = countOffer(Strategy.MIN_DEGREE, Kind.FIXED, observation.source(),
+                    fixed = countOffer(fixedStrategy, Kind.FIXED, observation.source(),
                         OptionalLong.of(baseline.work()), problem, cancellation);
                     long predicted = saturatedSum(best.work(), Math.ceilDiv(trained.trainingWork(), expectedUses));
                     predicted = saturatedSum(predicted, work.used());
@@ -209,7 +217,7 @@ public final class FiniteConstraintPlanLearning {
                         OptionalLong.of(predicted), problem, cancellation);
                     return new Offers<>(fixed, Optional.of(learned), trained.retainedCells);
                 }
-                var unseen = countOffer(Strategy.MIN_DEGREE, Kind.LEARNED, "NO_MATCHING_VERIFIED_CONTROL",
+                var unseen = countOffer(fixedStrategy, Kind.LEARNED, "NO_MATCHING_VERIFIED_CONTROL",
                     OptionalLong.empty(), problem, cancellation);
                 return new Offers<>(fixed, Optional.of(unseen), trained.retainedCells);
             });

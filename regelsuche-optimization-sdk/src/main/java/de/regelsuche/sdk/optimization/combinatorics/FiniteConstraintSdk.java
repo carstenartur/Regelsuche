@@ -75,6 +75,17 @@ public final class FiniteConstraintSdk {
             limits(budget), cancellation::isCancelled);
     }
 
+    /** Compare with the caller's explicitly selected fixed elimination policy. */
+    public static de.regelsuche.math.algorithms.planning.BoundedPlanSelection.Decision<
+            FiniteConstraintPlanLearning.Size, FiniteConstraintCounter.Result> countWithPolicy(
+            java.util.Optional<FiniteConstraintPlanLearning.Model> model, FiniteConstraintCounter.Problem problem,
+            FiniteConstraintPlanner.Strategy fixedControl, long expectedUses, long maximumProbeWork,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        long probe = budget.maximumCandidates() == 1 ? Math.min(0, maximumProbeWork) : maximumProbeWork;
+        return FiniteConstraintPlanLearning.countWithPolicy(model, problem, fixedControl, expectedUses, probe,
+            limits(budget), cancellation::isCancelled);
+    }
+
     private static IterationLimits limits(OptimizationBudget budget) {
         return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());
     }
