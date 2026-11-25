@@ -4,7 +4,7 @@
 
 `FiniteConstraintCounter` sums a product of local nonnegative integer factors over all Boolean assignments consistent with `Problem.fixed`. A factor table uses bit `i` for its sorted scope's `i`th variable. Zero/one tables describe forbidden/allowed configurations; larger weights give weighted counts. Empty products equal one. Every unfixed variable is summed over, including variables absent from all factors.
 
-The implementation performs bounded variable elimination in ascending variable order. It returns an exact `BigInteger` count, a source-bound elimination trace, and a positive-weight assignment when the count is positive. `FiniteConstraintVerifier` independently conditions the original tables and replays each local sum, checks all buckets and remaining scalar factors, and checks the witness against the original problem. The producer invokes this verifier before returning `EXACT`.
+The implementation performs bounded variable elimination using the minimum remaining degree by default. Ties use the original variable ID. The strategy overload also supports minimum fill (ties by remaining degree, then ID) and ascending IDs for comparisons. Graph construction, order selection and edge updates share the counting budget. Certificates keep the original variable IDs. It returns an exact `BigInteger` count, a source-bound elimination trace, and a positive-weight assignment when the count is positive. `FiniteConstraintVerifier` independently conditions the original tables and replays each local sum, checks all buckets and remaining scalar factors, and checks the witness against the original problem. The producer invokes this verifier before returning `EXACT`.
 
 Resource exhaustion returns `UNAVAILABLE` with no count or certificate. It never means zero solutions. Work, cancellation, interruption, wall time, retained table cells, intermediate width and integer bit lengths are bounded. Input factors have at most 20 variables; actual admissible table sizes also depend on the state budget. The shared hard ceiling is one million retained cells and 65,536 integer bits. Elimination can be exponential in induced width; the API makes no general polynomial-time or optimal-order claim. It does not implement a SAT asymptotic theorem or optional generating-polynomial refinements.
 
@@ -19,6 +19,16 @@ The [complete Java example](../../examples/external-consumers/checked-math-java2
 ## Evidence
 
 `FiniteConstraintCounterTest` checks empty instances, isolated variables, weighted tables, contradictions, conditioning, forged local tables/totals/sources/witnesses and resource boundaries. Seventy seeded arbitrary small problems are compared with independent complete enumeration. `FiniteConstraintSdkTest` checks the public facade and cancellation. These tests check exactness and boundary behavior, not an unmeasured performance improvement.
+
+## Learning a plan choice
+
+`FiniteConstraintPlanLearning.train` compares the three strategies on earlier named problems.
+The model stores measurements and graph characteristics of training inputs. At application it uses
+the conditioned input structure to choose a strategy; the chosen plan must pass the ordinary
+count verifier. The SDK exposes training and application alongside the three fixed controls.
+See the [public-project study with input hashes, budgets, failed cases and external counts](../../research/benchmarks/constraint-planning-transfer/README.md).
+Acquisition work is charged once per trained model, followed by selection, planning, solving and
+certificate replay for each subsequent input.
 
 ## Research relationship
 

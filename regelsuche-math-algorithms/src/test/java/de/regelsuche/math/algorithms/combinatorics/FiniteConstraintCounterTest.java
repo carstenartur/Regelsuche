@@ -50,10 +50,14 @@ class FiniteConstraintCounterTest {
             }
             var fixed = trial % 3 == 0 ? Map.of(random.nextInt(n), random.nextBoolean()) : Map.<Integer, Boolean>of();
             var problem = new FiniteConstraintCounter.Problem(n, factors, fixed);
-            var result = FiniteConstraintCounter.count(problem, LIMITS, () -> false);
-            assertEquals(FiniteConstraintCounter.Status.EXACT, result.status(), result.reason());
-            assertEquals(enumerate(problem), result.count().orElseThrow());
-            assertTrue(FiniteConstraintVerifier.verify(problem, result.certificate().orElseThrow(), LIMITS, () -> false).valid());
+            BigInteger expected = enumerate(problem);
+            for (var strategy : FiniteConstraintPlanner.Strategy.values()) {
+                var result = FiniteConstraintCounter.count(problem, strategy, LIMITS, () -> false);
+                assertEquals(FiniteConstraintCounter.Status.EXACT, result.status(), result.reason());
+                assertEquals(expected, result.count().orElseThrow());
+                assertTrue(FiniteConstraintVerifier.verify(problem, result.certificate().orElseThrow(),
+                    LIMITS, () -> false).valid());
+            }
         }
     }
 
@@ -168,7 +172,7 @@ class FiniteConstraintCounterTest {
 
         var polls = new AtomicInteger();
         var earlyResult = FiniteConstraintCounter.count(new FiniteConstraintCounter.Problem(22, early, Map.of()),
-            LIMITS, () -> {
+            FiniteConstraintPlanner.Strategy.ASCENDING, LIMITS, () -> {
                 polls.incrementAndGet();
                 return false;
             });
@@ -176,7 +180,7 @@ class FiniteConstraintCounterTest {
         int cancelAfter = polls.get() + 8;
         polls.set(0);
         var lateResult = FiniteConstraintCounter.count(new FiniteConstraintCounter.Problem(22, late, Map.of()),
-            LIMITS, () -> polls.incrementAndGet() > cancelAfter);
+            FiniteConstraintPlanner.Strategy.ASCENDING, LIMITS, () -> polls.incrementAndGet() > cancelAfter);
         assertEquals("CANCELLED", lateResult.reason());
         assertTrue(earlyResult.certificate().isEmpty());
         assertTrue(lateResult.certificate().isEmpty());

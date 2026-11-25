@@ -1,0 +1,43 @@
+package transfer;
+import java.math.BigInteger;
+final class Selected {
+    static BigInteger[] convolution256(BigInteger[] x, BigInteger[] y) {
+        var v5 = x[0].multiply(y[0]);
+        var v6 = x[0].multiply(y[1]);
+        var v7 = x[1].multiply(y[0]);
+        var v8 = x[1].multiply(y[1]);
+        var v9 = v6.add(v7);
+        return new BigInteger[] {v5, v9, v8};
+    }
+    static BigInteger[] convolution2048(BigInteger[] x, BigInteger[] y) {
+        var v5 = x[0].multiply(y[0]);
+        var v6 = x[1].multiply(y[1]);
+        var v7 = x[0].add(x[1]);
+        var v8 = y[0].add(y[1]);
+        var v9 = v7.multiply(v8);
+        var v10 = v5.add(v6);
+        var v11 = v9.subtract(v10);
+        return new BigInteger[] {v5, v11, v6};
+    }
+    static BigInteger[] convolution8192(BigInteger[] x, BigInteger[] y) {
+        var v5 = x[0].multiply(y[0]);
+        var v6 = x[1].multiply(y[1]);
+        var v7 = x[0].add(x[1]);
+        var v8 = y[0].add(y[1]);
+        var v9 = v7.multiply(v8);
+        var v10 = v5.add(v6);
+        var v11 = v9.subtract(v10);
+        return new BigInteger[] {v5, v11, v6};
+    }
+    static BigInteger[] fp2(BigInteger[] x, BigInteger[] y) {
+        var v5 = y[0].add(y[1]);
+        var v6 = x[0].multiply(v5);
+        var v7 = y[0].subtract(y[1]);
+        var v8 = x[1].multiply(v7);
+        var v9 = x[0].add(x[1]);
+        var v10 = y[1].multiply(v9);
+        var v11 = v6.subtract(v10);
+        var v12 = v8.add(v10);
+        return new BigInteger[] {v11, v12};
+    }
+}

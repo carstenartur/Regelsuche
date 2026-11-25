@@ -1,10 +1,10 @@
-# Gemeinsame bilineare Programme aus einem endlichen Formenkatalog
+# Gemeinsame bilineare Programme aus Koeffizienten und Formenkatalogen
 
 ## Auftrag und mathematischer Vertrag
 
 Für Eingaben $x\in\mathbb Q^m$, $y\in\mathbb Q^n$ enthält jede Zeile von
 `Tensor.outputs()` die Koeffizienten einer Ausgabe. An Position `i*n+j`
-steht der Faktor von $x_i y_j$. Die Anfrage gibt zusätzlich die zulässigen
+steht der Faktor von $x_i y_j$. Der Katalogaufruf `search` gibt zusätzlich die zulässigen
 linken und rechten linearen Formen und die maximale Produktzahl vor.
 Dimensionen und Ausgabeanzahl sind positiv, der Produktgrenzwert darf null
 sein. Leere Formenkataloge erlauben das leere Programm für einen Nulltensor.
@@ -21,7 +21,7 @@ Quelltensor wird durch dieselbe vollständige Prüfung erkannt.
 `evaluate` prüft das Programm gegen den übergebenen Auftrag und wertet es
 mit dem verbleibenden Budget exakt aus.
 
-## Suche und Grenzen
+## Suche mit vorgegebenem Katalog
 
 Die Suche betrachtet das kartesische Produkt der beiden Kataloge. Sie
 enumeriert Teilmengen nach wachsender Größe und innerhalb einer Größe
@@ -52,6 +52,69 @@ der logischen Zellrechnung. Das SDK verwendet `maximumStates` als Zellgrenze
 und reicht Arbeitsgrenze, Laufzeit und Abbruchsignal weiter. Der einzige
 zurückgegebene Kandidat wird unabhängig geprüft.
 
+## Automatische Suche und nachprüfbare Produktgrenze
+
+`BilinearProgramSdk.discover(tensor, maximumProducts, budget, token)` benötigt
+die Quellkoeffizienten und die Produktgrenze. Die Ausgabe enthält den erzeugten
+Auftrag, das geprüfte Programm mit seinen Ausführungskosten und einen separaten
+Beleg für eine untere Schranke. Die Signatur von `search(request, ...)` bleibt
+für benutzerdefinierte Kataloge verfügbar.
+
+Für eine einzelne Ausgabematrix zieht der Java-Kern an jedem Nichtnullpivot ein
+äußeres Produkt von der Restmatrix ab. Seine linke Form ist die Pivotspalte
+geteilt durch den Pivotwert, seine rechte Form ist die ursprüngliche Pivotzeile
+des jeweiligen Schritts. Über den rationalen Zahlen liefert das auch bei
+rechteckigen Matrizen ein Programm mit genau so vielen Produkten wie der
+Matrixrang. Ein Nulltensor hat ein leeres Programm für alle Ausgaben.
+
+Bei mehreren Ausgaben gewinnt die Suche Eingabeformen aus allen von null verschiedenen
+Zeilen und Spalten jeder Koeffizientenmatrix. Die Normierung setzt den ersten
+Nichtnullkoeffizienten auf eins. Ergänzt werden Koordinaten sowie Summen und
+Differenzen je zweier Koordinaten. Die Katalogsuche beginnt bei der bewiesenen
+unteren Schranke und sucht gemeinsame Produktmengen für sämtliche Ausgaben.
+Diese endliche Auswahl kann andere rationale Zerlegungen verfehlen. Die
+Erzeugung der Kataloge, die Produktsuche und die unabhängigen Prüfungen
+verwenden dieselbe Arbeitsabrechnung.
+
+Für die Untergrenze betrachtet `BilinearRankBound` den dreidimensionalen
+Koeffiziententensor aus drei Richtungen. Für jede dieser Abflachungen trägt
+ein Produkt höchstens Matrixrang eins bei. Ein Nichtnullminor der Ordnung
+$r$ belegt daher, dass jede Zerlegung in rationale bilineare Produkte
+mindestens $r$ Produkte braucht. Der Prüfer rekonstruiert den Minor aus den
+ursprünglichen Koeffizienten. Die Programme dürfen beliebige lineare Formen
+auf den zwei vorgegebenen Eingabeseiten verwenden. Eine Optimalitätsaussage
+erstreckt sich ausschließlich auf die Zahl dieser bilinearen Produkte.
+Technischer Bezug sind die Aufteilungen und Rangargumente in
+[Familie 379](https://github.com/openai/math/blob/f5702854040e97fa7675c21ba37a9608f5f92dd3/preprints/VP-and-VNP-are-different-November-23-2026/build/Paper.tex).
+
+`computeRankBound` und `verifyRankBound` stehen unabhängig von einem
+Programmfund zur Verfügung. `certifyProductBounds` prüft Programm und
+Minor am selben Auftrag unter einem gemeinsamen Budget und liefert das
+Intervall zwischen bewiesener Untergrenze und ausführbarer Obergrenze.
+Gleiche Grenzen belegen Produktoptimalität. Im Test erreicht die
+Zweiterm-Faltung das Intervall $[3,3]$. Bei der komplexen Multiplikation
+über rationalen Komponenten liefert dieselbe Suche drei Produkte und
+die Abflachung eine Untergrenze von zwei.
+
+## Übertragung gelernter Produktformen
+
+`trainProducts` gewinnt die **Paare** linker und rechter Eingabeformen aus
+einem geprüften Programm einer Trainingsquelle. `reuseProducts` ermittelt
+die Ausgabegewichte für die neue Aufgabe erneut durch exakte Elimination.
+Der Prüfer kontrolliert alle neuen Koeffizienten. Bei übereinstimmenden Schranken kann der Plan sofort zurückgegeben werden.
+Bleibt eine Lücke, sucht der Kern im generierten Katalog nach einem günstigeren Plan.
+Ein Fund ersetzt den übernommenen Plan. Bei vollständig ausgeschöpftem Katalog
+bleibt der geprüfte übernommene Plan mit offener Schranke erhalten.
+Bei unpassenden Formen oder Dimensionen läuft die reguläre Suche im verbleibenden Budget. Ein Abbruch an einer Ressourcen-
+oder Zeitgrenze beendet den gesamten Aufruf.
+
+Die Pivotzerlegung, die Formenerzeugung und die Suche sind implementierte
+allgemeine Verfahren. Gelernt werden die konkreten Produktpaare der
+Trainingsquelle. Ein Lernvergleich muss Erwerb, erfolglose Anpassungen,
+Prüfung und Rückfall zur regulären Suche mitrechnen. Das
+[Java-Benchmarkprojekt](../../research/benchmarks/bilinear-form-transfer/)
+vergleicht zusätzlich den ausführbaren Rechenplan in einem Verbraucher.
+
 ## Kosten des ausführbaren Programms
 
 Die feste Reihenfolge bildet die linke Form, die rechte Form und ihr Produkt,
@@ -69,6 +132,49 @@ bis er verbraucht oder als fertige Ausgabe abgelegt ist. Ein skalierter
 Summand kann einen weiteren Platz beanspruchen. Eine Operation darf einen
 verbrauchten Platz überschreiben. Der Wert beschreibt das skalare Programm,
 nicht den JVM-Heap oder die Suchkosten.
+
+## Ausführungspläne für ganzzahlige Operanden
+
+`BilinearProgramSdk.selectInteger` vergleicht mehrere Zerlegungen eines ganzzahligen
+Quelltensors. Der Aufrufer gibt für jede linke und rechte Eingabe eine Betragsbreite
+$b$ mit $|x|<2^b$ an. Der direkte Vergleichsplan berechnet jedes benötigte
+Koordinatenprodukt einmal für alle Ausgaben. Er nimmt teil, sofern die Produktgrenze
+ihn zulässt. Wer eine Optimierung gegen den ursprünglichen Rechenweg abwägen möchte,
+sollte diese Grenze entsprechend wählen.
+
+Die Suche untersucht über den rationalen Zahlen unabhängige Produktmengen aus dem
+erzeugten Formenkatalog. Sie teilt ganzzahlige Zeilen und Spalten durch ihren
+vorzeichenbehafteten größten gemeinsamen Teiler. So bleibt etwa die Richtung
+$(2,3)$ ohne Division in der Ausführung darstellbar. Die Ausgabegewichte werden
+für diese Formen neu bestimmt und müssen ebenfalls ganzzahlig sein.
+Zerlegungen mit abhängigen Zusatzprodukten oder exakten Divisionen können außerhalb
+dieser Suche liegen. Für jeden aufgenommenen Kandidaten
+prüft sie die Identität am Quelltensor und erzeugt einen ausführbaren Plan. Dieser
+kombiniert schmale Terme zuerst, führt Vorzeichen bis zur nächsten Addition,
+Subtraktion oder Ausgabe mit und verwendet identische Zwischenergebnisse mehrfach.
+Auch ein Fund aus `discover`, `search` oder `reuseProducts` lässt sich über
+`scheduleInteger` gegen seinen Auftrag prüfen und in dieser Form ausführen.
+`evaluateInteger` kontrolliert die Betragsgrenzen vor der Auswertung.
+
+Das Kostenmodell schätzt arithmetische Arbeit und Schreibaufwand in 32-Bit-Wörtern.
+Für Multiplikationen verwendet es das Produkt der Operandenlängen in Wörtern.
+Es zählt die Ergebnisobjekte und die Wörter ihrer Magnituden getrennt.
+JIT-Optimierung, unterschiedliche Multiplikationsverfahren im JDK und die anschließende
+Reduktion modulo $p$ gehen in die JVM-Messung ein, soweit der Verbraucher sie ausführt.
+Der Aufrufer kann anhand der Modellwerte zwischen zwei Zielen wählen.
+
+| SDK-Ergebnis | Wahl unter den geprüften Kandidaten |
+| --- | --- |
+| `selected()` | Geringste geschätzte Wortarbeit. Bei Gleichstand entscheiden Ergebniswörter, Ergebnisobjekte und schließlich variable Produkte. |
+| `preferredWithoutAllocationIncrease()` | Geringste geschätzte Wortarbeit unter den Kandidaten, deren Ergebniswörter **und** Ergebnisobjekte jeweils höchstens den Wert des direkten Plans erreichen. Ohne zulässigen Direktvergleich bleibt das Ergebnis leer. |
+
+Beide Entscheidungen sind an das angegebene Profil gebunden. Der Teilmengengrenzwert
+und `budget.maximumCandidates()` begrenzen die Auswahl. Bei Erreichen einer
+solchen Grenze kann die Suche den besten bisher geprüften Plan mit `complete() == false`
+liefern. Ein Abbruchsignal oder eine harte Arbeits-, Zell- oder Zeitgrenze ergibt
+`INCONCLUSIVE` ohne Plan. Auch `complete() == true` gilt nur für die unterstützte
+Suche im endlichen Katalog. Den [Vergleich von Modell, JMH und gemessener Allokation](../../research/benchmarks/bilinear-integer-selection/)
+gibt es für Ganzzahlfaltung und die 381-Bit-Feldrechnung aus Bouncy Castle.
 
 ## Ausführbares SDK-Beispiel
 
@@ -99,6 +205,16 @@ System.out.println(BilinearProgramSdk.evaluate(request, witness.program(), row(2
 // [8, 22, 15]
 ```
 
+Mit demselben Tensor ist auch der Aufruf ohne vorgegebene Formen möglich.
+Die beiden Prüfer lassen sich auf die übertragenen Daten erneut anwenden.
+
+```java
+var discovered = BilinearProgramSdk.discover(tensor, 3, budget, token).value().orElseThrow();
+var interval = BilinearProgramSdk.certifyProductBounds(discovered.request(),
+    discovered.witness().program(), discovered.lowerBound(), budget, token).value().orElseThrow();
+System.out.println(interval.productOptimal()); // true
+```
+
 Der direkte Plan für $(ac,ad+bc,bd)$ verwendet vier variable Produkte und
 eine Addition. Das gefundene Programm verwendet drei variable Produkte,
 vier Additionen, zwei explizite Vorzeichenfaktoren und maximal fünf skalare
@@ -117,6 +233,6 @@ Dimensionen, Abbruch und Ressourcenüberschreitung.
 
 ```sh
 mvn -pl regelsuche-optimization-sdk -am \
-  -Dtest=BilinearProgramSearchTest,BilinearProgramSdkTest,BilinearPairCandidatesTest,CertificateWorkTest \
+  -Dtest=BilinearProgramSearchTest,BilinearFormDiscoveryTest,BilinearRankBoundTest,BilinearProductLearningTest,BilinearInteger*Test,BilinearProgramSdkTest,BilinearPairCandidatesTest,CertificateWorkTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
