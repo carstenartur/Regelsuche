@@ -1,0 +1,42 @@
+{
+  "extractorVersion": "0.1.10",
+  "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+  "originalRejectedSnapshotByteIdentical": true,
+  "originalRejectedTrendByteIdentical": true,
+  "replayedCurrentSnapshotByteIdentical": true,
+  "acceptedSnapshotSha256": "6d9d7df9fdbcb5873753401166494d8fe605e4d99cafd09322f9c88ed692e16d",
+  "acceptedAgainstPrevious": {
+    "passed": true,
+    "violationCount": 0,
+    "tokenIncrease": 14490.0,
+    "radiusIncrease": 2.0,
+    "normalizedDebtIncrease": -0.10999999999999943
+  },
+  "rejectedAgainstPrevious": {
+    "passed": false,
+    "violationCount": 1,
+    "tokenIncrease": 20310.0,
+    "radiusIncrease": 2.0,
+    "normalizedDebtIncrease": -0.16000000000000014
+  },
+  "rejectedAgainstAccepted": {
+    "passed": true,
+    "violationCount": 0,
+    "tokenIncrease": 5820.0,
+    "radiusIncrease": 0.0,
+    "normalizedDebtIncrease": -0.05000000000000071
+  },
+  "unchangedThresholds": {
+    "maxCognitiveDebtIncrease": 10.0,
+    "maxConceptRadiusIncrease": 3.0,
+    "maxContextTokenIncrease": 15000.0,
+    "failOnWarnings": false
+  },
+  "retainedArtifactVerification": {
+    "verifier": "scripts/verify-ai-knowledge-artifacts.py",
+    "sourceIdentity": "Unchanged HEAD source equals accepted main; exact files copied to scratch for sparse-checkout execution.",
+    "requiredFilesEvidenceSchemaAndSemanticCoverage": "PASS",
+    "coverageNegativeControlsPassed": 8
+  },
+  "scope": "Native projection and trend replay over retained CI measurements, plus read-only retained-artifact validation. This is not a fresh source extraction or complete candidate CI."
+}

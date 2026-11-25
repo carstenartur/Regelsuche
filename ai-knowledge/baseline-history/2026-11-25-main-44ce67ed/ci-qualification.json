@@ -1,0 +1,233 @@
+{
+  "sourceCommit": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+  "sourceTree": "407fa19621be08d47b4bdc8641d0f9e4858f8b83",
+  "runId": 45655429380,
+  "runAttempt": 1,
+  "event": "push",
+  "status": "completed",
+  "conclusion": "success",
+  "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380",
+  "createdAt": "2026-11-25T16:34:58Z",
+  "updatedAt": "2026-11-25T17:40:15Z",
+  "workflow": {
+    "path": ".github/workflows/gradle.yml",
+    "sha256": "70deb28c6c467f6128ca5f16f485692363faab1edeb5b22e5309a4c833c18013",
+    "mandatorySourceJobKeys": [
+      "preflight-contracts",
+      "gradle-verification",
+      "jmh-verification",
+      "sympy-runtime-verification",
+      "maven-product-verification",
+      "maven-git-free-verification",
+      "typed-external-polynomial-comparison",
+      "checked-proofs",
+      "native-scalar-reproduction",
+      "maven-polynomial-qualification",
+      "maven-native-polynomial-study",
+      "maven-typed-polynomial-study",
+      "maven-schema-polynomial-study",
+      "maven-student-sdk-archive-qualification"
+    ]
+  },
+  "mandatorySourceAuthoritiesPassed": 14,
+  "successfulJobs": [
+    {
+      "workflowJob": "preflight-contracts",
+      "id": 139350700594,
+      "name": "Fast build and workflow contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:02Z",
+      "completedAt": "2026-11-25T16:35:55Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139350700594"
+    },
+    {
+      "workflowJob": "gradle-verification",
+      "id": 139351303915,
+      "name": "Checkout-local Gradle authority",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T17:19:34Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351303915"
+    },
+    {
+      "workflowJob": "jmh-verification",
+      "id": 139351304018,
+      "name": "Isolated JMH authority",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:58:42Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304018"
+    },
+    {
+      "workflowJob": "sympy-runtime-verification",
+      "id": 139351304017,
+      "name": "Isolated SymPy runtime authority",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:40:58Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304017"
+    },
+    {
+      "workflowJob": "maven-product-verification",
+      "id": 139351303935,
+      "name": "Complete Maven product and Docker authority",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T17:37:53Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351303935"
+    },
+    {
+      "workflowJob": "maven-git-free-verification",
+      "id": 139351303941,
+      "name": "Complete Git-free Maven lifecycle",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T17:37:24Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351303941"
+    },
+    {
+      "workflowJob": "typed-external-polynomial-comparison",
+      "id": 139357075371,
+      "name": "Typed source-only learning comparison",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:44:48Z",
+      "completedAt": "2026-11-25T16:47:43Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139357075371"
+    },
+    {
+      "workflowJob": "checked-proofs",
+      "id": 139351304329,
+      "name": "Checked Lean and SMT proof authority",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:46:32Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304329"
+    },
+    {
+      "workflowJob": "native-scalar-reproduction",
+      "id": 139351304470,
+      "name": "Independent clean and pinned scalar reproduction",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:38:53Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304470"
+    },
+    {
+      "workflowJob": "maven-polynomial-qualification",
+      "id": 139351304543,
+      "name": "Maven pinned polynomial pilot",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:38:30Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304543"
+    },
+    {
+      "workflowJob": "maven-native-polynomial-study",
+      "id": 139351304310,
+      "name": "Maven pinned native polynomial study",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:44:44Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304310"
+    },
+    {
+      "workflowJob": "maven-typed-polynomial-study",
+      "id": 139351304623,
+      "name": "Maven pinned typed polynomial study",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:59Z",
+      "completedAt": "2026-11-25T16:42:40Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304623"
+    },
+    {
+      "workflowJob": "maven-schema-polynomial-study",
+      "id": 139351304172,
+      "name": "Maven pinned checked-schema polynomial study",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:58Z",
+      "completedAt": "2026-11-25T16:43:08Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351304172"
+    },
+    {
+      "workflowJob": "maven-student-sdk-archive-qualification",
+      "id": 139351303991,
+      "name": "Fresh Maven Student SDK archive qualification",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T16:35:59Z",
+      "completedAt": "2026-11-25T16:40:24Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139351303991"
+    },
+    {
+      "workflowJob": "verification",
+      "id": 139390984057,
+      "name": "Checkout-local ciCheck",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T17:37:55Z",
+      "completedAt": "2026-11-25T17:39:19Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139390984057"
+    },
+    {
+      "workflowJob": "publish-pages",
+      "id": 139391870245,
+      "name": "Publish generated reports",
+      "status": "completed",
+      "conclusion": "success",
+      "headSha": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "startedAt": "2026-11-25T17:39:24Z",
+      "completedAt": "2026-11-25T17:40:14Z",
+      "url": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380/job/139391870245"
+    }
+  ],
+  "optionalStudyJobsSkipped": [
+    {
+      "id": 139350702948,
+      "name": "JMH precision study v2 replica ${{ matrix.replicate }}",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 139350703256,
+      "name": "JMH precision study replica ${{ matrix.replicate }}",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 139350704285,
+      "name": "Retained JMH precision study v2 analysis",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 139350704767,
+      "name": "Retained JMH precision study analysis",
+      "conclusion": "skipped"
+    }
+  ]
+}

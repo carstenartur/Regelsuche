@@ -1,0 +1,19 @@
+2026-11-25T18:25:18.1231093Z ##[group]Fetching the repository
+2026-11-25T18:25:18.1235740Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/* +728ee8612c2aa38142ac0ad4dc6179d9768c4458:refs/remotes/pull/1394/merge
+2026-11-25T18:25:42.9546494Z From https://github.com/carstenartur/Regelsuche
+2026-11-25T18:25:42.9547618Z  * [new branch]              adr/dual-expression-representations -> origin/adr/dual-expression-representations
+2026-11-25T18:25:43.1073646Z ##[group]Checking out the ref
+2026-11-25T18:25:43.1076868Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1394/merge
+2026-11-25T18:25:43.6652337Z Note: switching to 'refs/remotes/pull/1394/merge'.
+2026-11-25T18:25:43.6652829Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-25T18:25:43.6656107Z HEAD is now at 728ee8612c2 Merge 5f25a206c2afae32c8d46aa6fb1711de22dbdbc9 into 44ce67edab538c5c5a69f992e75f3f222ec4fd72
+2026-11-25T18:25:43.6712795Z ##[endgroup]
+2026-11-25T18:25:43.6754428Z [command]/usr/bin/git log -1 --format=%H
+2026-11-25T18:25:43.6778528Z 728ee8612c2aa38142ac0ad4dc6179d9768c4458
+2026-11-25T18:25:43.7032507Z ##[group]Run actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+2026-11-25T18:27:26.7961876Z > Task :ai-knowledge-verification:aiKnowledgeCheck FAILED
+2026-11-25T18:27:28.1971357Z > Task :testSafeRuntimeProductQualificationScripts
+2026-11-25T18:28:11.8113982Z 	... 25 more
+2026-11-25T18:28:11.8114316Z Caused by: java.io.IOException: AI knowledge quality gate failed: trendViolations=1
+2026-11-25T18:28:11.8114888Z 	at org.aiknowledge.core.AiKnowledgeRunner$QualityGateResult.requirePassed(AiKnowledgeRunner.java:388)
+2026-11-25T18:28:11.8115456Z 	at org.aiknowledge.core.AiKnowledgeRunner.verify(AiKnowledgeRunner.java:78)

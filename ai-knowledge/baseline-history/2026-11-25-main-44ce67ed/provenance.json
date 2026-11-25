@@ -1,0 +1,361 @@
+{
+  "schema": "regelsuche.ai-knowledge-accepted-main-evidence/v1",
+  "qualification": "ACCEPTED_MAIN_ORIGINAL_COMPLETE_CI",
+  "sourceCommit": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+  "sourceTree": "407fa19621be08d47b4bdc8641d0f9e4858f8b83",
+  "originalMainCI": {
+    "runId": 45655429380,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45655429380",
+    "event": "push",
+    "runAttempt": 1,
+    "conclusion": "success",
+    "mandatorySourceAuthoritiesPassed": 14,
+    "aggregateCiCheckJobId": 139390984057,
+    "reportPublicationJobId": 139391870245,
+    "gradleJobId": 139351303915,
+    "qualificationRecord": {
+      "path": "ci-qualification.json",
+      "bytes": 8918,
+      "sha256": "61b8f4c7be01553bd9a53c0ccfa3c4a8ee07231ef4ea40ed49cac69ae46b958d"
+    }
+  },
+  "originalQualityEvidence": {
+    "artifactId": 15048345801,
+    "artifactName": "quality-acceptance-evidence",
+    "artifactUrl": "https://api.github.com/repos/carstenartur/Regelsuche/actions/artifacts/15048345801",
+    "downloadedZipBytes": 29212500,
+    "downloadedZipSha256": "0c13da09a4127a66fa13f0e6e6357da0113079d313542fc4b9314e510c37493d",
+    "apiDigestMatchesDownloadedZip": true,
+    "indexSha256": "b9f5157d4e91f1a0ef582ab3603c05fd404976a82cb7507750d210f1088e39fa",
+    "checkout": {
+      "revision": "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "tree": "407fa19621be08d47b4bdc8641d0f9e4858f8b83",
+      "trackedChangesPresent": false
+    },
+    "indexedFilesVerified": 293,
+    "trackedSourceFilesMatched": 64,
+    "generatedReportsVerified": 229,
+    "verificationRecord": {
+      "path": "artifact-verification.json",
+      "bytes": 136347,
+      "sha256": "2955db5b87d3075ce7690e7001373e71234bc448a753f57a7258aaf4c9a4633b"
+    },
+    "nativeCheck": {
+      "path": "accepted-check.json",
+      "bytes": 10187,
+      "sha256": "0cc86d2196b6325a5393f1b6605b50a2b8beb49e33482e44aa748299da46b8e0",
+      "passed": true,
+      "trendPassed": true,
+      "trendViolationCount": 0,
+      "claimFailureCount": 0
+    },
+    "nativeComplexity": {
+      "path": "accepted-complexity.json",
+      "bytes": 20799,
+      "sha256": "51d23f97acacd26fb15a61c2fd48cb9e1364715b5962d5e59882e892fe1a22a8"
+    },
+    "claimBoundary": "The ZIP digest, all 293 indexed entries and 64 exact tracked source Git blobs were verified. Successful execution is established separately by the complete original main job graph."
+  },
+  "unavailableRepositoryArtifact": {
+    "artifactId": 15045453210,
+    "artifactName": "repository-verification",
+    "apiSizeBytes": 766258160,
+    "apiReportedDigest": "sha256:bf22221ff81541d08340f162ea2c4a21fe0ae89719dcdbb192f5734815fe4182",
+    "downloaded": false,
+    "contentsVerified": false,
+    "reason": "GitHub artifact download tool rejects artifacts above 536870912 bytes; this artifact is 766258160 bytes.",
+    "fallback": "Use the verified quality-acceptance-evidence artifact and the established native projection procedure. No full repository-verification archive verification is claimed."
+  },
+  "snapshot": {
+    "extractorRelease": "v0.1.10",
+    "extractorCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "extractorTagObject": "ef0956a5743197a2aa62f425591282396ad46825",
+    "projection": "Unchanged released TrendAnalyzer.snapshot and StableIo.writeJson receive the complete original accepted complexity report. No selected fields are constructed by hand.",
+    "nativeSnapshotAbsentFromAvailableQualityArtifact": true,
+    "file": {
+      "path": "metrics-snapshot.json",
+      "bytes": 341,
+      "sha256": "6d9d7df9fdbcb5873753401166494d8fe605e4d99cafd09322f9c88ed692e16d"
+    },
+    "previousReference": {
+      "path": "previous-baseline.json",
+      "bytes": 351,
+      "sha256": "6acc6c0ee804e3960ddbf647e24eae316e047aa7a68d39503479bdc63e413277"
+    },
+    "sourceFiles": [
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/ExtractionOptions.java",
+        "gitBlob": "5adbc86925c03d7a11e604ba91e3ec2fd657696f",
+        "url": "https://github.com/carstenartur/ai-knowledge-extractor/blob/b409bed957c31d63ce7b6ef37205890f0f0ebd9a/core/src/main/java/org/aiknowledge/core/ExtractionOptions.java",
+        "bytes": 8461,
+        "sha256": "4e09d4181d5c7b0d5c06e14d13f70c15552175eee65ec39143171e0f25bed0be"
+      },
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/JsonSupport.java",
+        "gitBlob": "efa421c9521d3c209544f86ef4ab1875a1352713",
+        "url": "https://github.com/carstenartur/ai-knowledge-extractor/blob/b409bed957c31d63ce7b6ef37205890f0f0ebd9a/core/src/main/java/org/aiknowledge/core/JsonSupport.java",
+        "bytes": 2077,
+        "sha256": "f1c11d0d129ac36d1bea700fbbc3c94730261cce02bc71a145e8258f9f5928ad"
+      },
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/StableIo.java",
+        "gitBlob": "7247ea8188ed67665419d1ff3263638fd474cf02",
+        "url": "https://github.com/carstenartur/ai-knowledge-extractor/blob/b409bed957c31d63ce7b6ef37205890f0f0ebd9a/core/src/main/java/org/aiknowledge/core/StableIo.java",
+        "bytes": 672,
+        "sha256": "f3a56731aff707b4b8f157aef716c5324582875873970ab970ea7914c166bde6"
+      },
+      {
+        "path": "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java",
+        "gitBlob": "7964f1ecf2ad7fe9ab18c393a39c9112b92d28dd",
+        "url": "https://github.com/carstenartur/ai-knowledge-extractor/blob/b409bed957c31d63ce7b6ef37205890f0f0ebd9a/core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java",
+        "bytes": 10083,
+        "sha256": "17450bbe6c00bd16ee9ba45d6eb520b0e9b4403ba8c956cd71011ef0bc2179ae"
+      }
+    ],
+    "driver": {
+      "path": "../2026-11-24-main-f183aedd/ProjectionDriver.java",
+      "bytes": 1560,
+      "sha256": "cc538f449e04082e795347fac54044e44dab3ad0daafef64c914287ae958fa82"
+    },
+    "execution": {
+      "javaVersion": "25.0.5",
+      "runtime": "Temurin-25.0.5+8",
+      "compiledRelease": 17,
+      "scope": "Four unchanged released classes plus the existing complete-JSON-input ProjectionDriver; no repository scan."
+    },
+    "jsonInputParser": [
+      {
+        "path": "jackson-databind-2.23.0.jar",
+        "bytes": 1716668,
+        "sha256": "abd1edd2736c764da03fe6cb7a9de70d48dd0a198aed131604c564bff62f9cc1",
+        "role": "Parse complete retained JSON only; native extractor supplies projection, trend decisions and serialization."
+      },
+      {
+        "path": "jackson-core-2.23.0.jar",
+        "bytes": 603520,
+        "sha256": "449798beb4c4ec26de9cc25b39ca2198036883fb905ca968cbef7136d19a25d9",
+        "role": "Parse complete retained JSON only; native extractor supplies projection, trend decisions and serialization."
+      },
+      {
+        "path": "jackson-annotations-2.23.jar",
+        "bytes": 84212,
+        "sha256": "e5b60c3088e0887b290ff9226394354589a1dad583743944b7f5538661056b4c",
+        "role": "Parse complete retained JSON only; native extractor supplies projection, trend decisions and serialization."
+      }
+    ],
+    "verificationRecord": {
+      "path": "projection-verification.json",
+      "bytes": 1603,
+      "sha256": "4871653263b701833e65fb79c56c0d2ff5e2550f9def22bc4fccc6be96c9dfdb"
+    },
+    "acceptedTrendProjection": {
+      "path": "accepted-trend-projected.json",
+      "bytes": 2052,
+      "sha256": "3ea79df95e731768973f47d7fcbe711b432f3fcfa80d6ecc498a5ee9439e8b50"
+    }
+  },
+  "unchangedPolicies": {
+    "trendThresholds": {
+      "maxCognitiveDebtIncrease": 10.0,
+      "maxConceptRadiusIncrease": 3.0,
+      "maxContextTokenIncrease": 15000.0,
+      "failOnWarnings": false
+    },
+    "maxCognitiveDebt": 21.7,
+    "files": [
+      {
+        "path": "gradle.properties",
+        "bytes": 370,
+        "sha256": "2d0c622ff20ce78d0432c004df2dba7af170bdb50f5ce68faffdc5bcd1f1b285",
+        "gitBlob": "7838b3d7efecc913e5dd91296583718ec37ff3cc"
+      },
+      {
+        "path": "settings.gradle",
+        "bytes": 8065,
+        "sha256": "384b73ba3908d2eb055a8f81a127d1691068a59f746816355f1f1a1f5b0fc229",
+        "gitBlob": "6a97d7802723dc26a1099874d7c13c31a5102a44"
+      },
+      {
+        "path": "build.gradle",
+        "bytes": 12937,
+        "sha256": "0c4e2217e2b754dc22022b5130d7026ffca0496fe6c91f5ebd2efd1ae12d78ae",
+        "gitBlob": "8c0e35391f3e3769a8dc8508a35b3914aa00ac4a"
+      },
+      {
+        "path": "ai-knowledge-verification/build.gradle",
+        "bytes": 1156,
+        "sha256": "d98aab126212c0a594a46faf9b94fc01b3adcbb98c491d6b2aeb5549792b891b",
+        "gitBlob": "adcdd3e98470fee319924204c8c35957c376fa01"
+      },
+      {
+        "path": "gradle/ai-knowledge-verification.gradle",
+        "bytes": 4349,
+        "sha256": "dc0d8833e2fbb0cf045326b4a6924abc0717dfa21247b6a026d4ad5915176368",
+        "gitBlob": "9fd073d3546712fae06facd4d5f36b58d0142cfa"
+      },
+      {
+        "path": "gradle/quality-gates.gradle",
+        "bytes": 11893,
+        "sha256": "2bdeae0cfa30bad464022f7adf2827ef92d1b62ac476648ef9943418305b55ab",
+        "gitBlob": "d70b622a7a53be686754a2fcacdd8721e6fe0803"
+      },
+      {
+        "path": "ai-knowledge/capabilities.seed.yaml",
+        "bytes": 20351,
+        "sha256": "16d64630109485ca14a5c1566d64084f3b932d7edf52bf70facd4274de0b8d0b",
+        "gitBlob": "fac75eafa652636cae6fb87ee8ca0d7ab68f3c15"
+      },
+      {
+        "path": "ai-knowledge/claims.seed.yaml",
+        "bytes": 6232,
+        "sha256": "013935ebad67ff3868602be8c68b73dba723610ad5ba728113f87e114f3dc108",
+        "gitBlob": "a71bda7d6a2cf2f28a5f14f2d2d0662e25d81036"
+      },
+      {
+        "path": "ai-knowledge/claims.json",
+        "bytes": 6422,
+        "sha256": "cce03fad40abaa23770707154b2cab60afe37f1b0cbc8fb4d8865a886480b0c1",
+        "gitBlob": "0e3d797a6e4130f9fc5087d57b2570873e0f045c"
+      },
+      {
+        "path": "config/ai-knowledge-capability-coverage.json",
+        "bytes": 721,
+        "sha256": "9c1705776a062b5784cd9bad1cdc847878338f1ce32ac1fc66e7769ed98adbed",
+        "gitBlob": "5527280725bb8513145443f3309bb2ac9b02cd41"
+      },
+      {
+        "path": "config/quality/complexity-hotspots.json",
+        "bytes": 7741,
+        "sha256": "67cfc003891fcb8765a0d9999ce68fe4d65f357d189af21d099d6e3dbb3b50d4",
+        "gitBlob": "5670714ca96ec70342f7228c647687120b5757a1"
+      },
+      {
+        "path": "config/quality/coverage-policy.json",
+        "bytes": 2419,
+        "sha256": "4591f7817ba3db5830b345511a8b0c6ab8ad821e0ba87bc1d69be6cf13f84f6c",
+        "gitBlob": "0b78714844d9d07ac3e83709b695e73f4e12f914"
+      },
+      {
+        "path": "scripts/verify-ai-knowledge-artifacts.py",
+        "bytes": 12589,
+        "sha256": "845708cb45420565d5636539b00b60034162db762132bf781b6d3f9b4a7b3f7b",
+        "gitBlob": "e67d8816f783d8adfd6bd093b55449581cd895ae"
+      },
+      {
+        "path": "scripts/test_ai_knowledge_coverage.py",
+        "bytes": 5509,
+        "sha256": "ec21b3b2050f528c221e118c5e87948847e9de32384ee5eb6b382eea2210bca4",
+        "gitBlob": "c5853048956f679ee9a5eba351cd89131a63dcc1"
+      }
+    ],
+    "selectorsThresholdsAndExceptionsChanged": false
+  },
+  "rejectedPrEvidence": {
+    "pullRequest": 1394,
+    "headCommit": "5f25a206c2afae32c8d46aa6fb1711de22dbdbc9",
+    "headTree": "28207e8e125fc075777708c20e90147bd05cf69b",
+    "checkoutRevision": "728ee8612c2aa38142ac0ad4dc6179d9768c4458",
+    "checkoutTree": "28207e8e125fc075777708c20e90147bd05cf69b",
+    "checkoutParents": [
+      "44ce67edab538c5c5a69f992e75f3f222ec4fd72",
+      "5f25a206c2afae32c8d46aa6fb1711de22dbdbc9"
+    ],
+    "checkoutBinding": "Original Gradle job checkout log names the tested merge; the GitHub commit API binds its tree and both parents. The tested tree equals the PR head tree.",
+    "checkoutLogExcerpt": {
+      "path": "rejected-checkout-log.txt",
+      "bytes": 1881,
+      "sha256": "e7af25828ab9b3305a4d0eeb32967c23da55065e809256be72eee8c30cadc096"
+    },
+    "decodedOriginalJobLog": {
+      "path": "rejected-job-full.log",
+      "bytes": 330934,
+      "sha256": "d1560f33ca3dcb94da7125cd618c9bad308d976ff6868bae5a9082df16522238",
+      "retention": "Complete decoded log hashed in scratch; checkout and native failure excerpt retained."
+    },
+    "runId": 45674833926,
+    "runUrl": "https://github.com/carstenartur/Regelsuche/actions/runs/45674833926",
+    "runAttempt": 1,
+    "runStatusAtInspection": "in_progress",
+    "runConclusionAtInspection": null,
+    "gradleJobId": 139419894086,
+    "gradleJobConclusion": "failure",
+    "artifactId": 15051506541,
+    "artifactName": "repository-verification",
+    "downloadedZipBytes": 2229887,
+    "downloadedZipSha256": "14ea52bdedcdacaa110bf8d0e771bb3152429840786094ce9ec09bfda51a8a23",
+    "apiDigestMatchesDownloadedZip": true,
+    "reports": [
+      {
+        "path": "rejected-check.json",
+        "bytes": 10209,
+        "sha256": "c75ace86ce7d16b3ee4c1d53250412add7af2f468ba95bee513e762c7b888692"
+      },
+      {
+        "path": "rejected-complexity.json",
+        "bytes": 20801,
+        "sha256": "63d830b7fe3cf479d841c8aecc379fdac3bca68f0b72562e235c0c3d40b8512c"
+      },
+      {
+        "path": "rejected-metrics-snapshot.json",
+        "bytes": 342,
+        "sha256": "eaf0f2464d8e00ed293a0b797a6699b1ebeea6d5a911c34fe70c752fc45c1afc"
+      },
+      {
+        "path": "rejected-trend.json",
+        "bytes": 2208,
+        "sha256": "24c287b37845cfb9e348c1d45e7c864ca545ea0972cf85495ca62c171ebc186e"
+      }
+    ],
+    "claimBoundary": "This original Gradle authority failed the native trend. Other jobs were still running at inspection; no overall acceptance is inferred. Rejected feature measurements supply no reference values."
+  },
+  "unchangedTrendReplay": {
+    "originalRejectedSnapshotByteIdentical": true,
+    "originalRejectedTrendByteIdentical": true,
+    "acceptedMainAgainstPrevious": {
+      "passed": true,
+      "violationCount": 0,
+      "tokenIncrease": 14490.0,
+      "radiusIncrease": 2.0,
+      "normalizedDebtIncrease": -0.10999999999999943
+    },
+    "rejectedAgainstPrevious": {
+      "passed": false,
+      "violationCount": 1,
+      "tokenIncrease": 20310.0,
+      "radiusIncrease": 2.0,
+      "normalizedDebtIncrease": -0.16000000000000014
+    },
+    "rejectedAgainstAccepted": {
+      "passed": true,
+      "violationCount": 0,
+      "tokenIncrease": 5820.0,
+      "radiusIncrease": 0.0,
+      "normalizedDebtIncrease": -0.05000000000000071
+    },
+    "replayReport": {
+      "path": "replayed-trend.json",
+      "bytes": 2002,
+      "sha256": "9f35e92f76e0a5bb9a92c6773771886185339e8c56c0abbab9713da619447012"
+    },
+    "featureInventoryIncrease": {
+      "productionClasses": {
+        "count": 12,
+        "weight": 260,
+        "tokens": 3120
+      },
+      "tests": {
+        "count": 9,
+        "weight": 140,
+        "tokens": 1260
+      },
+      "docs": {
+        "count": 8,
+        "weight": 180,
+        "tokens": 1440
+      },
+      "totalTokens": 5820
+    },
+    "expectedAdditionalDocumentationTokens": 180,
+    "claimBoundary": "Retained-measurement replay is not fresh extraction or complete candidate acceptance. The new evidence README adds one document; a fresh unchanged extractor/CI run must measure the final candidate."
+  }
+}
