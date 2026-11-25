@@ -132,7 +132,7 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - **Folgerung.** Die Beispiele belegen die angegebenen endlichen Instanzen und den ausgewiesenen Präfixvergleich. Für Laufzeitvergleiche ist eine Messung der konkreten Implementierungen nötig.
 
 - [`CertificateDemoWorkbench.java`](../../app/src/main/java/de/regelsuche/web/CertificateDemoWorkbench.java#L30) <!-- strategy-code: app/src/main/java/de/regelsuche/web/CertificateDemoWorkbench.java | final class CertificateDemoWorkbench { -->
-- [`CertificateDemoBrowserFlowTest.java`](../../app/src/e2eTest/java/de/regelsuche/e2e/CertificateDemoBrowserFlowTest.java#L20) <!-- strategy-code: app/src/e2eTest/java/de/regelsuche/e2e/CertificateDemoBrowserFlowTest.java | class CertificateDemoBrowserFlowTest { -->
+- [`CertificateDemoBrowserFlowTest.java`](../../app/src/e2eTest/java/de/regelsuche/e2e/CertificateDemoBrowserFlowTest.java#L24) <!-- strategy-code: app/src/e2eTest/java/de/regelsuche/e2e/CertificateDemoBrowserFlowTest.java | class CertificateDemoBrowserFlowTest { -->
 - [`PairReductionBrowserFlowTest.java`](../../app/src/e2eTest/java/de/regelsuche/e2e/PairReductionBrowserFlowTest.java#L20) <!-- strategy-code: app/src/e2eTest/java/de/regelsuche/e2e/PairReductionBrowserFlowTest.java | class PairReductionBrowserFlowTest { -->
 
 ## Rationale Positivitätszertifikate für Polynome

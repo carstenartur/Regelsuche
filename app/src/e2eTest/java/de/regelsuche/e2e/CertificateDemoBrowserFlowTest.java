@@ -3,10 +3,14 @@ package de.regelsuche.e2e;
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import com.microsoft.playwright.Route;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -180,13 +184,45 @@ class CertificateDemoBrowserFlowTest {
                 clauses.append(i + 1).append(' ').append(i + 129).append(' ').append((i * 13 + 7) % 128 + 1).append('\n');
             page.locator("#cnfClauses").fill(clauses.toString());
             page.locator("#cnfWork").fill("2000000");
-            var response = page.waitForResponse(r -> r.url().endsWith("/cancel"), () -> page.evaluate("""
-                () => {
-                    document.querySelector('#cnfRun').click();
-                    document.querySelector('#cnfCancel').click();
-                }
-                """));
-            assertEquals(202, response.status());
+            var heldCount = new AtomicReference<Route>();
+            page.route("**/api/certificate-demos/cnf/*", heldCount::set);
+            page.locator("#cnfRun").press("Enter");
+            page.waitForCondition(() -> heldCount.get() != null);
+            var cancel = page.locator("#cnfCancel");
+            var countUrl = heldCount.get().request().url();
+            var cancelUrl = countUrl + "/cancel";
+            var early = page.waitForResponse(cancelUrl, cancel::click);
+            assertEquals(404, early.status());
+            assertThat(cancel).isEnabled();
+
+            var counted = new AtomicReference<Response>();
+            var cancellation = new AtomicReference<>(early);
+            page.onResponse(response -> {
+                if (response.url().equals(countUrl)) counted.set(response);
+                if (response.url().equals(cancelUrl)) cancellation.set(response);
+            });
+            heldCount.get().resume();
+            long deadline = System.nanoTime() + 5_000_000_000L;
+            page.waitForCondition(() -> {
+                var response = cancellation.get();
+                if (response == null) return false;
+                // The cancelled count may arrive before its in-flight cancellation response.
+                if (response.status() == 202) return counted.get() != null;
+                assertEquals(404, response.status());
+                assertNull(counted.get(), () -> "Count completed before cancellation was accepted: "
+                    + counted.get().text());
+                if (!cancel.isEnabled()) return false;
+                double remainingMillis = (deadline - System.nanoTime()) / 1_000_000d;
+                assertTrue(remainingMillis > 0, "Cancellation was not accepted within the existing timeout");
+                cancellation.set(null);
+                cancel.press("Enter", new Locator.PressOptions().setTimeout(remainingMillis));
+                return false;
+            });
+            assertEquals(202, cancellation.get().status());
+            assertEquals(200, counted.get().status());
+            var report = new com.fasterxml.jackson.databind.ObjectMapper().readTree(counted.get().body());
+            assertEquals("UNAVAILABLE", report.path("status").textValue());
+            assertEquals("CANCELLED", report.path("reason").textValue());
             assertThat(page.locator("#cnfStatus")).containsText("Berechnung abgebrochen");
             assertThat(page.locator("#cnfDownload")).isHidden();
         }
