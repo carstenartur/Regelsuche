@@ -6,8 +6,9 @@ Die Arbeit stellt ein Produkt kommutierender Operatoren in einer gemeinsamen
 Eigenbasis dar. Ein Prädiktor trifft viele Multiplikatoren. Eine zusätzliche
 Transformation repariert die abweichenden Komponenten. Die Abweichungen können
 in der Arbeit für jede Frequenz andere Zeilen eines ganzen Stapels betreffen.
-Der Java-Kern untersucht den begrenzten Fall einer einzelnen rationalen Matrix
-mit explizit gegebener Basis. Stapelverfahren, zyklotomische Erweiterungen,
+Der spektrale Java-Einstieg untersucht den begrenzten Fall einer einzelnen rationalen Matrix
+mit explizit gegebener Basis. Die unten beschriebene automatische Suche benötigt
+keine Eigenbasis. Stapelverfahren, zyklotomische Erweiterungen,
 Basisfindung und Fourier-Komplexität bleiben außerhalb dieses Modells.
 [Originalverfahren, Abschnitt „Prediction and exact spectral repair“](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/preprints/The-logarithmic-exponent-of-finite-Fourier-transforms-November-24-2026/build/repair.tex)
 
@@ -36,7 +37,7 @@ bescheinigen. Der Prüfer benötigt keine Behauptungen über die Erzeugung der
 Faktoren. `Plan.expression()` gibt die geordnete Summe bzw. das geordnete
 Produkt in der bestehenden Matrixausdruckssprache zurück.
 
-## Was die Kostenentscheidung umfasst
+## Kostenmodell der bisherigen spektralen Auswahl
 
 `select` vergleicht alle eingereichten Pläne mit der dichten bereits
 materialisierten Quelle. Für eine $m\times n$-Matrix zählt das deklarierte
@@ -82,6 +83,57 @@ Verifikation und Auswahl jeweils eines Kandidaten 796/150/163 bzw.
 9786/1664/1738 Arbeitseinheiten (letzte Zeile mit $t=1/2$).
 Das sind drei getrennte API-Aufrufe.
 
+## Automatische Suche und wiederverwendbare Ausführung
+
+`OperatorPlanSdk.discover(source, policy, budget, token)` konstruiert Prädiktoren
+direkt aus der rationalen Quellmatrix: Nullmatrix, Einheit, Diagonale und
+Tridiagonale. Die Einheit entfällt bei rechteckigen Quellen. Für jeden
+Prädiktor berechnet die Suche $R=F-P$, reduziert $R$ exakt und nimmt als $U$
+die ursprünglichen Pivotspalten sowie als $V$ die nichtverschwindenden Zeilen
+der reduzierten Zeilenstufenform. Damit gilt $R=UV$; die Spaltenzahl von $U$
+ist bei diesen erzeugten Faktoren der tatsächliche Rang von $R$. Der
+bestehende unabhängige Planprüfer rechnet $F=P+UV$ vollständig nach.
+
+Die Policy begrenzt die Prädiktorliste und den Korrekturrang. Ein zu hoher Rang
+verwirft den Kandidaten, lässt aber die geprüfte direkte Quelle als Möglichkeit
+bestehen. Die Arbeits- und Speicherrechnung bezahlt auch solche verworfenen
+Kandidaten einschließlich der dichten Prädiktorauswertung. Alle Versuche,
+Prüfungen und die Übersetzung in einen ausführbaren Plan teilen ein Budget.
+Ein Ressourcenabbruch liefert keinen als fertig ausgewiesenen Gewinner.
+
+Das Ergebnis enthält einen unveränderlichen `PreparedOperator`. Seine
+Konstruktion ist geschlossen; ein extern eingereichter Plan erreicht sie nur
+über `prepare` mit erneuter Quellen- und Identitätsprüfung. Wiederholte Aufrufe
+von `OperatorPlanSdk.apply` benötigen keine erneute Matrixexpansion. Sie
+prüfen weiterhin Vektorform, Zahlenbreite, Arbeit, Speicher, Zeit und Abbruch.
+`correctionWidth()` ist bei automatisch ermittelten Faktoren der Residualrang,
+bei externen Faktoren lediglich eine Rangobergrenze.
+
+Der ausführbare Plan überspringt Nullkoeffizienten und Multiplikationen mit
+eins. **Dieselbe Optimierung gilt für die direkte Vergleichsmatrix.** Deshalb
+gewinnt eine Reparatur keinen künstlichen Vorteil gegenüber einer Diagonalmatrix.
+Ein statisch verschwindender Summand wird nicht ausgeführt. Die angegebenen
+Kosten zählen verbleibende rationale Multiplikationen und Additionen, ohne
+Laufzeit oder Bitkosten damit gleichzusetzen.
+
+| Automatisch ausgewertete Quelle | Auswahl | Operationen pro Vektor | Direkte Quelle |
+| --- | --- | ---: | ---: |
+| Dichtes $I+uv^T$ aus dem obigen Vierdimensionenfall | Einheit mit Rang-eins-Korrektur | 14 | 28 |
+| Zentrierung $I-\frac18\mathbf1\mathbf1^T$ | Einheit mit Rang-eins-Korrektur | 23 | 120 |
+| Zentrierung $I-\frac1{16}\mathbf1\mathbf1^T$ | Einheit mit Rang-eins-Korrektur | 47 | 496 |
+| $\operatorname{diag}(1,2,\ldots,8)$ | Direkt | 7 | 7 |
+| Feste dichte Zufallsmatrix der Ordnung acht | Direkt | 97 | 97 |
+
+Die Zentrierung ist ein wiederholter Verbraucher: unterschiedliche rationale
+Messvektoren verwenden denselben entdeckten Plan. Tests vergleichen weitere
+rechteckige und quadratische Quellen mit einer separaten direkten Berechnung.
+Das [Messprotokoll](../../research/benchmarks/operator-residual-search/README.md)
+enthält zusätzlich Suchkosten, wiederholte Anwendungen, Allokationen, eine
+ungeprüfte dünn besetzte Direktrechnung und die handgeschriebene Mittelwertformel
+als stärkere fachliche Kontrolle. Die Messung ist eine lokale Beobachtung mit
+getrennten JVM-Prozessen und Aufwärmphase; sie ist kein allgemeiner
+Geschwindigkeitsbeweis und keine Messung des JVM-Kaltstarts.
+
 ## Komposition mit belegtem Hilfsregister
 
 `OccupiedWorkspace.composition(A1,A2)` liefert vier lineare Aktualisierungen
@@ -117,7 +169,8 @@ rechteckigen Test benötigt 755 Arbeitseinheiten.
 
 ## Zugang, Grenzen und Reproduktion
 
-Der SDK-Einstieg `OperatorPlanSdk` bietet `spectral`, `verify`, `select`,
+Der SDK-Einstieg `OperatorPlanSdk` bietet `discover`, `prepare`, `apply`,
+`spectral`, `verify`, `select`,
 `verifyWorkspace` und `applyWorkspace`. Die Nutzung setzt konstante rationale
 Einträge in `SymbolicLinearSystem.PolynomialMatrix` voraus. Der Prädiktor
 unterstützt `Matrix`, `Identity`, `Sum` und geordnete `Product`-Knoten.
@@ -135,6 +188,6 @@ Die fokussierten Tests laufen mit Java 25 im Repository-Stamm.
 
 ```sh
 mvn -B -ntp -pl regelsuche-optimization-sdk -am \
-  -Dtest=OccupiedWorkspaceTest,OperatorResidualPlansTest,OperatorPlanSdkTest,MatrixOperatorRulesTest \
+  -Dtest=OccupiedWorkspaceTest,OperatorResidualPlansTest,OperatorResidualSearchTest,OperatorPlanSdkTest,MatrixOperatorRulesTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```

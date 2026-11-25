@@ -2,6 +2,7 @@ package de.regelsuche.polynomial;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,38 +23,68 @@ public final class UnivariatePolynomialView<C> {
         PolynomialRing<C> ring,
         List<C> coefficients
     ) {
+        this(ring, coefficients, PolynomialWorkSink.none(), "univariate.construct");
+    }
+
+    private UnivariatePolynomialView(
+        PolynomialRing<C> ring, List<C> coefficients, PolynomialWorkSink work, String stage
+    ) {
         this.ring = requireUnivariateRing(ring);
+        Objects.requireNonNull(work, "work");
         CoefficientDomain<C> domain = ring.coefficientDomain();
-        ArrayList<C> canonical = new ArrayList<>(
-            Objects.requireNonNull(coefficients, "coefficients").size());
+        Objects.requireNonNull(coefficients, "coefficients");
+        checkpoint(work, stage, 0);
+        ArrayList<C> canonical = new ArrayList<>(coefficients.size());
+        int index = 0;
         for (C coefficient : coefficients) {
+            checkpoint(work, stage, index++);
             canonical.add(domain.canonical(
                 Objects.requireNonNull(coefficient, "coefficient")));
         }
-        int size = canonical.size();
-        while (size > 0 && domain.isZero(canonical.get(size - 1))) {
-            size--;
+        int size = trimmedDegree(canonical, domain, canonical.size() - 1, work, stage) + 1;
+        if (work == PolynomialWorkSink.NoOp.INSTANCE) {
+            this.coefficients = List.copyOf(canonical.subList(0, size));
+        } else if (size == 0) {
+            this.coefficients = List.of();
+        } else {
+            // The local list has no escaped mutable alias. Avoid List.copyOf's
+            // unpolled degree-sized copy/null-check pass on checked paths.
+            this.coefficients = Collections.unmodifiableList(size == canonical.size()
+                ? canonical : copy(canonical, size, work, stage));
         }
-        this.coefficients = List.copyOf(canonical.subList(0, size));
+        checkpoint(work, stage, 0);
     }
 
     public static <C> UnivariatePolynomialView<C> from(
         SparsePolynomial<C> polynomial
     ) {
+        return from(polynomial, PolynomialWorkSink.none(), "univariate.from");
+    }
+
+    /** Convert using the sink's optional checkpoints, without charging prepaid work again. */
+    public static <C> UnivariatePolynomialView<C> from(
+        SparsePolynomial<C> polynomial, PolynomialWorkSink work, String stage
+    ) {
         Objects.requireNonNull(polynomial, "polynomial");
+        Objects.requireNonNull(work, "work");
         PolynomialRing<C> ring = requireUnivariateRing(polynomial.ring());
-        if (polynomial.isZero()) {
-            return zero(ring);
-        }
+        checkpoint(work, stage, 0);
+        if (polynomial.isZero()) return zero(ring);
         ArrayList<C> coefficients = zeros(
-            ring.coefficientDomain(),
-            polynomial.degree(0) + 1);
+            ring.coefficientDomain(), polynomial.degree(0) + 1, work, stage);
+        int index = 0;
         for (Map.Entry<Monomial, C> term : polynomial.terms().entrySet()) {
-            coefficients.set(
-                term.getKey().exponent(0),
-                term.getValue());
+            checkpoint(work, stage, index++);
+            coefficients.set(term.getKey().exponent(0), term.getValue());
         }
-        return new UnivariatePolynomialView<>(ring, coefficients);
+        return new UnivariatePolynomialView<>(ring, coefficients, work, stage);
+    }
+
+    /** Canonicalize with optional checkpoints; the result still owns an immutable coefficient list. */
+    public static <C> UnivariatePolynomialView<C> of(
+        PolynomialRing<C> ring, List<C> ascendingCoefficients, PolynomialWorkSink work, String stage
+    ) {
+        return new UnivariatePolynomialView<>(ring, ascendingCoefficients, work, stage);
     }
 
     public static <C> UnivariatePolynomialView<C> of(
@@ -124,19 +155,22 @@ public final class UnivariatePolynomialView<C> {
         return coefficients.getLast();
     }
 
-    public SparsePolynomial<C> toSparsePolynomial() {
-        TreeMap<Monomial, C> terms =
-            new TreeMap<>(ring.monomialComparator());
+    /** Poll both the dense scan and the sparse polynomial's canonicalization. */
+    public SparsePolynomial<C> toSparsePolynomial(PolynomialWorkSink work, String stage) {
+        Objects.requireNonNull(work, "work");
+        checkpoint(work, stage, 0);
+        TreeMap<Monomial, C> terms = new TreeMap<>(ring.monomialComparator());
         CoefficientDomain<C> domain = ring.coefficientDomain();
-        for (int exponent = 0;
-                exponent < coefficients.size();
-                exponent++) {
+        for (int exponent = 0; exponent < coefficients.size(); exponent++) {
+            checkpoint(work, stage, exponent);
             C coefficient = coefficients.get(exponent);
-            if (!domain.isZero(coefficient)) {
-                terms.put(Monomial.of(exponent), coefficient);
-            }
+            if (!domain.isZero(coefficient)) terms.put(Monomial.of(exponent), coefficient);
         }
-        return new SparsePolynomial<>(ring, terms);
+        return new SparsePolynomial<>(ring, terms, work, stage);
+    }
+
+    public SparsePolynomial<C> toSparsePolynomial() {
+        return toSparsePolynomial(PolynomialWorkSink.none(), "univariate.to-sparse");
     }
 
     public UnivariatePolynomialView<C> add(
@@ -225,7 +259,7 @@ public final class UnivariatePolynomialView<C> {
         requireSameRing(other);
         CoefficientDomain<C> domain = ring.coefficientDomain();
         int size = Math.max(coefficientCount(), other.coefficientCount());
-        ArrayList<C> result = zeros(domain, size);
+        ArrayList<C> result = zeros(domain, size, work, stage);
         for (int exponent = 0; exponent < size; exponent++) {
             consume(work, stage, 1);
             result.set(
@@ -234,7 +268,7 @@ public final class UnivariatePolynomialView<C> {
                     coefficient(exponent),
                     other.coefficient(exponent)));
         }
-        return new UnivariatePolynomialView<>(ring, result);
+        return new UnivariatePolynomialView<>(ring, result, work, stage);
     }
 
     public UnivariatePolynomialView<C> subtract(
@@ -245,7 +279,7 @@ public final class UnivariatePolynomialView<C> {
         requireSameRing(other);
         CoefficientDomain<C> domain = ring.coefficientDomain();
         int size = Math.max(coefficientCount(), other.coefficientCount());
-        ArrayList<C> result = zeros(domain, size);
+        ArrayList<C> result = zeros(domain, size, work, stage);
         for (int exponent = 0; exponent < size; exponent++) {
             consume(work, stage, 1);
             result.set(
@@ -254,7 +288,7 @@ public final class UnivariatePolynomialView<C> {
                     coefficient(exponent),
                     other.coefficient(exponent)));
         }
-        return new UnivariatePolynomialView<>(ring, result);
+        return new UnivariatePolynomialView<>(ring, result, work, stage);
     }
 
     public UnivariatePolynomialView<C> scale(
@@ -273,7 +307,7 @@ public final class UnivariatePolynomialView<C> {
             consume(work, stage, 1);
             result.add(domain.multiply(coefficient, canonicalScalar));
         }
-        return new UnivariatePolynomialView<>(ring, result);
+        return new UnivariatePolynomialView<>(ring, result, work, stage);
     }
 
     public UnivariatePolynomialView<C> multiply(
@@ -288,7 +322,7 @@ public final class UnivariatePolynomialView<C> {
         CoefficientDomain<C> domain = ring.coefficientDomain();
         ArrayList<C> result = zeros(
             domain,
-            degree() + other.degree() + 1);
+            degree() + other.degree() + 1, work, stage);
         for (int left = 0; left < coefficientCount(); left++) {
             for (int right = 0; right < other.coefficientCount(); right++) {
                 consume(work, stage, 2);
@@ -302,7 +336,7 @@ public final class UnivariatePolynomialView<C> {
                             other.coefficient(right))));
             }
         }
-        return new UnivariatePolynomialView<>(ring, result);
+        return new UnivariatePolynomialView<>(ring, result, work, stage);
     }
 
     public UnivariatePolynomialView<C> derivative(
@@ -313,7 +347,7 @@ public final class UnivariatePolynomialView<C> {
             return zero(ring);
         }
         CoefficientDomain<C> domain = ring.coefficientDomain();
-        ArrayList<C> result = zeros(domain, degree());
+        ArrayList<C> result = zeros(domain, degree(), work, stage);
         for (int exponent = 1;
                 exponent < coefficientCount();
                 exponent++) {
@@ -325,7 +359,7 @@ public final class UnivariatePolynomialView<C> {
                     domain.fromInteger(
                         BigInteger.valueOf(exponent))));
         }
-        return new UnivariatePolynomialView<>(ring, result);
+        return new UnivariatePolynomialView<>(ring, result, work, stage);
     }
 
     public UnivariatePolynomialView<C> monic(
@@ -388,8 +422,8 @@ public final class UnivariatePolynomialView<C> {
         CoefficientDomain<C> domain = ring.coefficientDomain();
         ArrayList<C> quotient = zeros(
             domain,
-            degree() - divisor.degree() + 1);
-        ArrayList<C> remainder = new ArrayList<>(coefficients);
+            degree() - divisor.degree() + 1, work, stage);
+        ArrayList<C> remainder = copy(coefficients, coefficientCount(), work, stage);
         int remainderDegree = degree();
         String iterationStage = stage + ".iterations";
         String divisionStage = stage + ".coefficient-divisions";
@@ -432,12 +466,12 @@ public final class UnivariatePolynomialView<C> {
                             scale,
                             divisor.coefficient(exponent))));
             }
-            remainderDegree = trimmedDegree(remainder, domain, remainderDegree);
+            remainderDegree = trimmedDegree(remainder, domain, remainderDegree, work, stage);
         }
 
         return new DivisionResult<>(
-            new UnivariatePolynomialView<>(ring, quotient),
-            new UnivariatePolynomialView<>(ring, remainder));
+            new UnivariatePolynomialView<>(ring, quotient, work, stage),
+            new UnivariatePolynomialView<>(ring, remainder, work, stage));
     }
 
     public UnivariatePolynomialView<C> exactQuotient(
@@ -502,26 +536,48 @@ public final class UnivariatePolynomialView<C> {
     }
 
     private static <C> ArrayList<C> zeros(
-        CoefficientDomain<C> domain,
-        int size
+        CoefficientDomain<C> domain, int size, PolynomialWorkSink work, String stage
     ) {
+        checkpoint(work, stage, 0);
         ArrayList<C> result = new ArrayList<>(size);
         for (int index = 0; index < size; index++) {
+            checkpoint(work, stage, index);
             result.add(domain.zero());
         }
+        checkpoint(work, stage, 0);
+        return result;
+    }
+
+    private static <C> ArrayList<C> copy(
+        List<C> values, int size, PolynomialWorkSink work, String stage
+    ) {
+        checkpoint(work, stage, 0);
+        ArrayList<C> result = new ArrayList<>(size);
+        for (int index = 0; index < size; index++) {
+            checkpoint(work, stage, index);
+            result.add(values.get(index));
+        }
+        checkpoint(work, stage, 0);
         return result;
     }
 
     private static <C> int trimmedDegree(
-        List<C> values,
-        CoefficientDomain<C> domain,
-        int degree
+        List<C> values, CoefficientDomain<C> domain, int degree, PolynomialWorkSink work, String stage
     ) {
         // Entries above the previous remainder degree are already known zero.
-        while (degree >= 0 && domain.isZero(values.get(degree))) {
+        int scanned = 0;
+        while (degree >= 0) {
+            checkpoint(work, stage, scanned++);
+            if (!domain.isZero(values.get(degree))) break;
             degree--;
         }
+        checkpoint(work, stage, 0);
         return degree;
+    }
+
+    private static void checkpoint(PolynomialWorkSink work, String stage, int index) {
+        if ((index & 1023) == 0) work.checkpoint(stage == null || stage.isBlank()
+            ? "univariate.construction" : stage);
     }
 
     private static void consume(

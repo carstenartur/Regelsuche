@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-25",
+  "base_commit": "d4784fcde5f92e9dc222e760af4febccc30e9f4e",
+  "jdk": "Eclipse Temurin 25.0.5+8",
+  "architecture": "x86_64",
+  "os": "Linux",
+  "heap": "-Xms128m -Xmx256m",
+  "seed": 291843,
+  "samples_per_family": 64,
+  "forks_per_family_and_arm": 3,
+  "warmup_blocks": 5,
+  "measured_blocks": 7,
+  "acquisition_calls_per_block": 20,
+  "application_calls_per_block": 2000,
+  "measured_jvm_processes": 60,
+  "rows": 420,
+  "measurement": "System.nanoTime and current-thread allocated bytes; warmed observations, no JMH or cold-start claim",
+  "source_sha256": {
+    "research/benchmarks/operator-residual-search/OperatorResidualStudy.java": "f48c3a0b997b22a6f0e5c3b7d11a7e87f1fa98b3c7e6048e56bc4c42baf2d326",
+    "research/benchmarks/operator-residual-search/run.sh": "8d2c201e6535d7b4189e3897b76668ca4594b04810600a2fc10d3787c7f354fb",
+    "regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OperatorResidualSearch.java": "f5af8ac000edb80c7778247170a414dc961a3cf9c9c2384dda225b923d1bfcd0",
+    "regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/PreparedOperator.java": "fc602e8ce3a484cf078995d5eb85724b35ab40920e950df32358d88ae6c6c651",
+    "regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OperatorResidualPlans.java": "42c4bbdf7083d841761f9e397abc7d69673da90d9fddb160b2e1d82d4ecf2786",
+    "regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/algebra/OperatorChecks.java": "77e93ba6f38249d11fcefb2639847f2fe0390ee8e3d3c37572a0afa2206b1fd0",
+    "regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/algebra/OperatorPlanSdk.java": "a58afd2e602fae4d02ee105f69f3c7bc4ed0442ce62d1359d73d74615a718043"
+  },
+  "data_sha256": {
+    "selection.tsv": "c534e3dc960348e24574fb482f6ae74eb600890a605de969e496722a60304043",
+    "observations.tsv": "2a3df37c69930c3225c3ddfe7328b568f87370ab26a3244443cac8f8e3630b10"
+  }
+}

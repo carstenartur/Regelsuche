@@ -59,7 +59,7 @@ public final class OperatorResidualPlans {
         return OperatorChecks.run(limits, cancel, checks -> verify(source, plan, checks));
     }
 
-    private static Cost verify(PolynomialMatrix source, Plan plan, OperatorChecks checks) {
+    static Cost verify(PolynomialMatrix source, Plan plan, OperatorChecks checks) {
         need(plan != null, "MISSING_PLAN");
         checks.input(source);
         checks.input(plan.source());
