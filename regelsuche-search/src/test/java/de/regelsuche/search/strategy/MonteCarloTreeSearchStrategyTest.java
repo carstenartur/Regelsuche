@@ -122,6 +122,28 @@ class MonteCarloTreeSearchStrategyTest {
         }
     }
 
+    @Test
+    void creditsDescendantRolloutsToAncestorsInsteadOfStarvingAnAlternative() {
+        // Single variables have identical scores: only the exploration term
+        // distinguishes branches. Seed 7 initially rolls out the second child.
+        SearchProblem problem = problem("x", expression -> switch (expression) {
+            case "x" -> List.of(step("a", "a", RewriteKind.NORMALIZE),
+                step("b", "b", RewriteKind.NORMALIZE));
+            case "a" -> List.of(step("c", "c", RewriteKind.NORMALIZE));
+            case "c" -> List.of(step("d", "d", RewriteKind.NORMALIZE));
+            case "d" -> List.of(step("e", "e", RewriteKind.NORMALIZE));
+            case "b" -> List.of(step("f", "f", RewriteKind.NORMALIZE));
+            default -> List.of();
+        }, 5, 6, 0);
+        var states = new MonteCarloTreeSearchStrategy(7L, 1, 1).search(problem);
+        assertEquals(6, states.size());
+        assertEquals(1, states.stream().map(state -> state.score().weightedTotal()).distinct().count());
+        assertTrue(states.stream().anyMatch(state -> state.path().equals(List.of("x", "a", "c"))));
+        assertTrue(states.stream().anyMatch(state -> state.path().equals(List.of("x", "b", "f"))),
+            "descendant visits must reduce the exploration bonus of their ancestor");
+        assertTrue(states.stream().allMatch(state -> state.recordedExecution().isPresent()));
+    }
+
     private static SearchProblem problem(String root, TransformationEngine engine,
             int depth, int states, int expansions) {
         return new SearchProblem(root, engine, new ExpressionScorer(), new ExpressionCanonicalizer(),
