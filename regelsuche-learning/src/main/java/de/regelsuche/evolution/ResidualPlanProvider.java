@@ -112,7 +112,7 @@ public final class ResidualPlanProvider implements MoveVerifier {
             }
             long before = replayWork.units();
             Transformation candidate = null;
-            boolean exhausted = false;
+            boolean noEdge = false;
             try {
                 if (replayPrefix == null) {
                     String source = normalizedSource();
@@ -124,16 +124,17 @@ public final class ResidualPlanProvider implements MoveVerifier {
                     var checked = ResidualPlanCompiler.checkPrepared(replayPrefix.source, pending.effects(), replayPrefix.result, replayWork);
                     if (!List.of(checked.proofRoot()).equals(pending.proofRoots()))
                         throw new IllegalStateException("source replay differs from selected residual plan");
-                    candidate = issue(checked);
+                    noEdge = state.expression().equals(checked.expression());
+                    if (!noEdge) candidate = issue(checked);
                 }
             } catch (StructuralConstructionPrograms.Limit refused) {
-                exhausted = true;
+                noEdge = true;
                 replayIncomplete = true;
             } finally {
                 meter.prepay(ticket, ApplicationPhase.EVIDENCE, replayWork.units() - before);
             }
             boolean spent = replayWork.units() - before + 1 >= allowance;
-            if (exhausted) meter.abandon(ticket);
+            if (noEdge) meter.abandon(ticket);
             else if (candidate != null) meter.complete(ticket, candidate.executionWork());
             else { status = spent ? Status.LIMIT : Status.READY; return Optional.empty(); }
             ticket = null;

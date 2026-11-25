@@ -55,6 +55,34 @@ class ResidualPlanProviderTest {
         assertTrue(result.accountingComplete());
     }
 
+    @Test void aPaidIdentityAlternativeDoesNotHideTheOtherCheckedTarget() {
+        var targets = new ResidualPlanController(STATE.expression()).run(ResidualPlanController.Arm.LEARNED,7,0)
+            .candidates().stream().map(ResidualPlanController.Candidate::expression).toList();
+        assertEquals(2,targets.size());
+        for (int i = 0; i < targets.size(); i++) {
+            var source = MoveState.root(targets.get(i));
+            var context = MoveContext.frozen(targets.get(1-i));
+            var result = ResidualPlanController.search(source.expression(),context,ResidualPlanController.Mode.DISCOVERY,
+                7,LIMIT,LIMIT,new MoveSearch.Budget(0,1,LIMIT,16,1_000_000));
+            assertTrue(result.reached(),result.outcome().name());
+            assertTrue(result.accountingComplete());
+            var plans = new ResidualPlanProvider(source,context,ResidualPlanController.Mode.DISCOVERY,7,LIMIT,LIMIT);
+            try (var cursor = plans.provider().openSession(source,context)) {
+                var emitted = new ArrayList<String>();
+                while (!cursor.snapshot().complete()) {
+                    cursor.next(LIMIT).ifPresent(move -> emitted.add(move.transformedExpression()));
+                    assertTrue(cursor.snapshot().accountingComplete(),cursor.snapshot().detailCode());
+                    assertNotEquals(Status.INCONCLUSIVE,cursor.snapshot().status());
+                }
+                assertEquals(List.of(context.goal()),emitted);
+                var receipt = cursor.snapshot().work().prepaidApplications();
+                assertEquals(0,receipt.openApplications());
+                assertEquals(1,receipt.abandonedApplications());
+                assertTrue(receipt.chargedUnits() > receipt.completedMathematics().exactTheoryWorkUnits());
+            }
+        }
+    }
+
     @Test void canceledMidReplaySettlesEveryPaidPhaseAndReleasesTheOpenTicket() {
         var plans = new ResidualPlanProvider(STATE,CONTEXT,ResidualPlanController.Mode.DISCOVERY,7,LIMIT,LIMIT);
         var cursor = plans.provider().openSession(STATE,CONTEXT);

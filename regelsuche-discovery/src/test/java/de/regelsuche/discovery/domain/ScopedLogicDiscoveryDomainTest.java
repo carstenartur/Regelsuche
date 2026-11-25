@@ -78,6 +78,45 @@ class ScopedLogicDiscoveryDomainTest {
         assertEquals(1,stopped.work());
     }
 
+    @Test void aPullStopsAtEachProjectionAndSpecialization() {
+        var base = context(R);
+        var conjunction = Obligation.create(base.obligationId(),base.declarations(),base.theories(),
+            List.of(Predicate.holds("pair",new Call("and",List.of(P,Q)))),base.goal(),base.requestedEvidence(),base.provenance());
+        var f = new Symbol("f");
+        var declarations = List.of(new SymbolDeclaration("f",Sort.NAT_PREDICATE),new SymbolDeclaration("m",Sort.NATURAL),
+            new SymbolDeclaration("n",Sort.NATURAL));
+        var universal = Obligation.create("quantified",declarations,base.theories(),List.of(Predicate.holds("all",
+            new Binder(BinderKind.FORALL,Sort.NATURAL,new Call("at",List.of(f,new Bound(0)))))),
+            Goal.holds(new Call("at",List.of(f,new Symbol("m")))),base.requestedEvidence(),base.provenance());
+        for (var source : List.of(conjunction,universal)) {
+            var batch = ScopedProofSearch.discover(source,1024);
+            assertTrue(batch.proposals().size() >= 2);
+            var stopped = ScopedProofSearch.open(source,1024);
+            try (stopped) {
+                var first = pullProposal(stopped);
+                assertEquals(batch.proposals().getFirst(),first);
+                assertEquals(first.formationWork(),stopped.work());
+            }
+            assertEquals(batch.proposals().getFirst().formationWork(),stopped.work());
+            assertTrue(stopped.next(1).isEmpty());
+            try (var cursor = ScopedProofSearch.open(source,1024)) {
+                for (var expected : batch.proposals()) {
+                    var actual = pullProposal(cursor);
+                    assertEquals(expected,actual);
+                    assertEquals(expected.formationWork(),cursor.work());
+                }
+            }
+        }
+    }
+
+    private static ScopedProofSearch.Proposal pullProposal(ScopedProofSearch.Cursor cursor) {
+        while (!cursor.done()) {
+            var proposal = cursor.next(1);
+            if (proposal.isPresent()) return proposal.get();
+        }
+        throw new AssertionError("Expected an additional scoped proposal");
+    }
+
     @Test void normalDiscoveryEntryKeepsAProposedGraphSeparateFromCheckedEvidence(@TempDir Path dir) {
         var domain = new ScopedLogicDiscoveryDomain(new CheckedLeanScopedProofExecutor(
             new LeanSolverBackend(dir.resolve("missing"),dir),
