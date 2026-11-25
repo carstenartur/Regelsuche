@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearIntegerSchedule.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearIntegerSchedule.java</span></div><h1>BilinearIntegerSchedule.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Rejection;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Result;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.function.BooleanSupplier;
+
+/** Exact integer lowering with a width-sensitive, deterministic magnitude-word cost model. */
+public final class BilinearIntegerSchedule {
+    private BilinearIntegerSchedule() {}
+
+    /** b allows both signs with abs(x) &lt; 2^b. In particular b=0 permits only zero. */
+    public record Profile(List&lt;Integer&gt; leftBits, List&lt;Integer&gt; rightBits) {
+<span class="fc" id="L22">        public Profile {</span>
+<span class="fc" id="L23">            leftBits = List.copyOf(leftBits);</span>
+<span class="fc" id="L24">            rightBits = List.copyOf(rightBits);</span>
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">            if (leftBits.isEmpty() || rightBits.isEmpty()) throw new IllegalArgumentException(&quot;EMPTY_INPUT_PROFILE&quot;);</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            for (int bits : leftBits) checkWidth(bits);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (int bits : rightBits) checkWidth(bits);</span>
+<span class="fc" id="L28">        }</span>
+
+        private static void checkWidth(int bits) {
+<span class="pc bpc" id="L31" title="2 of 4 branches missed.">            if (bits &lt; 0 || bits &gt; IterationLimits.MAX_RUNTIME_BITS)</span>
+<span class="nc" id="L32">                throw new IllegalArgumentException(&quot;INVALID_MAGNITUDE_WIDTH&quot;);</span>
+<span class="fc" id="L33">        }</span>
+
+<span class="fc" id="L35">        public long retainedCells() { return 2L + leftBits.size() + rightBits.size(); }</span>
+    }
+
+<span class="fc" id="L38">    public enum Op { ADD, SUBTRACT, NEGATE, SCALE, MULTIPLY }</span>
+
+    /** Left and right are slot indices. Only SCALE uses coefficient; unary operations have right=-1. */
+<span class="fc" id="L41">    public record Step(Op op, int left, int right, BigInteger coefficient) {}</span>
+
+    /**
+     * limbWork counts modeled arithmetic plus result-magnitude writes in 32-bit words.
+     * Products use schoolbook width products. Each operation materializes one modeled object.
+     * NEGATE can share its magnitude. These counts describe a schedule, not JVM allocations.
+     */
+<span class="fc" id="L48">    public record Cost(long limbWork, long allocatedWords, long allocatedObjects,</span>
+                       long variableProducts) implements Comparable&lt;Cost&gt; {
+        @Override public int compareTo(Cost other) {
+<span class="fc" id="L51">            int order = Long.compare(limbWork, other.limbWork);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            if (order == 0) order = Long.compare(allocatedWords, other.allocatedWords);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            if (order == 0) order = Long.compare(allocatedObjects, other.allocatedObjects);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (order == 0) order = Long.compare(variableProducts, other.variableProducts);</span>
+<span class="fc" id="L55">            return order;</span>
+        }
+    }
+
+    /** Slots hold the left then right inputs, zero, and one result for each successive step. */
+    public static final class Plan {
+        private final Profile profile;
+        private final List&lt;Step&gt; steps;
+        private final List&lt;Integer&gt; outputs;
+        private final List&lt;Integer&gt; magnitudeBits;
+        private final Cost cost;
+        private final long retainedCells;
+
+<span class="fc" id="L68">        private Plan(Builder builder, List&lt;Integer&gt; outputs) {</span>
+<span class="fc" id="L69">            this.profile = builder.profile;</span>
+<span class="fc" id="L70">            this.steps = List.copyOf(builder.steps);</span>
+<span class="fc" id="L71">            this.outputs = List.copyOf(outputs);</span>
+<span class="fc" id="L72">            this.magnitudeBits = List.copyOf(builder.bits);</span>
+<span class="fc" id="L73">            this.cost = new Cost(builder.limbWork, builder.allocatedWords, steps.size(), builder.products);</span>
+<span class="fc" id="L74">            this.retainedCells = 7L + magnitudeBits.size() + outputs.size() + 6L * steps.size() + builder.coefficientWords;</span>
+<span class="fc" id="L75">        }</span>
+
+<span class="nc" id="L77">        public Profile profile() { return profile; }</span>
+<span class="fc" id="L78">        public int zeroSlot() { return profile.leftBits().size() + profile.rightBits().size(); }</span>
+<span class="fc" id="L79">        public List&lt;Step&gt; steps() { return steps; }</span>
+<span class="fc" id="L80">        public List&lt;Integer&gt; outputs() { return outputs; }</span>
+<span class="fc" id="L81">        public List&lt;Integer&gt; magnitudeBits() { return magnitudeBits; }</span>
+<span class="fc" id="L82">        public Cost cost() { return cost; }</span>
+        /** Additional cells beyond the immutable profile shared with the caller. */
+<span class="fc" id="L84">        public long retainedCells() { return retainedCells; }</span>
+    }
+
+    public static Result&lt;Plan&gt; plan(BilinearProgram program, Profile profile, IterationLimits limits,
+                                    BooleanSupplier cancellation) {
+<span class="fc" id="L89">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L90">            long cells = profile.retainedCells() + BilinearProgram.matrixCells(program.u())</span>
+<span class="fc" id="L91">                + BilinearProgram.matrixCells(program.v()) + BilinearProgram.matrixCells(program.w());</span>
+<span class="fc" id="L92">            return plan(program, profile, cells, work);</span>
+        });
+    }
+
+    /** Caller includes program, profile, and all other live portfolio data in retained. */
+    static Plan plan(BilinearProgram program, Profile profile, long retained, CertificateWork work) {
+<span class="fc" id="L98">        work.cells(retained);</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">        if (program.u().size() != program.v().size() || program.w().isEmpty())</span>
+<span class="nc" id="L100">            throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
+<span class="fc" id="L101">        var builder = new Builder(profile, program, retained, work);</span>
+<span class="fc" id="L102">        return builder.lower(program);</span>
+    }
+
+    /** Executes the exact schedule after checking the profiled magnitude of each signed input. */
+    public static Result&lt;List&lt;BigInteger&gt;&gt; evaluate(Plan plan, List&lt;BigInteger&gt; left, List&lt;BigInteger&gt; right,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L108">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">            if (left.size() != plan.profile.leftBits().size() || right.size() != plan.profile.rightBits().size())</span>
+<span class="fc" id="L110">                throw new Rejection(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+<span class="fc" id="L111">            long retained = plan.retainedCells() + plan.profile.retainedCells() + plan.magnitudeBits.size()</span>
+<span class="fc" id="L112">                + 2L * plan.outputs.size() + left.size() + right.size();</span>
+<span class="fc" id="L113">            work.cells(retained);</span>
+<span class="fc" id="L114">            var slots = new ArrayList&lt;BigInteger&gt;(plan.magnitudeBits.size());</span>
+<span class="fc" id="L115">            retained = addInputs(slots, left, plan.profile.leftBits(), retained, work);</span>
+<span class="fc" id="L116">            retained = addInputs(slots, right, plan.profile.rightBits(), retained, work);</span>
+<span class="fc" id="L117">            slots.add(BigInteger.ZERO);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (Step step : plan.steps) {</span>
+<span class="fc" id="L119">                var a = slots.get(step.left());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                var b = step.right() &gt;= 0 ? slots.get(step.right()) : step.coefficient();</span>
+<span class="fc" id="L121">                int aBits = magnitudeBits(a), bBits = magnitudeBits(b);</span>
+<span class="fc" id="L122">                int bound = resultBits(step.op(), aBits, bBits, step.coefficient());</span>
+<span class="fc" id="L123">                work.cells(retained + words(bound) + 1);</span>
+<span class="fc" id="L124">                work.charge(arithmeticWork(step.op(), aBits, bBits));</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">                var value = switch (step.op()) {</span>
+<span class="fc" id="L126">                    case ADD -&gt; a.add(b);</span>
+<span class="fc" id="L127">                    case SUBTRACT -&gt; a.subtract(b);</span>
+<span class="fc" id="L128">                    case NEGATE -&gt; a.negate();</span>
+<span class="fc" id="L129">                    case SCALE, MULTIPLY -&gt; a.multiply(b);</span>
+                };
+<span class="fc" id="L131">                slots.add(work.check(value));</span>
+<span class="fc" id="L132">                retained += words(magnitudeBits(value)) + 1;</span>
+<span class="fc" id="L133">            }</span>
+<span class="fc" id="L134">            work.charge(plan.outputs.size());</span>
+<span class="fc" id="L135">            var results = new ArrayList&lt;BigInteger&gt;(plan.outputs.size());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            for (int slot : plan.outputs) results.add(slots.get(slot));</span>
+<span class="fc" id="L137">            return List.copyOf(results);</span>
+        });
+    }
+
+    private static long addInputs(List&lt;BigInteger&gt; slots, List&lt;BigInteger&gt; inputs, List&lt;Integer&gt; bounds,
+                                  long retained, CertificateWork work) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int i = 0; i &lt; inputs.size(); i++) {</span>
+<span class="fc" id="L144">            var value = Objects.requireNonNull(inputs.get(i));</span>
+<span class="fc" id="L145">            int bits = magnitudeBits(value);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (bits &gt; bounds.get(i)) throw new Rejection(&quot;INPUT_OUTSIDE_PROFILE&quot;);</span>
+<span class="fc" id="L147">            retained += words(bits);</span>
+<span class="fc" id="L148">            work.cells(retained);</span>
+<span class="fc" id="L149">            slots.add(work.check(value));</span>
+        }
+<span class="fc" id="L151">        return retained;</span>
+    }
+
+    // Unlike BigInteger.bitLength(), this includes the magnitude bit of negative powers of two.
+<span class="fc" id="L155">    private static int magnitudeBits(BigInteger value) { return value.abs().bitLength(); }</span>
+
+<span class="fc" id="L157">    private static long words(int bits) { return (bits + 31L) / 32; }</span>
+
+    private static long arithmeticWork(Op op, int a, int b) {
+<span class="fc bfc" id="L160" title="All 3 branches covered.">        return switch (op) {</span>
+<span class="fc" id="L161">            case ADD, SUBTRACT -&gt; Math.max(1, words(Math.max(a, b)));</span>
+<span class="fc" id="L162">            case NEGATE -&gt; 1;</span>
+<span class="fc" id="L163">            case SCALE, MULTIPLY -&gt; Math.max(1, words(a) * words(b));</span>
+        };
+    }
+
+    private static int resultBits(Op op, int a, int b, BigInteger coefficient) {
+<span class="fc bfc" id="L168" title="All 4 branches covered.">        return switch (op) {</span>
+<span class="fc" id="L169">            case NEGATE -&gt; a;</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            case ADD, SUBTRACT -&gt; Math.min(a, b) == 0 ? Math.max(a, b) : Math.max(a, b) + 1;</span>
+            case SCALE -&gt; {
+<span class="fc" id="L172">                int shift = coefficient.getLowestSetBit();</span>
+<span class="fc bfc" id="L173" title="All 4 branches covered.">                yield a == 0 ? 0 : a + (shift == b - 1 ? shift : b);</span>
+            }
+<span class="fc bfc" id="L175" title="All 4 branches covered.">            case MULTIPLY -&gt; Math.min(a, b) &lt;= 1 ? (Math.min(a, b) == 0 ? 0 : Math.max(a, b)) : a + b;</span>
+        };
+    }
+
+    /** A negative term denotes minus the value in its slot until the sign is absorbed by another operation. */
+<span class="fc" id="L180">    private record Term(int slot, boolean negative) {}</span>
+
+    private static final class Builder {
+        private final Profile profile;
+        private final CertificateWork work;
+        private final long fixedCells;
+<span class="fc" id="L186">        private final ArrayList&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L187">        private final ArrayList&lt;Integer&gt; bits = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L188">        private final HashMap&lt;Step, Integer&gt; available = new HashMap&lt;&gt;();</span>
+        private final int zeroSlot;
+        private long limbWork;
+        private long allocatedWords;
+        private long coefficientWords;
+        private long products;
+
+<span class="fc" id="L195">        Builder(Profile profile, BilinearProgram program, long retained, CertificateWork work) {</span>
+<span class="fc" id="L196">            this.profile = profile;</span>
+<span class="fc" id="L197">            this.work = work;</span>
+<span class="fc" id="L198">            int rank = program.u().size();</span>
+<span class="fc" id="L199">            int inputs = Math.addExact(profile.leftBits().size(), profile.rightBits().size());</span>
+<span class="fc" id="L200">            int longest = Math.max(rank, Math.max(profile.leftBits().size(), profile.rightBits().size()));</span>
+            // Input, product and output terms, a temporary priority queue and the final immutable snapshots.
+<span class="fc" id="L202">            this.fixedCells = retained + 2L * inputs + 3L * rank + 3L * program.w().size() + 5L * longest + 12;</span>
+<span class="fc" id="L203">            work.cells(fixedCells);</span>
+<span class="fc" id="L204">            work.charge(inputs);</span>
+<span class="fc" id="L205">            bits.addAll(profile.leftBits());</span>
+<span class="fc" id="L206">            bits.addAll(profile.rightBits());</span>
+<span class="fc" id="L207">            zeroSlot = bits.size();</span>
+<span class="fc" id="L208">            bits.add(0);</span>
+<span class="fc" id="L209">        }</span>
+
+        Plan lower(BilinearProgram program) {
+<span class="fc" id="L212">            var products = new ArrayList&lt;Term&gt;(program.u().size());</span>
+<span class="fc" id="L213">            int rightOffset = profile.leftBits().size();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            for (int p = 0; p &lt; program.u().size(); p++) {</span>
+<span class="fc" id="L215">                var left = form(program.u().get(p), null, 0, rightOffset);</span>
+<span class="fc" id="L216">                var right = form(program.v().get(p), null, rightOffset, profile.rightBits().size());</span>
+<span class="pc bpc" id="L217" title="2 of 4 branches missed.">                int slot = left.slot() == zeroSlot || right.slot() == zeroSlot</span>
+<span class="pc" id="L218">                    ? zeroSlot : emit(Op.MULTIPLY, left.slot(), right.slot(), BigInteger.ONE);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                products.add(new Term(slot, left.negative() != right.negative()));</span>
+            }
+<span class="fc" id="L221">            var outputs = new ArrayList&lt;Integer&gt;(program.w().size());</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (var row : program.w()) {</span>
+<span class="fc" id="L223">                var value = form(row, products, 0, products.size());</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                outputs.add(value.negative() ? emit(Op.NEGATE, value.slot(), -1, BigInteger.ONE) : value.slot());</span>
+<span class="fc" id="L225">            }</span>
+<span class="fc" id="L226">            work.charge(bits.size() + (long) outputs.size() + steps.size());</span>
+<span class="fc" id="L227">            return new Plan(this, outputs);</span>
+        }
+
+        private Term form(List&lt;ExactRational&gt; coefficients, List&lt;Term&gt; terms, int offset, int width) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (coefficients.size() != width) throw new Rejection(&quot;PROGRAM_SHAPE&quot;);</span>
+<span class="fc" id="L232">            var queue = new PriorityQueue&lt;Term&gt;((a, b) -&gt; {</span>
+<span class="fc" id="L233">                work.charge(1);</span>
+<span class="fc" id="L234">                int order = Integer.compare(bits.get(a.slot()), bits.get(b.slot()));</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                if (order == 0) order = Integer.compare(a.slot(), b.slot());</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                if (order == 0) order = Boolean.compare(a.negative(), b.negative());</span>
+<span class="fc" id="L237">                return order;</span>
+            });
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            for (int i = 0; i &lt; width; i++) {</span>
+<span class="fc" id="L240">                var coefficient = work.check(coefficients.get(i));</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                if (!coefficient.denominator().equals(BigInteger.ONE)) throw new Rejection(&quot;NON_INTEGRAL_COEFFICIENT&quot;);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                if (coefficient.isZero()) continue;</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                var source = terms == null ? new Term(offset + i, false) : terms.get(i);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                if (source.slot() == zeroSlot) continue;</span>
+<span class="fc" id="L245">                BigInteger weight = coefficient.numerator();</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                if (source.negative()) weight = weight.negate();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                if (weight.abs().equals(BigInteger.ONE)) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                    queue.add(new Term(source.slot(), weight.signum() &lt; 0));</span>
+                } else {
+<span class="fc" id="L250">                    queue.add(new Term(emit(Op.SCALE, source.slot(), -1, weight), false));</span>
+                }
+            }
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (queue.isEmpty()) return new Term(zeroSlot, false);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            while (queue.size() &gt; 1) queue.add(combine(queue.remove(), queue.remove()));</span>
+<span class="fc" id="L255">            return queue.remove();</span>
+        }
+
+        private Term combine(Term a, Term b) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            if (a.slot() == zeroSlot) return b;</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (b.slot() == zeroSlot) return a;</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (a.negative() == b.negative())</span>
+<span class="fc" id="L262">                return new Term(emit(Op.ADD, a.slot(), b.slot(), BigInteger.ONE), a.negative());</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (a.slot() == b.slot()) return new Term(zeroSlot, false);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            int positive = a.negative() ? b.slot() : a.slot();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            int negative = a.negative() ? a.slot() : b.slot();</span>
+<span class="fc" id="L266">            return new Term(emit(Op.SUBTRACT, positive, negative, BigInteger.ONE), false);</span>
+        }
+
+        private int emit(Op op, int left, int right, BigInteger coefficient) {
+<span class="fc bfc" id="L270" title="All 6 branches covered.">            if ((op == Op.ADD || op == Op.MULTIPLY) &amp;&amp; right &lt; left) {</span>
+<span class="fc" id="L271">                int swap = left;</span>
+<span class="fc" id="L272">                left = right;</span>
+<span class="fc" id="L273">                right = swap;</span>
+            }
+<span class="fc" id="L275">            work.charge(1L + words(magnitudeBits(coefficient)));</span>
+<span class="fc" id="L276">            var step = new Step(op, left, right, coefficient);</span>
+<span class="fc" id="L277">            var existing = available.get(step);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (existing != null) return existing;</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            long storedWords = op == Op.SCALE ? words(magnitudeBits(coefficient)) : 0;</span>
+<span class="fc" id="L280">            work.cells(fixedCells + 14L * (steps.size() + 1) + coefficientWords + storedWords);</span>
+<span class="fc" id="L281">            int a = bits.get(left);</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            int b = right &gt;= 0 ? bits.get(right) : magnitudeBits(coefficient);</span>
+<span class="fc" id="L283">            int bound = resultBits(op, a, b, coefficient);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            long resultWords = op == Op.NEGATE ? 0 : words(bound);</span>
+<span class="fc" id="L285">            limbWork = Math.addExact(limbWork, arithmeticWork(op, a, b) + resultWords);</span>
+<span class="fc" id="L286">            allocatedWords += resultWords;</span>
+<span class="fc" id="L287">            coefficientWords += storedWords;</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (op == Op.MULTIPLY) products++;</span>
+<span class="fc" id="L289">            int slot = bits.size();</span>
+<span class="fc" id="L290">            bits.add(bound);</span>
+<span class="fc" id="L291">            steps.add(step);</span>
+<span class="fc" id="L292">            available.put(step, slot);</span>
+<span class="fc" id="L293">            return slot;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

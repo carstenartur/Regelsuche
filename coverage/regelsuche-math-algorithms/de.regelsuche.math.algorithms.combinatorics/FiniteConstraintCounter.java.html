@@ -65,171 +65,184 @@ public final class FiniteConstraintCounter {
             String reason, long work) {}
 
     public static Result count(Problem problem, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L68">        Objects.requireNonNull(problem);</span>
-<span class="fc" id="L69">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L68">        return count(problem, FiniteConstraintPlanner.Strategy.MIN_DEGREE, limits, cancellation);</span>
+    }
+
+    /** Count in the selected order, including planning and independent replay in the work budget. */
+    public static Result count(Problem problem, FiniteConstraintPlanner.Strategy strategy,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L74">        Objects.requireNonNull(problem);</span>
+<span class="fc" id="L75">        Objects.requireNonNull(strategy);</span>
+<span class="fc" id="L76">        var work = new CertificateWork(limits, cancellation);</span>
         try {
-<span class="fc" id="L71">            long retained = FiniteConstraintSupport.inspect(problem, work);</span>
-<span class="fc" id="L72">            var active = new LinkedHashMap&lt;Integer, Factor&gt;();</span>
-<span class="fc" id="L73">            var history = new ArrayList&lt;Factor&gt;();</span>
-<span class="fc" id="L74">            retained = condition(problem, active, history, retained, work);</span>
-<span class="fc" id="L75">            var steps = new ArrayList&lt;Step&gt;();</span>
-<span class="fc" id="L76">            retained = eliminate(problem, active, history, steps, retained, work);</span>
-<span class="fc" id="L77">            BigInteger total = BigInteger.ONE;</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (Factor factor : active.values()) total = FiniteConstraintSupport.multiply(total, factor.values().get(0), work);</span>
-<span class="fc" id="L79">            Optional&lt;Map&lt;Integer, Boolean&gt;&gt; witness = findWitness(problem, total, history, steps, retained, work);</span>
-<span class="fc" id="L80">            work.cells(retained + steps.size() + 2L * witness.map(Map::size).orElse(0));</span>
-<span class="fc" id="L81">            work.charge(steps.size());</span>
-<span class="fc" id="L82">            var certificate = new Certificate(problem, steps, total, witness);</span>
-<span class="fc" id="L83">            var verification = FiniteConstraintVerifier.verify(problem, certificate, work.remainingLimits(), cancellation);</span>
-<span class="fc" id="L84">            work.charge(verification.work());</span>
-<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (verification.status() == FiniteConstraintVerifier.Status.UNAVAILABLE) throw new CertificateWork.Stop(verification.reason());</span>
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (!verification.valid()) throw new IllegalStateException(&quot;COUNT_CERTIFICATE_REJECTED: &quot; + verification.reason());</span>
-<span class="fc" id="L87">            work.charge(0);</span>
-<span class="fc" id="L88">            return new Result(Status.EXACT, Optional.of(total), Optional.of(certificate), &quot;VERIFIED&quot;, work.used());</span>
-<span class="fc" id="L89">        } catch (CertificateWork.Stop stop) {</span>
-<span class="fc" id="L90">            return new Result(Status.UNAVAILABLE, Optional.empty(), Optional.empty(), stop.getMessage(), work.used());</span>
+<span class="fc" id="L78">            long retained = FiniteConstraintSupport.inspect(problem, work);</span>
+<span class="fc" id="L79">            var active = new LinkedHashMap&lt;Integer, Factor&gt;();</span>
+<span class="fc" id="L80">            var history = new ArrayList&lt;Factor&gt;();</span>
+<span class="fc" id="L81">            retained = condition(problem, active, history, retained, work);</span>
+<span class="fc" id="L82">            var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L83">            retained = eliminate(problem, active, history, steps, strategy, retained, work);</span>
+<span class="fc" id="L84">            BigInteger total = BigInteger.ONE;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (Factor factor : active.values()) total = FiniteConstraintSupport.multiply(total, factor.values().get(0), work);</span>
+<span class="fc" id="L86">            Optional&lt;Map&lt;Integer, Boolean&gt;&gt; witness = findWitness(problem, total, history, steps, retained, work);</span>
+<span class="fc" id="L87">            work.cells(retained + steps.size() + 2L * witness.map(Map::size).orElse(0));</span>
+<span class="fc" id="L88">            work.charge(steps.size());</span>
+<span class="fc" id="L89">            var certificate = new Certificate(problem, steps, total, witness);</span>
+<span class="fc" id="L90">            var verification = FiniteConstraintVerifier.verify(problem, certificate, work.remainingLimits(), cancellation);</span>
+<span class="fc" id="L91">            work.charge(verification.work());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (verification.status() == FiniteConstraintVerifier.Status.UNAVAILABLE) throw new CertificateWork.Stop(verification.reason());</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (!verification.valid()) throw new IllegalStateException(&quot;COUNT_CERTIFICATE_REJECTED: &quot; + verification.reason());</span>
+<span class="fc" id="L94">            work.charge(0);</span>
+<span class="fc" id="L95">            return new Result(Status.EXACT, Optional.of(total), Optional.of(certificate), &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L96">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L97">            return new Result(Status.UNAVAILABLE, Optional.empty(), Optional.empty(), stop.getMessage(), work.used());</span>
         }
     }
 
     private static long condition(Problem problem, Map&lt;Integer, Factor&gt; active, List&lt;Factor&gt; history,
             long retained, CertificateWork work) {
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (Factor source : problem.factors()) {</span>
-<span class="fc" id="L97">            var scope = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">            for (int variable : source.variables()) {</span>
-<span class="fc" id="L99">                work.charge(1);</span>
-<span class="fc bfc" id="L100" title="All 2 branches covered.">                if (!problem.fixed().containsKey(variable)) {</span>
-<span class="fc" id="L101">                    work.cells(retained + scope.size() + 1L);</span>
-<span class="fc" id="L102">                    scope.add(variable);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (Factor source : problem.factors()) {</span>
+<span class="fc" id="L104">            var scope = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (int variable : source.variables()) {</span>
+<span class="fc" id="L106">                work.charge(1);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                if (!problem.fixed().containsKey(variable)) {</span>
+<span class="fc" id="L108">                    work.cells(retained + scope.size() + 1L);</span>
+<span class="fc" id="L109">                    scope.add(variable);</span>
                 }
-<span class="fc" id="L104">            }</span>
-<span class="fc" id="L105">            int size = FiniteConstraintSupport.tableSize(scope.size(), work);</span>
-<span class="fc" id="L106">            retained += size + scope.size() + 2L; // conditioned factor, active entry and historical reference</span>
-<span class="fc" id="L107">            work.cells(retained + size + scope.size());</span>
-<span class="fc" id="L108">            var values = new ArrayList&lt;BigInteger&gt;(size);</span>
-<span class="fc bfc" id="L109" title="All 2 branches covered.">            for (int mask = 0; mask &lt; size; mask++) {</span>
-<span class="fc" id="L110">                int sourceIndex = 0, freeIndex = 0;</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">                for (int i = 0; i &lt; source.variables().size(); i++) {</span>
-<span class="fc" id="L112">                    work.charge(1);</span>
-<span class="fc" id="L113">                    Boolean fixed = problem.fixed().get(source.variables().get(i));</span>
-<span class="fc bfc" id="L114" title="All 4 branches covered.">                    boolean bit = fixed == null ? ((mask &gt;&gt;&gt; freeIndex++) &amp; 1) != 0 : fixed;</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">                    if (bit) sourceIndex |= 1 &lt;&lt; i;</span>
+<span class="fc" id="L111">            }</span>
+<span class="fc" id="L112">            int size = FiniteConstraintSupport.tableSize(scope.size(), work);</span>
+<span class="fc" id="L113">            retained += size + scope.size() + 2L; // conditioned factor, active entry and historical reference</span>
+<span class="fc" id="L114">            work.cells(retained + size + scope.size());</span>
+<span class="fc" id="L115">            var values = new ArrayList&lt;BigInteger&gt;(size);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            for (int mask = 0; mask &lt; size; mask++) {</span>
+<span class="fc" id="L117">                int sourceIndex = 0, freeIndex = 0;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                for (int i = 0; i &lt; source.variables().size(); i++) {</span>
+<span class="fc" id="L119">                    work.charge(1);</span>
+<span class="fc" id="L120">                    Boolean fixed = problem.fixed().get(source.variables().get(i));</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">                    boolean bit = fixed == null ? ((mask &gt;&gt;&gt; freeIndex++) &amp; 1) != 0 : fixed;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    if (bit) sourceIndex |= 1 &lt;&lt; i;</span>
                 }
-<span class="fc" id="L117">                work.charge(1); values.add(source.values().get(sourceIndex));</span>
+<span class="fc" id="L124">                work.charge(1); values.add(source.values().get(sourceIndex));</span>
             }
-<span class="fc" id="L119">            work.charge(2L * (size + scope.size()));</span>
-<span class="fc" id="L120">            Factor conditioned = new Factor(scope, values);</span>
-<span class="fc" id="L121">            work.charge(0);</span>
-<span class="fc" id="L122">            active.put(history.size(), conditioned); history.add(conditioned);</span>
-<span class="fc" id="L123">        }</span>
-<span class="fc" id="L124">        return retained;</span>
+<span class="fc" id="L126">            work.charge(2L * (size + scope.size()));</span>
+<span class="fc" id="L127">            Factor conditioned = new Factor(scope, values);</span>
+<span class="fc" id="L128">            work.charge(0);</span>
+<span class="fc" id="L129">            active.put(history.size(), conditioned); history.add(conditioned);</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        return retained;</span>
     }
 
     private static long eliminate(Problem problem, Map&lt;Integer, Factor&gt; active, List&lt;Factor&gt; history,
-            List&lt;Step&gt; steps, long retained, CertificateWork work) {
-        // Stable ascending order makes the exact certificate deterministic. Width is explicitly bounded.
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (int variable = 0; variable &lt; problem.variableCount(); variable++) {</span>
-<span class="fc" id="L131">            work.charge(1);</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (problem.fixed().containsKey(variable)) continue;</span>
-<span class="fc" id="L133">            var inputs = new ArrayList&lt;Integer&gt;();</span>
-<span class="fc" id="L134">            var union = new TreeSet&lt;Integer&gt;();</span>
-<span class="fc" id="L135">            collectInputs(variable, active, inputs, union, retained, work);</span>
-<span class="fc" id="L136">            int size = FiniteConstraintSupport.tableSize(union.size(), work);</span>
-<span class="fc" id="L137">            retained += size + union.size() + inputs.size() + 3L;</span>
-<span class="fc" id="L138">            work.cells(retained + size + union.size() + inputs.size());</span>
-<span class="fc" id="L139">            work.charge(union.size());</span>
-<span class="fc" id="L140">            var scope = List.copyOf(union);</span>
-<span class="fc" id="L141">            Factor output = sumOut(variable, inputs, scope, active, size, work);</span>
-<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int id : inputs) {</span>
-<span class="fc" id="L143">                work.charge(1);</span>
-<span class="fc" id="L144">                active.remove(id);</span>
-<span class="fc" id="L145">            }</span>
-<span class="fc" id="L146">            active.put(history.size(), output); history.add(output);</span>
-<span class="fc" id="L147">            steps.add(new Step(variable, inputs, output));</span>
-<span class="fc" id="L148">            work.charge(0);</span>
+            List&lt;Step&gt; steps, FiniteConstraintPlanner.Strategy strategy, long retained, CertificateWork work) {
+        // The historical order needs no auxiliary graph or order array.
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        int[] order = strategy == FiniteConstraintPlanner.Strategy.ASCENDING ? null</span>
+<span class="fc" id="L138">            : FiniteConstraintPlanner.order(problem, active.values(), strategy, retained, work);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        int variables = order == null ? problem.variableCount() : order.length;</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        long orderCells = order == null ? 0 : order.length;</span>
+<span class="fc" id="L141">        retained += orderCells;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int position = 0; position &lt; variables; position++) {</span>
+<span class="fc" id="L143">            work.charge(1);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            int variable = order == null ? position : order[position];</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (problem.fixed().containsKey(variable)) continue;</span>
+<span class="fc" id="L146">            var inputs = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L147">            var union = new TreeSet&lt;Integer&gt;();</span>
+<span class="fc" id="L148">            collectInputs(variable, active, inputs, union, retained, work);</span>
+<span class="fc" id="L149">            int size = FiniteConstraintSupport.tableSize(union.size(), work);</span>
+<span class="fc" id="L150">            retained += size + union.size() + inputs.size() + 3L;</span>
+<span class="fc" id="L151">            work.cells(retained + size + union.size() + inputs.size());</span>
+<span class="fc" id="L152">            work.charge(union.size());</span>
+<span class="fc" id="L153">            var scope = List.copyOf(union);</span>
+<span class="fc" id="L154">            Factor output = sumOut(variable, inputs, scope, active, size, work);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int id : inputs) {</span>
+<span class="fc" id="L156">                work.charge(1);</span>
+<span class="fc" id="L157">                active.remove(id);</span>
+<span class="fc" id="L158">            }</span>
+<span class="fc" id="L159">            active.put(history.size(), output); history.add(output);</span>
+<span class="fc" id="L160">            steps.add(new Step(variable, inputs, output));</span>
+<span class="fc" id="L161">            work.charge(0);</span>
         }
-<span class="fc" id="L150">        return retained;</span>
+<span class="fc" id="L163">        return retained - orderCells;</span>
     }
 
     private static void collectInputs(int variable, Map&lt;Integer, Factor&gt; active, List&lt;Integer&gt; inputs,
             TreeSet&lt;Integer&gt; union, long retained, CertificateWork work) {
-<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (var entry : active.entrySet()) {</span>
-<span class="fc" id="L156">            work.charge(1L + entry.getValue().variables().size());</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (entry.getValue().variables().contains(variable)) {</span>
-<span class="fc" id="L158">                work.cells(retained + inputs.size() + union.size() + 1L);</span>
-<span class="fc" id="L159">                inputs.add(entry.getKey());</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">                for (int member : entry.getValue().variables()) {</span>
-<span class="fc" id="L161">                    work.charge(1);</span>
-<span class="fc bfc" id="L162" title="All 4 branches covered.">                    if (member != variable &amp;&amp; !union.contains(member)) {</span>
-<span class="fc" id="L163">                        FiniteConstraintSupport.requireWidth(union.size() + 1);</span>
-<span class="fc" id="L164">                        work.cells(retained + inputs.size() + union.size() + 1L);</span>
-<span class="fc" id="L165">                        union.add(member);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (var entry : active.entrySet()) {</span>
+<span class="fc" id="L169">            work.charge(1L + entry.getValue().variables().size());</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (entry.getValue().variables().contains(variable)) {</span>
+<span class="fc" id="L171">                work.cells(retained + inputs.size() + union.size() + 1L);</span>
+<span class="fc" id="L172">                inputs.add(entry.getKey());</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                for (int member : entry.getValue().variables()) {</span>
+<span class="fc" id="L174">                    work.charge(1);</span>
+<span class="fc bfc" id="L175" title="All 4 branches covered.">                    if (member != variable &amp;&amp; !union.contains(member)) {</span>
+<span class="fc" id="L176">                        FiniteConstraintSupport.requireWidth(union.size() + 1);</span>
+<span class="fc" id="L177">                        work.cells(retained + inputs.size() + union.size() + 1L);</span>
+<span class="fc" id="L178">                        union.add(member);</span>
                     }
-<span class="fc" id="L167">                }</span>
+<span class="fc" id="L180">                }</span>
             }
-<span class="fc" id="L169">        }</span>
-<span class="fc" id="L170">    }</span>
+<span class="fc" id="L182">        }</span>
+<span class="fc" id="L183">    }</span>
 
     private static Factor sumOut(int variable, List&lt;Integer&gt; inputs, List&lt;Integer&gt; scope,
             Map&lt;Integer, Factor&gt; active, int size, CertificateWork work) {
-<span class="fc" id="L174">        var values = new ArrayList&lt;BigInteger&gt;(size);</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (int mask = 0; mask &lt; size; mask++) {</span>
-<span class="fc" id="L176">            BigInteger sum = BigInteger.ZERO;</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (int bit = 0; bit &lt; 2; bit++) {</span>
-<span class="fc" id="L178">                BigInteger product = BigInteger.ONE;</span>
-<span class="fc bfc" id="L179" title="All 2 branches covered.">                for (int id : inputs) {</span>
-<span class="fc" id="L180">                    Factor factor = active.get(id);</span>
-<span class="fc" id="L181">                    int index = 0;</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">                    for (int i = 0; i &lt; factor.variables().size(); i++) {</span>
-<span class="fc" id="L183">                        work.charge(1);</span>
-<span class="fc" id="L184">                        int v = factor.variables().get(i);</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">                        int position = v == variable ? -1 : java.util.Collections.binarySearch(scope, v);</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">                        int value = v == variable ? bit : (mask &gt;&gt;&gt; position) &amp; 1;</span>
-<span class="fc" id="L187">                        index |= value &lt;&lt; i;</span>
+<span class="fc" id="L187">        var values = new ArrayList&lt;BigInteger&gt;(size);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (int mask = 0; mask &lt; size; mask++) {</span>
+<span class="fc" id="L189">            BigInteger sum = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            for (int bit = 0; bit &lt; 2; bit++) {</span>
+<span class="fc" id="L191">                BigInteger product = BigInteger.ONE;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                for (int id : inputs) {</span>
+<span class="fc" id="L193">                    Factor factor = active.get(id);</span>
+<span class="fc" id="L194">                    int index = 0;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    for (int i = 0; i &lt; factor.variables().size(); i++) {</span>
+<span class="fc" id="L196">                        work.charge(1);</span>
+<span class="fc" id="L197">                        int v = factor.variables().get(i);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                        int position = v == variable ? -1 : java.util.Collections.binarySearch(scope, v);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                        int value = v == variable ? bit : (mask &gt;&gt;&gt; position) &amp; 1;</span>
+<span class="fc" id="L200">                        index |= value &lt;&lt; i;</span>
                     }
-<span class="fc" id="L189">                    product = FiniteConstraintSupport.multiply(product, factor.values().get(index), work);</span>
-<span class="fc" id="L190">                }</span>
-<span class="fc" id="L191">                sum = FiniteConstraintSupport.add(sum, product, work);</span>
+<span class="fc" id="L202">                    product = FiniteConstraintSupport.multiply(product, factor.values().get(index), work);</span>
+<span class="fc" id="L203">                }</span>
+<span class="fc" id="L204">                sum = FiniteConstraintSupport.add(sum, product, work);</span>
             }
-<span class="fc" id="L193">            values.add(sum);</span>
+<span class="fc" id="L206">            values.add(sum);</span>
         }
-<span class="fc" id="L195">        work.charge(2L * size + scope.size() + inputs.size());</span>
-<span class="fc" id="L196">        return new Factor(scope, values);</span>
+<span class="fc" id="L208">        work.charge(2L * size + scope.size() + inputs.size());</span>
+<span class="fc" id="L209">        return new Factor(scope, values);</span>
     }
 
     private static Optional&lt;Map&lt;Integer, Boolean&gt;&gt; findWitness(Problem problem, BigInteger total,
             List&lt;Factor&gt; history, List&lt;Step&gt; steps, long retained, CertificateWork work) {
-<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (total.signum() &lt;= 0) return Optional.empty();</span>
-<span class="fc" id="L202">        work.cells(retained + 4L * problem.variableCount());</span>
-<span class="fc" id="L203">        var assignment = new LinkedHashMap&lt;Integer, Boolean&gt;();</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (var entry : problem.fixed().entrySet()) {</span>
-<span class="fc" id="L205">            work.charge(1);</span>
-<span class="fc" id="L206">            assignment.put(entry.getKey(), entry.getValue());</span>
-<span class="fc" id="L207">        }</span>
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (int i = steps.size() - 1; i &gt;= 0; i--) {</span>
-<span class="fc" id="L209">            Step step = steps.get(i);</span>
-<span class="fc" id="L210">            boolean found = false;</span>
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            for (boolean bit : new boolean[] {false, true}) {</span>
-<span class="fc" id="L212">                work.charge(1); assignment.put(step.variable(), bit);</span>
-<span class="fc" id="L213">                boolean possible = true;</span>
-<span class="fc bfc" id="L214" title="All 2 branches covered.">                for (int id : step.inputs()) {</span>
-<span class="fc" id="L215">                    work.charge(1);</span>
-<span class="fc" id="L216">                    Factor factor = history.get(id);</span>
-<span class="fc" id="L217">                    int index = 0;</span>
-<span class="fc bfc" id="L218" title="All 2 branches covered.">                    for (int j = 0; j &lt; factor.variables().size(); j++) {</span>
-<span class="fc" id="L219">                        work.charge(1);</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">                        if (assignment.get(factor.variables().get(j))) index |= 1 &lt;&lt; j;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (total.signum() &lt;= 0) return Optional.empty();</span>
+<span class="fc" id="L215">        work.cells(retained + 4L * problem.variableCount());</span>
+<span class="fc" id="L216">        var assignment = new LinkedHashMap&lt;Integer, Boolean&gt;();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (var entry : problem.fixed().entrySet()) {</span>
+<span class="fc" id="L218">            work.charge(1);</span>
+<span class="fc" id="L219">            assignment.put(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (int i = steps.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L222">            Step step = steps.get(i);</span>
+<span class="fc" id="L223">            boolean found = false;</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            for (boolean bit : new boolean[] {false, true}) {</span>
+<span class="fc" id="L225">                work.charge(1); assignment.put(step.variable(), bit);</span>
+<span class="fc" id="L226">                boolean possible = true;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                for (int id : step.inputs()) {</span>
+<span class="fc" id="L228">                    work.charge(1);</span>
+<span class="fc" id="L229">                    Factor factor = history.get(id);</span>
+<span class="fc" id="L230">                    int index = 0;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                    for (int j = 0; j &lt; factor.variables().size(); j++) {</span>
+<span class="fc" id="L232">                        work.charge(1);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                        if (assignment.get(factor.variables().get(j))) index |= 1 &lt;&lt; j;</span>
                     }
-<span class="fc bfc" id="L222" title="All 2 branches covered.">                    if (factor.values().get(index).signum() == 0) { possible = false; break; }</span>
-<span class="fc" id="L223">                }</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">                if (possible) { found = true; break; }</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                    if (factor.values().get(index).signum() == 0) { possible = false; break; }</span>
+<span class="fc" id="L236">                }</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                if (possible) { found = true; break; }</span>
             }
-<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (!found) throw new IllegalStateException(&quot;INCONSISTENT_COUNT_TRACE&quot;);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">            if (!found) throw new IllegalStateException(&quot;INCONSISTENT_COUNT_TRACE&quot;);</span>
         }
-<span class="fc" id="L228">        return Optional.of(ImmutableIntegerMap.copyOf(assignment, work));</span>
+<span class="fc" id="L241">        return Optional.of(ImmutableIntegerMap.copyOf(assignment, work));</span>
     }
 
     private static void checkVariable(int variable, int count) {
-<span class="pc bpc" id="L232" title="1 of 4 branches missed.">        if (variable &lt; 0 || variable &gt;= count) throw new IllegalArgumentException(&quot;VARIABLE_OUT_OF_RANGE&quot;);</span>
-<span class="fc" id="L233">    }</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        if (variable &lt; 0 || variable &gt;= count) throw new IllegalArgumentException(&quot;VARIABLE_OUT_OF_RANGE&quot;);</span>
+<span class="fc" id="L246">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

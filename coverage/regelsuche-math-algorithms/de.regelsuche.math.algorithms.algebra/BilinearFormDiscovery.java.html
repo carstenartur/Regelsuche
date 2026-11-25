@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearFormDiscovery.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearFormDiscovery.java</span></div><h1>BilinearFormDiscovery.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Result;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Tensor;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Witness;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Discovers rational input forms from the target coefficients without a caller-supplied dictionary. */
+public final class BilinearFormDiscovery {
+    private BilinearFormDiscovery() {}
+
+    /** The generated request can be replayed with the ordinary verifier and evaluator. */
+    public record Discovery(Request request, Witness witness, BilinearRankBound.Certificate lowerBound) {
+<span class="fc" id="L23">        public Discovery {</span>
+<span class="fc" id="L24">            Objects.requireNonNull(request);</span>
+<span class="fc" id="L25">            Objects.requireNonNull(witness);</span>
+<span class="fc" id="L26">            Objects.requireNonNull(lowerBound);</span>
+<span class="fc" id="L27">        }</span>
+    }
+
+    public static Result&lt;Discovery&gt; discover(Tensor tensor, int maximumProducts,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L32">        return BilinearProgram.run(limits, cancellation, work -&gt; discover(tensor, maximumProducts, work));</span>
+    }
+
+    static Discovery discover(Tensor tensor, int maximumProducts, CertificateWork work) {
+<span class="fc" id="L36">        return discover(tensor, maximumProducts, 0, work);</span>
+    }
+
+    static Discovery discover(Tensor tensor, int maximumProducts, long additionalRetained, CertificateWork work) {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (maximumProducts &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_PRODUCT_LIMIT&quot;);</span>
+<span class="fc" id="L41">        long sourceCells = additionalRetained + BilinearProgram.matrixCells(tensor.outputs());</span>
+<span class="fc" id="L42">        work.cells(sourceCells);</span>
+<span class="fc" id="L43">        BilinearProgram.checkEntries(tensor.outputs(), work);</span>
+<span class="fc" id="L44">        var bound = BilinearRankBound.derive(tensor, sourceCells, work);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (bound.lowerBound() &gt; maximumProducts) throw new CertificateWork.Stop(&quot;PRODUCT_LIMIT_BELOW_BOUND&quot;);</span>
+<span class="fc" id="L46">        long extra = additionalRetained + bound.retainedCells();</span>
+
+<span class="fc bfc" id="L48" title="All 4 branches covered.">        if (tensor.outputs().size() == 1 || bound.lowerBound() == 0) {</span>
+<span class="fc" id="L49">            var program = oneMatrixOrZero(tensor, bound.lowerBound(), sourceCells + bound.retainedCells(), work);</span>
+<span class="fc" id="L50">            long factors = BilinearProgram.matrixCells(program.u()) + BilinearProgram.matrixCells(program.v());</span>
+<span class="fc" id="L51">            work.cells(sourceCells + bound.retainedCells() + factors + BilinearProgram.matrixCells(program.w())</span>
+<span class="fc" id="L52">                + 2L * program.u().size());</span>
+<span class="fc" id="L53">            work.charge(2L * program.u().size());</span>
+<span class="fc" id="L54">            var request = new Request(tensor, program.u(), program.v(), maximumProducts);</span>
+<span class="fc" id="L55">            var cost = BilinearProgramVerifier.check(request, program, extra + request.checkInputs(work), work);</span>
+<span class="fc" id="L56">            return new Discovery(request, new Witness(program, cost), bound);</span>
+        }
+
+<span class="fc" id="L59">        var request = generatedRequest(tensor, maximumProducts, sourceCells + bound.retainedCells(), false, work);</span>
+<span class="fc" id="L60">        var witness = BilinearProgramSearch.find(request, bound.lowerBound(), extra, work);</span>
+<span class="fc" id="L61">        return new Discovery(request, witness, bound);</span>
+    }
+
+    static Request generatedRequest(Tensor tensor, int maximumProducts, long retained, boolean integral, CertificateWork work) {
+<span class="fc" id="L65">        return new Forms(tensor, retained, integral, work).request(maximumProducts);</span>
+    }
+
+    // Exact rank factorization for a single matrix: each nonzero pivot removes one rank-one outer product.
+    private static BilinearProgram oneMatrixOrZero(Tensor tensor, int rank, long retained, CertificateWork work) {
+<span class="fc" id="L70">        int height = tensor.leftSize();</span>
+<span class="fc" id="L71">        int width = tensor.rightSize();</span>
+<span class="fc" id="L72">        int cells = tensor.outputs().getFirst().size();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        work.cells(retained + (rank == 0 ? 0 : cells + (long) Math.max(width, height))</span>
+<span class="fc" id="L74">            + rank * (4L + height + width) + (long) tensor.outputs().size() * (2L + rank));</span>
+<span class="fc" id="L75">        var left = new ArrayList&lt;List&lt;ExactRational&gt;&gt;(rank);</span>
+<span class="fc" id="L76">        var right = new ArrayList&lt;List&lt;ExactRational&gt;&gt;(rank);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (rank &gt; 0) {</span>
+<span class="fc" id="L78">            work.charge(cells);</span>
+<span class="fc" id="L79">            var residual = new ArrayList&lt;&gt;(tensor.outputs().getFirst());</span>
+<span class="fc" id="L80">            int pivot = 0;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (int step = 0; step &lt; rank; step++) {</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">                while (pivot &lt; cells &amp;&amp; residual.get(pivot).isZero()) {</span>
+<span class="fc" id="L83">                    work.charge(1);</span>
+<span class="fc" id="L84">                    pivot++;</span>
+                }
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (pivot == cells) throw new IllegalStateException(&quot;RANK_EXCEEDS_MATRIX&quot;);</span>
+<span class="fc" id="L87">                int column = pivot % width;</span>
+<span class="fc" id="L88">                int rowStart = pivot - column;</span>
+<span class="fc" id="L89">                var u = new ArrayList&lt;ExactRational&gt;(height);</span>
+<span class="fc" id="L90">                var v = new ArrayList&lt;ExactRational&gt;(width);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                for (int i = 0; i &lt; height; i++) u.add(work.div(residual.get(i * width + column), residual.get(pivot)));</span>
+<span class="fc" id="L92">                work.charge(width);</span>
+<span class="fc" id="L93">                v.addAll(residual.subList(rowStart, rowStart + width));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                for (int i = 0; i &lt; height; i++) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                    for (int j = 0; j &lt; width; j++) {</span>
+<span class="fc" id="L96">                        int index = i * width + j;</span>
+<span class="fc" id="L97">                        residual.set(index, work.sub(residual.get(index), work.mul(u.get(i), v.get(j))));</span>
+                    }
+                }
+<span class="fc" id="L100">                work.charge((long) height + width);</span>
+<span class="fc" id="L101">                left.add(List.copyOf(u));</span>
+<span class="fc" id="L102">                right.add(List.copyOf(v));</span>
+            }
+        }
+<span class="fc" id="L105">        work.charge(rank * (2L + width + height) + (long) tensor.outputs().size() * (rank + 1L));</span>
+<span class="fc" id="L106">        return new BilinearProgram(left, right,</span>
+<span class="fc" id="L107">            Collections.nCopies(tensor.outputs().size(), Collections.nCopies(rank, ExactRational.ONE)));</span>
+    }
+
+    private static final class Forms {
+        private final Tensor tensor;
+        private final CertificateWork work;
+        private final boolean integral;
+<span class="fc" id="L114">        private final List&lt;List&lt;ExactRational&gt;&gt; left = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L115">        private final List&lt;List&lt;ExactRational&gt;&gt; right = new ArrayList&lt;&gt;();</span>
+        private long retained;
+
+<span class="fc" id="L118">        Forms(Tensor tensor, long sourceCells, boolean integral, CertificateWork work) {</span>
+<span class="fc" id="L119">            this.tensor = tensor;</span>
+<span class="fc" id="L120">            this.integral = integral;</span>
+<span class="fc" id="L121">            this.retained = sourceCells;</span>
+<span class="fc" id="L122">            this.work = work;</span>
+<span class="fc" id="L123">        }</span>
+
+        Request request(int maximumProducts) {
+<span class="fc" id="L126">            int height = tensor.leftSize();</span>
+<span class="fc" id="L127">            int width = tensor.rightSize();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (var output : tensor.outputs()) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                for (int j = 0; j &lt; width; j++) addFiber(left, output, j, width, height);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                for (int i = 0; i &lt; height; i++) addFiber(right, output, i * width, 1, width);</span>
+<span class="fc" id="L131">            }</span>
+<span class="fc" id="L132">            addCoordinateForms(left, height);</span>
+<span class="fc" id="L133">            addCoordinateForms(right, width);</span>
+<span class="fc" id="L134">            work.cells(retained + left.size() + right.size());</span>
+<span class="fc" id="L135">            work.charge((long) left.size() + right.size());</span>
+<span class="fc" id="L136">            return new Request(tensor, left, right, maximumProducts);</span>
+        }
+
+        /** Rational forms have leading coefficient one; integer forms are signed primitive vectors. */
+        private void addFiber(List&lt;List&lt;ExactRational&gt;&gt; forms, List&lt;ExactRational&gt; output,
+                              int start, int stride, int size) {
+<span class="fc" id="L142">            var first = ExactRational.ZERO;</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">            for (int k = 0; k &lt; size &amp;&amp; first.isZero(); k++) {</span>
+<span class="fc" id="L144">                work.charge(1);</span>
+<span class="fc" id="L145">                first = output.get(start + k * stride);</span>
+            }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (first.isZero()) return;</span>
+<span class="fc" id="L148">            var divisor = first;</span>
+<span class="fc bfc" id="L149" title="All 4 branches covered.">            if (integral &amp;&amp; !first.numerator().abs().equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L150">                var content = first.numerator().abs();</span>
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">                for (int k = 0; k &lt; size &amp;&amp; !content.equals(BigInteger.ONE); k++) {</span>
+<span class="fc" id="L152">                    var coefficient = output.get(start + k * stride).numerator();</span>
+<span class="fc" id="L153">                    work.check(coefficient);</span>
+<span class="fc" id="L154">                    work.check(content);</span>
+<span class="fc" id="L155">                    content = work.check(content.gcd(coefficient));</span>
+                }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                divisor = ExactRational.integer(first.numerator().signum() &lt; 0 ? content.negate() : content);</span>
+            }
+<span class="fc" id="L159">            work.cells(retained + size + 1L);</span>
+<span class="fc" id="L160">            var vector = new ArrayList&lt;ExactRational&gt;(size);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            for (int k = 0; k &lt; size; k++) vector.add(work.div(output.get(start + k * stride), divisor));</span>
+<span class="fc" id="L162">            addDistinct(forms, vector);</span>
+<span class="fc" id="L163">        }</span>
+
+        private void addCoordinateForms(List&lt;List&lt;ExactRational&gt;&gt; forms, int size) {
+<span class="fc" id="L166">            work.cells(retained + size + 1L);</span>
+<span class="fc" id="L167">            work.charge(size);</span>
+<span class="fc" id="L168">            var vector = new ArrayList&lt;&gt;(Collections.nCopies(size, ExactRational.ZERO));</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L170">                vector.set(i, ExactRational.ONE);</span>
+<span class="fc" id="L171">                addDistinct(forms, vector);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                for (int j = i + 1; j &lt; size; j++) {</span>
+<span class="fc" id="L173">                    vector.set(j, ExactRational.ONE);</span>
+<span class="fc" id="L174">                    addDistinct(forms, vector);</span>
+<span class="fc" id="L175">                    vector.set(j, ExactRational.NEGATIVE_ONE);</span>
+<span class="fc" id="L176">                    addDistinct(forms, vector);</span>
+<span class="fc" id="L177">                    vector.set(j, ExactRational.ZERO);</span>
+                }
+<span class="fc" id="L179">                vector.set(i, ExactRational.ZERO);</span>
+            }
+<span class="fc" id="L181">        }</span>
+
+        private void addDistinct(List&lt;List&lt;ExactRational&gt;&gt; forms, List&lt;ExactRational&gt; candidate) {
+<span class="fc" id="L184">            long cells = candidate.size() + 1L;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            for (var form : forms) {</span>
+<span class="fc" id="L186">                work.charge(cells);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                if (form.equals(candidate)) return;</span>
+<span class="fc" id="L188">            }</span>
+<span class="fc" id="L189">            work.cells(retained + 2 * cells);</span>
+<span class="fc" id="L190">            work.charge(cells);</span>
+<span class="fc" id="L191">            forms.add(List.copyOf(candidate));</span>
+<span class="fc" id="L192">            retained += cells;</span>
+<span class="fc" id="L193">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

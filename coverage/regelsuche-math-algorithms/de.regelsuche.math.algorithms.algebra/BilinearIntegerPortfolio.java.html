@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearIntegerPortfolio.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearIntegerPortfolio.java</span></div><h1>BilinearIntegerPortfolio.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.algebra.BilinearIntegerSchedule.Plan;
+import de.regelsuche.math.algorithms.algebra.BilinearIntegerSchedule.Profile;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Result;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Tensor;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Witness;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Select a checked integer schedule by its estimated cost at the requested operand widths. */
+public final class BilinearIntegerPortfolio {
+    private BilinearIntegerPortfolio() {}
+
+<span class="fc" id="L23">    public enum Completion { DICTIONARY_EXHAUSTED, SUBSET_LIMIT, CANDIDATE_LIMIT }</span>
+
+<span class="fc" id="L25">    public record Candidate(Request request, Witness witness, Plan schedule) {}</span>
+
+<span class="fc" id="L27">    public record Selection(Candidate selected, Optional&lt;Candidate&gt; direct,</span>
+            Optional&lt;Candidate&gt; preferredWithoutAllocationIncrease, long examinedSubsets,
+            int verifiedCandidates, Completion completion) {
+        /** Replay the selected witness against this request. */
+<span class="fc" id="L31">        public Request request() { return selected.request(); }</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        public boolean complete() { return completion == Completion.DICTIONARY_EXHAUSTED; }</span>
+    }
+
+    public static Result&lt;Selection&gt; select(Tensor tensor, int maximumProducts, int maximumSubsets,
+            int maximumCandidates, Profile profile, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L37" title="3 of 6 branches missed.">        if (maximumSubsets &lt; 0 || maximumProducts &lt; 0 || maximumCandidates &lt; 1)</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(&quot;INVALID_PORTFOLIO_LIMIT&quot;);</span>
+<span class="fc" id="L39">        return BilinearProgram.run(limits, cancellation, work -&gt;</span>
+<span class="fc" id="L40">            new Search(tensor, profile, maximumProducts, maximumSubsets, maximumCandidates, work).run());</span>
+    }
+
+    private static final class Search {
+        private final Tensor tensor;
+        private final Profile profile;
+        private final int maximumProducts;
+        private final int maximumSubsets;
+        private final int maximumCandidates;
+        private final CertificateWork work;
+        private final long sourceCells;
+        private Candidate direct;
+        private Candidate selected;
+        private Candidate guarded;
+        private int examined;
+        private int accepted;
+
+        Search(Tensor tensor, Profile profile, int maximumProducts, int maximumSubsets,
+<span class="fc" id="L58">               int maximumCandidates, CertificateWork work) {</span>
+<span class="fc" id="L59">            this.tensor = tensor;</span>
+<span class="fc" id="L60">            this.profile = profile;</span>
+<span class="fc" id="L61">            this.maximumProducts = maximumProducts;</span>
+<span class="fc" id="L62">            this.maximumSubsets = maximumSubsets;</span>
+<span class="fc" id="L63">            this.maximumCandidates = maximumCandidates;</span>
+<span class="fc" id="L64">            this.work = work;</span>
+<span class="fc" id="L65">            sourceCells = BilinearProgram.matrixCells(tensor.outputs()) + profile.retainedCells();</span>
+<span class="fc" id="L66">        }</span>
+
+        Selection run() {
+<span class="fc" id="L69">            work.cells(sourceCells);</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">            if (profile.leftBits().size() != tensor.leftSize() || profile.rightBits().size() != tensor.rightSize())</span>
+<span class="fc" id="L71">                throw new BilinearProgram.Rejection(&quot;PROFILE_SHAPE&quot;);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (var output : tensor.outputs()) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                for (var value : output) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                    if (!work.check(value).denominator().equals(BigInteger.ONE))</span>
+<span class="fc" id="L75">                        throw new BilinearProgram.Rejection(&quot;NON_INTEGRAL_TENSOR&quot;);</span>
+<span class="fc" id="L76">                }</span>
+<span class="fc" id="L77">            }</span>
+<span class="fc" id="L78">            var baseline = directProgram();</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (baseline != null) {</span>
+<span class="fc" id="L80">                var request = new Request(tensor, baseline.u(), baseline.v(), maximumProducts);</span>
+<span class="fc" id="L81">                direct = evaluate(request, baseline, 0);</span>
+<span class="fc" id="L82">                accepted++;</span>
+<span class="fc" id="L83">                selected = direct;</span>
+<span class="fc" id="L84">                guarded = direct;</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                if (baseline.u().isEmpty()) return finish(Completion.DICTIONARY_EXHAUSTED);</span>
+            }
+<span class="fc" id="L87">            Completion capped = capped();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (capped != null) return finish(capped);</span>
+
+<span class="fc" id="L90">            long base = sourceCells + retained(null);</span>
+<span class="fc" id="L91">            int minimum = BilinearRankBound.derive(tensor, base, work).lowerBound();</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (minimum &gt; maximumProducts) throw new CertificateWork.Stop(&quot;PRODUCT_LIMIT_BELOW_BOUND&quot;);</span>
+<span class="fc" id="L93">            var request = BilinearFormDiscovery.generatedRequest(tensor, maximumProducts, base, true, work);</span>
+<span class="fc" id="L94">            long pairs = (long) request.leftForms().size() * request.rightForms().size();</span>
+<span class="fc" id="L95">            int dimension = tensor.outputs().getFirst().size();</span>
+<span class="fc" id="L96">            int maximum = (int) Math.min(maximumProducts, Math.min(pairs, dimension));</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (int rank = minimum; rank &lt;= maximum; rank++) {</span>
+<span class="fc" id="L98">                work.cells(sourceCells + formsCells(request) + retained(request) + rank);</span>
+<span class="fc" id="L99">                work.charge(rank);</span>
+<span class="fc" id="L100">                long[] subset = new long[rank];</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                for (int p = 0; p &lt; rank; p++) subset[p] = p;</span>
+                do {
+<span class="fc" id="L103">                    capped = capped();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    if (capped != null) return finish(capped);</span>
+<span class="fc" id="L105">                    work.charge(1);</span>
+<span class="fc" id="L106">                    examined++;</span>
+<span class="fc" id="L107">                    long cells = sourceCells + formsCells(request) + retained(request);</span>
+<span class="fc" id="L108">                    var candidate = BilinearProgramSearch.solve(request, subset, cells, work);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                    if (candidate != null) consider(request, candidate, rank);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                } while (BilinearProgramSearch.nextSubset(subset, pairs, work));</span>
+            }
+<span class="fc" id="L112">            return finish(Completion.DICTIONARY_EXHAUSTED);</span>
+        }
+
+        private Completion capped() {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (examined &gt;= maximumSubsets) return Completion.SUBSET_LIMIT;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            return accepted &gt;= maximumCandidates ? Completion.CANDIDATE_LIMIT : null;</span>
+        }
+
+        private Selection finish(Completion reason) {
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (selected == null) throw new CertificateWork.Stop(reason.name());</span>
+<span class="fc" id="L122">            return new Selection(selected, Optional.ofNullable(direct), Optional.ofNullable(guarded),</span>
+                examined, accepted, reason);
+        }
+
+        /** Every nonzero coordinate product appears exactly once, shared by all requiring it. */
+        private BilinearProgram directProgram() {
+<span class="fc" id="L128">            var active = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L129">            int width = tensor.rightSize();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            for (int ij = 0; ij &lt; tensor.outputs().getFirst().size(); ij++) {</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                for (var output : tensor.outputs()) {</span>
+<span class="fc" id="L132">                    work.charge(1);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    if (output.get(ij).isZero()) continue;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                    if (active.size() == maximumProducts) return null;</span>
+<span class="fc" id="L135">                    work.cells(sourceCells + active.size() + 1L);</span>
+<span class="fc" id="L136">                    active.add(ij);</span>
+<span class="fc" id="L137">                    break;</span>
+                }
+            }
+<span class="fc" id="L140">            int rank = active.size();</span>
+<span class="fc" id="L141">            long formCells = (long) rank * (2L + tensor.leftSize() + width);</span>
+<span class="fc" id="L142">            long weights = (long) tensor.outputs().size() * (1L + rank);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            long buffers = rank == 0 ? 0 : Math.max(rank, Math.max(tensor.leftSize(), width));</span>
+<span class="fc" id="L144">            work.cells(sourceCells + formCells + weights + buffers + 5L * rank + tensor.outputs().size());</span>
+<span class="fc" id="L145">            work.charge(formCells + 5L * rank + 2 * weights);</span>
+<span class="fc" id="L146">            var left = new ArrayList&lt;List&lt;ExactRational&gt;&gt;(rank);</span>
+<span class="fc" id="L147">            var right = new ArrayList&lt;List&lt;ExactRational&gt;&gt;(rank);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (int ij : active) {</span>
+<span class="fc" id="L149">                left.add(unit(tensor.leftSize(), ij / width));</span>
+<span class="fc" id="L150">                right.add(unit(width, ij % width));</span>
+<span class="fc" id="L151">            }</span>
+<span class="fc" id="L152">            var outputWeights = new ArrayList&lt;List&lt;ExactRational&gt;&gt;();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (var output : tensor.outputs()) {</span>
+<span class="fc" id="L154">                var row = new ArrayList&lt;ExactRational&gt;(rank);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                for (int ij : active) row.add(output.get(ij));</span>
+<span class="fc" id="L156">                outputWeights.add(List.copyOf(row));</span>
+<span class="fc" id="L157">            }</span>
+<span class="fc" id="L158">            return new BilinearProgram(left, right, outputWeights);</span>
+        }
+
+        private List&lt;ExactRational&gt; unit(int size, int coordinate) {
+<span class="fc" id="L162">            work.charge(size + 1L);</span>
+<span class="fc" id="L163">            var row = new ArrayList&lt;&gt;(Collections.nCopies(size, ExactRational.ZERO));</span>
+<span class="fc" id="L164">            row.set(coordinate, ExactRational.ONE);</span>
+<span class="fc" id="L165">            return List.copyOf(row);</span>
+        }
+
+        private void consider(Request request, BilinearProgram program, int subsetCells) {
+            // A zero output column is a dead product. Its smaller subset is also enumerated.
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (int p = 0; p &lt; program.u().size(); p++) {</span>
+<span class="fc" id="L171">                boolean used = false;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">                for (var row : program.w()) {</span>
+<span class="fc" id="L173">                    work.charge(1);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    if (!row.get(p).isZero()) { used = true; break; }</span>
+<span class="fc" id="L175">                }</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                if (!used) return;</span>
+            }
+<span class="fc bfc" id="L178" title="All 4 branches covered.">            if (direct != null &amp;&amp; program.u().size() == direct.witness().program().u().size()) {</span>
+<span class="fc" id="L179">                work.charge(programCells(program));</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                if (program.equals(direct.witness().program())) return;</span>
+            }
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            for (var matrix : List.of(program.u(), program.v(), program.w())) {</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                for (var row : matrix) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                    for (var coefficient : row) {</span>
+<span class="fc" id="L185">                        work.charge(1);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                        if (!coefficient.denominator().equals(BigInteger.ONE)) return;</span>
+<span class="fc" id="L187">                    }</span>
+<span class="fc" id="L188">                }</span>
+<span class="fc" id="L189">            }</span>
+<span class="fc" id="L190">            var candidate = evaluate(request, program, subsetCells);</span>
+<span class="fc" id="L191">            accepted++;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (cheaper(candidate, selected)) selected = candidate;</span>
+<span class="pc bpc" id="L193" title="1 of 6 branches missed.">            if (direct != null &amp;&amp; withinAllocation(candidate, direct) &amp;&amp; cheaper(candidate, guarded)) guarded = candidate;</span>
+<span class="fc" id="L194">        }</span>
+
+        private Candidate evaluate(Request request, BilinearProgram program, int subsetCells) {
+<span class="fc" id="L197">            long base = sourceCells + formsCells(request) + retained(request) + subsetCells;</span>
+<span class="fc" id="L198">            var outputCost = BilinearProgramVerifier.check(request, program, base, work);</span>
+<span class="fc" id="L199">            var schedule = BilinearIntegerSchedule.plan(program, profile, base + programCells(program), work);</span>
+<span class="fc" id="L200">            return new Candidate(request, new Witness(program, outputCost), schedule);</span>
+        }
+
+        /** Input tensor is shared. Retain each incumbent and each distinct inactive dictionary once. */
+        private long retained(Request active) {
+<span class="fc" id="L205">            long cells = candidateCells(direct);</span>
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">            if (direct != null &amp;&amp; direct.request() != active) cells += formsCells(direct.request());</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (selected != direct) cells += candidateCells(selected);</span>
+<span class="pc bpc" id="L208" title="1 of 4 branches missed.">            if (guarded != direct &amp;&amp; guarded != selected) cells += candidateCells(guarded);</span>
+<span class="fc" id="L209">            return cells;</span>
+        }
+
+        private static long candidateCells(Candidate candidate) {
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            return candidate == null ? 0 : programCells(candidate.witness().program()) + candidate.schedule().retainedCells() + 3;</span>
+        }
+
+        private static long formsCells(Request request) {
+<span class="fc" id="L217">            return BilinearProgram.matrixCells(request.leftForms()) + BilinearProgram.matrixCells(request.rightForms());</span>
+        }
+
+        private static long programCells(BilinearProgram program) {
+<span class="fc" id="L221">            return BilinearProgram.matrixCells(program.u()) + BilinearProgram.matrixCells(program.v())</span>
+<span class="fc" id="L222">                + BilinearProgram.matrixCells(program.w());</span>
+        }
+
+        private static boolean cheaper(Candidate a, Candidate b) {
+<span class="fc bfc" id="L226" title="All 4 branches covered.">            return b == null || a.schedule().cost().compareTo(b.schedule().cost()) &lt; 0;</span>
+        }
+
+        private static boolean withinAllocation(Candidate a, Candidate baseline) {
+<span class="fc" id="L230">            var cost = a.schedule().cost();</span>
+<span class="fc" id="L231">            var directCost = baseline.schedule().cost();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            return cost.allocatedWords() &lt;= directCost.allocatedWords()</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                &amp;&amp; cost.allocatedObjects() &lt;= directCost.allocatedObjects();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

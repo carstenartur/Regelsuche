@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BilinearRankBound.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">BilinearRankBound.java</span></div><h1>BilinearRankBound.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Rejection;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Request;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Result;
+import de.regelsuche.math.algorithms.algebra.BilinearProgram.Tensor;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/**
+ * Lower bounds on the number of rational bilinear products. Every product contributes an
+ * outer product of three vectors, hence at most one matrix rank on each of the three cuts.
+ * A nonzero minor of order r therefore rules out every decomposition with fewer than r
+ * products, including decompositions outside the search dictionary.
+ */
+public final class BilinearRankBound {
+    private BilinearRankBound() {}
+
+    /** The remaining axes become columns, ordered as in the source (output, left, right). */
+<span class="fc" id="L25">    public enum Axis { OUTPUT, LEFT, RIGHT }</span>
+
+    /** Indices are zero-based. Their order fixes the sign of the determinant. */
+    public record Certificate(Tensor source, Axis axis, List&lt;Integer&gt; rows,
+                              List&lt;Integer&gt; columns, ExactRational determinant) {
+<span class="fc" id="L30">        public Certificate {</span>
+<span class="fc" id="L31">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L32">            Objects.requireNonNull(axis);</span>
+<span class="fc" id="L33">            rows = List.copyOf(rows);</span>
+<span class="fc" id="L34">            columns = List.copyOf(columns);</span>
+<span class="fc" id="L35">            Objects.requireNonNull(determinant);</span>
+<span class="fc" id="L36">        }</span>
+
+<span class="fc" id="L38">        public int lowerBound() { return rows.size(); }</span>
+
+        /** Additional retained cells beyond the source tensor. */
+<span class="fc" id="L41">        public long retainedCells() { return 5L + rows.size() + columns.size(); }</span>
+    }
+
+    public static Result&lt;Certificate&gt; compute(Tensor tensor, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L45">        return BilinearProgram.run(limits, cancellation,</span>
+<span class="fc" id="L46">            work -&gt; derive(tensor, checkSource(tensor, work), work));</span>
+    }
+
+    public static Result&lt;Integer&gt; verify(Tensor tensor, Certificate certificate,
+                                         IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L51">        return BilinearProgram.run(limits, cancellation,</span>
+<span class="fc" id="L52">            work -&gt; verifyMinor(tensor, certificate, checkSource(tensor, work), work));</span>
+    }
+
+    /** Bounds on the minimum number of variable products over all rational bilinear programs. */
+    public record Interval(int lowerBound, int upperBound) {
+<span class="fc" id="L57">        public Interval {</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">            if (lowerBound &lt; 0 || lowerBound &gt; upperBound) throw new IllegalArgumentException(&quot;INVALID_PRODUCT_INTERVAL&quot;);</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        public boolean productOptimal() { return lowerBound == upperBound; }</span>
+    }
+
+    /** Replay both certificates from their source before asserting anything about optimality. */
+    public static Result&lt;Interval&gt; certify(Request request, BilinearProgram program, Certificate certificate,
+                                           IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L66">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L67">            long sourceCells = request.checkInputs(work);</span>
+<span class="fc" id="L68">            var tensor = request.tensor();</span>
+<span class="fc" id="L69">            long boundCells = certificate.retainedCells();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (tensor != certificate.source()) boundCells += BilinearProgram.matrixCells(certificate.source().outputs());</span>
+<span class="fc" id="L71">            var cost = BilinearProgramVerifier.check(request, program, sourceCells + boundCells, work);</span>
+<span class="fc" id="L72">            long programCells = BilinearProgram.matrixCells(program.u()) + BilinearProgram.matrixCells(program.v())</span>
+<span class="fc" id="L73">                + BilinearProgram.matrixCells(program.w());</span>
+<span class="fc" id="L74">            int lower = verifyMinor(tensor, certificate, sourceCells + programCells, work);</span>
+<span class="fc" id="L75">            return new Interval(lower, Math.toIntExact(cost.variableMultiplications()));</span>
+        });
+    }
+
+    private static long checkSource(Tensor tensor, CertificateWork work) {
+<span class="fc" id="L80">        long cells = BilinearProgram.matrixCells(tensor.outputs());</span>
+<span class="fc" id="L81">        work.cells(cells);</span>
+<span class="fc" id="L82">        BilinearProgram.checkEntries(tensor.outputs(), work);</span>
+<span class="fc" id="L83">        return cells;</span>
+    }
+
+    /** Caller checked all source entries and includes all already-live data in sourceCells. */
+    static Certificate derive(Tensor tensor, long sourceCells, CertificateWork work) {
+<span class="fc" id="L88">        var best = new Certificate(tensor, Axis.OUTPUT, List.of(), List.of(), ExactRational.ONE);</span>
+<span class="fc" id="L89">        work.cells(sourceCells + best.retainedCells());</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Axis axis : Axis.values()) {</span>
+<span class="fc" id="L91">            int rows = rowCount(tensor, axis);</span>
+<span class="fc" id="L92">            int columns = columnCount(tensor, axis);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (Math.min(rows, columns) &lt;= best.lowerBound()) continue;</span>
+<span class="fc" id="L94">            var candidate = findMinor(tensor, axis, rows, columns, sourceCells + best.retainedCells(), work);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (candidate.lowerBound() &gt; best.lowerBound()) best = candidate;</span>
+        }
+<span class="fc" id="L97">        verifyMinor(tensor, best, sourceCells, work);</span>
+<span class="fc" id="L98">        return best;</span>
+    }
+
+    private static int rowCount(Tensor tensor, Axis axis) {
+<span class="fc bfc" id="L102" title="All 3 branches covered.">        return switch (axis) {</span>
+<span class="fc" id="L103">            case OUTPUT -&gt; tensor.outputs().size();</span>
+<span class="fc" id="L104">            case LEFT -&gt; tensor.leftSize();</span>
+<span class="fc" id="L105">            case RIGHT -&gt; tensor.rightSize();</span>
+        };
+    }
+
+    private static int columnCount(Tensor tensor, Axis axis) {
+<span class="fc bfc" id="L110" title="All 3 branches covered.">        return switch (axis) {</span>
+<span class="fc" id="L111">            case OUTPUT -&gt; tensor.outputs().getFirst().size();</span>
+<span class="fc" id="L112">            case LEFT -&gt; Math.multiplyExact(tensor.outputs().size(), tensor.rightSize());</span>
+<span class="fc" id="L113">            case RIGHT -&gt; Math.multiplyExact(tensor.outputs().size(), tensor.leftSize());</span>
+        };
+    }
+
+    private static ExactRational entry(Tensor tensor, Axis axis, int row, int column) {
+<span class="fc bfc" id="L118" title="All 3 branches covered.">        return switch (axis) {</span>
+<span class="fc" id="L119">            case OUTPUT -&gt; tensor.outputs().get(row).get(column);</span>
+<span class="fc" id="L120">            case LEFT -&gt; tensor.outputs().get(column / tensor.rightSize())</span>
+<span class="fc" id="L121">                .get(row * tensor.rightSize() + column % tensor.rightSize());</span>
+<span class="fc" id="L122">            case RIGHT -&gt; tensor.outputs().get(column / tensor.leftSize())</span>
+<span class="fc" id="L123">                .get((column % tensor.leftSize()) * tensor.rightSize() + row);</span>
+        };
+    }
+
+    // Gaussian row elimination selects an independent minor and keeps original row identities.
+    private static Certificate findMinor(Tensor tensor, Axis axis, int rows, int columns,
+                                         long retained, CertificateWork work) {
+<span class="fc" id="L130">        int capacity = Math.min(rows, columns);</span>
+<span class="fc" id="L131">        work.cells(retained + (long) rows * (2L + columns) + 4L * capacity + 6);</span>
+<span class="fc" id="L132">        var matrix = new ExactRational[rows][columns];</span>
+<span class="fc" id="L133">        var originalRow = new int[rows];</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc" id="L135">            work.charge(1L + columns);</span>
+<span class="fc" id="L136">            originalRow[i] = i;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (int j = 0; j &lt; columns; j++) matrix[i][j] = entry(tensor, axis, i, j);</span>
+        }
+<span class="fc" id="L139">        var pivotRows = new ArrayList&lt;Integer&gt;(capacity);</span>
+<span class="fc" id="L140">        var pivotColumns = new ArrayList&lt;Integer&gt;(capacity);</span>
+<span class="fc" id="L141">        var determinant = ExactRational.ONE;</span>
+<span class="fc bfc" id="L142" title="All 4 branches covered.">        for (int j = 0; j &lt; columns &amp;&amp; pivotRows.size() &lt; rows; j++) {</span>
+<span class="fc" id="L143">            int k = pivotRows.size();</span>
+<span class="fc" id="L144">            int pivot = k;</span>
+<span class="fc bfc" id="L145" title="All 4 branches covered.">            while (pivot &lt; rows &amp;&amp; matrix[pivot][j].isZero()) {</span>
+<span class="fc" id="L146">                work.charge(1);</span>
+<span class="fc" id="L147">                pivot++;</span>
+            }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (pivot == rows) continue;</span>
+            // In the order reported in pivotRows, no determinant sign correction is needed.
+<span class="fc" id="L151">            var pivotRow = matrix[pivot];</span>
+<span class="fc" id="L152">            matrix[pivot] = matrix[k];</span>
+<span class="fc" id="L153">            matrix[k] = pivotRow;</span>
+<span class="fc" id="L154">            pivotRows.add(originalRow[pivot]);</span>
+<span class="fc" id="L155">            originalRow[pivot] = originalRow[k];</span>
+<span class="fc" id="L156">            pivotColumns.add(j);</span>
+<span class="fc" id="L157">            determinant = work.mul(determinant, pivotRow[j]);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            for (int i = k + 1; i &lt; rows; i++) {</span>
+<span class="fc" id="L159">                work.charge(1);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                if (matrix[i][j].isZero()) continue;</span>
+<span class="fc" id="L161">                var factor = work.div(matrix[i][j], pivotRow[j]);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                for (int c = j + 1; c &lt; columns; c++)</span>
+<span class="fc" id="L163">                    matrix[i][c] = work.sub(matrix[i][c], work.mul(factor, pivotRow[c]));</span>
+            }
+        }
+<span class="fc" id="L166">        return new Certificate(tensor, axis, pivotRows, pivotColumns, determinant);</span>
+    }
+
+    private static int verifyMinor(Tensor tensor, Certificate certificate, long retained, CertificateWork work) {
+<span class="fc" id="L170">        int size = certificate.lowerBound();</span>
+<span class="fc" id="L171">        Axis axis = certificate.axis();</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">        if (certificate.columns().size() != size || size &gt; Math.min(rowCount(tensor, axis), columnCount(tensor, axis)))</span>
+<span class="fc" id="L173">            throw new Rejection(&quot;MINOR_SHAPE&quot;);</span>
+<span class="fc" id="L174">        retained += certificate.retainedCells();</span>
+<span class="fc" id="L175">        retained = checkBoundSource(tensor, certificate.source(), retained, work);</span>
+<span class="fc" id="L176">        work.cells(retained + (long) size * (1L + size));</span>
+<span class="fc" id="L177">        work.check(certificate.determinant());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (certificate.determinant().isZero()) throw new Rejection(&quot;ZERO_DETERMINANT&quot;);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L180">            work.charge(1);</span>
+<span class="fc" id="L181">            int r = certificate.rows().get(i), c = certificate.columns().get(i);</span>
+<span class="pc bpc" id="L182" title="2 of 8 branches missed.">            if (r &lt; 0 || r &gt;= rowCount(tensor, axis) || c &lt; 0 || c &gt;= columnCount(tensor, axis))</span>
+<span class="fc" id="L183">                throw new Rejection(&quot;MINOR_INDEX&quot;);</span>
+        }
+<span class="fc" id="L185">        var minor = new ExactRational[size][size];</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L187">            work.charge(size);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (int j = 0; j &lt; size; j++)</span>
+<span class="fc" id="L189">                minor[i][j] = entry(tensor, axis, certificate.rows().get(i), certificate.columns().get(j));</span>
+        }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (!determinant(minor, work).equals(certificate.determinant()))</span>
+<span class="fc" id="L192">            throw new Rejection(&quot;DETERMINANT_MISMATCH&quot;);</span>
+<span class="fc" id="L193">        return size;</span>
+    }
+
+    private static long checkBoundSource(Tensor expected, Tensor claimed, long retained, CertificateWork work) {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (expected == claimed) return retained;</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (expected.leftSize() != claimed.leftSize() || expected.rightSize() != claimed.rightSize()</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            || expected.outputs().size() != claimed.outputs().size()) throw new Rejection(&quot;TENSOR_MISMATCH&quot;);</span>
+<span class="fc" id="L200">        retained += BilinearProgram.matrixCells(claimed.outputs());</span>
+<span class="fc" id="L201">        work.cells(retained);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int k = 0; k &lt; expected.outputs().size(); k++) {</span>
+<span class="fc" id="L203">            var expectedRow = expected.outputs().get(k);</span>
+<span class="fc" id="L204">            var claimedRow = claimed.outputs().get(k);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (int i = 0; i &lt; expectedRow.size(); i++)</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (!expectedRow.get(i).equals(work.check(claimedRow.get(i)))) throw new Rejection(&quot;TENSOR_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L208">        return retained;</span>
+    }
+
+    // Replay only the claimed square minor from its original entries, using Bareiss elimination.
+    private static ExactRational determinant(ExactRational[][] minor, CertificateWork work) {
+<span class="fc" id="L213">        int size = minor.length;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (size == 0) return ExactRational.ONE;</span>
+<span class="fc" id="L215">        var previous = ExactRational.ONE;</span>
+<span class="fc" id="L216">        boolean negative = false;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int k = 0; k &lt; size - 1; k++) {</span>
+<span class="fc" id="L218">            int pivot = k;</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">            while (pivot &lt; size &amp;&amp; minor[pivot][k].isZero()) {</span>
+<span class="fc" id="L220">                work.charge(1);</span>
+<span class="fc" id="L221">                pivot++;</span>
+            }
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (pivot == size) return ExactRational.ZERO;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            if (pivot != k) {</span>
+<span class="fc" id="L225">                var swap = minor[k];</span>
+<span class="fc" id="L226">                minor[k] = minor[pivot];</span>
+<span class="fc" id="L227">                minor[pivot] = swap;</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                negative = !negative;</span>
+            }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            for (int i = k + 1; i &lt; size; i++) {</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                for (int j = k + 1; j &lt; size; j++) {</span>
+<span class="fc" id="L232">                    var value = work.sub(work.mul(minor[k][k], minor[i][j]), work.mul(minor[i][k], minor[k][j]));</span>
+<span class="fc" id="L233">                    minor[i][j] = work.div(value, previous);</span>
+                }
+            }
+<span class="fc" id="L236">            previous = minor[k][k];</span>
+        }
+<span class="fc" id="L238">        var value = minor[size - 1][size - 1];</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        return negative ? work.sub(ExactRational.ZERO, value) : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

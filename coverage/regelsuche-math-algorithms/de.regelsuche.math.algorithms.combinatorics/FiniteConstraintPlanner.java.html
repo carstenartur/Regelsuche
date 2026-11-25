@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FiniteConstraintPlanner.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">FiniteConstraintPlanner.java</span></div><h1>FiniteConstraintPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Factor;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter.Problem;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.TreeSet;
+
+/** Deterministic elimination orders on the graph of conditioned factor scopes. */
+public final class FiniteConstraintPlanner {
+    /** Min-fill breaks ties by remaining degree; both graph heuristics break final ties by original variable ID. */
+<span class="fc" id="L14">    public enum Strategy { ASCENDING, MIN_DEGREE, MIN_FILL }</span>
+
+    private final ArrayList&lt;TreeSet&lt;Integer&gt;&gt; graph;
+    private final TreeSet&lt;Integer&gt; remaining;
+    private final CertificateWork work;
+    private final long baseCells;
+    private long adjacencyEntries;
+
+<span class="fc" id="L22">    private FiniteConstraintPlanner(Problem problem, long baseCells, CertificateWork work) {</span>
+<span class="fc" id="L23">        this.work = work;</span>
+<span class="fc" id="L24">        this.baseCells = baseCells;</span>
+<span class="fc" id="L25">        work.cells(baseCells);</span>
+<span class="fc" id="L26">        graph = new ArrayList&lt;&gt;(problem.variableCount());</span>
+<span class="fc" id="L27">        remaining = new TreeSet&lt;&gt;(Comparator.&lt;Integer&gt;comparingInt(v -&gt; graph.get(v).size())</span>
+<span class="fc" id="L28">            .thenComparingInt(Integer::intValue));</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (int v = 0; v &lt; problem.variableCount(); v++) {</span>
+<span class="fc" id="L30">            work.charge(1);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            graph.add(problem.fixed().containsKey(v) ? null : new TreeSet&lt;&gt;());</span>
+        }
+<span class="fc" id="L33">    }</span>
+
+    /** Returns null for the ascending order when conditioning leaves only isolated vertices. */
+    static int[] order(Problem problem, Collection&lt;Factor&gt; conditioned, Strategy strategy,
+            long retained, CertificateWork work) {
+<span class="fc" id="L38">        work.charge(0);</span>
+<span class="fc" id="L39">        boolean hasEdge = false;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (Factor factor : conditioned) {</span>
+<span class="fc" id="L41">            work.charge(1);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (factor.variables().size() &gt; 1) {</span>
+<span class="fc" id="L43">                hasEdge = true;</span>
+<span class="fc" id="L44">                break;</span>
+            }
+<span class="fc" id="L46">        }</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (!hasEdge) return null;</span>
+<span class="fc" id="L48">        int free = problem.variableCount() - problem.fixed().size();</span>
+        // Graph slots, free-vertex sets, ordered candidate entries and output order coexist.
+<span class="fc" id="L50">        var planner = new FiniteConstraintPlanner(problem, retained + problem.variableCount() + 3L * free, work);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (Factor factor : conditioned) {</span>
+<span class="fc" id="L52">            var scope = factor.variables();</span>
+<span class="fc" id="L53">            work.charge(1L + scope.size());</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            for (int i = 0; i &lt; scope.size(); i++) {</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                for (int j = i + 1; j &lt; scope.size(); j++) planner.connect(scope.get(i), scope.get(j));</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (int v = 0; v &lt; problem.variableCount(); v++) {</span>
+<span class="fc" id="L59">            work.charge(1);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (planner.graph.get(v) != null) planner.insertCandidate(v);</span>
+        }
+<span class="fc" id="L62">        var order = new int[free];</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i = 0; i &lt; free; i++) {</span>
+<span class="fc" id="L64">            int variable = planner.choose(strategy);</span>
+<span class="fc" id="L65">            planner.eliminate(variable);</span>
+<span class="fc" id="L66">            order[i] = variable;</span>
+        }
+<span class="fc" id="L68">        return order;</span>
+    }
+
+    private int choose(Strategy strategy) {
+        // Degrees change only for the neighbors of the selected vertex.
+<span class="fc" id="L73">        work.charge(treeWork(remaining.size()));</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (strategy == Strategy.MIN_DEGREE) return remaining.first();</span>
+<span class="fc" id="L75">        int selected = -1;</span>
+<span class="fc" id="L76">        long bestScore = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int v : remaining) {</span>
+<span class="fc" id="L78">            work.charge(1);</span>
+<span class="fc" id="L79">            long score = fillCount(graph.get(v), bestScore);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (score &lt; bestScore) {</span>
+<span class="fc" id="L81">                selected = v;</span>
+<span class="fc" id="L82">                bestScore = score;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                if (score == 0) break;</span>
+            }
+<span class="fc" id="L85">        }</span>
+<span class="fc" id="L86">        return selected;</span>
+    }
+
+    /** A search-tree access is charged against a logarithmic size bound. */
+    private static long treeWork(int size) {
+<span class="fc" id="L91">        return 1L + 2L * (Integer.SIZE - Integer.numberOfLeadingZeros(size));</span>
+    }
+
+    private void insertCandidate(int v) {
+<span class="fc" id="L95">        work.charge(treeWork(remaining.size()));</span>
+<span class="fc" id="L96">        remaining.add(v);</span>
+<span class="fc" id="L97">    }</span>
+
+    private void removeCandidate(int v) {
+<span class="fc" id="L100">        work.charge(treeWork(remaining.size()));</span>
+<span class="fc" id="L101">        remaining.remove(v);</span>
+<span class="fc" id="L102">    }</span>
+
+    private long fillCount(TreeSet&lt;Integer&gt; neighbors, long cutoff) {
+<span class="fc" id="L105">        long missing = 0;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int left : neighbors) {</span>
+<span class="fc" id="L107">            work.charge(treeWork(neighbors.size()));</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int right : neighbors.tailSet(left, false)) {</span>
+<span class="fc" id="L109">                work.charge(treeWork(graph.get(left).size()));</span>
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">                if (!graph.get(left).contains(right) &amp;&amp; ++missing &gt; cutoff) return missing;</span>
+<span class="fc" id="L111">            }</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        return missing;</span>
+    }
+
+    private void eliminate(int variable) {
+<span class="fc" id="L117">        var neighbors = graph.get(variable);</span>
+<span class="fc" id="L118">        FiniteConstraintSupport.requireWidth(neighbors.size());</span>
+<span class="fc" id="L119">        removeCandidate(variable);</span>
+        // Remove every affected key before its comparator-visible degree changes.
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int v : neighbors) removeCandidate(v);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (int v : neighbors) {</span>
+<span class="fc" id="L123">            work.charge(treeWork(graph.get(v).size()));</span>
+<span class="fc" id="L124">            graph.get(v).remove(variable);</span>
+<span class="fc" id="L125">            adjacencyEntries--;</span>
+<span class="fc" id="L126">        }</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int left : neighbors) {</span>
+<span class="fc" id="L128">            work.charge(treeWork(neighbors.size()));</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (int right : neighbors.tailSet(left, false)) connect(left, right);</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int v : neighbors) insertCandidate(v);</span>
+<span class="fc" id="L132">        graph.set(variable, null);</span>
+<span class="fc" id="L133">        adjacencyEntries -= neighbors.size();</span>
+<span class="fc" id="L134">    }</span>
+
+    private void connect(int left, int right) {
+<span class="fc" id="L137">        var adjacent = graph.get(left);</span>
+<span class="fc" id="L138">        work.charge(treeWork(adjacent.size()));</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (adjacent.contains(right)) return;</span>
+<span class="fc" id="L140">        work.cells(baseCells + adjacencyEntries + 2);</span>
+<span class="fc" id="L141">        work.charge(treeWork(adjacent.size()) + treeWork(graph.get(right).size()));</span>
+<span class="fc" id="L142">        adjacent.add(right);</span>
+<span class="fc" id="L143">        graph.get(right).add(left);</span>
+<span class="fc" id="L144">        adjacencyEntries += 2;</span>
+<span class="fc" id="L145">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

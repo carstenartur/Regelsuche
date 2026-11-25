@@ -81,38 +81,53 @@ public final class BilinearProgramVerifier {
 <span class="fc" id="L81">        }</span>
 <span class="fc" id="L82">    }</span>
 
+    /** Reuse a supplied witness with a width profile after checking every source coefficient. */
+    public static Result&lt;BilinearIntegerSchedule.Plan&gt; scheduleInteger(Request request, BilinearProgram program,
+            BilinearIntegerSchedule.Profile profile, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="nc" id="L87">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            if (profile.leftBits().size() != request.tensor().leftSize()</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                    || profile.rightBits().size() != request.tensor().rightSize()) {</span>
+<span class="nc" id="L90">                throw new Rejection(&quot;PROFILE_SHAPE&quot;);</span>
+            }
+<span class="nc" id="L92">            long source = request.checkInputs(work) + profile.retainedCells();</span>
+<span class="nc" id="L93">            check(request, program, source, work);</span>
+<span class="nc" id="L94">            long retained = source + certificateCells(request, program.u().size());</span>
+<span class="nc" id="L95">            return BilinearIntegerSchedule.plan(program, profile, retained, work);</span>
+        });
+    }
+
     /** Verify against the source, then execute with the same resource account. */
     public static Result&lt;List&lt;ExactRational&gt;&gt; evaluate(Request request, BilinearProgram program,
             List&lt;ExactRational&gt; x, List&lt;ExactRational&gt; y, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L87">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
-<span class="fc" id="L88">            var tensor = request.tensor();</span>
-<span class="fc" id="L89">            long inputCells = (long) tensor.leftSize() + tensor.rightSize();</span>
-<span class="fc" id="L90">            work.cells(inputCells);</span>
-<span class="fc" id="L91">            work.charge(inputCells);</span>
-<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            if (x.size() != tensor.leftSize() || y.size() != tensor.rightSize()) {</span>
-<span class="fc" id="L93">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+<span class="fc" id="L102">        return BilinearProgram.run(limits, cancellation, work -&gt; {</span>
+<span class="fc" id="L103">            var tensor = request.tensor();</span>
+<span class="fc" id="L104">            long inputCells = (long) tensor.leftSize() + tensor.rightSize();</span>
+<span class="fc" id="L105">            work.cells(inputCells);</span>
+<span class="fc" id="L106">            work.charge(inputCells);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (x.size() != tensor.leftSize() || y.size() != tensor.rightSize()) {</span>
+<span class="fc" id="L108">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
             }
-<span class="fc" id="L95">            var left = List.copyOf(x);</span>
-<span class="fc" id="L96">            var right = List.copyOf(y);</span>
-<span class="pc bpc" id="L97" title="2 of 4 branches missed.">            if (left.size() != tensor.leftSize() || right.size() != tensor.rightSize()) {</span>
-<span class="nc" id="L98">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
+<span class="fc" id="L110">            var left = List.copyOf(x);</span>
+<span class="fc" id="L111">            var right = List.copyOf(y);</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">            if (left.size() != tensor.leftSize() || right.size() != tensor.rightSize()) {</span>
+<span class="nc" id="L113">                throw new IllegalArgumentException(&quot;INPUT_VECTOR_SHAPE&quot;);</span>
             }
-<span class="fc" id="L100">            long source = request.checkInputs(work);</span>
-<span class="fc" id="L101">            int rank = program.u().size();</span>
-<span class="fc" id="L102">            check(request, program, source, work);</span>
-<span class="fc" id="L103">            work.cells(source + certificateCells(request, rank) + inputCells</span>
-<span class="fc" id="L104">                + rank + tensor.outputs().size() + 3L);</span>
-<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (var value : left) work.check(value);</span>
-<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (var value : right) work.check(value);</span>
-<span class="fc" id="L107">            var products = new ArrayList&lt;ExactRational&gt;(rank);</span>
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int p = 0; p &lt; rank; p++) {</span>
-<span class="fc" id="L109">                var a = BilinearProgramSchedule.dot(program.u().get(p), left, work);</span>
-<span class="fc" id="L110">                var b = BilinearProgramSchedule.dot(program.v().get(p), right, work);</span>
-<span class="fc" id="L111">                products.add(work.mul(a, b));</span>
+<span class="fc" id="L115">            long source = request.checkInputs(work);</span>
+<span class="fc" id="L116">            int rank = program.u().size();</span>
+<span class="fc" id="L117">            check(request, program, source, work);</span>
+<span class="fc" id="L118">            work.cells(source + certificateCells(request, rank) + inputCells</span>
+<span class="fc" id="L119">                + rank + tensor.outputs().size() + 3L);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (var value : left) work.check(value);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (var value : right) work.check(value);</span>
+<span class="fc" id="L122">            var products = new ArrayList&lt;ExactRational&gt;(rank);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (int p = 0; p &lt; rank; p++) {</span>
+<span class="fc" id="L124">                var a = BilinearProgramSchedule.dot(program.u().get(p), left, work);</span>
+<span class="fc" id="L125">                var b = BilinearProgramSchedule.dot(program.v().get(p), right, work);</span>
+<span class="fc" id="L126">                products.add(work.mul(a, b));</span>
             }
-<span class="fc" id="L113">            var values = new ArrayList&lt;ExactRational&gt;(program.w().size());</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (var weights : program.w()) values.add(BilinearProgramSchedule.dot(weights, products, work));</span>
-<span class="fc" id="L115">            return List.copyOf(values);</span>
+<span class="fc" id="L128">            var values = new ArrayList&lt;ExactRational&gt;(program.w().size());</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (var weights : program.w()) values.add(BilinearProgramSchedule.dot(weights, products, work));</span>
+<span class="fc" id="L130">            return List.copyOf(values);</span>
         });
     }
 }
