@@ -128,7 +128,7 @@ final class NativeSearchOperations implements AutoCloseable {
 <span class="fc" id="L128">    }</span>
 
     synchronized Optional&lt;NativeSearchOperation&gt; find(String id) throws IOException {
-<span class="pc bpc" id="L131" title="2 of 8 branches missed.">        if (lease != null &amp;&amp; active != null &amp;&amp; !active.terminal() &amp;&amp; active.operationId().equals(id)) return Optional.of(active);</span>
+<span class="pc bpc" id="L131" title="3 of 8 branches missed.">        if (lease != null &amp;&amp; active != null &amp;&amp; !active.terminal() &amp;&amp; active.operationId().equals(id)) return Optional.of(active);</span>
 <span class="fc" id="L132">        var saved=store.find(id);</span>
 <span class="pc bpc" id="L133" title="2 of 6 branches missed.">        if (saved.isEmpty() || saved.get().terminal() || lease!=null) return saved;</span>
 <span class="fc" id="L134">        var recovery=store.tryLease();</span>
@@ -169,7 +169,7 @@ final class NativeSearchOperations implements AutoCloseable {
         // A terminal record is durable before execute() releases its workspace lease.
         // Do not return to the owning caller until that lease is released: an immediate
         // next operation must not fail solely because terminal persistence won the race.
-<span class="pc bpc" id="L172" title="2 of 8 branches missed.">        while (!current.terminal() || (lease != null &amp;&amp; active != null &amp;&amp; active.operationId().equals(id))) {</span>
+<span class="pc bpc" id="L172" title="5 of 8 branches missed.">        while (!current.terminal() || (lease != null &amp;&amp; active != null &amp;&amp; active.operationId().equals(id))) {</span>
 <span class="fc" id="L173">            long remaining=deadline-System.nanoTime();</span>
 <span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (remaining&lt;=0) throw new TimeoutException();</span>
 <span class="fc" id="L175">            TimeUnit.NANOSECONDS.timedWait(this,remaining);</span>
