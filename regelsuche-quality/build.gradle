@@ -142,19 +142,24 @@ rootProject.subprojects.findAll { it.name in coverageModules }.each { module ->
     }
 }
 
+def deferredSympy = providers.gradleProperty('separateSympyRuntimeAuthority').orNull == 'true' &&
+    System.getenv('REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY') == 'required-by-workflow'
+if (!deferredSympy) {
+    rootProject.tasks.named('verifyCoverageRegression').configure {
+        dependsOn coverageModules.collect { ":${it}:jacocoTestReport" }
+    }
+}
+
 rootProject.tasks.named('generateCiPages', JavaExec).configure {
     classpath = sourceSets.main.runtimeClasspath
     javaLauncher = javaToolchains.launcherFor(java.toolchain)
     inputs.file rootProject.file('config/quality/coverage-policy.json')
     outputs.upToDateWhen { false }
-    def deferredSympy = providers.gradleProperty('separateSympyRuntimeAuthority').orNull == 'true' &&
-        System.getenv('REGELSUCHE_SEPARATE_SYMPY_RUNTIME_AUTHORITY') == 'required-by-workflow'
     if (deferredSympy) {
         args '--tests-only'
     } else {
         dependsOn coverageReportRuntime
         dependsOn ':verifyCoverageRegression'
-        dependsOn coverageModules.collect { ":${it}:jacocoTestReport" }
     }
 }
 
