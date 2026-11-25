@@ -10,6 +10,7 @@ import de.regelsuche.scalar.ExactRational;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -74,6 +75,117 @@ public final class BilinearRankBound {
             int lower = verifyMinor(tensor, certificate, sourceCells + programCells, work);
             return new Interval(lower, Math.toIntExact(cost.variableMultiplications()));
         });
+    }
+
+    /** Coefficients of det(s A + t B) and the discriminant b^2 - 4ac over Q. */
+    public record Pencil(ExactRational a, ExactRational b, ExactRational c, ExactRational discriminant) {
+        public Pencil {
+            Objects.requireNonNull(a);
+            Objects.requireNonNull(b);
+            Objects.requireNonNull(c);
+            Objects.requireNonNull(discriminant);
+        }
+    }
+
+    /** Extends the original flattening certificate only when the output pencil proves an additional bound. */
+    public record RationalCertificate(Certificate minor, Optional<Pencil> pencil) {
+        public RationalCertificate {
+            Objects.requireNonNull(minor);
+            Objects.requireNonNull(pencil);
+        }
+        public int lowerBound() { return pencil.isPresent() ? Math.max(3, minor.lowerBound()) : minor.lowerBound(); }
+        long extraCells() { return pencil.isPresent() ? 8 : 3; }
+    }
+
+    public static Result<RationalCertificate> computeRational(Tensor tensor, IterationLimits limits,
+            BooleanSupplier cancellation) {
+        return BilinearProgram.run(limits, cancellation, work -> {
+            long source = checkSource(tensor, work);
+            var minor = derive(tensor, source, work);
+            long retained = source + minor.retainedCells() + 8;
+            work.cells(retained);
+            if (!isPencil(tensor)) return new RationalCertificate(minor, Optional.empty());
+            var first = tensor.outputs().get(0);
+            var second = tensor.outputs().get(1);
+            var a = det2(first, work);
+            var c = det2(second, work);
+            var b = work.sub(work.add(work.mul(first.get(0), second.get(3)), work.mul(second.get(0), first.get(3))),
+                work.add(work.mul(first.get(1), second.get(2)), work.mul(second.get(1), first.get(2))));
+            var p = new Pencil(a, b, c, discriminant(a, b, c, work));
+            if (!nonsquare(p.discriminant(), retained, work)) return new RationalCertificate(minor, Optional.empty());
+            verifyPencil(tensor, p, retained, work);
+            return new RationalCertificate(minor, Optional.of(p));
+        });
+    }
+
+    public static Result<Integer> verifyRational(Tensor tensor, RationalCertificate proof, IterationLimits limits,
+            BooleanSupplier cancellation) {
+        return BilinearProgram.run(limits, cancellation, work ->
+            verifyRational(tensor, proof, checkSource(tensor, work), work));
+    }
+
+    public static Result<Interval> certifyRational(Request request, BilinearProgram program, RationalCertificate proof,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        return BilinearProgram.run(limits, cancellation, work -> {
+            long source = request.checkInputs(work);
+            long programCells = BilinearProgram.matrixCells(program.u()) + BilinearProgram.matrixCells(program.v())
+                + BilinearProgram.matrixCells(program.w());
+            int lower = verifyRational(request.tensor(), proof, source + programCells, work);
+            long retained = source + proof.minor().retainedCells() + proof.extraCells();
+            if (request.tensor() != proof.minor().source())
+                retained += BilinearProgram.matrixCells(proof.minor().source().outputs());
+            var cost = BilinearProgramVerifier.check(request, program, retained, work);
+            return new Interval(lower, Math.toIntExact(cost.variableMultiplications()));
+        });
+    }
+
+    static int verifyRational(Tensor tensor, RationalCertificate proof, long retained, CertificateWork work) {
+        retained += proof.extraCells();
+        int minor = verifyMinor(tensor, proof.minor(), retained, work);
+        if (proof.pencil().isEmpty()) return minor;
+        retained += proof.minor().retainedCells();
+        if (tensor != proof.minor().source()) retained += BilinearProgram.matrixCells(proof.minor().source().outputs());
+        verifyPencil(tensor, proof.pencil().orElseThrow(), retained, work);
+        return Math.max(minor, 3);
+    }
+
+    private static boolean isPencil(Tensor t) {
+        return t.leftSize() == 2 && t.rightSize() == 2 && t.outputs().size() == 2;
+    }
+
+    private static ExactRational det2(List<ExactRational> matrix, CertificateWork work) {
+        return work.sub(work.mul(matrix.get(0), matrix.get(3)), work.mul(matrix.get(1), matrix.get(2)));
+    }
+
+    private static ExactRational discriminant(ExactRational a, ExactRational b, ExactRational c, CertificateWork work) {
+        return work.sub(work.mul(b, b), work.mul(ExactRational.integer(4), work.mul(a, c)));
+    }
+
+    // Use the existing exact root primitive, reserving limb buffers and a conservative quadratic work tariff.
+    private static boolean nonsquare(ExactRational value, long retained, CertificateWork work) {
+        work.check(value);
+        if (value.signum() < 0) return true;
+        long words = 1L + Math.max(value.numerator().bitLength(), value.denominator().bitLength()) / 32;
+        work.cells(retained + 12 * words + 16);
+        work.charge(2 * words * words);
+        return value.sqrtExact().isEmpty();
+    }
+
+    // Independent interpolation at (1,0), (0,1), (1,1), using the source slices only.
+    private static void verifyPencil(Tensor tensor, Pencil p, long retained, CertificateWork work) {
+        if (!isPencil(tensor)) throw new Rejection("PENCIL_SHAPE");
+        work.cells(retained + 16);
+        var first = tensor.outputs().get(0);
+        var second = tensor.outputs().get(1);
+        var sum = new ArrayList<ExactRational>(4);
+        for (int i = 0; i < 4; i++) sum.add(work.add(first.get(i), second.get(i)));
+        var a = det2(first, work);
+        var c = det2(second, work);
+        var b = work.sub(work.sub(det2(sum, work), a), c);
+        var d = discriminant(a, b, c, work);
+        if (!a.equals(work.check(p.a())) || !b.equals(work.check(p.b())) || !c.equals(work.check(p.c()))
+                || !d.equals(work.check(p.discriminant()))) throw new Rejection("PENCIL_MISMATCH");
+        if (!nonsquare(d, retained + 16, work)) throw new Rejection("SPLIT_PENCIL");
     }
 
     private static long checkSource(Tensor tensor, CertificateWork work) {
@@ -209,7 +321,7 @@ public final class BilinearRankBound {
     }
 
     // Replay only the claimed square minor from its original entries, using Bareiss elimination.
-    private static ExactRational determinant(ExactRational[][] minor, CertificateWork work) {
+    static ExactRational determinant(ExactRational[][] minor, CertificateWork work) {
         int size = minor.length;
         if (size == 0) return ExactRational.ONE;
         var previous = ExactRational.ONE;

@@ -11,6 +11,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BilinearProgramSdkTest {
+    @Test void sdkVerifiesTheStrongerBoundAndBindsBothInputBasesAndTarget() {
+        var one = ExactRational.ONE;
+        var zero = ExactRational.ZERO;
+        var neg = ExactRational.NEGATIVE_ONE;
+        var tensor = new BilinearProgram.Tensor(2, 2, List.of(List.of(one,zero,zero,neg), List.of(zero,one,one,zero)));
+        var budget = new OptimizationBudget(5_000_000, 10_000, 100, 10_000);
+        var token = CancellationToken.NONE;
+        var found = BilinearProgramSdk.discover(tensor, 3, budget, token).value().orElseThrow();
+        var proof = BilinearProgramSdk.computeRationalRankBound(tensor, budget, token).value().orElseThrow();
+        assertEquals(3, BilinearProgramSdk.verifyRationalRankBound(tensor, proof, budget, token).value().orElseThrow());
+        assertTrue(BilinearProgramSdk.certifyRationalProductBounds(found.request(), found.witness().program(), proof,
+            budget, token).value().orElseThrow().productOptimal());
+        var swap = List.of(List.of(zero,one), List.of(one,zero));
+        var identity = List.of(List.of(one,zero), List.of(zero,one));
+        var change = new de.regelsuche.math.algorithms.algebra.BilinearProductLearning.InputBases(swap, identity);
+        var target = new BilinearProgram.Tensor(2, 2, List.of(List.of(zero,neg,one,zero),List.of(one,zero,zero,one)));
+        var moved = BilinearProgramSdk.applyInputBases(found.request(), found.witness().program(), change, target,
+            budget, token).value().orElseThrow();
+        assertEquals(moved.witness().cost(), BilinearProgramSdk.verifyInputBases(found.request(), found.witness().program(),
+            change, moved.target(), moved.witness().program(), budget, token).value().orElseThrow());
+        assertEquals("CANCELLED", BilinearProgramSdk.applyInputBases(found.request(), found.witness().program(), change,
+            target, budget, () -> true).reason());
+    }
+
     @Test void typedEntryPointsFindCheckAndRunOneSharedProduct() {
         var one = List.of(ExactRational.ONE);
         var two = List.of(ExactRational.integer(2));

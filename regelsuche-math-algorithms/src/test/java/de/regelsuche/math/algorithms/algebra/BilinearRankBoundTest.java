@@ -33,6 +33,51 @@ class BilinearRankBoundTest {
         return proof;
     }
 
+    @Test void nonsquareRationalPencilClosesTwoToThreeGapIncludingTheComplexProduct() {
+        var tensor = new Tensor(2, 2, List.of(row(1,0,0,-1), row(0,1,1,0)));
+        var discovery = BilinearFormDiscovery.discover(tensor, 3, LIMITS, () -> false).value().orElseThrow();
+        var bound = BilinearRankBound.computeRational(tensor, LIMITS, () -> false).value().orElseThrow();
+        assertEquals(2, bound.minor().lowerBound());
+        assertEquals(ExactRational.integer(-4), bound.pencil().orElseThrow().discriminant());
+        assertEquals(3, BilinearRankBound.verifyRational(tensor, bound, LIMITS, () -> false).value().orElseThrow());
+        var interval = BilinearRankBound.certifyRational(discovery.request(), discovery.witness().program(), bound,
+            LIMITS, () -> false).value().orElseThrow();
+        assertEquals(new BilinearRankBound.Interval(3, 3), interval);
+        var search = BilinearProgramSearch.searchWithRationalBound(discovery.request(), bound, LIMITS, () -> false);
+        assertEquals(3, search.value().orElseThrow().cost().variableMultiplications());
+        var impossible = new BilinearProgram.Request(tensor, discovery.request().leftForms(), discovery.request().rightForms(), 2);
+        assertEquals("PRODUCT_LIMIT_BELOW_BOUND", BilinearProgramSearch.searchWithRationalBound(impossible, bound,
+            LIMITS, () -> false).reason());
+
+        for (String d : List.of("2", "1/2", "4", "1/9", "0")) {
+            var second = List.of(ExactRational.ZERO, ExactRational.ONE, ExactRational.parse(d), ExactRational.ZERO);
+            var source = new Tensor(2, 2, List.of(row(1,0,0,1), second));
+            var proof = BilinearRankBound.computeRational(source, LIMITS, () -> false).value().orElseThrow();
+            assertEquals(d.equals("2") || d.equals("1/2") ? 3 : 2, proof.lowerBound());
+            assertEquals(proof.lowerBound(), BilinearRankBound.verifyRational(source, proof, LIMITS, () -> false)
+                .value().orElseThrow());
+        }
+        assertEquals(0, BilinearRankBound.computeRational(new Tensor(2, 2, List.of(row(0,0,0,0),row(0,0,0,0))),
+            LIMITS, () -> false).value().orElseThrow().lowerBound());
+    }
+
+    @Test void forgedPencilOrWrongSourceAndLimitsCannotYieldTheStrongerBound() {
+        var tensor = new Tensor(2, 2, List.of(row(1,0,0,-1), row(0,1,1,0)));
+        var good = BilinearRankBound.computeRational(tensor, LIMITS, () -> false).value().orElseThrow();
+        var p = good.pencil().orElseThrow();
+        var fake = new BilinearRankBound.Pencil(p.a(), p.b(), p.c(), ExactRational.integer(-8));
+        var forged = new BilinearRankBound.RationalCertificate(good.minor(), java.util.Optional.of(fake));
+        assertEquals(REJECTED, BilinearRankBound.verifyRational(tensor, forged, LIMITS, () -> false).status());
+        assertEquals(REJECTED, BilinearRankBound.verifyRational(CONVOLUTION, good, LIMITS, () -> false).status());
+        var split = new Tensor(2, 2, List.of(row(1,0,0,1),row(0,1,1,0)));
+        var splitClaim = new BilinearRankBound.RationalCertificate(prove(split),
+            java.util.Optional.of(new BilinearRankBound.Pencil(ExactRational.ONE, ExactRational.ZERO,
+                ExactRational.NEGATIVE_ONE, ExactRational.integer(4))));
+        assertEquals(REJECTED, BilinearRankBound.verifyRational(split, splitClaim, LIMITS, () -> false).status());
+        assertEquals(INCONCLUSIVE, BilinearRankBound.computeRational(tensor, LIMITS.withMaximumWork(4), () -> false).status());
+        assertEquals(INCONCLUSIVE, BilinearRankBound.verifyRational(tensor, good, LIMITS, () -> true).status());
+    }
+
     @Test void getsRankThreeAcrossEachPossibleCutWithoutSupplyingForms() {
         var left = new Tensor(3, 2, List.of(row(1, 0, 0, 1, 0, 0), row(0, 0, 0, 0, 1, 0)));
         var right = new Tensor(2, 3, List.of(row(1, 0, 0, 0, 1, 0), row(0, 0, 1, 0, 0, 0)));

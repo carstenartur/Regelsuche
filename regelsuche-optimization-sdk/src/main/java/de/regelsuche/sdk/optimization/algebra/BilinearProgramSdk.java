@@ -74,6 +74,40 @@ public final class BilinearProgramSdk {
         return BilinearRankBound.certify(request, program, lowerBound, limits(budget), cancellation::isCancelled);
     }
 
+    public static BilinearProgram.Result<BilinearRankBound.RationalCertificate> computeRationalRankBound(
+            BilinearProgram.Tensor tensor, OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearRankBound.computeRational(tensor, limits(budget), cancellation::isCancelled);
+    }
+
+    public static BilinearProgram.Result<Integer> verifyRationalRankBound(BilinearProgram.Tensor tensor,
+            BilinearRankBound.RationalCertificate proof, OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearRankBound.verifyRational(tensor, proof, limits(budget), cancellation::isCancelled);
+    }
+
+    public static BilinearProgram.Result<BilinearRankBound.Interval> certifyRationalProductBounds(
+            BilinearProgram.Request request, BilinearProgram program, BilinearRankBound.RationalCertificate proof,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearRankBound.certifyRational(request, program, proof, limits(budget), cancellation::isCancelled);
+    }
+
+    public static BilinearProgram.Result<BilinearProgram.Witness> searchWithRationalBound(BilinearProgram.Request request,
+            BilinearRankBound.RationalCertificate proof, OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearProgramSearch.searchWithRationalBound(request, proof, limits(budget), cancellation::isCancelled);
+    }
+
+    public static BilinearProgram.Result<BilinearProductLearning.Transfer> applyInputBases(BilinearProgram.Request source,
+            BilinearProgram program, BilinearProductLearning.InputBases bases, BilinearProgram.Tensor target,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearProductLearning.applyInputBases(source, program, bases, target, limits(budget), cancellation::isCancelled);
+    }
+
+    public static BilinearProgram.Result<BilinearProgram.Cost> verifyInputBases(BilinearProgram.Request source,
+            BilinearProgram program, BilinearProductLearning.InputBases bases, BilinearProgram.Request target,
+            BilinearProgram transported, OptimizationBudget budget, CancellationToken cancellation) {
+        return BilinearProgramVerifier.verifyInputBases(source, program, bases, target, transported,
+            limits(budget), cancellation::isCancelled);
+    }
+
     public static BilinearProgram.Result<BilinearProgram.Witness> search(BilinearProgram.Request request,
             OptimizationBudget budget, CancellationToken cancellation) {
         return BilinearProgramSearch.search(request, limits(budget), cancellation::isCancelled);
