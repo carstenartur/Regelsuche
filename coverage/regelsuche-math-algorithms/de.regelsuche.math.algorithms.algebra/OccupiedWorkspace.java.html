@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OccupiedWorkspace.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">OccupiedWorkspace.java</span></div><h1>OccupiedWorkspace.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorChecks.need;
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/** Exact certification of linear shears on three disjoint, arbitrary-initial-value register blocks. */
+public final class OccupiedWorkspace {
+    private OccupiedWorkspace() {}
+<span class="fc" id="L17">    public enum Register { X, Y, Z }</span>
+<span class="fc" id="L18">    public enum Sign { PLUS, MINUS }</span>
+
+    public record Shear(Register from, Register to, PolynomialMatrix map, Sign sign) {
+<span class="fc" id="L21">        public Shear {</span>
+<span class="fc" id="L22">            Objects.requireNonNull(from);</span>
+<span class="fc" id="L23">            Objects.requireNonNull(to);</span>
+<span class="fc" id="L24">            Objects.requireNonNull(map);</span>
+<span class="fc" id="L25">            Objects.requireNonNull(sign);</span>
+<span class="fc" id="L26">        }</span>
+    }
+    public record Schedule(PolynomialMatrix first, PolynomialMatrix second, List&lt;Shear&gt; steps) {
+<span class="fc" id="L29">        public Schedule {</span>
+<span class="fc" id="L30">            Objects.requireNonNull(first);</span>
+<span class="fc" id="L31">            Objects.requireNonNull(second);</span>
+<span class="fc" id="L32">            steps = List.copyOf(steps);</span>
+<span class="fc" id="L33">        }</span>
+    }
+    /** borrowedCells is the declared Z-register capacity, even if an alternative schedule never accesses Z. */
+<span class="fc" id="L36">    public record Comparison(Cost scheduled, Cost direct, int borrowedCells) {}</span>
+
+    /** Immutable column vectors; equal Java objects in different slots still denote separate register values. */
+<span class="fc" id="L39">    public record State(PolynomialMatrix x, PolynomialMatrix y, PolynomialMatrix z) {}</span>
+
+    public static Schedule composition(PolynomialMatrix first, PolynomialMatrix second) {
+<span class="fc" id="L42">        return new Schedule(first, second, List.of(</span>
+            new Shear(Register.X, Register.Z, first, Sign.PLUS),
+            new Shear(Register.Z, Register.Y, second, Sign.PLUS),
+            new Shear(Register.X, Register.Z, first, Sign.MINUS),
+            new Shear(Register.Z, Register.Y, second, Sign.MINUS)));
+    }
+
+    public static Result&lt;Comparison&gt; verify(PolynomialMatrix first, PolynomialMatrix second,
+            Schedule schedule, IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L51">        return OperatorChecks.run(limits, cancel, checks -&gt; verify(first, second, schedule, checks));</span>
+    }
+
+    private static int dimension(Register register, PolynomialMatrix first, PolynomialMatrix second) {
+<span class="fc bfc" id="L55" title="All 3 branches covered.">        return switch (register) {</span>
+<span class="fc" id="L56">            case X -&gt; first.columns();</span>
+<span class="fc" id="L57">            case Y -&gt; second.rows();</span>
+<span class="fc" id="L58">            case Z -&gt; first.rows();</span>
+        };
+    }
+
+    private static Comparison verify(PolynomialMatrix first, PolynomialMatrix second,
+            Schedule schedule, OperatorChecks checks) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        need(schedule != null, &quot;MISSING_SCHEDULE&quot;);</span>
+<span class="fc" id="L65">        checks.input(first);</span>
+<span class="fc" id="L66">        checks.input(second);</span>
+<span class="fc" id="L67">        checks.input(schedule.first());</span>
+<span class="fc" id="L68">        checks.input(schedule.second());</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        need(checks.algebra.equal(first, schedule.first()) &amp;&amp; checks.algebra.equal(second, schedule.second()),</span>
+            &quot;SOURCE_MISMATCH&quot;);
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        need(first.rows() == second.columns(), &quot;COMPOSITION_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L72">        checks.work.cells(schedule.steps().size());</span>
+<span class="fc" id="L73">        var scheduled = new Cost(0, 0);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (var step : schedule.steps()) {</span>
+<span class="fc" id="L75">            checks.work.charge(1);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            need(step.from() != step.to(), &quot;ALIASED_REGISTERS&quot;);</span>
+<span class="fc" id="L77">            checks.input(step.map());</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            need(step.map().columns() == dimension(step.from(), first, second)</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                &amp;&amp; step.map().rows() == dimension(step.to(), first, second), &quot;SHEAR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L80">            scheduled = scheduled.plus(Cost.dense(step.map())).updates(step.map().rows());</span>
+<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">        var product = checks.times(second, first);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (Register input : Register.values()) {</span>
+<span class="fc" id="L84">            int width = dimension(input, first, second);</span>
+<span class="fc" id="L85">            var blocks = new EnumMap&lt;Register, PolynomialMatrix&gt;(Register.class);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            for (Register r : Register.values()) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                var block = input == r ? checks.unit(width)</span>
+<span class="fc" id="L88">                    : checks.matrix(dimension(r, first, second), width, (i, j) -&gt; Polynomial.zero());</span>
+<span class="fc" id="L89">                blocks.put(r, block);</span>
+            }
+<span class="fc" id="L91">            var expected = new EnumMap&lt;&gt;(blocks);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (input == Register.X) expected.put(Register.Y, product);</span>
+<span class="fc" id="L93">            replay(schedule, blocks, checks);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (Register r : Register.values())</span>
+<span class="fc" id="L95">                need(checks.algebra.equal(blocks.get(r), expected.get(r)), &quot;REGISTER_MAP_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L97">        var direct = Cost.dense(first).plus(Cost.dense(second)).updates(second.rows());</span>
+<span class="fc" id="L98">        return new Comparison(scheduled, direct, first.rows());</span>
+    }
+
+    /** Verify the full map, then replay on actual occupied columns using immutable value semantics. */
+    public static Result&lt;State&gt; apply(PolynomialMatrix first, PolynomialMatrix second, Schedule schedule,
+            State initial, IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L104">        return OperatorChecks.run(limits, cancel, checks -&gt; {</span>
+<span class="fc" id="L105">            verify(first, second, schedule, checks);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            need(initial != null, &quot;MISSING_STATE&quot;);</span>
+<span class="fc" id="L107">            var blocks = new EnumMap&lt;Register, PolynomialMatrix&gt;(Register.class);</span>
+<span class="fc" id="L108">            blocks.put(Register.X, initial.x());</span>
+<span class="fc" id="L109">            blocks.put(Register.Y, initial.y());</span>
+<span class="fc" id="L110">            blocks.put(Register.Z, initial.z());</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            for (Register r : Register.values()) {</span>
+<span class="fc" id="L112">                var column = blocks.get(r);</span>
+<span class="fc" id="L113">                checks.input(column);</span>
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">                need(column.rows() == dimension(r, first, second) &amp;&amp; column.columns() == 1, &quot;STATE_DIMENSION_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L116">            replay(schedule, blocks, checks);</span>
+<span class="fc" id="L117">            return new State(blocks.get(Register.X), blocks.get(Register.Y), blocks.get(Register.Z));</span>
+        });
+    }
+
+    private static void replay(Schedule schedule, EnumMap&lt;Register, PolynomialMatrix&gt; blocks, OperatorChecks checks) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (var step : schedule.steps()) {</span>
+<span class="fc" id="L123">            var delta = checks.times(step.map(), blocks.get(step.from()));</span>
+<span class="fc" id="L124">            var old = blocks.get(step.to());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            var next = step.sign() == Sign.PLUS ? checks.plus(old, delta)</span>
+<span class="fc" id="L126">                : checks.matrix(old.rows(), old.columns(), (i, j) -&gt; checks.algebra.add(old.get(i, j),</span>
+<span class="fc" id="L127">                    checks.algebra.multiply(OperatorChecks.MINUS_ONE, delta.get(i, j))));</span>
+<span class="fc" id="L128">            blocks.put(step.to(), next);</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

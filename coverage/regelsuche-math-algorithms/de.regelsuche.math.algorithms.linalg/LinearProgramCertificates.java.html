@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearProgramCertificates.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">LinearProgramCertificates.java</span></div><h1>LinearProgramCertificates.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Exact evidence for a rational maximization problem with unrestricted variables. */
+public final class LinearProgramCertificates {
+    private LinearProgramCertificates() {}
+
+    /** Maximizes c^T x subject to Ax ≤ b, in the supplied row and column order. */
+    public record Problem(List&lt;List&lt;ExactRational&gt;&gt; a, List&lt;ExactRational&gt; b, List&lt;ExactRational&gt; c) {
+<span class="fc" id="L14">        public Problem {</span>
+<span class="fc" id="L15">            Objects.requireNonNull(a);</span>
+<span class="fc" id="L16">            Objects.requireNonNull(b);</span>
+<span class="fc" id="L17">            Objects.requireNonNull(c);</span>
+<span class="fc bfc" id="L18" title="All 6 branches covered.">            if (a.isEmpty() || c.isEmpty() || a.size() != b.size()) {</span>
+<span class="fc" id="L19">                throw new IllegalArgumentException(&quot;INVALID_LINEAR_PROGRAM_SHAPE&quot;);</span>
+            }
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            for (List&lt;ExactRational&gt; row : a) {</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">                if (row.size() != c.size()) {</span>
+<span class="fc" id="L23">                    throw new IllegalArgumentException(&quot;INVALID_LINEAR_PROGRAM_SHAPE&quot;);</span>
+                }
+<span class="fc" id="L25">            }</span>
+<span class="fc" id="L26">            var rows = new ArrayList&lt;List&lt;ExactRational&gt;&gt;(a.size());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            for (List&lt;ExactRational&gt; row : a) rows.add(List.copyOf(row));</span>
+<span class="fc" id="L28">            a = List.copyOf(rows);</span>
+<span class="fc" id="L29">            b = List.copyOf(b);</span>
+<span class="fc" id="L30">            c = List.copyOf(c);</span>
+<span class="fc" id="L31">        }</span>
+
+<span class="fc" id="L33">        public int constraints() { return a.size(); }</span>
+
+<span class="fc" id="L35">        public int variables() { return c.size(); }</span>
+
+        long storageCells() {
+<span class="fc" id="L38">            return (long) constraints() * (variables() + 2L) + variables();</span>
+        }
+    }
+
+    public sealed interface Certificate permits Infeasible, Optimal, Unbounded {
+        Problem source();
+    }
+
+    /** A nonnegative Farkas multiplier y with A^T y = 0 and b^T y &lt; 0. */
+    public record Infeasible(Problem source, List&lt;ExactRational&gt; y) implements Certificate {
+<span class="fc" id="L48">        public Infeasible {</span>
+<span class="fc" id="L49">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L50">            y = List.copyOf(y);</span>
+<span class="fc" id="L51">        }</span>
+    }
+
+    /** A feasible x and a feasible dual multiplier y with equal objective values. */
+    public record Optimal(Problem source, List&lt;ExactRational&gt; x, List&lt;ExactRational&gt; y)
+            implements Certificate {
+<span class="fc" id="L57">        public Optimal {</span>
+<span class="fc" id="L58">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L59">            x = List.copyOf(x);</span>
+<span class="fc" id="L60">            y = List.copyOf(y);</span>
+<span class="fc" id="L61">        }</span>
+    }
+
+    /** A feasible x and a ray v with Av ≤ 0 and c^T v = 1. */
+    public record Unbounded(Problem source, List&lt;ExactRational&gt; x, List&lt;ExactRational&gt; v)
+            implements Certificate {
+<span class="fc" id="L67">        public Unbounded {</span>
+<span class="fc" id="L68">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L69">            x = List.copyOf(x);</span>
+<span class="fc" id="L70">            v = List.copyOf(v);</span>
+<span class="fc" id="L71">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

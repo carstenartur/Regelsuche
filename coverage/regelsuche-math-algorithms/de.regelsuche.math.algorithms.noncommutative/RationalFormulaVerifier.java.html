@@ -134,9 +134,9 @@ public final class RationalFormulaVerifier {
         void source(RationalFormula expected, RationalFormula recorded, int depth) {
 <span class="fc" id="L135">            work.enter(depth);</span>
 <span class="fc bfc" id="L136" title="All 2 branches covered.">            if (expected == recorded) return;</span>
-<span class="pc bpc" id="L137" title="1 of 5 branches missed.">            switch (expected) {</span>
-<span class="nc bnc" id="L138" title="All 2 branches missed.">                case Scalar scalar -&gt; expect(recorded instanceof Scalar other</span>
-<span class="nc bnc" id="L139" title="All 2 branches missed.">                    &amp;&amp; work.ledger.check(scalar.value()).equals(work.ledger.check(other.value())), &quot;SOURCE_SCALAR&quot;);</span>
+<span class="fc bfc" id="L137" title="All 5 branches covered.">            switch (expected) {</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                case Scalar scalar -&gt; expect(recorded instanceof Scalar other</span>
+<span class="pc bnc" id="L139" title="All 2 branches missed.">                    &amp;&amp; work.ledger.check(scalar.value()).equals(work.ledger.check(other.value())), &quot;SOURCE_SCALAR&quot;);</span>
 <span class="pc bpc" id="L140" title="1 of 4 branches missed.">                case Variable variable -&gt; expect(recorded instanceof Variable other &amp;&amp; variable.id() == other.id(),</span>
                     &quot;SOURCE_VARIABLE&quot;);
 <span class="fc" id="L142">                case Sum sum -&gt; {</span>

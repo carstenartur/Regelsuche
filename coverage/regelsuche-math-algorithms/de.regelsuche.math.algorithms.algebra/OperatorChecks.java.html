@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OperatorChecks.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">OperatorChecks.java</span></div><h1>OperatorChecks.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixAlgebra;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/** Shared accounting and domain guards for the two finite operator checks. */
+final class OperatorChecks {
+    final CertificateWork work;
+    final ExactMatrixAlgebra algebra;
+    private long materialized;
+<span class="fc" id="L22">    static final Polynomial MINUS_ONE = Polynomial.constant(Rational.NEGATIVE_ONE);</span>
+
+<span class="fc" id="L24">    private OperatorChecks(IterationLimits limits, BooleanSupplier cancel) {</span>
+<span class="fc" id="L25">        work = new CertificateWork(limits, cancel);</span>
+<span class="fc" id="L26">        algebra = new ExactMatrixAlgebra(new ExactMatrixAlgebra.Work(Integer.MAX_VALUE, work::charge));</span>
+<span class="fc" id="L27">    }</span>
+
+    static &lt;T&gt; Result&lt;T&gt; run(IterationLimits limits, BooleanSupplier cancel, Function&lt;OperatorChecks, T&gt; action) {
+<span class="fc" id="L30">        var checks = new OperatorChecks(limits, cancel);</span>
+        try {
+<span class="fc" id="L32">            checks.work.charge(1);</span>
+<span class="fc" id="L33">            T result = action.apply(checks);</span>
+<span class="fc" id="L34">            checks.work.charge(0);</span>
+<span class="fc" id="L35">            return new Result&lt;&gt;(Status.VERIFIED, &quot;&quot;, Optional.of(result), checks.work.used());</span>
+<span class="fc" id="L36">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L37">            return new Result&lt;&gt;(Status.STOPPED, stop.getMessage(), Optional.empty(), checks.work.used());</span>
+<span class="nc" id="L38">        } catch (ExactMatrixAlgebra.Exhausted stop) {</span>
+<span class="nc" id="L39">            return new Result&lt;&gt;(Status.STOPPED, &quot;MATRIX_WORK_LIMIT&quot;, Optional.empty(), checks.work.used());</span>
+<span class="nc" id="L40">        } catch (ExactMatrixAlgebra.Unsupported stop) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            Status status = stop.getMessage().endsWith(&quot;_LIMIT&quot;) ? Status.STOPPED : Status.INVALID;</span>
+<span class="nc" id="L42">            return new Result&lt;&gt;(status, stop.getMessage(), Optional.empty(), checks.work.used());</span>
+<span class="fc" id="L43">        } catch (Rejected rejected) {</span>
+<span class="fc" id="L44">            return new Result&lt;&gt;(rejected.status, rejected.getMessage(), Optional.empty(), checks.work.used());</span>
+        }
+    }
+
+    static final class Rejected extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final Status status;
+        Rejected(Status status, String reason) {
+<span class="fc" id="L52">            super(reason, null, false, false);</span>
+<span class="fc" id="L53">            this.status = status;</span>
+<span class="fc" id="L54">        }</span>
+    }
+
+    static void need(boolean condition, String reason) {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (!condition) throw new Rejected(Status.INVALID, reason);</span>
+<span class="fc" id="L59">    }</span>
+
+    private static void dimensions(int rows, int cols) {
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (rows &gt; ExactMatrixAlgebra.MAX_DIMENSION || cols &gt; ExactMatrixAlgebra.MAX_DIMENSION)</span>
+<span class="nc" id="L63">            throw new Rejected(Status.STOPPED, &quot;MATRIX_DIMENSION_LIMIT&quot;);</span>
+<span class="fc" id="L64">    }</span>
+
+    void reserve(int rows, int cols) {
+<span class="fc" id="L67">        dimensions(rows, cols);</span>
+<span class="fc" id="L68">        materialized += (long) rows * cols;</span>
+<span class="fc" id="L69">        work.cells(materialized);</span>
+<span class="fc" id="L70">    }</span>
+
+    void input(PolynomialMatrix matrix) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        need(matrix != null, &quot;MISSING_MATRIX&quot;);</span>
+<span class="fc" id="L74">        dimensions(matrix.rows(), matrix.columns());</span>
+<span class="fc" id="L75">        work.cells((long) matrix.rows() * matrix.columns());</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">        for (var row : matrix.entries()) for (var entry : row) {</span>
+<span class="fc" id="L77">            work.charge(1);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (entry.isZero()) continue;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (entry.termCount() != 1)</span>
+<span class="nc" id="L80">                throw new Rejected(Status.UNSUPPORTED, &quot;NON_RATIONAL_MATRIX&quot;);</span>
+<span class="fc" id="L81">            var term = entry.terms().entrySet().iterator().next();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (!term.getKey().powers().isEmpty())</span>
+<span class="fc" id="L83">                throw new Rejected(Status.UNSUPPORTED, &quot;NON_RATIONAL_MATRIX&quot;);</span>
+<span class="fc" id="L84">            var value = term.getValue();</span>
+<span class="fc" id="L85">            int bits = Math.max(value.numerator().bitLength(), value.denominator().bitLength());</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (bits &gt; ExactMatrixAlgebra.MAX_COEFFICIENT_BITS)</span>
+<span class="nc" id="L87">                throw new Rejected(Status.STOPPED, &quot;COEFFICIENT_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L88">            work.charge(1L + bits / Long.SIZE);</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">    }</span>
+
+    PolynomialMatrix matrix(int rows, int cols, BiFunction&lt;Integer, Integer, Polynomial&gt; entries) {
+<span class="fc" id="L93">        reserve(rows, cols);</span>
+<span class="fc" id="L94">        return algebra.matrix(rows, cols, entries);</span>
+    }
+
+    PolynomialMatrix unit(int n) {
+<span class="fc" id="L98">        reserve(n, n);</span>
+<span class="fc" id="L99">        return algebra.identity(n);</span>
+    }
+
+    PolynomialMatrix times(PolynomialMatrix left, PolynomialMatrix right) {
+<span class="fc" id="L103">        reserve(left.rows(), right.columns());</span>
+<span class="fc" id="L104">        return algebra.multiply(left, right);</span>
+    }
+
+    PolynomialMatrix plus(PolynomialMatrix left, PolynomialMatrix right) {
+<span class="fc" id="L108">        reserve(left.rows(), left.columns());</span>
+<span class="fc" id="L109">        return algebra.add(left, right);</span>
+    }
+
+<span class="fc" id="L112">    record Shape(int rows, int columns, Cost cost) {}</span>
+
+    /** Inspect before expansion. Charge each staged matvec occurrence, including shared subexpressions. */
+    Shape inspect(ExactMatrixExpression expression, int depth) {
+<span class="fc" id="L116">        work.charge(1);</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        need(expression != null, &quot;MISSING_OPERATOR&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (depth &gt; ExactMatrixAlgebra.MAX_DEPTH) throw new Rejected(Status.STOPPED, &quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
+<span class="pc bpc" id="L119" title="1 of 5 branches missed.">        Shape result = switch (expression) {</span>
+<span class="fc" id="L120">            case ExactMatrixExpression.Identity i -&gt; new Shape(i.dimension(), i.dimension(), new Cost(0, 0));</span>
+<span class="fc" id="L121">            case ExactMatrixExpression.Matrix m -&gt; {</span>
+<span class="fc" id="L122">                input(m.value());</span>
+<span class="fc" id="L123">                yield new Shape(m.value().rows(), m.value().columns(), Cost.dense(m.value()));</span>
+            }
+<span class="fc" id="L125">            case ExactMatrixExpression.Product p -&gt; {</span>
+<span class="fc" id="L126">                var left = inspect(p.left(), depth + 1);</span>
+<span class="fc" id="L127">                var right = inspect(p.right(), depth + 1);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                need(left.columns == right.rows, &quot;PRODUCT_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L129">                yield new Shape(left.rows, right.columns, left.cost.plus(right.cost));</span>
+            }
+<span class="fc" id="L131">            case ExactMatrixExpression.Sum s -&gt; {</span>
+<span class="fc" id="L132">                var left = inspect(s.left(), depth + 1);</span>
+<span class="fc" id="L133">                var right = inspect(s.right(), depth + 1);</span>
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">                need(left.rows == right.rows &amp;&amp; left.columns == right.columns, &quot;SUM_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L135">                yield new Shape(left.rows, left.columns, left.cost.plus(right.cost).updates(left.rows));</span>
+            }
+<span class="nc" id="L137">            default -&gt; throw new Rejected(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
+<span class="fc" id="L138">        };</span>
+<span class="fc" id="L139">        reserve(result.rows, result.columns);</span>
+<span class="fc" id="L140">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

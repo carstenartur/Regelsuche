@@ -318,34 +318,42 @@ public final class ExactMatrixAlgebra {
     public static final class Work {
         private final int configured;
         private int consumed;
+        private final java.util.function.LongConsumer observer;
 
-<span class="fc" id="L322">        public Work(int configured) {</span>
-<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            if (configured &lt; 0) {</span>
-<span class="nc" id="L324">                throw new IllegalArgumentException(&quot;work must not be negative&quot;);</span>
+        public Work(int configured) {
+<span class="fc" id="L324">            this(configured, null);</span>
+<span class="fc" id="L325">        }</span>
+
+        /** Share arithmetic charges and interruption checks with an enclosing bounded proof. */
+<span class="fc" id="L328">        public Work(int configured, java.util.function.LongConsumer observer) {</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            if (configured &lt; 0) {</span>
+<span class="nc" id="L330">                throw new IllegalArgumentException(&quot;work must not be negative&quot;);</span>
             }
-<span class="fc" id="L326">            this.configured = configured;</span>
-<span class="fc" id="L327">        }</span>
+<span class="fc" id="L332">            this.configured = configured;</span>
+<span class="fc" id="L333">            this.observer = observer;</span>
+<span class="fc" id="L334">        }</span>
 
         public void consume(long units) {
-<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (units &lt; 0) {</span>
-<span class="nc" id="L331">                throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (units &lt; 0) {</span>
+<span class="nc" id="L338">                throw new IllegalArgumentException(&quot;negative work&quot;);</span>
             }
-<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (units &gt; remaining()) {</span>
-<span class="fc" id="L334">                throw new Exhausted();</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (units &gt; remaining()) {</span>
+<span class="fc" id="L341">                throw new Exhausted();</span>
             }
-<span class="fc" id="L336">            consumed += (int) units;</span>
-<span class="fc" id="L337">        }</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (observer != null) observer.accept(units);</span>
+<span class="fc" id="L344">            consumed += (int) units;</span>
+<span class="fc" id="L345">        }</span>
 
         public int remaining() {
-<span class="fc" id="L340">            return configured - consumed;</span>
+<span class="fc" id="L348">            return configured - consumed;</span>
         }
 
         public RepresentationBridge.WorkLedger ledger() {
-<span class="fc" id="L344">            return RepresentationBridge.WorkLedger.of(configured, consumed);</span>
+<span class="fc" id="L352">            return RepresentationBridge.WorkLedger.of(configured, consumed);</span>
         }
     }
 
-<span class="fc" id="L348">    public static final class Exhausted extends RuntimeException {</span>
+<span class="fc" id="L356">    public static final class Exhausted extends RuntimeException {</span>
         private static final long serialVersionUID = 1L;
     }
 
@@ -353,8 +361,8 @@ public final class ExactMatrixAlgebra {
         private static final long serialVersionUID = 1L;
 
         public Unsupported(String detail) {
-<span class="fc" id="L356">            super(detail);</span>
-<span class="fc" id="L357">        }</span>
+<span class="fc" id="L364">            super(detail);</span>
+<span class="fc" id="L365">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

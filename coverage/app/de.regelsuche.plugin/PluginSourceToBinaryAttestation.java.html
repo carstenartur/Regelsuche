@@ -154,8 +154,8 @@ public record PluginSourceToBinaryAttestation(
 <span class="fc bfc" id="L154" title="All 2 branches covered.">            if (!verifier.verify(Base64.getDecoder().decode(signatureBase64))) {</span>
 <span class="fc" id="L155">                throw new SecurityException(&quot;invalid source-to-binary attestation signature&quot;);</span>
             }
-<span class="fc" id="L157">        } catch (GeneralSecurityException failure) {</span>
-<span class="fc" id="L158">            throw new SecurityException(&quot;unable to verify source-to-binary attestation&quot;, failure);</span>
+<span class="nc" id="L157">        } catch (GeneralSecurityException failure) {</span>
+<span class="nc" id="L158">            throw new SecurityException(&quot;unable to verify source-to-binary attestation&quot;, failure);</span>
 <span class="fc" id="L159">        }</span>
 <span class="fc" id="L160">    }</span>
 

@@ -172,12 +172,36 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main before bounded mathematical transfers (2026-11-25)
+
+[Main CI 45655429380](https://github.com/carstenartur/Regelsuche/actions/runs/45655429380)
+passed on `44ce67edab538c5c5a69f992e75f3f222ec4fd72`: all fourteen source
+authorities, aggregate `ciCheck`, and report publication succeeded. Its original
+native reports measured **905,475** estimated context tokens and concept radius
+**125**, passing the preceding reference at **+14,490** tokens and **+2** radius
+units. The active [complete snapshot](../ai-knowledge/baseline-history/2026-11-25-main-44ce67ed/metrics-snapshot.json)
+is projected from that accepted measurement by the unchanged released v0.1.10
+extractor. The original quality artifact's API digest, all 293 indexed file
+lengths and hashes, and 64 exact tracked source Git blobs were verified.
+
+PR #1394 originally measured 911,295 tokens and exceeded the old reference by
+20,310. Its original failing snapshot and trend reproduce byte for byte under
+the native implementation. Replaying that same measurement against accepted
+main passes at **+5,820** tokens and **+0** radius units. The
+[evidence and provenance](../ai-knowledge/baseline-history/2026-11-25-main-44ce67ed/README.md)
+retain the original reports, complete source qualification, unchanged policy
+hashes, and replay. The large repository-verification ZIP exceeded the download
+tool limit and was not verified; the independently verified quality artifact
+supplies the original native reports. No feature measurement supplies baseline
+values. The updated candidate still requires fresh extraction and complete CI;
+thresholds, selectors, and hotspot exceptions remain unchanged.
+
 ### Accepted main before exact plan discovery (2026-11-24)
 
 [Main CI 45482610184](https://github.com/carstenartur/Regelsuche/actions/runs/45482610184)
 passed on `3154931929450b3e4022de29a8f4421c0f17ba0b`. The native check measured
 890,985 estimated context tokens and concept radius 123. The original allowance
-accepted the increase of 14,885 tokens and two radius units. The active reference
+accepted the increase of 14,885 tokens and two radius units. The preceding reference
 is the [complete snapshot](../ai-knowledge/baseline-history/2026-11-24-main-31549319/metrics-snapshot.json)
 projected from this accepted main by the unchanged v0.1.10 extractor. All 293
 entries in the CI evidence index passed hash and length checks, including 64

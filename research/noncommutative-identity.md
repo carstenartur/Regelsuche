@@ -115,3 +115,11 @@ mvn -pl regelsuche-optimization-sdk -am \
   -Dtest=NoncommutativeIdentityTest,NoncommutativeIdentitySdkTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
+
+Für Formeln über rationalen Zahlen mit Inversengattern bietet
+`RationalFormulaSdk.compare` einen gesonderten Vergleich an einem vom
+Aufrufer angegebenen gemeinsamen Skalarzentrum. Das Gleichheitsurteil ist
+durch einen invarianten Spaltenraum belegt und gilt auf dem gemeinsamen
+Definitionsbereich aller Matrixordnungen. Ein Gegenbeispiel enthält
+konkrete Matrizen für die direkte Auswertung beider Quellbäume.
+[Vertrag, Beweis und Kosten](rational-formula-realization.md#vergleich-am-vorgegebenen-gemeinsamen-skalarpunkt)

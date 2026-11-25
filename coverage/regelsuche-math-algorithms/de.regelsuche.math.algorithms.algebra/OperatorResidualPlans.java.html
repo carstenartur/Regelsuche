@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OperatorResidualPlans.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">OperatorResidualPlans.java</span></div><h1>OperatorResidualPlans.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorChecks.need;
+
+/** Finite rational operators with an exactly checked predictor and optional factored correction. */
+public final class OperatorResidualPlans {
+    private OperatorResidualPlans() {}
+
+<span class="fc" id="L19">    public enum Status { VERIFIED, INVALID, UNSUPPORTED, STOPPED }</span>
+<span class="fc" id="L20">    public record Result&lt;T&gt;(Status status, String detail, Optional&lt;T&gt; value, long work) {</span>
+<span class="pc" id="L21">        public T requireValue() { return value.orElseThrow(() -&gt; new IllegalStateException(detail)); }</span>
+    }
+
+    /** Staged dense dot products; a nonempty row starts with its first product. */
+<span class="fc" id="L25">    public record Cost(long multiplies, long additions) {</span>
+<span class="fc" id="L26">        public long total() { return Math.addExact(multiplies, additions); }</span>
+        static Cost dense(PolynomialMatrix m) {
+<span class="fc" id="L28">            return new Cost((long) m.rows() * m.columns(), (long) m.rows() * (m.columns() - 1));</span>
+        }
+        Cost plus(Cost other) {
+<span class="fc" id="L31">            return new Cost(Math.addExact(multiplies, other.multiplies), Math.addExact(additions, other.additions));</span>
+        }
+<span class="fc" id="L33">        Cost updates(int rows) { return plus(new Cost(0, rows)); }</span>
+    }
+
+    /** The residual image lies in the column span of lift, and has rank at most lift.columns(). */
+    public record Factors(PolynomialMatrix lift, PolynomialMatrix coordinates) {
+<span class="fc" id="L38">        public Factors { Objects.requireNonNull(lift); Objects.requireNonNull(coordinates); }</span>
+    }
+    public record Plan(PolynomialMatrix source, ExactMatrixExpression predictor, Optional&lt;Factors&gt; correction) {
+<span class="fc" id="L41">        public Plan {</span>
+<span class="fc" id="L42">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L43">            Objects.requireNonNull(predictor);</span>
+<span class="fc" id="L44">            Objects.requireNonNull(correction);</span>
+<span class="fc" id="L45">        }</span>
+        public ExactMatrixExpression expression() {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if (correction.isEmpty()) return predictor;</span>
+<span class="fc" id="L48">            var factors = correction.orElseThrow();</span>
+<span class="fc" id="L49">            return new ExactMatrixExpression.Sum(predictor, new ExactMatrixExpression.Product(</span>
+<span class="fc" id="L50">                new ExactMatrixExpression.Matrix(&quot;lift&quot;, factors.lift()),</span>
+<span class="fc" id="L51">                new ExactMatrixExpression.Matrix(&quot;coordinates&quot;, factors.coordinates())));</span>
+        }
+    }
+
+<span class="fc" id="L55">    public record Selection(Plan plan, Cost cost, Cost directCost) {}</span>
+
+    public static Result&lt;Cost&gt; verify(PolynomialMatrix source, Plan plan, IterationLimits limits,
+            BooleanSupplier cancel) {
+<span class="fc" id="L59">        return OperatorChecks.run(limits, cancel, checks -&gt; verify(source, plan, checks));</span>
+    }
+
+    private static Cost verify(PolynomialMatrix source, Plan plan, OperatorChecks checks) {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        need(plan != null, &quot;MISSING_PLAN&quot;);</span>
+<span class="fc" id="L64">        checks.input(source);</span>
+<span class="fc" id="L65">        checks.input(plan.source());</span>
+<span class="fc" id="L66">        need(checks.algebra.equal(source, plan.source()), &quot;SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L67">        var expression = plan.expression();</span>
+<span class="fc" id="L68">        var shape = checks.inspect(expression, 0);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        need(shape.rows() == source.rows() &amp;&amp; shape.columns() == source.columns(), &quot;IDENTITY_MISMATCH&quot;);</span>
+<span class="fc" id="L70">        need(checks.algebra.equal(source, checks.algebra.evaluate(expression)), &quot;IDENTITY_MISMATCH&quot;);</span>
+<span class="fc" id="L71">        return shape.cost();</span>
+    }
+
+    /** Compare all supplied plans with the dense source. Invalid evidence fails the request. Ties keep the first. */
+    public static Result&lt;Selection&gt; select(PolynomialMatrix source, List&lt;Plan&gt; plans, int maxCandidates,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L77">        return OperatorChecks.run(limits, cancel, checks -&gt; {</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (maxCandidates &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_CANDIDATE_LIMIT&quot;);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            need(plans != null, &quot;MISSING_PLANS&quot;);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (plans.size() &gt; maxCandidates) throw new OperatorChecks.Rejected(Status.STOPPED, &quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L81">            checks.input(source);</span>
+<span class="fc" id="L82">            var direct = Cost.dense(source);</span>
+<span class="fc" id="L83">            var best = new Selection(new Plan(source, new ExactMatrixExpression.Matrix(&quot;source&quot;, source),</span>
+<span class="fc" id="L84">                Optional.empty()), direct, direct);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (var plan : plans) {</span>
+<span class="fc" id="L86">                checks.work.charge(1);</span>
+<span class="fc" id="L87">                var cost = verify(source, plan, checks);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (cost.total() &lt; best.cost().total()) best = new Selection(plan, cost, direct);</span>
+<span class="fc" id="L89">            }</span>
+<span class="fc" id="L90">            return best;</span>
+        });
+    }
+
+    /** Given a common rational eigenbasis and its inverse, construct a correction only on mismatching columns. */
+    public static Result&lt;Plan&gt; spectral(PolynomialMatrix source, ExactMatrixExpression predictor,
+            PolynomialMatrix basis, PolynomialMatrix inverse, IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L97">        return OperatorChecks.run(limits, cancel, checks -&gt; {</span>
+<span class="fc" id="L98">            checks.input(source);</span>
+<span class="fc" id="L99">            checks.input(basis);</span>
+<span class="fc" id="L100">            checks.input(inverse);</span>
+<span class="fc" id="L101">            int n = source.rows();</span>
+<span class="pc bpc" id="L102" title="3 of 6 branches missed.">            need(n == source.columns() &amp;&amp; n == basis.rows() &amp;&amp; n == basis.columns()</span>
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">                &amp;&amp; n == inverse.rows() &amp;&amp; n == inverse.columns(), &quot;BASIS_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L104">            var shape = checks.inspect(predictor, 0);</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">            need(n == shape.rows() &amp;&amp; n == shape.columns(), &quot;PREDICTOR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L106">            var unit = checks.unit(n);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            need(checks.algebra.equal(checks.times(basis, inverse), unit)</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                &amp;&amp; checks.algebra.equal(checks.times(inverse, basis), unit), &quot;BASIS_INVERSE_MISMATCH&quot;);</span>
+<span class="fc" id="L109">            var predicted = checks.algebra.evaluate(predictor);</span>
+<span class="fc" id="L110">            var targetDiagonal = inBasis(source, basis, inverse, checks);</span>
+<span class="fc" id="L111">            var predictedDiagonal = inBasis(predicted, basis, inverse, checks);</span>
+<span class="fc" id="L112">            var exceptional = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L113">            var differences = new ArrayList&lt;Polynomial&gt;();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L115">                checks.work.charge(1);</span>
+<span class="fc" id="L116">                var delta = checks.algebra.add(targetDiagonal.get(i, i),</span>
+<span class="fc" id="L117">                    checks.algebra.multiply(OperatorChecks.MINUS_ONE, predictedDiagonal.get(i, i)));</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (!delta.isZero()) {</span>
+<span class="fc" id="L119">                    exceptional.add(i);</span>
+<span class="fc" id="L120">                    differences.add(delta);</span>
+                }
+            }
+<span class="fc" id="L123">            Optional&lt;Factors&gt; factors = Optional.empty();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (!exceptional.isEmpty()) {</span>
+<span class="fc" id="L125">                var lift = checks.matrix(n, exceptional.size(),</span>
+<span class="fc" id="L126">                    (r, j) -&gt; checks.algebra.multiply(basis.get(r, exceptional.get(j)), differences.get(j)));</span>
+<span class="fc" id="L127">                var coordinates = checks.matrix(exceptional.size(), n, (j, c) -&gt; inverse.get(exceptional.get(j), c));</span>
+<span class="fc" id="L128">                factors = Optional.of(new Factors(lift, coordinates));</span>
+            }
+<span class="fc" id="L130">            var plan = new Plan(source, predictor, factors);</span>
+<span class="fc" id="L131">            verify(source, plan, checks);</span>
+<span class="fc" id="L132">            return plan;</span>
+        });
+    }
+
+    private static PolynomialMatrix inBasis(PolynomialMatrix operator, PolynomialMatrix basis,
+            PolynomialMatrix inverse, OperatorChecks checks) {
+<span class="fc" id="L138">        var diagonal = checks.times(inverse, checks.times(operator, basis));</span>
+<span class="fc bfc" id="L139" title="All 4 branches covered.">        for (int i = 0; i &lt; diagonal.rows(); i++) for (int j = 0; j &lt; diagonal.columns(); j++) {</span>
+<span class="fc" id="L140">            checks.work.charge(1);</span>
+<span class="fc bfc" id="L141" title="All 4 branches covered.">            need(i == j || diagonal.get(i, j).isZero(), &quot;NOT_COMMON_EIGENBASIS&quot;);</span>
+        }
+<span class="fc" id="L143">        return diagonal;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -227,8 +227,8 @@ final class FiniteFieldPolynomialArithmetic {
 <span class="fc" id="L227">                AlgorithmEvidence.append(</span>
                     material,
 <span class="fc" id="L229">                    exponent + &quot;:&quot; + gcd.canonicalMaterial());</span>
-<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                if (!gcd.isOne()) {</span>
-<span class="nc" id="L231">                    irreducible = false;</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                if (!gcd.isOne()) {</span>
+<span class="fc" id="L231">                    irreducible = false;</span>
                 }
             }
         }
@@ -253,7 +253,7 @@ final class FiniteFieldPolynomialArithmetic {
 <span class="fc" id="L253">        for (int divisor = 2;</span>
 <span class="fc bfc" id="L254" title="All 2 branches covered.">                (long) divisor * divisor &lt;= remaining;</span>
 <span class="fc" id="L255">                divisor++) {</span>
-<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            if (remaining % divisor == 0) {</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (remaining % divisor == 0) {</span>
 <span class="fc" id="L257">                result.add(divisor);</span>
 <span class="fc bfc" id="L258" title="All 2 branches covered.">                while (remaining % divisor == 0) {</span>
 <span class="fc" id="L259">                    remaining /= divisor;</span>

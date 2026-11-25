@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FarkasSparsifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">FarkasSparsifier.java</span></div><h1>FarkasSparsifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.scalar.ExactRational.NEGATIVE_ONE;
+import static de.regelsuche.scalar.ExactRational.ONE;
+import static de.regelsuche.scalar.ExactRational.ZERO;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Infeasible;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Problem;
+import de.regelsuche.math.algorithms.linalg.LinearProgramVerifier.Status;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Reduces an already supplied Farkas multiplier by exact dependence elimination. */
+public final class FarkasSparsifier {
+    private FarkasSparsifier() {}
+
+<span class="fc" id="L21">    public record Result(Status status, String reason, long work, Optional&lt;Infeasible&gt; certificate) {}</span>
+
+    /**
+     * Returns y with b^T y = -1 supported on at most rank(A) + 1 of the originally selected rows.
+     * Each cancellation preserves the augmented sum and strictly reduces the support.
+     */
+    public static Result sparsify(Problem problem, Infeasible certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L29">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L31">            var initial = LinearProgramVerifier.verify(problem, certificate, false, 0, work);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">            if (!initial.valid()) return empty(initial.status(), initial.reason(), work);</span>
+
+<span class="fc" id="L34">            long inputCells = LinearProgramVerifier.storageCells(problem, certificate, work);</span>
+<span class="fc" id="L35">            int rows = problem.constraints();</span>
+<span class="fc" id="L36">            int prefix = Math.min(rows, problem.variables() + 2);</span>
+<span class="fc" id="L37">            long workingCells = inputCells + rows + prefix;</span>
+<span class="fc" id="L38">            work.cells(workingCells);</span>
+<span class="fc" id="L39">            work.charge(rows + (long) prefix);</span>
+<span class="fc" id="L40">            var weights = new ExactRational[rows];</span>
+<span class="fc" id="L41">            var active = new int[prefix];</span>
+<span class="fc" id="L42">            var factor = work.div(NEGATIVE_ONE, LinearProgramVerifier.dot(problem.b(), certificate.y(), work));</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) weights[row] = work.mul(factor, certificate.y().get(row));</span>
+
+            while (true) {
+<span class="fc" id="L46">                int count = activePrefix(weights, active, work);</span>
+<span class="fc" id="L47">                var direction = dependency(problem, active, count, workingCells, work);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                if (direction == null) break;</span>
+<span class="fc" id="L49">                cancel(weights, active, direction, work);</span>
+<span class="fc" id="L50">            }</span>
+
+            // Reserve the snapshot and the transient reference array used to build it.
+<span class="fc" id="L53">            work.cells(workingCells + 2L * rows);</span>
+<span class="fc" id="L54">            work.charge(2L * rows);</span>
+<span class="fc" id="L55">            var sparse = new Infeasible(problem, Arrays.asList(weights));</span>
+<span class="fc" id="L56">            var verified = LinearProgramVerifier.verify(problem, sparse, true,</span>
+<span class="fc" id="L57">                workingCells - problem.storageCells(), work);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (!verified.valid()) return empty(Status.UNAVAILABLE, &quot;OUTPUT_&quot; + verified.reason(), work);</span>
+<span class="fc" id="L59">            work.charge(0);</span>
+<span class="fc" id="L60">            return new Result(Status.VERIFIED, &quot;VERIFIED&quot;, work.used(), Optional.of(sparse));</span>
+<span class="fc" id="L61">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L62">            return empty(Status.UNAVAILABLE, stop.getMessage(), work);</span>
+        }
+    }
+
+    private static int activePrefix(ExactRational[] weights, int[] active, CertificateWork work) {
+<span class="fc" id="L67">        int size = 0;</span>
+<span class="fc bfc" id="L68" title="All 4 branches covered.">        for (int row = 0; row &lt; weights.length &amp;&amp; size &lt; active.length; row++) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (!work.check(weights[row]).isZero()) active[size++] = row;</span>
+        }
+<span class="fc" id="L71">        return size;</span>
+    }
+
+    /** Finds the first dependent augmented column by elimination on an active prefix. */
+    private static ExactRational[] dependency(Problem problem, int[] active, int count,
+            long retainedCells, CertificateWork work) {
+<span class="fc" id="L77">        int variables = problem.variables();</span>
+<span class="fc" id="L78">        int dimensions = variables + 1;</span>
+        // Augmented coordinates are rows here, constraints in the active prefix are columns.
+<span class="fc" id="L80">        long cells = dimensions * (count + 1L) + count;</span>
+<span class="fc" id="L81">        work.cells(retainedCells + cells);</span>
+<span class="fc" id="L82">        work.charge(cells);</span>
+<span class="fc" id="L83">        var matrix = new ExactRational[dimensions][count];</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int coordinate = 0; coordinate &lt; dimensions; coordinate++) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (int column = 0; column &lt; count; column++) {</span>
+<span class="fc" id="L86">                int sourceRow = active[column];</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                var value = coordinate == variables ? problem.b().get(sourceRow)</span>
+<span class="fc" id="L88">                    : problem.a().get(sourceRow).get(coordinate);</span>
+<span class="fc" id="L89">                matrix[coordinate][column] = work.check(value);</span>
+            }
+        }
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int column = 0; column &lt; count; column++) {</span>
+<span class="fc" id="L94">            int pivot = column;</span>
+<span class="fc bfc" id="L95" title="All 4 branches covered.">            while (pivot &lt; dimensions &amp;&amp; work.check(matrix[pivot][column]).isZero()) pivot++;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (pivot == dimensions) return backSubstitute(matrix, column, work);</span>
+<span class="fc" id="L97">            work.charge(1);</span>
+<span class="fc" id="L98">            var row = matrix[pivot];</span>
+<span class="fc" id="L99">            matrix[pivot] = matrix[column];</span>
+<span class="fc" id="L100">            matrix[column] = row;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (int below = column + 1; below &lt; dimensions; below++) {</span>
+<span class="fc" id="L102">                var entry = work.check(matrix[below][column]);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (entry.isZero()) continue;</span>
+<span class="fc" id="L104">                var factor = work.div(entry, row[column]);</span>
+<span class="fc" id="L105">                matrix[below][column] = ZERO;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                for (int right = column + 1; right &lt; count; right++) {</span>
+<span class="fc" id="L107">                    matrix[below][right] = work.sub(matrix[below][right], work.mul(factor, row[right]));</span>
+                }
+            }
+        }
+<span class="fc" id="L111">        return null;</span>
+    }
+
+    /** Gives the free column coefficient +1, so minimum-ratio cancellation always has a positive entry. */
+    private static ExactRational[] backSubstitute(ExactRational[][] matrix, int free, CertificateWork work) {
+<span class="fc" id="L116">        work.charge(free + 1L);</span>
+<span class="fc" id="L117">        var direction = new ExactRational[free + 1];</span>
+<span class="fc" id="L118">        direction[free] = ONE;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (int row = free - 1; row &gt;= 0; row--) {</span>
+<span class="fc" id="L120">            var residual = ZERO;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (int column = row + 1; column &lt;= free; column++) {</span>
+<span class="fc" id="L122">                residual = work.sub(residual, work.mul(matrix[row][column], direction[column]));</span>
+            }
+<span class="fc" id="L124">            direction[row] = work.div(residual, matrix[row][row]);</span>
+        }
+<span class="fc" id="L126">        return direction;</span>
+    }
+
+    private static void cancel(ExactRational[] weights, int[] active, ExactRational[] direction,
+            CertificateWork work) {
+<span class="fc" id="L131">        int last = direction.length - 1;</span>
+<span class="fc" id="L132">        var step = work.check(weights[active[last]]);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int index = 0; index &lt; last; index++) {</span>
+<span class="fc" id="L134">            var coefficient = work.check(direction[index]);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (coefficient.signum() &gt; 0) {</span>
+<span class="fc" id="L136">                var ratio = work.div(weights[active[index]], coefficient);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                if (work.sub(ratio, step).signum() &lt; 0) step = ratio;</span>
+            }
+        }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int index = 0; index &lt; direction.length; index++) {</span>
+<span class="fc" id="L141">            int row = active[index];</span>
+<span class="fc" id="L142">            weights[row] = work.sub(weights[row], work.mul(step, direction[index]));</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    private static Result empty(Status status, String reason, CertificateWork work) {
+<span class="fc" id="L147">        return new Result(status, reason, work.used(), Optional.empty());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

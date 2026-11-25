@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearProgramVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">LinearProgramVerifier.java</span></div><h1>LinearProgramVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.scalar.ExactRational.NEGATIVE_ONE;
+import static de.regelsuche.scalar.ExactRational.ONE;
+import static de.regelsuche.scalar.ExactRational.ZERO;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Certificate;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Infeasible;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Optimal;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Problem;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Unbounded;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Checks supplied evidence by exact arithmetic on the original linear program. */
+public final class LinearProgramVerifier {
+    private LinearProgramVerifier() {}
+
+<span class="fc" id="L23">    public enum Status { VERIFIED, INVALID, UNAVAILABLE }</span>
+
+<span class="fc" id="L25">    public record Verification(Status status, String reason, long work) {</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        public boolean valid() { return status == Status.VERIFIED; }</span>
+    }
+
+    public static Verification verify(Problem problem, Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L31">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L33">            return verify(problem, certificate, false, 0, work);</span>
+<span class="fc" id="L34">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L35">            return new Verification(Status.UNAVAILABLE, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    static Verification verify(Problem problem, Certificate certificate, boolean normalized,
+            long retainedCells, CertificateWork work) {
+<span class="fc" id="L41">        Objects.requireNonNull(problem);</span>
+<span class="fc" id="L42">        work.charge(1);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (certificate == null) return result(&quot;MISSING_CERTIFICATE&quot;, work);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (problem.constraints() != certificate.source().constraints()</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                || problem.variables() != certificate.source().variables()) {</span>
+<span class="fc" id="L46">            return result(&quot;SOURCE_MISMATCH&quot;, work);</span>
+        }
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!compatible(problem, certificate)) return result(&quot;CERTIFICATE_SHAPE&quot;, work);</span>
+<span class="fc" id="L49">        work.cells(retainedCells + storageCells(problem, certificate, work));</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (!sameSource(problem, certificate.source(), work)) return result(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc" id="L51">        inspectValues(certificate, work);</span>
+<span class="fc bfc" id="L52" title="All 3 branches covered.">        return result(switch (certificate) {</span>
+<span class="fc" id="L53">            case Infeasible proof -&gt; checkInfeasible(problem, proof, normalized, work);</span>
+<span class="fc" id="L54">            case Optimal proof -&gt; checkOptimal(problem, proof, work);</span>
+<span class="fc" id="L55">            case Unbounded proof -&gt; checkUnbounded(problem, proof, work);</span>
+<span class="fc" id="L56">        }, work);</span>
+    }
+
+    private static boolean compatible(Problem problem, Certificate certificate) {
+<span class="fc bfc" id="L60" title="All 3 branches covered.">        return switch (certificate) {</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            case Infeasible proof -&gt; proof.y().size() == problem.constraints();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            case Optimal proof -&gt; proof.x().size() == problem.variables()</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                &amp;&amp; proof.y().size() == problem.constraints();</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            case Unbounded proof -&gt; proof.x().size() == problem.variables()</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                &amp;&amp; proof.v().size() == problem.variables();</span>
+        };
+    }
+
+    static long storageCells(Problem problem, Certificate certificate, CertificateWork work) {
+<span class="fc" id="L70">        long source = problem.storageCells();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        long bound = problem == certificate.source() ? 0 : certificate.source().storageCells();</span>
+<span class="fc" id="L72">        work.cells(source);</span>
+<span class="fc" id="L73">        work.cells(bound);</span>
+<span class="fc bfc" id="L74" title="All 3 branches covered.">        return source + bound + switch (certificate) {</span>
+<span class="fc" id="L75">            case Infeasible proof -&gt; proof.y().size();</span>
+<span class="fc" id="L76">            case Optimal proof -&gt; proof.x().size() + (long) proof.y().size();</span>
+<span class="fc" id="L77">            case Unbounded proof -&gt; proof.x().size() + (long) proof.v().size();</span>
+<span class="fc" id="L78">        };</span>
+    }
+
+    private static boolean sameSource(Problem request, Problem bound, CertificateWork work) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (int row = 0; row &lt; request.constraints(); row++) {</span>
+<span class="fc" id="L83">            work.charge(1);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (!sameValues(request.a().get(row), bound.a().get(row), work)) return false;</span>
+        }
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        return sameValues(request.b(), bound.b(), work) &amp;&amp; sameValues(request.c(), bound.c(), work);</span>
+    }
+
+    private static boolean sameValues(List&lt;ExactRational&gt; first, List&lt;ExactRational&gt; second, CertificateWork work) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int index = 0; index &lt; first.size(); index++) {</span>
+<span class="fc" id="L91">            var value = work.check(first.get(index));</span>
+<span class="fc bfc" id="L92" title="All 4 branches covered.">            if (first != second &amp;&amp; !value.equals(work.check(second.get(index)))) return false;</span>
+        }
+<span class="fc" id="L94">        return true;</span>
+    }
+
+    private static void inspectValues(Certificate certificate, CertificateWork work) {
+<span class="fc bfc" id="L98" title="All 3 branches covered.">        switch (certificate) {</span>
+<span class="fc" id="L99">            case Infeasible proof -&gt; inspectVector(proof.y(), work);</span>
+<span class="fc" id="L100">            case Optimal proof -&gt; {</span>
+<span class="fc" id="L101">                inspectVector(proof.x(), work);</span>
+<span class="fc" id="L102">                inspectVector(proof.y(), work);</span>
+<span class="fc" id="L103">            }</span>
+<span class="fc" id="L104">            case Unbounded proof -&gt; {</span>
+<span class="fc" id="L105">                inspectVector(proof.x(), work);</span>
+<span class="fc" id="L106">                inspectVector(proof.v(), work);</span>
+            }
+        }
+<span class="fc" id="L109">    }</span>
+
+    private static void inspectVector(List&lt;ExactRational&gt; vector, CertificateWork work) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (ExactRational value : vector) work.check(value);</span>
+<span class="fc" id="L113">    }</span>
+
+    private static String checkInfeasible(Problem problem, Infeasible proof, boolean normalized,
+            CertificateWork work) {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!matchesDual(problem, proof.y(), false, work)) return &quot;FARKAS_MULTIPLIER&quot;;</span>
+<span class="fc" id="L118">        var contradiction = dot(problem.b(), proof.y(), work);</span>
+<span class="pc bpc" id="L119" title="1 of 6 branches missed.">        return (normalized ? contradiction.equals(NEGATIVE_ONE) : contradiction.signum() &lt; 0)</span>
+<span class="fc" id="L120">            ? null : &quot;FARKAS_CONTRADICTION&quot;;</span>
+    }
+
+    private static String checkOptimal(Problem problem, Optimal proof, CertificateWork work) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!withinRows(problem, proof.x(), false, work)) return &quot;PRIMAL_INFEASIBLE&quot;;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (!matchesDual(problem, proof.y(), true, work)) return &quot;DUAL_INFEASIBLE&quot;;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        return dot(problem.c(), proof.x(), work).equals(dot(problem.b(), proof.y(), work))</span>
+<span class="fc" id="L127">            ? null : &quot;DUALITY_GAP&quot;;</span>
+    }
+
+    private static String checkUnbounded(Problem problem, Unbounded proof, CertificateWork work) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!withinRows(problem, proof.x(), false, work)) return &quot;PRIMAL_INFEASIBLE&quot;;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (!withinRows(problem, proof.v(), true, work)) return &quot;RAY_DIRECTION&quot;;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        return dot(problem.c(), proof.v(), work).equals(ONE) ? null : &quot;RAY_OBJECTIVE_GAIN&quot;;</span>
+    }
+
+    private static boolean withinRows(Problem problem, List&lt;ExactRational&gt; vector, boolean homogeneous,
+            CertificateWork work) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (int row = 0; row &lt; problem.constraints(); row++) {</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            var bound = homogeneous ? ZERO : problem.b().get(row);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (work.sub(dot(problem.a().get(row), vector, work), bound).signum() &gt; 0) return false;</span>
+        }
+<span class="fc" id="L142">        return true;</span>
+    }
+
+    private static boolean matchesDual(Problem problem, List&lt;ExactRational&gt; y, boolean optimality,
+            CertificateWork work) {
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (ExactRational weight : y) {</span>
+<span class="fc" id="L148">            work.charge(1);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (weight.signum() &lt; 0) return false;</span>
+<span class="fc" id="L150">        }</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (int column = 0; column &lt; problem.variables(); column++) {</span>
+<span class="fc" id="L152">            var sum = ZERO;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (int row = 0; row &lt; problem.constraints(); row++) {</span>
+<span class="fc" id="L154">                sum = work.add(sum, work.mul(problem.a().get(row).get(column), y.get(row)));</span>
+            }
+<span class="fc bfc" id="L156" title="All 4 branches covered.">            if (!sum.equals(optimality ? problem.c().get(column) : ZERO)) return false;</span>
+        }
+<span class="fc" id="L158">        return true;</span>
+    }
+
+    static ExactRational dot(List&lt;ExactRational&gt; first, List&lt;ExactRational&gt; second, CertificateWork work) {
+<span class="fc" id="L162">        var sum = ZERO;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (int index = 0; index &lt; first.size(); index++) {</span>
+<span class="fc" id="L164">            sum = work.add(sum, work.mul(first.get(index), second.get(index)));</span>
+        }
+<span class="fc" id="L166">        return sum;</span>
+    }
+
+    private static Verification result(String rejection, CertificateWork work) {
+<span class="fc" id="L170">        work.charge(0);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        return rejection == null ? new Verification(Status.VERIFIED, &quot;VERIFIED&quot;, work.used())</span>
+<span class="fc" id="L172">            : new Verification(Status.INVALID, rejection, work.used());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

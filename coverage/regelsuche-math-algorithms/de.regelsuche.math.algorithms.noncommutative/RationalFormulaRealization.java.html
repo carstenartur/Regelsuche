@@ -72,130 +72,135 @@ public final class RationalFormulaRealization {
 <span class="fc" id="L72">        Objects.requireNonNull(source, &quot;source&quot;);</span>
 <span class="fc" id="L73">        var work = new RationalFormulaWork(limits, cancelled);</span>
         try {
-<span class="fc" id="L75">            int order = order(source, 1, work);</span>
-<span class="fc" id="L76">            var builder = new Builder(order, work);</span>
-<span class="fc" id="L77">            Selectors selectors = builder.write(source, 0);</span>
-<span class="fc" id="L78">            var certificate = new Certificate(source, new AffinePencil(order, Arrays.asList(builder.entries)),</span>
-<span class="fc" id="L79">                Arrays.asList(selectors.u()), Arrays.asList(selectors.v()), builder.obligations);</span>
-<span class="fc" id="L80">            RationalFormulaVerifier.checkStructure(source, certificate, work);</span>
-<span class="fc" id="L81">            work.ledger.charge(0);</span>
-<span class="fc" id="L82">            return new Result(Status.REALIZED, Optional.of(certificate), &quot;&quot;, work.ledger.used());</span>
-<span class="fc" id="L83">        } catch (CertificateWork.Stop stopped) {</span>
-<span class="fc" id="L84">            return new Result(RationalFormulaWork.status(stopped), Optional.empty(), stopped.getMessage(),</span>
-<span class="fc" id="L85">                work.ledger.used());</span>
-<span class="nc" id="L86">        } catch (RationalFormulaVerifier.Rejected rejected) {</span>
-<span class="nc" id="L87">            return new Result(rejected.status, Optional.empty(), rejected.getMessage(), work.ledger.used());</span>
+<span class="fc" id="L75">            var certificate = build(source, work);</span>
+<span class="fc" id="L76">            work.ledger.charge(0);</span>
+<span class="fc" id="L77">            return new Result(Status.REALIZED, Optional.of(certificate), &quot;&quot;, work.ledger.used());</span>
+<span class="fc" id="L78">        } catch (CertificateWork.Stop stopped) {</span>
+<span class="fc" id="L79">            return new Result(RationalFormulaWork.status(stopped), Optional.empty(), stopped.getMessage(),</span>
+<span class="fc" id="L80">                work.ledger.used());</span>
+<span class="nc" id="L81">        } catch (RationalFormulaVerifier.Rejected rejected) {</span>
+<span class="nc" id="L82">            return new Result(rejected.status, Optional.empty(), rejected.getMessage(), work.ledger.used());</span>
         }
     }
 
-    private static int order(RationalFormula source, int depth, RationalFormulaWork work) {
-<span class="fc" id="L92">        work.enter(depth);</span>
-<span class="fc bfc" id="L93" title="All 5 branches covered.">        int order = switch (source) {</span>
-<span class="fc" id="L94">            case Scalar scalar -&gt; {</span>
-<span class="fc" id="L95">                work.ledger.check(scalar.value());</span>
-<span class="fc" id="L96">                yield 2;</span>
-            }
-<span class="fc" id="L98">            case Variable ignored -&gt; 2;</span>
-<span class="fc" id="L99">            case Sum sum -&gt; order(sum.left(), depth + 1, work) + order(sum.right(), depth + 1, work);</span>
-<span class="fc" id="L100">            case Product product -&gt; order(product.left(), depth + 1, work) + order(product.right(), depth + 1, work);</span>
-<span class="fc" id="L101">            case Inverse inverse -&gt; order(inverse.operand(), depth + 1, work) + 1;</span>
-<span class="fc" id="L102">        };</span>
-<span class="fc" id="L103">        work.ledger.cells((long) order * order);</span>
-<span class="fc" id="L104">        return order;</span>
+    static Certificate build(RationalFormula source, RationalFormulaWork work) {
+<span class="fc" id="L87">        int order = order(source, 1, work);</span>
+<span class="fc" id="L88">        var builder = new Builder(order, work);</span>
+<span class="fc" id="L89">        Selectors selectors = builder.write(source, 0);</span>
+<span class="fc" id="L90">        var certificate = new Certificate(source, new AffinePencil(order, Arrays.asList(builder.entries)),</span>
+<span class="fc" id="L91">            Arrays.asList(selectors.u()), Arrays.asList(selectors.v()), builder.obligations);</span>
+<span class="fc" id="L92">        RationalFormulaVerifier.checkStructure(source, certificate, work);</span>
+<span class="fc" id="L93">        return certificate;</span>
     }
 
-<span class="fc" id="L107">    private record Selectors(ExactRational[] u, ExactRational[] v) {</span>
-<span class="fc" id="L108">        int order() { return u.length; }</span>
+    private static int order(RationalFormula source, int depth, RationalFormulaWork work) {
+<span class="fc" id="L97">        work.enter(depth);</span>
+<span class="fc bfc" id="L98" title="All 5 branches covered.">        int order = switch (source) {</span>
+<span class="fc" id="L99">            case Scalar scalar -&gt; {</span>
+<span class="fc" id="L100">                work.ledger.check(scalar.value());</span>
+<span class="fc" id="L101">                yield 2;</span>
+            }
+<span class="fc" id="L103">            case Variable ignored -&gt; 2;</span>
+<span class="fc" id="L104">            case Sum sum -&gt; order(sum.left(), depth + 1, work) + order(sum.right(), depth + 1, work);</span>
+<span class="fc" id="L105">            case Product product -&gt; order(product.left(), depth + 1, work) + order(product.right(), depth + 1, work);</span>
+<span class="fc" id="L106">            case Inverse inverse -&gt; order(inverse.operand(), depth + 1, work) + 1;</span>
+<span class="fc" id="L107">        };</span>
+<span class="fc" id="L108">        work.ledger.cells((long) order * order);</span>
+<span class="fc" id="L109">        return order;</span>
+    }
+
+<span class="fc" id="L112">    private record Selectors(ExactRational[] u, ExactRational[] v) {</span>
+<span class="fc" id="L113">        int order() { return u.length; }</span>
     }
 
     private static final class Builder {
         private final int order;
         private final RationalFormulaWork work;
         private final PencilEntry[] entries;
-<span class="fc" id="L115">        private final List&lt;InverseObligation&gt; obligations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L120">        private final List&lt;InverseObligation&gt; obligations = new ArrayList&lt;&gt;();</span>
         private int occurrence;
 
-<span class="fc" id="L118">        Builder(int order, RationalFormulaWork work) {</span>
-<span class="fc" id="L119">            this.order = order;</span>
-<span class="fc" id="L120">            this.work = work;</span>
+<span class="fc" id="L123">        Builder(int order, RationalFormulaWork work) {</span>
+<span class="fc" id="L124">            this.order = order;</span>
+<span class="fc" id="L125">            this.work = work;</span>
             // Count both the mutable builder storage and the immutable certificate snapshot.
-<span class="fc" id="L122">            work.reserve(2L * order * order + 2L * order);</span>
-<span class="fc" id="L123">            entries = new PencilEntry[order * order];</span>
-<span class="fc" id="L124">            Arrays.fill(entries, new Constant(ZERO));</span>
-<span class="fc" id="L125">        }</span>
+<span class="fc" id="L127">            work.reserve(2L * order * order + 2L * order);</span>
+<span class="fc" id="L128">            entries = new PencilEntry[order * order];</span>
+<span class="fc" id="L129">            Arrays.fill(entries, new Constant(ZERO));</span>
+<span class="fc" id="L130">        }</span>
 
         Selectors write(RationalFormula source, int offset) {
-<span class="fc" id="L128">            work.ledger.charge(1);</span>
-<span class="fc bfc" id="L129" title="All 5 branches covered.">            Selectors selectors = switch (source) {</span>
-<span class="fc" id="L130">                case Scalar scalar -&gt; leaf(offset, new Constant(scalar.value().negate()));</span>
-<span class="fc" id="L131">                case Variable variable -&gt; leaf(offset, new VariableTerm(variable.id(), NEGATIVE_ONE));</span>
-<span class="fc" id="L132">                case Sum sum -&gt; binary(sum.left(), sum.right(), offset, false);</span>
-<span class="fc" id="L133">                case Product product -&gt; binary(product.left(), product.right(), offset, true);</span>
-<span class="fc" id="L134">                case Inverse inverse -&gt; inverse(inverse.operand(), offset);</span>
-<span class="fc" id="L135">            };</span>
-<span class="fc" id="L136">            occurrence++;</span>
-<span class="fc" id="L137">            return selectors;</span>
+<span class="fc" id="L133">            work.ledger.charge(1);</span>
+<span class="fc bfc" id="L134" title="All 5 branches covered.">            Selectors selectors = switch (source) {</span>
+<span class="fc" id="L135">                case Scalar scalar -&gt; leaf(offset, new Constant(scalar.value().negate()));</span>
+<span class="fc" id="L136">                case Variable variable -&gt; leaf(offset, new VariableTerm(variable.id(), NEGATIVE_ONE));</span>
+<span class="fc" id="L137">                case Sum sum -&gt; binary(sum.left(), sum.right(), offset, false);</span>
+<span class="fc" id="L138">                case Product product -&gt; binary(product.left(), product.right(), offset, true);</span>
+<span class="fc" id="L139">                case Inverse inverse -&gt; inverse(inverse.operand(), offset);</span>
+<span class="fc" id="L140">            };</span>
+<span class="fc" id="L141">            occurrence++;</span>
+<span class="fc" id="L142">            return selectors;</span>
         }
 
         private Selectors leaf(int offset, PencilEntry value) {
-<span class="fc" id="L141">            put(offset, offset, new Constant(ONE));</span>
-<span class="fc" id="L142">            put(offset, offset + 1, value);</span>
-<span class="fc" id="L143">            put(offset + 1, offset + 1, new Constant(ONE));</span>
-<span class="fc" id="L144">            Selectors selectors = zeros(2);</span>
-<span class="fc" id="L145">            selectors.u()[0] = ONE;</span>
-<span class="fc" id="L146">            selectors.v()[1] = ONE;</span>
-<span class="fc" id="L147">            return selectors;</span>
+<span class="fc" id="L146">            put(offset, offset, new Constant(ONE));</span>
+<span class="fc" id="L147">            put(offset, offset + 1, value);</span>
+<span class="fc" id="L148">            put(offset + 1, offset + 1, new Constant(ONE));</span>
+<span class="fc" id="L149">            Selectors selectors = zeros(2);</span>
+<span class="fc" id="L150">            selectors.u()[0] = ONE;</span>
+<span class="fc" id="L151">            selectors.v()[1] = ONE;</span>
+<span class="fc" id="L152">            return selectors;</span>
         }
 
         private Selectors binary(RationalFormula left, RationalFormula right, int offset, boolean product) {
-<span class="fc" id="L151">            Selectors a = write(left, offset);</span>
-<span class="fc" id="L152">            int rightOffset = offset + a.order();</span>
-<span class="fc" id="L153">            Selectors b = write(right, rightOffset);</span>
-<span class="fc" id="L154">            Selectors combined = zeros(a.order() + b.order());</span>
-<span class="fc" id="L155">            System.arraycopy(a.u(), 0, combined.u(), 0, a.order());</span>
-<span class="fc" id="L156">            System.arraycopy(b.v(), 0, combined.v(), a.order(), b.order());</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (product) {</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">                for (int row = 0; row &lt; a.order(); row++) {</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">                    for (int column = 0; column &lt; b.order(); column++) {</span>
-<span class="fc" id="L160">                        ExactRational cross = work.ledger.mul(a.v()[row], b.u()[column]).negate();</span>
-<span class="fc" id="L161">                        put(offset + row, rightOffset + column, new Constant(cross));</span>
+<span class="fc" id="L156">            Selectors a = write(left, offset);</span>
+<span class="fc" id="L157">            int rightOffset = offset + a.order();</span>
+<span class="fc" id="L158">            Selectors b = write(right, rightOffset);</span>
+<span class="fc" id="L159">            Selectors combined = zeros(a.order() + b.order());</span>
+<span class="fc" id="L160">            System.arraycopy(a.u(), 0, combined.u(), 0, a.order());</span>
+<span class="fc" id="L161">            System.arraycopy(b.v(), 0, combined.v(), a.order(), b.order());</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (product) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                for (int row = 0; row &lt; a.order(); row++) {</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                    for (int column = 0; column &lt; b.order(); column++) {</span>
+<span class="fc" id="L165">                        ExactRational cross = work.ledger.mul(a.v()[row], b.u()[column]).negate();</span>
+<span class="fc" id="L166">                        put(offset + row, rightOffset + column, new Constant(cross));</span>
                     }
                 }
             } else {
-<span class="fc" id="L165">                System.arraycopy(b.u(), 0, combined.u(), a.order(), b.order());</span>
-<span class="fc" id="L166">                System.arraycopy(a.v(), 0, combined.v(), 0, a.order());</span>
+<span class="fc" id="L170">                System.arraycopy(b.u(), 0, combined.u(), a.order(), b.order());</span>
+<span class="fc" id="L171">                System.arraycopy(a.v(), 0, combined.v(), 0, a.order());</span>
             }
-<span class="fc" id="L168">            return combined;</span>
+<span class="fc" id="L173">            return combined;</span>
         }
 
         private Selectors inverse(RationalFormula operand, int offset) {
-<span class="fc" id="L172">            Selectors child = write(operand, offset);</span>
-<span class="fc" id="L173">            int border = offset + child.order();</span>
-<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (int i = 0; i &lt; child.order(); i++) {</span>
-<span class="fc" id="L175">                put(offset + i, border, new Constant(child.v()[i]));</span>
-<span class="fc" id="L176">                put(border, offset + i, new Constant(child.u()[i]));</span>
+<span class="fc" id="L177">            Selectors child = write(operand, offset);</span>
+<span class="fc" id="L178">            int border = offset + child.order();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            for (int i = 0; i &lt; child.order(); i++) {</span>
+<span class="fc" id="L180">                put(offset + i, border, new Constant(child.v()[i]));</span>
+<span class="fc" id="L181">                put(border, offset + i, new Constant(child.u()[i]));</span>
             }
-<span class="fc" id="L178">            Selectors result = zeros(child.order() + 1);</span>
-<span class="fc" id="L179">            result.u()[child.order()] = NEGATIVE_ONE;</span>
-<span class="fc" id="L180">            result.v()[child.order()] = ONE;</span>
-<span class="fc" id="L181">            work.reserve(2);</span>
-<span class="fc" id="L182">            obligations.add(new InverseObligation(occurrence, offset, result.order()));</span>
-<span class="fc" id="L183">            return result;</span>
+<span class="fc" id="L183">            Selectors result = zeros(child.order() + 1);</span>
+<span class="fc" id="L184">            result.u()[child.order()] = NEGATIVE_ONE;</span>
+<span class="fc" id="L185">            result.v()[child.order()] = ONE;</span>
+<span class="fc" id="L186">            work.reserve(2);</span>
+<span class="fc" id="L187">            obligations.add(new InverseObligation(occurrence, offset, result.order()));</span>
+<span class="fc" id="L188">            return result;</span>
         }
 
         private Selectors zeros(int size) {
-<span class="fc" id="L187">            work.reserve(2L * size);</span>
-<span class="fc" id="L188">            var u = new ExactRational[size];</span>
-<span class="fc" id="L189">            var v = new ExactRational[size];</span>
-<span class="fc" id="L190">            Arrays.fill(u, ZERO);</span>
-<span class="fc" id="L191">            Arrays.fill(v, ZERO);</span>
-<span class="fc" id="L192">            return new Selectors(u, v);</span>
+<span class="fc" id="L192">            work.reserve(2L * size);</span>
+<span class="fc" id="L193">            var u = new ExactRational[size];</span>
+<span class="fc" id="L194">            var v = new ExactRational[size];</span>
+<span class="fc" id="L195">            Arrays.fill(u, ZERO);</span>
+<span class="fc" id="L196">            Arrays.fill(v, ZERO);</span>
+<span class="fc" id="L197">            return new Selectors(u, v);</span>
         }
 
         private void put(int row, int column, PencilEntry entry) {
-<span class="fc" id="L196">            work.ledger.charge(1);</span>
-<span class="fc" id="L197">            entries[row * order + column] = entry;</span>
-<span class="fc" id="L198">        }</span>
+<span class="fc" id="L201">            work.ledger.charge(1);</span>
+<span class="fc" id="L202">            entries[row * order + column] = entry;</span>
+<span class="fc" id="L203">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

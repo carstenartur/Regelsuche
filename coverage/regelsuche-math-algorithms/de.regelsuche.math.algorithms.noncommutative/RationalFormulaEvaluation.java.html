@@ -90,7 +90,7 @@ final class RationalFormulaEvaluation {
 <span class="fc bfc" id="L90" title="All 2 branches covered.">        for (var obligation : certificate.obligations()) {</span>
 <span class="fc" id="L91">            int order = obligation.order() * dimension;</span>
 <span class="fc" id="L92">            ExactRational[] data = pencilSystem(obligation.offset(), obligation.order(), 0);</span>
-<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (!reduce(data, order, order)) return OptionalInt.of(obligation.occurrence());</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (!reduce(data, order, order, work)) return OptionalInt.of(obligation.occurrence());</span>
 <span class="fc" id="L94">        }</span>
 <span class="fc" id="L95">        return OptionalInt.empty();</span>
     }
@@ -106,7 +106,7 @@ final class RationalFormulaEvaluation {
 <span class="fc" id="L106">                data[(block * dimension + index) * width + order + index] = certificate.v().get(block);</span>
             }
         }
-<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!reduce(data, order, width)) throw new Rejected(Status.INVALID_CERTIFICATE, &quot;SINGULAR_ROOT_PENCIL&quot;);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!reduce(data, order, width, work)) throw new Rejected(Status.INVALID_CERTIFICATE, &quot;SINGULAR_ROOT_PENCIL&quot;);</span>
 
 <span class="fc" id="L111">        ExactRational[] value = table(dimension, dimension);</span>
 <span class="fc bfc" id="L112" title="All 2 branches covered.">        for (int block = 0; block &lt; blockOrder; block++) {</span>
@@ -217,7 +217,7 @@ final class RationalFormulaEvaluation {
             }
 <span class="fc" id="L218">            data[row * width + dimension + row] = ONE;</span>
         }
-<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (!reduce(data, dimension, width)) throw new Undefined(nextOccurrence);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (!reduce(data, dimension, width, work)) throw new Undefined(nextOccurrence);</span>
 <span class="fc" id="L221">        ExactRational[] value = table(dimension, dimension);</span>
 <span class="fc bfc" id="L222" title="All 2 branches covered.">        for (int row = 0; row &lt; dimension; row++) {</span>
 <span class="fc" id="L223">            work.ledger.charge(dimension);</span>
@@ -227,7 +227,7 @@ final class RationalFormulaEvaluation {
     }
 
     /** Exact Gauss-Jordan elimination, with optional trailing right hand sides. */
-    private boolean reduce(ExactRational[] data, int order, int width) {
+    static boolean reduce(ExactRational[] data, int order, int width, RationalFormulaWork work) {
 <span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int pivot = 0; pivot &lt; order; pivot++) {</span>
 <span class="fc" id="L232">            int pivotRow = pivot;</span>
 <span class="fc bfc" id="L233" title="All 4 branches covered.">            while (pivotRow &lt; order &amp;&amp; data[pivotRow * width + pivot].isZero()) {</span>

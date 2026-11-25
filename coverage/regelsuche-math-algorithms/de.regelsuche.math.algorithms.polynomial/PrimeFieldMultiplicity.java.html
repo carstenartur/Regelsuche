@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrimeFieldMultiplicity.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">PrimeFieldMultiplicity.java</span></div><h1>PrimeFieldMultiplicity.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PrimeField;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Complete univariate prime-field decomposition, including the unit and inseparable factors. */
+public final class PrimeFieldMultiplicity {
+    private PrimeFieldMultiplicity() {}
+
+<span class="fc" id="L20">    public enum Status { COMPLETE, INVALID_EVIDENCE, UNSUPPORTED, INCONCLUSIVE }</span>
+
+    public record Certificate(SparsePolynomial&lt;BigInteger&gt; source, BigInteger unit,
+                              List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; factors) {
+<span class="fc" id="L24">        public Certificate {</span>
+<span class="fc" id="L25">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L26">            Objects.requireNonNull(unit);</span>
+<span class="fc" id="L27">            factors = List.copyOf(factors);</span>
+<span class="fc" id="L28">        }</span>
+    }
+
+<span class="fc" id="L31">    public record Result(Status status, Optional&lt;Certificate&gt; certificate, String reason, PolynomialWorkLedger work) {}</span>
+
+    public static Result factor(FactorizationRequest&lt;BigInteger&gt; request, FiniteFieldFactorizationPolicy policy,
+                                BooleanSupplier cancelled) {
+<span class="fc" id="L35">        return run(request, policy, null, cancelled);</span>
+    }
+
+    public static Result verify(FactorizationRequest&lt;BigInteger&gt; request, FiniteFieldFactorizationPolicy policy,
+                                Certificate evidence, BooleanSupplier cancelled) {
+<span class="fc" id="L40">        return run(request, policy, Objects.requireNonNull(evidence), cancelled);</span>
+    }
+
+    private static Result run(FactorizationRequest&lt;BigInteger&gt; request, FiniteFieldFactorizationPolicy policy,
+                              Certificate evidence, BooleanSupplier cancelled) {
+<span class="fc" id="L45">        Objects.requireNonNull(policy);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(cancelled);</span>
+<span class="fc" id="L47">        var work = new PolynomialWorkBudget(request.maxWorkUnits(),</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">            () -&gt; cancelled.getAsBoolean() || Thread.currentThread().isInterrupted());</span>
+<span class="fc" id="L49">        var source = request.source();</span>
+        try {
+<span class="fc" id="L51">            work.consume(&quot;input&quot;, 0);</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">            if (!(source.ring().coefficientDomain() instanceof PrimeField field) || source.ring().variableCount() != 1)</span>
+<span class="fc" id="L53">                return stopped(Status.UNSUPPORTED, &quot;REQUIRES_UNIVARIATE_PRIME_FIELD&quot;, work);</span>
+<span class="fc" id="L54">            work.consume(&quot;input.terms&quot;, source.termCount());</span>
+<span class="fc" id="L55">            var violation = request.structuralViolation();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (violation.isPresent()) return stopped(Status.INCONCLUSIVE, violation.orElseThrow(), work);</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">            if (request.maxCandidates() == 0 || field.prime() &gt; policy.maxEnumeratedFieldElements()</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                || !policy.permitsMatrixDegree(source.degree(0)))</span>
+<span class="fc" id="L59">                return stopped(Status.INCONCLUSIVE, &quot;FACTORIZATION_POLICY&quot;, work);</span>
+<span class="fc" id="L60">            work.consume(&quot;input.dense&quot;, source.degree(0) + 1L);</span>
+<span class="fc" id="L61">            var original = UnivariatePolynomialView.from(source);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (evidence == null) {</span>
+<span class="fc" id="L63">                var factors = new ArrayList&lt;PolynomialFactor&lt;BigInteger&gt;&gt;();</span>
+<span class="fc" id="L64">                var monic = original.monic(field, work, &quot;normalize&quot;);</span>
+<span class="fc" id="L65">                decompose(monic, 1, field, factors, work);</span>
+<span class="fc" id="L66">                evidence = new Certificate(source, original.leadingCoefficient(), factors);</span>
+            }
+<span class="fc" id="L68">            String error = check(original, source, evidence, field, work);</span>
+<span class="fc" id="L69">            work.consume(&quot;final&quot;, 0);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (error != null) return stopped(Status.INVALID_EVIDENCE, error, work);</span>
+<span class="fc" id="L71">            return new Result(Status.COMPLETE, Optional.of(evidence), &quot;&quot;, work.ledger());</span>
+<span class="fc" id="L72">        } catch (PolynomialWorkBudget.LimitReached stop) {</span>
+<span class="fc" id="L73">            return stopped(Status.INCONCLUSIVE, &quot;WORK_LIMIT&quot;, work);</span>
+<span class="fc" id="L74">        } catch (PolynomialWorkBudget.Cancelled stop) {</span>
+<span class="fc" id="L75">            return stopped(Status.INCONCLUSIVE, &quot;CANCELLED&quot;, work);</span>
+        }
+    }
+
+    private static Result stopped(Status status, String reason, PolynomialWorkBudget work) {
+<span class="fc" id="L80">        return new Result(status, Optional.empty(), reason, work.ledger());</span>
+    }
+
+    /** Separate exact multiplicity layers. Residual exponents divisible by p descend via Frobenius. */
+    private static void decompose(UnivariatePolynomialView&lt;BigInteger&gt; f, int scale, PrimeField field,
+                                  List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; factors, PolynomialWorkBudget work) {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (f.isOne()) return;</span>
+<span class="fc" id="L87">        var common = UnivariatePolynomialAlgorithms.gcd(f, f.derivative(work, &quot;layers.derivative&quot;),</span>
+            field, work, &quot;layers.gcd&quot;);
+<span class="fc" id="L89">        var remaining = f.exactQuotient(common, field, work, &quot;layers.divide&quot;);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 1; !remaining.isOne(); i++) {</span>
+<span class="fc" id="L91">            var next = UnivariatePolynomialAlgorithms.gcd(remaining, common, field, work, &quot;layers.intersection&quot;);</span>
+<span class="fc" id="L92">            var layer = remaining.exactQuotient(next, field, work, &quot;layers.extract&quot;);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (!layer.isOne()) {</span>
+<span class="fc" id="L94">                var kernel = BerlekampKernel.compute(layer, field, work);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                for (var factor : FiniteFieldFactorization.split(layer, kernel, field, work)) {</span>
+<span class="fc" id="L96">                    work.consume(&quot;layers.issue-factor&quot;, factor.degree() + 1L);</span>
+<span class="fc" id="L97">                    factors.add(new PolynomialFactor&lt;&gt;(factor.toSparsePolynomial(), Math.multiplyExact(i, scale)));</span>
+<span class="fc" id="L98">                }</span>
+            }
+<span class="fc" id="L100">            remaining = next;</span>
+<span class="fc" id="L101">            common = common.exactQuotient(next, field, work, &quot;layers.remove&quot;);</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!common.isOne()) {</span>
+<span class="fc" id="L104">            int p = field.prime();</span>
+<span class="fc" id="L105">            var root = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            for (int k = 0; k &lt;= common.degree(); k++) {</span>
+<span class="fc" id="L107">                work.consume(&quot;layers.frobenius-root&quot;, 1);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                if (k % p == 0) root.add(common.coefficient(k));</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                else if (common.coefficient(k).signum() != 0)</span>
+<span class="nc" id="L110">                    throw new IllegalStateException(&quot;INVALID_FROBENIUS_RESIDUE&quot;);</span>
+            }
+<span class="fc" id="L112">            decompose(UnivariatePolynomialView.of(f.ring(), root), Math.multiplyExact(scale, p), field, factors, work);</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+    /** Verify source binding, uniqueness, Rabin irreducibility, and complete reconstruction. */
+    private static String check(UnivariatePolynomialView&lt;BigInteger&gt; original, SparsePolynomial&lt;BigInteger&gt; source,
+                                Certificate evidence, PrimeField field, PolynomialWorkBudget work) {
+<span class="fc" id="L119">        work.consume(&quot;check.source-terms&quot;, source.termCount());</span>
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        if (source.termCount() != evidence.source().termCount() || !source.equals(evidence.source())) return &quot;SOURCE&quot;;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!original.leadingCoefficient().equals(evidence.unit())) return &quot;UNIT&quot;;</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (evidence.factors().size() &gt; original.degree()) return &quot;FACTOR_COUNT&quot;;</span>
+<span class="fc" id="L123">        var product = FiniteFieldPolynomialArithmetic.constant(source.ring(), evidence.unit());</span>
+<span class="fc" id="L124">        var seen = new ArrayList&lt;SparsePolynomial&lt;BigInteger&gt;&gt;();</span>
+<span class="fc" id="L125">        long remainingDegree = original.degree();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (var item : evidence.factors()) {</span>
+<span class="fc" id="L127">            var sparse = item.polynomial();</span>
+<span class="fc" id="L128">            work.consume(&quot;check.factor&quot;, 1);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (!source.ring().equals(sparse.ring())) return &quot;FACTOR_RING&quot;;</span>
+<span class="fc" id="L130">            work.consume(&quot;check.factor-terms&quot;, sparse.termCount());</span>
+<span class="fc" id="L131">            long degree = sparse.degree(0);</span>
+<span class="fc" id="L132">            long contribution = degree * item.multiplicity();</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">            if (contribution &gt; remainingDegree || !BigInteger.ONE.equals(sparse.leadingCoefficient())) return &quot;FACTOR_SHAPE&quot;;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (var previous : seen) {</span>
+<span class="fc" id="L135">                work.consume(&quot;check.distinct&quot;, 1L + sparse.termCount());</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (sparse.equals(previous)) return &quot;DUPLICATE_FACTOR&quot;;</span>
+<span class="fc" id="L137">            }</span>
+<span class="fc" id="L138">            seen.add(sparse);</span>
+<span class="fc" id="L139">            remainingDegree -= contribution;</span>
+<span class="fc" id="L140">            work.consume(&quot;check.factor-conversion&quot;, degree + 1);</span>
+<span class="fc" id="L141">            var factor = UnivariatePolynomialView.from(sparse);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (!FiniteFieldPolynomialArithmetic.verifyIrreducible(factor, field, work, &quot;check.rabin&quot;).irreducible())</span>
+<span class="fc" id="L143">                return &quot;REDUCIBLE&quot;;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            for (int i = 0; i &lt; item.multiplicity(); i++) product = product.multiply(factor, work, &quot;check.multiply&quot;);</span>
+<span class="fc" id="L145">        }</span>
+<span class="fc" id="L146">        work.consume(&quot;check.product&quot;, original.degree() + 1L);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        return original.equals(product) ? null : &quot;PRODUCT&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
