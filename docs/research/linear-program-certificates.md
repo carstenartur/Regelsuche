@@ -106,7 +106,10 @@ Erhaltung des Trägers für ein allgemeines geordnetes Feld.
 [Lean-Beweis](https://github.com/openai/math/blob/3344da59991ed94f9ba711217b29c1d760badfa6/lean/OAI/Optimization/LinearProgramming/Farkas/Sparse.lean#L137-L171)
 
 Diese Java-Komponente prüft gegebene Zertifikate und reduziert einen gegebenen
-Farkas-Zeugen. Die Lean-Quelle beschreibt darüber hinaus eigenständige
+Farkas-Zeugen. Der zusätzliche [begrenzte LP-Erzeuger](linear-program-search.md)
+findet solche Ausgänge mit einem klassischen exakten Zweiphasen-Simplex und
+verwendet sie für affine Implikationen. Die hier beschriebene Prüfung bleibt
+unabhängig vom Erzeuger. Die Lean-Quelle beschreibt darüber hinaus eigenständige
 Algorithmen für streng polynomielle Zulässigkeitsprüfung und Optimierung.
 Die Java-Implementierung ist durch Tests geprüft. Eine formale
 Implementierungskorrespondenz zu Lean und eine allgemeine Laufzeitaussage

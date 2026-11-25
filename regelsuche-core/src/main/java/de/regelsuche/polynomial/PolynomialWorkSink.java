@@ -11,6 +11,10 @@ package de.regelsuche.polynomial;
 public interface PolynomialWorkSink {
     void consume(String stage, long units);
 
+    /** Optional cancellation/time checkpoint; it does not add arithmetic work. */
+    default void checkpoint(String stage) { }
+
+
     static PolynomialWorkSink none() {
         return NoOp.INSTANCE;
     }

@@ -112,7 +112,8 @@ müssen dort definiert sein. Der Algorithmus überprüft ihre Inversenvorkommen
 mit der konkreten Auswertung. Bei einem singulären Zentrum, einer fehlenden
 Variablen oder einem Ressourcenabbruch liefert er `INCONCLUSIVE` und leere
 Evidenz. Beispielsweise ist $(XY-YX)^{-1}$ an jedem skalaren Zentrum
-undefiniert. Der Algorithmus sucht kein anderes Zentrum.
+undefiniert. Dieser Einstieg mit festem Zentrum sucht kein anderes Zentrum;
+die unten beschriebene Policy-Überladung übernimmt die begrenzte Suche.
 
 Die Blockdiagonale der beiden überprüften Pencils realisiert die Differenz
 mit dem Ausgangsselektor $u=(u_l,-u_r)$ und der gestapelten Eingangsspalte
@@ -175,5 +176,60 @@ implementiert keine universelle Trefferliste.
 ```sh
 mvn -pl regelsuche-optimization-sdk -am \
   -Dtest=RationalFormulaComparisonTest,RationalFormulaComparisonSdkTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+## Ein gemeinsames Skalarzentrum automatisch suchen
+
+`RationalFormulaSdk.compare(left, right, policy, limits, token)` sammelt die
+Variablen beider ursprünglicher Formeln und besucht das kartesische Gitter der
+in der Policy vorgegebenen rationalen Werte. Die Standardpolicy versucht
+`[0, 1, -1, 2, -2]` in dieser Reihenfolge und höchstens 256 Zentren. Variablen
+stehen nach ihrer ID aufsteigend; ein gemischter Zähler vermeidet den Aufbau
+der möglicherweise riesigen Gittergröße. Andere Werte und Grenzen sind
+explizit konfigurierbar.
+
+Die Suche realisiert beide Quellen einmal. Sie prüft an jedem Zentrum die
+Inversenvorkommen beider ursprünglicher Bäume. Nur ein undefiniertes Zentrum
+wird übersprungen. Alle Versuche, gespeicherten Zwischenergebnisse, die
+anschließende Raumsuche und die unabhängige Evidenzprüfung teilen dieselbe
+Arbeits-, Speicher-, Zeit- und Abbruchgrenze. Bei Erfolg enthält das Ergebnis
+das tatsächlich verwendete Zentrum und die gewöhnliche Vergleichsevidenz.
+`verifyComparison` kann sie unabhängig von der Zentrumsuche erneut prüfen.
+
+Für $(X(X-1))^{-1}$ sind null und eins unzulässig; die Standardpolicy findet
+minus eins im dritten Versuch. Für $(X^{-1})^{-1}=X$ findet sie eins und
+behält beide ursprünglichen Inversionsbedingungen auf der linken Seite.
+Das Ergebnis behauptet daher keine Gleichheit der Definitionsbereiche.
+`XY` und `YX` stimmen an allen Skalarpunkten überein, erhalten aber weiterhin
+einen geprüften Matrixgegenzeugen. Die Inverse des Kommutators
+$(XY-YX)^{-1}$ ist an jedem Skalarzentrum undefiniert: Ein ausgeschöpftes
+Gitter liefert `INCONCLUSIVE / CENTER_GRID_EXHAUSTED`, keine Gleichheit.
+
+Die Tests prüfen zusätzlich eine exakt um eins zu kleine Gesamtarbeitsgrenze,
+kumulativen Platzverbrauch, Schlussabbruch und unverändertes Replay. Diese
+endliche Suchpolicy ist keine universelle Trefferliste und kein
+Vollständigkeitsbeweis für rationale nichtkommutative Formeln.
+
+Für die vier oben beschriebenen Eingaben aus `RationalFormulaCenterSearchTest`
+mit `X=Variable(17)`, `Y=Variable(-2)` und Arbeit/Platz/Zeit
+5.000.000/500.000/10.000 ms ergibt die Ledger-Beobachtung:
+
+| Vergleich | Policy-Werte | Besuchte Zentren | Gesamte Such- und Prüfarbeit | Separate frische Prüfung |
+| --- | --- | ---: | ---: | ---: |
+| $(X(X-1))^{-1}$ mit sich selbst | `[0,1,-1]` | 3 | 20.480 | 6.828 |
+| $(X^{-1})^{-1}$ gegen $X$ | Standard | 2 | 3.137 | 1.337 |
+| $XY$ gegen $YX$ | Standard | 1 | 6.282 | 3.971 |
+| $(XY-YX)^{-1}$ mit sich selbst | `[0,1]` | 4 | 8.057 | keine Evidenz |
+
+Die beschränkten Policies erlauben jeweils höchstens zehn Zentren; die
+Standardpolicy erlaubt 256. Die frische Prüfung ist ein separater Aufruf
+von `verifyComparison` mit dem ausgegebenen Zentrum und Beleg. Der Zähler
+der Suche enthält bereits ihre eigene Abschlussprüfung und sämtliche
+erfolglosen Zentren. Die Tabelle misst keine Laufzeit.
+
+```sh
+mvn -B -ntp -pl regelsuche-optimization-sdk -am \
+  -Dtest=RationalFormulaCenterSearchTest,RationalFormulaComparisonTest,RationalFormulaSdkTest \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```

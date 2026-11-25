@@ -1,5 +1,10 @@
 # Vollständige Faktorisierung mit Vielfachheiten über Primkörpern
 
+Diese Seite beschreibt den bestehenden kleinen `PrimeField`-Vertrag.
+Der zusätzliche [große-Primmodul-Pfad](large-prime-factorization.md) verwendet
+einen echten `BigInteger`-Modulus, getrennte Such- und Prüfpolicies und eine
+explizite Primzahlprämisse; er benötigt keine Enumeration aller Körperreste.
+
 `PrimeFieldFactorizationSdk.factor(request, policy, token)` zerlegt ein
 von null verschiedenes univariates Polynom über einem ausdrücklich
 angegebenen `PrimeField`. Es liefert den Leitkoeffizienten als Einheit und

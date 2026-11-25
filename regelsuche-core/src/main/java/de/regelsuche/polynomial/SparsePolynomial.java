@@ -15,10 +15,22 @@ public final class SparsePolynomial<C> {
         PolynomialRing<C> ring,
         Map<Monomial, C> terms
     ) {
+        this(ring, terms, PolynomialWorkSink.none(), "sparse.construct");
+    }
+
+    /** Canonicalize using optional checkpoints, without changing arithmetic work accounting. */
+    public SparsePolynomial(
+        PolynomialRing<C> ring, Map<Monomial, C> terms, PolynomialWorkSink work, String stage
+    ) {
         this.ring = Objects.requireNonNull(ring, "ring");
         Objects.requireNonNull(terms, "terms");
+        Objects.requireNonNull(work, "work");
+        String checkedStage = stage == null || stage.isBlank() ? "sparse.construct" : stage;
+        work.checkpoint(checkedStage);
         TreeMap<Monomial, C> normalized = newTermMap(ring);
+        int index = 0;
         for (Map.Entry<Monomial, C> entry : terms.entrySet()) {
+            if ((index++ & 1023) == 0) work.checkpoint(checkedStage);
             Monomial monomial = Objects.requireNonNull(
                 entry.getKey(),
                 "monomial");
@@ -34,6 +46,7 @@ public final class SparsePolynomial<C> {
                 normalized.put(monomial, coefficient);
             }
         }
+        work.checkpoint(checkedStage);
         this.terms = Collections.unmodifiableNavigableMap(normalized);
     }
 
@@ -114,6 +127,8 @@ public final class SparsePolynomial<C> {
     }
 
     public int totalDegree() {
+        // Every supported monomial order sorts univariate powers by degree.
+        if (ring.variableCount() == 1) return isZero() ? -1 : terms.firstKey().exponent(0);
         return isZero()
             ? -1
             : terms.keySet().stream()
@@ -128,6 +143,7 @@ public final class SparsePolynomial<C> {
             throw new IllegalArgumentException(
                 "variable index outside polynomial ring");
         }
+        if (ring.variableCount() == 1) return isZero() ? -1 : terms.firstKey().exponent(0);
         return isZero()
             ? -1
             : terms.keySet().stream()

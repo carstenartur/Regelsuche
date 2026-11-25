@@ -37,10 +37,11 @@ Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
 | Kostengebundene feste oder gelernte Planwahl | `BoundedPlanSelection` | `FiniteConstraintSdk.countWithPolicy`, `BilinearProgramSdk.selectIntegerWithReuse` | nein | Java-/SDK-Aufruf mit Auswahl- und Kostenprotokoll |
 | Rationalfunktionsvorschläge auf der Originaldomäne | `RationalFunctionPlanner` | `RationalFunctionSdk.simplify`, `verify` | nein | Java-/SDK-Aufruf mit expliziten Nichtnullbedingungen |
 | Rationaler 2×2×2-Rangnachweis und Eingabebasiswechsel | `BilinearRankBound`, `BilinearProductLearning` | `BilinearProgramSdk` | nein | ausführbare, unabhängig geprüfte Studie |
-| Exakte LP-Ausgänge und Farkas-Trägerreduktion | `LinearProgramCertificates`, `LinearProgramVerifier`, `FarkasSparsifier` | `LinearProgramSdk` | nein | Java-/SDK-Aufruf; kein allgemeiner LP-Löser |
-| Rationale Operatorreparatur und belegte Hilfsregister | `OperatorResidualPlans`, `OccupiedWorkspace` | `OperatorPlanSdk` | nein | Java-/SDK-Aufruf mit Kosten und separater Prüfung |
-| Rationale nichtkommutative Vergleiche am gemeinsamen Skalarzentrum | `RationalFormulaComparison` | `RationalFormulaSdk.compare`, `verifyComparison` | nein | Java-/SDK-Aufruf; gemeinsamer Definitionsbereich |
+| Exakte LP-Suche, affine Implikation und Farkas-Trägerreduktion | `LinearProgramSearch`, `AffineImplication`, unabhängige Prüfer, `FarkasSparsifier` | `LinearProgramSdk.search`, `imply`, `verifyImplication`, `sparsify` | nein | begrenzter klassischer rationaler Simplex; Java-/SDK-Aufruf |
+| Automatische rationale Operatorreparatur, vorbereitete Ausführung und belegte Hilfsregister | `OperatorResidualSearch`, `PreparedOperator`, `OperatorResidualPlans`, `OccupiedWorkspace` | `OperatorPlanSdk.discover`, `prepare`, `apply` und Prüfeinstiege | nein | Java-/SDK-Aufruf mit starker direkter Vergleichsrechnung und getrennten Erwerbskosten |
+| Rationale nichtkommutative Vergleiche und automatische Skalarzentrumssuche | `RationalFormulaComparison`, `RationalFormulaCenterSearch` | `RationalFormulaSdk.compare`, `verifyComparison` | nein | begrenzte Zentrumssuche; Gleichheit auf gemeinsamem ursprünglichem Definitionsbereich |
 | Primkörperfaktorisierung mit Vielfachheiten | `PrimeFieldMultiplicity` | `PrimeFieldFactorizationSdk` | nein | Java-/SDK-Aufruf unter der bestehenden Feld- und Arbeitsgrenze |
+| Vollständige Polynomfaktorisierung über großen Primmoduli | `BigPrimeField`, `LargePrimeFactorization`, `LargePrimeFactorizationVerifier` | zusätzliche `PrimeFieldFactorizationSdk.factor`-/`verify`-Überladungen | nein | echter `BigInteger`-Modulus; bei angenommener Primzahleigenschaft ausdrücklich bedingtes Ergebnis |
 | Zyklische Energie-/Kreditzertifikate | `EnergyGame`, `EnergyGameVerifier` | `EnergyGameSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
@@ -52,9 +53,11 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
 ## Verträge und Reproduktion
 
 - [LP-Zertifikate und Farkas-Reduktion](research/linear-program-certificates.md),
+  [automatische LP-Suche und affine Implikation](research/linear-program-search.md),
   [Operatorreparatur und belegter Speicher](research/operator-residual-repair.md),
   [rationale Formelvergleiche](research/rational-formula-realization.md),
-  [Primkörperfaktoren mit Vielfachheiten](research/prime-field-multiplicities.md).
+  [Primkörperfaktoren mit Vielfachheiten](research/prime-field-multiplicities.md),
+  [Faktorisierung über großen Primmoduli](research/large-prime-factorization.md).
 
 - [Exakte lokale Constraint-Zählung](research/finite-constraint-counting.md),
   [vollständiger Erwerbs-/Anfragevergleich](../research/benchmarks/constraint-lifecycle-v1/README.md),
