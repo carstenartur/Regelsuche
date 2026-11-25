@@ -52,7 +52,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         // This controller retains complete paths. A semantic value hash alone
         // cannot identify a continuation or its proof/assumption obligations.
         Map<SearchState, Node> nodes = new LinkedHashMap<>();
-        nodes.put(rootState, new Node());
+        nodes.put(rootState, new Node(null));
 
         int budget = problem.heuristic().maxVisitedExpressions();
         long maxIterations = 4L * budget;
@@ -74,7 +74,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
             List<SearchState> children = expand(problem, selected);
             List<SearchState> admitted = new ArrayList<>();
             for (SearchState child : children) {
-                if (nodes.putIfAbsent(child, new Node()) == null) {
+                if (nodes.putIfAbsent(child, new Node(selectedNode)) == null) {
                     admitted.add(child);
                 }
                 selectedNode.addChild(child);
@@ -131,7 +131,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
             }
             SearchState best = null;
             double bestScore = Double.NEGATIVE_INFINITY;
-            int parentVisits = Math.max(node.visits, 1);
+            long parentVisits = Math.max(node.visits, 1L);
             boolean anyNonTerminal = false;
             for (SearchState childKey : node.children) {
                 Node child = nodes.get(childKey);
@@ -222,20 +222,25 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
     }
 
     private void backpropagate(Map<SearchState, Node> nodes, SearchState leaf, double reward) {
-        // This existing heuristic updates the admitted leaf's statistics only.
-        // It does not claim full ancestor backpropagation.
-        Node node = nodes.get(leaf);
-        if (node != null) {
+        // Each admitted state retains its full path, so its parent is unique.
+        // Credit the simulated outcome to every choice on that path, including
+        // the root, rather than starving ancestors of visit/reward statistics.
+        for (Node node = nodes.get(leaf); node != null; node = node.parent) {
             node.visits++;
             node.totalReward += reward;
         }
     }
 
     private static final class Node {
+        private final Node parent;
         private final List<SearchState> children = new ArrayList<>();
-        private int visits;
+        private long visits;
         private double totalReward;
         private boolean terminal;
+
+        Node(Node parent) {
+            this.parent = parent;
+        }
 
         void addChild(SearchState key) {
             if (!children.contains(key)) {
