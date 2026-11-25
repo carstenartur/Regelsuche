@@ -54,6 +54,18 @@ class BilinearIntegerPortfolioTest {
         assertEquals(4, decision.value().orElseThrow().schedule().cost().variableProducts());
     }
 
+    @Test void disabledReuseRequiresOnlyTheFixedWorkEvenWithSuppliedAcquisition() {
+        var profile = profile(381);
+        var hint = acquire(COMPLEX, profile);
+        var cold = BilinearIntegerPortfolio.selectWithReuse(COMPLEX, profile, Objective.LIMB_WORK, Optional.empty(),
+            0, LIMITS, () -> false);
+        var exact = BilinearIntegerPortfolio.selectWithReuse(COMPLEX, profile, Objective.LIMB_WORK, Optional.of(hint),
+            0, LIMITS.withMaximumWork(cold.work()), () -> false);
+        assertEquals("DIRECT_COORDINATES", exact.selectedProvider().orElse("unavailable"));
+        assertEquals(hint.acquisitionWork(), exact.priorWork());
+        assertEquals(cold.work(), exact.work());
+    }
+
     @Test void matchingWidthEvidenceIsRequiredAndTiesKeepTheFixedPlan() {
         var tensor = new Tensor(2, 2, List.of(row(1,0,0,0), row(0,1,1,0), row(0,0,0,1)));
         for (int width : List.of(256, 381, 2048, 8192)) {

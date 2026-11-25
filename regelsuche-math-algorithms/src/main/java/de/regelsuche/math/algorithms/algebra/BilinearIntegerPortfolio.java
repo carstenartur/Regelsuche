@@ -79,11 +79,11 @@ public final class BilinearIntegerPortfolio {
         Objects.requireNonNull(objective);
         return BoundedPlanSelection.choose(profile, BoundedPlanSelection.Unit.MODELED_LIMB_WORK,
             reuse.map(Reuse::acquisitionWork).orElse(0L), maximumProbeWork, limits, cancellation,
-            work -> offers(tensor, profile, objective, reuse, cancellation, work));
+            work -> offers(tensor, profile, objective, reuse, maximumProbeWork > 0, cancellation, work));
     }
 
     private static Offers<Candidate> offers(Tensor tensor, Profile profile, Objective objective,
-            Optional<Reuse> reuse, BooleanSupplier cancellation, CertificateWork work) {
+            Optional<Reuse> reuse, boolean probeEnabled, BooleanSupplier cancellation, CertificateWork work) {
         long hintCells = reuse.map(h -> retainedHint(h.candidate(), tensor, profile)).orElse(0L);
         // Keep the hint and trace live while constructing the fixed quote.
         var quote = BilinearProgram.run(work.remainingLimits(BoundedPlanSelection.TRACE_CELLS + hintCells),
@@ -102,6 +102,8 @@ public final class BilinearIntegerPortfolio {
         var fixed = new Offer<Candidate>(new Estimate("DIRECT_COORDINATES", Kind.FIXED, objective.name(),
             OptionalLong.of(directCost.limbWork())), allowance ->
                 checked(baseline.program(), tensor, profile, baseline, objective, false, allowance, cancellation));
+        long retained = hintCells + Search.programCells(baseline.program()) + baseline.schedule().retainedCells();
+        if (!probeEnabled) return new Offers<>(fixed, Optional.empty(), retained);
         Optional<Offer<Candidate>> alternative = reuse.map(hint -> {
             var old = hint.candidate();
             work.charge(profile.retainedCells());
@@ -113,7 +115,6 @@ public final class BilinearIntegerPortfolio {
             return new Offer<>(new Estimate("REUSED_PROGRAM", Kind.REUSED, objective.name(), cost), unmet, allowance ->
                 checked(old.witness().program(), tensor, profile, baseline, objective, true, allowance, cancellation));
         });
-        long retained = hintCells + Search.programCells(baseline.program()) + baseline.schedule().retainedCells();
         return new Offers<>(fixed, alternative, retained);
     }
 
