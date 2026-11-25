@@ -10,6 +10,7 @@ import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintVerifier.Veri
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 /** Reconstructs each required local relation from the original signed literals before factor replay. */
@@ -21,6 +22,7 @@ public final class FiniteConstraintCnfVerifier {
         var work = new CertificateWork(limits, cancellation);
         try {
             boolean valid = matchesTranslation(source, problem, FiniteConstraintCnf.sourceCells(source, work), work);
+            work.charge(0);
             return new Verification(valid ? Status.VERIFIED : Status.INVALID,
                 valid ? "VERIFIED" : "CNF_TRANSLATION", work.used());
         } catch (CertificateWork.Stop stop) {
@@ -37,11 +39,11 @@ public final class FiniteConstraintCnfVerifier {
             if (recorded != source) {
                 retained += FiniteConstraintCnf.sourceCells(recorded, work);
                 work.cells(retained);
-                if (!matchesSource(source, recorded, work)) return new Verification(Status.INVALID, "CNF_SOURCE", work.used());
+                if (!matchesSource(source, recorded, work)) return invalid("CNF_SOURCE", work);
             }
             var elimination = certificate.elimination();
             if (!matchesTranslation(source, elimination.source(), retained, work))
-                return new Verification(Status.INVALID, "CNF_TRANSLATION", work.used());
+                return invalid("CNF_TRANSLATION", work);
             var result = FiniteConstraintVerifier.verify(elimination.source(), elimination,
                 work.remainingLimits(retained), cancellation);
             work.chargeCompleted(result.work());
@@ -52,14 +54,36 @@ public final class FiniteConstraintCnfVerifier {
         }
     }
 
+    private static Verification invalid(String reason, CertificateWork work) {
+        work.charge(0);
+        return new Verification(Status.INVALID, reason, work.used());
+    }
+
     private static boolean matchesSource(Source expected, Source recorded, CertificateWork work) {
-        work.charge(1L + expected.fixed().size());
-        if (expected.variableCount() != recorded.variableCount() || !expected.fixed().equals(recorded.fixed())
-                || expected.clauses().size() != recorded.clauses().size()) return false;
+        work.charge(1);
+        if (expected.variableCount() != recorded.variableCount() || expected.clauses().size() != recorded.clauses().size()
+                || !matchesFixed(expected.fixed(), recorded.fixed(), work)) return false;
         for (int i = 0; i < expected.clauses().size(); i++) {
             var clause = expected.clauses().get(i);
-            work.charge(1L + clause.size());
-            if (!clause.equals(recorded.clauses().get(i))) return false;
+            var other = recorded.clauses().get(i);
+            work.charge(1);
+            if (clause.size() != other.size()) return false;
+            for (int j = 0; j < clause.size(); j++) {
+                work.charge(1);
+                if (!clause.get(j).equals(other.get(j))) return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean matchesFixed(Map<Integer, Boolean> expected, Map<Integer, Boolean> recorded,
+            CertificateWork work) {
+        if (expected.size() != recorded.size()) return false;
+        // Both source constructors snapshot fixed assignments in ascending key order.
+        var other = recorded.entrySet().iterator();
+        for (var entry : expected.entrySet()) {
+            work.charge(1);
+            if (!entry.equals(other.next())) return false;
         }
         return true;
     }
@@ -67,8 +91,8 @@ public final class FiniteConstraintCnfVerifier {
     static boolean matchesTranslation(Source source, Problem problem, long retained, CertificateWork work) {
         long cells = FiniteConstraintSupport.inspect(problem, work);
         work.cells(retained + cells + 8);
-        work.charge(1L + source.fixed().size());
-        if (!problem.fixed().equals(source.fixed())) return false;
+        work.charge(1);
+        if (!matchesFixed(source.fixed(), problem.fixed(), work)) return false;
         int factor = 0;
         int auxiliaries = 0;
         for (List<Integer> clause : source.clauses()) {

@@ -126,6 +126,40 @@ class FiniteConstraintCnfTest {
             LIMITS, () -> true).reason());
     }
 
+    @Test void lateFixedMismatchPollsInsideBothSourceAndLoweringComparison() {
+        int variables = 2048;
+        var assignments = new java.util.HashMap<Integer, Boolean>();
+        for (int i = 0; i < variables; i++) assignments.put(i, false);
+        var source = new FiniteConstraintCnf.Source(variables, List.of(), assignments);
+        assignments.put(variables - 1, true);
+        var recorded = new FiniteConstraintCnf.Source(variables, List.of(), assignments);
+        var problem = new FiniteConstraintCounter.Problem(variables, List.of(), assignments);
+        var proof = new FiniteConstraintCnf.Certificate(recorded, new FiniteConstraintCounter.Certificate(problem,
+            List.of(), BigInteger.ONE, java.util.Optional.empty()));
+        var polls = new java.util.concurrent.atomic.AtomicInteger();
+        assertEquals("CNF_SOURCE", FiniteConstraintCnf.verify(source, proof, LIMITS, () -> false).reason());
+        assertEquals("CANCELLED", FiniteConstraintCnf.verify(source, proof, LIMITS,
+            () -> polls.incrementAndGet() >= variables / 2).reason());
+        polls.set(0);
+        assertEquals("CNF_TRANSLATION", FiniteConstraintCnfVerifier.verifyLowering(source, problem, LIMITS, () -> false).reason());
+        assertEquals("CANCELLED", FiniteConstraintCnfVerifier.verifyLowering(source, problem, LIMITS,
+            () -> polls.incrementAndGet() >= variables / 2).reason());
+    }
+
+    @Test void lateLiteralMismatchPollsInsideASingleClause() {
+        int length = 2048;
+        var clause = new ArrayList<>(java.util.Collections.nCopies(length, 1));
+        var source = new FiniteConstraintCnf.Source(1, List.of(clause), Map.of());
+        clause.set(length - 1, -1);
+        var recorded = new FiniteConstraintCnf.Source(1, List.of(clause), Map.of());
+        var elimination = count(0, List.of(), Map.of()).certificate().orElseThrow().elimination();
+        var proof = new FiniteConstraintCnf.Certificate(recorded, elimination);
+        var polls = new java.util.concurrent.atomic.AtomicInteger();
+        assertEquals("CNF_SOURCE", FiniteConstraintCnf.verify(source, proof, LIMITS, () -> false).reason());
+        assertEquals("CANCELLED", FiniteConstraintCnf.verify(source, proof, LIMITS,
+            () -> polls.incrementAndGet() >= length / 2).reason());
+    }
+
     @Test void cancellationOnFinalReturnIncludesAllNestedWork() {
         var source = new FiniteConstraintCnf.Source(5, List.of(List.of(1, 2, -3, -4, 5)), Map.of());
         var polls = new java.util.concurrent.atomic.AtomicInteger();
