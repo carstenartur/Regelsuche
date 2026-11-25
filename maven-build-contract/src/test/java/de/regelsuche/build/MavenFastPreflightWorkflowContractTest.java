@@ -14,7 +14,7 @@ class MavenFastPreflightWorkflowContractTest {
         "gradle-verification", "jmh-verification", "sympy-runtime-verification", "maven-product-verification",
         "maven-git-free-verification", "maven-student-sdk-archive-qualification", "maven-polynomial-qualification",
         "maven-native-polynomial-study", "maven-typed-polynomial-study", "maven-schema-polynomial-study",
-        "typed-external-polynomial-comparison", "checked-proofs", "native-scalar-reproduction");
+        "checked-proofs", "native-scalar-reproduction");
 
     @Test
     void staticPreflightIsAFailClosedPrerequisiteForEveryRequiredAuthority() throws Exception {
@@ -34,6 +34,10 @@ class MavenFastPreflightWorkflowContractTest {
             assertEquals("preflight-contracts", jobs.path(name).path("needs").asText(), name);
             assertFalse(jobs.path(name).path("if").asText().contains("always()"), name);
         }
+        var archives = jobs.required("typed-external-polynomial-comparison");
+        assertEquals(List.of("preflight-contracts", "maven-typed-polynomial-study", "maven-native-polynomial-study"),
+            archives.required("needs").valueStream().map(n -> n.asText()).toList());
+        assertFalse(archives.required("if").asText().contains("always()"));
         var aggregate = jobs.path("verification");
         assertTrue(aggregate.path("needs").toString().contains("preflight-contracts"));
         assertTrue(aggregate.path("if").asText().contains("always()"));

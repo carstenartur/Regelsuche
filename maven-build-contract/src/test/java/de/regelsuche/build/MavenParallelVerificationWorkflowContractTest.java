@@ -276,9 +276,8 @@ class MavenParallelVerificationWorkflowContractTest {
         .valueStream().filter(step -> "Collect complete checkout-owned quality acceptance evidence".equals(step.path("name").asText()))
         .findFirst().orElseThrow();
     assertEquals("mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am "
-        + "-Dtest=QualityAcceptancePublicationTest,PolynomialParityQualificationTest "
+        + "-Dtest=QualityAcceptancePublicationTest "
         + "-Dsurefire.failIfNoSpecifiedTests=false "
-        + "-Dregelsuche.polynomialParity.enabled=${{ github.event_name != 'create' }} "
         + "-Dregelsuche.qualityAcceptance.collect=true verify", collection.required("run").asText().strip());
     assertFalse(collection.has("if"));
     assertFalse(collection.has("continue-on-error"));
@@ -302,55 +301,55 @@ class MavenParallelVerificationWorkflowContractTest {
   }
 
   @Test
-  void polynomialParityUsesSameRevisionArchivesAndFailsClosed() throws IOException {
-    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
-        ".github/workflows/gradle.yml").toFile());
-    List<JsonNode> steps = workflow.required("jobs").required("verification")
-        .required("steps").valueStream().toList();
+  void archiveQualificationUsesCurrentProducerArtifactsAndFailsClosed() throws IOException {
+    var workflow = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile());
+    var jobs = workflow.required("jobs");
+    var job = jobs.required("typed-external-polynomial-comparison");
+    assertEquals("Typed source-only learning comparison", job.required("name").asText());
+    assertEquals("github.event_name != 'create'", job.required("if").asText());
+    assertEquals("ubuntu-22.04", job.required("runs-on").asText());
+    assertEquals(30, job.required("timeout-minutes").asInt());
+    assertFalse(job.has("continue-on-error"));
+    var steps = job.required("steps").valueStream().toList();
     String revision = "${{ github.event.pull_request.head.sha || github.sha }}";
-    String routine = "github.event_name != 'create'";
-    JsonNode collection = steps.stream()
-        .filter(step -> "acceptance_evidence".equals(step.path("id").asText()))
-        .findFirst().orElseThrow();
-    assertEquals(revision, collection.required("env").required("EVIDENCE_REVISION").asText());
-    assertFalse(collection.has("if"));
-    assertFalse(collection.has("continue-on-error"));
-    JsonNode source = steps.stream()
-        .filter(step -> "Checkout exact polynomial evidence source".equals(step.path("name").asText()))
-        .findFirst().orElseThrow();
-    assertTrue(source.required("uses").asText().startsWith("actions/checkout@"));
-    assertEquals(revision, source.required("with").required("ref").asText());
-    assertEquals("build/polynomial-parity-source", source.required("with").required("path").asText());
-    assertFalse(source.required("with").required("persist-credentials").asBoolean(true));
-    assertEquals(routine, source.required("if").asText());
-    assertFalse(source.has("continue-on-error"));
-    assertTrue(steps.indexOf(source) < steps.indexOf(collection));
-    List<String> archives = List.of("typed-external-polynomial-", "maven-typed-polynomial-",
-        "maven-native-polynomial-");
-    List<String> directories = List.of("legacy", "typed", "native");
-    for (int i = 0; i < archives.size(); i++) {
-      String artifact = archives.get(i) + revision;
-      JsonNode download = steps.stream()
-          .filter(step -> artifact.equals(step.path("with").path("name").asText()))
+    var checkout = steps.getFirst();
+    assertTrue(checkout.required("uses").asText().startsWith("actions/checkout@"));
+    assertEquals(revision, checkout.required("with").required("ref").asText());
+    assertFalse(checkout.required("with").required("persist-credentials").asBoolean(true));
+    var commands = steps.stream().filter(step -> step.has("run")).toList();
+    assertEquals(List.of("bash gradle/test-polynomial-controllers.sh",
+        "mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am "
+        + "-Dtest=PolynomialArchiveQualificationTest -Dsurefire.failIfNoSpecifiedTests=false "
+        + "-Dregelsuche.polynomialArchives.enabled=true test"),
+        commands.stream().map(step -> step.required("run").asText().strip()).toList());
+    var qualify = commands.getLast();
+    assertEquals(revision, qualify.required("env").required("EVIDENCE_REVISION").asText());
+    for (String kind : List.of("typed", "native")) {
+      String name = "maven-" + kind + "-polynomial-" + revision;
+      var download = steps.stream().filter(step -> name.equals(step.path("with").path("name").asText()))
           .findFirst().orElseThrow();
       assertTrue(download.required("uses").asText().startsWith("actions/download-artifact@"));
-      assertEquals("build/polynomial-parity/" + directories.get(i),
-          download.required("with").required("path").asText());
-      assertEquals(routine, download.required("if").asText());
-      assertFalse(download.has("continue-on-error"));
-      assertTrue(steps.indexOf(source) < steps.indexOf(download));
-      assertTrue(steps.indexOf(download) < steps.indexOf(collection));
+      assertEquals("build/polynomial-archives/" + kind, download.required("with").required("path").asText());
+      assertTrue(steps.indexOf(download) < steps.indexOf(qualify));
     }
-    JsonNode receipt = steps.stream()
-        .filter(step -> ("polynomial-parity-qualification-" + revision)
-            .equals(step.path("with").path("name").asText()))
-        .findFirst().orElseThrow();
-    assertTrue(receipt.required("uses").asText().startsWith("actions/upload-artifact@"));
-    assertEquals("build/polynomial-parity/qualification.json", receipt.required("with").required("path").asText());
-    assertEquals("error", receipt.required("with").required("if-no-files-found").asText());
-    assertEquals(routine, receipt.required("if").asText());
-    assertFalse(receipt.has("continue-on-error"));
-    assertTrue(steps.indexOf(receipt) > steps.indexOf(collection));
+    var upload = steps.getLast();
+    assertTrue(upload.required("uses").asText().startsWith("actions/upload-artifact@"));
+    assertEquals("polynomial-archive-qualification-" + revision, upload.required("with").required("name").asText());
+    assertEquals("build/polynomial-archives/qualification.json", upload.required("with").required("path").asText());
+    assertEquals("error", upload.required("with").required("if-no-files-found").asText());
+    for (var step : steps) {
+      assertFalse(step.has("if"));
+      assertFalse(step.has("continue-on-error"));
+    }
+    var aggregate = jobs.required("verification");
+    assertFalse(aggregate.required("steps").toString().contains("polynomial-parity"));
+    for (String driver : List.of("run-typed-external-polynomial-comparison.sh",
+        "run-native-polynomial-comparison.sh", "run-checked-schema-comparison.sh")) {
+      assertFalse(workflow.toString().contains(driver), driver);
+    }
+    assertFalse(Files.exists(repositoryRoot().resolve("gradle/run-checked-schema-comparison.sh")));
+    var controller = Files.readString(repositoryRoot().resolve("gradle/test-polynomial-controllers.sh"));
+    assertTrue(controller.contains("-m unittest discover -s scripts/external_polynomial_comparison -p 'test_*.py' -v"));
   }
 
   @Test
@@ -643,60 +642,6 @@ class MavenParallelVerificationWorkflowContractTest {
           .getPathMatcher("glob:" + pattern).matches(Path.of(base))),
           () -> "CI must run for pull requests into " + base);
     }
-  }
-
-  @Test
-  void typedComparisonRunsTheCheckoutOwnedProtocolAndRetainsEveryOutcome()
-      throws IOException {
-    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
-        ".github/workflows/gradle.yml").toFile());
-    JsonNode comparison = workflow.path("jobs").path(
-        "typed-external-polynomial-comparison");
-    assertTrue(comparison.isObject(),
-        "the typed comparison must run within the required CI workflow");
-    assertEquals("github.event_name != 'create'", comparison.path("if").asText());
-    assertEquals("ubuntu-22.04", comparison.path("runs-on").asText());
-    assertEquals(30, comparison.path("timeout-minutes").asInt());
-    assertEquals("preflight-contracts", comparison.path("needs").asText(),
-        "the typed comparison must start independently of the other authorities");
-    assertFalse(comparison.has("continue-on-error"));
-
-    List<JsonNode> steps = comparison.path("steps").valueStream().toList();
-    JsonNode checkout = steps.stream().filter(step -> step.path("uses").asText()
-        .startsWith("actions/checkout@")).findFirst().orElseThrow();
-    assertEquals(0, checkout.path("with").path("fetch-depth").asInt(-1));
-    assertEquals("${{ github.event.pull_request.head.sha || github.sha }}",
-        checkout.path("with").path("ref").asText());
-
-    List<JsonNode> commands = steps.stream().filter(step -> step.has("run")).toList();
-    assertEquals(List.of(
-        "bash gradle/run-typed-external-polynomial-comparison.sh",
-        "bash gradle/run-native-polynomial-comparison.sh"),
-        commands.stream().map(command -> command.path("run").asText()).toList(),
-        "both remaining checkout-owned comparisons must run, in prerequisite order");
-    for (JsonNode command : commands) {
-      assertFalse(command.has("if"));
-      assertFalse(command.has("continue-on-error"));
-    }
-    assertTrue(Files.notExists(repositoryRoot().resolve(
-        "gradle/run-checked-schema-comparison.sh")),
-        "the retired schema host driver must not be reintroduced");
-    assertFalse(Files.readString(repositoryRoot().resolve(".github/workflows/gradle.yml"))
-        .contains("gradle/run-checked-schema-comparison.sh"),
-        "checked-schema authority belongs exclusively to the pinned Maven job");
-
-    JsonNode upload = steps.stream().filter(step -> step.path("uses").asText()
-        .startsWith("actions/upload-artifact@")).findFirst().orElseThrow();
-    assertEquals("${{ always() && !cancelled() }}", upload.path("if").asText());
-    assertEquals("typed-external-polynomial-${{ github.event.pull_request.head.sha || github.sha }}",
-        upload.path("with").path("name").asText());
-    assertEquals(List.of(
-        "build/reports/typed-external-polynomial-comparison/**",
-        "build/reports/native-polynomial-comparison/**",
-        "regelsuche-search/build/test-results/**",
-        "regelsuche-learning/build/test-results/**"),
-        upload.path("with").path("path").asText().lines().toList());
-    assertEquals("error", upload.path("with").path("if-no-files-found").asText());
   }
 
   @Test
