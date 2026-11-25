@@ -99,18 +99,18 @@ public final class ExactParsedSubtermProjector {
         String expectedFormattedText
     ) {
         Objects.requireNonNull(root, "root");
-        List<Integer> stablePath = validatePath(path);
+        boolean reuseOccurrence = mode == Mode.REUSE_OCCURRENCE;
+        List<Integer> stablePath = reuseOccurrence ? List.of() : validatePath(path);
         String expected = Objects.requireNonNull(
             expectedFormattedText,
             "expectedFormattedText");
-        if (expected.isBlank()) {
-            throw new IllegalArgumentException(
-                "expected subtree text must not be blank");
+        if (!reuseOccurrence) {
+            validateExpectedText(expected);
         }
 
-        boolean reuseOccurrence = mode == Mode.REUSE_OCCURRENCE;
+        int pathLength = reuseOccurrence ? Objects.requireNonNull(path, "path").size() : stablePath.size();
         Work work = new Work(policy.maxWorkUnits(), authority, reuseOccurrence);
-        if (stablePath.size() > policy.maxPathDepth()) {
+        if (pathLength > policy.maxPathDepth()) {
             return failure(
                 Status.BUDGET_INCONCLUSIVE,
                 "MAX_PATH_DEPTH_EXCEEDED",
@@ -153,6 +153,9 @@ public final class ExactParsedSubtermProjector {
         String rootSourceHash = "";
         try {
             if (reuseOccurrence) {
+                work.consume("projection.reused-parser-selection-validation-units", 3L * pathLength + expected.length());
+                stablePath = captureBoundedPath(path, pathLength);
+                validateExpectedText(expected);
                 work.bindSelection(stablePath, expected);
                 if (!root.hasParserBindings()) {
                     return failure(Status.UNSUPPORTED, "PARSER_OCCURRENCE_BINDINGS_REQUIRED",
@@ -353,6 +356,7 @@ public final class ExactParsedSubtermProjector {
         ExactParsedTerm.SourceRange selectedRange,
         Work work
     ) {
+        boolean reuseOccurrence = mode == Mode.REUSE_OCCURRENCE;
         Deque<Expr> pending = new ArrayDeque<>();
         pending.push(selected);
         IdentityHashMap<Expr, Boolean> visited = new IdentityHashMap<>();
@@ -373,6 +377,13 @@ public final class ExactParsedSubtermProjector {
                 throw limit("MAX_SUBTREE_NODES_EXCEEDED");
             }
             work.consume("projection.subtree-node-visits", 1);
+            int childCount = 0;
+            if (reuseOccurrence) {
+                childCount = childCount(node);
+                if (childCount > policy.maxSubtreeNodes() - nodeCount - pending.size()) {
+                    throw limit("MAX_SUBTREE_NODES_EXCEEDED");
+                }
+            }
             commitNodeKind(commitment, node, work);
 
             Optional<ExactParsedTerm.SourceRange> sourceRange =
@@ -429,6 +440,9 @@ public final class ExactParsedSubtermProjector {
                 }
             }
 
+            if (reuseOccurrence) {
+                work.consume("projection.reused-parser-subtree-scheduling-entries", childCount);
+            }
             if (node instanceof BinaryExpr binary) {
                 pending.push(binary.right());
                 pending.push(binary.left());
@@ -442,7 +456,7 @@ public final class ExactParsedSubtermProjector {
             }
         }
 
-        if (mode == Mode.REUSE_OCCURRENCE) {
+        if (reuseOccurrence) {
             // A parser tree's children are in source order, including after rebasing.
             work.consume("projection.reused-parser-binding-snapshot-entries", (long) shiftedRanges.size() + literals.size());
         } else {
@@ -453,6 +467,13 @@ public final class ExactParsedSubtermProjector {
             shiftedRanges,
             List.copyOf(literals),
             commitment.finish());
+    }
+
+    private static int childCount(Expr node) {
+        if (node instanceof BinaryExpr) {
+            return 2;
+        }
+        return node instanceof FunctionExpr function ? function.arguments().size() : 0;
     }
 
     private static Expr navigate(
@@ -491,6 +512,31 @@ public final class ExactParsedSubtermProjector {
                 "subterm projection path is invalid");
         }
         return stable;
+    }
+
+    private static List<Integer> captureBoundedPath(List<Integer> path, int length) {
+        List<Integer> stable = new ArrayList<>(length);
+        var entries = path.iterator();
+        for (int offset = 0; offset < length; offset++) {
+            if (!entries.hasNext()) {
+                throw new IllegalArgumentException("subterm projection path length changed");
+            }
+            int index = Objects.requireNonNull(entries.next(), "path index");
+            if (index < 0) {
+                throw new IllegalArgumentException("subterm projection path is invalid");
+            }
+            stable.add(index);
+        }
+        if (entries.hasNext()) {
+            throw new IllegalArgumentException("subterm projection path length changed");
+        }
+        return List.copyOf(stable);
+    }
+
+    private static void validateExpectedText(String expected) {
+        if (expected.isBlank()) {
+            throw new IllegalArgumentException("expected subtree text must not be blank");
+        }
     }
 
     private static String pathMaterial(List<Integer> path) {
@@ -824,6 +870,7 @@ public final class ExactParsedSubtermProjector {
             return policy;
         }
 
+        /** The input path snapshot, or an empty list if occurrence reuse stopped before capturing it. */
         public List<Integer> path() {
             return path;
         }

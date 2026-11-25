@@ -15,19 +15,20 @@ Die Eingaben wurden vor der Projektion geparst.
 
 | Eingabe | Pfad | Standard | Wurzelwiederverwendung | Vorkommenswiederverwendung |
 | --- | --- | ---: | ---: | ---: |
-| `f(g(((01 / 004.00))), g(((01 / 004.00))))` | `[0, 0]` | 1.967 | 1.967 | 1.018 |
-| `\t  x^2 - 01.250 \n` mit Tab und Zeilenumbruch | `[]` | 1.989 | 1.989 | 982 |
-| `x^2-1/9` | `[]` | 2.815 | 74 | 126 |
-| `f(x, y)` | `[0]` | 86 | 86 | 133 |
+| `f(g(((01 / 004.00))), g(((01 / 004.00))))` | `[0, 0]` | 1.967 | 1.967 | 1.031 |
+| `\t  x^2 - 01.250 \n` mit Tab und Zeilenumbruch | `[]` | 1.989 | 1.989 | 998 |
+| `x^2-1/9` | `[]` | 2.815 | 74 | 139 |
+| `f(x, y)` | `[0]` | 86 | 86 | 137 |
 
 Bei den beiden ersten Eingaben genügt ein Projektionsbudget von 1.500
 Einheiten für die Vorkommenswiederverwendung. Der Standard stoppt bei der
 erneuten Belegprüfung. Der neue Pfad berechnet die relative Bindung einmal
-und verbucht die tatsächlich erzeugten Indizes und die Aufnahme der Auswahl
-in den Beleg. Bei der kleinen Variablenprojektion erhöht die zusätzliche
+und verbucht die Prüfung der Auswahl, die eingeplanten Kindknoten, die
+erzeugten Indizes und die Aufnahme der Auswahl in den Beleg. Bei der kleinen
+Variablenprojektion erhöhen die Auswahlprüfung und die zusätzliche
 Auswahlbindung die verbuchte Arbeit. Die Messung betrifft allein die
 Projektionsabrechnung. Parsezeit, CPU-Zeit, Allokationen und die Kosten
-nachgelagerter mathematischer Prüfungen sind hier nicht gemessen.
+nachgelagerter mathematischer Prüfungen erfordern eigene Messungen.
 
 Zur Reproduktion in `jshell --class-path regelsuche-core/target/classes`
 nach einem Maven-Build des Kernmoduls lässt sich folgender Aufruf auf die

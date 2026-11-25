@@ -14,10 +14,12 @@ import de.regelsuche.polynomial.ExactParsedUnivariatePolynomialView;
 import de.regelsuche.polynomial.PolynomialWorkAuthority;
 import de.regelsuche.polynomial.PolynomialWorkLedger;
 import de.regelsuche.scalar.ExactRational;
+import java.util.AbstractList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 
 class ExactParsedSubtermProjectorTest {
@@ -190,6 +192,85 @@ class ExactParsedSubtermProjectorTest {
         assertTrue(succeeded.successful(), succeeded.detailCode());
         assertEquals(baseline.work(), succeeded.work());
         assertEquals(exact.stages, succeeded.work().stages());
+    }
+
+    @Test
+    void rejectsOversizedPathBeforeReadingCallerEntries() {
+        var policy = new ExactParsedSubtermProjector.Policy(1, 100, 10, 100, 100, 1_500);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var path = new CountingPath(100_000);
+
+        var result = reusable.project(parser.parseExactTerm("x"), path, "x");
+
+        assertEquals("MAX_PATH_DEPTH_EXCEEDED", result.detailCode());
+        assertEquals(0, path.reads);
+        assertEquals(0L, result.work().totalWorkUnits());
+    }
+
+    @Test
+    void admitsPathValidationBeforeReadingCallerEntries() {
+        var policy = new ExactParsedSubtermProjector.Policy(2, 100, 10, 100, 100, 1);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+        var path = new CountingPath(2);
+
+        var result = reusable.project(parser.parseExactTerm("x"), path, "x");
+
+        assertEquals(ExactParsedSubtermProjector.Status.BUDGET_INCONCLUSIVE, result.status());
+        assertEquals(0, path.reads);
+        assertEquals(0L, result.work().totalWorkUnits());
+    }
+
+    @Test
+    void boundsWhitespaceSnapshotBeforeInspectingItsCharacters() {
+        var parsed = parser.parseExactTerm("x");
+        String whitespace = " ".repeat(10_000);
+        var formattedLimit = new ExactParsedSubtermProjector.Policy(1, 100, 10, 100, 100, 100_000);
+        var workLimit = new ExactParsedSubtermProjector.Policy(1, 100, 10, 100, 10_000, 1);
+
+        var oversized = ExactParsedSubtermProjector.withParserOccurrenceReuse(formattedLimit, PolynomialWorkAuthority.unbounded())
+            .project(parsed, List.of(), whitespace);
+        var unaffordable = ExactParsedSubtermProjector.withParserOccurrenceReuse(workLimit, PolynomialWorkAuthority.unbounded())
+            .project(parsed, List.of(), whitespace);
+
+        assertEquals("MAX_EXPECTED_FORMATTED_CODE_UNITS_EXCEEDED", oversized.detailCode());
+        assertEquals("SUBTERM_PROJECTION_WORK_BUDGET_EXCEEDED", unaffordable.detailCode());
+        assertEquals(0L, oversized.work().totalWorkUnits());
+        assertEquals(0L, unaffordable.work().totalWorkUnits());
+    }
+
+    @Test
+    void detectsWideFunctionNodeLimitBeforePreparingItsChildren() {
+        var source = "outer(" + "wide".repeat(40) + "(" + "x,".repeat(256) + "y))";
+        var policy = new ExactParsedSubtermProjector.Policy(2, 1_000, 1, 1_000, 100, 4L * source.length() + 100);
+        var reusable = ExactParsedSubtermProjector.withParserOccurrenceReuse(policy, PolynomialWorkAuthority.unbounded());
+
+        var result = reusable.project(parser.parseExactTerm(source), List.of(0), "wide");
+
+        assertEquals("MAX_SUBTREE_NODES_EXCEEDED", result.detailCode());
+        assertEquals(1L, result.work().units("projection.subtree-node-visits"));
+        assertEquals(0L, result.work().units("projection.range-commitment-code-units"));
+        assertTrue(result.projected().isEmpty());
+    }
+
+    private static final class CountingPath extends AbstractList<Integer> {
+        private final int size;
+        private int reads;
+
+        private CountingPath(int size) {
+            this.size = size;
+        }
+
+        @Override
+        public Integer get(int index) {
+            Objects.checkIndex(index, size);
+            reads++;
+            return 0;
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
     }
 
     private static final class BoundedAuthority implements PolynomialWorkAuthority {
