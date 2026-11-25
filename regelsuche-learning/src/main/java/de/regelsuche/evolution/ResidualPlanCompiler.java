@@ -38,23 +38,30 @@ public final class ResidualPlanCompiler {
     }
 
     public static Bound bind(String source, List<String> selected, long workLimit) {
+        return bind(source, selected, new Work(workLimit));
+    }
+
+    static Bound bind(String source, List<String> selected, Work work) {
         source = source.strip().replaceAll("\\s+", " ");
         if (source.isEmpty()) throw new IllegalArgumentException("source must contain an expression");
         var ids = List.copyOf(selected);
         if (ids.size() != 2 || ids.getFirst().equals(ids.getLast())) {
             throw new IllegalArgumentException("two distinct source effect IDs required");
         }
-        var work = new Work(workLimit);
         try {
             work.add(source.length() + 1L);
             var prepared = StructuralConstructionPrograms.prepareResidual(source, work, true);
-            if (prepared == null || prepared.parts().size() != 4) throw new IllegalArgumentException("four source components required");
-            var effects = prepared.effects().stream().filter(e -> ids.contains(e.id())).toList();
-            if (effects.size() != 2) throw new IllegalArgumentException("unknown source effect");
-            return discharge(source, prepared, effects, work);
+            return checkPrepared(source, ids, prepared, work);
         } catch (StructuralConstructionPrograms.Limit exhausted) {
             throw new IllegalArgumentException("residual plan check exhausted its work limit", exhausted);
         }
+    }
+
+    static Bound checkPrepared(String source, List<String> ids, PreparedResidual prepared, Work work) {
+        if (prepared == null || prepared.parts().size() != 4) throw new IllegalArgumentException("four source components required");
+        var effects = prepared.effects().stream().filter(e -> ids.contains(e.id())).toList();
+        if (effects.size() != 2) throw new IllegalArgumentException("unknown source effect");
+        return discharge(source, prepared, effects, work);
     }
 
     private static Bound discharge(String source, PreparedResidual prepared, List<Effect> effects, Work work) {
@@ -73,7 +80,7 @@ public final class ResidualPlanCompiler {
             c.assumptions(), c.root(), work.units());
     }
 
-    private static SchematicProofPlan plan(String source, String prepared) {
+    static SchematicProofPlan plan(String source, String prepared) {
         var holes = HOLES.stream().map(id -> {
             boolean sign = id.endsWith("sign");
             var kind = sign ? SchematicProofPlan.HoleKind.SIGN : SchematicProofPlan.HoleKind.DISJOINT_TERM_PAIR;

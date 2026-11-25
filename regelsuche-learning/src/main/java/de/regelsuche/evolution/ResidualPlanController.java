@@ -9,6 +9,10 @@ import de.regelsuche.math.algorithms.equivalence.ExactPolynomialResidualComposer
 import de.regelsuche.math.algorithms.equivalence.Monomial;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.search.program.RewriteProgram;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MovePriorityPolicy;
+import de.regelsuche.search.moves.MoveSearch;
+import de.regelsuche.search.moves.MoveState;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +37,16 @@ public final class ResidualPlanController {
         return new Session(Objects.requireNonNull(source).strip().replaceAll("\\s+", " "), mode, mask, budget);
     }
 
+    /** Search the source's residual alternatives through the staged frontier and its independent move verifier. */
+    public static MoveSearch.Result search(String source, MoveContext context, Mode mode, int mask,
+                                           long formationBudget, long replayBudget, MoveSearch.Budget searchBudget) {
+        var root = new MoveState(source, 0, 0, "", context.initialAssumptions(), java.util.Set.of(), 0);
+        var plans = new ResidualPlanProvider(root, context, mode, mask, formationBudget, replayBudget);
+        var problem = new MoveSearch.Problem(source, context, List.of(plans.provider()), MovePriorityPolicy.INVENTORY_ORDER,
+            plans, state -> 0, MoveSearch.Mode.FAST, MoveSearch.Scheduling.STAGED_INCREMENTAL, searchBudget);
+        return new MoveSearch().search(problem);
+    }
+
     /** A suspended run of this controller, sharing its native checker and selectors. */
     public static final class Session {
         private record Issued(List<String> effects, long acquisitionWork, int pairCount) { }
@@ -43,27 +57,53 @@ public final class ResidualPlanController {
         private final long budget;
         private final Work work;
         private final ResidualPlanController controller;
+        private StructuralConstructionPrograms.ResidualPreparation preparation;
         private ResidualPlanController.PairCursor cursor;
         private ResidualPlanController.Pair pending;
         private String status = "ACTIVE";
 
         private Session(String source, Mode mode, int mask, long budget) {
+            this(source, mode, mask, budget, new Work(budget));
+            while (status.equals("PREPARING")) prepareNext();
+        }
+
+        Session(String source, Mode mode, int mask, long budget, Work work) {
             Objects.requireNonNull(mode);
             if (mask < 0 || mask > 7) throw new IllegalArgumentException("selector mask must be in [0,7]");
             this.mask = mode == Mode.COMPLETE_REFERENCE ? 0 : mask;
             this.budget = budget;
             this.source = source;
-            this.work = new Work(budget);
+            this.work = work;
             this.controller = new ResidualPlanController(source, work);
             this.sourceHash = SolverIr.sha256("residual-search/v1\n" + source);
+            status = "PREPARING";
+        }
+
+        void prepareNext() {
             try {
-                if (controller.prepare()) cursor = controller.cursor();
-                else status = "UNSUPPORTED";
+                if (preparation == null) {
+                    work.add(source.length() + 1L);
+                    preparation = new StructuralConstructionPrograms.ResidualPreparation(source, work, true);
+                }
+                preparation.advance();
+                if (!preparation.done) return;
+                controller.material = preparation.result;
+                preparation = null;
+                if (controller.material == null || controller.material.parts().size() != 4) status = "UNSUPPORTED";
+                else { cursor = controller.cursor(); status = "ACTIVE"; }
             } catch (Limit exhausted) {
                 status = "BUDGET_EXHAUSTED";
             } catch (IllegalArgumentException unsupported) {
                 status = "UNSUPPORTED";
             }
+        }
+
+        String status() { return status; }
+
+        /** Source-bound typed holes and obligations of the selected, still unchecked pair. */
+        public java.util.Optional<SchematicProofPlan> openPlan() {
+            return pending == null ? java.util.Optional.empty()
+                : java.util.Optional.of(ResidualPlanCompiler.plan(source, controller.material.expression()));
         }
 
         public State state() {

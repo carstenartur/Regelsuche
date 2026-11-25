@@ -96,6 +96,9 @@ class ResidualPlanComparisonTest {
             var before = fast.state();
             var step = fast.advance();
             if (fast.state().unresolvedObligations() == 4) {
+                var open = fast.openPlan().orElseThrow();
+                assertEquals(4, open.holes().size());
+                assertEquals(4, open.obligations().size());
                 assertTrue(step.proofRoots().isEmpty());
                 assertNotEquals(before.key(), fast.state().key());
             }

@@ -32,6 +32,52 @@ class ScopedLogicDiscoveryDomainTest {
         assertTrue(ScopedProofSearch.discover(context(Q),1).exhausted());
     }
 
+    @Test void incrementalFormationResumesWithoutReplayingPremisesAndRefusesForeignScope(@TempDir Path dir) {
+        var receiver = new CheckedLeanScopedProofExecutor(new LeanSolverBackend(dir.resolve("missing"),dir),
+            new LeanEvidenceRebuilder(dir.resolve("other"),dir));
+        var domain = new ScopedLogicDiscoveryDomain(receiver,1024);
+        var source = context(R);
+        var initial = new ScopedLogicDiscoveryDomain.State(source,null,0,false);
+        var expected = ScopedProofSearch.discover(source,1024);
+        try (var cursor = domain.openPlans(initial)) {
+            assertTrue(cursor.next(0).isEmpty());
+            assertEquals(0,cursor.work());
+            var found = new java.util.ArrayList<ScopedProofSearch.Proposal>();
+            while (!cursor.done()) cursor.next(1).ifPresent(found::add);
+            assertEquals(expected.proposals(),found);
+            assertEquals(expected.work(),cursor.work());
+            var dag = found.getFirst().dag();
+            assertNotEquals(DiscoveryDomain.EvaluationStatus.CONFIRMED,domain.receivePlan(dag.obligation(),dag).status());
+            assertThrows(IllegalArgumentException.class,()->domain.receivePlan(source,dag));
+            var changed = Obligation.create(source.obligationId(),source.declarations(), source.theories(),
+                List.of(Predicate.holds("bound",new Binder(BinderKind.FORALL,Sort.NATURAL,P))),
+                dag.obligation().goal(),source.requestedEvidence(),source.provenance());
+            assertThrows(IllegalArgumentException.class,()->domain.receivePlan(changed,dag));
+        }
+        // Change only the kind of a nested source binder, keeping assumption names and the receiving goal.
+        var premises = new java.util.ArrayList<>(source.assumptions());
+        var inner = new Binder(BinderKind.FORALL,Sort.NATURAL,P);
+        premises.add(Predicate.holds("binding",new Binder(BinderKind.FORALL,Sort.NATURAL,inner)));
+        var bound = Obligation.create(source.obligationId(),source.declarations(),source.theories(),premises,
+            source.goal(),source.requestedEvidence(),source.provenance());
+        try (var cursor = domain.openPlans(new ScopedLogicDiscoveryDomain.State(bound,null,0,false))) {
+            java.util.Optional<ScopedProofSearch.Proposal> offer = java.util.Optional.empty();
+            while (!cursor.done() && offer.isEmpty()) offer = cursor.next(1);
+            var dag = offer.orElseThrow().dag();
+            premises.set(premises.size()-1,Predicate.holds("binding",new Binder(BinderKind.FORALL,Sort.NATURAL,
+                new Binder(BinderKind.EXISTS,Sort.NATURAL,P))));
+            var foreign = Obligation.create(source.obligationId(),source.declarations(),source.theories(),premises,
+                dag.obligation().goal(),source.requestedEvidence(),source.provenance());
+            assertThrows(IllegalArgumentException.class,()->domain.receivePlan(foreign,dag));
+        }
+        var stopped = domain.openPlans(initial);
+        stopped.next(1);
+        stopped.close();
+        assertTrue(stopped.done());
+        assertTrue(stopped.next(1024).isEmpty());
+        assertEquals(1,stopped.work());
+    }
+
     @Test void normalDiscoveryEntryKeepsAProposedGraphSeparateFromCheckedEvidence(@TempDir Path dir) {
         var domain = new ScopedLogicDiscoveryDomain(new CheckedLeanScopedProofExecutor(
             new LeanSolverBackend(dir.resolve("missing"),dir),
@@ -67,6 +113,15 @@ class ScopedLogicDiscoveryDomainTest {
         assertTrue(java.nio.file.Files.isRegularFile(receipt.kernelDirectory().resolve("proof.olean")));
         assertTrue(java.nio.file.Files.isRegularFile(receipt.rebuildDirectory().resolve("rebuild.txt")));
         assertEquals(result.selectedCandidate().orElseThrow().hash(),receipt.dag().hash());
+
+        try (var cursor = domain.openPlans(domain.generator().generate(seed).getFirst())) {
+            var offered = java.util.Optional.<ScopedProofSearch.Proposal>empty();
+            while (!cursor.done() && offered.isEmpty()) offered = cursor.next(1);
+            var dag = offered.orElseThrow().dag();
+            var replay = domain.receivePlan(dag.obligation(),dag);
+            assertEquals(DiscoveryDomain.EvaluationStatus.CONFIRMED,replay.status(),replay.summary());
+            assertEquals(dag.hash(),replay.certificate().dag().hash());
+        }
 
         new DomainDiscoveryExport().write(export, result.evidence());
         var workspace = DomainExportWorkspace.fromVerified(new DomainDiscoveryExportVerifier().requireVerified(export));

@@ -7,6 +7,7 @@ import de.regelsuche.solver.ir.SolverIr.*;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
 
 /** Source-only finite logical formation. Premises are inspected, the supplied endpoint is never queried. */
 public final class ScopedProofSearch {
@@ -23,49 +24,115 @@ public final class ScopedProofSearch {
 
     private ScopedProofSearch(Obligation context, int limit) { this.context = context; this.limit = limit; }
     public static Report discover(Obligation source, int budget) {
+        try (var cursor = open(source, budget)) {
+            var proposals = new ArrayList<Proposal>();
+            while (!cursor.done()) cursor.next(Long.MAX_VALUE).ifPresent(proposals::add);
+            return new Report(proposals, cursor.work(), cursor.exhausted());
+        }
+    }
+
+    public static Cursor open(Obligation source, int budget) {
         if (!SolverIr.SCOPED_OBLIGATION_SCHEMA.equals(source.schema()) || source.assumptions().size() > 32
                 || source.declarations().size() > 32 || budget < 0 || budget > 65_536)
             throw new IllegalArgumentException("outside scoped proof formation bounds");
-        var search = new ScopedProofSearch(source,budget);
-        try { search.run(); return new Report(search.proposals,search.work,false); }
-        catch (Stop exhausted) { return new Report(search.proposals,search.work,true); }
+        return new Cursor(new ScopedProofSearch(source,budget));
     }
-    private void run() {
-        for (int i = 0; i < context.assumptions().size(); i++) {
-            charge(1);
-            var premise = context.assumptions().get(i);
-            if (premise.relation() == Relation.HOLDS) facts.putIfAbsent(premise.left(),new Fact(premise.left(),List.of(premise(i))));
-        }
-        var initial = List.copyOf(facts.values());
-        for (var fact : initial) fromPremise(fact,initial);
-        for (int i = 0; i < context.declarations().size(); i++) {
-            var predicate = context.declarations().get(i);
-            if (predicate.sort() != Sort.NAT_PREDICATE) continue;
-            charge(1 + 2 * context.assumptions().size());
-            var found = NaturalInduction.propose(context,predicate);
-            if (found.isEmpty()) continue;
-            var plan = found.get();
-            int base = context.assumptions().indexOf(plan.base()), step = context.assumptions().indexOf(plan.step());
-            retain(plan.conclusion().goal().left(),List.of(premise(base),premise(step),indexed(INDUCTION,i,0,1)));
-        }
-        for (int round = 0; round < 4; round++) {
-            int before = facts.size();
-            var previous = List.copyOf(facts.values());
-            for (var fact : previous) apply(fact);
-            if (before == facts.size()) break;
-        }
-        // Retained discovery states contain the original formation work at each proposal.
-        // Run the additional rules after the original proposal prefix has been formed.
-        for (int round = 0; round < 4; round++) {
-            int before = facts.size();
-            var previous = List.copyOf(facts.values());
-            for (var fact : previous) {
-                projectConjunction(fact);
-                eliminateExistential(fact, previous);
+
+    /** Each rule application is atomic. Its completed work (including an overrun of a slice) stays paid. */
+    public static final class Cursor implements AutoCloseable {
+        private enum Stage { PREMISES, FROM_PREMISE, INDUCTION, APPLY, ELIMINATE, APPLY_NEW, END }
+        private final ScopedProofSearch search;
+        private Stage stage = Stage.PREMISES;
+        private List<Fact> roundFacts = List.of();
+        private int index, round, output;
+        private boolean exhausted, closed;
+
+        private Cursor(ScopedProofSearch search) { this.search = search; }
+        public int work() { return search.work; }
+        public boolean exhausted() { return exhausted; }
+        public boolean done() { return closed || stage == Stage.END && output == search.proposals.size(); }
+
+        public Optional<Proposal> next(long allowance) {
+            if (allowance < 0) throw new IllegalArgumentException("negative formation allowance");
+            if (allowance == 0 || done()) return Optional.empty();
+            int before = work();
+            try {
+                while (stage != Stage.END && output == search.proposals.size() && work() - before < allowance)
+                    advance();
+            } catch (Stop stop) {
+                stage = Stage.END;
+                exhausted = true;
             }
-            if (before == facts.size()) return;
-            for (var fact : List.copyOf(facts.values())) apply(fact);
+            return output < search.proposals.size() ? Optional.of(search.proposals.get(output++)) : Optional.empty();
         }
+
+        private void start(Stage next) {
+            stage = next;
+            index = 0;
+            roundFacts = switch (next) {
+                case FROM_PREMISE, APPLY, ELIMINATE, APPLY_NEW -> List.copyOf(search.facts.values());
+                default -> List.of();
+            };
+        }
+
+        private void advance() {
+            switch (stage) {
+                case PREMISES -> {
+                    if (index < search.context.assumptions().size()) search.addPremise(index++);
+                    else start(Stage.FROM_PREMISE);
+                }
+                case FROM_PREMISE -> {
+                    if (index < roundFacts.size()) search.fromPremise(roundFacts.get(index++),roundFacts);
+                    else start(Stage.INDUCTION);
+                }
+                case INDUCTION -> {
+                    if (index < search.context.declarations().size()) search.induct(index++);
+                    else start(Stage.APPLY);
+                }
+                case APPLY -> {
+                    if (index < roundFacts.size()) search.apply(roundFacts.get(index++));
+                    else if (++round < 4 && roundFacts.size() != search.facts.size()) start(Stage.APPLY);
+                    else { round = 0; start(Stage.ELIMINATE); }
+                }
+                case ELIMINATE -> {
+                    if (index < roundFacts.size()) {
+                        var fact = roundFacts.get(index++);
+                        search.projectConjunction(fact);
+                        search.eliminateExistential(fact, roundFacts);
+                    } else start(roundFacts.size() == search.facts.size() ? Stage.END : Stage.APPLY_NEW);
+                }
+                case APPLY_NEW -> {
+                    if (index < roundFacts.size()) search.apply(roundFacts.get(index++));
+                    else start(++round < 4 ? Stage.ELIMINATE : Stage.END);
+                }
+                case END -> throw new IllegalStateException("formation ended");
+            }
+        }
+
+        @Override public void close() {
+            closed = true;
+            roundFacts = List.of();
+            search.facts.clear();
+            search.proposals.clear();
+        }
+    }
+
+    private void addPremise(int index) {
+        charge(1);
+        var predicate = context.assumptions().get(index);
+        if (predicate.relation() == Relation.HOLDS)
+            facts.putIfAbsent(predicate.left(),new Fact(predicate.left(),List.of(premise(index))));
+    }
+
+    private void induct(int index) {
+        var predicate = context.declarations().get(index);
+        if (predicate.sort() != Sort.NAT_PREDICATE) return;
+        charge(1 + 2 * context.assumptions().size());
+        var found = NaturalInduction.propose(context,predicate);
+        if (found.isEmpty()) return;
+        var plan = found.get();
+        int base = context.assumptions().indexOf(plan.base()), step = context.assumptions().indexOf(plan.step());
+        retain(plan.conclusion().goal().left(),List.of(premise(base),premise(step),indexed(INDUCTION,index,0,1)));
     }
     private void fromPremise(Fact fact, List<Fact> initial) {
         if (fact.formula() instanceof Binder b && b.kind()==BinderKind.FORALL) specialize(fact,b);
