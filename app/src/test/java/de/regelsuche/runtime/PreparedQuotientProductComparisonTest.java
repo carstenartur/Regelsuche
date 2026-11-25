@@ -47,7 +47,7 @@ class PreparedQuotientProductComparisonTest {
             if (measure) measure(sample, fixed, rows);
         }
         if (measure) {
-            var output = Path.of("target", "prepared-quotient-product-v1", "measurements.tsv");
+            var output = Path.of("target", "prepared-quotient-product-v2", "measurements-typed-replay.tsv");
             Files.createDirectories(output.getParent());
             Files.writeString(output, rows, StandardCharsets.UTF_8);
         }

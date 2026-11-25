@@ -144,14 +144,23 @@ public final class PreparedAstRewriteTransformationEngine
             return List.of();
         }
 
-        return transformParsed(root, null);
+        return transformParsed(root, null, false);
     }
 
     /** Uses a source AST already prepared by the owning search. */
     public PreparedTransformations transformPrepared(Expr root) {
+        return transformPrepared(root, false);
+    }
+
+    /** Uses precise binary grouping for the syntax of successor states. */
+    public PreparedTransformations transformPreparedStructurally(Expr root) {
+        return transformPrepared(root, true);
+    }
+
+    private PreparedTransformations transformPrepared(Expr root, boolean preserveStructure) {
         AstRewriteTransport.requireBounded(root);
         var work = new RewriteWork();
-        return new PreparedTransformations(transformParsed(root, work), work.nodeVisits, work.ruleAttempts);
+        return new PreparedTransformations(transformParsed(root, work, preserveStructure), work.nodeVisits, work.ruleAttempts);
     }
 
     public record PreparedTransformations(List<Transformation> transformations, long nodeVisits, long ruleAttempts) {
@@ -163,12 +172,12 @@ public final class PreparedAstRewriteTransformationEngine
         long ruleAttempts;
     }
 
-    private List<Transformation> transformParsed(Expr root, RewriteWork work) {
-        String formattedInput = ExpressionFormatter.format(root);
+    private List<Transformation> transformParsed(Expr root, RewriteWork work, boolean preserveStructure) {
+        String formattedInput = format(root, preserveStructure);
         int originalSize = canonicalAstNodeCount(root);
         Set<Transformation> transformations = new LinkedHashSet<>();
         for (RewriteResult result : rewriteEverywhere(root, true, work)) {
-            String formatted = ExpressionFormatter.format(result.expression());
+            String formatted = format(result.expression(), preserveStructure);
             if (formatted.equals(formattedInput)) {
                 continue;
             }
@@ -196,6 +205,10 @@ public final class PreparedAstRewriteTransformationEngine
             }
         }
         return new ArrayList<>(transformations);
+    }
+
+    private static String format(Expr expression, boolean preserveStructure) {
+        return preserveStructure ? ExpressionFormatter.formatStructure(expression) : ExpressionFormatter.format(expression);
     }
 
     /** Typed sibling of the historical string path; called only by the opt-in transport. */

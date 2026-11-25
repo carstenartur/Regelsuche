@@ -54,6 +54,29 @@ class PreparedQuotientSearchApiTest {
     }
 
     @Test
+    void rootReplayPreservesGroupingInsideTheSelectedTerm() throws IOException {
+        var result = search("pair(x+0,a+(b+c))", "\"budget\":{\"maxDepth\":1}");
+        var parser = new ExpressionParser();
+
+        assertEquals("VERIFIED_PRIMITIVE_REPLAY", continuation(result).get("replay"));
+        assertEquals(java.util.List.of("ast_add_zero_right"), continuation(result).get("bestRules"));
+        assertEquals(parser.parseTerm("pair(x,a+(b+c))"), parser.parseTerm((String) result.get("bestExpression")));
+    }
+
+    @Test
+    void replaysEveryPrimitiveWithNestedAndNonassociativeBranchesInsideTheSelection() throws IOException {
+        var result = search("outer(pair(x+0,y+0,a-(b-(c+(d+e))),z*(u*(v/w))),keep)",
+            "\"position\":{\"path\":[0],\"text\":\"pair(x + 0, y + 0, a - (b - (c + d + e)), z * u * (v / w))\"},"
+            + "\"budget\":{\"maxDepth\":2}");
+        var parser = new ExpressionParser();
+
+        assertEquals("VERIFIED_PRIMITIVE_REPLAY", continuation(result).get("replay"));
+        assertEquals(2L, ((Number) object(continuation(result).get("work")).get("replayCalls")).longValue());
+        assertEquals(parser.parseTerm("outer(pair(x,y,a-(b-(c+(d+e))),z*(u*(v/w))),keep)"),
+            parser.parseTerm((String) result.get("bestExpression")));
+    }
+
+    @Test
     void keepsSourceSyntaxAndAssumptionsInTheProductBinding() throws IOException {
         var first = continuation(search("x+0", "\"assumptions\":[\"x>0\"]"));
         var opposite = continuation(search("x+0", "\"assumptions\":[\"x<0\"]"));

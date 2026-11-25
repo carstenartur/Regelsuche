@@ -35,7 +35,7 @@ import java.util.Set;
 
 /** Invocation-owned, explicitly qualified product search. */
 final class PreparedQuotientSearch {
-    static final String REVISION = "regelsuche.product-prepared-quotient/v1";
+    static final String REVISION = "regelsuche.product-prepared-quotient/v2";
     static final SearchProfile PROFILE = SearchProfile.PREPARED_QUOTIENT_DISCOVERY;
     private static final int MAX_SOURCE_LENGTH = 1_024;
     private static final int MAX_POSITION_DEPTH = 64;
@@ -104,11 +104,10 @@ final class PreparedQuotientSearch {
         evidence.put("status", stateBudgetExhausted ? "STATE_BUDGET"
             : best != null ? "EXECUTED" : prepared == null ? "NO_IMPROVEMENT" : "EXHAUSTED");
         var replay = new AstRewriteTransformationEngine(rules, MAX_AST_GROWTH, context.budget.maxCandidatesPerState());
-        Replay checked = verify(best, term.source(), context.assumptions, replay);
+        Replay checked = verify(best, term, context.assumptions, replay, parser);
         String rewritten = null;
-        if (checked.valid) {
-            Expr replacement = parser.parseTerm(best.expression());
-            var applied = context.position.replaceAt(parsed.expression(), replacement);
+        if (checked.replacement != null) {
+            var applied = context.position.replaceAt(parsed.expression(), checked.replacement);
             if (applied.selectedSubtree().orElseThrow() != term.expression()) {
                 throw new IllegalStateException("replay selected a different source occurrence");
             }
@@ -138,7 +137,7 @@ final class PreparedQuotientSearch {
         String formatted = ExpressionFormatter.format(rewrittenRoot);
         if (reparsesAs(parser, formatted, rewrittenRoot)) return formatted;
 
-        // Formatting can drop association outside the selected subtree. Keep that source intact.
+        // Keep the verified replacement and the source outside its range intact.
         String spliced = source.substring(0, range.startInclusive()) + "(" + replacement + ")"
             + source.substring(range.endExclusive());
         return reparsesAs(parser, spliced, rewrittenRoot) ? spliced : null;
@@ -233,7 +232,7 @@ final class PreparedQuotientSearch {
         @Override
         public List<Transformation> transformPrepared(String source, Expr parsed, List<String> assumptions) {
             calls++;
-            var result = engine.transformPrepared(parsed);
+            var result = engine.transformPreparedStructurally(parsed);
             proposals += result.transformations().size();
             ruleAttempts += result.ruleAttempts();
             nodeVisits += result.nodeVisits();
@@ -241,20 +240,26 @@ final class PreparedQuotientSearch {
         }
     }
 
-    private record Replay(boolean valid, long calls, long proposals) { }
+    private record Replay(Expr replacement, long calls, long proposals) { }
 
-    private static Replay verify(SearchState best, String source, List<String> assumptions,
-            AstRewriteTransformationEngine reference) {
-        if (best == null) return new Replay(false, 0, 0);
-        if (!best.path().getFirst().equals(source) || !best.assumptions().equals(assumptions)) {
-            return new Replay(false, 0, 0);
+    private static Replay verify(SearchState best, ExactParsedTerm source, List<String> assumptions,
+            AstRewriteTransformationEngine reference, ExpressionParser parser) {
+        if (best == null || !best.path().getFirst().equals(source.source()) || !best.assumptions().equals(assumptions)) {
+            return new Replay(null, 0, 0);
         }
+        Expr current = source.expression();
         long proposals = 0;
         for (int index = 0; index < best.transformations().size(); index++) {
-            var alternatives = reference.transform(best.path().get(index));
+            var alternatives = reference.transformStructurally(current);
             proposals += alternatives.size();
-            if (!alternatives.contains(best.transformations().get(index))) return new Replay(false, index + 1L, proposals);
+            var recorded = best.transformations().get(index);
+            Expr next = alternatives.stream().filter(alternative -> alternative.transformation().equals(recorded))
+                .map(AstRewriteTransformationEngine.GeneratedAstTransformation::result).findFirst().orElse(null);
+            if (next == null || !reparsesAs(parser, best.path().get(index + 1), next)) {
+                return new Replay(null, index + 1L, proposals);
+            }
+            current = next;
         }
-        return new Replay(true, best.transformations().size(), proposals);
+        return new Replay(current, best.transformations().size(), proposals);
     }
 }

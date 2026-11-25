@@ -25,12 +25,22 @@ public final class ExpressionFormatter {
         return formatMeasured(expr, NativeEmission.INSTANCE);
     }
 
+    /** Keeps binary grouping in a term whose atoms are representable by the parser. */
+    public static String formatStructure(Expr expr) {
+        return formatMeasured(expr, NativeEmission.INSTANCE, true);
+    }
+
     /**
      * Delegates emitted code units before appending each fragment. Native observation
      * additionally pays workspace, allocation and copying; it does not charge the
      * delegated emission again. An active native scope requires an audited callback view.
      */
     public static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits) {
+        return formatMeasured(expr, emittedCodeUnits, false);
+    }
+
+    private static String formatMeasured(Expr expr, java.util.function.LongConsumer emittedCodeUnits,
+            boolean preserveStructure) {
         Objects.requireNonNull(expr, "expr");
         Objects.requireNonNull(emittedCodeUnits, "emittedCodeUnits");
         if (expr instanceof VariableExpr variable) {
@@ -42,7 +52,7 @@ public final class ExpressionFormatter {
         }
         Output builder = new Output(expr, emittedCodeUnits);
         try (var output = RetainedOperation.retainCompleted(19, builder)) {
-            append(builder);
+            append(builder, preserveStructure);
             return builder.value();
         }
     }
@@ -51,12 +61,12 @@ public final class ExpressionFormatter {
         Objects.requireNonNull(equation, "equation");
         Output builder = new Output(equation, NativeEmission.INSTANCE);
         try (var output = RetainedOperation.retainCompleted(19, builder)) {
-            append(builder);
+            append(builder, false);
             return builder.value();
         }
     }
 
-    private static void append(Output builder) {
+    private static void append(Output builder, boolean preserveStructure) {
         builder.initialize();
         while (!builder.pending.isEmpty()) {
             Action action = builder.pending.pop();
@@ -66,7 +76,7 @@ public final class ExpressionFormatter {
                 builder.appendOwned(text.value());
             } else {
                 FormatExpression format = (FormatExpression) action;
-                schedule(format.expression(), format.parentPrecedence(), builder.pending, builder);
+                schedule(format.expression(), format.parentPrecedence(), builder.pending, builder, preserveStructure);
             }
             builder.current = null;
             RetainedOperation.work(1);
@@ -82,7 +92,8 @@ public final class ExpressionFormatter {
         Expr expression,
         int parentPrecedence,
         Deque<Action> pending,
-        Output builder
+        Output builder,
+        boolean preserveStructure
     ) {
         if (expression instanceof NumberExpr number) {
             appendNumber(number, parentPrecedence, builder);
@@ -98,7 +109,7 @@ public final class ExpressionFormatter {
             return;
         }
         if (expression instanceof BinaryExpr binary) {
-            scheduleBinary(binary, parentPrecedence, pending, builder);
+            scheduleBinary(binary, parentPrecedence, pending, builder, preserveStructure);
             RetainedOperation.checkpoint();
             return;
         }
@@ -232,7 +243,8 @@ public final class ExpressionFormatter {
         BinaryExpr binary,
         int parentPrecedence,
         Deque<Action> pending,
-        Output builder
+        Output builder,
+        boolean preserveStructure
     ) {
         BinaryOperator operator = binary.operator();
         int precedence = operator.precedence();
@@ -248,8 +260,8 @@ public final class ExpressionFormatter {
             // to MUL/DIV precedence would turn x^(A*B) into x^A*B.
             case POW -> 0;
             case DIV, SUB -> 1;
-            case MUL -> isDivision(binary.right()) ? 1 : 0;
-            default -> 0;
+            case MUL -> preserveStructure || isDivision(binary.right()) ? 1 : 0;
+            case ADD -> preserveStructure ? 1 : 0;
         };
         push(pending, new FormatExpression(
             binary.right(),
