@@ -106,7 +106,7 @@ Teilbaum mit geschachtelter Addition, Subtraktion, Multiplikation und Division.
 `9cb46b2e719304a402254905190885bbd8308567e86fca11090624390b62208b`.
 Die Messung lief mit Temurin 25.0.5+8 auf Linux x86-64 und AMD EPYC 9V74
 aus dem Git-Quellbaum `c34b0170e1fec0e41bdda26ed30e2aef4a837dae` des
-Messcommits `f52d5d7084da3a5a825dc82dea80a83f33b9c742`. Die Tabellen zeigen
+lokalen Messcommits `f52d5d7084da3a5a825dc82dea80a83f33b9c742`. Der [veröffentlichte Commit](https://github.com/carstenartur/Regelsuche/commit/d0ad9afda45bef7c48dbab91514f9cf3a1893b0a) enthält denselben vollständigen Git-Baum; die [Zuordnung](../source-publication-2026-11-25.json) erhält die ursprüngliche Quellidentität. Die Tabellen zeigen
 jeweils die Summe der Fallmediane. Pro Laufzeitmessung wurde eine JVM
 verwendet. Die einzelnen Fallwerte schwanken weiterhin in beide Richtungen.
 
