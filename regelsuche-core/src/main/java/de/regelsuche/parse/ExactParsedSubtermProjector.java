@@ -386,58 +386,9 @@ public final class ExactParsedSubtermProjector {
             }
             commitNodeKind(commitment, node, work);
 
-            Optional<ExactParsedTerm.SourceRange> sourceRange =
-                root.sourceRangeFor(node);
-            if (sourceRange.isPresent()) {
-                ExactParsedTerm.SourceRange absolute =
-                    sourceRange.orElseThrow();
-                if (!selectedRange.contains(absolute)) {
-                    throw invariant(
-                        "SUBTREE_NODE_RANGE_ESCAPES_SELECTED_OCCURRENCE");
-                }
-                work.consume("projection.shifted-range-bindings", 1);
-                ExactParsedTerm.SourceRange shifted =
-                    new ExactParsedTerm.SourceRange(
-                        absolute.startInclusive()
-                            - selectedRange.startInclusive(),
-                        absolute.endExclusive()
-                            - selectedRange.startInclusive());
-                shiftedRanges.put(node, shifted);
-                commit(commitment, shifted.canonicalMaterial(), work);
-            } else {
-                commit(commitment, "NO_SOURCE_RANGE", work);
-            }
-
+            recordShiftedRange(root, node, selectedRange, shiftedRanges, commitment, work);
             if (node instanceof NumberExpr number) {
-                Optional<ExactParsedTerm.LiteralOccurrence> literal =
-                    root.literalFor(number);
-                if (literal.isPresent()) {
-                    ExactParsedTerm.LiteralOccurrence absolute =
-                        literal.orElseThrow();
-                    if (!selectedRange.contains(
-                            absolute.startInclusive(),
-                            absolute.endExclusive())) {
-                        throw invariant(
-                            "SUBTREE_LITERAL_ESCAPES_SELECTED_OCCURRENCE");
-                    }
-                    work.consume("projection.shifted-literal-bindings", 1);
-                    ExactParsedTerm.LiteralOccurrence shifted =
-                        new ExactParsedTerm.LiteralOccurrence(
-                            number,
-                            absolute.startInclusive()
-                                - selectedRange.startInclusive(),
-                            absolute.endExclusive()
-                                - selectedRange.startInclusive(),
-                            absolute.sourceLexeme(),
-                            absolute.evidence());
-                    literals.add(shifted);
-                    commit(
-                        commitment,
-                        absolute.evidence().certificateHash(),
-                        work);
-                } else {
-                    commit(commitment, "SYNTHETIC_NUMBER", work);
-                }
+                recordShiftedLiteral(root, number, selectedRange, literals, commitment, work);
             }
 
             if (reuseOccurrence) {
@@ -467,6 +418,47 @@ public final class ExactParsedSubtermProjector {
             shiftedRanges,
             List.copyOf(literals),
             commitment.finish());
+    }
+
+    private static void recordShiftedRange(ExactParsedTerm root, Expr node,
+            ExactParsedTerm.SourceRange selectedRange, Map<Expr, ExactParsedTerm.SourceRange> shiftedRanges,
+            EvidenceDigest commitment, Work work) {
+        var sourceRange = root.sourceRangeFor(node);
+        if (sourceRange.isEmpty()) {
+            commit(commitment, "NO_SOURCE_RANGE", work);
+            return;
+        }
+        var absolute = sourceRange.orElseThrow();
+        if (!selectedRange.contains(absolute)) {
+            throw invariant("SUBTREE_NODE_RANGE_ESCAPES_SELECTED_OCCURRENCE");
+        }
+        work.consume("projection.shifted-range-bindings", 1);
+        var shifted = new ExactParsedTerm.SourceRange(
+            absolute.startInclusive() - selectedRange.startInclusive(),
+            absolute.endExclusive() - selectedRange.startInclusive());
+        shiftedRanges.put(node, shifted);
+        commit(commitment, shifted.canonicalMaterial(), work);
+    }
+
+    private static void recordShiftedLiteral(ExactParsedTerm root, NumberExpr number,
+            ExactParsedTerm.SourceRange selectedRange, List<ExactParsedTerm.LiteralOccurrence> literals,
+            EvidenceDigest commitment, Work work) {
+        var literal = root.literalFor(number);
+        if (literal.isEmpty()) {
+            commit(commitment, "SYNTHETIC_NUMBER", work);
+            return;
+        }
+        var absolute = literal.orElseThrow();
+        if (!selectedRange.contains(absolute.startInclusive(), absolute.endExclusive())) {
+            throw invariant("SUBTREE_LITERAL_ESCAPES_SELECTED_OCCURRENCE");
+        }
+        work.consume("projection.shifted-literal-bindings", 1);
+        var shifted = new ExactParsedTerm.LiteralOccurrence(number,
+            absolute.startInclusive() - selectedRange.startInclusive(),
+            absolute.endExclusive() - selectedRange.startInclusive(),
+            absolute.sourceLexeme(), absolute.evidence());
+        literals.add(shifted);
+        commit(commitment, absolute.evidence().certificateHash(), work);
     }
 
     private static int childCount(Expr node) {
