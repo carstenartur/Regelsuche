@@ -54,12 +54,23 @@ public final class RationalFormulaComparison {
     private static Result run(RationalFormula left, RationalFormula right, Assignment center, Evidence evidence,
                               IterationLimits limits, BooleanSupplier cancelled) {
         var work = new RationalFormulaWork(limits, cancelled);
+        return run(left, right, center, evidence, null, work);
+    }
+
+    /** Reuse checked realizations and the enclosing search's single resource ledger. */
+    static Result comparePrepared(RationalFormula left, RationalFormula right, Certificate leftCertificate,
+                                  Certificate rightCertificate, Assignment center, RationalFormulaWork work) {
+        return run(left, right, center, null, new Binding(leftCertificate, rightCertificate, center), work);
+    }
+
+    private static Result run(RationalFormula left, RationalFormula right, Assignment center, Evidence evidence,
+                              Binding prepared, RationalFormulaWork work) {
         try {
             work.ledger.charge(0);
             if (center.order() != 1) return failure(Status.INCONCLUSIVE, "REQUIRES_SCALAR_CENTER", work);
             Binding binding;
             if (evidence == null) {
-                binding = new Binding(RationalFormulaRealization.build(left, work),
+                binding = prepared != null ? prepared : new Binding(RationalFormulaRealization.build(left, work),
                     RationalFormulaRealization.build(right, work), center);
             } else {
                 binding = evidence.binding();

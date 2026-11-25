@@ -3,6 +3,7 @@ package de.regelsuche.sdk.optimization.noncommutative;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormula;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaCenterSearch;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaRealization.Certificate;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier;
@@ -32,6 +33,12 @@ public final class RationalFormulaSdk {
     public static RationalFormulaComparison.Result compare(RationalFormula left, RationalFormula right, Assignment center,
                                                            IterationLimits limits, CancellationToken cancellation) {
         return RationalFormulaComparison.compare(left, right, center, limits, cancellation::isCancelled);
+    }
+
+    /** Search for a common defined scalar center and return an independently replayable comparison. */
+    public static RationalFormulaCenterSearch.Result compare(RationalFormula left, RationalFormula right,
+        RationalFormulaCenterSearch.Policy policy, IterationLimits limits, CancellationToken cancellation) {
+        return RationalFormulaCenterSearch.compare(left, right, policy, limits, cancellation::isCancelled);
     }
 
     public static RationalFormulaComparison.Result verifyComparison(RationalFormula left, RationalFormula right,
