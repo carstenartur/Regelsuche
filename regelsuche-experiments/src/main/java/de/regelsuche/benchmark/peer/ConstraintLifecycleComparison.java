@@ -173,13 +173,7 @@ public final class ConstraintLifecycleComparison {
     }
 
     static Graph graph(String family, int a, int b) {
-        if (a < 1 || a > 16 || b < 0 || b > 16 || !List.of("grid", "complete_bipartite", "disconnected_triangles",
-                "path", "cycle", "binary_tree", "complete", "star", "wheel").contains(family))
-            throw new IllegalArgumentException("graph fixture limit");
-        if ((family.equals("grid") || family.equals("complete_bipartite")) && b == 0)
-            throw new IllegalArgumentException("nonempty graph dimensions required");
-        int n = switch (family) { case "grid" -> a * b; case "complete_bipartite" -> a + b; case "disconnected_triangles" -> 3 * a; default -> a; };
-        if (a < 1 || b < 0 || n > 16) throw new IllegalArgumentException("graph fixture limit");
+        int n = graphOrder(family, a, b);
         var edges = new ArrayList<List<Integer>>();
         for (int i = 0; i < n; i++) for (int j = i + 1; j < n; j++) {
             boolean linked = switch (family) {
@@ -199,6 +193,22 @@ public final class ConstraintLifecycleComparison {
         var factors = edges.stream().map(edge -> new Factor(edge,
             List.of(BigInteger.ONE, BigInteger.ONE, BigInteger.ONE, BigInteger.ZERO))).toList();
         return new Graph(family, a, b, new Problem(n, factors, Map.of()), List.copyOf(edges));
+    }
+
+    private static int graphOrder(String family, int a, int b) {
+        if (a < 1 || a > 16 || b < 0 || b > 16 || !List.of("grid", "complete_bipartite", "disconnected_triangles",
+                "path", "cycle", "binary_tree", "complete", "star", "wheel").contains(family))
+            throw new IllegalArgumentException("graph fixture limit");
+        if ((family.equals("grid") || family.equals("complete_bipartite")) && b == 0)
+            throw new IllegalArgumentException("nonempty graph dimensions required");
+        int vertices = switch (family) {
+            case "grid" -> a * b;
+            case "complete_bipartite" -> a + b;
+            case "disconnected_triangles" -> 3 * a;
+            default -> a;
+        };
+        if (vertices > 16) throw new IllegalArgumentException("graph fixture limit");
+        return vertices;
     }
 
     static BigInteger enumerate(Graph graph) {
