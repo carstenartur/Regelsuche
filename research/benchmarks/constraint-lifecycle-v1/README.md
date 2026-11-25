@@ -36,7 +36,10 @@ Jeder Erwerbsversuch erhält höchstens 20.000 Arbeitseinheiten, der gesamte
 Erwerb höchstens 10 Millionen. Jede Anfrage hat höchstens 2 Millionen
 Arbeitseinheiten, 200.000 Zustandszellen und 20 Sekunden. Die gelernte
 Vorschlagsprüfung darf höchstens 100.000 Einheiten verbrauchen und teilt
-das verbleibende Anfragebudget mit dem festen Rückfall.
+das verbleibende Anfragebudget mit dem festen Rückfall. Für die
+Amortisationsschätzung erhält die Auswahl vier erwartete Anwendungen in der
+Validierung und 96 in der finalen Phase. Die tatsächliche Erwerbsarbeit wird
+in der Gesamtbilanz über alle 100 Anfragen genau einmal berechnet.
 
 ## Vollständiges Ergebnis
 
@@ -45,7 +48,10 @@ vollständigen Aufzählung der ursprünglichen Graphbelegungen überein. Der
 Erwerb umfasst 17 erfolgreiche und **vier nicht verfügbare** Strategieversuche.
 Seine gesamten 147.631 Einheiten gehen einmal in den gelernten Lebenszyklus
 ein. Die neue Suche pro Anfrage enthält außerdem 20 erfolglose Teilversuche.
-Keiner dieser Versuche wurde aus den Kosten oder Rohdaten entfernt.
+Die Erwerbsversuche haben einzelne Ergebniszeilen. Für die frische Suche
+stehen pro Anfrage die Anzahl erfolgloser Teilversuche und ihre im gesamten
+Anfrageaufwand enthaltenen Kosten; separate Belege jedes frischen Teilversuchs
+werden nicht ausgegeben. Keiner dieser Aufwände wurde aus der Bilanz entfernt.
 
 | Verfahren | Validierung | Finale Anfragen | Gesamte Arbeit einschließlich Erwerb | Richtige Antworten |
 | --- | ---: | ---: | ---: | ---: |

@@ -14,7 +14,7 @@ For three variables `a,b,c`, use factors with scopes `[0,1]` and `[1,2]`, both w
 
 Core entry points: `FiniteConstraintCounter.count` and `FiniteConstraintVerifier.verify`. SDK entry points: `FiniteConstraintSdk.count` and `FiniteConstraintSdk.verify`. Pass an explicit `OptimizationBudget` appropriate to the retained tables; the SDK introduces no second arithmetic implementation.
 
-The [complete Java example](../../examples/external-consumers/checked-math-java25/src/main/java/example/FiniteConstraintCount.java) prints counts `5`, `1`, `4`. Build and run it through the [standalone Maven consumer](../../examples/external-consumers/checked-math-java25/README.md); `mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify` runs all six examples after the source SDK has been installed. The published 0.5.3 SDK does not contain this API.
+The [complete Java example](../../examples/external-consumers/checked-math-java25/src/main/java/example/FiniteConstraintCount.java) prints counts `5`, `1`, `4`. Build and run it through the [standalone Maven consumer](../../examples/external-consumers/checked-math-java25/README.md); `mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify` runs all seven examples after the source SDK has been installed. The published 0.5.3 SDK does not contain this API.
 
 ## Evidence
 

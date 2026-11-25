@@ -97,7 +97,7 @@ final class StudentSdkArchive {
         files.put("sdk-compatibility.json", canonicalJson(policy));
         addSources(root, version, files);
         files.put("README.md", utf8("# Regelsuche Java SDK " + version + "\n\n"
-            + "Run the [six checked calculations](examples/external-consumers/checked-math-java25/README.md) with Java 25 and Maven 3.9.9+:\n\n"
+            + "Run the [seven checked calculations](examples/external-consumers/checked-math-java25/README.md) with Java 25 and Maven 3.9.9+:\n\n"
             + "```sh\nmvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify\n```\n\n"
             + "The bundled Maven projects use this archive's SDK version without overrides.\n"
             + "The [SDK guide](docs/java-sdk-quickstart.md) also documents the published Central release and historical archives.\n\n"

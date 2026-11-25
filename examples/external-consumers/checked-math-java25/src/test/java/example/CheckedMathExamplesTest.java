@@ -51,6 +51,14 @@ class CheckedMathExamplesTest {
         assertTrue(result.contains("factor coverage and values: VERIFIED"), result);
     }
 
+    @Test void usesTheNewBoundedApisFromTheResolvedSdk() {
+        assertEquals(List.of("62-variable OR: 4611686018427387903; replay=true",
+                "fixed MIN_FILL: count=3; replay=true", "rational simplification: VERIFIED; replay=true",
+                "missing rational condition: REQUIRES_ASSUMPTIONS", "new denominator hole: rejected=true",
+                "complex multiplication rational rank: 3; replay=true"),
+            output(() -> BoundedPlanning.main(new String[0])).lines().toList());
+    }
+
     private static String output(Runnable program) {
         var original = System.out;
         var bytes = new ByteArrayOutputStream();

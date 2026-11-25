@@ -10,7 +10,7 @@ Der veröffentlichte Maven-Einstieg ist
 Dieser Checkout entwickelt `0.5.4-SNAPSHOT`. Ein Quellcode-Einstieg, eine
 vorhandene Demo und ein veröffentlichter Binärstand sind getrennte Aussagen.
 Ein eigener Build dieses Checkouts ist für die neuen APIs erforderlich.
-Die sechs [Mathematikbeispiele als Maven-Projekt](../examples/external-consumers/checked-math-java25/README.md)
+Die sieben [Mathematikbeispiele als Maven-Projekt](../examples/external-consumers/checked-math-java25/README.md)
 bieten dafür einen vollständigen Installations- und Ausführungspfad. Das
 SDK-Paket enthält dieses Projekt mit einer an seine Archivversion gebundenen
 Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
