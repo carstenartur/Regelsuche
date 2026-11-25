@@ -1,0 +1,40 @@
+{
+  "schema": "regelsuche.constraint-lifecycle-protocol/v1",
+  "decision": "Freeze families and controls before execution; no tuning after validation.",
+  "semantics": "Boolean independent-set counting through identical nonnegative pair factors",
+  "fixedControl": "MIN_FILL",
+  "additionalControl": "MIN_DEGREE",
+  "trainingMaximumWork": 10000000,
+  "perTrainingTrialWork": 20000,
+  "queryMaximumWork": 2000000,
+  "maximumStates": 200000,
+  "timeoutMillis": 20000,
+  "maximumProbeWork": 100000,
+  "finalRounds": 16,
+  "training": [
+    {"family":"path","a":8,"b":0},
+    {"family":"path","a":12,"b":0},
+    {"family":"cycle","a":9,"b":0},
+    {"family":"cycle","a":13,"b":0},
+    {"family":"binary_tree","a":7,"b":0},
+    {"family":"binary_tree","a":15,"b":0},
+    {"family":"complete","a":12,"b":0}
+  ],
+  "validation": [
+    {"family":"star","a":10,"b":0},
+    {"family":"star","a":14,"b":0},
+    {"family":"wheel","a":8,"b":0},
+    {"family":"wheel","a":12,"b":0}
+  ],
+  "final": [
+    {"family":"grid","a":2,"b":5},
+    {"family":"grid","a":3,"b":4},
+    {"family":"complete_bipartite","a":3,"b":4},
+    {"family":"complete_bipartite","a":4,"b":5},
+    {"family":"disconnected_triangles","a":3,"b":0},
+    {"family":"disconnected_triangles","a":4,"b":0}
+  ],
+  "accounting": "All acquisition trials, including unavailable trials, charged once to each learned lifecycle; each query pays preparation, attempted proposal and fixed fallback. Repeat phases are explicit, not new unique holdouts. Independent truth enumeration and verification exported separately.",
+  "measurements": ["chargedWork", "wallNanos", "threadCpuNanos", "allocatedBytesWhenAvailable"],
+  "prohibitions": ["No benchmark metadata supplied to planner", "No removal of failed rows", "No historical artifact edits", "No claimed runtime advantage from a single local panel"]
+}
