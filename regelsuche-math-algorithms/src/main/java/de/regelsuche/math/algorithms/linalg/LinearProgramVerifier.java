@@ -78,7 +78,7 @@ public final class LinearProgramVerifier {
         };
     }
 
-    private static boolean sameSource(Problem request, Problem bound, CertificateWork work) {
+    static boolean sameSource(Problem request, Problem bound, CertificateWork work) {
         for (int row = 0; row < request.constraints(); row++) {
             work.charge(1);
             if (!sameValues(request.a().get(row), bound.a().get(row), work)) return false;
