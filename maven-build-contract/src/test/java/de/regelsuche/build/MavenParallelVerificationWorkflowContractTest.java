@@ -276,7 +276,9 @@ class MavenParallelVerificationWorkflowContractTest {
         .valueStream().filter(step -> "Collect complete checkout-owned quality acceptance evidence".equals(step.path("name").asText()))
         .findFirst().orElseThrow();
     assertEquals("mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am "
-        + "-Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false "
+        + "-Dtest=QualityAcceptancePublicationTest,PolynomialParityQualificationTest "
+        + "-Dsurefire.failIfNoSpecifiedTests=false "
+        + "-Dregelsuche.polynomialParity.enabled=${{ github.event_name != 'create' }} "
         + "-Dregelsuche.qualityAcceptance.collect=true verify", collection.required("run").asText().strip());
     assertFalse(collection.has("if"));
     assertFalse(collection.has("continue-on-error"));
@@ -297,6 +299,58 @@ class MavenParallelVerificationWorkflowContractTest {
     assertFalse(workflow.contains(" --exclude-task "));
     assertFalse(workflow.contains(" -x "),
         "moving work to required jobs must not use Gradle task exclusion");
+  }
+
+  @Test
+  void polynomialParityUsesSameRevisionArchivesAndFailsClosed() throws IOException {
+    JsonNode workflow = YAML.readTree(repositoryRoot().resolve(
+        ".github/workflows/gradle.yml").toFile());
+    List<JsonNode> steps = workflow.required("jobs").required("verification")
+        .required("steps").valueStream().toList();
+    String revision = "${{ github.event.pull_request.head.sha || github.sha }}";
+    String routine = "github.event_name != 'create'";
+    JsonNode collection = steps.stream()
+        .filter(step -> "acceptance_evidence".equals(step.path("id").asText()))
+        .findFirst().orElseThrow();
+    assertEquals(revision, collection.required("env").required("EVIDENCE_REVISION").asText());
+    assertFalse(collection.has("if"));
+    assertFalse(collection.has("continue-on-error"));
+    JsonNode source = steps.stream()
+        .filter(step -> "Checkout exact polynomial evidence source".equals(step.path("name").asText()))
+        .findFirst().orElseThrow();
+    assertTrue(source.required("uses").asText().startsWith("actions/checkout@"));
+    assertEquals(revision, source.required("with").required("ref").asText());
+    assertEquals("build/polynomial-parity-source", source.required("with").required("path").asText());
+    assertFalse(source.required("with").required("persist-credentials").asBoolean(true));
+    assertEquals(routine, source.required("if").asText());
+    assertFalse(source.has("continue-on-error"));
+    assertTrue(steps.indexOf(source) < steps.indexOf(collection));
+    List<String> archives = List.of("typed-external-polynomial-", "maven-typed-polynomial-",
+        "maven-native-polynomial-");
+    List<String> directories = List.of("legacy", "typed", "native");
+    for (int i = 0; i < archives.size(); i++) {
+      String artifact = archives.get(i) + revision;
+      JsonNode download = steps.stream()
+          .filter(step -> artifact.equals(step.path("with").path("name").asText()))
+          .findFirst().orElseThrow();
+      assertTrue(download.required("uses").asText().startsWith("actions/download-artifact@"));
+      assertEquals("build/polynomial-parity/" + directories.get(i),
+          download.required("with").required("path").asText());
+      assertEquals(routine, download.required("if").asText());
+      assertFalse(download.has("continue-on-error"));
+      assertTrue(steps.indexOf(source) < steps.indexOf(download));
+      assertTrue(steps.indexOf(download) < steps.indexOf(collection));
+    }
+    JsonNode receipt = steps.stream()
+        .filter(step -> ("polynomial-parity-qualification-" + revision)
+            .equals(step.path("with").path("name").asText()))
+        .findFirst().orElseThrow();
+    assertTrue(receipt.required("uses").asText().startsWith("actions/upload-artifact@"));
+    assertEquals("build/polynomial-parity/qualification.json", receipt.required("with").required("path").asText());
+    assertEquals("error", receipt.required("with").required("if-no-files-found").asText());
+    assertEquals(routine, receipt.required("if").asText());
+    assertFalse(receipt.has("continue-on-error"));
+    assertTrue(steps.indexOf(receipt) > steps.indexOf(collection));
   }
 
   @Test
