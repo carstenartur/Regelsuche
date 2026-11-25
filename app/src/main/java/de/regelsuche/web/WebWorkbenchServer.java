@@ -884,6 +884,23 @@ public class WebWorkbenchServer {
             sendStatus(exchange, 400, ex.getMessage());
             return;
         }
+        if (profile == SearchProfile.PREPARED_QUOTIENT_DISCOVERY) {
+            if (type != InputType.TERM) {
+                sendStatus(exchange, 400, "prepared quotient requires TERM input");
+                return;
+            }
+            try {
+                var context = body.continuation() == null ? java.util.Map.<String, Object>of() : body.continuation();
+                sendJson(exchange, 200, de.regelsuche.runtime.SafeRuntimeAdapter.analyzePreparedQuotient(expression, goal, context));
+            } catch (IllegalArgumentException invalid) {
+                sendStatus(exchange, 400, invalid.getMessage());
+            }
+            return;
+        }
+        if (body.continuation() != null) {
+            sendStatus(exchange, 400, "continuation options require PREPARED_QUOTIENT_DISCOVERY");
+            return;
+        }
         TransformationSearchService search = new TransformationSearchService(
             new SymPyTransformationEngine(),
             graphStore,

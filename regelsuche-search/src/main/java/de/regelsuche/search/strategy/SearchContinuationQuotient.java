@@ -10,6 +10,7 @@ import java.util.Map;
 /** Run-local continuation labels. Semantic nodes do not own histories or notation. */
 final class SearchContinuationQuotient {
     private record NodeKey(ValueId value, String unparsedSyntax, List<String> assumptions) {}
+    private record PreparedKey(String syntax, List<String> assumptions) { }
     private record Label(int depth, int expansions, boolean checked) {
         static Label of(SearchState state) {
             return new Label(state.depth(), state.expandedStepCount(), state.transformations() != null
@@ -21,7 +22,7 @@ final class SearchContinuationQuotient {
     }
     private final BestFirstSearchStrategy.ValueIdentitySession identity;
     private final Map<NodeKey, Map<String, List<Label>>> nodes = new LinkedHashMap<>();
-    private final Map<String, List<Transformation>> successors = new LinkedHashMap<>();
+    private final Map<Object, List<Transformation>> successors = new LinkedHashMap<>();
     private int retainedLabels;
     private int syntaxObservations;
     private long duplicateArrivals;
@@ -61,14 +62,19 @@ final class SearchContinuationQuotient {
         return true;
     }
 
-    List<Transformation> transformations(SearchProblem problem, String expression) {
-        var retained = successors.get(expression);
+    List<Transformation> transformations(SearchProblem problem, SearchState state, boolean qualified) {
+        String expression = state.expression();
+        Object key = qualified ? new PreparedKey(expression, state.assumptions()) : expression;
+        var retained = successors.get(key);
         if (retained != null) {
             successorCacheHits++;
             return retained;
         }
-        var frozen = List.copyOf(problem.transformations(expression));
-        successors.put(expression, frozen);
+        var frozen = List.copyOf(qualified
+            ? Transformation.requirePrimitiveOnly(((StateLocalTransformationEngine) problem.engine())
+                .transformPrepared(expression, identity.preparedExpression(expression), state.assumptions()))
+            : problem.transformations(expression));
+        successors.put(key, frozen);
         return frozen;
     }
 

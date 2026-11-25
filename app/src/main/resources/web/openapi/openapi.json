@@ -3779,8 +3779,25 @@
         "properties": {
           "expression": {"type": "string"},
           "type": {"type": "string", "enum": ["TERM", "EQUATION", "SYSTEM"], "default": "TERM"},
-          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "QUOTIENT_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION"], "default": "FAST_SIMPLIFY"},
-          "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "NUMERICALLY_STABLE", "PROOF_FRIENDLY", "TEACHING_FRIENDLY", "DIDAKTIK"]}
+          "profile": {"type": "string", "enum": ["FAST_SIMPLIFY", "DISCOVERY", "DIVERSITY_DISCOVERY", "QUOTIENT_DISCOVERY", "TEACHING", "PROOF_ORIENTED", "EXHAUSTIVE_SMALL", "DISCOVERY_PLUS", "EQUALITY_SATURATION", "PREPARED_QUOTIENT_DISCOVERY"], "default": "FAST_SIMPLIFY"},
+          "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "NUMERICALLY_STABLE", "PROOF_FRIENDLY", "TEACHING_FRIENDLY", "DIDAKTIK"]},
+          "continuation": {
+            "type": "object", "additionalProperties": false,
+            "description": "Options for PREPARED_QUOTIENT_DISCOVERY on a term.",
+            "properties": {
+              "assumptions": {"type": "array", "maxItems": 64, "items": {"type": "string", "maxLength": 256}},
+              "position": {"type": "object", "additionalProperties": false, "required": ["path", "text"], "properties": {
+                "path": {"type": "array", "maxItems": 64, "items": {"type": "integer", "minimum": 0, "maximum": 2147483647}},
+                "text": {"type": "string", "minLength": 1, "maxLength": 4096}
+              }},
+              "budget": {"type": "object", "additionalProperties": false, "properties": {
+                "maxDepth": {"type": "integer", "minimum": 0, "maximum": 6},
+                "maxVisitedExpressions": {"type": "integer", "minimum": 1, "maximum": 2000},
+                "maxExpandingSteps": {"type": "integer", "minimum": 0, "maximum": 6},
+                "maxCandidatesPerState": {"type": "integer", "minimum": 1, "maximum": 80}
+              }}
+            }
+          }
         }
       },
       "SearchResult": {
@@ -3793,7 +3810,8 @@
           "expression": {"type": "string"},
           "successes": {"type": "integer", "minimum": 0},
           "bestExpression": {"type": ["string", "null"]},
-          "improvement": {"type": "integer"}
+          "improvement": {"type": "integer"},
+          "continuation": {"type": "object", "description": "Source binding, budget, observed work and primitive replay status for the prepared profile."}
         }
       },
       "DiscoveryRequest": {"type": "object", "properties": {"min": {"type": "integer", "default": 1}, "max": {"type": "integer", "default": 3}}},

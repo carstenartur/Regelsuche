@@ -2,6 +2,7 @@ package de.regelsuche.search.strategy;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExactParsedTerm;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.scoring.ExpressionScore;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
@@ -43,6 +44,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     private final IdentityPolicy identityPolicy;
     public enum TieOrder { HISTORICAL_HASH_V1, SYNTAX_V1 }
     private final TieOrder tieOrder;
+    private final boolean preparedQuotient;
 
     public BestFirstSearchStrategy() { this(IdentityPolicy.APPLICATION_HISTORY_V1); }
 
@@ -51,8 +53,17 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     public BestFirstSearchStrategy(IdentityPolicy identityPolicy, TieOrder tieOrder) {
+        this(identityPolicy, tieOrder, false);
+    }
+
+    public static BestFirstSearchStrategy preparedQuotient() {
+        return new BestFirstSearchStrategy(IdentityPolicy.CONTINUATION_QUOTIENT_V1, TieOrder.SYNTAX_V1, true);
+    }
+
+    private BestFirstSearchStrategy(IdentityPolicy identityPolicy, TieOrder tieOrder, boolean preparedQuotient) {
         this.identityPolicy = Objects.requireNonNull(identityPolicy, "identityPolicy");
         this.tieOrder = Objects.requireNonNull(tieOrder, "tieOrder");
+        this.preparedQuotient = preparedQuotient;
         if (identityPolicy == IdentityPolicy.CONTINUATION_QUOTIENT_V1 && getClass() != BestFirstSearchStrategy.class)
             throw new IllegalArgumentException("continuation quotient requires the concrete state-local BestFirst controller");
     }
@@ -81,10 +92,29 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     /** Policy-bound diagnostics; the historical GoalSearchResult format is unchanged. */
     public ExecutionDiagnostics searchWithExecutionDiagnostics(SearchProblem problem) {
+        return execute(problem, null, List.of());
+    }
+
+    /** Starts the qualified search with an already bound source and its initial assumptions. */
+    public ExecutionDiagnostics searchPrepared(SearchProblem problem, ExactParsedTerm source, List<String> assumptions) {
         Objects.requireNonNull(problem, "problem");
-        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer(), identityPolicy)) {
+        Objects.requireNonNull(source, "source");
+        if (!preparedQuotient || !problem.rootExpression().equals(source.source())) {
+            throw new IllegalArgumentException("prepared quotient requires the exact bound input source");
+        }
+        return execute(problem, source, List.copyOf(assumptions));
+    }
+
+    private ExecutionDiagnostics execute(SearchProblem problem, ExactParsedTerm source, List<String> assumptions) {
+        Objects.requireNonNull(problem, "problem");
+        if (preparedQuotient && !(problem.engine() instanceof StateLocalTransformationEngine)) {
+            throw new IllegalArgumentException("prepared quotient requires an explicitly state-local transformation provider");
+        }
+        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer(), identityPolicy, preparedQuotient)) {
+            if (source != null) identity.bindSource(source);
             TargetSession target = new TargetSession(problem.target(), identity);
             SearchState rootState = createRootState(problem, identity);
+            if (!assumptions.isEmpty()) rootState = rootState.withAssumptions(assumptions);
             SearchFrame frame = createFrame(problem, identity, target);
             frame.frontier().add(rootState);
             frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visitedSize());
@@ -122,7 +152,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     private SearchState createRootState(SearchProblem problem, ValueIdentitySession identity) {
-        String root = normalize(problem.rootExpression());
+        String root = preparedQuotient ? problem.rootExpression() : normalize(problem.rootExpression());
         ExpressionScore rootScore = problem.scorer().score(root);
         return new SearchState(
             root,
@@ -245,7 +275,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             problem,
             current,
             new ArrayList<>(frame.quotient() == null ? problem.transformations(current.expression())
-                : frame.quotient().transformations(problem, current.expression())),
+                : frame.quotient().transformations(problem, current, preparedQuotient)),
             target.enabled(),
             transformation -> target.distance(transformation.transformedExpression()));
     }
@@ -748,6 +778,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         private final Map<String, ExprValueArena.ValueId> arenaValues = new LinkedHashMap<>();
         private final Map<String, String> valueHashesByExpression = new LinkedHashMap<>();
         private final Map<String, ExprValue> valuesByExpression = new LinkedHashMap<>();
+        private final Map<String, Expr> preparedSyntax;
         private final Set<String> unparseableExpressions = new HashSet<>();
         private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();
         private int cacheHits;
@@ -758,8 +789,26 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         }
 
         ValueIdentitySession(ExpressionCanonicalizer canonicalizer, IdentityPolicy policy) {
+            this(canonicalizer, policy, false);
+        }
+
+        private ValueIdentitySession(ExpressionCanonicalizer canonicalizer, IdentityPolicy policy, boolean prepareSyntax) {
             this.canonicalizer = Objects.requireNonNull(canonicalizer, "canonicalizer");
             arena = policy == IdentityPolicy.APPLICATION_HISTORY_V1 ? null : new ExprValueArena(1_000_000);
+            preparedSyntax = prepareSyntax ? new LinkedHashMap<>() : null;
+        }
+
+        private void bindSource(ExactParsedTerm source) {
+            preparedSyntax.put(normalize(source.source()), source.expression());
+        }
+
+        Expr preparedExpression(String source) {
+            return parseSyntax(normalize(source));
+        }
+
+        private Expr parseSyntax(String normalized) {
+            return preparedSyntax == null ? parser.parseTerm(normalized)
+                : preparedSyntax.computeIfAbsent(normalized, parser::parseTerm);
         }
 
         String valueHash(String expression) {
@@ -789,7 +838,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return Optional.empty();
             }
             try {
-                Expr parsed = parser.parseTerm(normalized);
+                Expr parsed = parseSyntax(normalized);
                 Expr canonical = canonicalizer.canonicalize(parsed);
                 ExprValue value = factory.fromExpr(canonical);
                 valuesByExpression.put(normalized, value);
@@ -806,7 +855,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             if (cached != null) return Optional.of(cached);
             if (unparseableExpressions.contains(normalized)) return Optional.empty();
             try {
-                var id = arena.intern(canonicalizer.canonicalize(parser.parseTerm(normalized)));
+                var id = arena.intern(canonicalizer.canonicalize(parseSyntax(normalized)));
                 arenaValues.put(normalized, id);
                 return Optional.of(id);
             } catch (IllegalArgumentException unsupported) {
@@ -843,6 +892,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         @Override
         public void close() {
             valueHashesByExpression.clear();
+            if (preparedSyntax != null) preparedSyntax.clear();
             valuesByExpression.clear();
             unparseableExpressions.clear();
             legacyHashesByExpression.clear();

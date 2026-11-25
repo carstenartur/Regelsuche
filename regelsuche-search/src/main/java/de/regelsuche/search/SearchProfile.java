@@ -102,6 +102,13 @@ public enum SearchProfile {
         public SearchStrategy newStrategy() {
             return new EqualitySaturationStrategy();
         }
+    },
+    /** Opt-in prepared search for explicitly state-local providers. */
+    PREPARED_QUOTIENT_DISCOVERY(new SearchHeuristic(6, 2_000, 1, 6, 80, 16), TransformationGoal.SIMPLIFY) {
+        @Override
+        public BestFirstSearchStrategy newStrategy() {
+            return BestFirstSearchStrategy.preparedQuotient();
+        }
     };
 
     private final SearchHeuristic heuristic;
