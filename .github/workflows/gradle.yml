@@ -610,7 +610,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: build/polynomial-parity-source
-          sparse-checkout: scripts/external_polynomial_comparison
           persist-credentials: false
       - name: Download paired host polynomial archives
         if: github.event_name != 'create'
@@ -630,22 +629,19 @@ jobs:
         with:
           name: maven-native-polynomial-${{ github.event.pull_request.head.sha || github.sha }}
           path: build/polynomial-parity/native
-      - name: Qualify paired polynomial archives without executing solvers
-        if: github.event_name != 'create'
+      - name: Verify complete cross-authority coverage and render standard JaCoCo pages
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
+          -Pverify-cross-authority-coverage -Dregelsuche.coverage.publish=true -DskipTests verify
+      - name: Collect complete checkout-owned quality acceptance evidence
+        id: acceptance_evidence
         env:
           EVIDENCE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          export PYTHONPATH="$GITHUB_WORKSPACE/build/polynomial-parity-source/scripts"
-          test "$(git -C build/polynomial-parity-source rev-parse HEAD)" = "$EVIDENCE_REVISION"
-          tree=$(git -C build/polynomial-parity-source rev-parse 'HEAD^{tree}')
-          python3 -m unittest external_polynomial_comparison.test_native_parity external_polynomial_comparison.test_typed_parity
-          python3 -m external_polynomial_comparison.qualify_parity \
-            build/polynomial-parity/legacy/build/reports/typed-external-polynomial-comparison \
-            build/polynomial-parity/typed/regelsuche-release/target/reports/typed-external-polynomial-comparison/extracted/typed-external-polynomial-comparison \
-            build/polynomial-parity/legacy/build/reports/native-polynomial-comparison \
-            build/polynomial-parity/native/regelsuche-release/target/reports/native-polynomial-comparison/extracted/native-polynomial-comparison \
-            --revision "$EVIDENCE_REVISION" --tree "$tree" | tee build/polynomial-parity/qualification.json
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am
+          -Dtest=QualityAcceptancePublicationTest,PolynomialParityQualificationTest -Dsurefire.failIfNoSpecifiedTests=false
+          -Dregelsuche.polynomialParity.enabled=${{ github.event_name != 'create' }}
+          -Dregelsuche.qualityAcceptance.collect=true verify
       - name: Retain polynomial parity qualification
         if: github.event_name != 'create'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -653,16 +649,6 @@ jobs:
           name: polynomial-parity-qualification-${{ github.event.pull_request.head.sha || github.sha }}
           path: build/polynomial-parity/qualification.json
           if-no-files-found: error
-      - name: Verify complete cross-authority coverage and render standard JaCoCo pages
-        run: >-
-          mvn --batch-mode --no-transfer-progress -pl regelsuche-quality
-          -Pverify-cross-authority-coverage -Dregelsuche.coverage.publish=true -DskipTests verify
-      - name: Collect complete checkout-owned quality acceptance evidence
-        id: acceptance_evidence
-        run: >-
-          mvn --batch-mode --no-transfer-progress -pl regelsuche-release -am
-          -Dtest=QualityAcceptancePublicationTest -Dsurefire.failIfNoSpecifiedTests=false
-          -Dregelsuche.qualityAcceptance.collect=true verify
       - name: Retain quality acceptance index and bound source files
         if: ${{ always() && !cancelled() && steps.acceptance_evidence.outcome != 'skipped' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
