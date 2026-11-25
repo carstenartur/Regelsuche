@@ -1,9 +1,9 @@
 package de.regelsuche.search.strategy;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 /**
  * Hybrid strategy that combines complementary search strategies and unions
@@ -11,8 +11,8 @@ import java.util.Map;
  *
  * <p>Defaults to running {@link BestFirstSearchStrategy} followed by
  * {@link BeamSearchStrategy}; callers can supply any list of strategies. States
- * are deduplicated by canonical hash + applied rule applications so a state
- * discovered by multiple strategies is only returned once.</p>
+ * are deduplicated only when the complete immutable state, including retained
+ * lineage and assumptions, agrees. Equal values are not necessarily equal evidence.</p>
  */
 public class HybridSearchStrategy implements SearchStrategy {
     private final List<SearchStrategy> strategies;
@@ -30,15 +30,10 @@ public class HybridSearchStrategy implements SearchStrategy {
 
     @Override
     public List<SearchState> search(SearchProblem problem) {
-        Map<String, SearchState> deduplicated = new LinkedHashMap<>();
+        Set<SearchState> deduplicated = new LinkedHashSet<>();
         for (SearchStrategy strategy : strategies) {
-            for (SearchState state : strategy.search(problem)) {
-                deduplicated.putIfAbsent(
-                    state.canonicalHash() + ":" + state.appliedRuleApplications(),
-                    state
-                );
-            }
+            deduplicated.addAll(strategy.search(problem));
         }
-        return new ArrayList<>(deduplicated.values());
+        return new ArrayList<>(deduplicated);
     }
 }
