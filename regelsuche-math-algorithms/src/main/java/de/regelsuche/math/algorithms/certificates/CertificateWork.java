@@ -26,6 +26,12 @@ public final class CertificateWork {
         if (count < 0) throw new IllegalArgumentException("NEGATIVE_WORK");
         if (cancellation.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new Stop("CANCELLED");
         if (System.nanoTime() - start >= timeoutNanos) throw new Stop("TIME_LIMIT");
+        chargeCompleted(count);
+    }
+
+    /** Post a nested operation's already incurred work before observing cancellation or deadline at return. */
+    public void chargeCompleted(long count) {
+        if (count < 0) throw new IllegalArgumentException("NEGATIVE_WORK");
         if (count > limits.maximumWork() - used) throw new Stop("WORK_LIMIT");
         used += count;
     }
