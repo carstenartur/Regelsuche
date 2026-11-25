@@ -117,6 +117,60 @@ class CertificateDemoBrowserFlowTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {1200, 390})
+    void countsEditedCnfDownloadsAndRestoresDraft(int width) throws IOException {
+        try (var context = browser.newContext(new Browser.NewContextOptions().setViewportSize(width, 900))) {
+            var page = context.newPage();
+            page.setDefaultTimeout(5_000);
+            page.navigate(app.baseUrl() + "/static/certificate-demos.html");
+            var run = page.locator("#cnfRun");
+            var status = page.locator("#cnfStatus");
+            page.locator("#cnfVariableCount").fill("62");
+            page.locator("#cnfClauses").fill("1 -2");
+            page.locator("#cnfFixed").fill("1");
+            run.press("Enter");
+            assertThat(status).containsText("Exakt 2305843009213693952 Belegungen");
+            var file = page.waitForDownload(() -> page.locator("#cnfDownload").click());
+            var json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(java.nio.file.Files.readAllBytes(file.path()));
+            assertEquals("2305843009213693952", json.at("/certificate/elimination/total").textValue());
+            page.locator("#cnfWork").fill("1"); run.press("Enter");
+            assertThat(status).containsText("Arbeitsbudget erschöpft");
+            assertThat(page.locator("#cnfDownload")).isHidden();
+            page.locator("#cnfClauses").fill("oops"); run.press("Enter");
+            assertThat(status).containsText("ganze Zahlen");
+            page.locator("#cnfClauses").fill("63"); run.press("Enter");
+            assertThat(status).containsText("zwischen -62 und 62");
+            page.reload();
+            assertThat(page.locator("#cnfClauses")).hasValue("63");
+            assertThat(page.locator("#cnfDownload")).isHidden();
+            assertEquals(true, page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
+        }
+    }
+
+    @Test void countsEditedCnfCanBeCancelledOnTheServer() throws IOException {
+        try (var context = browser.newContext()) {
+            var page = context.newPage();
+            page.setDefaultTimeout(5_000);
+            page.navigate(app.baseUrl() + "/static/certificate-demos.html");
+            page.locator("#cnfVariableCount").fill("256");
+            var clauses = new StringBuilder();
+            for (int i = 0; i < 128; i++)
+                clauses.append(i + 1).append(' ').append(i + 129).append(' ').append((i * 13 + 7) % 128 + 1).append('\n');
+            page.locator("#cnfClauses").fill(clauses.toString());
+            page.locator("#cnfWork").fill("2000000");
+            var response = page.waitForResponse(r -> r.url().endsWith("/cancel"), () -> page.evaluate("""
+                () => {
+                    document.querySelector('#cnfRun').click();
+                    document.querySelector('#cnfCancel').click();
+                }
+                """));
+            assertEquals(202, response.status());
+            assertThat(page.locator("#cnfStatus")).containsText("Berechnung abgebrochen");
+            assertThat(page.locator("#cnfDownload")).isHidden();
+        }
+    }
+
     @Test
     void aFailedReplayClearsThePreviousResult() {
         try (var context = browser.newContext()) {

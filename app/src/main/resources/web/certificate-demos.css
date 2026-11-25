@@ -87,3 +87,17 @@
     .certificate-demo-page header { padding-inline: .75rem; }
     .certificate-demo-page .card { padding: 1rem; }
 }
+
+#cnfFields {
+    display: grid;
+    gap: .45rem;
+    border: 0;
+    padding: 0;
+    margin: 0 0 1rem;
+    min-width: 0;
+}
+#cnfFields label { font-weight: 650; margin-top: .5rem; }
+#cnfFields p { margin: 0; }
+#cnfFields input, #cnfFields textarea { min-width: 0; max-width: 100%; }
+#cnfFields textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+#cnfFields input[type=number] { width: 12em; }

@@ -412,9 +412,15 @@ public class WebWorkbenchServer {
         }
     }
 
+    private final CnfCountingRoute cnfCounting = new CnfCountingRoute();
+
     private void handleCertificateDemos(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
         String demoPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        if (demoPath.startsWith(CnfCountingRoute.BASE)) {
+            cnfCounting.handle(exchange, demoPath.substring(CnfCountingRoute.BASE.length()), securityConfig.maxRequestBytes());
+            return;
+        }
         String result = switch (demoPath) {
             case "/api/certificate-demos/hall" -> CertificateDemoWorkbench.hall();
             case "/api/certificate-demos/montgomery" -> CertificateDemoWorkbench.montgomery();

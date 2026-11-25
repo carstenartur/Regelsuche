@@ -45,7 +45,7 @@ final class DomainExportWorkspaceActions {
             }
             String[] path = suffix.substring(1).split("/", -1);
             if (!path[0].matches("[0-9a-f]{64}")) throw new IllegalArgumentException("invalid export digest");
-            if (path.length == 3 && Set.of("assessment", "validate", "model-proof").contains(path[1])) {
+            if (path.length == 3 && Set.of("assessment", "validate", "model-proof", SCOPED_CHECK).contains(path[1])) {
                 sendRetainedReceipt(exchange, repository, directory, "sha256:" + path[0], path[1], path[2]);
                 return;
             }
@@ -76,6 +76,11 @@ final class DomainExportWorkspaceActions {
         String prefix;
         String missing;
         switch (action) {
+            case SCOPED_CHECK -> {
+                bytes = new ScopedCheckReceipts(directory).find(runId, hash);
+                prefix = "scoped-check";
+                missing = "SCOPED_CHECK_NOT_FOUND";
+            }
             case "assessment" -> {
                 bytes = new DomainSnapshotAssessmentRepository(directory).find(runId, hash);
                 prefix = "domain-assessment";
@@ -114,7 +119,7 @@ final class DomainExportWorkspaceActions {
             error(exchange, 409, "SOURCE_BINDING_MISMATCH", "request belongs to another source view"); return;
         }
         if (action.equals(SCOPED_CHECK)) {
-            checkScopedCandidate(exchange, workspace, (String) boundRequest.get("candidateHash"));
+            checkScopedCandidate(exchange, directory, workspace, (String) boundRequest.get("candidateHash"));
             return;
         }
         if (action.equals("assessment")) {
@@ -152,27 +157,34 @@ final class DomainExportWorkspaceActions {
         } catch (IllegalStateException exception) { error(exchange, 409, "REPLAY_NOT_REPRODUCED", exception.getMessage()); }
     }
 
-    private static void checkScopedCandidate(HttpExchange exchange, DomainExportWorkspace workspace, String candidateHash) throws IOException {
+    private static void checkScopedCandidate(HttpExchange exchange, Path directory, DomainExportWorkspace workspace, String candidateHash) throws IOException {
         if (!SCOPED_CHECK_SLOT.tryAcquire()) {
             error(exchange, 429, "SCOPED_CHECK_BUSY", "another scoped candidate check is running");
             return;
         }
         try {
-            Thread.startVirtualThread(() -> finishScopedCheck(exchange, workspace, candidateHash));
+            Thread.startVirtualThread(() -> finishScopedCheck(exchange, directory, workspace, candidateHash));
         } catch (RuntimeException | Error failure) {
             SCOPED_CHECK_SLOT.release();
             throw failure;
         }
     }
 
-    private static void finishScopedCheck(HttpExchange exchange, DomainExportWorkspace workspace, String candidateHash) {
+    private static void finishScopedCheck(HttpExchange exchange, Path directory, DomainExportWorkspace workspace, String candidateHash) {
         try {
             try {
-                ObjectNode result;
-                try { result = scopedCheck(workspace, candidateHash); }
-                finally { SCOPED_CHECK_SLOT.release(); }
-                exchange.getResponseHeaders().set("X-Regelsuche-Run-Id", workspace.runId());
-                send(exchange, 200, JSON.writeValueAsString(result));
+                byte[] bytes;
+                String digest;
+                try {
+                    var checked = scopedCheck(workspace, candidateHash);
+                    bytes = JSON.writeValueAsBytes(checked.report());
+                    digest = new ScopedCheckReceipts(directory).retain(workspace, bytes, checked.certificate());
+                } catch (IOException failure) {
+                    throw new IllegalStateException("unable to retain scoped receipt", failure);
+                } finally { SCOPED_CHECK_SLOT.release(); }
+                exchange.getResponseHeaders().set("Location", BASE + "/" + workspace.runId().substring(7)
+                    + "/" + SCOPED_CHECK + "/" + digest);
+                sendReceipt(exchange, workspace.runId(), digest, bytes, SCOPED_CHECK);
             } catch (IllegalArgumentException invalid) {
                 error(exchange, 400, "INVALID_DOMAIN_EXPORT", invalid.getMessage());
             } catch (RuntimeException failure) {
@@ -183,7 +195,9 @@ final class DomainExportWorkspaceActions {
         }
     }
 
-    private static ObjectNode scopedCheck(DomainExportWorkspace workspace, String candidateHash) {
+    private record CheckedCandidate(ObjectNode report, Optional<ScopedLogicDiscoveryDomain.Certificate> certificate) {}
+
+    private static CheckedCandidate scopedCheck(DomainExportWorkspace workspace, String candidateHash) {
         String project = System.getProperty("regelsuche.lean.project", System.getenv().getOrDefault("REGELSUCHE_LEAN_PROJECT", ""));
         String rebuild = System.getProperty("regelsuche.lean.rebuild.project", System.getenv().getOrDefault("REGELSUCHE_LEAN_REBUILD_PROJECT", ""));
         boolean configured = !project.isBlank() && !rebuild.isBlank();
@@ -216,7 +230,7 @@ final class DomainExportWorkspaceActions {
                 proof.put("rebuildHash", evaluation.certificate().rebuildHash());
             }
         });
-        return result;
+        return new CheckedCandidate(result, checked.freshProof().map(DiscoveryDomain.Evaluation::certificate));
     }
 
     private static void sendReceipt(HttpExchange exchange, String runId,

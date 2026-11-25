@@ -113,6 +113,8 @@ class DomainExportWorkspaceHttpTest {
     }
 
     @Test void retainsLogicalExportThroughHttpWithoutIssuingProofOrReplayAuthority() throws Exception {
+        String previousRun = runId;
+        String previousUpload = upload();
         var domain = new ScopedLogicDiscoveryDomain(proposal -> {
             throw new AssertionError("retained workspace must not call a proof receiver");
         }, 1024);
@@ -149,7 +151,8 @@ class DomainExportWorkspaceHttpTest {
         var replay = request("POST", path() + "/replay", bound);
         assertEquals(409, replay.statusCode(), replay.body());
         assertEquals("REPLAY_NOT_REPRODUCED", json.readTree(replay.body()).path("code").asText());
-        verifyScopedCandidateCheck(view.path("contentHash").asText());
+        assertEquals(201, request("POST", "", previousUpload).statusCode());
+        verifyScopedCandidateCheck(view.path("contentHash").asText(), previousRun);
         var assessment = request("POST", path() + "/assessment", bound);
         assertEquals(200, assessment.statusCode(), assessment.body());
         var assessed = json.readTree(assessment.body());
@@ -174,7 +177,7 @@ class DomainExportWorkspaceHttpTest {
         assertEquals(imported.body(), request("GET", path(), null).body());
     }
 
-    private void verifyScopedCandidateCheck(String workspaceHash) throws Exception {
+    private void verifyScopedCandidateCheck(String workspaceHash, String previousRun) throws Exception {
         String candidate = evidence.candidateAttempts().getFirst().candidateHash();
         String scopedPath = path() + "/scoped-check";
         ObjectNode bound = json.createObjectNode().put("expectedWorkspaceHash", workspaceHash)
@@ -189,6 +192,12 @@ class DomainExportWorkspaceHttpTest {
             var exactChunked = requestWithBody("POST", scopedPath, chunkedBody(exactBody));
             assertEquals(200, exactChunked.statusCode(), exactChunked.body());
             assertEquals(response.body(), exactChunked.body());
+            String location = response.headers().firstValue("Location").orElseThrow();
+            assertTrue(location.matches(DomainExportWorkspaceActions.BASE + scopedPath + "/[0-9a-f]{64}"), location);
+            var reopened = request("GET", location.substring(DomainExportWorkspaceActions.BASE.length()), null);
+            assertEquals(200, reopened.statusCode(), reopened.body());
+            assertEquals(response.body(), reopened.body());
+            assertEquals(404, request("GET", scopedPath + "/" + "0".repeat(64), null).statusCode());
             String oversizedBody = exactBody + " ";
             for (var publisher : List.of(HttpRequest.BodyPublishers.ofString(oversizedBody), chunkedBody(oversizedBody))) {
                 var oversized = requestWithBody("POST", scopedPath, publisher);
@@ -211,6 +220,28 @@ class DomainExportWorkspaceHttpTest {
             assertEquals("UNSUPPORTED", report.at("/proof/status").asText());
             assertFalse(report.at("/proof/backendConfigured").asBoolean());
             assertFalse(report.path("proof").has("kernelHash"));
+            var altered = ((ObjectNode) report).deepCopy().put("proposalHash", SolverIr.sha256("different proposal"));
+            String alteredBytes = altered.toString();
+            String alteredDigest = SolverIr.sha256(alteredBytes).substring(7);
+            var receipts = temporary.resolve("runs-domain-exports-scoped-checks").resolve(runId.substring(7));
+            Files.writeString(receipts.resolve(alteredDigest + ".json"), alteredBytes);
+            assertEquals(500, request("GET", scopedPath + "/" + alteredDigest, null).statusCode());
+            var forged = ((ObjectNode) report).deepCopy();
+            forged.putObject("proof").put("backendConfigured", true).put("status", "CONFIRMED")
+                .put("kernelHash", SolverIr.sha256("invented kernel")).put("rebuildHash", SolverIr.sha256("invented rebuild"));
+            String forgedBytes = forged.toString();
+            String forgedDigest = SolverIr.sha256(forgedBytes).substring(7);
+            Files.writeString(receipts.resolve(forgedDigest + ".json"), forgedBytes);
+            assertEquals(500, request("GET", scopedPath + "/" + forgedDigest, null).statusCode());
+            var tamperedFile = receipts.resolve(location.substring(location.lastIndexOf('/') + 1) + ".json");
+            String otherRun = previousRun.substring(7);
+            String otherPath = "/" + otherRun + "/scoped-check/" + tamperedFile.getFileName().toString().substring(0, 64);
+            assertEquals(404, request("GET", otherPath, null).statusCode());
+            var otherDirectory = Files.createDirectories(receipts.resolveSibling(otherRun));
+            Files.copy(tamperedFile, otherDirectory.resolve(tamperedFile.getFileName()));
+            assertEquals(500, request("GET", otherPath, null).statusCode());
+            Files.writeString(tamperedFile, " ", StandardOpenOption.APPEND);
+            assertEquals(500, request("GET", location.substring(DomainExportWorkspaceActions.BASE.length()), null).statusCode());
             assertEquals(400, request("POST", scopedPath, bound.deepCopy().put("candidateHash", "sha256:" + "f".repeat(64)).toString()).statusCode());
             assertEquals(409, request("POST", scopedPath, bound.deepCopy().put("expectedWorkspaceHash", evidence.contentHash()).toString()).statusCode());
             bound.remove("candidateHash");

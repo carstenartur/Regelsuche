@@ -85,3 +85,17 @@ against complete enumeration, count extensions separately for every original ass
 example, and reject an independently replayable factor proof with a forged gate row.
 Run `mvn -pl regelsuche-optimization-sdk -am -Dtest='FiniteConstraint*Test' -Dsurefire.failIfNoSpecifiedTests=false test`
 with Java 25. JUnit report entries give the work measurements for each graph and the wide clause.
+
+### Workbench
+
+Open **Exakte Rechennachweise → Belegungen einer CNF zählen**. Enter one clause per line. Signed
+one-based literal numbers encode the variable and its polarity. A single `0` line represents an empty clause,
+and a blank formula represents the empty conjunction. For three variables, the lines `-1 -2` and `-2 -3`
+give five assignments. Fixing variable 2 to true (enter `2`) gives one. The form keeps edited input in this
+tab's session storage and clears any previous result after an edit.
+
+The web adapter accepts up to 256 variables, 256 clauses, 4,096 total clause literals and 32 KiB of JSON.
+A request runs with its selected work limit (at most 2,000,000), 40,000 cells and a two-second SDK timeout.
+The cancel button addresses that live request's SDK cancellation token. An exact result offers the complete
+source and elimination certificate as a JSON download, with arbitrary-size weights and the count encoded as
+decimal strings. A resource or cancellation result displays the reason and work with no certificate.
