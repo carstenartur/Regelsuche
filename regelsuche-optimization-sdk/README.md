@@ -18,6 +18,22 @@ Boolean model counts, conditional counts through source-bound fixed variables,
 an elimination trace and a positive-weight witness. The verifier independently
 replays each local sum. See [factor tables and counting limits](../docs/research/finite-constraint-counting.md).
 
+`countCnf` accepts signed one-based literals and zero-based fixed-variable
+keys. Its compact OR chains have a unique auxiliary extension, and
+`verifyCnf` checks the original clauses independently. `countIndexed` uses
+bounded factor incidence for elimination. `countWithPolicy` returns the
+selected provider and all paid attempts; its overload accepts an explicit
+fixed strategy. Failed probes and fallback share the query budget. The
+[frozen lifecycle study](../research/benchmarks/constraint-lifecycle-v1/README.md)
+reports acquisition and failed training trials and finds no learned advantage.
+
+`equivalence.RationalFunctionSdk.simplify` returns a bounded rational
+candidate with the original expression's nonzero requirements. Missing
+assumptions yield `REQUIRES_ASSUMPTIONS`, without a verified certificate.
+`verify` independently binds the source, equality and original domain;
+receipt assumptions cannot authorize new holes. Zero powers require a
+nonzero base. See [domain contract and independent comparison](../research/benchmarks/rational-functions-v1/README.md).
+
 `combinatorics.EnergyGameSdk.solve` and `verify` expose bounded cyclic
 Min/Max credit synthesis and local invariant checking. Every Min edge and the
 chosen Max edge must preserve the certified nonnegative credits inside the
@@ -35,6 +51,13 @@ requires the caller's explicit transition/domain contract. See [SOS and potentia
 for a multioutput rational tensor from finite input-form dictionaries. The
 verifier checks every tensor coefficient; reported costs include additions,
 constant factors and temporary slots. See [search limits and executable example](../docs/research/bilinear-program-search.md).
+
+The source APIs also expose a rational determinant-pencil lower bound for
+2×2×2 tensors, checked input-basis transport, and costed integer-plan reuse.
+The complex multiplication example now has matching rational lower and upper
+bounds of three. Transfer checks both the original and target tensors;
+the [basis-change study](../docs/research/bilinear-input-basis-study.md) reports
+the stronger fixed classical control and all acquisition costs.
 
 `noncommutative.RationalFormulaSdk.realize` constructs an affine pencil for a
 rational formula. `verify` binds it to every inverse occurrence. `evaluate`

@@ -17,6 +17,13 @@ Die Tabelle zeigt die modellierte Arbeit einer späteren Ausführung. Bei 381 Bi
 
 ## Endliche Faktoren zählen
 
+Der zusätzliche Overload mit `fixedStrategy` vor `expectedUses` macht die
+feste Kontrolle ausdrücklich wählbar. Die Schätzung verwendet den passenden
+erfolgreichen Trainingslauf derselben Kontrolle. Der bisherige Aufruf behält
+Min-Degree. Die [eingefrorene Lebenszyklusstudie](../../research/benchmarks/constraint-lifecycle-v1/README.md)
+vergleicht beide festen Kontrollen auf disjunkten Familien und weist auch
+Erwerbs- und Fehlversuchskosten aus. Dort entsteht kein Lernvorteil.
+
 `FiniteConstraintSdk.countWithPolicy(model, problem, expectedUses, maximumProbeWork, budget, cancellation)` verwendet festes Min-Degree als Kontrolle. Eine trainierte Auswahl setzt eine frühere Beobachtung mit gleichem Strukturmerkmalsvektor und erfolgreichem Kontrolllauf voraus. Die erste passende Beobachtung in Trainingsreihenfolge liefert den Kandidaten. Zu dessen gezählter früherer Arbeit addiert die Schätzung die bisher bezahlte Suche im Modell und den auf `expectedUses` verteilten Erwerb, aufgerundet auf ganze Einheiten. Die Schätzung muss strikt unter der früheren Min-Degree-Arbeit liegen. Jede aktuelle Ausführung prüft ein neues Zertifikat am aktuellen Problem. Quellenbeschriftungen dokumentieren die Beobachtung.
 
 Für die Kette aus sieben booleschen Variablen mit sechs gleichen Nachbarausschlüssen (Trainingsbezeichnung `chain`) verbrauchte der Erwerb 5.472 Einheiten. Eine erwartete Anwendung wählte Min-Degree mit 1.943 aktuellen Einheiten. Bei 1.000 erwarteten Anwendungen wählte die Regel die aufsteigende Reihenfolge mit 1.647 aktuellen Einheiten. Eine Grenze von 100 Einheiten für den Versuch ergab 43 Einheiten Vorbereitung, 100 für den abgebrochenen Versuch und 1.900 für den verifizierten Rückfall. Das ist eine Wiederholung auf derselben Graphstruktur. Die früheren Ergebnisse auf getrennten Projekten stehen im [Transfervergleich](../../research/benchmarks/constraint-planning-transfer/README.md).

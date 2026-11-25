@@ -1,7 +1,7 @@
 # Getting Started
 
 Ohne Installation: [aufgezeichnete Browserdemo](demos/recorded-discovery.html).
-Externe Java-Integration: [veröffentlichtes SDK 0.5.2 mit Maven-Beispiel](java-sdk-quickstart.md).
+Externe Java-Integration: [veröffentlichtes SDK 0.5.3 mit Maven-Beispiel](java-sdk-quickstart.md).
 English overview: [Start here](start-here.md).
 
 Diese Anleitung führt von einem leeren Checkout zur ersten nachvollziehbaren
@@ -87,6 +87,31 @@ Zielausdruck und wählt einen Zustand nach einer eingefrorenen Policy. Ein
 besuchter, aber nicht ausgewählter Ausdruck zählt dabei nicht als Ergebnis.
 
 ## 4. Ergebnisse richtig lesen
+
+### Eigene endliche Zählaufgabe
+
+Öffne in diesem Quellbuild die Seite **Exakte Rechennachweise** unter
+`http://127.0.0.1:8080/static/certificate-demos.html#cnfTitle`. Dort lassen sich
+Variablenzahl, Klauseln, feste Werte und Arbeitsbudget bearbeiten. Die
+Klausel `1 2 3` bedeutet, dass mindestens eine der drei Variablen wahr ist;
+ein Minuszeichen negiert ein Literal. Mit drei Variablen und dieser einen
+Klausel ist die exakte Anzahl sieben.
+
+Ein erfolgreicher Lauf bietet die Anzahl und den vollständigen geprüften
+JSON-Beleg zum Download an. Große Anzahlen bleiben exakte Dezimalstrings.
+Nach einer Eingabeänderung ist ein neuer Lauf nötig. **Abbrechen** sendet ein
+Abbruchsignal an den laufenden Zähler; die Oberfläche wartet auf dessen
+Ergebnis. [Eingabevertrag und Grenzen](research/finite-constraint-counting.md)
+
+### Logischen Einzelbeleg wieder öffnen
+
+Im Domain-Export kann ein logischer Kandidat geprüft und der erzeugte
+Einzelbeleg über seinen Link nach einem Neuladen wieder geöffnet werden.
+Der Abruf prüft erneut die Bindung an Quelle, Kandidatenzustand und
+Beweisgraph. Der angezeigte Backendstatus beschreibt die gespeicherte
+Prüfung. Eine neue Prüfung mit den aktuell konfigurierten Lean-Projekten
+wird ausdrücklich neu gestartet.
+[Vollständiger Ablauf](domain-export-workspaces.md)
 
 ### Suchgraph
 
@@ -177,6 +202,15 @@ Für den vollständigen, auch in CI verwendeten Lebenszyklus:
 `ciCheck` ist absichtlich umfangreich. Für schnelle lokale Zyklen stehen
 modul- und schichtspezifische Tasks zur Verfügung; siehe
 [Developer Guide](developer-guide.md) und [Testing](testing.md).
+
+Die CI startet mit einer kurzen Vertragsprüfung, bevor die langen
+unabhängigen Prüfjobs anlaufen. Dieselbe Vorprüfung lässt sich lokal ausführen:
+
+```sh
+mvn -B -ntp -pl maven-build-contract,regelsuche-core -am \
+  '-Dtest=Maven*ContractTest,StrategyCodeReferencesTest' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
 
 ## Fehlerdiagnose
 

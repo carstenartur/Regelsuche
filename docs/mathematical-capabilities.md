@@ -1,6 +1,6 @@
 # Mathematische Funktionen: Quelle, Release und Oberfläche
 
-Stand: 22. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
+Stand: 25. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
 genannten Funktionen. Mathematische Verträge und ausgeführte Vergleiche stehen
 in den verlinkten Fachseiten; der [Strategien-Index](research/strategies.md)
 führt Hypothesen, Befunde und Folgerungen.
@@ -33,7 +33,10 @@ Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
 | Rationale nichtkommutative Formeln auf gegebenen Matrizen | `RationalFormulaRealization`, `RationalFormulaVerifier` | `RationalFormulaSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
 | Dynamische Auswertung über quadratfreien Primkörperquotienten | `DynamicAlgebraEvaluation`, `DynamicAlgebraVerifier` | `DynamicAlgebraSdk` | nein | Java-Beispiel ohne eigene Eingabemaske |
 | Quellengebundener endlicher Beweis-DAG | `FiniteProofDag` | `FiniteProofDagSdk`, `FiniteProofDagJson` | nein | versionierter JSON-Transport; Java-/SDK-Beispiele |
-| Exakte gewichtete lokale Constraint-Zählung | `FiniteConstraintCounter`, `FiniteConstraintVerifier` | `FiniteConstraintSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
+| Exakte gewichtete lokale Constraint-Zählung und kompakte CNF | `FiniteConstraintCounter`, `FiniteConstraintCnf`, unabhängige Prüfer | `FiniteConstraintSdk`, einschließlich `countCnf` und `countIndexed` | nein | editierbare CNF mit Fixwerten, Budget, Abbruch und JSON-Beleg |
+| Kostengebundene feste oder gelernte Planwahl | `BoundedPlanSelection` | `FiniteConstraintSdk.countWithPolicy`, `BilinearProgramSdk.selectIntegerWithReuse` | nein | Java-/SDK-Aufruf mit Auswahl- und Kostenprotokoll |
+| Rationalfunktionsvorschläge auf der Originaldomäne | `RationalFunctionPlanner` | `RationalFunctionSdk.simplify`, `verify` | nein | Java-/SDK-Aufruf mit expliziten Nichtnullbedingungen |
+| Rationaler 2×2×2-Rangnachweis und Eingabebasiswechsel | `BilinearRankBound`, `BilinearProductLearning` | `BilinearProgramSdk` | nein | ausführbare, unabhängig geprüfte Studie |
 | Zyklische Energie-/Kreditzertifikate | `EnergyGame`, `EnergyGameVerifier` | `EnergyGameSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
 
 Die bestehenden [Paarsummen-Demos](demo-gallery.md) ergänzen ihre kleine
@@ -45,7 +48,12 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
 ## Verträge und Reproduktion
 
 - [Exakte lokale Constraint-Zählung](research/finite-constraint-counting.md),
+  [vollständiger Erwerbs-/Anfragevergleich](../research/benchmarks/constraint-lifecycle-v1/README.md),
+  [kostengebundene Planwahl](research/bounded-plan-selection.md),
   [zyklische Energiespiel-Zertifikate](research/energy-game-certificates.md).
+- [Rationalfunktionen und vollständiges Fremdinventar](../research/benchmarks/rational-functions-v1/README.md),
+  [rationale Basiswechsel und feste Kontrollen](research/bilinear-input-basis-study.md),
+  [fortsetzbare Beweispläne](research/resumable-proof-plans.md).
 
 - [Kongruenzüberdeckung](research/congruence-coverage.md),
   [Hunter und endliche Beweis-DAGs](research/hunter-finite-proofs.md),
