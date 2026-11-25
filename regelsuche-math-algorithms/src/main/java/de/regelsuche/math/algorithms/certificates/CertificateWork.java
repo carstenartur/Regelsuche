@@ -85,6 +85,15 @@ public final class CertificateWork {
         return new IterationLimits(remaining, limits.maximumTerms(), millis);
     }
 
+    /** Reserve caller-owned cells that stay live during a nested search or verification. */
+    public IterationLimits remainingLimits(long retainedCells) {
+        cells(retainedCells);
+        var remaining = remainingLimits();
+        long terms = Math.min(remaining.maximumTerms(), MAX_CELLS) - retainedCells;
+        if (terms < 1) throw new Stop("TERM_LIMIT");
+        return new IterationLimits(remaining.maximumWork(), (int) terms, remaining.timeoutMillis());
+    }
+
     /** A resource boundary, never evidence for or against a mathematical statement. */
     public static final class Stop extends RuntimeException {
         private static final long serialVersionUID = 1L;

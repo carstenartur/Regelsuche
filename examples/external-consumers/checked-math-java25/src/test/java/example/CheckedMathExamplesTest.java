@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 /** Checks the actual programs' results; each program also independently verifies its certificate. */
 class CheckedMathExamplesTest {
     @Test void countsAllAndConditionalAssignments() {
-        assertEquals(List.of("condition={}, count=5", "condition={1=true}, count=1", "condition={1=false}, count=4"),
+        assertEquals(List.of("condition={}, count=5", "condition={1=true}, count=1", "condition={1=false}, count=4",
+                "ASCENDING star: UNAVAILABLE (TERM_LIMIT)", "MIN_DEGREE star: 1048577"),
             output(() -> FiniteConstraintCount.main(new String[0])).lines().toList());
     }
 
@@ -30,7 +31,12 @@ class CheckedMathExamplesTest {
     @Test void computesTheConvolutionWithThreeProducts() {
         String result = output(() -> BilinearSearch.main(new String[0]));
         assertTrue(result.contains("variableMultiplications=3"), result);
+        assertTrue(result.contains("discovered rational bilinear products: [3,3]; optimal=true"), result);
         assertTrue(result.lines().toList().contains("[8, 22, 15]"), result);
+        assertTrue(result.lines().anyMatch(line -> line.startsWith("8-bit schedule: products=4,")
+            && line.endsWith("exact=true")), result);
+        assertTrue(result.lines().anyMatch(line -> line.startsWith("2048-bit schedule: products=3,")
+            && line.endsWith("exact=true")), result);
     }
 
     @Test void preservesTheOriginalMatrixInverseDomain() {

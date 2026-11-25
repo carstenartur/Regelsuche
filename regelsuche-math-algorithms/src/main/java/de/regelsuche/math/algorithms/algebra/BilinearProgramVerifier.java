@@ -81,6 +81,21 @@ public final class BilinearProgramVerifier {
         }
     }
 
+    /** Reuse a supplied witness with a width profile after checking every source coefficient. */
+    public static Result<BilinearIntegerSchedule.Plan> scheduleInteger(Request request, BilinearProgram program,
+            BilinearIntegerSchedule.Profile profile, IterationLimits limits, BooleanSupplier cancellation) {
+        return BilinearProgram.run(limits, cancellation, work -> {
+            if (profile.leftBits().size() != request.tensor().leftSize()
+                    || profile.rightBits().size() != request.tensor().rightSize()) {
+                throw new Rejection("PROFILE_SHAPE");
+            }
+            long source = request.checkInputs(work) + profile.retainedCells();
+            check(request, program, source, work);
+            long retained = source + certificateCells(request, program.u().size());
+            return BilinearIntegerSchedule.plan(program, profile, retained, work);
+        });
+    }
+
     /** Verify against the source, then execute with the same resource account. */
     public static Result<List<ExactRational>> evaluate(Request request, BilinearProgram program,
             List<ExactRational> x, List<ExactRational> y, IterationLimits limits, BooleanSupplier cancellation) {

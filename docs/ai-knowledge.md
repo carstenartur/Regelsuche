@@ -172,9 +172,28 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main before exact plan discovery (2026-11-24)
+
+[Main CI 45482610184](https://github.com/carstenartur/Regelsuche/actions/runs/45482610184)
+passed on `3154931929450b3e4022de29a8f4421c0f17ba0b`. The native check measured
+890,985 estimated context tokens and concept radius 123. The original allowance
+accepted the increase of 14,885 tokens and two radius units. The active reference
+is the [complete snapshot](../ai-knowledge/baseline-history/2026-11-24-main-31549319/metrics-snapshot.json)
+projected from this accepted main by the unchanged v0.1.10 extractor. All 293
+entries in the CI evidence index passed hash and length checks, including 64
+tracked sources compared to their exact Git objects.
+
+PR #1387 initially measured 894,885 tokens, exceeding the former reference by
+18,785. Replaying that same measurement against accepted main gives +3,900
+tokens, zero change in concept radius and a passing trend. The full gate must
+run on subsequent source changes. The [provenance](../ai-knowledge/baseline-history/2026-11-24-main-31549319/provenance.json)
+binds both original GitHub artifacts, the input [native reports](../ai-knowledge/baseline-history/2026-11-24-main-31549319/original-reports.zip)
+and the [replayed decision](../ai-knowledge/baseline-history/2026-11-24-main-31549319/replayed-trend.json).
+Both runs use the existing [projection driver](../ai-knowledge/baseline-history/2026-11-24-main-f183aedd/ProjectionDriver.java).
+
 ### Accepted main after scoped-proof integration (2026-11-24)
 
-The current reference is accepted main `f183aedd1ff2ab061ed903559b96a11d28974e7f`,
+The preceding reference is accepted main `f183aedd1ff2ab061ed903559b96a11d28974e7f`,
 tree `c5764e9bdb462df4ac4d92a06532c169d96f68cb`.
 [Original main CI 45290302102](https://github.com/carstenartur/Regelsuche/actions/runs/45290302102)
 passed all thirteen mandatory source authorities, the aggregate `ciCheck` and
