@@ -2,6 +2,7 @@ package de.regelsuche.sdk.optimization.combinatorics;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCnf;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanLearning;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanner.Strategy;
@@ -13,6 +14,18 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class FiniteConstraintSdkTest {
+    @Test void countsCnfAndReplaysTheOriginalSource() {
+        var budget = new OptimizationBudget(100_000, 1_000, 1, 5_000);
+        var source = new FiniteConstraintCnf.Source(4, List.of(List.of(1, 2, 3, 4)), Map.of(0, false));
+        var count = FiniteConstraintSdk.countCnf(source, budget, CancellationToken.NONE);
+        assertEquals(BigInteger.valueOf(7), count.count().orElseThrow());
+        var certificate = count.certificate().orElseThrow();
+        assertTrue(FiniteConstraintSdk.verifyCnf(source, certificate, budget, CancellationToken.NONE).valid());
+        var indexed = FiniteConstraintSdk.countIndexed(certificate.elimination().source(), Strategy.MIN_DEGREE,
+            budget, CancellationToken.NONE);
+        assertEquals(count.count(), indexed.count());
+    }
+
     @Test void sdkCountsVerifiesAndPropagatesCancellation() {
         var budget = new OptimizationBudget(100_000, 1_000, 1, 5_000);
         var problem = new FiniteConstraintCounter.Problem(3,

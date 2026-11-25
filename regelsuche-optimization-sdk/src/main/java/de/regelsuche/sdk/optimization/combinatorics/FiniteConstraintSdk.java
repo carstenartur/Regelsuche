@@ -1,5 +1,7 @@
 package de.regelsuche.sdk.optimization.combinatorics;
 
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCnf;
+import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCnfVerifier;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintCounter;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanLearning;
 import de.regelsuche.math.algorithms.combinatorics.FiniteConstraintPlanner;
@@ -21,6 +23,31 @@ public final class FiniteConstraintSdk {
     public static FiniteConstraintCounter.Result count(FiniteConstraintCounter.Problem problem,
             FiniteConstraintPlanner.Strategy strategy, OptimizationBudget budget, CancellationToken cancellation) {
         return FiniteConstraintCounter.count(problem, strategy, limits(budget), cancellation::isCancelled);
+    }
+
+    public static FiniteConstraintCounter.Result countIndexed(FiniteConstraintCounter.Problem problem,
+            FiniteConstraintPlanner.Strategy strategy, OptimizationBudget budget, CancellationToken cancellation) {
+        return FiniteConstraintCounter.countIndexed(problem, strategy, limits(budget), cancellation::isCancelled);
+    }
+
+    public static FiniteConstraintCnf.Lowering lowerCnf(FiniteConstraintCnf.Source source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return FiniteConstraintCnf.lower(source, limits(budget), cancellation::isCancelled);
+    }
+
+    public static FiniteConstraintVerifier.Verification verifyCnfLowering(FiniteConstraintCnf.Source source,
+            FiniteConstraintCounter.Problem problem, OptimizationBudget budget, CancellationToken cancellation) {
+        return FiniteConstraintCnfVerifier.verifyLowering(source, problem, limits(budget), cancellation::isCancelled);
+    }
+
+    public static FiniteConstraintCnf.Result countCnf(FiniteConstraintCnf.Source source,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return FiniteConstraintCnf.count(source, limits(budget), cancellation::isCancelled);
+    }
+
+    public static FiniteConstraintVerifier.Verification verifyCnf(FiniteConstraintCnf.Source source,
+            FiniteConstraintCnf.Certificate certificate, OptimizationBudget budget, CancellationToken cancellation) {
+        return FiniteConstraintCnf.verify(source, certificate, limits(budget), cancellation::isCancelled);
     }
 
     public static FiniteConstraintPlanLearning.Training train(List<FiniteConstraintPlanLearning.Example> examples,

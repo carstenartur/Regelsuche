@@ -33,3 +33,55 @@ certificate replay for each subsequent input.
 ## Research relationship
 
 The motivation is the local-constraint/counting transfer identified in the [quantitative reduction manuscript](https://github.com/openai/math/blob/4eaee87548250b2682affda7d05d947c05554bae/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026/build/quantitative-reduction.tex). The implemented component is a conventional, finite, exact factor-elimination engine with an independent checker. Its correctness does not rely on the manuscript's headline complexity claim.
+
+## Indexed elimination and signed CNF, v1 (2026-11-25)
+
+`FiniteConstraintSdk.countIndexed(problem, strategy, budget, cancellation)` accepts the same weighted factors
+and order as `count`. Each live nonscalar factor belongs to the bucket of its earliest remaining variable.
+Eliminating that variable consumes its bucket and indexes the resulting factor. Appending factors in ID order
+preserves the original certificate's ordered input IDs. Independent replay still checks every active factor
+for bucket membership. Existing counter and training entry points retain the historical construction profile.
+
+`FiniteConstraintCnf.Source` takes the declared number of variables, a list of clauses of signed one-based
+DIMACS literals, and fixed assignments keyed by **zero-based** variable ID. For example,
+`new FiniteConstraintCnf.Source(4, List.of(List.of(1, 2, 3, 4)), Map.of(0, false))` has seven models.
+The empty clause is false and the empty conjunction is true. Every unfixed declared variable contributes to the count,
+including those absent from the clauses.
+
+`FiniteConstraintSdk.lowerCnf` returns a verified factor problem and `verifyCnfLowering` checks the translation.
+Each clause longer than three literals gets fresh private variables. A gate enforces that the new variable
+equals the OR of the running prefix and the next literal. Its two directions determine a unique prefix value
+for every original assignment. The final factor requires the remaining disjunction to hold. A clause of length
+`k` introduces `max(0,k-3)` auxiliaries and one additional factor for final acceptance. All scopes have
+at most three distinct variables, including when literals repeat or have opposite signs.
+
+`FiniteConstraintSdk.countCnf` checks the translation and calls the indexed min-degree counter under the
+remaining budget. Its certificate holds the original CNF and the elimination certificate, whose source
+is the lowered factor problem. Witness keys below the original variable count give the original assignment.
+`verifyCnf` binds clause order, literal order, declared variables and fixed values to the supplied source.
+It checks every truth-table row of each required prefix and acceptance relation, then independently replays
+elimination. `UNAVAILABLE` includes the stopping reason and paid work. General CNFs can still exceed induced
+width, memory, time or work limits.
+
+### Measured work
+
+`FiniteConstraintCnfTest` compares a 100-variable weighted chain with 50 disjoint pairs on the same
+100 variables. Both fix variable 0 to true and use the ordered two-variable weight table `[2,1,0,1]`
+on every edge. Each comparison holds source, order and replay constant and checks certificate equality.
+Counts below are charged work units for construction, ordering and verification.
+
+| Graph | Order | Historical scan | Indexed v1 |
+| --- | --- | ---: | ---: |
+| Chain | Ascending | 53,613 | 39,751 |
+| Chain | Minimum degree | 61,741 | 47,977 |
+| Chain | Minimum fill | 62,134 | 48,370 |
+| Disjoint pairs | Ascending | 32,456 | 23,151 |
+| Disjoint pairs | Minimum degree | 38,184 | 28,977 |
+| Disjoint pairs | Minimum fill | 38,430 | 29,223 |
+
+A single positive 62-literal disjunction produced `2^62-1` with 121 lowered variables and 60 factors,
+using 68,714 work units through verified return. Additional controls compare 100 seeded small CNFs
+against complete enumeration, count extensions separately for every original assignment of a repeated-literal
+example, and reject an independently replayable factor proof with a forged gate row.
+Run `mvn -pl regelsuche-optimization-sdk -am -Dtest='FiniteConstraint*Test' -Dsurefire.failIfNoSpecifiedTests=false test`
+with Java 25. JUnit report entries give the work measurements for each graph and the wide clause.
