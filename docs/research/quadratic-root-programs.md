@@ -77,6 +77,56 @@ Originalkoordinaten übereinstimmen. Der Consumer muss die tatsächliche
 Java-Implementierung des Charakteroperators und ihre Aufrufbedingungen
 separat an die geprüfte Operation binden.
 
+### Begrenzte allgemeine Jacobi-Auswertung
+
+`QuadraticCharacter.jacobi` behält vorzeichenbehaftete Zähler, positive
+ungerade Nenner einschließlich zusammengesetzter Zahlen und den Wert eins
+für Nenner eins. Nach der kanonischen Anfangsreduktion entfernt der
+Mehrwortpfad Zweierpotenzen und wendet beim Vertauschen quadratische
+Reziprozität an. Bei einem Bitlängenabstand von mindestens 32 reduziert
+er den größeren ungeraden Operanden modulo dem kleineren; sonst subtrahiert
+er einmal. Beide Schritte erhalten das Jacobi-Symbol. Der feste Abstand
+ist eine allgemeine Operandenbedingung, keine Modulus- oder Quelltexterkennung
+und kein Anspruch auf eine optimale Schwelle.
+
+Der anschließende positive `long`-Pfad verwendet den euklidischen Rest.
+**Beide** aktiven Operanden müssen höchstens 63 Bit besitzen. Nach einer
+Subtraktion kann der Zähler größer als der Nenner sein; ein Test nur des
+Nenners würde große Zähler abschneiden. Die Rückgabe behält die abschließende
+Prüfung auf ggT eins und liefert bei Nicht-Einheiten null. Die mathematisch
+bereits bewiesene Primkörper-Einheiten-Spezialisierung eines Consumers ist
+von dieser allgemeinen API zu unterscheiden.
+
+Der optionale `CertificateWork`-Etat wird vor jeder Phase belastet; jede
+Belastung prüft auch Abbruchsignal und Zeitgrenze. Mit
+`w(x)=1+floor(bitLength(abs(x))/64)` gilt das explizite Modell:
+
+| Phase | Arbeitseinheiten vor der Operation |
+|---|---:|
+| Anfangsreduktion des gegebenen Zählers modulo Nenner | `1 + w(Zähler)*w(Nenner)` |
+| Mehrwortrunde: Verschiebung, Vorzeichen und Vergleich | `1 + max(w(a),w(n))` |
+| Restreduktion nach einer großen Bitlängendifferenz | `1 + w(a)*w(n)` |
+| Subtraktion bei vergleichbaren Operanden | `1 + max(w(a),w(n))` |
+| Eine positive native euklidische Runde | `2 = 1 + 1*1` |
+
+Bereichs- und exakte Klassenprüfung bleiben vor dem Etat in ihrer bisherigen
+Reihenfolge. Auch Zähler null, Vielfache des Nenners und Nenner eins bezahlen
+die Anfangsreduktion und beachten einen bereits erschöpften oder abgebrochenen
+Etat. Für negative Zähler zählt die Bitlänge des Betrags, insbesondere an
+Grenzen wie `-2^63`. Der öffentliche Aufruf ohne Etat bleibt verfügbar.
+Dies sind deterministische Ressourcenmodelle, keine CPU-Zeit, Allokationsbytes
+oder JDK-internen Operationszähler.
+
+`QuadraticCharacterTest` verwendet unabhängige Euler-Orakel mit exakt
+belegten großen Primzahlen und multiplikative Orakel bekannter
+Faktorisierungen bis zur 4096-Bit-Grenze. Er prüft Vorzeichen, null,
+Nenner eins, Nicht-Einheiten, 62/63/64/65-Bit-Übergänge, Abstand 31/32/33,
+große Zweierpotenzen und den Fall eines 64-Bit-Zählers über einem kleinen
+Nenner nach Subtraktion. Exakter Etat gegen eine Einheit weniger,
+Abbruch an jeder belasteten Phase und die unveränderte Fehlerreihenfolge
+sind eigene Gegenproben. Der Algorithmus allein belegt noch keine
+Beschleunigung eines vollständigen erzeugten Wurzel- oder Hash-Aufrufs.
+
 ## Exakte Primzahlbelege
 
 `PrimeEvidenceVerifier` prüft gegen einen separat angegebenen erwarteten
@@ -152,9 +202,17 @@ Arbeitsmengen; dies sind keine Zeitmessungen:
 
 | Modul | Vorbereitung einmal | Vorbereitete Auswertung (g=2 / g=p−2) | Auswertung mit erneuter Prüfung (g=2 / g=p−2) |
 |---|---:|---:|---:|
-| 43 | 726 | 24 / 28 | 750 / 754 |
-| `2^61−1` | 2419 | 79 / 87 | 2498 / 2506 |
-| Katalogmodul mit 381 Bit | 365763 | 14049 / 14093 | 379812 / 379856 |
+| 43 | 726 | 24 / 30 | 750 / 756 |
+| `2^61−1` | 2419 | 79 / 89 | 2498 / 2508 |
+| Katalogmodul mit 381 Bit | 365763 | 14049 / 14107 | 379812 / 379870 |
+
+Die Werte sind mit der oben beschriebenen, vollständig belasteten
+Jacobi-Auswertung neu ermittelt. Die Vorbereitung und der positive Normfall
+bleiben unverändert. Im negativen Normfall ersetzen 30/89/14107 die früheren
+28/87/14093 Einheiten. Insbesondere die zuvor unbezahlte Anfangsreduktion
+ist jetzt enthalten; aus dieser Modelländerung folgt keine Aussage über
+einen Laufzeitverlust oder -gewinn. Die Suche für genau diese Darstellung
+und Gewichte benötigt 1933/3683/393507 Arbeitseinheiten für die drei Module.
 
 Der Import des 61-Bit-Belegs benötigt zusätzlich 3623 Arbeitseinheiten
 und passt in `OptimizationBudget.DEFAULT`. Die Zahlen beziehen sich auf
@@ -182,7 +240,7 @@ Im Java-25-Checkout:
 
 ```bash
 mvn -pl regelsuche-optimization-sdk -am \
-  -Dtest='PrimeEvidence*Test,QuadraticRoot*Test' \
+  -Dtest='PrimeEvidence*Test,QuadraticCharacterTest,QuadraticRoot*Test' \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
@@ -191,6 +249,13 @@ Testquellen außerdem mit `-Xlint:all -Werror`. Die fokussierten Tests
 trennen algebraische Äquivalenz, konkrete Ausführung, verfälschte Zeugen
 und Ressourcenabbruch. Die Quellcode- und Laufzeitqualifikation gehört
 zum jeweiligen Consumer.
+
+`QuadraticRootWorkModelTest` rekonstruiert die hier dokumentierte
+Originaldarstellung samt Gewichten und erzeugt
+`regelsuche-math-algorithms/target/quadratic-root-work-model.tsv` mit den
+tatsächlich gezählten Such-, Vorbereitungs- und Auswertungswerten. Der Test
+prüft zusätzlich die exakten Ergebnisse und die Arbeitsgrenzen; er enthält
+keine Zeitmessung und erhöht keinen Budgetdeckel.
 
 Siehe auch: [Gemeinsame Potenzen](shared-power-relations.md) und
 [Strategien-Index](strategies.md).
