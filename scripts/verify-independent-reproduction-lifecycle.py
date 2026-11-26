@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -17,11 +19,12 @@ import tempfile
 from typing import Any
 
 from independent_reproduction_environment import (
-    ARTIFACT_V2,
+    ARTIFACT_V3,
     DESCRIPTOR_SHA256,
-    DOCKERFILE_V2,
+    DOCKERFILE_V3,
     ENVIRONMENT_MODULE,
-    RECEIPT_V2,
+    RECEIPT_V3,
+    checked_descriptor,
     repository_descriptor,
 )
 
@@ -181,13 +184,13 @@ def verify_frozen_sources(repository: Path) -> None:
     )
 
     dockerfile = require_regular_file(
-        repository / DOCKERFILE_V2,
+        repository / DOCKERFILE_V3,
         "reproduction Dockerfile",
     )
     dockerfile_lines = dockerfile.read_text(encoding="utf-8").splitlines()
     require(
         sha256_file(dockerfile) == descriptor["containerDefinitionSha256"],
-        "v2 reproduction Dockerfile bytes differ from the frozen contract",
+        "v3 reproduction Dockerfile bytes differ from the frozen contract",
     )
     require(bool(dockerfile_lines), "reproduction Dockerfile is empty")
     require(
@@ -254,7 +257,7 @@ def verify_artifact(
         "manifest Java image digest differs from frozen contract",
     )
     require(
-        manifest.get("schema") == ARTIFACT_V2
+        manifest.get("schema") == ARTIFACT_V3
         and environment.get("environmentDescriptorSha256") == DESCRIPTOR_SHA256
         and environment.get("gradleDistributionSha256")
         == repository_descriptor(repository)["gradleDistributionSha256"],
@@ -391,11 +394,21 @@ def verify_source_negatives(
 
 def reproduction_environment() -> dict[str, str]:
     environment = os.environ.copy()
-    executable_directory = str(Path(sys.executable).resolve().parent)
+    # Resolving a venv interpreter symlink would select the global Python instead.
+    executable_directory = str(Path(sys.executable).absolute().parent)
     environment["PATH"] = (
         executable_directory + os.pathsep + environment.get("PATH", "")
     )
     return environment
+
+
+def verify_launcher_environment(repository: Path) -> None:
+    result = run(
+        ["python3", "-c", "import sys; print(sys.prefix)"],
+        cwd=repository, environment=reproduction_environment(),
+    )
+    require(result.stdout.strip() == sys.prefix,
+            "public launcher escaped the selected Python environment")
 
 
 def verify_packaged_launcher(
@@ -514,6 +527,117 @@ def verify_receipt(repository: Path, artifact: Path, receipt: Path) -> dict[str,
     return load_unique(receipt)
 
 
+def verify_receipt_version_dispatch(repository: Path, temporary: Path) -> None:
+    """Damaged bundles retain their own version and never accept another version's receipt."""
+    fixtures: list[tuple[Path, Path]] = []
+    for version in ("v1", "v2", "v3"):
+        artifact = temporary / f"receipt-dispatch-{version}"
+        (artifact / "schemas").mkdir(parents=True)
+        shutil.copyfile(
+            repository / f"docs/schemas/regelsuche-independent-reproduction-receipt-{version}.schema.json",
+            artifact / "schemas/reproduction-receipt.schema.json",
+        )
+        observed = temporary / f"unexecuted-{version}"
+        observed.mkdir()
+        receipt_path = temporary / f"receipt-dispatch-{version}.json"
+        run(
+            compare_command(
+                repository, artifact, observed, receipt_path,
+                environment_id=f"checkout-local-{version}-dispatch-negative",
+                started_at="2034-01-01T00:00:00Z",
+                finished_at="2034-01-01T00:00:01Z",
+                execution_exit_code=125,
+            ),
+            cwd=repository, expect_success=False,
+        )
+        require(receipt_path.is_file(), f"{version} damaged bundle lost its negative receipt")
+        receipt = verify_receipt(repository, artifact, receipt_path)
+        require(receipt["schema"] == f"regelsuche.independent-reproduction-receipt/{version}",
+                f"{version} damaged bundle selected another version")
+        require(receipt["reproductionStatus"] == "NOT_REPRODUCED",
+                f"{version} missing manifest claimed reproduction")
+        require("artifact manifest is missing" in receipt["semanticComparison"]["inputArtifactFailures"],
+                f"{version} negative receipt lost its missing-manifest diagnostic")
+        fixtures.append((artifact, receipt_path))
+
+    for artifact, own_receipt in fixtures:
+        for _, other_receipt in fixtures:
+            if other_receipt != own_receipt:
+                run(
+                    [sys.executable, str(repository / "scripts/verify-independent-reproduction.py"),
+                     "verify-receipt", "--root", str(artifact), "--receipt", str(other_receipt)],
+                    cwd=repository, expect_success=False,
+                )
+
+
+def verify_source_environment_dispatch(repository: Path, temporary: Path) -> None:
+    """Exercise the real archive reader with isolated historical contract fixtures."""
+    spec = importlib.util.spec_from_file_location(
+        "independent_reproduction_verifier",
+        repository / "scripts/verify-independent-reproduction.py",
+    )
+    verifier = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(verifier)
+    versions = (
+        ("v1", "9.7.1", "acd53f1edaf02f1a8ff99879f8a34b302661a057d9b063ae9e35b552f804d20a"),
+        ("v2", "9.9.1", "d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228"),
+        ("v3", "9.9.2", "971fcd7150ca4ba04852c0b2ca0d2d0ab9468e14b03473eab19528809914c76b"),
+    )
+    common = (
+        "gradlew", "settings.gradle", "gradle/wrapper/gradle-wrapper.jar",
+        "reproduction/Dockerfile.reproduction", "reproduction/reproduce.sh",
+        "scripts/build-independent-reproduction-artifact.py",
+        "scripts/verify-independent-reproduction.py",
+        "regelsuche-release/src/main/java/de/regelsuche/release/AutonomousDiscoveryWalkthroughRunner.java",
+    )
+    for version, gradle, checksum in versions:
+        identity = f"regelsuche.independent-reproduction-artifact/{version}"
+        manifest = {"schema": identity, "declaredEnvironment": {"gradleDistributionSha256": checksum}}
+        members = {relative: (repository / relative).read_bytes() for relative in common}
+        descriptor = None
+        refs = {}
+        if version != "v1":
+            relative = f"reproduction/environments/{version}/environment.json"
+            members[relative] = (repository / relative).read_bytes()
+            descriptor = checked_descriptor(members[relative], identity)
+            for relative in (
+                f"reproduction/environments/{version}/Dockerfile.reproduction",
+                f"docs/schemas/regelsuche-independent-reproduction-artifact-{version}.schema.json",
+                f"docs/schemas/regelsuche-independent-reproduction-receipt-{version}.schema.json",
+                ENVIRONMENT_MODULE,
+            ):
+                members[relative] = (repository / relative).read_bytes()
+            refs[ENVIRONMENT_MODULE] = {"sha256": sha256_file(repository / ENVIRONMENT_MODULE)}
+            other = "v2" if version == "v3" else "v3"
+            wrong_descriptor = (repository / f"reproduction/environments/{other}/environment.json").read_bytes()
+            try:
+                checked_descriptor(wrong_descriptor, identity)
+            except ValueError:
+                pass
+            else:
+                fail(f"{version} accepted the {other} descriptor")
+
+        alternate = versions[1] if version == "v3" else versions[2]
+        for wrapper_version, wrapper_checksum in ((gradle, checksum), alternate[1:]):
+            members["gradle/wrapper/gradle-wrapper.properties"] = (
+                "distributionUrl=https\\://services.gradle.org/distributions/"
+                f"gradle-{wrapper_version}-bin.zip\ndistributionSha256Sum={wrapper_checksum}\n"
+            ).encode("utf-8")
+            source = temporary / f"source-contract-{version}.tar.gz"
+            with tarfile.open(source, "w:gz") as archive:
+                for relative, data in sorted(members.items()):
+                    member = tarfile.TarInfo(f"regelsuche-source/{relative}")
+                    member.size = len(data)
+                    archive.addfile(member, io.BytesIO(data))
+            failures = verifier.inspect_source_archive(source, manifest, descriptor, refs)
+            if wrapper_version == gradle:
+                require(not failures, f"{version} source contract rejected: {failures}")
+            else:
+                require("source archive Gradle URL is not frozen" in failures
+                        and "source archive Gradle distribution checksum is not frozen" in failures,
+                        f"{version} accepted a substituted wrapper: {failures}")
+
+
 def verify_environment_negatives(repository: Path, artifact: Path, temporary: Path) -> None:
     negative_root = temporary / "environment-negatives"
     shutil.copytree(artifact, negative_root)
@@ -526,7 +650,7 @@ def verify_environment_negatives(repository: Path, artifact: Path, temporary: Pa
     ]
 
     manifest = json.loads(manifest_bytes)
-    manifest["schema"] = "regelsuche.independent-reproduction-artifact/v3"
+    manifest["schema"] = "regelsuche.independent-reproduction-artifact/unsupported"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     result = run(command, cwd=repository, expect_success=False)
     require("unsupported artifact manifest schema" in result.stdout, "unknown version passed")
@@ -585,12 +709,12 @@ def verify_environment_negatives(repository: Path, artifact: Path, temporary: Pa
     for relative, verify_command, diagnostic in (
         (
             ENVIRONMENT_MODULE, command,
-            f"manifest v2 environment file is missing: {ENVIRONMENT_MODULE}",
+            f"manifest v3 environment file is missing: {ENVIRONMENT_MODULE}",
         ),
         (
             "source/regelsuche-source.tar.gz",
             [str(negative_root / "reproduce.sh"), "--verify-only"],
-            "v2 source archive is absent from the file inventory",
+            "v3 source archive is absent from the file inventory",
         ),
     ):
         original = artifact / relative
@@ -650,7 +774,7 @@ def verify_receipt_semantics(
     )
     first = verify_receipt(repository, artifact, first_path)
     second = verify_receipt(repository, artifact, second_path)
-    require(first["schema"] == second["schema"] == RECEIPT_V2, "receipt schema is not v2")
+    require(first["schema"] == second["schema"] == RECEIPT_V3, "receipt schema is not v3")
     require(
         first["reproductionStatus"] == "EXACT_BYTE_REPRODUCED",
         "first receipt is not exact",
@@ -728,7 +852,7 @@ def verify_receipt_semantics(
         expect_success=False,
     )
     corrupt = verify_receipt(repository, corrupt_root, corrupt_receipt)
-    require(corrupt["schema"] == RECEIPT_V2, "corrupt artifact lost v2 receipt identity")
+    require(corrupt["schema"] == RECEIPT_V3, "corrupt artifact lost v3 receipt identity")
     require(
         corrupt["reproductionStatus"] == "NOT_REPRODUCED",
         "unreadable manifest did not retain NOT_REPRODUCED",
@@ -753,11 +877,11 @@ def verify_receipt_semantics(
     )
     damaged = verify_receipt(repository, corrupt_root, missing_descriptor_receipt)
     require(
-        damaged["schema"] == RECEIPT_V2 and damaged["reproductionStatus"] == "NOT_REPRODUCED",
-        "missing descriptor must preserve the frozen v2 negative receipt",
+        damaged["schema"] == RECEIPT_V3 and damaged["reproductionStatus"] == "NOT_REPRODUCED",
+        "missing descriptor must preserve the frozen v3 negative receipt",
     )
     require(
-        any(message.startswith("invalid v2 reproduction environment descriptor:")
+        any(message.startswith("invalid v3 reproduction environment descriptor:")
             for message in damaged["semanticComparison"]["inputArtifactFailures"]),
         "missing descriptor diagnostic was lost",
     )
@@ -852,6 +976,7 @@ def main() -> None:
     reports = args.report_directory.resolve()
 
     verify_frozen_sources(repository)
+    verify_launcher_environment(repository)
     require_identical_trees(artifact_a, artifact_b)
     require(
         archive_a.read_bytes() == archive_b.read_bytes(),
@@ -868,6 +993,8 @@ def main() -> None:
     reports.mkdir(parents=True)
     with tempfile.TemporaryDirectory(prefix="regelsuche-reproduction-") as raw:
         temporary = Path(raw)
+        verify_receipt_version_dispatch(repository, temporary)
+        verify_source_environment_dispatch(repository, temporary)
         verify_source_negatives(
             repository,
             artifact_a,

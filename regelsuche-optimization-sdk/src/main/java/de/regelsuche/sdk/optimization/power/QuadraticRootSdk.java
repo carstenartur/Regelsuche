@@ -19,6 +19,12 @@ public final class QuadraticRootSdk {
         return QuadraticRootSearch.search(expected, weights, budget.maximumCandidates(), limits(budget), cancellation::isCancelled);
     }
 
+    /** Verified alternatives for consumers that price the complete emitted program themselves. */
+    public static QuadraticRootSearch.Portfolio portfolio(QuadraticRootContract expected, SharedPowerPlan.Weights weights,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return QuadraticRootSearch.portfolio(expected, weights, budget.maximumCandidates(), limits(budget), cancellation::isCancelled);
+    }
+
     public static QuadraticRootVerifier.Result verify(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             OptimizationBudget budget, CancellationToken cancellation) {
         return QuadraticRootVerifier.verify(expected, certificate, limits(budget), cancellation::isCancelled);

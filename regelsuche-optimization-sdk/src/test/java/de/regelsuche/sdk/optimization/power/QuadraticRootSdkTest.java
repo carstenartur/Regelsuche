@@ -17,5 +17,9 @@ class QuadraticRootSdkTest {
         var result = QuadraticRootSdk.search(contract, new SharedPowerPlan.Weights(1, 1, 10),
                 OptimizationBudget.DEFAULT, () -> true);
         assertEquals("CANCELLED", result.reason());
+        var portfolio = QuadraticRootSdk.portfolio(contract, new SharedPowerPlan.Weights(1, 1, 10),
+                OptimizationBudget.DEFAULT, () -> true);
+        assertEquals("CANCELLED", portfolio.reason());
+        assertEquals(List.of(), portfolio.certificates());
     }
 }

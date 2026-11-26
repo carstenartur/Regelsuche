@@ -17,14 +17,14 @@ from typing import Any, Iterable
 
 
 from independent_reproduction_environment import (
-    ARTIFACT_SCHEMA_V2,
-    ARTIFACT_V2,
+    ARTIFACT_SCHEMA_V3,
+    ARTIFACT_V3,
     DESCRIPTOR_BUNDLE,
     DESCRIPTOR_SHA256,
     DESCRIPTOR_SOURCE,
-    DOCKERFILE_V2,
+    DOCKERFILE_V3,
     ENVIRONMENT_MODULE,
-    RECEIPT_SCHEMA_V2,
+    RECEIPT_SCHEMA_V3,
     repository_descriptor,
 )
 
@@ -215,19 +215,19 @@ def validate_environment(repository: Path, environment: dict[str, Any]) -> None:
     )
     expected_url = environment["gradleDistributionUrl"].replace(":", r"\:", 1)
     if properties.get("distributionUrl") != expected_url:
-        raise ValueError("Gradle distribution URL differs from the v2 contract")
+        raise ValueError("Gradle distribution URL differs from the v3 contract")
     if properties.get("distributionSha256Sum") != environment["gradleDistributionSha256"]:
-        raise ValueError("Gradle distribution checksum differs from the v2 contract")
+        raise ValueError("Gradle distribution checksum differs from the v3 contract")
 
     for relative, field in (
         ("gradle/wrapper/gradle-wrapper.jar", "gradleWrapperJarSha256"),
-        (DOCKERFILE_V2, "containerDefinitionSha256"),
-        (ARTIFACT_SCHEMA_V2, "artifactSchemaSha256"),
-        (RECEIPT_SCHEMA_V2, "receiptSchemaSha256"),
+        (DOCKERFILE_V3, "containerDefinitionSha256"),
+        (ARTIFACT_SCHEMA_V3, "artifactSchemaSha256"),
+        (RECEIPT_SCHEMA_V3, "receiptSchemaSha256"),
     ):
         path = repository / relative
         if path.is_symlink() or not path.is_file() or sha256_file(path) != environment[field]:
-            raise ValueError(f"v2 reproduction environment file differs: {relative}")
+            raise ValueError(f"v3 reproduction environment file differs: {relative}")
 
 
 def create_source_archive(repository: Path, revision: str, output: Path) -> None:
@@ -403,7 +403,7 @@ def main() -> None:
     environment = repository_descriptor(repository)
     validate_environment(repository, environment)
     if args.architecture not in environment["architectures"]:
-        raise ValueError("architecture is outside the v2 reproduction environment")
+        raise ValueError("architecture is outside the v3 reproduction environment")
 
     card = load_unique(walkthrough / "result-card.json")
     validate_result_card(card, revision)
@@ -423,7 +423,7 @@ def main() -> None:
 
     create_source_archive(repository, revision, bundle / "source/regelsuche-source.tar.gz")
     copy_required(
-        repository / DOCKERFILE_V2,
+        repository / DOCKERFILE_V3,
         bundle / "environment/Dockerfile.reproduction",
     )
     copy_required(repository / DESCRIPTOR_SOURCE, bundle / DESCRIPTOR_BUNDLE)
@@ -447,11 +447,11 @@ def main() -> None:
         executable=True,
     )
     copy_required(
-        repository / ARTIFACT_SCHEMA_V2,
+        repository / ARTIFACT_SCHEMA_V3,
         bundle / "schemas/artifact-manifest.schema.json",
     )
     copy_required(
-        repository / RECEIPT_SCHEMA_V2,
+        repository / RECEIPT_SCHEMA_V3,
         bundle / "schemas/reproduction-receipt.schema.json",
     )
     copy_required(
@@ -505,7 +505,7 @@ def main() -> None:
         else "DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION"
     )
     manifest: dict[str, Any] = {
-        "schema": ARTIFACT_V2,
+        "schema": ARTIFACT_V3,
         "artifactId": (
             "regelsuche-autonomous-discovery-reproduction/"
             f"{release_tag}/{revision}"

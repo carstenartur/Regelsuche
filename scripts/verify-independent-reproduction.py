@@ -19,18 +19,15 @@ from typing import Any, Iterable
 # Import the bundled contract without writing unlisted files into the artifact.
 sys.dont_write_bytecode = True
 from independent_reproduction_environment import (
-    ARTIFACT_SCHEMA_V2,
     ARTIFACT_V1,
-    ARTIFACT_V2,
     DESCRIPTOR_BUNDLE,
-    DESCRIPTOR_SHA256,
-    DESCRIPTOR_SOURCE,
-    DOCKERFILE_V2,
     ENVIRONMENT_MODULE,
-    RECEIPT_SCHEMA_V2,
+    RECEIPT_BY_ARTIFACT,
     RECEIPT_V1,
     RECEIPT_V2,
+    RECEIPT_V3,
     checked_descriptor,
+    environment_contract,
 )
 CLAIM_POLICY = "REPRODUCTION_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"
 BASE_IMAGE = (
@@ -47,6 +44,7 @@ ARTIFACT_SCHEMA_V1_SHA256 = (
 RECEIPT_SCHEMA_SHA256 = {
     RECEIPT_V1: "sha256:074943b4dfc5882ff88aec976b2f0018231904d8d9f5256611aa18510de976ea",
     RECEIPT_V2: "sha256:b267a2fc555551820163b0e028458532ae2108fff177599bfca3d90c7b2c63cd",
+    RECEIPT_V3: "sha256:871e0d4a948b5e96b407ccef6c1a0a7c5217b75b2ec1a63c686ec667efa76048",
 }
 GRADLE_DISTRIBUTION = "gradle-9.7.1-bin.zip"
 GRADLE_DISTRIBUTION_SHA256 = (
@@ -198,11 +196,13 @@ def inspect_source_archive(
     }
     bound_members = {}
     if descriptor is not None:
+        contract = environment_contract(manifest["schema"])
+        version = manifest["schema"].rsplit("/", 1)[1]
         bound_members = {
-            DESCRIPTOR_SOURCE: DESCRIPTOR_SHA256,
-            DOCKERFILE_V2: descriptor["containerDefinitionSha256"],
-            ARTIFACT_SCHEMA_V2: descriptor["artifactSchemaSha256"],
-            RECEIPT_SCHEMA_V2: descriptor["receiptSchemaSha256"],
+            contract["descriptorSource"]: contract["descriptorSha256"],
+            contract["dockerfile"]: descriptor["containerDefinitionSha256"],
+            contract["artifactSchemaSource"]: descriptor["artifactSchemaSha256"],
+            contract["receiptSchemaSource"]: descriptor["receiptSchemaSha256"],
             ENVIRONMENT_MODULE: refs.get(ENVIRONMENT_MODULE, {}).get("sha256"),
             "gradle/wrapper/gradle-wrapper.jar": descriptor["gradleWrapperJarSha256"],
         }
@@ -234,7 +234,7 @@ def inspect_source_archive(
                     with archive.extractfile(member) as handle:
                         if sha256_bytes(handle.read()) == expected:
                             continue
-                failures.append(f"source archive v2 environment file differs: {relative}")
+                failures.append(f"source archive {version} environment file differs: {relative}")
 
             properties_member = by_name.get(
                 "regelsuche-source/gradle/wrapper/gradle-wrapper.properties"
@@ -393,10 +393,12 @@ def container_definition_failures(root: Path, manifest: dict[str, Any]) -> list[
     return failures
 
 
-def v2_environment_failures(
+def versioned_environment_failures(
     manifest: dict[str, Any], refs: dict[str, dict[str, Any]], descriptor: dict
 ) -> list[str]:
     failures: list[str] = []
+    contract = environment_contract(manifest["schema"])
+    version = manifest["schema"].rsplit("/", 1)[1]
     environment = manifest.get("declaredEnvironment", {})
     for field in (
         "javaImage", "gradleDistribution", "gradleDistributionUrl",
@@ -404,21 +406,21 @@ def v2_environment_failures(
         "evaluatedRunNetworkPolicy", "buildNetworkPolicy",
     ):
         if environment.get(field) != descriptor[field]:
-            failures.append(f"manifest v2 environment differs: {field}")
+            failures.append(f"manifest {version} environment differs: {field}")
     if environment.get("architecture") not in descriptor["architectures"]:
-        failures.append("manifest architecture is outside the v2 environment")
+        failures.append(f"manifest architecture is outside the {version} environment")
     if ENVIRONMENT_MODULE not in refs:
-        failures.append(f"manifest v2 environment file is missing: {ENVIRONMENT_MODULE}")
-    if environment.get("environmentDescriptorSha256") != DESCRIPTOR_SHA256:
-        failures.append("manifest v2 environment descriptor checksum differs")
+        failures.append(f"manifest {version} environment file is missing: {ENVIRONMENT_MODULE}")
+    if environment.get("environmentDescriptorSha256") != contract["descriptorSha256"]:
+        failures.append(f"manifest {version} environment descriptor checksum differs")
     for relative, expected in (
-        (DESCRIPTOR_BUNDLE, DESCRIPTOR_SHA256),
+        (DESCRIPTOR_BUNDLE, contract["descriptorSha256"]),
         ("environment/Dockerfile.reproduction", descriptor["containerDefinitionSha256"]),
         ("schemas/artifact-manifest.schema.json", descriptor["artifactSchemaSha256"]),
         ("schemas/reproduction-receipt.schema.json", descriptor["receiptSchemaSha256"]),
     ):
         if refs.get(relative, {}).get("sha256") != expected:
-            failures.append(f"manifest v2 environment file differs: {relative}")
+            failures.append(f"manifest {version} environment file differs: {relative}")
     return failures
 
 
@@ -485,14 +487,15 @@ def backend_identity_failures(root: Path, manifest: dict[str, Any]) -> list[str]
 def verify_artifact(root: Path, manifest: dict[str, Any]) -> list[str]:
     failures: list[str] = []
     version = manifest.get("schema")
-    if version not in (ARTIFACT_V1, ARTIFACT_V2):
+    if not isinstance(version, str) or version not in RECEIPT_BY_ARTIFACT:
         return ["unsupported artifact manifest schema"]
     descriptor = None
-    if version == ARTIFACT_V2:
+    if version != ARTIFACT_V1:
         try:
-            descriptor = checked_descriptor(resolve(root, DESCRIPTOR_BUNDLE).read_bytes())
+            descriptor = checked_descriptor(resolve(root, DESCRIPTOR_BUNDLE).read_bytes(), version)
         except (OSError, ValueError) as exc:
-            return [f"invalid v2 reproduction environment descriptor: {exc}"]
+            label = version.rsplit("/", 1)[1]
+            return [f"invalid {label} reproduction environment descriptor: {exc}"]
     if expected_hash(manifest) != manifest.get("contentHash"):
         failures.append("artifact manifest contentHash mismatch")
     if manifest.get("claimPolicy") != CLAIM_POLICY:
@@ -548,7 +551,7 @@ def verify_artifact(root: Path, manifest: dict[str, Any]) -> list[str]:
 
     failures.extend(specialized_reference_failures(manifest, refs))
     if descriptor is not None:
-        failures.extend(v2_environment_failures(manifest, refs, descriptor))
+        failures.extend(versioned_environment_failures(manifest, refs, descriptor))
     for item in manifest.get("schemas", []):
         if not isinstance(item, dict) or not isinstance(item.get("path"), str):
             continue
@@ -557,7 +560,7 @@ def verify_artifact(root: Path, manifest: dict[str, Any]) -> list[str]:
             if path == root / "schemas/artifact-manifest.schema.json":
                 continue  # Checked against the frozen bytes when validating the manifest.
             if path == root / "schemas/reproduction-receipt.schema.json":
-                identity = RECEIPT_V2 if version == ARTIFACT_V2 else RECEIPT_V1
+                identity = RECEIPT_BY_ARTIFACT[version]
                 if sha256_file(path) != RECEIPT_SCHEMA_SHA256[identity]:
                     raise ValueError("receipt schema bytes differ from the frozen contract")
             schema_check(path)
@@ -565,10 +568,11 @@ def verify_artifact(root: Path, manifest: dict[str, Any]) -> list[str]:
             failures.append(f"schema is invalid: {item.get('path')}: {exc}")
 
     source_path = source.get("archivePath", "")
-    if version == ARTIFACT_V2:
+    if descriptor is not None:
         source_path = "source/regelsuche-source.tar.gz"
         if source_path not in refs:
-            failures.append("v2 source archive is absent from the file inventory")
+            label = version.rsplit("/", 1)[1]
+            failures.append(f"{label} source archive is absent from the file inventory")
     if isinstance(source_path, str) and source_path in refs:
         if refs[source_path].get("sha256") != source.get("archiveSha256"):
             failures.append("source archive hash disagrees with file inventory")
@@ -981,10 +985,9 @@ def fallback_manifest(schema: str) -> dict[str, Any]:
 def fallback_artifact_schema(root: Path) -> str:
     path = resolve(root, "schemas/reproduction-receipt.schema.json")
     digest = sha256_file(path)
-    if digest == RECEIPT_SCHEMA_SHA256[RECEIPT_V2]:
-        return ARTIFACT_V2
-    if digest == RECEIPT_SCHEMA_SHA256[RECEIPT_V1]:
-        return ARTIFACT_V1
+    for artifact, receipt in RECEIPT_BY_ARTIFACT.items():
+        if digest == RECEIPT_SCHEMA_SHA256[receipt]:
+            return artifact
     raise ValueError("cannot determine artifact version from frozen receipt schema bytes")
 
 
@@ -1007,10 +1010,12 @@ def load_manifest_for_receipt(
 
 def validate_artifact_schema(root: Path, manifest: dict[str, Any]) -> None:
     identity = manifest.get("schema")
+    if not isinstance(identity, str) or identity not in RECEIPT_BY_ARTIFACT:
+        raise ValueError("unsupported artifact manifest schema")
     path = resolve(root, "schemas/artifact-manifest.schema.json")
     expected = ARTIFACT_SCHEMA_V1_SHA256
-    if identity == ARTIFACT_V2:
-        descriptor = checked_descriptor(resolve(root, DESCRIPTOR_BUNDLE).read_bytes())
+    if identity != ARTIFACT_V1:
+        descriptor = checked_descriptor(resolve(root, DESCRIPTOR_BUNDLE).read_bytes(), identity)
         expected = descriptor["artifactSchemaSha256"]
     validate_frozen_schema(path, manifest, identity, expected)
 
@@ -1074,7 +1079,7 @@ def main() -> None:
             manifest = fallback_manifest(fallback_artifact_schema(root))
         except (OSError, ValueError) as exc:
             raise SystemExit(f"ERROR: {load_failures[0]}\nERROR: {exc}") from exc
-    elif manifest.get("schema") not in (ARTIFACT_V1, ARTIFACT_V2):
+    elif not isinstance(manifest.get("schema"), str) or manifest["schema"] not in RECEIPT_BY_ARTIFACT:
         raise SystemExit("ERROR: unsupported artifact manifest schema")
     else:
         try:
@@ -1094,7 +1099,7 @@ def main() -> None:
         print(manifest_file_sha)
         return
 
-    receipt_schema = RECEIPT_V2 if manifest.get("schema") == ARTIFACT_V2 else RECEIPT_V1
+    receipt_schema = RECEIPT_BY_ARTIFACT[manifest["schema"]]
     if args.command == "verify-receipt":
         receipt = load_unique(args.receipt.resolve())
         validate_receipt_schema(root, receipt, receipt_schema)

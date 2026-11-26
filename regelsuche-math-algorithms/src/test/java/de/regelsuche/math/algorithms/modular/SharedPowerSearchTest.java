@@ -2,6 +2,7 @@ package de.regelsuche.math.algorithms.modular;
 
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import java.math.BigInteger;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,30 @@ class SharedPowerSearchTest {
         assertTrue(certificate.schedule().steps().stream()
                 .anyMatch(step -> step.operation() == Operation.POWER && step.exponent().equals(bi(254))));
         assertTrue(SharedPowerVerifier.verify(request, certificate, WEIGHTS, LIMITS, () -> false).valid());
+    }
+
+    @Test void portfolioRetainsDistinctExactAndReducedSchedulesWithIndependentCosts() {
+        var request = signedPair(1019);
+        var result = SharedPowerSearch.portfolio(request, WEIGHTS, 8, 6, LIMITS, () -> false);
+        var schedules = new HashSet<Schedule>();
+        assertTrue(result.candidates().stream().anyMatch(SharedPowerSearch.Candidate::exact));
+        assertTrue(result.candidates().stream().anyMatch(candidate -> !candidate.exact()));
+        for (var candidate : result.candidates()) {
+            assertTrue(schedules.add(candidate.certificate().schedule()));
+            var proof = SharedPowerVerifier.verify(request, candidate.certificate(), WEIGHTS, LIMITS, () -> false);
+            assertEquals(candidate.cost(), proof.cost().orElseThrow());
+        }
+        assertTrue(SharedPowerSearch.portfolio(request, WEIGHTS, 8, 6, LIMITS.withMaximumWork(result.work() - 1),
+                () -> false).candidates().isEmpty());
+    }
+
+    @Test void retainedPowerSchedulesShareTheNextProposalsTableBudget() {
+        var request = signedPair(43);
+        var limited = new IterationLimits(LIMITS.maximumWork(), 128, LIMITS.timeoutMillis());
+        assertFalse(SharedPowerSearch.portfolio(request, WEIGHTS, 8, 1, limited, () -> false).candidates().isEmpty());
+        var stopped = SharedPowerSearch.portfolio(request, WEIGHTS, 8, 6, limited, () -> false);
+        assertEquals("TERM_LIMIT", stopped.reason());
+        assertTrue(stopped.candidates().isEmpty());
     }
 
     @Test void exhaustivePrimeFieldsAgreeWithIndependentModPowObservations() {
