@@ -94,7 +94,7 @@ public final class SharedPowerPlan {
     }
 
     static void bounded(BigInteger value) {
-<span class="pc bpc" id="L97" title="2 of 6 branches missed.">        if (value == null || value.getClass() != BigInteger.class || value.abs().bitLength() &gt; MAX_BITS) {</span>
+<span class="fc bfc" id="L97" title="All 6 branches covered.">        if (value == null || value.getClass() != BigInteger.class || value.abs().bitLength() &gt; MAX_BITS) {</span>
 <span class="fc" id="L98">            throw new IllegalArgumentException(&quot;POWER_INTEGER_LIMIT&quot;);</span>
         }
 <span class="fc" id="L100">    }</span>

@@ -22,6 +22,18 @@ public final class SharedPowerSearch {
 <span class="fc" id="L22">        public long work() { return searchWork + verificationWork; }</span>
     }
 
+    /** An exact proposal used unreduced representatives for every requested exponent. */
+<span class="fc" id="L26">    public record Candidate(Certificate certificate, Cost cost, boolean exact) {}</span>
+
+    /** Distinct independently verified schedules in increasing weighted cost order. */
+    public record Portfolio(List&lt;Candidate&gt; candidates, String reason, long searchWork, long verificationWork) {
+<span class="fc" id="L30">        public Portfolio { candidates = List.copyOf(candidates); }</span>
+<span class="fc" id="L31">        public long work() { return searchWork + verificationWork; }</span>
+        long retainedCells() {
+<span class="fc" id="L33">            return candidates.stream().mapToLong(candidate -&gt; cells(candidate.certificate())).sum();</span>
+        }
+    }
+
     /**
      * Compares exact and observation-reduced representatives under identical reuse rules,
      * each in source, ascending and descending order. The exact candidate is always retained.
@@ -29,88 +41,100 @@ public final class SharedPowerSearch {
      */
     public static Result search(Request request, Weights weights, int maximumShift,
             IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L32">        return search(request, weights, maximumShift, 6, limits, cancellation);</span>
+<span class="fc" id="L44">        return search(request, weights, maximumShift, 6, limits, cancellation);</span>
     }
 
     /** Stops after at most maximumCandidates (1..6) verified proposals, with exact candidates first. */
     public static Result search(Request request, Weights weights, int maximumShift, int maximumCandidates,
             IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L38">        Objects.requireNonNull(request);</span>
-<span class="fc" id="L39">        Objects.requireNonNull(weights);</span>
-<span class="pc bpc" id="L40" title="2 of 4 branches missed.">        if (maximumShift &lt; 0 || maximumShift &gt; 64) throw new IllegalArgumentException(&quot;SHIFT_LIMIT&quot;);</span>
-<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (maximumCandidates &lt; 1 || maximumCandidates &gt; 6) throw new IllegalArgumentException(&quot;CANDIDATE_LIMIT&quot;);</span>
-<span class="fc" id="L42">        var work = new CertificateWork(limits, cancellation);</span>
-<span class="fc" id="L43">        long verificationWork = 0;</span>
+<span class="fc" id="L50">        var result = portfolio(request, weights, maximumShift, maximumCandidates, limits, cancellation);</span>
+<span class="fc" id="L51">        var best = result.candidates().stream().findFirst();</span>
+<span class="fc" id="L52">        var exact = result.candidates().stream().filter(Candidate::exact).findFirst();</span>
+<span class="fc" id="L53">        return new Result(best.map(Candidate::certificate), exact.map(Candidate::cost), best.map(Candidate::cost),</span>
+<span class="fc" id="L54">                result.reason(), result.searchWork(), result.verificationWork());</span>
+    }
+
+    /** Retains distinct exact and observation-reduced schedules from up to six ordered proposals. */
+    public static Portfolio portfolio(Request request, Weights weights, int maximumShift, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L60">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L61">        Objects.requireNonNull(weights);</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (maximumShift &lt; 0 || maximumShift &gt; 64) throw new IllegalArgumentException(&quot;SHIFT_LIMIT&quot;);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (maximumCandidates &lt; 1 || maximumCandidates &gt; 6) throw new IllegalArgumentException(&quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L64">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L65">        long verificationWork = 0;</span>
         try {
-<span class="fc" id="L45">            SharedPowerVerifier.inspect(request, work);</span>
-<span class="fc" id="L46">            Certificate best = null, exact = null;</span>
-<span class="fc" id="L47">            Cost bestCost = null, exactCost = null;</span>
-<span class="fc" id="L48">            int candidates = 0;</span>
+<span class="fc" id="L67">            SharedPowerVerifier.inspect(request, work);</span>
+<span class="fc" id="L68">            var distinct = new ArrayList&lt;Candidate&gt;();</span>
+<span class="fc" id="L69">            long retained = 0;</span>
+<span class="fc" id="L70">            int candidates = 0;</span>
             portfolio:
-<span class="fc bfc" id="L50" title="All 2 branches covered.">            for (boolean relaxed : new boolean[]{false, true}) {</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">                for (int order = 0; order &lt; 3; order++) {</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                    if (candidates == maximumCandidates) break portfolio;</span>
-<span class="fc" id="L53">                    candidates++;</span>
-<span class="fc" id="L54">                    long retained = cells(best) + cells(exact);</span>
-<span class="fc" id="L55">                    work.cells(retained + 8L * request.outputs().size() + 8);</span>
-<span class="fc" id="L56">                    var targets = targets(request, relaxed, order, work);</span>
-<span class="fc" id="L57">                    var builder = new Builder(request.orderMultiple(), weights, maximumShift, work,</span>
-<span class="fc" id="L58">                            retained + 8L * request.outputs().size());</span>
-<span class="fc" id="L59">                    var outputs = new Integer[targets.size()];</span>
-<span class="fc bfc" id="L60" title="All 2 branches covered.">                    for (var target : targets) outputs[target.position()] = builder.ensure(target.exponent());</span>
-<span class="fc" id="L61">                    work.charge(1L + builder.steps.size() + outputs.length);</span>
-<span class="fc" id="L62">                    var certificate = new Certificate(request, new Schedule(builder.steps, List.of(outputs)));</span>
-<span class="fc" id="L63">                    long before = work.used();</span>
-<span class="fc" id="L64">                    var checked = SharedPowerVerifier.verify(request, certificate, weights, work,</span>
-<span class="fc" id="L65">                            retained + 8L * request.outputs().size() + 4L * builder.values.size());</span>
-<span class="fc" id="L66">                    verificationWork += work.used() - before;</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                    if (!checked.valid()) {</span>
-<span class="nc" id="L68">                        return new Result(Optional.empty(), Optional.empty(), Optional.empty(), checked.reason(),</span>
-<span class="nc" id="L69">                                work.used() - verificationWork, verificationWork);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (boolean relaxed : new boolean[]{false, true}) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                for (int order = 0; order &lt; 3; order++) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                    if (candidates == maximumCandidates) break portfolio;</span>
+<span class="fc" id="L75">                    candidates++;</span>
+<span class="fc" id="L76">                    work.cells(retained + 8L * request.outputs().size() + 8);</span>
+<span class="fc" id="L77">                    var targets = targets(request, relaxed, order, work);</span>
+<span class="fc" id="L78">                    var builder = new Builder(request.orderMultiple(), weights, maximumShift, work,</span>
+<span class="fc" id="L79">                            retained + 8L * request.outputs().size());</span>
+<span class="fc" id="L80">                    var outputs = new Integer[targets.size()];</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                    for (var target : targets) outputs[target.position()] = builder.ensure(target.exponent());</span>
+<span class="fc" id="L82">                    work.charge(1L + builder.steps.size() + outputs.length);</span>
+<span class="fc" id="L83">                    long buildCells = retained + 8L * outputs.length + 5L * builder.values.size();</span>
+<span class="fc" id="L84">                    work.cells(buildCells + cells(builder.steps.size(), outputs.length));</span>
+<span class="fc" id="L85">                    var certificate = new Certificate(request, new Schedule(builder.steps, List.of(outputs)));</span>
+<span class="fc" id="L86">                    long before = work.used();</span>
+<span class="fc" id="L87">                    var checked = SharedPowerVerifier.verify(request, certificate, weights, work,</span>
+<span class="fc" id="L88">                            buildCells + cells(certificate));</span>
+<span class="fc" id="L89">                    verificationWork += work.used() - before;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                    if (!checked.valid()) {</span>
+<span class="fc" id="L91">                        return new Portfolio(List.of(), checked.reason(), work.used() - verificationWork, verificationWork);</span>
                     }
-<span class="fc" id="L71">                    var cost = checked.cost().orElseThrow();</span>
-<span class="pc bpc" id="L72" title="1 of 6 branches missed.">                    if (!relaxed &amp;&amp; (exactCost == null || cost.weighted() &lt; exactCost.weighted())) {</span>
-<span class="fc" id="L73">                        exact = certificate;</span>
-<span class="fc" id="L74">                        exactCost = cost;</span>
-                    }
-<span class="fc bfc" id="L76" title="All 4 branches covered.">                    if (bestCost == null || cost.weighted() &lt; bestCost.weighted()) {</span>
-<span class="fc" id="L77">                        best = certificate;</span>
-<span class="fc" id="L78">                        bestCost = cost;</span>
+<span class="fc" id="L93">                    work.charge((1L + distinct.size()) * (1L + builder.steps.size() + outputs.length));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                    if (distinct.stream().noneMatch(prior -&gt; prior.certificate().schedule().equals(certificate.schedule()))) {</span>
+<span class="fc" id="L95">                        retained += cells(certificate);</span>
+<span class="fc" id="L96">                        work.cells(retained);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                        distinct.add(new Candidate(certificate, checked.cost().orElseThrow(), !relaxed));</span>
                     }
                 }
             }
-<span class="fc" id="L82">            work.charge(0);</span>
-<span class="fc" id="L83">            return new Result(Optional.of(Objects.requireNonNull(best)), Optional.of(Objects.requireNonNull(exactCost)),</span>
-<span class="fc" id="L84">                    Optional.of(Objects.requireNonNull(bestCost)), &quot;VERIFIED&quot;, work.used() - verificationWork,</span>
-                    verificationWork);
-<span class="fc" id="L86">        } catch (CertificateWork.Stop stop) {</span>
-<span class="fc" id="L87">            return new Result(Optional.empty(), Optional.empty(), Optional.empty(), stop.getMessage(),</span>
-<span class="fc" id="L88">                    work.used() - verificationWork, verificationWork);</span>
+<span class="fc" id="L101">            work.cells(retained + 2L * distinct.size());</span>
+<span class="fc" id="L102">            distinct.sort((a, b) -&gt; {</span>
+<span class="fc" id="L103">                work.charge(1);</span>
+<span class="fc" id="L104">                return Long.compare(a.cost().weighted(), b.cost().weighted());</span>
+            });
+<span class="fc" id="L106">            work.charge(1L + distinct.size());</span>
+<span class="fc" id="L107">            return new Portfolio(distinct, &quot;VERIFIED&quot;, work.used() - verificationWork, verificationWork);</span>
+<span class="fc" id="L108">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L109">            return new Portfolio(List.of(), stop.getMessage(), work.used() - verificationWork, verificationWork);</span>
         }
     }
 
-<span class="fc" id="L92">    private record Target(int position, BigInteger exponent) {}</span>
+<span class="fc" id="L113">    private record Target(int position, BigInteger exponent) {}</span>
 
     private static List&lt;Target&gt; targets(Request request, boolean relaxed, int order, CertificateWork work) {
-<span class="fc" id="L95">        var result = new ArrayList&lt;Target&gt;();</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (int i = 0; i &lt; request.outputs().size(); i++) {</span>
-<span class="fc" id="L97">            var output = request.outputs().get(i);</span>
-<span class="fc" id="L98">            work.charge(1L + SharedPowerVerifier.words(request.orderMultiple())</span>
-<span class="fc" id="L99">                    + SharedPowerVerifier.words(output.exponent()));</span>
-<span class="fc bfc" id="L100" title="All 2 branches covered.">            var modulus = relaxed ? request.orderMultiple().divide(output.observationPower()) : request.orderMultiple();</span>
-<span class="fc" id="L101">            result.add(new Target(i, output.exponent().mod(modulus)));</span>
+<span class="fc" id="L116">        var result = new ArrayList&lt;Target&gt;();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int i = 0; i &lt; request.outputs().size(); i++) {</span>
+<span class="fc" id="L118">            var output = request.outputs().get(i);</span>
+<span class="fc" id="L119">            work.charge(1L + SharedPowerVerifier.words(request.orderMultiple())</span>
+<span class="fc" id="L120">                    + SharedPowerVerifier.words(output.exponent()));</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            var modulus = relaxed ? request.orderMultiple().divide(output.observationPower()) : request.orderMultiple();</span>
+<span class="fc" id="L122">            result.add(new Target(i, output.exponent().mod(modulus)));</span>
         }
-<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (order != 0) result.sort((a, b) -&gt; {</span>
-<span class="fc" id="L104">            work.charge(1L + SharedPowerVerifier.words(a.exponent()) + SharedPowerVerifier.words(b.exponent()));</span>
-<span class="fc" id="L105">            int comparison = a.exponent().compareTo(b.exponent());</span>
-<span class="fc bfc" id="L106" title="All 2 branches covered.">            return order == 1 ? comparison : -comparison;</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (order != 0) result.sort((a, b) -&gt; {</span>
+<span class="fc" id="L125">            work.charge(1L + SharedPowerVerifier.words(a.exponent()) + SharedPowerVerifier.words(b.exponent()));</span>
+<span class="fc" id="L126">            int comparison = a.exponent().compareTo(b.exponent());</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            return order == 1 ? comparison : -comparison;</span>
         });
-<span class="fc" id="L108">        return result;</span>
+<span class="fc" id="L129">        return result;</span>
     }
 
     private static long cells(Certificate certificate) {
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        return certificate == null ? 0 : 2L * certificate.schedule().steps().size()</span>
-<span class="fc" id="L113">                + certificate.schedule().outputs().size();</span>
+<span class="fc" id="L133">        return cells(certificate.schedule().steps().size(), certificate.schedule().outputs().size());</span>
+    }
+
+    private static long cells(int steps, int outputs) {
+<span class="fc" id="L137">        return 14L + 5L * steps + outputs;</span>
     }
 
     private static final class Builder {
@@ -119,78 +143,78 @@ public final class SharedPowerSearch {
         private final int maximumShift;
         private final CertificateWork work;
         private final long retained;
-<span class="fc" id="L122">        private final List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L123">        private final Map&lt;BigInteger, Integer&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L146">        private final List&lt;Step&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L147">        private final Map&lt;BigInteger, Integer&gt; values = new LinkedHashMap&lt;&gt;();</span>
 
-<span class="fc" id="L125">        Builder(BigInteger n, Weights weights, int maximumShift, CertificateWork work, long retained) {</span>
-<span class="fc" id="L126">            this.n = n;</span>
-<span class="fc" id="L127">            this.weights = weights;</span>
-<span class="fc" id="L128">            this.maximumShift = maximumShift;</span>
-<span class="fc" id="L129">            this.work = work;</span>
-<span class="fc" id="L130">            this.retained = retained;</span>
-<span class="fc" id="L131">            values.put(BigInteger.ZERO, 0);</span>
-<span class="fc" id="L132">            values.putIfAbsent(BigInteger.ONE.mod(n), 1);</span>
-<span class="fc" id="L133">        }</span>
+<span class="fc" id="L149">        Builder(BigInteger n, Weights weights, int maximumShift, CertificateWork work, long retained) {</span>
+<span class="fc" id="L150">            this.n = n;</span>
+<span class="fc" id="L151">            this.weights = weights;</span>
+<span class="fc" id="L152">            this.maximumShift = maximumShift;</span>
+<span class="fc" id="L153">            this.work = work;</span>
+<span class="fc" id="L154">            this.retained = retained;</span>
+<span class="fc" id="L155">            values.put(BigInteger.ZERO, 0);</span>
+<span class="fc" id="L156">            values.putIfAbsent(BigInteger.ONE.mod(n), 1);</span>
+<span class="fc" id="L157">        }</span>
 
         int ensure(BigInteger target) {
-<span class="fc" id="L136">            work.charge(1);</span>
-<span class="fc" id="L137">            var present = values.get(target);</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (present != null) return present;</span>
-<span class="fc" id="L139">            var complement = target.negate().mod(n);</span>
-<span class="fc" id="L140">            long bestCost = powerCost(target, weights);</span>
-<span class="fc" id="L141">            int operation = 0, reference = -1, shift = 0;</span>
-<span class="fc" id="L142">            var inverse = values.get(complement);</span>
-<span class="fc bfc" id="L143" title="All 4 branches covered.">            if (inverse != null &amp;&amp; weights.inverse() &lt;= bestCost) {</span>
-<span class="fc" id="L144">                bestCost = weights.inverse();</span>
-<span class="fc" id="L145">                operation = 1;</span>
-<span class="fc" id="L146">                reference = inverse;</span>
+<span class="fc" id="L160">            work.charge(1);</span>
+<span class="fc" id="L161">            var present = values.get(target);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (present != null) return present;</span>
+<span class="fc" id="L163">            var complement = target.negate().mod(n);</span>
+<span class="fc" id="L164">            long bestCost = powerCost(target, weights);</span>
+<span class="fc" id="L165">            int operation = 0, reference = -1, shift = 0;</span>
+<span class="fc" id="L166">            var inverse = values.get(complement);</span>
+<span class="fc bfc" id="L167" title="All 4 branches covered.">            if (inverse != null &amp;&amp; weights.inverse() &lt;= bestCost) {</span>
+<span class="fc" id="L168">                bestCost = weights.inverse();</span>
+<span class="fc" id="L169">                operation = 1;</span>
+<span class="fc" id="L170">                reference = inverse;</span>
             }
-<span class="fc" id="L148">            long complementCost = powerCost(complement, weights) + weights.inverse();</span>
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (complementCost &lt; bestCost) {</span>
-<span class="fc" id="L150">                bestCost = complementCost;</span>
-<span class="fc" id="L151">                operation = 2;</span>
+<span class="fc" id="L172">            long complementCost = powerCost(complement, weights) + weights.inverse();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (complementCost &lt; bestCost) {</span>
+<span class="fc" id="L174">                bestCost = complementCost;</span>
+<span class="fc" id="L175">                operation = 2;</span>
             }
-<span class="fc" id="L153">            BigInteger start = BigInteger.ZERO;</span>
-<span class="fc bfc" id="L154" title="All 2 branches covered.">            for (var value : values.entrySet()) {</span>
-<span class="fc" id="L155">                work.charge(1L + SharedPowerVerifier.words(target) + SharedPowerVerifier.words(value.getKey()));</span>
-<span class="fc" id="L156">                var difference = target.subtract(value.getKey()).mod(n);</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (difference.compareTo(BigInteger.valueOf(maximumShift)) &lt;= 0) {</span>
-<span class="fc" id="L158">                    int count = difference.intValueExact();</span>
-<span class="fc" id="L159">                    long cost = count * Math.max(weights.multiplication(), weights.squaring());</span>
-<span class="fc bfc" id="L160" title="All 2 branches covered.">                    if (cost &lt; bestCost) {</span>
-<span class="fc" id="L161">                        bestCost = cost;</span>
-<span class="fc" id="L162">                        operation = 3;</span>
-<span class="fc" id="L163">                        reference = value.getValue();</span>
-<span class="fc" id="L164">                        start = value.getKey();</span>
-<span class="fc" id="L165">                        shift = count;</span>
+<span class="fc" id="L177">            BigInteger start = BigInteger.ZERO;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (var value : values.entrySet()) {</span>
+<span class="fc" id="L179">                work.charge(1L + SharedPowerVerifier.words(target) + SharedPowerVerifier.words(value.getKey()));</span>
+<span class="fc" id="L180">                var difference = target.subtract(value.getKey()).mod(n);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                if (difference.compareTo(BigInteger.valueOf(maximumShift)) &lt;= 0) {</span>
+<span class="fc" id="L182">                    int count = difference.intValueExact();</span>
+<span class="fc" id="L183">                    long cost = count * Math.max(weights.multiplication(), weights.squaring());</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                    if (cost &lt; bestCost) {</span>
+<span class="fc" id="L185">                        bestCost = cost;</span>
+<span class="fc" id="L186">                        operation = 3;</span>
+<span class="fc" id="L187">                        reference = value.getValue();</span>
+<span class="fc" id="L188">                        start = value.getKey();</span>
+<span class="fc" id="L189">                        shift = count;</span>
                     }
                 }
-<span class="fc" id="L168">            }</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (operation == 1) return append(Step.inverse(reference), target);</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (operation == 2) {</span>
-<span class="fc" id="L171">                int seed = append(Step.power(complement), complement);</span>
-<span class="fc" id="L172">                return append(Step.inverse(seed), target);</span>
+<span class="fc" id="L192">            }</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (operation == 1) return append(Step.inverse(reference), target);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (operation == 2) {</span>
+<span class="fc" id="L195">                int seed = append(Step.power(complement), complement);</span>
+<span class="fc" id="L196">                return append(Step.inverse(seed), target);</span>
             }
-<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (operation == 3) {</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">                for (int i = 0; i &lt; shift; i++) {</span>
-<span class="fc" id="L176">                    work.charge(1);</span>
-<span class="fc" id="L177">                    start = start.add(BigInteger.ONE).mod(n);</span>
-<span class="fc" id="L178">                    var previous = values.get(start);</span>
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                    reference = previous == null ? append(Step.multiply(reference, 1), start) : previous;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (operation == 3) {</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                for (int i = 0; i &lt; shift; i++) {</span>
+<span class="fc" id="L200">                    work.charge(1);</span>
+<span class="fc" id="L201">                    start = start.add(BigInteger.ONE).mod(n);</span>
+<span class="fc" id="L202">                    var previous = values.get(start);</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    reference = previous == null ? append(Step.multiply(reference, 1), start) : previous;</span>
                 }
-<span class="fc" id="L181">                return reference;</span>
+<span class="fc" id="L205">                return reference;</span>
             }
-<span class="fc" id="L183">            return append(Step.power(target), target);</span>
+<span class="fc" id="L207">            return append(Step.power(target), target);</span>
         }
 
         private int append(Step step, BigInteger exponent) {
-<span class="fc" id="L187">            work.charge(1);</span>
-<span class="fc" id="L188">            work.cells(retained + 5L * (steps.size() + 3));</span>
-<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (steps.size() == MAX_STEPS) throw new CertificateWork.Stop(&quot;POWER_STEP_LIMIT&quot;);</span>
-<span class="fc" id="L190">            steps.add(step);</span>
-<span class="fc" id="L191">            int reference = steps.size() + 1;</span>
-<span class="fc" id="L192">            values.put(exponent, reference);</span>
-<span class="fc" id="L193">            return reference;</span>
+<span class="fc" id="L211">            work.charge(1);</span>
+<span class="fc" id="L212">            work.cells(retained + 5L * (steps.size() + 3));</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            if (steps.size() == MAX_STEPS) throw new CertificateWork.Stop(&quot;POWER_STEP_LIMIT&quot;);</span>
+<span class="fc" id="L214">            steps.add(step);</span>
+<span class="fc" id="L215">            int reference = steps.size() + 1;</span>
+<span class="fc" id="L216">            values.put(exponent, reference);</span>
+<span class="fc" id="L217">            return reference;</span>
         }
     }
 }

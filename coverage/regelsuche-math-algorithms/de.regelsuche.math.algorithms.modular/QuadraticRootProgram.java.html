@@ -50,7 +50,7 @@ public record QuadraticRootProgram(List&lt;Step&gt; prefix, int guardLeft, int g
 
     /** Binary-chain group-work estimate. Additive operations and character selections are counted separately. */
     public PathCost cost(boolean equalityHolds, SharedPowerPlan.Weights weights) {
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        var arm = equalityHolds ? equal : unequal;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        var arm = equalityHolds ? equal : unequal;</span>
 <span class="fc" id="L54">        int[] counts = new int[Op.values().length];</span>
 <span class="fc" id="L55">        long weighted = 0;</span>
 <span class="fc bfc" id="L56" title="All 4 branches covered.">        for (var block : List.of(prefix, arm.steps())) for (var step : block) {</span>
@@ -68,13 +68,27 @@ public record QuadraticRootProgram(List&lt;Step&gt; prefix, int guardLeft, int g
 <span class="fc bfc" id="L68" title="All 2 branches covered.">                counts[Op.NEGATE.ordinal()], arm.normalizeRealCharacter() ? 1 : 0, weighted);</span>
     }
 
+    /**
+     * Default structural estimate for one traversal of each path. Includes binary-chain group work,
+     * one unit per power call, guard, addition, subtraction or negation, and eight per character
+     * selection. Literal references carry no group work. Consumers can price each path separately.
+     */
+    public long score(SharedPowerPlan.Weights weights) {
+<span class="fc" id="L77">        return score(cost(true, weights)) + score(cost(false, weights));</span>
+    }
+
+    private static long score(PathCost path) {
+<span class="fc" id="L81">        return path.weightedGroupWork() + path.powerCalls() + 1L + path.additions() + path.subtractions()</span>
+<span class="fc" id="L82">                + path.negations() + 8L * path.characterSelections();</span>
+    }
+
     private static List&lt;Step&gt; block(List&lt;Step&gt; steps) {
-<span class="fc" id="L72">        var copy = new ArrayList&lt;Step&gt;();</span>
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (var step : steps) {</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (copy.size() == MAX_BLOCK) throw new IllegalArgumentException(&quot;FIELD_BLOCK_LIMIT&quot;);</span>
-<span class="fc" id="L75">            copy.add(Objects.requireNonNull(step));</span>
-<span class="fc" id="L76">        }</span>
-<span class="fc" id="L77">        return List.copyOf(copy);</span>
+<span class="fc" id="L86">        var copy = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (copy.size() == MAX_BLOCK) throw new IllegalArgumentException(&quot;FIELD_BLOCK_LIMIT&quot;);</span>
+<span class="fc" id="L89">            copy.add(Objects.requireNonNull(step));</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        return List.copyOf(copy);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

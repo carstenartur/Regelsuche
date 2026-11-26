@@ -19,178 +19,217 @@ final class QuadraticRootBasis {
 <span class="fc" id="L19">    private final Map&lt;Integer, Factor&gt; factors = new HashMap&lt;&gt;();</span>
     private final BigInteger p;
     private final CertificateWork work;
+    private final int[] aliases;
     private final int root;
     private final int base;
     private final int scale;
     private final SharedPowerPlan.Request request;
 
-<span class="fc" id="L27">    private record Factor(int register, BigInteger degree) {}</span>
-<span class="fc" id="L28">    record Template(List&lt;Step&gt; prefix, int guardLeft, int guardRight, int real, int imaginary) {</span>
+<span class="fc" id="L28">    private record Factor(int register, BigInteger degree) {}</span>
+<span class="fc" id="L29">    record Template(List&lt;Step&gt; prefix, int guardLeft, int guardRight, int real, int imaginary) {</span>
         QuadraticRootProgram program(Arm equal, Arm unequal) {
-<span class="fc" id="L30">            return new QuadraticRootProgram(prefix, guardLeft, guardRight, equal, unequal);</span>
+<span class="fc" id="L31">            return new QuadraticRootProgram(prefix, guardLeft, guardRight, equal, unequal);</span>
         }
     }
 
-<span class="fc" id="L34">    QuadraticRootBasis(QuadraticRootContract contract, CertificateWork work) {</span>
-<span class="fc" id="L35">        this.p = contract.modulus();</span>
-<span class="fc" id="L36">        this.work = work;</span>
-<span class="fc" id="L37">        var original = contract.original();</span>
-<span class="fc" id="L38">        work.cells(retainedCells() + original.prefix().size() + original.equal().steps().size());</span>
-<span class="fc" id="L39">        source.addAll(original.prefix());</span>
-<span class="fc" id="L40">        source.addAll(original.equal().steps());</span>
-<span class="fc" id="L41">        root = original.equal().real();</span>
-<span class="fc" id="L42">        var power = sourceStep(root);</span>
-<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        if (power.op() != Op.POWER || original.equal().normalizeRealCharacter()) throw unsupported();</span>
-<span class="fc" id="L44">        int sourceBase = power.left();</span>
-        int square;
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (original.guardLeft() == sourceBase) square = original.guardRight();</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        else if (original.guardRight() == sourceBase) square = original.guardLeft();</span>
-<span class="fc" id="L48">        else throw unsupported();</span>
-<span class="fc" id="L49">        var guard = sourceStep(square);</span>
-<span class="pc bpc" id="L50" title="6 of 8 branches missed.">        if (guard.left() != root || !(guard.op() == Op.SQUARE || guard.op() == Op.MULTIPLY &amp;&amp; guard.right() == root)) {</span>
-<span class="nc" id="L51">            throw unsupported();</span>
+<span class="fc" id="L35">    QuadraticRootBasis(QuadraticRootContract contract, CertificateWork work) {</span>
+<span class="fc" id="L36">        this.p = contract.modulus();</span>
+<span class="fc" id="L37">        this.work = work;</span>
+<span class="fc" id="L38">        var original = contract.original();</span>
+<span class="fc" id="L39">        int count = original.prefix().size() + original.equal().steps().size();</span>
+<span class="fc" id="L40">        work.cells(12L + INPUTS + 2L * count);</span>
+<span class="fc" id="L41">        aliases = new int[INPUTS + count];</span>
+<span class="fc" id="L42">        source.addAll(original.prefix());</span>
+<span class="fc" id="L43">        source.addAll(original.equal().steps());</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        for (int i = 0; i &lt; INPUTS; i++) aliases[i] = i;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int ref = INPUTS; ref &lt; aliases.length; ref++) {</span>
+<span class="fc" id="L46">            work.charge(1);</span>
+<span class="fc" id="L47">            aliases[ref] = representative(ref);</span>
         }
-<span class="fc" id="L53">        base = factor(sourceBase).register();</span>
-<span class="fc" id="L54">        var imaginary = factor(original.equal().imaginary());</span>
-<span class="fc" id="L55">        scale = imaginary.register();</span>
-<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!imaginary.degree().equals(BigInteger.ONE.negate())) throw unsupported();</span>
-<span class="fc" id="L57">        var exponent = power.literal();</span>
-<span class="fc" id="L58">        request = new SharedPowerPlan.Request(p.subtract(BigInteger.ONE), List.of(</span>
+<span class="fc" id="L49">        root = aliases[original.equal().real()];</span>
+<span class="fc" id="L50">        var power = sourceStep(root);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (power.op() != Op.POWER || original.equal().normalizeRealCharacter()) throw unsupported();</span>
+<span class="fc" id="L52">        int sourceBase = aliases[power.left()];</span>
+        int square;
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (aliases[original.guardLeft()] == sourceBase) square = aliases[original.guardRight()];</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        else if (aliases[original.guardRight()] == sourceBase) square = aliases[original.guardLeft()];</span>
+<span class="fc" id="L56">        else throw unsupported();</span>
+<span class="fc" id="L57">        var guard = sourceStep(square);</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        boolean squaresOperand = switch (guard.op()) {</span>
+<span class="fc" id="L59">            case SQUARE -&gt; true;</span>
+<span class="fc" id="L60">            case POWER -&gt; guard.literal().equals(BigInteger.TWO);</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            case MULTIPLY -&gt; aliases[guard.right()] == root;</span>
+<span class="nc" id="L62">            default -&gt; false;</span>
+        };
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">        if (!squaresOperand || aliases[guard.left()] != root) throw unsupported();</span>
+<span class="fc" id="L65">        base = factor(power.left()).register();</span>
+<span class="fc" id="L66">        var imaginary = factor(original.equal().imaginary());</span>
+<span class="fc" id="L67">        scale = imaginary.register();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!imaginary.degree().equals(BigInteger.ONE.negate())) throw unsupported();</span>
+<span class="fc" id="L69">        var exponent = power.literal();</span>
+<span class="fc" id="L70">        request = new SharedPowerPlan.Request(p.subtract(BigInteger.ONE), List.of(</span>
                 new SharedPowerPlan.Output(exponent, BigInteger.TWO),
-<span class="fc" id="L60">                new SharedPowerPlan.Output(exponent.multiply(imaginary.degree()), BigInteger.TWO)));</span>
-<span class="fc" id="L61">    }</span>
+<span class="fc" id="L72">                new SharedPowerPlan.Output(exponent.multiply(imaginary.degree()), BigInteger.TWO)));</span>
+<span class="fc" id="L73">    }</span>
 
-<span class="fc" id="L63">    SharedPowerPlan.Request request() { return request; }</span>
+<span class="fc" id="L75">    SharedPowerPlan.Request request() { return request; }</span>
 
     /** Caller-owned state that remains live while the shared power search or verifier runs. */
     long retainedCells() {
-<span class="fc" id="L67">        return 12L + source.size() + (long) CELLS_PER_STEP * steps.size() + (long) CELLS_PER_FACTOR * factors.size();</span>
+<span class="fc" id="L79">        return 12L + aliases.length + source.size() + (long) CELLS_PER_STEP * steps.size() + (long) CELLS_PER_FACTOR * factors.size();</span>
     }
 
-<span class="fc" id="L70">    private static IllegalArgumentException unsupported() { return new IllegalArgumentException(&quot;UNSUPPORTED_POWER_SOURCE&quot;); }</span>
+<span class="fc" id="L82">    private static IllegalArgumentException unsupported() { return new IllegalArgumentException(&quot;UNSUPPORTED_POWER_SOURCE&quot;); }</span>
 
     private Step sourceStep(int ref) {
-<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        if (ref &lt; INPUTS || ref - INPUTS &gt;= source.size()) throw unsupported();</span>
-<span class="fc" id="L74">        return source.get(ref - INPUTS);</span>
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (ref &lt; INPUTS || ref - INPUTS &gt;= source.size()) throw unsupported();</span>
+<span class="fc" id="L86">        return source.get(ref - INPUTS);</span>
+    }
+
+    // Every alias is an unconditional field identity. The verifier still interprets the unmodified source.
+    private int representative(int ref) {
+<span class="fc" id="L91">        var step = sourceStep(ref);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (step.left() &lt; 0) return ref;</span>
+<span class="fc" id="L93">        int a = aliases[step.left()];</span>
+<span class="pc bpc" id="L94" title="5 of 6 branches missed.">        if (step.op() == Op.NEGATE &amp;&amp; a &gt;= INPUTS &amp;&amp; sourceStep(a).op() == Op.NEGATE) {</span>
+<span class="nc" id="L95">            return aliases[sourceStep(a).left()];</span>
+        }
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (step.right() &lt; 0) return ref;</span>
+<span class="fc" id="L98">        int b = aliases[step.right()];</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (step.op() == Op.MULTIPLY) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (isConstant(a, BigInteger.ONE)) return b;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (isConstant(b, BigInteger.ONE)) return a;</span>
+        }
+<span class="fc bfc" id="L103" title="All 4 branches covered.">        if (step.op() == Op.ADD &amp;&amp; isConstant(a, BigInteger.ZERO)) return b;</span>
+<span class="fc bfc" id="L104" title="All 6 branches covered.">        if ((step.op() == Op.ADD || step.op() == Op.SUBTRACT) &amp;&amp; isConstant(b, BigInteger.ZERO)) return a;</span>
+<span class="fc" id="L105">        return ref;</span>
+    }
+
+    private boolean isConstant(int ref, BigInteger value) {
+<span class="fc bfc" id="L109" title="All 6 branches covered.">        return ref &gt;= INPUTS &amp;&amp; sourceStep(ref).op() == Op.CONSTANT &amp;&amp; value.equals(sourceStep(ref).literal());</span>
     }
 
     private int append(Step step) {
-<span class="fc" id="L78">        work.charge(1);</span>
-<span class="fc" id="L79">        var found = common.get(step);</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (found != null) return found;</span>
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (steps.size() == MAX_BLOCK) throw new CertificateWork.Stop(&quot;FIELD_BLOCK_LIMIT&quot;);</span>
-<span class="fc" id="L82">        work.cells(retainedCells() + CELLS_PER_STEP);</span>
-<span class="fc" id="L83">        int ref = INPUTS + steps.size();</span>
-<span class="fc" id="L84">        steps.add(step);</span>
-<span class="fc" id="L85">        common.put(step, ref);</span>
-<span class="fc" id="L86">        return ref;</span>
+<span class="fc" id="L113">        work.charge(1);</span>
+<span class="fc" id="L114">        var found = common.get(step);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (found != null) return found;</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (steps.size() == MAX_BLOCK) throw new CertificateWork.Stop(&quot;FIELD_BLOCK_LIMIT&quot;);</span>
+<span class="fc" id="L117">        work.cells(retainedCells() + CELLS_PER_STEP);</span>
+<span class="fc" id="L118">        int ref = INPUTS + steps.size();</span>
+<span class="fc" id="L119">        steps.add(step);</span>
+<span class="fc" id="L120">        common.put(step, ref);</span>
+<span class="fc" id="L121">        return ref;</span>
     }
 
     private BigInteger literal(int ref) {
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (ref &lt; INPUTS) return null;</span>
-<span class="fc" id="L91">        var step = steps.get(ref - INPUTS);</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        return step.op() == Op.CONSTANT ? step.literal() : null;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (ref &lt; INPUTS) return null;</span>
+<span class="fc" id="L126">        var step = steps.get(ref - INPUTS);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        return step.op() == Op.CONSTANT ? step.literal() : null;</span>
     }
 
     private int product(int left, int right) {
-<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (BigInteger.ONE.equals(literal(left))) return right;</span>
-<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (BigInteger.ONE.equals(literal(right))) return left;</span>
-<span class="fc" id="L98">        return append(Step.multiply(left, right));</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (BigInteger.ONE.equals(literal(left))) return right;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (BigInteger.ONE.equals(literal(right))) return left;</span>
+<span class="fc" id="L133">        return append(Step.multiply(left, right));</span>
     }
 
     private int inverse(int ref) {
-<span class="fc" id="L102">        var value = literal(ref);</span>
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (value == null) return append(Step.inverse(ref));</span>
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (value.signum() == 0) throw unsupported();</span>
-<span class="fc" id="L105">        long words = SharedPowerVerifier.words(p);</span>
-<span class="fc" id="L106">        work.charge(1L + words * words * p.bitLength());</span>
-<span class="fc" id="L107">        return append(Step.constant(value.modInverse(p)));</span>
+<span class="fc" id="L137">        var value = literal(ref);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (value == null) return append(Step.inverse(ref));</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (value.signum() == 0) throw unsupported();</span>
+<span class="fc" id="L140">        long words = SharedPowerVerifier.words(p);</span>
+<span class="fc" id="L141">        work.charge(1L + words * words * p.bitLength());</span>
+<span class="fc" id="L142">        return append(Step.constant(value.modInverse(p)));</span>
     }
 
     /** Substitute the distinguished root R=1 to recover scale, tracking the exact Laurent degree in R. */
     private Factor factor(int ref) {
-<span class="fc" id="L112">        work.charge(1);</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (ref &lt; INPUTS) return new Factor(ref, BigInteger.ZERO);</span>
-<span class="fc" id="L114">        var known = factors.get(ref);</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (known != null) return known;</span>
+<span class="fc" id="L147">        work.charge(1);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (ref &lt; INPUTS) return new Factor(ref, BigInteger.ZERO);</span>
+<span class="fc" id="L149">        var known = factors.get(ref);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (known != null) return known;</span>
         Factor value;
-<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (ref == root) value = new Factor(append(Step.constant(BigInteger.ONE)), BigInteger.ONE);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (ref == root) value = new Factor(append(Step.constant(BigInteger.ONE)), BigInteger.ONE);</span>
         else {
-<span class="fc" id="L119">            var step = sourceStep(ref);</span>
-<span class="fc bfc" id="L120" title="All 2 branches covered.">            var a = step.left() &lt; 0 ? null : factor(step.left());</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">            var b = step.right() &lt; 0 ? null : factor(step.right());</span>
-<span class="pc bpc" id="L122" title="3 of 7 branches missed.">            value = switch (step.op()) {</span>
-<span class="fc" id="L123">                case CONSTANT -&gt; new Factor(append(step), BigInteger.ZERO);</span>
-<span class="fc" id="L124">                case MULTIPLY -&gt; new Factor(product(a.register(), b.register()), a.degree().add(b.degree()));</span>
-<span class="fc" id="L125">                case INVERSE -&gt; new Factor(inverse(a.register()), a.degree().negate());</span>
+<span class="fc" id="L154">            var step = sourceStep(ref);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            var a = step.left() &lt; 0 ? null : factor(step.left());</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            var b = step.right() &lt; 0 ? null : factor(step.right());</span>
+<span class="pc bpc" id="L157" title="3 of 7 branches missed.">            value = switch (step.op()) {</span>
+<span class="fc" id="L158">                case CONSTANT -&gt; new Factor(append(step), BigInteger.ZERO);</span>
+<span class="fc" id="L159">                case MULTIPLY -&gt; new Factor(product(a.register(), b.register()), a.degree().add(b.degree()));</span>
+<span class="fc" id="L160">                case INVERSE -&gt; new Factor(inverse(a.register()), a.degree().negate());</span>
                 case ADD, SUBTRACT -&gt; {
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                    if (!a.degree().equals(b.degree())) throw unsupported();</span>
-<span class="fc" id="L128">                    yield new Factor(append(new Step(step.op(), a.register(), b.register(), step.literal())), a.degree());</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                    if (!a.degree().equals(b.degree())) {</span>
+                        // A neutral zero may carry degree zero beside a nonzero-degree operand.
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                        if (aliases[ref] == ref) throw unsupported();</span>
+<span class="fc" id="L165">                        yield factor(aliases[ref]);</span>
+                    }
+<span class="fc" id="L167">                    yield new Factor(append(new Step(step.op(), a.register(), b.register(), step.literal())), a.degree());</span>
                 }
-<span class="nc" id="L130">                case NEGATE -&gt; new Factor(append(Step.negate(a.register())), a.degree());</span>
-<span class="nc" id="L131">                case SQUARE -&gt; new Factor(append(Step.square(a.register())), a.degree().shiftLeft(1));</span>
-<span class="nc" id="L132">                case POWER -&gt; new Factor(append(Step.power(a.register(), step.literal())), a.degree().multiply(step.literal()));</span>
+<span class="nc" id="L169">                case NEGATE -&gt; new Factor(append(Step.negate(a.register())), a.degree());</span>
+<span class="nc" id="L170">                case SQUARE -&gt; new Factor(append(Step.square(a.register())), a.degree().shiftLeft(1));</span>
+<span class="nc" id="L171">                case POWER -&gt; new Factor(append(Step.power(a.register(), step.literal())), a.degree().multiply(step.literal()));</span>
             };
         }
-<span class="fc" id="L135">        work.check(value.degree());</span>
-<span class="fc" id="L136">        work.cells(retainedCells() + CELLS_PER_FACTOR);</span>
-<span class="fc" id="L137">        factors.put(ref, value);</span>
-<span class="fc" id="L138">        return value;</span>
+<span class="fc" id="L174">        work.check(value.degree());</span>
+<span class="fc" id="L175">        work.cells(retainedCells() + CELLS_PER_FACTOR);</span>
+<span class="fc" id="L176">        factors.put(ref, value);</span>
+<span class="fc" id="L177">        return value;</span>
     }
 
     Template instantiate(SharedPowerPlan.Schedule schedule) {
-<span class="fc" id="L142">        int[] outputs = instantiateOutputs(schedule);</span>
-<span class="fc" id="L143">        int real = outputs[0];</span>
-<span class="fc" id="L144">        int imaginary = product(scale, outputs[1]);</span>
-<span class="fc" id="L145">        int guard = append(Step.square(real));</span>
-<span class="fc" id="L146">        return liveTemplate(guard, real, imaginary);</span>
+<span class="fc" id="L181">        int[] outputs = instantiateOutputs(schedule);</span>
+<span class="fc" id="L182">        int real = outputs[0];</span>
+<span class="fc" id="L183">        int imaginary = product(scale, outputs[1]);</span>
+<span class="fc" id="L184">        int guard = append(Step.square(real));</span>
+<span class="fc" id="L185">        return liveTemplate(guard, real, imaginary);</span>
     }
 
     private int[] instantiateOutputs(SharedPowerPlan.Schedule schedule) {
-<span class="fc" id="L150">        int count = 2 + schedule.steps().size();</span>
-<span class="fc" id="L151">        work.cells(retainedCells() + count + CELLS_PER_STEP);</span>
-<span class="fc" id="L152">        var references = new int[count];</span>
-<span class="fc" id="L153">        references[0] = append(Step.constant(BigInteger.ONE));</span>
-<span class="fc" id="L154">        references[1] = base;</span>
-<span class="fc" id="L155">        int output = 2;</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (var step : schedule.steps()) {</span>
+<span class="fc" id="L189">        int count = 2 + schedule.steps().size();</span>
+<span class="fc" id="L190">        work.cells(retainedCells() + count + CELLS_PER_STEP);</span>
+<span class="fc" id="L191">        var references = new int[count];</span>
+<span class="fc" id="L192">        references[0] = append(Step.constant(BigInteger.ONE));</span>
+<span class="fc" id="L193">        references[1] = base;</span>
+<span class="fc" id="L194">        int output = 2;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (var step : schedule.steps()) {</span>
             // Each instruction defines a reference even if its field operation folds into an existing register.
-<span class="fc" id="L158">            work.cells(retainedCells() + count + CELLS_PER_STEP);</span>
-<span class="fc" id="L159">            work.charge(1);</span>
-<span class="fc" id="L160">            int left = references[step.left()];</span>
-<span class="pc bpc" id="L161" title="1 of 3 branches missed.">            references[output++] = switch (step.operation()) {</span>
-<span class="fc" id="L162">                case POWER -&gt; append(Step.power(base, step.exponent()));</span>
-<span class="fc" id="L163">                case MULTIPLY -&gt; product(left, references[step.right()]);</span>
-<span class="nc" id="L164">                case INVERSE -&gt; inverse(left);</span>
+<span class="fc" id="L197">            work.cells(retainedCells() + count + CELLS_PER_STEP);</span>
+<span class="fc" id="L198">            work.charge(1);</span>
+<span class="fc" id="L199">            int left = references[step.left()];</span>
+<span class="fc bfc" id="L200" title="All 3 branches covered.">            references[output++] = switch (step.operation()) {</span>
+<span class="fc" id="L201">                case POWER -&gt; append(Step.power(base, step.exponent()));</span>
+<span class="fc" id="L202">                case MULTIPLY -&gt; product(left, references[step.right()]);</span>
+<span class="fc" id="L203">                case INVERSE -&gt; inverse(left);</span>
             };
-<span class="fc" id="L166">        }</span>
-<span class="fc" id="L167">        return new int[]{references[schedule.outputs().get(0)], references[schedule.outputs().get(1)]};</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">        return new int[]{references[schedule.outputs().get(0)], references[schedule.outputs().get(1)]};</span>
     }
 
     /** Substitution and constant folding may leave unused literals. Compact them before exporting SSA. */
     private Template liveTemplate(int guard, int real, int imaginary) {
-<span class="fc" id="L172">        int n = INPUTS + steps.size();</span>
-<span class="fc" id="L173">        work.cells(retainedCells() + 4L * n);</span>
-<span class="fc" id="L174">        work.charge(2L * n);</span>
-<span class="fc" id="L175">        var live = new boolean[n];</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int ref : new int[]{guard, base, real, imaginary}) live[ref] = true;</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (int ref = n - 1; ref &gt;= INPUTS; ref--) {</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (!live[ref]) continue;</span>
-<span class="fc" id="L179">            var step = steps.get(ref - INPUTS);</span>
-<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (step.left() &gt;= 0) live[step.left()] = true;</span>
-<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (step.right() &gt;= 0) live[step.right()] = true;</span>
+<span class="fc" id="L211">        int n = INPUTS + steps.size();</span>
+<span class="fc" id="L212">        work.cells(retainedCells() + 4L * n);</span>
+<span class="fc" id="L213">        work.charge(2L * n);</span>
+<span class="fc" id="L214">        var live = new boolean[n];</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int ref : new int[]{guard, base, real, imaginary}) live[ref] = true;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int ref = n - 1; ref &gt;= INPUTS; ref--) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (!live[ref]) continue;</span>
+<span class="fc" id="L218">            var step = steps.get(ref - INPUTS);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (step.left() &gt;= 0) live[step.left()] = true;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (step.right() &gt;= 0) live[step.right()] = true;</span>
         }
-<span class="fc" id="L183">        var remap = new int[n];</span>
-<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (int i = 0; i &lt; INPUTS; i++) remap[i] = i;</span>
-<span class="fc" id="L185">        var compact = new ArrayList&lt;Step&gt;();</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (int ref = INPUTS; ref &lt; n; ref++) {</span>
-<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (!live[ref]) continue;</span>
-<span class="fc" id="L188">            var step = steps.get(ref - INPUTS);</span>
-<span class="fc" id="L189">            remap[ref] = INPUTS + compact.size();</span>
-<span class="fc bfc" id="L190" title="All 2 branches covered.">            compact.add(new Step(step.op(), step.left() &lt; 0 ? -1 : remap[step.left()],</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">                    step.right() &lt; 0 ? -1 : remap[step.right()], step.literal()));</span>
+<span class="fc" id="L222">        var remap = new int[n];</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        for (int i = 0; i &lt; INPUTS; i++) remap[i] = i;</span>
+<span class="fc" id="L224">        var compact = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int ref = INPUTS; ref &lt; n; ref++) {</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (!live[ref]) continue;</span>
+<span class="fc" id="L227">            var step = steps.get(ref - INPUTS);</span>
+<span class="fc" id="L228">            remap[ref] = INPUTS + compact.size();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            compact.add(new Step(step.op(), step.left() &lt; 0 ? -1 : remap[step.left()],</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                    step.right() &lt; 0 ? -1 : remap[step.right()], step.literal()));</span>
         }
-<span class="fc" id="L193">        return new Template(List.copyOf(compact), remap[guard], remap[base], remap[real], remap[imaginary]);</span>
+<span class="fc" id="L232">        return new Template(List.copyOf(compact), remap[guard], remap[base], remap[real], remap[imaginary]);</span>
     }
 
 }

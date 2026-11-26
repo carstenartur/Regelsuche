@@ -13,49 +13,80 @@ public final class QuadraticRootEvaluation {
 <span class="fc" id="L13">    public record Pair(BigInteger real, BigInteger imaginary) {}</span>
 <span class="fc" id="L14">    public record Result(Optional&lt;Pair&gt; pair, String reason, long work) {}</span>
 
+<span class="fc" id="L16">    public record Preparation(Optional&lt;Prepared&gt; plan, String reason, long work) {}</span>
+
+    /** Replay the source binding, prime evidence and program proof once, within a single allowance. */
+    public static Preparation prepare(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L21">        var checked = QuadraticRootVerifier.verify(expected, certificate, limits, cancellation);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        var plan = checked.valid() ? Optional.of(new Prepared(expected.modulus(), certificate.program()))</span>
+<span class="fc" id="L23">                : Optional.&lt;Prepared&gt;empty();</span>
+<span class="fc" id="L24">        return new Preparation(plan, checked.reason(), checked.work());</span>
+    }
+
+    /** Immutable, source-verified execution plan. Each invocation has an independent budget and input guard. */
+    public static final class Prepared {
+        private final BigInteger modulus;
+        private final QuadraticRootProgram program;
+
+<span class="fc" id="L32">        private Prepared(BigInteger modulus, QuadraticRootProgram program) {</span>
+<span class="fc" id="L33">            this.modulus = modulus;</span>
+<span class="fc" id="L34">            this.program = program;</span>
+<span class="fc" id="L35">        }</span>
+
+        public Result evaluate(BigInteger a, BigInteger b, BigInteger g, IterationLimits limits,
+                BooleanSupplier cancellation) {
+<span class="fc" id="L39">            var work = new CertificateWork(limits, cancellation);</span>
+            try {
+<span class="fc" id="L41">                return execute(modulus, program, a, b, g, work);</span>
+<span class="fc" id="L42">            } catch (CertificateWork.Stop ex) {</span>
+<span class="fc" id="L43">                return new Result(Optional.empty(), ex.getMessage(), work.used());</span>
+            }
+        }
+    }
+
     public static Result evaluate(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             BigInteger a, BigInteger b, BigInteger g, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L18">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L50">        var work = new CertificateWork(limits, cancellation);</span>
         try {
-<span class="fc" id="L20">            QuadraticRootVerifier.checkField(expected, work, cancellation);</span>
-<span class="fc" id="L21">            QuadraticRootVerifier.verifyProgram(expected, certificate, work, cancellation);</span>
-<span class="fc" id="L22">            return execute(expected, certificate.program(), a, b, g, work);</span>
-<span class="nc" id="L23">        } catch (CertificateWork.Stop | IllegalArgumentException ex) {</span>
-<span class="nc" id="L24">            return new Result(Optional.empty(), ex.getMessage(), work.used());</span>
+<span class="fc" id="L52">            QuadraticRootVerifier.checkField(expected, work, cancellation);</span>
+<span class="fc" id="L53">            QuadraticRootVerifier.verifyProgram(expected, certificate, work, cancellation);</span>
+<span class="fc" id="L54">            return execute(expected.modulus(), certificate.program(), a, b, g, work);</span>
+<span class="nc" id="L55">        } catch (CertificateWork.Stop | IllegalArgumentException ex) {</span>
+<span class="nc" id="L56">            return new Result(Optional.empty(), ex.getMessage(), work.used());</span>
         }
     }
 
     static Result execute(QuadraticRootContract contract, QuadraticRootProgram program, BigInteger a, BigInteger b,
             BigInteger g, IterationLimits limits, BooleanSupplier cancellation) {
-<span class="fc" id="L30">        return execute(contract, program, a, b, g, new CertificateWork(limits, cancellation));</span>
+<span class="fc" id="L62">        return execute(contract.modulus(), program, a, b, g, new CertificateWork(limits, cancellation));</span>
     }
 
-    private static Result execute(QuadraticRootContract contract, QuadraticRootProgram program, BigInteger a, BigInteger b,
+    private static Result execute(BigInteger p, QuadraticRootProgram program, BigInteger a, BigInteger b,
             BigInteger g, CertificateWork work) {
-<span class="fc" id="L35">        var p = contract.modulus();</span>
-<span class="fc" id="L36">        long words = SharedPowerVerifier.words(p);</span>
-<span class="fc" id="L37">        work.charge(1L + 4 * words * words);</span>
-<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (!QuadraticRootContract.accepts(p, a, b, g)) return new Result(Optional.empty(), &quot;OUTSIDE_FIELD_DOMAIN&quot;, work.used());</span>
-<span class="fc" id="L39">        var field = new Concrete(p, work, words * words);</span>
-<span class="fc" id="L40">        var prefix = QuadraticRootMachine.prefix(program, List.of(a, b, g), field, work);</span>
-<span class="fc bfc" id="L41" title="All 2 branches covered.">        var arm = prefix.equal() ? program.equal() : program.unequal();</span>
-<span class="fc" id="L42">        var pair = QuadraticRootMachine.exit(arm, prefix, field, work);</span>
-<span class="fc" id="L43">        work.charge(0);</span>
-<span class="fc" id="L44">        return new Result(Optional.of(new Pair(pair.real(), pair.imaginary())), &quot;EVALUATED&quot;, work.used());</span>
+<span class="fc" id="L67">        long words = SharedPowerVerifier.words(p);</span>
+<span class="fc" id="L68">        work.charge(1L + 4 * words * words);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (!QuadraticRootContract.accepts(p, a, b, g)) return new Result(Optional.empty(), &quot;OUTSIDE_FIELD_DOMAIN&quot;, work.used());</span>
+<span class="fc" id="L70">        var field = new Concrete(p, work, words * words);</span>
+<span class="fc" id="L71">        var prefix = QuadraticRootMachine.prefix(program, List.of(a, b, g), field, work);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        var arm = prefix.equal() ? program.equal() : program.unequal();</span>
+<span class="fc" id="L73">        var pair = QuadraticRootMachine.exit(arm, prefix, field, work);</span>
+<span class="fc" id="L74">        work.charge(0);</span>
+<span class="fc" id="L75">        return new Result(Optional.of(new Pair(pair.real(), pair.imaginary())), &quot;EVALUATED&quot;, work.used());</span>
     }
 
-<span class="fc" id="L47">    private record Concrete(BigInteger p, CertificateWork work, long wordCost) implements QuadraticRootMachine.Field&lt;BigInteger&gt; {</span>
-<span class="fc" id="L48">        @Override public BigInteger constant(BigInteger literal) { return literal; }</span>
-<span class="fc" id="L49">        @Override public BigInteger add(BigInteger a, BigInteger b) { work.charge(wordCost); return a.add(b).mod(p); }</span>
-<span class="fc" id="L50">        @Override public BigInteger negate(BigInteger a) { work.charge(wordCost); return a.negate().mod(p); }</span>
-<span class="fc" id="L51">        @Override public BigInteger multiply(BigInteger a, BigInteger b) { work.charge(wordCost); return a.multiply(b).mod(p); }</span>
+<span class="fc" id="L78">    private record Concrete(BigInteger p, CertificateWork work, long wordCost) implements QuadraticRootMachine.Field&lt;BigInteger&gt; {</span>
+<span class="fc" id="L79">        @Override public BigInteger constant(BigInteger literal) { return literal; }</span>
+<span class="fc" id="L80">        @Override public BigInteger add(BigInteger a, BigInteger b) { work.charge(wordCost); return a.add(b).mod(p); }</span>
+<span class="fc" id="L81">        @Override public BigInteger negate(BigInteger a) { work.charge(wordCost); return a.negate().mod(p); }</span>
+<span class="fc" id="L82">        @Override public BigInteger multiply(BigInteger a, BigInteger b) { work.charge(wordCost); return a.multiply(b).mod(p); }</span>
         @Override public BigInteger power(BigInteger a, BigInteger exponent) {
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            work.charge(wordCost * (1L + exponent.abs().bitLength() + (exponent.signum() &lt; 0 ? p.bitLength() : 0)));</span>
-<span class="fc" id="L54">            return a.modPow(exponent, p);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            work.charge(wordCost * (1L + exponent.abs().bitLength() + (exponent.signum() &lt; 0 ? p.bitLength() : 0)));</span>
+<span class="fc" id="L85">            return a.modPow(exponent, p);</span>
         }
-<span class="fc" id="L56">        @Override public boolean equal(BigInteger a, BigInteger b) { return a.equals(b); }</span>
-<span class="fc" id="L57">        @Override public int character(BigInteger a) { return QuadraticCharacter.jacobi(a, p, work); }</span>
-<span class="fc" id="L58">        @Override public int cells(BigInteger a) { return 1; }</span>
+<span class="fc" id="L87">        @Override public boolean equal(BigInteger a, BigInteger b) { return a.equals(b); }</span>
+<span class="fc" id="L88">        @Override public int character(BigInteger a) { return QuadraticCharacter.jacobi(a, p, work); }</span>
+<span class="fc" id="L89">        @Override public int cells(BigInteger a) { return 1; }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

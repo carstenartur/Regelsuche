@@ -105,7 +105,7 @@ final class NativeScalarDiagnostics {
 <span class="fc" id="L105">        long elapsed = System.nanoTime() - started;</span>
 <span class="fc" id="L106">        long endBytes = allocatedBytes(allocation);</span>
 <span class="fc" id="L107">        var run = observation.result();</span>
-<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        boolean withinBudget = !fixedTime || elapsed &lt;= TIME_LIMIT_NANOS;</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">        boolean withinBudget = !fixedTime || elapsed &lt;= TIME_LIMIT_NANOS;</span>
 <span class="fc" id="L109">        row.put(&quot;case&quot;, id)</span>
 <span class="fc" id="L110">                .put(&quot;schedule&quot;, budget.schedule().name())</span>
 <span class="fc bfc" id="L111" title="All 2 branches covered.">                .put(&quot;regime&quot;, fixedTime ? &quot;FIXED_TIME&quot; : &quot;FIXED_WORK&quot;)</span>
@@ -113,7 +113,7 @@ final class NativeScalarDiagnostics {
 <span class="fc" id="L113">                .put(&quot;elapsedNanos&quot;, elapsed)</span>
 <span class="fc" id="L114">                .put(&quot;withinBudget&quot;, withinBudget)</span>
 <span class="fc" id="L115">                .put(&quot;rounds&quot;, run.rounds())</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                .put(&quot;terminal&quot;, withinBudget ? run.terminal() : &quot;TIME_BUDGET_INCONCLUSIVE&quot;);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                .put(&quot;terminal&quot;, withinBudget ? run.terminal() : &quot;TIME_BUDGET_INCONCLUSIVE&quot;);</span>
 <span class="fc" id="L117">        row.set(&quot;budget&quot;, JSON.valueToTree(budget));</span>
 <span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (startBytes &lt; 0 || endBytes &lt; startBytes) {</span>
 <span class="nc" id="L119">            row.putNull(&quot;threadAllocatedBytes&quot;);</span>
@@ -141,10 +141,10 @@ final class NativeScalarDiagnostics {
 <span class="fc" id="L141">        var work = run.ledger().values();</span>
 <span class="fc" id="L142">        long matching = work.stream().mapToLong(RuleWork::fuelSpent).sum();</span>
 <span class="fc" id="L143">        logWork(row, observation.producerStages(), work, matching, run.analysisEvaluations(), replay);</span>
-<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (withinBudget) {</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (withinBudget) {</span>
 <span class="fc" id="L145">            row.put(&quot;reached&quot;, reached(run, target));</span>
         } else {
-<span class="nc" id="L147">            row.putNull(&quot;reached&quot;);</span>
+<span class="fc" id="L147">            row.putNull(&quot;reached&quot;);</span>
         }
 <span class="fc" id="L149">    }</span>
 

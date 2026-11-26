@@ -26,7 +26,7 @@ public record QuadraticRootContract(String sourceIdentity, BigInteger modulus, P
     }
 
     private static boolean canonical(BigInteger scalar, BigInteger modulus) {
-<span class="pc bpc" id="L29" title="2 of 8 branches missed.">        return scalar != null &amp;&amp; scalar.getClass() == BigInteger.class &amp;&amp; scalar.signum() &gt;= 0 &amp;&amp; scalar.compareTo(modulus) &lt; 0;</span>
+<span class="pc bpc" id="L29" title="1 of 8 branches missed.">        return scalar != null &amp;&amp; scalar.getClass() == BigInteger.class &amp;&amp; scalar.signum() &gt;= 0 &amp;&amp; scalar.compareTo(modulus) &lt; 0;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

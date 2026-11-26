@@ -12,94 +12,206 @@ import static de.regelsuche.math.algorithms.modular.QuadraticRootProgram.*;
 /** Bounded shared-power synthesis followed by an independent signed permutation of each branch. */
 public final class QuadraticRootSearch {
     private QuadraticRootSearch() {}
+    private static final int PERMUTATIONS = 8;
 
     public record Certificate(QuadraticRootContract contract, SharedPowerPlan.Certificate power, QuadraticRootProgram program) {
-<span class="fc" id="L17">        public Certificate {</span>
-<span class="fc" id="L18">            Objects.requireNonNull(contract);</span>
-<span class="fc" id="L19">            Objects.requireNonNull(power);</span>
-<span class="fc" id="L20">            Objects.requireNonNull(program);</span>
-<span class="fc" id="L21">        }</span>
+<span class="fc" id="L18">        public Certificate {</span>
+<span class="fc" id="L19">            Objects.requireNonNull(contract);</span>
+<span class="fc" id="L20">            Objects.requireNonNull(power);</span>
+<span class="fc" id="L21">            Objects.requireNonNull(program);</span>
+<span class="fc" id="L22">        }</span>
     }
-<span class="fc" id="L23">    public record Result(Optional&lt;Certificate&gt; certificate, String reason, long work, int candidates) {}</span>
+<span class="fc" id="L24">    public record Result(Optional&lt;Certificate&gt; certificate, String reason, long work, int candidates) {}</span>
+
+    /** Verified whole programs ordered by the default mathematical score, including alternatives to the original. */
+    public record Portfolio(List&lt;Certificate&gt; certificates, String reason, long work, int candidates) {
+<span class="fc" id="L28">        public Portfolio { certificates = List.copyOf(certificates); }</span>
+    }
+
+<span class="fc" id="L31">    private record Ranked(Certificate certificate, long score) {}</span>
+<span class="fc" id="L32">    private record Outcome(Portfolio portfolio, boolean improvesOriginal) {}</span>
 
     public static Result search(QuadraticRootContract expected, SharedPowerPlan.Weights weights, int maximumCandidates,
             IterationLimits limits, BooleanSupplier cancellation) {
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_CANDIDATE_LIMIT_REQUIRED&quot;);</span>
-<span class="fc" id="L28">        var work = new CertificateWork(limits, cancellation);</span>
-<span class="fc" id="L29">        int tried = 0;</span>
-        try {
-<span class="fc" id="L31">            QuadraticRootVerifier.checkField(expected, work, cancellation);</span>
-<span class="fc" id="L32">            var basis = new QuadraticRootBasis(expected, work);</span>
-<span class="fc" id="L33">            var powers = SharedPowerSearch.search(basis.request(), weights, 8, work.remainingLimits(basis.retainedCells()), cancellation);</span>
-<span class="fc" id="L34">            work.chargeCompleted(powers.work());</span>
-<span class="pc" id="L35">            var power = powers.certificate().orElseThrow(() -&gt; new IllegalArgumentException(powers.reason()));</span>
-<span class="fc" id="L36">            var template = basis.instantiate(power.schedule());</span>
-<span class="fc" id="L37">            var options = permutations(template);</span>
-<span class="fc" id="L38">            var lanes = QuadraticRootVerifier.lanes(expected, template.program(options.getFirst(), options.getFirst()), work);</span>
-<span class="fc" id="L39">            Arm bestEqual = null, bestUnequal = null;</span>
-<span class="fc" id="L40">            int bestCost = Integer.MAX_VALUE;</span>
-<span class="fc" id="L41">            var checkedEqual = new ArrayList&lt;Optional&lt;Arm&gt;&gt;();</span>
-<span class="fc" id="L42">            var checkedUnequal = new ArrayList&lt;Optional&lt;Arm&gt;&gt;();</span>
-            portfolio:
-<span class="fc bfc" id="L44" title="All 4 branches covered.">            for (int l = 0; l &lt; options.size(); l++) for (int r = 0; r &lt; options.size(); r++) {</span>
-<span class="fc bfc" id="L45" title="All 2 branches covered.">                if (tried == maximumCandidates) break portfolio;</span>
-<span class="fc" id="L46">                tried++;</span>
-<span class="fc" id="L47">                work.charge(1);</span>
-<span class="fc" id="L48">                var left = check(l, true, options, checkedEqual, lanes, expected, work);</span>
-<span class="fc" id="L49">                var right = check(r, false, options, checkedUnequal, lanes, expected, work);</span>
-<span class="fc bfc" id="L50" title="All 4 branches covered.">                if (left.isEmpty() || right.isEmpty()) continue;</span>
-<span class="fc" id="L51">                var a = left.orElseThrow();</span>
-<span class="fc" id="L52">                var b = right.orElseThrow();</span>
-<span class="fc" id="L53">                int cost = exitCost(a) + exitCost(b);</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (cost &lt; bestCost) {</span>
-<span class="fc" id="L55">                    bestCost = cost;</span>
-<span class="fc" id="L56">                    bestEqual = a;</span>
-<span class="fc" id="L57">                    bestUnequal = b;</span>
-                }
-            }
-<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (bestEqual == null) throw new IllegalArgumentException(&quot;NO_PROVED_BRANCH_PAIR&quot;);</span>
-<span class="fc" id="L61">            var cert = new Certificate(expected, power, template.program(bestEqual, bestUnequal));</span>
-<span class="fc" id="L62">            QuadraticRootVerifier.verifyProgram(expected, cert, work, cancellation);</span>
-<span class="fc" id="L63">            work.charge(0);</span>
-<span class="fc" id="L64">            return new Result(Optional.of(cert), &quot;VERIFIED&quot;, work.used(), tried);</span>
-<span class="fc" id="L65">        } catch (CertificateWork.Stop | IllegalArgumentException ex) {</span>
-<span class="fc" id="L66">            return new Result(Optional.empty(), ex.getMessage(), work.used(), tried);</span>
+<span class="fc" id="L36">        var outcome = searchPrograms(expected, weights, maximumCandidates, limits, cancellation);</span>
+<span class="fc" id="L37">        var all = outcome.portfolio();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (all.certificates().isEmpty()) return new Result(Optional.empty(), all.reason(), all.work(), all.candidates());</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (!outcome.improvesOriginal()) return new Result(Optional.empty(), &quot;NO_COST_IMPROVEMENT&quot;, all.work(), all.candidates());</span>
+<span class="fc" id="L40">        return new Result(Optional.of(all.certificates().getFirst()), all.reason(), all.work(), all.candidates());</span>
+    }
+
+    /** Splits the global branch-pair allowance across distinct verified schedules, cheapest power schedule first. */
+    public static Portfolio portfolio(QuadraticRootContract expected, SharedPowerPlan.Weights weights, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L46">        return searchPrograms(expected, weights, maximumCandidates, limits, cancellation).portfolio();</span>
+    }
+
+    private static final class PairBudget {
+        private final int maximum;
+        private int tried;
+<span class="fc" id="L52">        PairBudget(int maximum) { this.maximum = maximum; }</span>
+        int schedules(int available) {
+            // With a small budget, cover a full row of signed unequal exits before opening another schedule.
+<span class="fc" id="L55">            return Math.min(available, Math.max(1, maximum / PERMUTATIONS));</span>
+        }
+        int allowance(int schedulesLeft) {
+<span class="fc" id="L58">            return Math.min(PERMUTATIONS * PERMUTATIONS, 1 + (maximum - tried - 1) / schedulesLeft);</span>
         }
     }
 
+    private static Outcome searchPrograms(QuadraticRootContract expected, SharedPowerPlan.Weights weights, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_CANDIDATE_LIMIT_REQUIRED&quot;);</span>
+<span class="fc" id="L65">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L66">        var budget = new PairBudget(maximumCandidates);</span>
+        try {
+<span class="fc" id="L68">            QuadraticRootVerifier.checkField(expected, work, cancellation);</span>
+<span class="fc" id="L69">            var powers = powerCandidates(expected, weights, work, cancellation);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (powers.candidates().isEmpty()) throw new IllegalArgumentException(powers.reason());</span>
+<span class="fc" id="L71">            var ranked = new ArrayList&lt;Ranked&gt;();</span>
+<span class="fc" id="L72">            long retained = powers.retainedCells();</span>
+<span class="fc" id="L73">            int schedulesLeft = budget.schedules(powers.candidates().size());</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            for (var power : powers.candidates()) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                if (schedulesLeft == 0) break;</span>
+<span class="fc" id="L76">                int allowance = budget.allowance(schedulesLeft);</span>
+<span class="fc" id="L77">                schedulesLeft--;</span>
+<span class="fc" id="L78">                var child = new CertificateWork(work.remainingLimits(retained), cancellation);</span>
+                List&lt;Certificate&gt; proposals;
+                try {
+<span class="fc" id="L81">                    proposals = propose(expected, power.certificate(), allowance, budget, child, cancellation);</span>
+                } finally {
+<span class="fc" id="L83">                    work.chargeCompleted(child.used());</span>
+                }
+<span class="fc" id="L85">                long pending = proposals.stream().mapToLong(c -&gt; programCells(c.program())).sum();</span>
+<span class="fc" id="L86">                long replayCells = retained + pending;</span>
+<span class="fc" id="L87">                work.cells(replayCells);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                for (var cert : proposals) {</span>
+<span class="fc" id="L89">                    long cells = programCells(cert.program());</span>
+<span class="fc" id="L90">                    work.charge((1L + ranked.size()) * cells);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                    if (ranked.stream().noneMatch(prior -&gt; prior.certificate().program().equals(cert.program()))) {</span>
+<span class="fc" id="L92">                        var replay = new CertificateWork(work.remainingLimits(replayCells), cancellation);</span>
+                        try {
+<span class="fc" id="L94">                            QuadraticRootVerifier.verifyProgram(expected, cert, replay, cancellation);</span>
+                        } finally {
+<span class="fc" id="L96">                            work.chargeCompleted(replay.used());</span>
+                        }
+<span class="fc" id="L98">                        ranked.add(new Ranked(cert, score(cert.program(), weights, work)));</span>
+<span class="fc" id="L99">                        retained += cells;</span>
+                    }
+<span class="fc" id="L101">                }</span>
+<span class="fc" id="L102">            }</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (ranked.isEmpty()) throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                    budget.tried &lt; (long) powers.candidates().size() * PERMUTATIONS * PERMUTATIONS</span>
+<span class="pc" id="L105">                            ? &quot;CANDIDATE_LIMIT&quot; : &quot;NO_PROVED_BRANCH_PAIR&quot;);</span>
+<span class="fc" id="L106">            work.cells(retained + 3L * ranked.size());</span>
+<span class="fc" id="L107">            ranked.sort((a, b) -&gt; {</span>
+<span class="fc" id="L108">                work.charge(1);</span>
+<span class="fc" id="L109">                return Long.compare(a.score(), b.score());</span>
+            });
+<span class="fc" id="L111">            long baseline = score(expected.original(), weights, work);</span>
+<span class="fc" id="L112">            work.charge(1L + ranked.size());</span>
+<span class="fc" id="L113">            var result = new Portfolio(ranked.stream().map(Ranked::certificate).toList(), &quot;VERIFIED&quot;, work.used(), budget.tried);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            return new Outcome(result, ranked.getFirst().score() &lt; baseline);</span>
+<span class="fc" id="L115">        } catch (CertificateWork.Stop | IllegalArgumentException ex) {</span>
+<span class="fc" id="L116">            return new Outcome(new Portfolio(List.of(), ex.getMessage(), work.used(), budget.tried), false);</span>
+        }
+    }
+
+    private static long programCells(QuadraticRootProgram program) {
+<span class="fc" id="L121">        return 16L + 5L * (program.prefix().size() + program.equal().steps().size() + program.unequal().steps().size());</span>
+    }
+
+    private static long score(QuadraticRootProgram program, SharedPowerPlan.Weights weights, CertificateWork work) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (var block : List.of(program.prefix(), program.equal().steps(), program.unequal().steps())) {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            for (var step : block) work.charge(2L * (1L + SharedPowerVerifier.words(step.literal())));</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return program.score(weights);</span>
+    }
+
+    private static SharedPowerSearch.Portfolio powerCandidates(QuadraticRootContract expected, SharedPowerPlan.Weights weights,
+            CertificateWork work, BooleanSupplier cancellation) {
+<span class="fc" id="L133">        var basis = new QuadraticRootBasis(expected, work);</span>
+<span class="fc" id="L134">        var powers = SharedPowerSearch.portfolio(basis.request(), weights, 8, 6,</span>
+<span class="fc" id="L135">                work.remainingLimits(basis.retainedCells()), cancellation);</span>
+<span class="fc" id="L136">        work.chargeCompleted(powers.work());</span>
+<span class="fc" id="L137">        return powers;</span>
+    }
+
+<span class="fc" id="L140">    private record Exits(Arm equal, Arm unequal) {</span>
+        boolean dominates(Exits other) {
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">            return dominates(equal, other.equal) &amp;&amp; dominates(unequal, other.unequal);</span>
+        }
+        private static boolean dominates(Arm a, Arm b) {
+<span class="fc bfc" id="L145" title="All 6 branches covered.">            return a.steps().size() &lt;= b.steps().size() &amp;&amp; (!a.normalizeRealCharacter() || b.normalizeRealCharacter());</span>
+        }
+    }
+
+    private static List&lt;Certificate&gt; propose(QuadraticRootContract expected, SharedPowerPlan.Certificate power, int allowance,
+            PairBudget budget, CertificateWork work, BooleanSupplier cancellation) {
+<span class="fc" id="L151">        var t = new QuadraticRootBasis(expected, work).instantiate(power.schedule());</span>
+        // Template, permutation instructions, two match caches, and a bounded frontier of exit pairs.
+<span class="fc" id="L153">        long retained = 5L * t.prefix().size() + 160 + 4L * allowance;</span>
+<span class="fc" id="L154">        work.cells(retained);</span>
+<span class="fc" id="L155">        work.charge(4L * PERMUTATIONS + t.prefix().size());</span>
+<span class="fc" id="L156">        var options = permutations(t);</span>
+<span class="fc" id="L157">        var exits = new ArrayList&lt;Exits&gt;();</span>
+<span class="fc" id="L158">        var proof = new CertificateWork(work.remainingLimits(retained), cancellation);</span>
+        try {
+<span class="fc" id="L160">            var lanes = QuadraticRootVerifier.lanes(expected, t.program(options.getFirst(), options.getFirst()), proof);</span>
+<span class="fc" id="L161">            var equal = new ArrayList&lt;Optional&lt;Arm&gt;&gt;();</span>
+<span class="fc" id="L162">            var unequal = new ArrayList&lt;Optional&lt;Arm&gt;&gt;();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            for (int i = 0; i &lt; allowance; i++) {</span>
+<span class="fc" id="L164">                budget.tried++;</span>
+<span class="fc" id="L165">                proof.charge(1);</span>
+<span class="fc" id="L166">                var a = check(i / options.size(), true, options, equal, lanes, expected, proof);</span>
+<span class="fc" id="L167">                var b = check(i % options.size(), false, options, unequal, lanes, expected, proof);</span>
+<span class="fc bfc" id="L168" title="All 4 branches covered.">                if (a.isEmpty() || b.isEmpty()) continue;</span>
+<span class="fc" id="L169">                var pair = new Exits(a.orElseThrow(), b.orElseThrow());</span>
+<span class="fc" id="L170">                proof.charge(1L + 2L * exits.size());</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                if (exits.stream().anyMatch(known -&gt; known.dominates(pair))) continue;</span>
+<span class="fc" id="L172">                exits.removeIf(pair::dominates);</span>
+<span class="fc" id="L173">                exits.add(pair);</span>
+            }
+        } finally {
+<span class="fc" id="L176">            work.chargeCompleted(proof.used());</span>
+        }
+<span class="fc" id="L178">        var proposals = new ArrayList&lt;Certificate&gt;();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (var pair : exits) {</span>
+<span class="fc" id="L180">            work.charge(1L + t.prefix().size());</span>
+<span class="fc" id="L181">            work.cells(retained + (proposals.size() + 1L) * (16L + 5L * (t.prefix().size() + 4L)));</span>
+<span class="fc" id="L182">            proposals.add(new Certificate(expected, power, t.program(pair.equal(), pair.unequal())));</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        return proposals;</span>
+    }
+
     private static List&lt;Arm&gt; permutations(QuadraticRootBasis.Template t) {
-<span class="fc" id="L71">        var out = new ArrayList&lt;Arm&gt;();</span>
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (boolean swap : new boolean[]{false, true}) {</span>
-<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (int signs : new int[]{0, 1, 2, 3}) {</span>
-<span class="fc bfc" id="L74" title="All 2 branches covered.">                int a = swap ? t.imaginary() : t.real();</span>
-<span class="fc bfc" id="L75" title="All 2 branches covered.">                int b = swap ? t.real() : t.imaginary();</span>
-<span class="fc" id="L76">                var steps = new ArrayList&lt;Step&gt;();</span>
-<span class="fc" id="L77">                int next = INPUTS + t.prefix().size();</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">                if ((signs &amp; 2) != 0) { steps.add(Step.negate(a)); a = next++; }</span>
-<span class="fc bfc" id="L79" title="All 2 branches covered.">                if ((signs &amp; 1) != 0) { steps.add(Step.negate(b)); b = next; }</span>
-<span class="fc" id="L80">                out.add(new Arm(steps, a, b, false));</span>
+<span class="fc" id="L188">        var out = new ArrayList&lt;Arm&gt;();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (boolean swap : new boolean[]{false, true}) {</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            for (int signs : new int[]{0, 1, 2, 3}) {</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                int a = swap ? t.imaginary() : t.real();</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                int b = swap ? t.real() : t.imaginary();</span>
+<span class="fc" id="L193">                var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L194">                int next = INPUTS + t.prefix().size();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                if ((signs &amp; 2) != 0) { steps.add(Step.negate(a)); a = next++; }</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                if ((signs &amp; 1) != 0) { steps.add(Step.negate(b)); b = next; }</span>
+<span class="fc" id="L197">                out.add(new Arm(steps, a, b, false));</span>
             }
         }
-<span class="fc" id="L83">        return out;</span>
+<span class="fc" id="L200">        return out;</span>
     }
 
     private static Optional&lt;Arm&gt; check(int index, boolean equal, List&lt;Arm&gt; options, List&lt;Optional&lt;Arm&gt;&gt; cache,
             List&lt;QuadraticRootVerifier.Lane&gt; lanes, QuadraticRootContract contract, CertificateWork work) {
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (index &lt; cache.size()) return cache.get(index);</span>
-<span class="fc" id="L89">        var arm = options.get(index);</span>
-<span class="fc" id="L90">        Optional&lt;Arm&gt; option = Optional.empty();</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (QuadraticRootVerifier.matches(lanes, equal, arm, contract.observation(), work)) option = Optional.of(arm);</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        else if (contract.observation() == QuadraticRootContract.Observation.EXACT_PAIR) {</span>
-<span class="fc" id="L93">            var normalized = new Arm(arm.steps(), arm.real(), arm.imaginary(), true);</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (QuadraticRootVerifier.matches(lanes, equal, normalized, contract.observation(), work)) option = Optional.of(normalized);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (index &lt; cache.size()) return cache.get(index);</span>
+<span class="fc" id="L206">        var arm = options.get(index);</span>
+<span class="fc" id="L207">        Optional&lt;Arm&gt; option = Optional.empty();</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (QuadraticRootVerifier.matches(lanes, equal, arm, contract.observation(), work)) option = Optional.of(arm);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        else if (contract.observation() == QuadraticRootContract.Observation.EXACT_PAIR) {</span>
+<span class="fc" id="L210">            var normalized = new Arm(arm.steps(), arm.real(), arm.imaginary(), true);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (QuadraticRootVerifier.matches(lanes, equal, normalized, contract.observation(), work)) option = Optional.of(normalized);</span>
         }
-<span class="fc" id="L96">        cache.add(option);</span>
-<span class="fc" id="L97">        return option;</span>
-    }
-
-    /** All proposals share a power schedule. Prefer fewer character selections, then fewer negations. */
-    private static int exitCost(Arm arm) {
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        return arm.steps().size() + (arm.normalizeRealCharacter() ? 8 : 0);</span>
+<span class="fc" id="L213">        cache.add(option);</span>
+<span class="fc" id="L214">        return option;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

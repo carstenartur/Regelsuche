@@ -52,7 +52,7 @@ final class QuadraticLaurent implements QuadraticRootMachine.Field&lt;QuadraticL
 <span class="fc bfc" id="L52" title="All 4 branches covered.">        if (u &lt; 0 &amp;&amp; h.subtract(hr).divide(m).testBit(0)) coefficient = coefficient.negate();</span>
 <span class="fc bfc" id="L53" title="All 4 branches covered.">        if (s &lt; 0 &amp;&amp; x.subtract(xr).divide(m).testBit(0)) coefficient = coefficient.negate();</span>
 <span class="fc" id="L54">        var c = coefficient.mod(p);</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        return new Form(c.signum() == 0 ? Map.of() : Map.of(new Degrees(hr, xr), c));</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        return new Form(c.signum() == 0 ? Map.of() : Map.of(new Degrees(hr, xr), c));</span>
     }
 
 <span class="fc" id="L58">    @Override public Form constant(BigInteger c) { return term(c, BigInteger.ZERO, BigInteger.ZERO); }</span>

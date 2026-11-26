@@ -19,18 +19,34 @@ public final class QuadraticRootSdk {
 <span class="fc" id="L19">        return QuadraticRootSearch.search(expected, weights, budget.maximumCandidates(), limits(budget), cancellation::isCancelled);</span>
     }
 
+    /** Verified alternatives for consumers that price the complete emitted program themselves. */
+    public static QuadraticRootSearch.Portfolio portfolio(QuadraticRootContract expected, SharedPowerPlan.Weights weights,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L25">        return QuadraticRootSearch.portfolio(expected, weights, budget.maximumCandidates(), limits(budget), cancellation::isCancelled);</span>
+    }
+
     public static QuadraticRootVerifier.Result verify(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L24">        return QuadraticRootVerifier.verify(expected, certificate, limits(budget), cancellation::isCancelled);</span>
+<span class="nc" id="L30">        return QuadraticRootVerifier.verify(expected, certificate, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static QuadraticRootEvaluation.Preparation prepare(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L35">        return QuadraticRootEvaluation.prepare(expected, certificate, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static QuadraticRootEvaluation.Result evaluate(QuadraticRootEvaluation.Prepared plan,
+            BigInteger a, BigInteger b, BigInteger g, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L40">        return plan.evaluate(a, b, g, limits(budget), cancellation::isCancelled);</span>
     }
 
     public static QuadraticRootEvaluation.Result evaluate(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             BigInteger a, BigInteger b, BigInteger g, OptimizationBudget budget, CancellationToken cancellation) {
-<span class="nc" id="L29">        return QuadraticRootEvaluation.evaluate(expected, certificate, a, b, g, limits(budget), cancellation::isCancelled);</span>
+<span class="fc" id="L45">        return QuadraticRootEvaluation.evaluate(expected, certificate, a, b, g, limits(budget), cancellation::isCancelled);</span>
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="fc" id="L33">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L49">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

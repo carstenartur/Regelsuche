@@ -63,11 +63,14 @@ By default the checkout tasks create a
 only when the named Git tag resolves to the exact checked-out commit; the
 builder then emits `FROZEN_PUBLIC_RELEASE`.
 
-Current builds use the [v2 environment descriptor](../reproduction/environments/v2/environment.json).
-It binds the Gradle 9.9.1 wrapper, the existing Temurin base digest, the v2
-Dockerfile and both v2 schema hashes. The predecessor entry identifies the v1
-contract. Retained v1 artifacts carry Gradle 9.7.1 and their original schema and
-Dockerfile bytes. See [reproduction environment maintenance](reproduction-environment-maintenance.md).
+Current builds use the [v3 environment descriptor](../reproduction/environments/v3/environment.json).
+It binds the Gradle 9.9.2 wrapper, the existing Temurin base digest, the v3
+Dockerfile and both v3 schema hashes. Its predecessor entry identifies the frozen
+v2 descriptor and contracts. Retained v2 artifacts carry Gradle 9.9.1; retained
+v1 artifacts carry Gradle 9.7.1. Both keep their original schema and Dockerfile
+bytes. Verification selects the environment by artifact version, including the
+original receipt schema when a missing or corrupt manifest requires a negative
+receipt. See [reproduction environment maintenance](reproduction-environment-maintenance.md).
 
 ## Determinism and source-state guarantees
 

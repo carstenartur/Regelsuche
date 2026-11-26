@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrimeEvidenceJson.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">PrimeEvidenceJson.java</span></div><h1>PrimeEvidenceJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.modular.PrimeEvidence;
+import de.regelsuche.math.algorithms.modular.PrimeEvidenceVerifier;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Optional;
+
+/** Bounded import of modulus-bound exact prime evidence. All integers except multiplicities are decimal strings. */
+public final class PrimeEvidenceJson {
+    private static final String SCHEMA = &quot;regelsuche-prime-evidence-v1&quot;;
+    private static final int MAX_BYTES = 65_536;
+    private static final int MAX_DEPTH = 32;
+    private static final int MAX_DECIMAL_LENGTH = 1235; // 4096 bits and optional minus
+<span class="fc" id="L28">    private static final JsonFactory FACTORY = JsonFactory.builder()</span>
+<span class="fc" id="L29">            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(3 * MAX_DEPTH + 1)</span>
+<span class="fc" id="L30">                    .maxNumberLength(10).maxStringLength(MAX_DECIMAL_LENGTH).maxNameLength(32).build())</span>
+<span class="fc" id="L31">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();</span>
+<span class="fc" id="L32">    private static final ObjectMapper JSON = JsonMapper.builder(FACTORY)</span>
+<span class="fc" id="L33">            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();</span>
+
+    private PrimeEvidenceJson() {}
+
+<span class="fc" id="L37">    public record Result(Optional&lt;PrimeEvidence.Certificate&gt; certificate, String reason, long work) {}</span>
+
+    /** Parse a tree without references and replay it independently. Import and replay share one budget. */
+    public static Result read(BigInteger expectedModulus, byte[] json, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L41">        var limits = new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L42">        var work = new CertificateWork(limits, cancellation::isCancelled);</span>
+        try {
+<span class="fc" id="L44">            work.charge(1);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            require(json != null, &quot;MISSING_PRIME_JSON&quot;);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            require(json.length &lt;= MAX_BYTES, &quot;PRIME_JSON_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L47">            work.charge(2L * json.length); // Two bounded parser passes over the same immutable snapshot.</span>
+<span class="fc" id="L48">            var snapshot = json.clone();</span>
+<span class="fc" id="L49">            int retained = preflight(snapshot, work);</span>
+<span class="fc" id="L50">            var proof = decode(snapshot, work);</span>
+<span class="fc" id="L51">            var checked = PrimeEvidenceVerifier.verify(expectedModulus, proof, work.remainingLimits(retained), cancellation::isCancelled);</span>
+<span class="fc" id="L52">            work.chargeCompleted(checked.work());</span>
+<span class="fc" id="L53">            work.charge(0);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            return new Result(checked.valid() ? Optional.of(proof) : Optional.empty(), checked.reason(), work.used());</span>
+<span class="fc" id="L55">        } catch (IOException malformed) {</span>
+<span class="fc" id="L56">            return new Result(Optional.empty(), &quot;MALFORMED_PRIME_JSON&quot;, work.used());</span>
+<span class="fc" id="L57">        } catch (CertificateWork.Stop | IllegalArgumentException invalid) {</span>
+<span class="fc" id="L58">            return new Result(Optional.empty(), invalid.getMessage(), work.used());</span>
+        }
+    }
+
+    /** Reserve the tree and its typed copy before databind allocates them, including for malformed wide packets. */
+    private static int preflight(byte[] snapshot, CertificateWork work) throws IOException {
+<span class="fc" id="L64">        int values = 0;</span>
+<span class="fc" id="L65">        int containers = 0;</span>
+<span class="fc" id="L66">        try (var parser = FACTORY.createParser(snapshot)) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (JsonToken token; (token = parser.nextToken()) != null;) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                if (token.isStructStart()) containers++;</span>
+<span class="fc bfc" id="L69" title="All 4 branches covered.">                if (token.isScalarValue() || token.isStructStart()) values++;</span>
+<span class="fc" id="L70">                work.cells((long) values + containers);</span>
+            }
+        }
+        // Scalar and container values also conservatively cover all typed proof fields retained during replay.
+<span class="fc" id="L74">        return values;</span>
+    }
+
+    private static PrimeEvidence.Certificate decode(byte[] snapshot, CertificateWork work) throws IOException {
+<span class="fc" id="L78">        var document = JSON.readTree(snapshot);</span>
+<span class="fc" id="L79">        fields(document, &quot;schema&quot;, &quot;proof&quot;);</span>
+<span class="fc" id="L80">        require(SCHEMA.equals(document.get(&quot;schema&quot;).textValue()), &quot;UNKNOWN_PRIME_SCHEMA&quot;);</span>
+<span class="fc" id="L81">        return proof(document.get(&quot;proof&quot;), 1, work);</span>
+    }
+
+    private static PrimeEvidence.Certificate proof(JsonNode node, int depth, CertificateWork work) {
+<span class="fc" id="L85">        work.charge(1);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        require(depth &lt;= MAX_DEPTH, &quot;PRIME_JSON_DEPTH_LIMIT&quot;);</span>
+<span class="pc bpc" id="L87" title="2 of 6 branches missed.">        require(node != null &amp;&amp; node.isObject() &amp;&amp; node.path(&quot;kind&quot;).isTextual(), &quot;INVALID_PRIME_JSON_FIELDS&quot;);</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        return switch (node.get(&quot;kind&quot;).textValue()) {</span>
+            case &quot;small&quot; -&gt; {
+<span class="fc" id="L90">                fields(node, &quot;kind&quot;, &quot;modulus&quot;);</span>
+<span class="fc" id="L91">                yield new PrimeEvidence.SmallPrime(integer(node, &quot;modulus&quot;));</span>
+            }
+            case &quot;lucas&quot; -&gt; {
+<span class="fc" id="L94">                fields(node, &quot;kind&quot;, &quot;modulus&quot;, &quot;witness&quot;, &quot;factors&quot;);</span>
+<span class="fc" id="L95">                var array = node.get(&quot;factors&quot;);</span>
+<span class="fc" id="L96">                require(array.isArray(), &quot;INVALID_PRIME_JSON_FIELDS&quot;);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                require(array.size() &lt;= 256, &quot;PRIME_FACTOR_LIMIT&quot;);</span>
+<span class="fc" id="L98">                var factors = new ArrayList&lt;PrimeEvidence.Factor&gt;(array.size());</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                for (var factor : array) {</span>
+<span class="fc" id="L100">                    fields(factor, &quot;prime&quot;, &quot;exponent&quot;);</span>
+<span class="fc" id="L101">                    var exponent = factor.get(&quot;exponent&quot;);</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">                    require(exponent.isIntegralNumber() &amp;&amp; exponent.canConvertToInt(), &quot;INVALID_MULTIPLICITY&quot;);</span>
+<span class="fc" id="L103">                    factors.add(new PrimeEvidence.Factor(proof(factor.get(&quot;prime&quot;), depth + 1, work), exponent.intValue()));</span>
+<span class="fc" id="L104">                }</span>
+<span class="fc" id="L105">                yield new PrimeEvidence.Lucas(integer(node, &quot;modulus&quot;), integer(node, &quot;witness&quot;), factors);</span>
+            }
+            case &quot;elliptic-order&quot; -&gt; {
+<span class="fc" id="L108">                fields(node, &quot;kind&quot;, &quot;modulus&quot;, &quot;a&quot;, &quot;b&quot;, &quot;x&quot;, &quot;y&quot;, &quot;orderPrime&quot;);</span>
+<span class="fc" id="L109">                yield new PrimeEvidence.EllipticOrder(integer(node, &quot;modulus&quot;), integer(node, &quot;a&quot;), integer(node, &quot;b&quot;),</span>
+<span class="fc" id="L110">                        integer(node, &quot;x&quot;), integer(node, &quot;y&quot;), proof(node.get(&quot;orderPrime&quot;), depth + 1, work));</span>
+            }
+<span class="nc" id="L112">            default -&gt; throw new IllegalArgumentException(&quot;UNKNOWN_PRIME_PROOF_KIND&quot;);</span>
+        };
+    }
+
+    private static BigInteger integer(JsonNode object, String field) {
+<span class="fc" id="L117">        String decimal = object.get(field).textValue();</span>
+<span class="pc bpc" id="L118" title="2 of 6 branches missed.">        require(decimal != null &amp;&amp; !decimal.isEmpty() &amp;&amp; decimal.length() &lt;= MAX_DECIMAL_LENGTH, &quot;INVALID_PRIME_INTEGER&quot;);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (decimal.equals(&quot;0&quot;)) return BigInteger.ZERO;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        int start = decimal.charAt(0) == '-' ? 1 : 0;</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        require(start &lt; decimal.length() &amp;&amp; decimal.charAt(start) != '0', &quot;INVALID_PRIME_INTEGER&quot;);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        for (int i = start; i &lt; decimal.length(); i++) {</span>
+<span class="fc" id="L123">            char digit = decimal.charAt(i);</span>
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">            require(digit &gt;= '0' &amp;&amp; digit &lt;= '9', &quot;INVALID_PRIME_INTEGER&quot;);</span>
+        }
+<span class="fc" id="L126">        return new BigInteger(decimal);</span>
+    }
+
+    private static void fields(JsonNode node, String... names) {
+<span class="pc bpc" id="L130" title="2 of 6 branches missed.">        require(node != null &amp;&amp; node.isObject() &amp;&amp; node.size() == names.length, &quot;INVALID_PRIME_JSON_FIELDS&quot;);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (var name : names) require(node.hasNonNull(name), &quot;INVALID_PRIME_JSON_FIELDS&quot;);</span>
+<span class="fc" id="L132">    }</span>
+
+    private static void require(boolean condition, String reason) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (!condition) throw new IllegalArgumentException(reason);</span>
+<span class="fc" id="L136">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
