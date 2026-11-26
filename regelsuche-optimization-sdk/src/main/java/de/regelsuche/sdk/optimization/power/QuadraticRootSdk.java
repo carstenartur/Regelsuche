@@ -24,6 +24,16 @@ public final class QuadraticRootSdk {
         return QuadraticRootVerifier.verify(expected, certificate, limits(budget), cancellation::isCancelled);
     }
 
+    public static QuadraticRootEvaluation.Preparation prepare(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return QuadraticRootEvaluation.prepare(expected, certificate, limits(budget), cancellation::isCancelled);
+    }
+
+    public static QuadraticRootEvaluation.Result evaluate(QuadraticRootEvaluation.Prepared plan,
+            BigInteger a, BigInteger b, BigInteger g, OptimizationBudget budget, CancellationToken cancellation) {
+        return plan.evaluate(a, b, g, limits(budget), cancellation::isCancelled);
+    }
+
     public static QuadraticRootEvaluation.Result evaluate(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             BigInteger a, BigInteger b, BigInteger g, OptimizationBudget budget, CancellationToken cancellation) {
         return QuadraticRootEvaluation.evaluate(expected, certificate, a, b, g, limits(budget), cancellation::isCancelled);
