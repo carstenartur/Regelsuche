@@ -1,5 +1,5 @@
 # ---------- Legacy Gradle builder: walkthrough target only ----------
-FROM eclipse-temurin:25.0.5_8-jdk-noble AS walkthrough-build
+FROM eclipse-temurin:25.0.5.1_2-jdk-noble AS walkthrough-build
 ARG REGELSUCHE_PREPARATION_REVISION
 WORKDIR /workspace
 
@@ -107,7 +107,7 @@ RUN mvn --batch-mode --no-transfer-progress -Pfull -pl app -am \
 
 
 # ---------- Default Web Workbench runtime ----------
-FROM eclipse-temurin:25.0.5_8-jre-noble AS runtime
+FROM eclipse-temurin:25.0.5.1_2-jre-noble AS runtime
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     JAVA_OPTS=""

@@ -25,7 +25,7 @@ RUN mvn --batch-mode --no-transfer-progress -Pfull -pl app -am \
     && test -s /workspace/app-distribution/regelsuche.jar
 
 # ---------- Stage 2: Runtime with provers ----------
-FROM eclipse-temurin:25.0.5_8-jre-noble AS runtime
+FROM eclipse-temurin:25.0.5.1_2-jre-noble AS runtime
 
 ARG INSTALL_LEAN=false
 ARG ELAN_GIT_SHA=3d5138e1526a569a23901b8ee559032793cf445e
