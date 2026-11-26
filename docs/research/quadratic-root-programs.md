@@ -37,6 +37,42 @@ des Koordinatenpaares je Verzweigungsarm betrachtet. Eine mögliche
 gemeinsame Vorzeichennormalisierung ist Teil des ausführbaren Programms.
 Die Auswahl einer Permutation ist ein Suchergebnis.
 
+Die Basiserkennung erkennt Multiplikation mit eins, Addition oder
+Subtraktion von null und doppelte Negation an Wurzel- und Guardregistern.
+Das Quadrat im Vergleich erkennt sie als Quadratoperation, Multiplikation
+der Wurzel mit sich selbst oder Potenz mit Exponent zwei. Der Beleg bindet
+weiterhin das unveränderte Original. Die unabhängige Prüfung muss beide
+vollständigen Programme erklären.
+
+`SharedPowerSearch.portfolio` behält unterschiedliche geprüfte Potenzpläne.
+`QuadraticRootSearch.portfolio` beziehungsweise die dünne SDK-Fassade
+`QuadraticRootSdk.portfolio` liefern daraus unveränderliche Listen
+vollständiger, unabhängig geprüfter Programme. Der globale Kandidatenetat
+wird zwischen den Potenzplänen verteilt. Für kleine Etaten wird der
+günstigste Plan zuerst untersucht; es gibt keinen Vollständigkeitsanspruch.
+Bei den besuchten Ausgängen werden nur solche Kombinationen verworfen,
+die auf beiden Pfaden mindestens ebenso viele Negationen und
+Charakterauswahlen benötigen wie eine andere Kombination.
+
+Die voreingestellte Ordnung bewertet den vollständigen Gleichheits- und
+Ungleichheitspfad jeweils einmal. Sie zählt die binäre Potenzarbeit nach
+den angegebenen Gruppenoperationsgewichten, einen Punkt je Potenzaufruf,
+Guard, Addition, Subtraktion oder Negation und acht Punkte je
+Charakterauswahl. Der Einzelaufruf `search` liefert nur eine gegenüber
+dem Original streng günstigere Variante; andernfalls lautet der Grund
+`NO_COST_IMPROVEMENT`. Das Portfolio hält auch andere geprüfte Varianten
+für die eigene Kostenbewertung des Consumers bereit. Java-Schutzprüfungen,
+Speicherallokation und konkrete JDK-Potenzalgorithmen sind in dieser
+mathematischen Voreinstellung nicht bepreist.
+
+Beim 381-Bit-Original mit dem Nenner `2*r` und den Gewichten `(1,1,10)`
+liefert der Etat von 64 Ausgabepaaren vier geprüfte Programme. Der
+Strukturwert sinkt von 1855 auf 1235. Die Suche benötigt 1003408 statt
+der historischen 504157 Arbeitseinheiten; die unabhängige Wiederprüfung
+421108 statt 421099. Die zusätzlichen Alternativen kosten Sucharbeit.
+Diese Zahlen beschreiben genau diese Quelle und Konfiguration und
+belegen keinen Laufzeitgewinn des erzeugten Java-Codes.
+
 Die Prüfung rekonstruiert sowohl das Original als auch den Kandidaten.
 Mit `X=(a+g)/2` und `H=b/2` gilt unter den Eingabebedingungen
 

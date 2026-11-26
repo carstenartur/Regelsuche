@@ -22,6 +22,18 @@ public final class SharedPowerSearch {
         public long work() { return searchWork + verificationWork; }
     }
 
+    /** An exact proposal used unreduced representatives for every requested exponent. */
+    public record Candidate(Certificate certificate, Cost cost, boolean exact) {}
+
+    /** Distinct independently verified schedules in increasing weighted cost order. */
+    public record Portfolio(List<Candidate> candidates, String reason, long searchWork, long verificationWork) {
+        public Portfolio { candidates = List.copyOf(candidates); }
+        public long work() { return searchWork + verificationWork; }
+        long retainedCells() {
+            return candidates.stream().mapToLong(candidate -> cells(candidate.certificate())).sum();
+        }
+    }
+
     /**
      * Compares exact and observation-reduced representatives under identical reuse rules,
      * each in source, ascending and descending order. The exact candidate is always retained.
@@ -35,6 +47,16 @@ public final class SharedPowerSearch {
     /** Stops after at most maximumCandidates (1..6) verified proposals, with exact candidates first. */
     public static Result search(Request request, Weights weights, int maximumShift, int maximumCandidates,
             IterationLimits limits, BooleanSupplier cancellation) {
+        var result = portfolio(request, weights, maximumShift, maximumCandidates, limits, cancellation);
+        var best = result.candidates().stream().findFirst();
+        var exact = result.candidates().stream().filter(Candidate::exact).findFirst();
+        return new Result(best.map(Candidate::certificate), exact.map(Candidate::cost), best.map(Candidate::cost),
+                result.reason(), result.searchWork(), result.verificationWork());
+    }
+
+    /** Retains distinct exact and observation-reduced schedules from up to six ordered proposals. */
+    public static Portfolio portfolio(Request request, Weights weights, int maximumShift, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancellation) {
         Objects.requireNonNull(request);
         Objects.requireNonNull(weights);
         if (maximumShift < 0 || maximumShift > 64) throw new IllegalArgumentException("SHIFT_LIMIT");
@@ -43,15 +65,14 @@ public final class SharedPowerSearch {
         long verificationWork = 0;
         try {
             SharedPowerVerifier.inspect(request, work);
-            Certificate best = null, exact = null;
-            Cost bestCost = null, exactCost = null;
+            var distinct = new ArrayList<Candidate>();
+            long retained = 0;
             int candidates = 0;
             portfolio:
             for (boolean relaxed : new boolean[]{false, true}) {
                 for (int order = 0; order < 3; order++) {
                     if (candidates == maximumCandidates) break portfolio;
                     candidates++;
-                    long retained = cells(best) + cells(exact);
                     work.cells(retained + 8L * request.outputs().size() + 8);
                     var targets = targets(request, relaxed, order, work);
                     var builder = new Builder(request.orderMultiple(), weights, maximumShift, work,
@@ -59,33 +80,33 @@ public final class SharedPowerSearch {
                     var outputs = new Integer[targets.size()];
                     for (var target : targets) outputs[target.position()] = builder.ensure(target.exponent());
                     work.charge(1L + builder.steps.size() + outputs.length);
+                    long buildCells = retained + 8L * outputs.length + 5L * builder.values.size();
+                    work.cells(buildCells + cells(builder.steps.size(), outputs.length));
                     var certificate = new Certificate(request, new Schedule(builder.steps, List.of(outputs)));
                     long before = work.used();
                     var checked = SharedPowerVerifier.verify(request, certificate, weights, work,
-                            retained + 8L * request.outputs().size() + 4L * builder.values.size());
+                            buildCells + cells(certificate));
                     verificationWork += work.used() - before;
                     if (!checked.valid()) {
-                        return new Result(Optional.empty(), Optional.empty(), Optional.empty(), checked.reason(),
-                                work.used() - verificationWork, verificationWork);
+                        return new Portfolio(List.of(), checked.reason(), work.used() - verificationWork, verificationWork);
                     }
-                    var cost = checked.cost().orElseThrow();
-                    if (!relaxed && (exactCost == null || cost.weighted() < exactCost.weighted())) {
-                        exact = certificate;
-                        exactCost = cost;
-                    }
-                    if (bestCost == null || cost.weighted() < bestCost.weighted()) {
-                        best = certificate;
-                        bestCost = cost;
+                    work.charge((1L + distinct.size()) * (1L + builder.steps.size() + outputs.length));
+                    if (distinct.stream().noneMatch(prior -> prior.certificate().schedule().equals(certificate.schedule()))) {
+                        retained += cells(certificate);
+                        work.cells(retained);
+                        distinct.add(new Candidate(certificate, checked.cost().orElseThrow(), !relaxed));
                     }
                 }
             }
-            work.charge(0);
-            return new Result(Optional.of(Objects.requireNonNull(best)), Optional.of(Objects.requireNonNull(exactCost)),
-                    Optional.of(Objects.requireNonNull(bestCost)), "VERIFIED", work.used() - verificationWork,
-                    verificationWork);
+            work.cells(retained + 2L * distinct.size());
+            distinct.sort((a, b) -> {
+                work.charge(1);
+                return Long.compare(a.cost().weighted(), b.cost().weighted());
+            });
+            work.charge(1L + distinct.size());
+            return new Portfolio(distinct, "VERIFIED", work.used() - verificationWork, verificationWork);
         } catch (CertificateWork.Stop stop) {
-            return new Result(Optional.empty(), Optional.empty(), Optional.empty(), stop.getMessage(),
-                    work.used() - verificationWork, verificationWork);
+            return new Portfolio(List.of(), stop.getMessage(), work.used() - verificationWork, verificationWork);
         }
     }
 
@@ -109,8 +130,11 @@ public final class SharedPowerSearch {
     }
 
     private static long cells(Certificate certificate) {
-        return certificate == null ? 0 : 2L * certificate.schedule().steps().size()
-                + certificate.schedule().outputs().size();
+        return cells(certificate.schedule().steps().size(), certificate.schedule().outputs().size());
+    }
+
+    private static long cells(int steps, int outputs) {
+        return 14L + 5L * steps + outputs;
     }
 
     private static final class Builder {

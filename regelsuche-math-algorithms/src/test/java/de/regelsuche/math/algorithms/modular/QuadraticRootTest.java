@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class QuadraticRootTest {
@@ -121,6 +122,109 @@ class QuadraticRootTest {
         assertEquals(0, generated.inversions());
         assertEquals(1, generated.characterSelections());
         assertTrue(generated.weightedGroupWork() < path.weightedGroupWork());
+    }
+
+    @Test void neutralSourceDefinitionsKeepTheOriginalContractThroughReplay() {
+        var c = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var original = c.original();
+        var prefix = new ArrayList<>(original.prefix());
+        prefix.add(constant(BigInteger.ONE)); // 8
+        prefix.add(constant(BigInteger.ZERO)); // 9
+        prefix.add(add(9, 5)); // alias the base in the guard
+        prefix.add(multiply(7, 8)); // alias the square in the guard
+        var equal = new QuadraticRootProgram.Arm(List.of(multiply(1, 3), inverse(6), multiply(12, 13),
+                multiply(8, 6), subtract(14, 9)), 15, 16, false);
+        var unequal = new QuadraticRootProgram.Arm(List.of(subtract(0, 2), multiply(12, 3), power(13, BigInteger.valueOf(11)),
+                multiply(1, 3), inverse(14), multiply(15, 16)), 14, 17, false);
+        var wrapped = new QuadraticRootProgram(prefix, 10, 11, equal, unequal);
+        var variant = new QuadraticRootContract(c.sourceIdentity(), c.modulus(), c.primeEvidence(), wrapped, EXACT_PAIR);
+        var cert = search(variant);
+        assertEquals(wrapped, cert.contract().original());
+        assertFalse(QuadraticRootVerifier.verify(c, cert, LIMITS, () -> false).valid());
+
+        prefix.set(5, constant(BigInteger.TWO));
+        var changed = new QuadraticRootContract(c.sourceIdentity(), c.modulus(), c.primeEvidence(),
+                new QuadraticRootProgram(prefix, 10, 11, equal, unequal), EXACT_PAIR);
+        assertTrue(QuadraticRootSearch.search(changed, WEIGHTS, 64, LIMITS, () -> false).certificate().isEmpty());
+    }
+
+    @Test void replaysExistingCertificatesWhoseBasisContainsNeutralSourceOperations() {
+        var c = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var old = c.original();
+        var original = new QuadraticRootProgram(old.prefix(), 7, 5, new QuadraticRootProgram.Arm(List.of(
+                multiply(1, 3), constant(BigInteger.ZERO), add(8, 9), inverse(6), multiply(10, 11)), 6, 12, false), old.unequal());
+        var contract = new QuadraticRootContract("old", c.modulus(), c.primeEvidence(), original, EXACT_PAIR);
+        // A certificate produced by the earlier search, before neutral-root extraction was supported.
+        var prefix = List.of(add(0, 2), constant(BigInteger.valueOf(22)), multiply(3, 4), multiply(1, 4),
+                constant(BigInteger.ZERO), add(6, 7), power(5, BigInteger.TEN), multiply(9, 5), multiply(8, 9), square(10));
+        var program = new QuadraticRootProgram(prefix, 12, 5, new QuadraticRootProgram.Arm(List.of(), 10, 11, false),
+                new QuadraticRootProgram.Arm(List.of(negate(10)), 11, 13, true));
+        var request = new SharedPowerPlan.Request(BigInteger.valueOf(42), List.of(
+                new SharedPowerPlan.Output(BigInteger.valueOf(11), BigInteger.TWO),
+                new SharedPowerPlan.Output(BigInteger.valueOf(-11), BigInteger.TWO)));
+        var schedule = new SharedPowerPlan.Schedule(List.of(SharedPowerPlan.Step.power(BigInteger.TEN),
+                SharedPowerPlan.Step.multiply(2, 1)), List.of(3, 2));
+        var cert = new QuadraticRootSearch.Certificate(contract, new SharedPowerPlan.Certificate(request, schedule), program);
+        var proof = QuadraticRootVerifier.verify(contract, cert, LIMITS, () -> false);
+        assertTrue(proof.valid(), proof.reason());
+    }
+
+    @Test void recognizesTheGuardWhenTheSourceSquaresWithAPowerInstruction() {
+        var source = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var old = source.original();
+        var prefix = new ArrayList<>(old.prefix());
+        prefix.set(4, power(6, BigInteger.TWO));
+        var contract = new QuadraticRootContract("power-square", source.modulus(), source.primeEvidence(),
+                new QuadraticRootProgram(prefix, old.guardLeft(), old.guardRight(), old.equal(), old.unequal()), EXACT_PAIR);
+        assertTrue(QuadraticRootSearch.search(contract, WEIGHTS, 64, LIMITS, () -> false).certificate().isPresent());
+    }
+
+    @Test void ranksCompleteVerifiedProgramsAcrossPowerSchedules() {
+        var source = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var found = QuadraticRootSearch.portfolio(source, WEIGHTS, 64, LIMITS, () -> false);
+        var schedules = new HashSet<SharedPowerPlan.Schedule>();
+        var programs = new HashSet<QuadraticRootProgram>();
+        long previous = 0;
+        for (var cert : found.certificates()) {
+            assertTrue(programs.add(cert.program()));
+            schedules.add(cert.power().schedule());
+            assertTrue(QuadraticRootVerifier.verify(source, cert, LIMITS, () -> false).valid());
+            assertTrue(cert.program().score(WEIGHTS) >= previous);
+            previous = cert.program().score(WEIGHTS);
+        }
+        assertTrue(schedules.size() >= 2, found.reason());
+        var best = found.certificates().getFirst();
+        assertEquals(best, QuadraticRootSearch.search(source, WEIGHTS, 64, LIMITS, () -> false).certificate().orElseThrow());
+        assertTrue(best.program().score(WEIGHTS) < source.original().score(WEIGHTS));
+        assertTrue(found.certificates().stream().anyMatch(alt ->
+                alt.program().score(WEIGHTS) > best.program().score(WEIGHTS)
+                && alt.program().unequal().steps().size() < best.program().unequal().steps().size()),
+                "An exit-only comparison would prefer an expensive power schedule");
+        assertTrue(QuadraticRootSearch.portfolio(source, WEIGHTS, 64,
+                LIMITS.withMaximumWork(found.work() - 1), () -> false).certificates().isEmpty());
+    }
+
+    @Test void aSmallPairBudgetCanStillExploreBothBranchesOfTheFirstPowerSchedule() {
+        var c = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var result = QuadraticRootSearch.portfolio(c, WEIGHTS, 8, LIMITS, () -> false);
+        assertFalse(result.certificates().isEmpty(), result.reason());
+        assertEquals(8, result.candidates());
+        var limited = new IterationLimits(LIMITS.maximumWork(), 600, LIMITS.timeoutMillis());
+        assertFalse(QuadraticRootSearch.portfolio(c, WEIGHTS, 8, limited, () -> false).certificates().isEmpty());
+        var stop = QuadraticRootSearch.portfolio(c, WEIGHTS, 64, limited, () -> false);
+        assertEquals("TERM_LIMIT", stop.reason());
+        assertTrue(stop.certificates().isEmpty());
+    }
+
+    @Test void anAlreadyCheapestCompleteProgramHasNoMathematicalImprovement() {
+        var source = source(BigInteger.valueOf(31), EXACT_PAIR);
+        var cheapInverse = new SharedPowerPlan.Weights(1, 1, 1);
+        var selected = QuadraticRootSearch.portfolio(source, cheapInverse, 64, LIMITS, () -> false);
+        var optimal = new QuadraticRootContract("efficient-original", source.modulus(), source.primeEvidence(),
+                selected.certificates().getFirst().program(), EXACT_PAIR);
+        var repeated = QuadraticRootSearch.search(optimal, cheapInverse, 64, LIMITS, () -> false);
+        assertEquals("NO_COST_IMPROVEMENT", repeated.reason());
+        assertTrue(repeated.certificate().isEmpty());
     }
 
     @Test void proofRejectsModifiedGuardCoordinatePowerCertificateAndInvalidReferences() {
@@ -235,6 +339,41 @@ class QuadraticRootTest {
         var basis = new QuadraticRootBasis(source, work);
         var stop = assertThrows(CertificateWork.Stop.class, () -> basis.instantiate(schedule));
         assertEquals("TERM_LIMIT", stop.getMessage());
+    }
+
+    @Test void branchProofStopsWithinItsBudgetAndReportsEachCompletedCharge() {
+        var source = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var polls = new AtomicInteger();
+        long ceiling = 1000;
+        var limited = QuadraticRootSearch.portfolio(source, WEIGHTS, 8, LIMITS.withMaximumWork(ceiling), () -> {
+            polls.incrementAndGet();
+            return false;
+        });
+        assertEquals("WORK_LIMIT", limited.reason());
+        assertTrue(limited.certificates().isEmpty());
+
+        // Stop a generously budgeted replay at the same charge. Its receipt measures the work
+        // actually completed before that boundary, independently of the exhausted child ledger.
+        var replayPolls = new AtomicInteger();
+        var cancelled = QuadraticRootSearch.portfolio(source, WEIGHTS, 8, LIMITS,
+                () -> replayPolls.incrementAndGet() == polls.get());
+        assertEquals("CANCELLED", cancelled.reason());
+        assertTrue(cancelled.certificates().isEmpty());
+        assertEquals(cancelled.work(), limited.work());
+        assertTrue(cancelled.work() <= ceiling);
+
+        var deadlinePolls = new AtomicInteger();
+        int timeoutMillis = 50;
+        var timed = QuadraticRootSearch.portfolio(source, WEIGHTS, 8,
+                new IterationLimits(LIMITS.maximumWork(), LIMITS.maximumTerms(), timeoutMillis), () -> {
+                    if (deadlinePolls.incrementAndGet() == polls.get()) {
+                        assertDoesNotThrow(() -> Thread.sleep(2L * timeoutMillis));
+                    }
+                    return false;
+                });
+        assertEquals("TIME_LIMIT", timed.reason());
+        assertTrue(timed.certificates().isEmpty());
+        assertTrue(timed.work() <= cancelled.work());
     }
 
     @Test void verificationAndSearchRequireTheirEntireReportedWork() {
