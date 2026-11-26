@@ -12,15 +12,21 @@
   <build><plugins><plugin>
     <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
     <executions>
-      <execution><id>shared-power-strict-main</id><phase>process-classes</phase><goals><goal>compile</goal></goals>
+      <!-- A second compile goal replaces the reactor artifact with its partial output.
+           testCompile can lint the main source root without publishing the check classes. -->
+      <execution><id>shared-power-strict-main</id><phase>process-classes</phase><goals><goal>testCompile</goal></goals>
         <configuration>
-          <includes><include>**/SharedPower*.java</include><include>**/Quadratic*.java</include></includes>
+          <skip>false</skip>
+          <compileSourceRoots><compileSourceRoot>${project.build.sourceDirectory}</compileSourceRoot></compileSourceRoots>
+          <outputDirectory>${project.build.directory}/strict-classes</outputDirectory>
+          <testIncludes><testInclude>**/SharedPower*.java</testInclude><testInclude>**/Quadratic*.java</testInclude><testInclude>**/PrimeEvidence*.java</testInclude></testIncludes>
           <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
         </configuration>
       </execution>
       <execution><id>shared-power-strict-tests</id><phase>process-test-classes</phase><goals><goal>testCompile</goal></goals>
         <configuration>
-          <testIncludes><testInclude>**/SharedPower*Test.java</testInclude><testInclude>**/Quadratic*Test.java</testInclude></testIncludes>
+          <outputDirectory>${project.build.directory}/strict-test-classes</outputDirectory>
+          <testIncludes><testInclude>**/SharedPower*Test.java</testInclude><testInclude>**/Quadratic*Test.java</testInclude><testInclude>**/PrimeEvidence*Test.java</testInclude></testIncludes>
           <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
         </configuration>
       </execution>

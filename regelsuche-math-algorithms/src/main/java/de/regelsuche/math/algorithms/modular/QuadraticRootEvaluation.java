@@ -13,13 +13,45 @@ public final class QuadraticRootEvaluation {
     public record Pair(BigInteger real, BigInteger imaginary) {}
     public record Result(Optional<Pair> pair, String reason, long work) {}
 
+    public record Preparation(Optional<Prepared> plan, String reason, long work) {}
+
+    /** Replay the source binding, prime evidence and program proof once, within a single allowance. */
+    public static Preparation prepare(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+        var checked = QuadraticRootVerifier.verify(expected, certificate, limits, cancellation);
+        var plan = checked.valid() ? Optional.of(new Prepared(expected.modulus(), certificate.program()))
+                : Optional.<Prepared>empty();
+        return new Preparation(plan, checked.reason(), checked.work());
+    }
+
+    /** Immutable, source-verified execution plan. Each invocation has an independent budget and input guard. */
+    public static final class Prepared {
+        private final BigInteger modulus;
+        private final QuadraticRootProgram program;
+
+        private Prepared(BigInteger modulus, QuadraticRootProgram program) {
+            this.modulus = modulus;
+            this.program = program;
+        }
+
+        public Result evaluate(BigInteger a, BigInteger b, BigInteger g, IterationLimits limits,
+                BooleanSupplier cancellation) {
+            var work = new CertificateWork(limits, cancellation);
+            try {
+                return execute(modulus, program, a, b, g, work);
+            } catch (CertificateWork.Stop ex) {
+                return new Result(Optional.empty(), ex.getMessage(), work.used());
+            }
+        }
+    }
+
     public static Result evaluate(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             BigInteger a, BigInteger b, BigInteger g, IterationLimits limits, BooleanSupplier cancellation) {
         var work = new CertificateWork(limits, cancellation);
         try {
             QuadraticRootVerifier.checkField(expected, work, cancellation);
             QuadraticRootVerifier.verifyProgram(expected, certificate, work, cancellation);
-            return execute(expected, certificate.program(), a, b, g, work);
+            return execute(expected.modulus(), certificate.program(), a, b, g, work);
         } catch (CertificateWork.Stop | IllegalArgumentException ex) {
             return new Result(Optional.empty(), ex.getMessage(), work.used());
         }
@@ -27,12 +59,11 @@ public final class QuadraticRootEvaluation {
 
     static Result execute(QuadraticRootContract contract, QuadraticRootProgram program, BigInteger a, BigInteger b,
             BigInteger g, IterationLimits limits, BooleanSupplier cancellation) {
-        return execute(contract, program, a, b, g, new CertificateWork(limits, cancellation));
+        return execute(contract.modulus(), program, a, b, g, new CertificateWork(limits, cancellation));
     }
 
-    private static Result execute(QuadraticRootContract contract, QuadraticRootProgram program, BigInteger a, BigInteger b,
+    private static Result execute(BigInteger p, QuadraticRootProgram program, BigInteger a, BigInteger b,
             BigInteger g, CertificateWork work) {
-        var p = contract.modulus();
         long words = SharedPowerVerifier.words(p);
         work.charge(1L + 4 * words * words);
         if (!QuadraticRootContract.accepts(p, a, b, g)) return new Result(Optional.empty(), "OUTSIDE_FIELD_DOMAIN", work.used());

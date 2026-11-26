@@ -102,6 +102,65 @@ ebenfalls ein akzeptiertes Zeugnis; der Katalog ist kein allgemeiner
 Primzahlbeweiser. Klassen-, Methoden- und Quelltextnamen beeinflussen die
 mathematische Freigabe nicht.
 
+### Weitere Belege bereitstellen
+
+`PrimeEvidenceProvider.supplied(...)` nimmt bis zu 64 unterschiedliche,
+unveränderlich indizierte Belege entgegen und verwendet den Katalog für
+nicht belegte Moduli. Die Auswahl ist ausdrücklich untrusted: Der
+aufgerufene Prüfer muss den Beleg weiterhin gegen den tatsächlich
+beobachteten Modul prüfen. Doppelte Moduli werden abgelehnt.
+
+Das SDK importiert solche Daten mit
+`PrimeEvidenceJson.read(expectedModulus, bytes, budget, cancellation)`.
+Der versionierte Umschlag hat die Form
+`{"schema":"regelsuche-prime-evidence-v1","proof":{...}}`.
+Die Belegarten heißen `small`, `lucas` und `elliptic-order`; große
+Ganzzahlen sind kanonische dezimale Zeichenketten. Die Beispieldatei
+[`mersenne-61.json`](../../regelsuche-optimization-sdk/src/test/resources/prime-evidence/mersenne-61.json)
+belegt `2^61−1` durch die vollständige Faktorisierung von `n−1` und den
+Lucas-Zeugen 37. Damit ist die Bereitstellung zusätzlicher großer Moduli
+ausführbar, ohne den eingebauten Katalog oder den Suchalgorithmus zu ändern.
+
+Import und unabhängige Prüfung teilen sich das angegebene Arbeits-,
+Speicher- und Zeitbudget. Zusätzlich gelten 65.536 Eingabebytes, 32
+Belegebenen, 256 Faktoren pro Lucas-Knoten und die 4096-Bit-Grenze des
+Kernprüfers. Doppelte oder unbekannte Felder, unbekannte Schemata,
+abweichende Moduli und ungültige Zeugen werden abgewiesen. Das Format
+enthält keine Objektverweise und führt keinen Netzabruf aus.
+
+## Wiederholte Auswertung vorbereiten
+
+`QuadraticRootSdk.prepare(...)` prüft Quellvertrag, Primzahlbeleg und
+Programm einmal vollständig. Nur eine erfolgreiche Prüfung erzeugt den
+unveränderlichen `QuadraticRootEvaluation.Prepared`-Handle; sein
+Konstruktor ist nicht öffentlich. Wiederholte `evaluate`-Aufrufe prüfen
+weiterhin die konkreten kanonischen Eingaben und die Normgleichung und
+verbrauchen jeweils ein eigenes begrenztes Auswertungsbudget. Fehlerhafte
+oder abgebrochene Vorbereitung erzeugt keinen ausführbaren Handle.
+
+Die bisherige `QuadraticRootSdk.evaluate(...)`-Methode bleibt verfügbar
+und wiederholt die Belegprüfung bei jedem Aufruf. Der vorbereitete Pfad
+spart diese wiederholte Arbeit. Er ist keine Freigabe für eine inzwischen
+geänderte Java-Quelle: Ein Compiler-Consumer muss seine Quell- und
+Abhängigkeitsbelege vor Apply weiterhin auf Aktualität prüfen. Bereits
+erzeugter Java-Code hat ohnehin keine SDK-Belegprüfung pro Ausführung.
+
+Der ergänzende Modellvergleich verwendet jeweils beide Normvorzeichen für
+`(a,b)=(0,2)` und das ausführbare Original mit dem Faktor `b/2` vor der
+Inversion. Bei den Gewichten `(1,1,1000)` ergeben sich folgende gezählte
+Arbeitsmengen; dies sind keine Zeitmessungen:
+
+| Modul | Vorbereitung einmal | Vorbereitete Auswertung (g=2 / g=p−2) | Auswertung mit erneuter Prüfung (g=2 / g=p−2) |
+|---|---:|---:|---:|
+| 43 | 726 | 24 / 28 | 750 / 754 |
+| `2^61−1` | 2419 | 79 / 87 | 2498 / 2506 |
+| Katalogmodul mit 381 Bit | 365763 | 14049 / 14093 | 379812 / 379856 |
+
+Der Import des 61-Bit-Belegs benötigt zusätzlich 3623 Arbeitseinheiten
+und passt in `OptimizationBudget.DEFAULT`. Die Zahlen beziehen sich auf
+diese Originaldarstellung und beide genannten Eingaben. Andere Programme
+und Suchgewichte können andere Pläne und Prüfkosten ergeben.
+
 ## Consumer-Verantwortung
 
 Eine mathematische Paaridentität beweist noch keine Java-Ersetzung. Ein
@@ -123,7 +182,8 @@ Im Java-25-Checkout:
 
 ```bash
 mvn -pl regelsuche-optimization-sdk -am \
-  -Dtest=PrimeEvidenceTest,QuadraticRootTest,QuadraticRootSdkTest test
+  -Dtest='PrimeEvidence*Test,QuadraticRoot*Test' \
+  -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 Die regulären Modul-POMs kompilieren die hinzugefügten Haupt- und
