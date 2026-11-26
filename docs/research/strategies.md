@@ -17,6 +17,19 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Gekoppelte Wurzelprogramme mit exakter Beobachtung
+
+- **Hypothese.** Gemeinsame Potenzen und eine endliche Suche über signierte Koordinatenpermutationen können ein ursprüngliches Wurzelprogramm verbessern, wenn Normrelation, Verzweigung und gemeinsame Vorzeichenwahl unabhängig geprüft werden.
+- **Umsetzungsstand.** `QuadraticRootSearch` gewinnt Potenzanforderungen aus dem ausführbaren Original und verwendet `SharedPowerSearch`. `QuadraticRootVerifier` rekonstruiert beide Programme in einer begrenzten Laurent-Normalform über vier Charakterfälle. Exakte Primzahlbelege sind eigene, unabhängig geprüfte Daten. Das SDK delegiert; `EXACT_PAIR` und gemeinsame Negation bleiben verschiedene Verträge.
+- **Befund.** Der Vergleich mit dem Original umfasst 2228 gültige nichtreelle Tripel über fünf kleinen Primkörpern und zwölf 381-Bit-Stichproben. Für das geprüfte 381-Bit-Original entsteht auf beiden Zweigen eine Potenzierung ohne Inversion; nur der Ungleichheitszweig benötigt die exakte Jacobi-Normalisierung. Die 64 Paarvorschläge kosten 504157 modellierte Arbeitseinheiten, die unabhängige Verifikation weitere 421099. Diese Strukturzahlen sind keine Laufzeitmessung. [Vertrag, Primzahlargument und Reproduktion](quadratic-root-programs.md)
+- **Folgerung.** Die gekoppelte Ausgabe im mathematischen Kern prüfen und Quellcode-, Identitäts-, Effekt- und Runtime-Bedingungen beim Consumer binden. Die begrenzte Programmfamilie und ein verfügbarer Primzahlbeleg sind Voraussetzungen; unbekannte Programme und ausgeschöpfte Limits erzeugen keine Freigabe.
+
+- [`QuadraticRootSearch.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/QuadraticRootSearch.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/QuadraticRootSearch.java | public final class QuadraticRootSearch { -->
+- [`QuadraticRootVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/QuadraticRootVerifier.java#L13) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/QuadraticRootVerifier.java | public final class QuadraticRootVerifier { -->
+- [`PrimeEvidenceVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/PrimeEvidenceVerifier.java#L14) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/PrimeEvidenceVerifier.java | public final class PrimeEvidenceVerifier { -->
+- [`QuadraticRootTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootTest.java#L17) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootTest.java | class QuadraticRootTest { -->
+- [`QuadraticRootSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/QuadraticRootSdk.java#L14) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/QuadraticRootSdk.java | public final class QuadraticRootSdk { -->
+
 ## Gemeinsame Potenzen unter expliziten Ausgabebeobachtungen
 
 - **Hypothese.** Mehrere Potenzen derselben Gruppenbasis können gemeinsame Zwischenergebnisse verwenden, wenn die Quelle exakte Gleichheit oder ausdrücklich Gleichheit nach einer weiteren Potenz verlangt.
