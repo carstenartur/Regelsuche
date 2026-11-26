@@ -247,6 +247,29 @@ class MavenParallelVerificationWorkflowContractTest {
           "short verification must not populate the full polynomial cache: " + job);
     }
 
+    String pilotScope = ".mvn/polynomial-pilot-cache-scope.txt";
+    String proofScope = ".mvn/checked-proof-cache-scope.txt";
+    assertEquals("polynomial-pilot-cache-v1", Files.readString(root.resolve(pilotScope)).strip());
+    assertEquals("checked-proof-cache-v1", Files.readString(root.resolve(proofScope)).strip());
+    assertEquals(fullCacheInputs + "\n" + pilotScope,
+        mavenCacheInputs(jobs.required("maven-polynomial-qualification")));
+    assertEquals(fullCacheInputs + "\n" + proofScope,
+        mavenCacheInputs(jobs.required("checked-proofs")));
+    for (var entry : jobs.properties()) {
+      for (var step : entry.getValue().path("steps")) {
+        if (!step.path("uses").asText().startsWith("actions/setup-java@")) {
+          continue;
+        }
+        String inputs = step.path("with").path("cache-dependency-path").asText();
+        if (!"maven-polynomial-qualification".equals(entry.getKey())) {
+          assertFalse(inputs.contains(pilotScope), "foreign pilot cache producer: " + entry.getKey());
+        }
+        if (!"checked-proofs".equals(entry.getKey())) {
+          assertFalse(inputs.contains(proofScope), "foreign proof cache producer: " + entry.getKey());
+        }
+      }
+    }
+
     int rejection = convergence.indexOf(
         "- name: Reject incomplete verification authority");
     int checkout = convergence.indexOf("- uses: actions/checkout@");
