@@ -195,9 +195,9 @@ Arbeitsmengen; dies sind keine Zeitmessungen:
 
 | Modul | Vorbereitung einmal | Vorbereitete Auswertung (g=2 / g=p−2) | Auswertung mit erneuter Prüfung (g=2 / g=p−2) |
 |---|---:|---:|---:|
-| 43 | 726 | 24 / 28 | 750 / 754 |
-| `2^61−1` | 2419 | 79 / 87 | 2498 / 2506 |
-| Katalogmodul mit 381 Bit | 365763 | 14049 / 14093 | 379812 / 379856 |
+| 43 | 734 | 24 / 28 | 758 / 762 |
+| `2^61−1` | 2427 | 79 / 87 | 2506 / 2514 |
+| Katalogmodul mit 381 Bit | 365771 | 14049 / 14093 | 379820 / 379864 |
 
 Der Import des 61-Bit-Belegs benötigt zusätzlich 3623 Arbeitseinheiten
 und passt in `OptimizationBudget.DEFAULT`. Die Zahlen beziehen sich auf
