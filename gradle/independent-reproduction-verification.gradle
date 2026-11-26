@@ -34,10 +34,17 @@ def reproductionVerifier = reproductionRepositoryRoot.file(
     'scripts/verify-independent-reproduction.py')
 def reproductionEnvironmentInputs = files(
     'scripts/independent_reproduction_environment.py',
+    'reproduction/Dockerfile.reproduction',
+    'docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json',
+    'docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json',
     'reproduction/environments/v2/environment.json',
     'reproduction/environments/v2/Dockerfile.reproduction',
     'docs/schemas/regelsuche-independent-reproduction-artifact-v2.schema.json',
     'docs/schemas/regelsuche-independent-reproduction-receipt-v2.schema.json',
+    'reproduction/environments/v3/environment.json',
+    'reproduction/environments/v3/Dockerfile.reproduction',
+    'docs/schemas/regelsuche-independent-reproduction-artifact-v3.schema.json',
+    'docs/schemas/regelsuche-independent-reproduction-receipt-v3.schema.json',
     'gradle/wrapper/gradle-wrapper.properties',
     'gradle/wrapper/gradle-wrapper.jar'
 )

@@ -3,15 +3,15 @@
 Ordinary application and build images receive routine dependency updates.
 Scientific reproduction definitions identify an immutable environment retained
 with evidence. An image refresh for such an environment requires a new version;
-it cannot change the meaning of existing v1 artifacts or receipts.
+it cannot change the meaning of existing artifacts or receipts.
 
 ## Current ownership
 
 | Definitions | Maintenance owner |
 | --- | --- |
-| `Dockerfile`, `Dockerfile.autopilot`, `Dockerfile.comparative-benchmarks`, `Dockerfile.proof`, `Dockerfile.release-readiness` | Routine Dependabot Docker updates, with the existing Java-major restriction and exact image-policy review |
+| `Dockerfile`, `Dockerfile.autopilot`, `Dockerfile.comparative-benchmarks`, `Dockerfile.external-polynomial`, `Dockerfile.external-proofs`, `Dockerfile.external-python`, `Dockerfile.proof`, `Dockerfile.release-readiness` | Routine Dependabot Docker updates, with the existing Java-major restriction and exact image-policy review |
 | `Dockerfile.visual-regression` | Routine Docker updates, with the existing Playwright dependency/image equality contract |
-| `Dockerfile.target-free-held-out-reproduction`, `reproduction/Dockerfile.reproduction`, `reproduction/environments/v2/Dockerfile.reproduction` | Explicit versioned reproduction-environment migration |
+| `Dockerfile.target-free-held-out-reproduction`, `reproduction/Dockerfile.reproduction`, `reproduction/environments/v2/Dockerfile.reproduction`, `reproduction/environments/v3/Dockerfile.reproduction` | Explicit versioned reproduction-environment migration |
 | `Dockerfile.safe-runtime-qualification` | Explicit versioned public runtime reproduction migration; same pinned base image, separate public qualification authority |
 
 The current v1 reproduction image is
@@ -25,7 +25,7 @@ schema byte identities from `fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812`. This add
 two identities without editing any of the five earlier retained files. It does
 not reopen the historical experiments or change the fixed public case manifest.
 
-`.github/dependabot.yml` excludes the four frozen definitions through literal
+`.github/dependabot.yml` excludes the five frozen definitions through literal
 `exclude-paths` entries on the root Docker job. GitHub documents these as file
 or directory exclusions relative to the update entry's directory, distinct
 from dependency-name `ignore` rules. Its Docker fetcher reads matching files
@@ -48,9 +48,9 @@ entries in `config/quality/container-image-policy.json` before qualification.
 
 `MavenFrozenReproductionEnvironmentContractTest` verifies the actual parsed
 Dependabot configuration and the declared Docker inventory. The current contract
-deliberately accepts one root Docker job and four literal exclusions. Additional
+deliberately accepts one root Docker job and five literal exclusions. Additional
 jobs, broader exclusions, dependency allow-lists, redirected targets or disabled
-routine Temurin updates require an explicit ownership review. The six ordinary
+routine Temurin updates require an explicit ownership review. The nine ordinary
 Dockerfiles remain eligible for maintenance.
 
 The contract also preserves the SHA-256 of the two v1 Dockerfiles and three v1
@@ -61,7 +61,8 @@ formatting change fails. These byte identities are part of the historical
 environment contract; a migration adds identities instead of updating these
 expected hashes.
 
-The seven frozen files also have explicit `text eol=lf` attributes. Their
+The seven v1 files and the four files for each of v2 and v3 also have explicit
+`text eol=lf` attributes. Their
 content-addressed bytes therefore survive a checkout with `core.autocrlf=true`.
 
 The existing `MavenContainerImagePolicyContractTest`, Dockerfile path checks,
@@ -83,9 +84,36 @@ inputs. They do not execute Dependabot's hosted service or regenerate scientific
 evidence. Full Gradle/`ciCheck`, Maven/product/Docker, JMH and SymPy qualification
 remain separate required authorities.
 
-## Gradle 9.9.1 toolchain transition
+## Current Gradle 9.9.2 toolchain transition
 
-New independent-reproduction artifacts use [v2](../reproduction/environments/v2/environment.json).
+New independent-reproduction artifacts use [v3](../reproduction/environments/v3/environment.json).
+The v3 descriptor adds Gradle 9.9.2 while retaining the existing Temurin image,
+architectures, runtime user and network policies. The distribution checksum is
+`971fcd7150ca4ba04852c0b2ca0d2d0ab9468e14b03473eab19528809914c76b`, from the
+[official Gradle 9.9.2 release metadata](https://github.com/gradle/gradle-distributions/releases/tag/v9.9.2).
+The wrapper JAR remains bound to
+`621008afc4f5d59357fcf06ffa644dd5aade5e091bdc363742710445f73cdaf8`.
+The active student starter and its external-consumer verifier require the same
+9.9.2 wrapper and copy its distribution checksum unchanged.
+
+The v3 descriptor, Dockerfile, artifact schema and receipt schema have new byte
+identities. Every frozen v1 and v2 file retains its original bytes. The v3
+predecessor records the v2 descriptor, Dockerfile and schema identities at
+`f13c2b6537037f33d1e5b6cb748e1768b59f09b5`; it does not assign an identity to an
+unavailable historical bundle. Replay still requires the original bundle or
+matching checkout and recorded inputs.
+
+The verifier selects v1, v2 or v3 from the artifact identity. A damaged manifest
+uses the exact bundled receipt-schema bytes to retain that version's negative
+receipt. It rejects unknown versions, substituted descriptors, wrapper pins,
+schema bytes and receipts from another version. The existing lifecycle gate
+exercises these historical contracts alongside current v3 artifact determinism
+and receipt semantics. These local controls do not claim an independent rerun
+of retained historical scientific results.
+
+## Retained Gradle 9.9.1 toolchain transition
+
+The earlier Gradle 9.9.1 transition uses [v2](../reproduction/environments/v2/environment.json).
 The v2 descriptor pins the wrapper distribution and JAR, Dockerfile, schemas,
 Temurin base image, supported architectures and execution policies. The builder
 archives exact `HEAD`. The verifier compares the environment bytes in that
@@ -113,23 +141,26 @@ following as one reviewed migration.
    against it before execution. Have the Java verifier, Python builder and both
    verifiers, schemas and self-tests consume or validate the same descriptor and
    its hash. Reject missing, unknown-version or mismatched bindings. Keep the v1
-   definitions, validators and byte identities available for historical replay.
+   definitions, validators and byte identities, and every later frozen version,
+   available for historical replay.
 3. Introduce new environment/artifact/receipt schema identities and explicit
    version dispatch. A v1 receipt must continue to validate against its original
    schema bytes and image contract; never select the newest environment merely
    because it is the current default. Bind the new schema bytes in new artifacts
    and receipts using the new version's contracts.
-4. Retain an explicit predecessor link containing the v1 environment, schema and
-   retained artifact identities plus their source revision. Describe any
+4. Retain an explicit predecessor link containing the previous environment,
+   schema and available retained artifact identities plus their source revision.
+   Describe any
    cross-version result comparison as a comparison between environments. Do not
    assert byte identity across environment versions.
 5. Under the explicitly selected migration, regenerate the current evidence in
    the new environment, verify repeated runs within that same environment and retain independent
-   verification receipts. Preserve historical v1 evidence. Evidence generation,
+   verification receipts. Preserve historical evidence for every version.
+   Evidence generation,
    held-out use and FINAL TEST execution remain governed by their existing
    authorizations and exposure rules.
 6. Extend maintenance ownership to the new frozen definitions while retaining
-   every v1 exclusion and hash. Add negative controls for mismatched descriptors,
+   every historical exclusion and hash. Add negative controls for mismatched descriptors,
    consumers, schemas, image pairs and version dispatch. Qualify the complete
    migration with all Gradle/`ciCheck`, Maven/product/Docker, JMH and SymPy
    authorities on its final commit before publishing it.

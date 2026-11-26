@@ -59,13 +59,14 @@ updates:
   # matching Java dependency update.
   - package-ecosystem: docker
     directory: /
-    # These definitions bind historical v1 evidence. Refresh them only through
+    # These definitions bind versioned evidence. Refresh them only through
     # the versioned migration in docs/reproduction-environment-maintenance.md.
     # File exclusions preserve ordinary Temurin updates in the same directory.
     exclude-paths:
       - "Dockerfile.target-free-held-out-reproduction"
       - "reproduction/Dockerfile.reproduction"
       - "reproduction/environments/v2/Dockerfile.reproduction"
+      - "reproduction/environments/v3/Dockerfile.reproduction"
       - "Dockerfile.safe-runtime-qualification"
     schedule:
       interval: weekly

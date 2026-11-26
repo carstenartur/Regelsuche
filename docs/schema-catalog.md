@@ -112,8 +112,10 @@ Work-Ledger.
 | [`regelsuche-autonomous-discovery-result-card-v1`](schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json) | Evidence-abgeleitete Ergebnisdarstellung |
 | [`regelsuche-independent-reproduction-artifact-v1`](schemas/regelsuche-independent-reproduction-artifact-v1.schema.json) | Inhalt und Identität des Reproduktionspakets |
 | [`regelsuche-independent-reproduction-artifact-v2`](schemas/regelsuche-independent-reproduction-artifact-v2.schema.json) | Inhalt und Identität des Reproduktionspakets |
+| [`regelsuche-independent-reproduction-artifact-v3`](schemas/regelsuche-independent-reproduction-artifact-v3.schema.json) | Inhalt und Identität des aktuellen Reproduktionspakets mit Gradle 9.9.2 |
 | [`regelsuche-independent-reproduction-receipt-v1`](schemas/regelsuche-independent-reproduction-receipt-v1.schema.json) | Ergebnis eines Reproduktionslaufs |
 | [`regelsuche-independent-reproduction-receipt-v2`](schemas/regelsuche-independent-reproduction-receipt-v2.schema.json) | Ergebnis eines Reproduktionslaufs |
+| [`regelsuche-independent-reproduction-receipt-v3`](schemas/regelsuche-independent-reproduction-receipt-v3.schema.json) | Ergebnis eines Reproduktionslaufs im v3-Vertrag |
 
 ## Solver und Proof
 
