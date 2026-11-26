@@ -1,0 +1,143 @@
+{
+  "schema": "regelsuche.ai-knowledge.baseline-promotion/v1",
+  "acceptedMain": {
+    "commit": "dea66e6f2955ad18b81f739d21f3674ea07884ab",
+    "tree": "7759063592fdf9f4bc5ebd86584388a0f2847c35",
+    "pullRequest": 1406,
+    "mergeTime": "2026-11-26T04:37:14Z",
+    "firstParent": "3a0fb43fd1fe5b8f849ce215e2db7c6316e6c2b7"
+  },
+  "acceptedCI": {
+    "runId": 45749173449,
+    "conclusion": "success",
+    "event": "pull_request",
+    "head": "d9caa8a0162c86668a57b7753edee1af9e2b7543",
+    "checkout": "ee0c12e15d3b5734989df95e9166433b20a3c52c",
+    "gradleJobId": 139672849896,
+    "successfulAuthorities": {
+      "Fast build and workflow contracts": 139672541931,
+      "Complete Maven product and Docker authority": 139672849818,
+      "Isolated SymPy runtime authority": 139672849855,
+      "Fresh Maven Student SDK archive qualification": 139672849860,
+      "Isolated JMH authority": 139672849866,
+      "Maven pinned polynomial pilot": 139672849877,
+      "Checkout-local Gradle authority": 139672849896,
+      "Complete Git-free Maven lifecycle": 139672849900,
+      "Checked Lean and SMT proof authority": 139672849912,
+      "Maven pinned typed polynomial study": 139672849915,
+      "Maven pinned checked-schema polynomial study": 139672849926,
+      "Maven pinned native polynomial study": 139672849946,
+      "Independent clean and pinned scalar reproduction": 139672849985,
+      "Typed source-only learning comparison": 139675368827,
+      "Checkout-local ciCheck": 139693207927
+    }
+  },
+  "originalQualityEvidence": {
+    "id": 15088085303,
+    "name": "quality-acceptance-evidence",
+    "size_in_bytes": 29212942,
+    "digest": "sha256:b3c4d2c775c3a9cac5015fedc4b3db9313634d7a6a6ebd2568d965de7b942dbb",
+    "indexSha256": "d8743ad3c840d02a4db9488ffcc1f0512e68eb0720075c7f2d6b0d0fd0b79f29",
+    "indexedFilesVerified": 293,
+    "trackedSourceBlobsVerified": 64,
+    "generatedFilesVerified": 229
+  },
+  "rejectedCI": {
+    "pullRequest": 1407,
+    "runId": 45760390430,
+    "jobId": 139709097371,
+    "head": "dc46d59d015f4d1ae68ef134e4ded5a00c4b2a5a",
+    "checkout": "975ffb613ca3d225f21454f9c146173b504c7cd1",
+    "tree": "b5f8741ea7526975fb909e3dc966722453ed18b9",
+    "artifact": {
+      "id": 15089458314,
+      "name": "repository-verification",
+      "size_in_bytes": 2253846,
+      "digest": "sha256:7b3e643cc289cd9f852597800d9894766377e0f720ec65f1a35d16a8dd192e2f"
+    }
+  },
+  "releaseExtractor": {
+    "tag": "v0.1.10",
+    "tagObject": "ef0956a5743197a2aa62f425591282396ad46825",
+    "commit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "sourceBlobs": {
+      "core/src/main/java/org/aiknowledge/core/TrendAnalyzer.java": "7964f1ecf2ad7fe9ab18c393a39c9112b92d28dd",
+      "core/src/main/java/org/aiknowledge/core/StableIo.java": "7247ea8188ed67665419d1ff3263638fd474cf02",
+      "core/src/main/java/org/aiknowledge/core/JsonSupport.java": "efa421c9521d3c209544f86ef4ab1875a1352713",
+      "core/src/main/java/org/aiknowledge/core/ExtractionOptions.java": "5adbc86925c03d7a11e604ba91e3ec2fd657696f"
+    },
+    "projectionDriver": "ai-knowledge/baseline-history/2026-11-24-main-f183aedd/ProjectionDriver.java",
+    "projectionDriverSha256": "cc538f449e04082e795347fac54044e44dab3ad0daafef64c914287ae958fa82",
+    "parserJarsSha256": {
+      "jackson-databind-2.23.0.jar": "abd1edd2736c764da03fe6cb7a9de70d48dd0a198aed131604c564bff62f9cc1",
+      "jackson-core-2.23.0.jar": "449798beb4c4ec26de9cc25b39ca2198036883fb905ca968cbef7136d19a25d9",
+      "jackson-annotations-2.23.jar": "e5b60c3088e0887b290ff9226394354589a1dad583743944b7f5538661056b4c"
+    },
+    "javaVersion": "Temurin 25.0.5+8",
+    "compilerRelease": 17
+  },
+  "policy": {
+    "maxCognitiveDebt": 21.7,
+    "trendThresholds": {
+      "maxCognitiveDebtIncrease": 10,
+      "maxConceptRadiusIncrease": 3,
+      "maxContextTokenIncrease": 15000,
+      "failOnWarnings": false
+    },
+    "unchangedPolicyBlobs": {
+      "gradle.properties": "7838b3d7efecc913e5dd91296583718ec37ff3cc",
+      "settings.gradle": "6a97d7802723dc26a1099874d7c13c31a5102a44",
+      "build.gradle": "8c0e35391f3e3769a8dc8508a35b3914aa00ac4a",
+      "ai-knowledge-verification/build.gradle": "adcdd3e98470fee319924204c8c35957c376fa01",
+      "gradle/ai-knowledge-verification.gradle": "9fd073d3546712fae06facd4d5f36b58d0142cfa",
+      "gradle/quality-gates.gradle": "d70b622a7a53be686754a2fcacdd8721e6fe0803",
+      "ai-knowledge/capabilities.seed.yaml": "fac75eafa652636cae6fb87ee8ca0d7ab68f3c15",
+      "ai-knowledge/claims.seed.yaml": "a71bda7d6a2cf2f28a5f14f2d2d0662e25d81036",
+      "ai-knowledge/claims.json": "0e3d797a6e4130f9fc5087d57b2570873e0f045c",
+      "config/ai-knowledge-capability-coverage.json": "5527280725bb8513145443f3309bb2ac9b02cd41",
+      "config/quality/complexity-hotspots.json": "5670714ca96ec70342f7228c647687120b5757a1",
+      "config/quality/coverage-policy.json": "0b78714844d9d07ac3e83709b695e73f4e12f914",
+      "scripts/verify-ai-knowledge-artifacts.py": "e67d8816f783d8adfd6bd093b55449581cd895ae",
+      "scripts/test_ai_knowledge_coverage.py": "c5853048956f679ee9a5eba351cd89131a63dcc1",
+      ".github/workflows/gradle.yml": "810a3f7e78aec270d09a68cd64a11f2f46b0ec81"
+    }
+  },
+  "retainedReportsSha256": {
+    "accepted-check.json": "412add83632e8cdadb7ec6bf593bd22ef85fafe0e98bf19b735391d281ee04e4",
+    "accepted-complexity.json": "0f31152e648ae1c343ad65f93f9e2e0645a5d11d4534997d15d11a6a1914d3e9",
+    "accepted-trend-projected.json": "0fd680ee3f5bc740021c1e1d288f59c131d42f19240b1d461ecd264618bfd8b5",
+    "metrics-snapshot.json": "9610ed49e94cf291fa8e75cda664f5d8caf0e7030ad5431bd54e4880fed4f63c",
+    "previous-baseline.json": "6d9d7df9fdbcb5873753401166494d8fe605e4d99cafd09322f9c88ed692e16d",
+    "rejected-check.json": "07f5ff51d305417e8981a7b842c468228d7dfec7d6427e699c0f3b00ab3ec7ac",
+    "rejected-complexity.json": "0fd7fa5fbf3bf9f7a9ad5ac13c2040a977b3951b02e52678c1386f10b2ebd610",
+    "rejected-trend.json": "9f4dcc9140356d1349fb24f6b574ed3bbfcf6308f42e06039743986a999caf35",
+    "replayed-trend.json": "8223255f3469bac9db39c05b7bedb2dce8253ebc52ce0d85f45c5384837ad7b6"
+  },
+  "originalRejectedSnapshotSha256": "9daf0d9ae1a0a9cfcb0e39af170f4d1ebbddaf03fabfebb45337bbe1fdb99f42",
+  "rejectedTrendAndSnapshotReproducedByteForByte": true,
+  "decisions": {
+    "accepted-trend-projected.json": {
+      "passed": true,
+      "estimatedContextTokens": 919570,
+      "contextTokenDelta": 14095,
+      "conceptRadiusDelta": 1,
+      "violations": []
+    },
+    "rejected-trend.json": {
+      "passed": false,
+      "estimatedContextTokens": 923550,
+      "contextTokenDelta": 18075,
+      "conceptRadiusDelta": 2,
+      "violations": [
+        "estimatedContextTokens"
+      ]
+    },
+    "replayed-trend.json": {
+      "passed": true,
+      "estimatedContextTokens": 923550,
+      "contextTokenDelta": 3980,
+      "conceptRadiusDelta": 1,
+      "violations": []
+    }
+  }
+}
