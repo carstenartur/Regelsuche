@@ -82,11 +82,11 @@ class ProofDockerfileBuildContextTest {
         assertThrows(AssertionError.class,
             () -> verifyStandardImage(valid.replace(
                 "FROM maven:3.10.0-eclipse-temurin-25-noble AS build",
-                "FROM eclipse-temurin:25.0.5_8-jdk-noble AS build")));
+                "FROM eclipse-temurin:25.0.5.1_2-jdk-noble AS build")));
     }
 
     private static void verifyStandardImage(String dockerfile) {
-        String legacy = "FROM eclipse-temurin:25.0.5_8-jdk-noble AS walkthrough-build";
+        String legacy = "FROM eclipse-temurin:25.0.5.1_2-jdk-noble AS walkthrough-build";
         String walkthrough = "FROM walkthrough-build AS walkthrough";
         String maven = "FROM maven:3.10.0-eclipse-temurin-25-noble AS build";
         assertTrue(dockerfile.contains(legacy), "Retain the legacy walkthrough target");
