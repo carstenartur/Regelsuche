@@ -9,6 +9,29 @@
     <dependency><groupId>io.github.carstenartur</groupId><artifactId>regelsuche-math-algorithms</artifactId></dependency>
     <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency>
   </dependencies>
+  <build><plugins><plugin>
+    <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
+    <executions>
+      <!-- A second compile goal replaces the reactor artifact with its partial output.
+           testCompile can lint the main source root without publishing the check classes. -->
+      <execution><id>shared-power-strict-main</id><phase>process-classes</phase><goals><goal>testCompile</goal></goals>
+        <configuration>
+          <skip>false</skip>
+          <compileSourceRoots><compileSourceRoot>${project.build.sourceDirectory}</compileSourceRoot></compileSourceRoots>
+          <outputDirectory>${project.build.directory}/strict-classes</outputDirectory>
+          <testIncludes><testInclude>**/SharedPower*.java</testInclude><testInclude>**/Quadratic*.java</testInclude><testInclude>**/PrimeEvidence*.java</testInclude></testIncludes>
+          <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
+        </configuration>
+      </execution>
+      <execution><id>shared-power-strict-tests</id><phase>process-test-classes</phase><goals><goal>testCompile</goal></goals>
+        <configuration>
+          <outputDirectory>${project.build.directory}/strict-test-classes</outputDirectory>
+          <testIncludes><testInclude>**/SharedPower*Test.java</testInclude><testInclude>**/Quadratic*Test.java</testInclude><testInclude>**/PrimeEvidence*Test.java</testInclude></testIncludes>
+          <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
+        </configuration>
+      </execution>
+    </executions>
+  </plugin></plugins></build>
   <profiles><profile><id>sdk-release</id><build><plugins>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-source-plugin</artifactId><executions><execution><id>sdk-sources</id><goals><goal>jar-no-fork</goal></goals></execution></executions></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-javadoc-plugin</artifactId><configuration><doclint>none</doclint><notimestamp>true</notimestamp></configuration><executions><execution><id>sdk-javadoc</id><goals><goal>jar</goal></goals></execution></executions></plugin>

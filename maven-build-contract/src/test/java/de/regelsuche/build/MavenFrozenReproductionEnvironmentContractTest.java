@@ -41,9 +41,11 @@ class MavenFrozenReproductionEnvironmentContractTest {
         + "3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617";
     private static final String INDEPENDENT_V2_DOCKERFILE =
         "reproduction/environments/v2/Dockerfile.reproduction";
+    private static final String INDEPENDENT_V3_DOCKERFILE =
+        "reproduction/environments/v3/Dockerfile.reproduction";
     private static final Set<String> FROZEN_DOCKERFILES = Set.of(
         "Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
-        "Dockerfile.safe-runtime-qualification", INDEPENDENT_V2_DOCKERFILE);
+        "Dockerfile.safe-runtime-qualification", INDEPENDENT_V2_DOCKERFILE, INDEPENDENT_V3_DOCKERFILE);
     // Original five v1 identities retained at 8afeda1a538c6726b0f6b8a6c8014dfcced0fbe2.
     // Additive public runtime definition/schema retained at fc55f6cffe5d69bd2e517d0e36bdb0d5f5de4812.
     // Future environments add a new version; they never replace these identities.
@@ -72,6 +74,16 @@ class MavenFrozenReproductionEnvironmentContractTest {
         "03c074c716eeac7602cdd7dbdfe6afb195b4d132df784039cd6a12235c992fc6",
         "docs/schemas/regelsuche-independent-reproduction-receipt-v2.schema.json",
         "b267a2fc555551820163b0e028458532ae2108fff177599bfca3d90c7b2c63cd");
+
+    private static final Map<String, String> V3_SHA256 = Map.of(
+        INDEPENDENT_V3_DOCKERFILE,
+        "24454356b0b414ce9c26a32fe85d2b4c67e94082353f5cf1ac837abbf82915d0",
+        "reproduction/environments/v3/environment.json",
+        "a6694702c8abe3d4ff1ac2008c4b2f6bc8dc806e0dc5cfb849d02ae954a83fba",
+        "docs/schemas/regelsuche-independent-reproduction-artifact-v3.schema.json",
+        "f9babe841151bb0047131ff68fb6947ea0760ba62d3503fc2c4667b80eb85161",
+        "docs/schemas/regelsuche-independent-reproduction-receipt-v3.schema.json",
+        "871e0d4a948b5e96b407ccef6c1a0a7c5217b75b2ec1a63c686ec667efa76048");
 
     @Test
     void repositorySeparatesRoutineImagesFromFrozenV1Evidence() throws IOException {
@@ -113,7 +125,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Dockerfile.target-free-held-out-reproduction", "reproduction/Dockerfile.reproduction",
-        "Dockerfile.safe-runtime-qualification", INDEPENDENT_V2_DOCKERFILE})
+        "Dockerfile.safe-runtime-qualification", INDEPENDENT_V2_DOCKERFILE, INDEPENDENT_V3_DOCKERFILE})
     void removingAnyFrozenExclusionFailsClosed(String removed, @TempDir Path temporary)
             throws IOException {
         fixture(temporary);
@@ -175,6 +187,32 @@ class MavenFrozenReproductionEnvironmentContractTest {
         Files.writeString(path, Files.readString(path) + "\n");
 
         assertViolation(temporary, "v2 bytes changed: " + relative);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        INDEPENDENT_V3_DOCKERFILE, "reproduction/environments/v3/environment.json",
+        "docs/schemas/regelsuche-independent-reproduction-artifact-v3.schema.json",
+        "docs/schemas/regelsuche-independent-reproduction-receipt-v3.schema.json"})
+    void v3EnvironmentBytesAreFrozen(String relative, @TempDir Path temporary)
+            throws IOException {
+        fixture(temporary);
+        Path path = temporary.resolve(relative);
+        Files.writeString(path, Files.readString(path) + "\n");
+
+        assertViolation(temporary, "v3 bytes changed: " + relative);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"v2", "v3"})
+    void imageAndPolicyUpdateCannotRedefineVersionedEnvironment(
+            String version, @TempDir Path temporary) throws IOException {
+        fixture(temporary);
+        String relative = "reproduction/environments/" + version + "/Dockerfile.reproduction";
+        replaceImageAndPolicy(temporary, relative, V1_IMAGE, "example/new-environment:25.0.5");
+
+        assertViolation(temporary, version + " bytes changed: " + relative);
+        assertViolation(temporary, version + " image policy changed: " + relative);
     }
 
     @ParameterizedTest
@@ -264,12 +302,14 @@ class MavenFrozenReproductionEnvironmentContractTest {
         });
         for (String path : FROZEN_DOCKERFILES) {
             if (!policy.path(path).equals(JSON.createArrayNode().add(V1_IMAGE))) {
-                String version = INDEPENDENT_V2_DOCKERFILE.equals(path) ? "v2" : "v1";
+                String version = INDEPENDENT_V3_DOCKERFILE.equals(path) ? "v3"
+                    : INDEPENDENT_V2_DOCKERFILE.equals(path) ? "v2" : "v1";
                 violations.add(version + " image policy changed: " + path);
             }
         }
         checkFrozenBytes(root, V1_SHA256, "v1", violations);
         checkFrozenBytes(root, V2_SHA256, "v2", violations);
+        checkFrozenBytes(root, V3_SHA256, "v3", violations);
         return new Evaluation(Set.copyOf(routine), List.copyOf(violations));
     }
 
@@ -289,6 +329,7 @@ class MavenFrozenReproductionEnvironmentContractTest {
         Path root = repositoryRoot();
         Set<String> paths = new TreeSet<>(V1_SHA256.keySet());
         paths.addAll(V2_SHA256.keySet());
+        paths.addAll(V3_SHA256.keySet());
         paths.addAll(List.of(DEPENDABOT, IMAGE_POLICY, "Dockerfile"));
         for (String relative : paths) {
             Path target = destination.resolve(relative);

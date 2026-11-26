@@ -53,11 +53,11 @@ fi
 
 log "Validate frozen wrapper, container and executable inputs"
 grep -qx \
-  'distributionSha256Sum=d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228' \
+  'distributionSha256Sum=971fcd7150ca4ba04852c0b2ca0d2d0ab9468e14b03473eab19528809914c76b' \
   gradle/wrapper/gradle-wrapper.properties
 grep -qx \
   'FROM eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617 AS build' \
-  reproduction/environments/v2/Dockerfile.reproduction
+  reproduction/environments/v3/Dockerfile.reproduction
 bash -n reproduction/reproduce.sh
 python3 -m py_compile \
   scripts/build-independent-reproduction-artifact.py \
@@ -112,6 +112,7 @@ import tarfile
 root = Path(sys.argv[1])
 archive = Path(sys.argv[2])
 manifest = json.loads((root / "artifact-manifest.json").read_text())
+assert manifest["schema"] == "regelsuche.independent-reproduction-artifact/v3"
 assert manifest["artifactStatus"] == "DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION"
 assert manifest["source"]["releaseTagStatus"] == "DEVELOPMENT_REVISION"
 assert manifest["externalAttestationStatus"] == "NOT_COLLECTED"
@@ -120,7 +121,7 @@ assert manifest["declaredEnvironment"]["javaImageIndexDigest"] == (
     "sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
 )
 assert manifest["declaredEnvironment"]["gradleDistributionSha256"] == (
-    "d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228"
+    "971fcd7150ca4ba04852c0b2ca0d2d0ab9468e14b03473eab19528809914c76b"
 )
 with tarfile.open(archive, "r:gz") as bundle:
     names = [member.name for member in bundle.getmembers()]

@@ -3,37 +3,37 @@
   "policy": "Every tracked Dockerfile must be declared. External FROM references must match this contract exactly. Digest pins are preferred; exact component versions are accepted and floating, major-only or latest tags are rejected.",
   "files": {
     "Dockerfile": [
-      "eclipse-temurin:25.0.5_8-jdk-noble",
+      "eclipse-temurin:25.0.5.1_2-jdk-noble",
       "maven:3.10.0-eclipse-temurin-25-noble",
-      "eclipse-temurin:25.0.5_8-jre-noble"
+      "eclipse-temurin:25.0.5.1_2-jre-noble"
     ],
     "Dockerfile.autopilot": [
-      "eclipse-temurin:25.0.5_8-jdk-noble",
-      "eclipse-temurin:25.0.5_8-jre-noble"
+      "eclipse-temurin:25.0.5.1_2-jdk-noble",
+      "eclipse-temurin:25.0.5.1_2-jre-noble"
     ],
     "Dockerfile.comparative-benchmarks": [
-      "eclipse-temurin:25.0.5_8-jdk-noble",
-      "eclipse-temurin:25.0.5_8-jre-noble"
+      "eclipse-temurin:25.0.5.1_2-jdk-noble",
+      "eclipse-temurin:25.0.5.1_2-jre-noble"
     ],
     "Dockerfile.external-polynomial": [
-      "eclipse-temurin:25.0.5_8-jdk-noble@sha256:3c35c595580ae3342eb34e5832e8e516ded8e767efa4a5fe61b8644d44847b8e",
+      "eclipse-temurin:25.0.5.1_2-jdk-noble@sha256:c7eef3dfeb81468533ea48c67bddaa8c7ca916454259e4d0d734d12bcff8e125",
       "python:3.12.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c"
     ],
     "Dockerfile.external-proofs": [
-      "eclipse-temurin:25.0.5_8-jdk-noble@sha256:3c35c595580ae3342eb34e5832e8e516ded8e767efa4a5fe61b8644d44847b8e",
+      "eclipse-temurin:25.0.5.1_2-jdk-noble@sha256:c7eef3dfeb81468533ea48c67bddaa8c7ca916454259e4d0d734d12bcff8e125",
       "debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc"
     ],
     "Dockerfile.external-python": [
-      "eclipse-temurin:25.0.5_8-jdk-noble@sha256:3c35c595580ae3342eb34e5832e8e516ded8e767efa4a5fe61b8644d44847b8e",
+      "eclipse-temurin:25.0.5.1_2-jdk-noble@sha256:c7eef3dfeb81468533ea48c67bddaa8c7ca916454259e4d0d734d12bcff8e125",
       "python:3.12.12-slim-bookworm@sha256:593bd06efe90efa80dc4eee3948be7c0fde4134606dd40d8dd8dbcade98e669c"
     ],
     "Dockerfile.proof": [
       "maven:3.10.0-eclipse-temurin-25-noble",
-      "eclipse-temurin:25.0.5_8-jre-noble"
+      "eclipse-temurin:25.0.5.1_2-jre-noble"
     ],
     "Dockerfile.release-readiness": [
-      "eclipse-temurin:25.0.5_8-jdk-noble",
-      "eclipse-temurin:25.0.5_8-jre-noble"
+      "eclipse-temurin:25.0.5.1_2-jdk-noble",
+      "eclipse-temurin:25.0.5.1_2-jre-noble"
     ],
     "Dockerfile.safe-runtime-qualification": [
       "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
@@ -42,12 +42,15 @@
       "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
     ],
     "Dockerfile.visual-regression": [
-      "mcr.microsoft.com/playwright/java:v1.65.0-noble@sha256:33872378140440f017536054734d761e01a3908e17bb30f675ae1c959daa46f4"
+      "mcr.microsoft.com/playwright/java:v1.65.1-noble@sha256:3cbef0eaf6c98292b2b209817bad5f2da150cdff7df8eea56c2001a4c716fcd9"
     ],
     "reproduction/Dockerfile.reproduction": [
       "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
     ],
     "reproduction/environments/v2/Dockerfile.reproduction": [
+      "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
+    ],
+    "reproduction/environments/v3/Dockerfile.reproduction": [
       "eclipse-temurin:25.0.3_9-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617"
     ]
   }
