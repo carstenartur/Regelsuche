@@ -141,6 +141,14 @@ using the deficit as a survivor bound must establish that all actual blockers
 are represented and have capacity one. See [the graph contract, examples and
 verification](../docs/research/bipartite-matching.md).
 
+`de.regelsuche.sdk.optimization.combinatorics.ConflictMatchingSdk.search` and
+`verify` add independently justified pairs of incompatible edges. The core
+uses its exact LP producer and then directly replays a source-bound weighted
+cover. The result is a fractional upper bound and its safe integer consequence,
+not an assertion of integral optimality. Budgets include all search and replay
+phases; exhausted calls publish no bound. See [the proof, canonical edge
+indices, controls and limits](../docs/research/conflict-matching.md).
+
 The `0.5.4-SNAPSHOT` source also exposes
 `de.regelsuche.sdk.optimization.modular.PolynomialCongruenceSdk.solve` and
 `verify`. Pass a core `PolynomialCongruence.Request` with signed
