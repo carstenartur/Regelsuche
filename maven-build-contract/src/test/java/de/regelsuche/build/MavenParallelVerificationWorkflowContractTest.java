@@ -316,6 +316,35 @@ class MavenParallelVerificationWorkflowContractTest {
   }
 
   @Test
+  void pilotAndCheckedProofAuthoritiesOwnSeparateMavenCaches() throws IOException {
+    Path root = repositoryRoot();
+    JsonNode jobs = YAML.readTree(root.resolve(".github/workflows/gradle.yml").toFile()).required("jobs");
+    String fullCacheInputs = "**/pom.xml\n.mvn/maven.config";
+    String pilotScope = ".mvn/polynomial-pilot-cache-scope.txt";
+    String proofScope = ".mvn/checked-proof-cache-scope.txt";
+    assertEquals("polynomial-pilot-cache-v1", Files.readString(root.resolve(pilotScope)).strip());
+    assertEquals("checked-proof-cache-v1", Files.readString(root.resolve(proofScope)).strip());
+    assertEquals(fullCacheInputs + "\n" + pilotScope,
+        mavenCacheInputs(jobs.required("maven-polynomial-qualification")));
+    assertEquals(fullCacheInputs + "\n" + proofScope,
+        mavenCacheInputs(jobs.required("checked-proofs")));
+    for (var entry : jobs.properties()) {
+      for (var step : entry.getValue().path("steps")) {
+        if (!step.path("uses").asText().startsWith("actions/setup-java@")) {
+          continue;
+        }
+        String inputs = step.path("with").path("cache-dependency-path").asText();
+        if (!"maven-polynomial-qualification".equals(entry.getKey())) {
+          assertFalse(inputs.contains(pilotScope), "foreign pilot cache producer: " + entry.getKey());
+        }
+        if (!"checked-proofs".equals(entry.getKey())) {
+          assertFalse(inputs.contains(proofScope), "foreign proof cache producer: " + entry.getKey());
+        }
+      }
+    }
+  }
+
+  @Test
   void archiveQualificationUsesCurrentProducerArtifactsAndFailsClosed() throws IOException {
     var workflow = YAML.readTree(repositoryRoot().resolve(".github/workflows/gradle.yml").toFile());
     var jobs = workflow.required("jobs");
