@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticRootProgram.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">QuadraticRootProgram.java</span></div><h1>QuadraticRootProgram.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Field-valued SSA. Registers 0, 1, 2 are a, b, g. Each arm extends the common prefix independently. */
+public record QuadraticRootProgram(List&lt;Step&gt; prefix, int guardLeft, int guardRight, Arm equal, Arm unequal) {
+    static final int INPUTS = 3;
+    static final int MAX_BLOCK = 128;
+
+<span class="fc" id="L13">    public QuadraticRootProgram {</span>
+<span class="fc" id="L14">        prefix = block(prefix);</span>
+<span class="fc" id="L15">        Objects.requireNonNull(equal);</span>
+<span class="fc" id="L16">        Objects.requireNonNull(unequal);</span>
+<span class="fc" id="L17">    }</span>
+
+<span class="fc" id="L19">    public enum Op { CONSTANT, ADD, SUBTRACT, MULTIPLY, SQUARE, NEGATE, POWER, INVERSE }</span>
+
+    /** Unused references are -1 and an unused literal is zero. */
+    public record Step(Op op, int left, int right, BigInteger literal) {
+<span class="fc" id="L23">        public Step {</span>
+<span class="fc" id="L24">            Objects.requireNonNull(op);</span>
+<span class="fc" id="L25">            SharedPowerPlan.bounded(literal);</span>
+<span class="fc bfc" id="L26" title="All 6 branches covered.">            boolean binary = op == Op.ADD || op == Op.SUBTRACT || op == Op.MULTIPLY;</span>
+<span class="pc bpc" id="L27" title="4 of 16 branches missed.">            if ((op == Op.CONSTANT ? left != -1 : left &lt; 0) || (binary ? right &lt; 0 : right != -1)</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">                    || (op == Op.POWER || op == Op.CONSTANT ? literal.signum() &lt; 0 : literal.signum() != 0)) {</span>
+<span class="nc" id="L29">                throw new IllegalArgumentException(&quot;INVALID_FIELD_STEP&quot;);</span>
+            }
+<span class="fc" id="L31">        }</span>
+<span class="fc" id="L32">        public static Step constant(BigInteger value) { return new Step(Op.CONSTANT, -1, -1, value); }</span>
+<span class="fc" id="L33">        public static Step add(int a, int b) { return new Step(Op.ADD, a, b, BigInteger.ZERO); }</span>
+<span class="fc" id="L34">        public static Step subtract(int a, int b) { return new Step(Op.SUBTRACT, a, b, BigInteger.ZERO); }</span>
+<span class="fc" id="L35">        public static Step multiply(int a, int b) { return new Step(Op.MULTIPLY, a, b, BigInteger.ZERO); }</span>
+<span class="fc" id="L36">        public static Step square(int a) { return new Step(Op.SQUARE, a, -1, BigInteger.ZERO); }</span>
+<span class="fc" id="L37">        public static Step negate(int a) { return new Step(Op.NEGATE, a, -1, BigInteger.ZERO); }</span>
+<span class="fc" id="L38">        public static Step power(int a, BigInteger exponent) { return new Step(Op.POWER, a, -1, exponent); }</span>
+<span class="fc" id="L39">        public static Step inverse(int a) { return new Step(Op.INVERSE, a, -1, BigInteger.ZERO); }</span>
+    }
+
+    /** The optional exit operation negates both outputs iff the nonzero real part has character -1. */
+    public record Arm(List&lt;Step&gt; steps, int real, int imaginary, boolean normalizeRealCharacter) {
+<span class="fc" id="L44">        public Arm { steps = block(steps); }</span>
+    }
+
+    /** Structural counts for the common prefix followed by the selected arm, with one equality comparison. */
+<span class="fc" id="L48">    public record PathCost(int powerCalls, int multiplications, int squarings, int inversions, int additions,</span>
+            int subtractions, int negations, int characterSelections, long weightedGroupWork) {}
+
+    /** Binary-chain group-work estimate. Additive operations and character selections are counted separately. */
+    public PathCost cost(boolean equalityHolds, SharedPowerPlan.Weights weights) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        var arm = equalityHolds ? equal : unequal;</span>
+<span class="fc" id="L54">        int[] counts = new int[Op.values().length];</span>
+<span class="fc" id="L55">        long weighted = 0;</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        for (var block : List.of(prefix, arm.steps())) for (var step : block) {</span>
+<span class="fc" id="L57">            counts[step.op().ordinal()]++;</span>
+<span class="fc bfc" id="L58" title="All 5 branches covered.">            weighted += switch (step.op()) {</span>
+<span class="fc" id="L59">                case POWER -&gt; SharedPowerPlan.powerCost(step.literal(), weights);</span>
+<span class="fc" id="L60">                case MULTIPLY -&gt; weights.multiplication();</span>
+<span class="fc" id="L61">                case SQUARE -&gt; weights.squaring();</span>
+<span class="fc" id="L62">                case INVERSE -&gt; weights.inverse();</span>
+<span class="fc" id="L63">                default -&gt; 0;</span>
+            };
+<span class="fc" id="L65">        }</span>
+<span class="fc" id="L66">        return new PathCost(counts[Op.POWER.ordinal()], counts[Op.MULTIPLY.ordinal()], counts[Op.SQUARE.ordinal()],</span>
+<span class="fc" id="L67">                counts[Op.INVERSE.ordinal()], counts[Op.ADD.ordinal()], counts[Op.SUBTRACT.ordinal()],</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                counts[Op.NEGATE.ordinal()], arm.normalizeRealCharacter() ? 1 : 0, weighted);</span>
+    }
+
+    private static List&lt;Step&gt; block(List&lt;Step&gt; steps) {
+<span class="fc" id="L72">        var copy = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (copy.size() == MAX_BLOCK) throw new IllegalArgumentException(&quot;FIELD_BLOCK_LIMIT&quot;);</span>
+<span class="fc" id="L75">            copy.add(Objects.requireNonNull(step));</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        return List.copyOf(copy);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

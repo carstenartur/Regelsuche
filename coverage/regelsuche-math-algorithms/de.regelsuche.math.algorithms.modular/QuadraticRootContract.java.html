@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticRootContract.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">QuadraticRootContract.java</span></div><h1>QuadraticRootContract.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import java.math.BigInteger;
+import java.util.Objects;
+
+/** Conditional specialization in Fp[i], i²=-1, over a proved prime p congruent to 3 modulo 4. */
+public record QuadraticRootContract(String sourceIdentity, BigInteger modulus, PrimeEvidence.Certificate primeEvidence,
+        QuadraticRootProgram original, Observation observation) {
+<span class="fc" id="L9">    public enum Observation { EXACT_PAIR, UP_TO_JOINT_SIGN }</span>
+
+<span class="fc" id="L11">    public QuadraticRootContract {</span>
+<span class="fc" id="L12">        Objects.requireNonNull(sourceIdentity);</span>
+<span class="pc bpc" id="L13" title="2 of 4 branches missed.">        if (sourceIdentity.length() &gt; 1024 || sourceIdentity.isBlank()) throw new IllegalArgumentException(&quot;FIELD_SOURCE_ID&quot;);</span>
+<span class="fc" id="L14">        SharedPowerPlan.bounded(modulus);</span>
+<span class="fc" id="L15">        Objects.requireNonNull(primeEvidence);</span>
+<span class="fc" id="L16">        Objects.requireNonNull(original);</span>
+<span class="fc" id="L17">        Objects.requireNonNull(observation);</span>
+<span class="fc" id="L18">    }</span>
+
+    /** The complete runtime input guard. Certification of the fixed modulus is a separate proof obligation. */
+    public static boolean accepts(BigInteger modulus, BigInteger a, BigInteger b, BigInteger g) {
+<span class="pc bpc" id="L22" title="3 of 6 branches missed.">        if (modulus == null || modulus.getClass() != BigInteger.class || modulus.signum() &lt;= 0</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">                || modulus.bitLength() &gt; SharedPowerPlan.MAX_BITS) return false;</span>
+<span class="fc bfc" id="L24" title="All 8 branches covered.">        if (!canonical(a, modulus) || !canonical(b, modulus) || !canonical(g, modulus) || b.signum() == 0) return false;</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        return g.multiply(g).subtract(a.multiply(a)).subtract(b.multiply(b)).mod(modulus).signum() == 0;</span>
+    }
+
+    private static boolean canonical(BigInteger scalar, BigInteger modulus) {
+<span class="pc bpc" id="L29" title="2 of 8 branches missed.">        return scalar != null &amp;&amp; scalar.getClass() == BigInteger.class &amp;&amp; scalar.signum() &gt;= 0 &amp;&amp; scalar.compareTo(modulus) &lt; 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

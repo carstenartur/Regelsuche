@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticRootSdk.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.power</a> &gt; <span class="el_source">QuadraticRootSdk.java</span></div><h1>QuadraticRootSdk.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.power;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.modular.QuadraticRootContract;
+import de.regelsuche.math.algorithms.modular.QuadraticRootEvaluation;
+import de.regelsuche.math.algorithms.modular.QuadraticRootSearch;
+import de.regelsuche.math.algorithms.modular.QuadraticRootVerifier;
+import de.regelsuche.math.algorithms.modular.SharedPowerPlan;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
+import java.math.BigInteger;
+
+/** Budget adapter for source-bound quadratic-root programs. */
+public final class QuadraticRootSdk {
+    private QuadraticRootSdk() {}
+
+    public static QuadraticRootSearch.Result search(QuadraticRootContract expected, SharedPowerPlan.Weights weights,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="fc" id="L19">        return QuadraticRootSearch.search(expected, weights, budget.maximumCandidates(), limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static QuadraticRootVerifier.Result verify(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L24">        return QuadraticRootVerifier.verify(expected, certificate, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    public static QuadraticRootEvaluation.Result evaluate(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            BigInteger a, BigInteger b, BigInteger g, OptimizationBudget budget, CancellationToken cancellation) {
+<span class="nc" id="L29">        return QuadraticRootEvaluation.evaluate(expected, certificate, a, b, g, limits(budget), cancellation::isCancelled);</span>
+    }
+
+    private static IterationLimits limits(OptimizationBudget budget) {
+<span class="fc" id="L33">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

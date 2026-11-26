@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrimeEvidenceVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">PrimeEvidenceVerifier.java</span></div><h1>PrimeEvidenceVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.polynomial.PrimeField;
+import java.math.BigInteger;
+import java.util.HashSet;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.modular.PrimeEvidence.*;
+import static java.math.BigInteger.*;
+
+/** Deterministic replay of untrusted, modulus-bound evidence. No witness lookup is used here. */
+public final class PrimeEvidenceVerifier {
+    private static final int MAX_DEPTH = 64;
+    private final CertificateWork work;
+
+<span class="fc" id="L18">    private PrimeEvidenceVerifier(CertificateWork work) { this.work = work; }</span>
+
+<span class="fc" id="L20">    public record Result(boolean valid, String reason, long work) {}</span>
+
+    public static Result verify(BigInteger expectedModulus, Certificate certificate, IterationLimits limits,
+            BooleanSupplier cancellation) {
+<span class="fc" id="L24">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L26">            work.charge(1);</span>
+<span class="pc bpc" id="L27" title="1 of 4 branches missed.">            require(PrimeEvidence.bounded(expectedModulus) &amp;&amp; certificate != null, &quot;MISSING_OR_INVALID_INPUT&quot;);</span>
+<span class="fc" id="L28">            work.check(expectedModulus);</span>
+<span class="fc" id="L29">            require(expectedModulus.equals(certificate.modulus()), &quot;MODULUS_MISMATCH&quot;);</span>
+<span class="fc" id="L30">            new PrimeEvidenceVerifier(work).replay(certificate, 1, 0);</span>
+<span class="fc" id="L31">            work.charge(0);</span>
+<span class="fc" id="L32">            return new Result(true, &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L33">        } catch (Invalid | CertificateWork.Stop failure) {</span>
+<span class="fc" id="L34">            return new Result(false, failure.getMessage(), work.used());</span>
+        }
+    }
+
+    private void replay(Certificate certificate, int depth, long retained) {
+<span class="fc" id="L39">        work.cells(retained + 1);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if (depth &gt; MAX_DEPTH) throw new CertificateWork.Stop(&quot;PRIME_DEPTH_LIMIT&quot;);</span>
+<span class="fc" id="L41">        var n = work.check(certificate.modulus());</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        require(n.compareTo(TWO) &gt;= 0, &quot;INVALID_MODULUS&quot;);</span>
+<span class="fc bfc" id="L43" title="All 3 branches covered.">        switch (certificate) {</span>
+<span class="fc" id="L44">            case SmallPrime leaf -&gt; {</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                require(n.bitLength() &lt;= 31, &quot;SMALL_PRIME_RANGE&quot;);</span>
+<span class="fc" id="L46">                int candidate = n.intValueExact();</span>
+                // Reserve the full odd trial-divisor loop before entering the core's exact predicate.
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                work.charge(n.testBit(0) ? 1L + (long) Math.sqrt(candidate) / 2 : 1);</span>
+<span class="fc" id="L49">                require(PrimeField.isPrimeModulus(candidate), &quot;COMPOSITE_LEAF&quot;);</span>
+<span class="fc" id="L50">            }</span>
+<span class="fc" id="L51">            case Lucas lucas -&gt; lucas(lucas, depth, retained + 1);</span>
+<span class="fc" id="L52">            case EllipticOrder curve -&gt; elliptic(curve, depth, retained + 1);</span>
+        }
+<span class="fc" id="L54">    }</span>
+
+    private void lucas(Lucas proof, int depth, long retained) {
+<span class="fc" id="L57">        var n = proof.modulus();</span>
+<span class="fc" id="L58">        var witness = work.check(proof.witness());</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">        require(witness.signum() &gt; 0 &amp;&amp; witness.compareTo(n) &lt; 0, &quot;INVALID_LUCAS_WITNESS&quot;);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        require(!proof.factors().isEmpty(), &quot;MISSING_FACTORIZATION&quot;);</span>
+<span class="fc" id="L61">        long cells = retained + proof.factors().size();</span>
+<span class="fc" id="L62">        work.cells(cells);</span>
+<span class="fc" id="L63">        var seen = new HashSet&lt;BigInteger&gt;();</span>
+<span class="fc" id="L64">        var nMinusOne = n.subtract(ONE);</span>
+<span class="fc" id="L65">        var remaining = nMinusOne;</span>
+<span class="fc" id="L66">        long cost = wordProduct(n);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (var factor : proof.factors()) {</span>
+<span class="fc" id="L68">            var q = work.check(factor.prime().modulus());</span>
+<span class="pc bpc" id="L69" title="1 of 6 branches missed.">            require(q.compareTo(TWO) &gt;= 0 &amp;&amp; q.compareTo(n) &lt; 0 &amp;&amp; seen.add(q), &quot;INVALID_LUCAS_FACTOR&quot;);</span>
+<span class="fc bfc" id="L70" title="All 4 branches covered.">            require(factor.exponent() &gt; 0 &amp;&amp; factor.exponent() &lt; n.bitLength(), &quot;INVALID_MULTIPLICITY&quot;);</span>
+            // Divide the remaining product down: even hostile multiplicities cannot grow a temporary integer.
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (int i = 0; i &lt; factor.exponent(); i++) {</span>
+<span class="fc" id="L73">                work.charge(cost);</span>
+<span class="fc" id="L74">                var quotient = remaining.divideAndRemainder(q);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                require(quotient[1].signum() == 0, &quot;FACTORIZATION_MISMATCH&quot;);</span>
+<span class="fc" id="L76">                remaining = quotient[0];</span>
+            }
+<span class="fc" id="L78">            replay(factor.prime(), depth + 1, cells);</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        require(remaining.equals(ONE), &quot;FACTORIZATION_MISMATCH&quot;);</span>
+<span class="fc" id="L81">        require(power(witness, nMinusOne, n, cost).equals(ONE), &quot;FERMAT_MISMATCH&quot;);</span>
+        // For each prime divisor of n the witness has order n-1 by these prime-factor tests.
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (var factor : proof.factors()) {</span>
+<span class="fc" id="L84">            work.charge(cost);</span>
+<span class="fc" id="L85">            var exponent = nMinusOne.divide(factor.prime().modulus());</span>
+<span class="fc" id="L86">            var residue = power(witness, exponent, n, cost);</span>
+<span class="fc" id="L87">            work.charge(4 * cost);</span>
+<span class="fc" id="L88">            require(residue.subtract(ONE).gcd(n).equals(ONE), &quot;LUCAS_ORDER_MISMATCH&quot;);</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">    }</span>
+
+    private BigInteger power(BigInteger base, BigInteger exponent, BigInteger n, long cost) {
+        // Binary powering needs at most two modular products per exponent bit.
+<span class="fc" id="L94">        work.charge(2L * exponent.bitLength() * cost);</span>
+<span class="fc" id="L95">        return base.modPow(exponent, n);</span>
+    }
+
+    private void elliptic(EllipticOrder proof, int depth, long retained) {
+<span class="fc" id="L99">        var n = proof.modulus();</span>
+<span class="fc" id="L100">        var order = work.check(proof.orderPrime().modulus());</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        require(n.compareTo(valueOf(3)) &gt; 0 &amp;&amp; order.compareTo(n) &lt; 0, &quot;INVALID_ELLIPTIC_ORDER&quot;);</span>
+<span class="fc" id="L102">        long cost = wordProduct(n);</span>
+<span class="fc" id="L103">        work.charge(8 * cost);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        require(order.compareTo(n.sqrt().shiftLeft(1).add(ONE)) &gt; 0, &quot;INSUFFICIENT_ELLIPTIC_ORDER&quot;);</span>
+<span class="fc" id="L105">        work.cells(retained + 4);</span>
+<span class="fc" id="L106">        var x = work.check(proof.x());</span>
+<span class="fc" id="L107">        var y = work.check(proof.y());</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        require(canonical(x, n) &amp;&amp; canonical(y, n), &quot;NONCANONICAL_POINT&quot;);</span>
+<span class="fc" id="L109">        var inputA = work.check(proof.a());</span>
+<span class="fc" id="L110">        var inputB = work.check(proof.b());</span>
+<span class="fc" id="L111">        work.charge(wordProduct(inputA) + wordProduct(inputB) + 20 * cost);</span>
+<span class="fc" id="L112">        var a = inputA.mod(n);</span>
+<span class="fc" id="L113">        var b = inputB.mod(n);</span>
+<span class="fc" id="L114">        var discriminant = a.pow(3).shiftLeft(2).add(b.pow(2).multiply(valueOf(27)));</span>
+<span class="fc" id="L115">        require(discriminant.multiply(valueOf(6)).gcd(n).equals(ONE), &quot;SINGULAR_OR_BAD_CHARACTERISTIC&quot;);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        require(y.pow(2).subtract(x.pow(3).add(a.multiply(x)).add(b)).mod(n).signum() == 0, &quot;OFF_CURVE&quot;);</span>
+<span class="fc" id="L117">        replay(proof.orderPrime(), depth + 1, retained + 4);</span>
+
+        // Every accepted sum reduces correctly modulo every prime divisor l of n. The finite point
+        // then has prime order r modulo l. At most 2*l+1 points exist, so no l &lt;= floor(sqrt(n)) exists.
+<span class="fc" id="L121">        var point = new Point(x, y);</span>
+<span class="fc" id="L122">        var multiple = point;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int bit = order.bitLength() - 2; bit &gt;= 0; bit--) {</span>
+<span class="fc" id="L124">            multiple = add(multiple, multiple, a, n, cost);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (order.testBit(bit)) multiple = add(multiple, point, a, n, cost);</span>
+        }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        require(multiple == Point.INFINITY, &quot;ELLIPTIC_ORDER_MISMATCH&quot;);</span>
+<span class="fc" id="L128">    }</span>
+
+<span class="fc" id="L130">    private record Point(BigInteger x, BigInteger y) {</span>
+<span class="fc" id="L131">        private static final Point INFINITY = new Point(null, null);</span>
+    }
+
+    private Point add(Point left, Point right, BigInteger a, BigInteger n, long cost) {
+<span class="fc" id="L135">        work.charge(1);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (left == Point.INFINITY) return right;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (right == Point.INFINITY) return left;</span>
+<span class="fc" id="L138">        work.charge(16 * cost); // field products, gcd and checked inverse of a full-width slope denominator</span>
+        BigInteger numerator;
+        BigInteger denominator;
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (left.x.equals(right.x)) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (left.y.add(right.y).mod(n).signum() == 0) return Point.INFINITY;</span>
+<span class="fc" id="L143">            require(left.y.equals(right.y), &quot;MIXED_ELLIPTIC_SUM&quot;);</span>
+<span class="fc" id="L144">            numerator = left.x.pow(2).multiply(valueOf(3)).add(a);</span>
+<span class="fc" id="L145">            denominator = left.y.shiftLeft(1);</span>
+        } else {
+<span class="fc" id="L147">            numerator = right.y.subtract(left.y);</span>
+<span class="fc" id="L148">            denominator = right.x.subtract(left.x);</span>
+        }
+<span class="fc" id="L150">        require(denominator.gcd(n).equals(ONE), &quot;NONUNIT_ELLIPTIC_DENOMINATOR&quot;);</span>
+<span class="fc" id="L151">        var slope = numerator.multiply(denominator.modInverse(n)).mod(n);</span>
+<span class="fc" id="L152">        var x = slope.pow(2).subtract(left.x).subtract(right.x).mod(n);</span>
+<span class="fc" id="L153">        var y = slope.multiply(left.x.subtract(x)).subtract(left.y).mod(n);</span>
+<span class="fc" id="L154">        return new Point(x, y);</span>
+    }
+
+    private static boolean canonical(BigInteger coordinate, BigInteger n) {
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        return coordinate.signum() &gt;= 0 &amp;&amp; coordinate.compareTo(n) &lt; 0;</span>
+    }
+
+    /** Work unit for full-width modular multiplication/division at this operand size. */
+    private static long wordProduct(BigInteger value) {
+<span class="fc" id="L163">        long words = 1L + value.bitLength() / Long.SIZE;</span>
+<span class="fc" id="L164">        return words * words;</span>
+    }
+
+    private static void require(boolean condition, String reason) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (!condition) throw new Invalid(reason);</span>
+<span class="fc" id="L169">    }</span>
+
+    private static final class Invalid extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+<span class="fc" id="L173">        private Invalid(String reason) { super(reason, null, false, false); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

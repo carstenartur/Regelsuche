@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticRootMachine.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">QuadraticRootMachine.java</span></div><h1>QuadraticRootMachine.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import static de.regelsuche.math.algorithms.modular.QuadraticRootProgram.*;
+
+/** One instruction semantics for concrete evaluation and symbolic interpretation. */
+final class QuadraticRootMachine {
+    private QuadraticRootMachine() {}
+    interface Field&lt;T&gt; {
+        T constant(BigInteger literal);
+        T add(T a, T b);
+        T negate(T a);
+        T multiply(T a, T b);
+        T power(T a, BigInteger e);
+        boolean equal(T a, T b);
+        int character(T a);
+        int cells(T a);
+<span class="fc" id="L21">        default void registers(long count, CertificateWork work) { work.cells(count); }</span>
+    }
+
+    static void validate(QuadraticRootProgram program, BigInteger modulus, CertificateWork work) {
+<span class="fc" id="L25">        int n = validate(program.prefix(), INPUTS, modulus, work);</span>
+<span class="fc" id="L26">        reference(program.guardLeft(), n);</span>
+<span class="fc" id="L27">        reference(program.guardRight(), n);</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        for (var arm : List.of(program.equal(), program.unequal())) {</span>
+<span class="fc" id="L29">            int end = validate(arm.steps(), n, modulus, work);</span>
+<span class="fc" id="L30">            reference(arm.real(), end);</span>
+<span class="fc" id="L31">            reference(arm.imaginary(), end);</span>
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">    }</span>
+
+    private static int validate(List&lt;Step&gt; steps, int n, BigInteger p, CertificateWork work) {
+<span class="fc" id="L36">        work.cells(n + steps.size());</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="fc" id="L38">            work.charge(1L + SharedPowerVerifier.words(step.literal()));</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (step.left() != -1) reference(step.left(), n);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (step.right() != -1) reference(step.right(), n);</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">            if (step.op() == Op.CONSTANT &amp;&amp; step.literal().compareTo(p) &gt;= 0) throw new IllegalArgumentException(&quot;NONCANONICAL_CONSTANT&quot;);</span>
+<span class="fc" id="L42">            n++;</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        return n;</span>
+    }
+
+    private static void reference(int ref, int bound) {
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (ref &lt; 0 || ref &gt;= bound) throw new IllegalArgumentException(&quot;INVALID_FIELD_REFERENCE&quot;);</span>
+<span class="fc" id="L49">    }</span>
+
+<span class="fc" id="L51">    record Pair&lt;T&gt;(T real, T imaginary) {}</span>
+<span class="fc" id="L52">    record Prefix&lt;T&gt;(List&lt;T&gt; registers, boolean equal) {}</span>
+
+    static &lt;T&gt; Prefix&lt;T&gt; prefix(QuadraticRootProgram program, List&lt;T&gt; inputs, Field&lt;T&gt; field, CertificateWork work) {
+<span class="fc" id="L55">        var values = run(program.prefix(), inputs, field, work);</span>
+<span class="fc" id="L56">        return new Prefix&lt;&gt;(values, field.equal(values.get(program.guardLeft()), values.get(program.guardRight())));</span>
+    }
+
+    static &lt;T&gt; Pair&lt;T&gt; exit(Arm arm, Prefix&lt;T&gt; prefix, Field&lt;T&gt; field, CertificateWork work) {
+<span class="fc" id="L60">        var values = run(arm.steps(), prefix.registers(), field, work);</span>
+<span class="fc" id="L61">        var real = values.get(arm.real());</span>
+<span class="fc" id="L62">        var imaginary = values.get(arm.imaginary());</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (arm.normalizeRealCharacter() &amp;&amp; field.character(real) &lt; 0) {</span>
+<span class="fc" id="L64">            return new Pair&lt;&gt;(field.negate(real), field.negate(imaginary));</span>
+        }
+<span class="fc" id="L66">        return new Pair&lt;&gt;(real, imaginary);</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; run(List&lt;Step&gt; steps, List&lt;T&gt; initial, Field&lt;T&gt; field, CertificateWork work) {
+<span class="fc" id="L70">        var values = new ArrayList&lt;&gt;(initial);</span>
+<span class="fc" id="L71">        long cells = values.stream().mapToLong(field::cells).sum();</span>
+<span class="fc" id="L72">        field.registers(cells, work);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (var step : steps) {</span>
+<span class="fc" id="L74">            work.charge(1);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            T a = step.left() &lt; 0 ? null : values.get(step.left());</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            T b = step.right() &lt; 0 ? null : values.get(step.right());</span>
+<span class="fc bfc" id="L77" title="All 8 branches covered.">            T result = switch (step.op()) {</span>
+<span class="fc" id="L78">                case CONSTANT -&gt; field.constant(step.literal());</span>
+<span class="fc" id="L79">                case ADD -&gt; field.add(a, b);</span>
+<span class="fc" id="L80">                case SUBTRACT -&gt; field.add(a, field.negate(b));</span>
+<span class="fc" id="L81">                case MULTIPLY -&gt; field.multiply(a, b);</span>
+<span class="fc" id="L82">                case SQUARE -&gt; field.multiply(a, a);</span>
+<span class="fc" id="L83">                case NEGATE -&gt; field.negate(a);</span>
+<span class="fc" id="L84">                case POWER -&gt; field.power(a, step.literal());</span>
+<span class="fc" id="L85">                case INVERSE -&gt; field.power(a, BigInteger.ONE.negate());</span>
+            };
+<span class="fc" id="L87">            cells += field.cells(result);</span>
+<span class="fc" id="L88">            field.registers(cells, work);</span>
+<span class="fc" id="L89">            values.add(result);</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">        return values;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

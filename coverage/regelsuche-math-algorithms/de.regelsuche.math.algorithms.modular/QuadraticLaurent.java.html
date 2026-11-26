@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticLaurent.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">QuadraticLaurent.java</span></div><h1>QuadraticLaurent.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.Map;
+
+/** Sparse Fp[H±,X±] in one character lane H^m=u, X^m=s, where m=(p-1)/2. */
+final class QuadraticLaurent implements QuadraticRootMachine.Field&lt;QuadraticLaurent.Form&gt; {
+<span class="fc" id="L10">    record Degrees(BigInteger h, BigInteger x) {}</span>
+    record Form(Map&lt;Degrees, BigInteger&gt; terms) {
+<span class="fc" id="L12">        Form { terms = Map.copyOf(terms); }</span>
+    }
+
+    private final BigInteger p;
+    private final BigInteger m;
+    private final int u;
+    private final int s;
+    private final CertificateWork work;
+    private final long wordCost;
+    private long externalCells;
+    private long registerCells;
+    private static final int MAX_TERMS = 32;
+
+<span class="fc" id="L25">    QuadraticLaurent(BigInteger p, int u, int s, CertificateWork work) {</span>
+<span class="fc" id="L26">        this.p = p;</span>
+<span class="fc" id="L27">        this.m = p.shiftRight(1);</span>
+<span class="fc" id="L28">        this.u = u;</span>
+<span class="fc" id="L29">        this.s = s;</span>
+<span class="fc" id="L30">        this.work = work;</span>
+<span class="fc" id="L31">        long words = SharedPowerVerifier.words(p);</span>
+<span class="fc" id="L32">        this.wordCost = words * words;</span>
+<span class="fc" id="L33">    }</span>
+
+    void retain(long count) {
+<span class="fc" id="L36">        externalCells = count;</span>
+<span class="fc" id="L37">        registerCells = 0;</span>
+<span class="fc" id="L38">        work.cells(count);</span>
+<span class="fc" id="L39">    }</span>
+
+    @Override public void registers(long count, CertificateWork budget) {
+<span class="fc" id="L42">        registerCells = count;</span>
+<span class="fc" id="L43">        budget.cells(externalCells + count);</span>
+<span class="fc" id="L44">    }</span>
+
+    Form term(BigInteger coefficient, BigInteger h, BigInteger x) {
+<span class="fc" id="L47">        work.charge(wordCost + SharedPowerVerifier.words(h) + SharedPowerVerifier.words(x));</span>
+<span class="fc" id="L48">        work.cells(externalCells + registerCells + 4);</span>
+<span class="fc" id="L49">        var hr = h.mod(m);</span>
+<span class="fc" id="L50">        var xr = x.mod(m);</span>
+        // The discarded multiples can be negative. Parity of their signed quotient gives the same sign.
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (u &lt; 0 &amp;&amp; h.subtract(hr).divide(m).testBit(0)) coefficient = coefficient.negate();</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (s &lt; 0 &amp;&amp; x.subtract(xr).divide(m).testBit(0)) coefficient = coefficient.negate();</span>
+<span class="fc" id="L54">        var c = coefficient.mod(p);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        return new Form(c.signum() == 0 ? Map.of() : Map.of(new Degrees(hr, xr), c));</span>
+    }
+
+<span class="fc" id="L58">    @Override public Form constant(BigInteger c) { return term(c, BigInteger.ZERO, BigInteger.ZERO); }</span>
+
+    private void accumulate(Map&lt;Degrees, BigInteger&gt; sum, Degrees degrees, BigInteger value) {
+<span class="fc" id="L61">        work.charge(wordCost);</span>
+<span class="fc" id="L62">        var c = sum.getOrDefault(degrees, BigInteger.ZERO).add(value).mod(p);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (c.signum() == 0) sum.remove(degrees);</span>
+<span class="fc" id="L64">        else sum.put(degrees, c);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (sum.size() &gt; MAX_TERMS) throw new CertificateWork.Stop(&quot;LAURENT_TERM_LIMIT&quot;);</span>
+<span class="fc" id="L66">        work.cells(externalCells + registerCells + 3L * sum.size() + 1);</span>
+<span class="fc" id="L67">    }</span>
+
+    @Override public Form add(Form a, Form b) {
+<span class="fc" id="L70">        var sum = new HashMap&lt;&gt;(a.terms());</span>
+<span class="fc" id="L71">        b.terms().forEach((degrees, value) -&gt; accumulate(sum, degrees, value));</span>
+<span class="fc" id="L72">        return new Form(sum);</span>
+    }
+
+    @Override public Form negate(Form a) {
+<span class="fc" id="L76">        var sum = new HashMap&lt;Degrees, BigInteger&gt;();</span>
+<span class="fc" id="L77">        a.terms().forEach((degrees, value) -&gt; accumulate(sum, degrees, value.negate()));</span>
+<span class="fc" id="L78">        return new Form(sum);</span>
+    }
+
+    @Override public Form multiply(Form a, Form b) {
+<span class="fc" id="L82">        work.charge(1L + (long)a.terms().size() * b.terms().size());</span>
+<span class="fc" id="L83">        var sum = new HashMap&lt;Degrees, BigInteger&gt;();</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        for (var left : a.terms().entrySet()) for (var right : b.terms().entrySet()) {</span>
+<span class="fc" id="L85">            var reduced = term(left.getValue().multiply(right.getValue()), left.getKey().h().add(right.getKey().h()),</span>
+<span class="fc" id="L86">                    left.getKey().x().add(right.getKey().x()));</span>
+<span class="fc" id="L87">            reduced.terms().forEach((degrees, value) -&gt; accumulate(sum, degrees, value));</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">        return new Form(sum);</span>
+    }
+
+    private Map.Entry&lt;Degrees, BigInteger&gt; unit(Form value) {
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (value.terms().size() != 1) throw new IllegalArgumentException(&quot;UNIT_MONOMIAL_REQUIRED&quot;);</span>
+<span class="fc" id="L94">        return value.terms().entrySet().iterator().next();</span>
+    }
+
+    @Override public Form power(Form a, BigInteger exponent) {
+<span class="fc" id="L98">        var entry = unit(a);</span>
+<span class="fc" id="L99">        var c = entry.getValue();</span>
+<span class="fc" id="L100">        work.charge(wordCost * (1L + SharedPowerVerifier.words(exponent)));</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">        if (c.equals(p.subtract(BigInteger.ONE))) c = exponent.testBit(0) ? c : BigInteger.ONE;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        else if (!c.equals(BigInteger.ONE)) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            work.charge(wordCost * (1L + exponent.abs().bitLength() + (exponent.signum() &lt; 0 ? p.bitLength() : 0)));</span>
+<span class="fc" id="L104">            c = c.modPow(exponent, p);</span>
+        }
+<span class="fc" id="L106">        return term(c, entry.getKey().h().multiply(exponent), entry.getKey().x().multiply(exponent));</span>
+    }
+
+    @Override public boolean equal(Form a, Form b) {
+<span class="fc" id="L110">        var difference = add(a, negate(b));</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (difference.terms().isEmpty()) return true;</span>
+<span class="fc" id="L112">        unit(difference); // A single nonzero Laurent monomial never vanishes in this lane.</span>
+<span class="fc" id="L113">        return false;</span>
+    }
+
+    @Override public int character(Form a) {
+<span class="fc" id="L117">        var monomial = unit(a);</span>
+<span class="fc" id="L118">        var c = monomial.getValue();</span>
+<span class="fc" id="L119">        int sign = 1;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (c.equals(p.subtract(BigInteger.ONE))) sign = -1;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        else if (!c.equals(BigInteger.ONE)) {</span>
+<span class="nc" id="L122">            work.charge(wordCost * (1L + m.bitLength()));</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            sign = c.modPow(m, p).equals(BigInteger.ONE) ? 1 : -1;</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (monomial.getKey().h().testBit(0)) sign *= u;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (monomial.getKey().x().testBit(0)) sign *= s;</span>
+<span class="fc" id="L127">        return sign;</span>
+    }
+
+<span class="fc" id="L130">    @Override public int cells(Form value) { return 1 + 3 * value.terms().size(); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

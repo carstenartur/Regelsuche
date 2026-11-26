@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticRootSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">QuadraticRootSearch.java</span></div><h1>QuadraticRootSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import static de.regelsuche.math.algorithms.modular.QuadraticRootProgram.*;
+
+/** Bounded shared-power synthesis followed by an independent signed permutation of each branch. */
+public final class QuadraticRootSearch {
+    private QuadraticRootSearch() {}
+
+    public record Certificate(QuadraticRootContract contract, SharedPowerPlan.Certificate power, QuadraticRootProgram program) {
+<span class="fc" id="L17">        public Certificate {</span>
+<span class="fc" id="L18">            Objects.requireNonNull(contract);</span>
+<span class="fc" id="L19">            Objects.requireNonNull(power);</span>
+<span class="fc" id="L20">            Objects.requireNonNull(program);</span>
+<span class="fc" id="L21">        }</span>
+    }
+<span class="fc" id="L23">    public record Result(Optional&lt;Certificate&gt; certificate, String reason, long work, int candidates) {}</span>
+
+    public static Result search(QuadraticRootContract expected, SharedPowerPlan.Weights weights, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 1) throw new IllegalArgumentException(&quot;POSITIVE_CANDIDATE_LIMIT_REQUIRED&quot;);</span>
+<span class="fc" id="L28">        var work = new CertificateWork(limits, cancellation);</span>
+<span class="fc" id="L29">        int tried = 0;</span>
+        try {
+<span class="fc" id="L31">            QuadraticRootVerifier.checkField(expected, work, cancellation);</span>
+<span class="fc" id="L32">            var basis = new QuadraticRootBasis(expected, work);</span>
+<span class="fc" id="L33">            var powers = SharedPowerSearch.search(basis.request(), weights, 8, work.remainingLimits(basis.retainedCells()), cancellation);</span>
+<span class="fc" id="L34">            work.chargeCompleted(powers.work());</span>
+<span class="pc" id="L35">            var power = powers.certificate().orElseThrow(() -&gt; new IllegalArgumentException(powers.reason()));</span>
+<span class="fc" id="L36">            var template = basis.instantiate(power.schedule());</span>
+<span class="fc" id="L37">            var options = permutations(template);</span>
+<span class="fc" id="L38">            var lanes = QuadraticRootVerifier.lanes(expected, template.program(options.getFirst(), options.getFirst()), work);</span>
+<span class="fc" id="L39">            Arm bestEqual = null, bestUnequal = null;</span>
+<span class="fc" id="L40">            int bestCost = Integer.MAX_VALUE;</span>
+<span class="fc" id="L41">            var checkedEqual = new ArrayList&lt;Optional&lt;Arm&gt;&gt;();</span>
+<span class="fc" id="L42">            var checkedUnequal = new ArrayList&lt;Optional&lt;Arm&gt;&gt;();</span>
+            portfolio:
+<span class="fc bfc" id="L44" title="All 4 branches covered.">            for (int l = 0; l &lt; options.size(); l++) for (int r = 0; r &lt; options.size(); r++) {</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                if (tried == maximumCandidates) break portfolio;</span>
+<span class="fc" id="L46">                tried++;</span>
+<span class="fc" id="L47">                work.charge(1);</span>
+<span class="fc" id="L48">                var left = check(l, true, options, checkedEqual, lanes, expected, work);</span>
+<span class="fc" id="L49">                var right = check(r, false, options, checkedUnequal, lanes, expected, work);</span>
+<span class="fc bfc" id="L50" title="All 4 branches covered.">                if (left.isEmpty() || right.isEmpty()) continue;</span>
+<span class="fc" id="L51">                var a = left.orElseThrow();</span>
+<span class="fc" id="L52">                var b = right.orElseThrow();</span>
+<span class="fc" id="L53">                int cost = exitCost(a) + exitCost(b);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (cost &lt; bestCost) {</span>
+<span class="fc" id="L55">                    bestCost = cost;</span>
+<span class="fc" id="L56">                    bestEqual = a;</span>
+<span class="fc" id="L57">                    bestUnequal = b;</span>
+                }
+            }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (bestEqual == null) throw new IllegalArgumentException(&quot;NO_PROVED_BRANCH_PAIR&quot;);</span>
+<span class="fc" id="L61">            var cert = new Certificate(expected, power, template.program(bestEqual, bestUnequal));</span>
+<span class="fc" id="L62">            QuadraticRootVerifier.verifyProgram(expected, cert, work, cancellation);</span>
+<span class="fc" id="L63">            work.charge(0);</span>
+<span class="fc" id="L64">            return new Result(Optional.of(cert), &quot;VERIFIED&quot;, work.used(), tried);</span>
+<span class="fc" id="L65">        } catch (CertificateWork.Stop | IllegalArgumentException ex) {</span>
+<span class="fc" id="L66">            return new Result(Optional.empty(), ex.getMessage(), work.used(), tried);</span>
+        }
+    }
+
+    private static List&lt;Arm&gt; permutations(QuadraticRootBasis.Template t) {
+<span class="fc" id="L71">        var out = new ArrayList&lt;Arm&gt;();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (boolean swap : new boolean[]{false, true}) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (int signs : new int[]{0, 1, 2, 3}) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                int a = swap ? t.imaginary() : t.real();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                int b = swap ? t.real() : t.imaginary();</span>
+<span class="fc" id="L76">                var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L77">                int next = INPUTS + t.prefix().size();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                if ((signs &amp; 2) != 0) { steps.add(Step.negate(a)); a = next++; }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                if ((signs &amp; 1) != 0) { steps.add(Step.negate(b)); b = next; }</span>
+<span class="fc" id="L80">                out.add(new Arm(steps, a, b, false));</span>
+            }
+        }
+<span class="fc" id="L83">        return out;</span>
+    }
+
+    private static Optional&lt;Arm&gt; check(int index, boolean equal, List&lt;Arm&gt; options, List&lt;Optional&lt;Arm&gt;&gt; cache,
+            List&lt;QuadraticRootVerifier.Lane&gt; lanes, QuadraticRootContract contract, CertificateWork work) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (index &lt; cache.size()) return cache.get(index);</span>
+<span class="fc" id="L89">        var arm = options.get(index);</span>
+<span class="fc" id="L90">        Optional&lt;Arm&gt; option = Optional.empty();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (QuadraticRootVerifier.matches(lanes, equal, arm, contract.observation(), work)) option = Optional.of(arm);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        else if (contract.observation() == QuadraticRootContract.Observation.EXACT_PAIR) {</span>
+<span class="fc" id="L93">            var normalized = new Arm(arm.steps(), arm.real(), arm.imaginary(), true);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (QuadraticRootVerifier.matches(lanes, equal, normalized, contract.observation(), work)) option = Optional.of(normalized);</span>
+        }
+<span class="fc" id="L96">        cache.add(option);</span>
+<span class="fc" id="L97">        return option;</span>
+    }
+
+    /** All proposals share a power schedule. Prefer fewer character selections, then fewer negations. */
+    private static int exitCost(Arm arm) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        return arm.steps().size() + (arm.normalizeRealCharacter() ? 8 : 0);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

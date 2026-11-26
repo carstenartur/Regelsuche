@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrimeEvidenceCatalog.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">PrimeEvidenceCatalog.java</span></div><h1>PrimeEvidenceCatalog.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Optional;
+
+import static de.regelsuche.math.algorithms.modular.PrimeEvidence.*;
+
+/** Local witness data. Callers must verify any returned certificate against their observed modulus. */
+public final class PrimeEvidenceCatalog {
+    private PrimeEvidenceCatalog() {}
+
+    // Curve, generator and subgroup order: Bouncy Castle bc-java commit
+    // 6560e91d0a164b8ab58266f141ee6daeec21a340, org.bouncycastle.crypto.bls.BLS12_381G1.
+    // The Lucas factorization and witness below are independently checked by the verifier.
+<span class="fc" id="L16">    private static final BigInteger FIELD = hex(</span>
+            &quot;1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab&quot;);
+<span class="fc" id="L18">    private static final Certificate ORDER = new Lucas(</span>
+            new BigInteger(&quot;52435875175126190479447740508185965837690552500527637822603658699938581184513&quot;),
+<span class="fc" id="L20">            BigInteger.valueOf(7), List.of(factor(2, 32), factor(3, 1), factor(11, 1), factor(19, 1),</span>
+<span class="fc" id="L21">                    factor(10177, 1), factor(125527, 1), factor(859267, 1), factor(906349, 2),</span>
+<span class="fc" id="L22">                    factor(2508409, 1), factor(2529403, 1), factor(52437899, 1), factor(254760293, 2)));</span>
+<span class="fc" id="L23">    private static final Certificate FIELD_PROOF = new EllipticOrder(FIELD, BigInteger.ZERO, BigInteger.valueOf(4),</span>
+<span class="fc" id="L24">            hex(&quot;17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb&quot;),</span>
+<span class="fc" id="L25">            hex(&quot;08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1&quot;),</span>
+            ORDER);
+
+    /** Supplies a trial-division request for small inputs or a known witness for larger inputs. */
+    public static Optional&lt;Certificate&gt; forModulus(BigInteger modulus) {
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">        if (!PrimeEvidence.bounded(modulus) || modulus.compareTo(BigInteger.TWO) &lt; 0) return Optional.empty();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (modulus.bitLength() &lt;= 31) return Optional.of(new SmallPrime(modulus));</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        return FIELD.equals(modulus) ? Optional.of(FIELD_PROOF) : Optional.empty();</span>
+    }
+
+    private static Factor factor(int prime, int exponent) {
+<span class="fc" id="L36">        return new Factor(new SmallPrime(BigInteger.valueOf(prime)), exponent);</span>
+    }
+
+<span class="fc" id="L39">    private static BigInteger hex(String digits) { return new BigInteger(digits, 16); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

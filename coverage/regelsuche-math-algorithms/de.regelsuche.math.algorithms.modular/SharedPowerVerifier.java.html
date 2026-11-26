@@ -66,7 +66,7 @@ public final class SharedPowerVerifier {
 <span class="fc" id="L66">                    }</span>
                     case MULTIPLY -&gt; {
 <span class="fc" id="L68">                        exponent = exponents.get(step.left()).add(exponents.get(step.right())).mod(n);</span>
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                        if (step.left() == step.right()) squarings++;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                        if (step.left() == step.right()) squarings++;</span>
 <span class="fc" id="L70">                        else multiplications++;</span>
 <span class="fc" id="L71">                    }</span>
                     case INVERSE -&gt; {

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QuadraticRootVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">QuadraticRootVerifier.java</span></div><h1>QuadraticRootVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import static de.regelsuche.math.algorithms.modular.QuadraticRootMachine.*;
+import static de.regelsuche.math.algorithms.modular.QuadraticRootProgram.Arm;
+
+/** Universal proof by exact Laurent arithmetic in all four independent character lanes. */
+public final class QuadraticRootVerifier {
+    private QuadraticRootVerifier() {}
+<span class="fc" id="L15">    public record Result(boolean valid, String reason, long work) {}</span>
+
+    public static Result verify(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L19">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L21">            checkField(expected, work, cancellation);</span>
+<span class="fc" id="L22">            verifyProgram(expected, certificate, work, cancellation);</span>
+<span class="fc" id="L23">            work.charge(0);</span>
+<span class="fc" id="L24">            return new Result(true, &quot;VERIFIED&quot;, work.used());</span>
+<span class="fc" id="L25">        } catch (CertificateWork.Stop | IllegalArgumentException ex) {</span>
+<span class="fc" id="L26">            return new Result(false, ex.getMessage(), work.used());</span>
+        }
+    }
+
+    static void checkField(QuadraticRootContract expected, CertificateWork work, BooleanSupplier cancellation) {
+<span class="fc" id="L31">        work.charge(1);</span>
+<span class="pc bpc" id="L32" title="3 of 6 branches missed.">        if (expected == null || expected.modulus().signum() &lt;= 0 || (expected.modulus().intValue() &amp; 3) != 3) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(&quot;PRIME_THREE_MOD_FOUR_REQUIRED&quot;);</span>
+        }
+<span class="fc" id="L35">        var prime = PrimeEvidenceVerifier.verify(expected.modulus(), expected.primeEvidence(), work.remainingLimits(), cancellation);</span>
+<span class="fc" id="L36">        work.chargeCompleted(prime.work());</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (!prime.valid()) throw new IllegalArgumentException(prime.reason());</span>
+<span class="fc" id="L38">        validate(expected.original(), expected.modulus(), work);</span>
+<span class="fc" id="L39">    }</span>
+
+    static void verifyProgram(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate, CertificateWork work,
+            BooleanSupplier cancellation) {
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (certificate == null) throw new IllegalArgumentException(&quot;MISSING_CERTIFICATE&quot;);</span>
+<span class="fc" id="L44">        var bound = certificate.contract();</span>
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        if (!bound.sourceIdentity().equals(expected.sourceIdentity()) || !bound.modulus().equals(expected.modulus())</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">                || bound.observation() != expected.observation() || !bound.original().equals(expected.original())) {</span>
+<span class="fc" id="L47">            throw new IllegalArgumentException(&quot;SOURCE_MISMATCH&quot;);</span>
+        }
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (bound.primeEvidence() != expected.primeEvidence()) {</span>
+            // Bound the depth and authenticate both trees before any structural record comparison.
+<span class="nc" id="L51">            checkField(bound, work, cancellation);</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            if (!bound.primeEvidence().equals(expected.primeEvidence())) throw new IllegalArgumentException(&quot;SOURCE_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L54">        var program = certificate.program();</span>
+<span class="fc" id="L55">        validate(program, expected.modulus(), work);</span>
+<span class="fc" id="L56">        var basis = new QuadraticRootBasis(expected, work);</span>
+<span class="fc" id="L57">        var nested = SharedPowerVerifier.verify(basis.request(), certificate.power(), new SharedPowerPlan.Weights(1, 1, 1), work,</span>
+<span class="fc" id="L58">                basis.retainedCells());</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!nested.valid()) throw new IllegalArgumentException(nested.reason());</span>
+<span class="fc" id="L60">        var template = basis.instantiate(certificate.power().schedule());</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if (!template.prefix().equals(program.prefix()) || template.guardLeft() != program.guardLeft()</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || template.guardRight() != program.guardRight()) throw new IllegalArgumentException(&quot;POWER_BINDING_MISMATCH&quot;);</span>
+<span class="fc" id="L63">        var lanes = lanes(expected, program, work);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!matches(lanes, true, program.equal(), expected.observation(), work)</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                || !matches(lanes, false, program.unequal(), expected.observation(), work)) {</span>
+<span class="fc" id="L66">            throw new IllegalArgumentException(&quot;COORDINATE_MISMATCH&quot;);</span>
+        }
+<span class="fc" id="L68">    }</span>
+
+<span class="fc" id="L70">    record Lane(QuadraticLaurent field, Pair&lt;QuadraticLaurent.Form&gt; original, Prefix&lt;QuadraticLaurent.Form&gt; candidate) {}</span>
+
+    static List&lt;Lane&gt; lanes(QuadraticRootContract expected, QuadraticRootProgram candidate, CertificateWork work) {
+<span class="fc" id="L73">        var lanes = new ArrayList&lt;Lane&gt;();</span>
+<span class="fc" id="L74">        long retained = 0;</span>
+<span class="fc bfc" id="L75" title="All 4 branches covered.">        for (int u : new int[]{1, -1}) for (int s : new int[]{1, -1}) {</span>
+<span class="fc" id="L76">            var field = new QuadraticLaurent(expected.modulus(), u, s, work);</span>
+<span class="fc" id="L77">            field.retain(retained);</span>
+            // H=b/2 and X=(a+g)/2 are units: X*(a-g)/2=-H². Conversely every unit pair gives a valid input.
+<span class="fc" id="L79">            var x = field.term(BigInteger.ONE, BigInteger.ZERO, BigInteger.ONE);</span>
+<span class="fc" id="L80">            var h = field.term(BigInteger.ONE, BigInteger.ONE, BigInteger.ZERO);</span>
+<span class="fc" id="L81">            var h2OverX = field.term(BigInteger.ONE, BigInteger.TWO, BigInteger.ONE.negate());</span>
+<span class="fc" id="L82">            var a = field.add(x, field.negate(h2OverX));</span>
+<span class="fc" id="L83">            var b = field.add(h, h);</span>
+<span class="fc" id="L84">            var g = field.add(x, h2OverX);</span>
+<span class="fc" id="L85">            var inputs = List.of(a, b, g);</span>
+<span class="fc" id="L86">            var prefix = prefix(expected.original(), inputs, field, work);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            var arm = prefix.equal() ? expected.original().equal() : expected.original().unequal();</span>
+<span class="fc" id="L88">            var old = exit(arm, prefix, field, work);</span>
+<span class="fc" id="L89">            var realSquare = field.multiply(old.real(), old.real());</span>
+<span class="fc" id="L90">            var imaginarySquare = field.multiply(old.imaginary(), old.imaginary());</span>
+<span class="fc" id="L91">            var product = field.multiply(old.real(), old.imaginary());</span>
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">            if (!a.equals(field.add(realSquare, field.negate(imaginarySquare))) || !b.equals(field.add(product, product))) {</span>
+<span class="fc" id="L93">                throw new IllegalArgumentException(&quot;SOURCE_IS_NOT_A_ROOT&quot;);</span>
+            }
+<span class="fc" id="L95">            retained += field.cells(old.real()) + field.cells(old.imaginary());</span>
+<span class="fc" id="L96">            field.retain(retained);</span>
+<span class="fc" id="L97">            var next = prefix(candidate, inputs, field, work);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            for (var register : next.registers()) retained += field.cells(register);</span>
+<span class="fc" id="L99">            work.cells(retained);</span>
+<span class="fc" id="L100">            lanes.add(new Lane(field, old, next));</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (var lane : lanes) {</span>
+            // The machine charges the active prefix itself. The other prefixes and all original exit pairs stay live.
+<span class="fc" id="L104">            long ownPrefix = lane.candidate().registers().stream().mapToLong(lane.field()::cells).sum();</span>
+<span class="fc" id="L105">            lane.field().retain(retained - ownPrefix);</span>
+<span class="fc" id="L106">        }</span>
+<span class="fc" id="L107">        return List.copyOf(lanes);</span>
+    }
+
+    static boolean matches(List&lt;Lane&gt; lanes, boolean equal, Arm candidate, QuadraticRootContract.Observation observation,
+            CertificateWork work) {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (var lane : lanes) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (lane.candidate().equal() != equal) continue;</span>
+<span class="fc" id="L114">            var field = lane.field();</span>
+<span class="fc" id="L115">            var actual = exit(candidate, lane.candidate(), field, work);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (actual.equals(lane.original())) continue;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (observation == QuadraticRootContract.Observation.EXACT_PAIR</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                    || !field.negate(actual.real()).equals(lane.original().real())</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                    || !field.negate(actual.imaginary()).equals(lane.original().imaginary())) return false;</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
