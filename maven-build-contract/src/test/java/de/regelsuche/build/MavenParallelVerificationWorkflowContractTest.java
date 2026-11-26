@@ -31,7 +31,7 @@ import org.w3c.dom.Node;
 class MavenParallelVerificationWorkflowContractTest {
   private static final ObjectMapper YAML = new ObjectMapper(YAMLFactory.builder()
       .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build());
-  private static final String PLAYWRIGHT_VERSION = "1.65.0";
+  private static final String PLAYWRIGHT_VERSION = "1.65.1";
   private static final String FULL_MAVEN_COMMAND =
       "mvn --batch-mode --no-transfer-progress -Pfull,sdk-release,web-workbench-image verify";
   private static final String GIT_FREE_AUTHORITY = "maven-git-free-verification";
@@ -231,6 +231,21 @@ class MavenParallelVerificationWorkflowContractTest {
     String fullCacheInputs = "**/pom.xml\n.mvn/maven.config";
     assertEquals(fullCacheInputs, mavenCacheInputs(jobs.required("maven-product-verification")));
     assertEquals(fullCacheInputs, mavenCacheInputs(jobs.required(GIT_FREE_AUTHORITY)));
+    String polynomialCacheInputs = fullCacheInputs + "\n.mvn/polynomial-study-cache-scope.txt";
+    assertTrue(Files.isRegularFile(root.resolve(".mvn/polynomial-study-cache-scope.txt")),
+        "the polynomial reactor cache scope must exist in every checkout");
+    for (String job : List.of("maven-native-polynomial-study", "maven-typed-polynomial-study",
+        "maven-schema-polynomial-study")) {
+      assertEquals(polynomialCacheInputs, mavenCacheInputs(jobs.required(job)),
+          "full polynomial verification must not reuse the short preflight cache: " + job);
+    }
+    for (String job : List.of("preflight-contracts", "maven-polynomial-qualification")) {
+      var setup = jobs.required(job).required("steps").valueStream()
+          .filter(step -> step.path("uses").asText().startsWith("actions/setup-java@"))
+          .findFirst().orElseThrow().required("with");
+      assertFalse(setup.path("cache-dependency-path").asText().contains(".mvn/polynomial-study-cache-scope.txt"),
+          "short verification must not populate the full polynomial cache: " + job);
+    }
 
     int rejection = convergence.indexOf(
         "- name: Reject incomplete verification authority");

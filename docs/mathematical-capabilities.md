@@ -1,6 +1,6 @@
 # Mathematische Funktionen: Quelle, Release und Oberfläche
 
-Stand: 25. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
+Stand: 26. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
 genannten Funktionen. Mathematische Verträge und ausgeführte Vergleiche stehen
 in den verlinkten Fachseiten; der [Strategien-Index](research/strategies.md)
 führt Hypothesen, Befunde und Folgerungen.
@@ -26,6 +26,7 @@ Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
 | Modulare Kernsubstitution mit exakter Prüfung | `ModularKernel`, `ModularKernelVerifier` | `ModularKernelSdk` | nein | Java-/SDK-Beispiele |
 | Beschränkte nichtkommutative Identitätsprüfung | `NoncommutativeIdentity` | `NoncommutativeIdentitySdk` | nein | experimenteller Java-Einstieg |
 | Endliche Montgomery-Pläne | `MontgomerySchedule`, `MontgomeryReductionPlanner` | `MontgomeryScheduleSdk` | nein | Live-Zertifikatsdemo |
+| Gemeinsame Potenzen unter exakten oder gelockerten Ausgabebeobachtungen | `SharedPowerSearch`, `SharedPowerVerifier`, `SharedPowerEvaluation` | `SharedPowerSdk` | nein | quellengetriebene Suche mit unabhängiger Exponentenprüfung; sechs reproduzierbare Vergleichsfälle |
 | Rationale Bernstein-Schranken und Positivitätsbeweise | `BernsteinPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
 | Exakte Gram-Matrix und Polynomidentität | `GramPositivity` | `PolynomialPositivitySdk` | nein | Java-/SDK-Beispiele |
 | Begrenzte SOS- und polynomielle Potentialsuche | `SosSynthesis`, `SosVerifier`, `PolynomialPotential` | `SosSynthesisSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
@@ -78,6 +79,7 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
 - [Rationale Matrixformeln und Definitionsbedingungen](research/rational-formula-realization.md),
   [dynamische Quotientenalgebren](research/dynamic-algebra-evaluation.md).
 - [Montgomery-Pläne](research/montgomery-schedules.md),
+  [gemeinsame Potenzen und Beobachtungsverträge](research/shared-power-relations.md),
   [nichtkommutative Identitäten](research/noncommutative-identity.md),
   [gemeinsame bilineare Vorschläge](research/bilinear-core-proposals.md).
 - [Demo-Galerie](demo-gallery.md), [SDK-Referenz](../regelsuche-optimization-sdk/README.md)
