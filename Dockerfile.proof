@@ -9,7 +9,7 @@
 # The exact Maven/JDK variant is part of the checked container-image policy.
 # The complete source context comes from the tracked-file snapshot in
 # RegelsucheDockerImages; .dockerignore excludes mutable build outputs.
-FROM maven:3.10.0-eclipse-temurin-25-noble AS build
+FROM maven:3-eclipse-temurin-26-noble AS build
 WORKDIR /workspace
 COPY . .
 
