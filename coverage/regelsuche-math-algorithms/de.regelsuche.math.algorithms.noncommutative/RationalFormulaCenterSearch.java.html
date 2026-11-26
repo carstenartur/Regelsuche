@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalFormulaCenterSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.noncommutative</a> &gt; <span class="el_source">RationalFormulaCenterSearch.java</span></div><h1>RationalFormulaCenterSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.noncommutative;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Evidence;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Status;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier.Assignment;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier.Matrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.function.BooleanSupplier;
+
+/** Bounded scalar-center discovery retaining every original inverse-domain obligation. */
+public final class RationalFormulaCenterSearch {
+    private RationalFormulaCenterSearch() {}
+
+    /** Cartesian grid, in supplied value order and ascending variable-id order. */
+    public record Policy(List&lt;ExactRational&gt; values, int maximumCenters) {
+<span class="fc" id="L23">        public Policy {</span>
+<span class="fc" id="L24">            values = List.copyOf(values);</span>
+<span class="fc bfc" id="L25" title="All 4 branches covered.">            if (values.isEmpty() || maximumCenters &lt; 0) throw new IllegalArgumentException(&quot;INVALID_CENTER_POLICY&quot;);</span>
+<span class="fc" id="L26">        }</span>
+
+        public static Policy defaults() {
+<span class="fc" id="L29">            return new Policy(List.of(ExactRational.ZERO, ExactRational.ONE, ExactRational.NEGATIVE_ONE,</span>
+<span class="fc" id="L30">                ExactRational.integer(2), ExactRational.integer(-2)), 256);</span>
+        }
+    }
+
+    /** Evidence is an ordinary comparison certificate, independently replayable without this search. */
+<span class="fc" id="L35">    public record Result(Status status, Optional&lt;Assignment&gt; center, Optional&lt;Evidence&gt; evidence,</span>
+                         String reason, long work, int centersTried) {}
+
+    public static Result compare(RationalFormula left, RationalFormula right, Policy policy,
+                                 IterationLimits limits, BooleanSupplier cancelled) {
+<span class="fc" id="L40">        Objects.requireNonNull(left);</span>
+<span class="fc" id="L41">        Objects.requireNonNull(right);</span>
+<span class="fc" id="L42">        Objects.requireNonNull(policy);</span>
+<span class="fc" id="L43">        var work = new RationalFormulaWork(limits, cancelled);</span>
+<span class="fc" id="L44">        int tried = 0;</span>
+        try {
+<span class="fc" id="L46">            work.ledger.charge(0);</span>
+<span class="fc" id="L47">            work.reserve(policy.values().size());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (var value : policy.values()) work.ledger.check(value);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (policy.maximumCenters() == 0) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L50">            var variables = new TreeSet&lt;Integer&gt;();</span>
+<span class="fc" id="L51">            collect(left, variables, work, 1);</span>
+<span class="fc" id="L52">            collect(right, variables, work, 1);</span>
+<span class="fc" id="L53">            work.reserve(3L * variables.size());</span>
+<span class="fc" id="L54">            var ids = List.copyOf(variables);</span>
+<span class="fc" id="L55">            int[] digits = new int[ids.size()];</span>
+<span class="fc" id="L56">            var leftCertificate = RationalFormulaRealization.build(left, work);</span>
+<span class="fc" id="L57">            var rightCertificate = RationalFormulaRealization.build(right, work);</span>
+            do {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                if (tried == policy.maximumCenters()) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L60">                work.ledger.charge(1);</span>
+<span class="fc" id="L61">                work.reserve(5L * ids.size() + 2);</span>
+<span class="fc" id="L62">                var assignments = new TreeMap&lt;Integer, Matrix&gt;();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                for (int index = 0; index &lt; ids.size(); index++) {</span>
+<span class="fc" id="L64">                    work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(index + 1));</span>
+<span class="fc" id="L65">                    assignments.put(ids.get(index), new Matrix(1, List.of(policy.values().get(digits[index]))));</span>
+                }
+<span class="fc" id="L67">                var center = new Assignment(1, assignments);</span>
+<span class="fc" id="L68">                tried++;</span>
+<span class="fc" id="L69">                var comparison = RationalFormulaComparison.comparePrepared(left, right, leftCertificate,</span>
+                    rightCertificate, center, work);
+<span class="fc bfc" id="L71" title="All 4 branches covered.">                if (comparison.status() == Status.EQUAL_ON_SHARED_DOMAIN || comparison.status() == Status.DISTINCT) {</span>
+<span class="fc" id="L72">                    work.ledger.charge(0);</span>
+<span class="fc" id="L73">                    return new Result(comparison.status(), Optional.of(center), comparison.evidence(), &quot;&quot;,</span>
+<span class="fc" id="L74">                        work.ledger.used(), tried);</span>
+                }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (!&quot;UNDEFINED_SCALAR_CENTER&quot;.equals(comparison.reason()))</span>
+<span class="fc" id="L77">                    return open(comparison.reason(), work, tried);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            } while (advance(digits, policy.values().size(), work));</span>
+<span class="fc" id="L79">            return open(&quot;CENTER_GRID_EXHAUSTED&quot;, work, tried);</span>
+<span class="fc" id="L80">        } catch (CertificateWork.Stop stopped) {</span>
+<span class="fc" id="L81">            return open(stopped.getMessage(), work, tried);</span>
+<span class="nc" id="L82">        } catch (RationalFormulaVerifier.Rejected rejected) {</span>
+<span class="nc" id="L83">            return open(rejected.getMessage(), work, tried);</span>
+        }
+    }
+
+    private static Result open(String reason, RationalFormulaWork work, int tried) {
+<span class="fc" id="L88">        return new Result(Status.INCONCLUSIVE, Optional.empty(), Optional.empty(), reason, work.ledger.used(), tried);</span>
+    }
+
+    private static void collect(RationalFormula formula, TreeSet&lt;Integer&gt; variables,
+                                RationalFormulaWork work, int depth) {
+<span class="fc" id="L93">        work.enter(depth);</span>
+<span class="fc bfc" id="L94" title="All 5 branches covered.">        switch (formula) {</span>
+<span class="fc" id="L95">            case RationalFormula.Variable variable -&gt; {</span>
+<span class="fc" id="L96">                work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(variables.size() + 1));</span>
+<span class="fc" id="L97">                work.reserve(1);</span>
+<span class="fc" id="L98">                variables.add(variable.id());</span>
+<span class="fc" id="L99">            }</span>
+<span class="fc" id="L100">            case RationalFormula.Scalar scalar -&gt; work.ledger.check(scalar.value());</span>
+<span class="fc" id="L101">            case RationalFormula.Sum sum -&gt; {</span>
+<span class="fc" id="L102">                collect(sum.left(), variables, work, depth + 1);</span>
+<span class="fc" id="L103">                collect(sum.right(), variables, work, depth + 1);</span>
+<span class="fc" id="L104">            }</span>
+<span class="fc" id="L105">            case RationalFormula.Product product -&gt; {</span>
+<span class="fc" id="L106">                collect(product.left(), variables, work, depth + 1);</span>
+<span class="fc" id="L107">                collect(product.right(), variables, work, depth + 1);</span>
+<span class="fc" id="L108">            }</span>
+<span class="fc" id="L109">            case RationalFormula.Inverse inverse -&gt; collect(inverse.operand(), variables, work, depth + 1);</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    /** Mixed-radix increment avoids constructing the potentially enormous grid cardinality. */
+    private static boolean advance(int[] digits, int radix, RationalFormulaWork work) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int index = digits.length - 1; index &gt;= 0; index--) {</span>
+<span class="fc" id="L116">            work.ledger.charge(1);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (digits[index] + 1 &lt; radix) {</span>
+<span class="fc" id="L118">                digits[index]++;</span>
+<span class="fc" id="L119">                return true;</span>
+            }
+<span class="fc" id="L121">            digits[index] = 0;</span>
+        }
+<span class="fc" id="L123">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

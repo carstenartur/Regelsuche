@@ -2,6 +2,8 @@
 
 import de.regelsuche.math.algorithms.polynomial.FiniteFieldFactorizationPolicy;
 import de.regelsuche.math.algorithms.polynomial.PrimeFieldMultiplicity;
+import de.regelsuche.math.algorithms.polynomial.LargePrimeFactorization;
+import de.regelsuche.math.algorithms.polynomial.LargePrimeFactorizationVerifier;
 import de.regelsuche.polynomial.FactorizationRequest;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import java.math.BigInteger;
@@ -12,12 +14,24 @@ public final class PrimeFieldFactorizationSdk {
 
     public static PrimeFieldMultiplicity.Result factor(FactorizationRequest&lt;BigInteger&gt; request,
         FiniteFieldFactorizationPolicy policy, CancellationToken token) {
-<span class="fc" id="L15">        return PrimeFieldMultiplicity.factor(request, policy, token::isCancelled);</span>
+<span class="fc" id="L17">        return PrimeFieldMultiplicity.factor(request, policy, token::isCancelled);</span>
     }
 
     public static PrimeFieldMultiplicity.Result verify(FactorizationRequest&lt;BigInteger&gt; request,
         FiniteFieldFactorizationPolicy policy, PrimeFieldMultiplicity.Certificate certificate, CancellationToken token) {
-<span class="fc" id="L20">        return PrimeFieldMultiplicity.verify(request, policy, certificate, token::isCancelled);</span>
+<span class="fc" id="L22">        return PrimeFieldMultiplicity.verify(request, policy, certificate, token::isCancelled);</span>
+    }
+    /** Large-prime path; the returned status explicitly retains a prime assumption. */
+    public static LargePrimeFactorization.Result factor(FactorizationRequest&lt;BigInteger&gt; request,
+        LargePrimeFactorization.Policy policy, CancellationToken token) {
+<span class="fc" id="L27">        return LargePrimeFactorization.factor(request, policy, token::isCancelled);</span>
+    }
+
+    /** Check supplied complete factors with no search or field-enumeration limit. */
+    public static LargePrimeFactorization.Result verify(FactorizationRequest&lt;BigInteger&gt; request,
+        LargePrimeFactorizationVerifier.Policy policy, LargePrimeFactorization.Certificate certificate,
+        CancellationToken token) {
+<span class="fc" id="L34">        return LargePrimeFactorizationVerifier.verify(request, policy, certificate, token::isCancelled);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

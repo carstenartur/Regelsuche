@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>IndependentBigPrimePolynomialArithmetic.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">IndependentBigPrimePolynomialArithmetic.java</span></div><h1>IndependentBigPrimePolynomialArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Independent dense verifier arithmetic. This class never calls the search's
+ * UnivariatePolynomialView operations, DDF or randomized splitting routines.
+ */
+final class IndependentBigPrimePolynomialArithmetic {
+    private final BigInteger modulus;
+    private final LargePrimeWorkBudget work;
+
+<span class="fc" id="L16">    IndependentBigPrimePolynomialArithmetic(BigInteger modulus, LargePrimeWorkBudget work) {</span>
+<span class="fc" id="L17">        this.modulus = modulus;</span>
+<span class="fc" id="L18">        this.work = work;</span>
+<span class="fc" id="L19">    }</span>
+
+    BigInteger[] from(SparsePolynomial&lt;BigInteger&gt; source) {
+<span class="fc" id="L22">        BigInteger[] result = zeros(source.degree(0) + 1L);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        for (var term : source.terms().entrySet()) {</span>
+<span class="fc" id="L24">            work.consume(&quot;verify.load&quot;, 1);</span>
+<span class="fc" id="L25">            result[term.getKey().exponent(0)] = term.getValue();</span>
+<span class="fc" id="L26">        }</span>
+<span class="fc" id="L27">        return result;</span>
+    }
+
+    BigInteger[] constant(BigInteger value) {
+<span class="fc" id="L31">        BigInteger[] result = zeros(1);</span>
+<span class="fc" id="L32">        result[0] = value;</span>
+<span class="fc" id="L33">        return result;</span>
+    }
+
+    BigInteger[] multiply(BigInteger[] left, BigInteger[] right) {
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if (left.length == 0 || right.length == 0) return zeros(0);</span>
+<span class="fc" id="L38">        BigInteger[] result = zeros(left.length + (long) right.length - 1);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (int i = 0; i &lt; left.length; i++) {</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            for (int j = 0; j &lt; right.length; j++) {</span>
+<span class="fc" id="L41">                work.consume(&quot;verify.multiply&quot;, 2);</span>
+<span class="fc" id="L42">                result[i + j] = result[i + j].add(left[i].multiply(right[j])).mod(modulus);</span>
+            }
+        }
+<span class="fc" id="L45">        return trim(result);</span>
+    }
+
+    private BigInteger[] subtract(BigInteger[] left, BigInteger[] right) {
+<span class="fc" id="L49">        BigInteger[] result = zeros(Math.max(left.length, right.length));</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="fc" id="L51">            work.consume(&quot;verify.subtract&quot;, 1);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            BigInteger a = i &lt; left.length ? left[i] : BigInteger.ZERO;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            BigInteger b = i &lt; right.length ? right[i] : BigInteger.ZERO;</span>
+<span class="fc" id="L54">            result[i] = a.subtract(b).mod(modulus);</span>
+        }
+<span class="fc" id="L56">        return trim(result);</span>
+    }
+
+    private BigInteger[] remainder(BigInteger[] dividend, BigInteger[] divisor) {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (divisor.length == 0) throw new ArithmeticException(&quot;zero polynomial divisor&quot;);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (dividend.length &lt; divisor.length) return dividend;</span>
+<span class="fc" id="L62">        BigInteger[] result = copy(dividend, dividend.length);</span>
+<span class="fc" id="L63">        BigInteger inverse = BigInteger.ONE;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!divisor[divisor.length - 1].equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L65">            work.inversion(&quot;verify.inverse&quot;);</span>
+<span class="fc" id="L66">            inverse = divisor[divisor.length - 1].modInverse(modulus);</span>
+<span class="fc" id="L67">            work.consume(&quot;verify.inverse-complete&quot;, 0);</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int i = dividend.length - 1; i &gt;= divisor.length - 1; i--) {</span>
+<span class="fc" id="L70">            work.consume(&quot;verify.divide-step&quot;, 1);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (result[i].signum() == 0) continue;</span>
+<span class="fc" id="L72">            BigInteger scalar = result[i].multiply(inverse).mod(modulus);</span>
+<span class="fc" id="L73">            int shift = i - divisor.length + 1;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            for (int j = 0; j &lt; divisor.length; j++) {</span>
+<span class="fc" id="L75">                work.consume(&quot;verify.divide-update&quot;, 2);</span>
+<span class="fc" id="L76">                result[shift + j] = result[shift + j].subtract(scalar.multiply(divisor[j])).mod(modulus);</span>
+            }
+        }
+<span class="fc" id="L79">        return trim(result);</span>
+    }
+
+    private BigInteger[] gcd(BigInteger[] first, BigInteger[] second) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        while (second.length != 0) {</span>
+<span class="fc" id="L84">            work.consume(&quot;verify.gcd&quot;, 1);</span>
+<span class="fc" id="L85">            BigInteger[] next = remainder(first, second);</span>
+<span class="fc" id="L86">            first = second;</span>
+<span class="fc" id="L87">            second = next;</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">        return first;</span>
+    }
+
+    private BigInteger[] power(BigInteger[] base, BigInteger exponent, BigInteger[] polynomial) {
+<span class="fc" id="L93">        BigInteger[] result = constant(BigInteger.ONE);</span>
+<span class="fc" id="L94">        BigInteger[] reduced = remainder(base, polynomial);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (int bit = exponent.bitLength() - 1; bit &gt;= 0; bit--) {</span>
+<span class="fc" id="L96">            work.consume(&quot;verify.power-bit&quot;, 1);</span>
+<span class="fc" id="L97">            result = remainder(multiply(result, result), polynomial);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            if (exponent.testBit(bit)) result = remainder(multiply(result, reduced), polynomial);</span>
+        }
+<span class="fc" id="L100">        return result;</span>
+    }
+
+    boolean irreducible(BigInteger[] polynomial) {
+<span class="fc" id="L104">        int degree = polynomial.length - 1;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (degree &lt;= 0) return false;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (degree == 1) {</span>
+<span class="fc" id="L107">            work.consume(&quot;verify.rabin-linear&quot;, 1);</span>
+<span class="fc" id="L108">            return true;</span>
+        }
+<span class="fc" id="L110">        List&lt;Integer&gt; checkpoints = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L111">        int remaining = degree;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (int divisor = 2; (long) divisor * divisor &lt;= remaining; divisor++) {</span>
+<span class="fc" id="L113">            work.consume(&quot;verify.degree-divisors&quot;, 1);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (remaining % divisor != 0) continue;</span>
+<span class="fc" id="L115">            work.reserve(1);</span>
+<span class="fc" id="L116">            checkpoints.add(degree / divisor);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            while (remaining % divisor == 0) {</span>
+<span class="fc" id="L118">                work.consume(&quot;verify.degree-divisors&quot;, 1);</span>
+<span class="fc" id="L119">                remaining /= divisor;</span>
+            }
+        }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (remaining &gt; 1) {</span>
+<span class="fc" id="L123">            work.reserve(1);</span>
+<span class="fc" id="L124">            checkpoints.add(degree / remaining);</span>
+        }
+<span class="fc" id="L126">        BigInteger[] x = zeros(2);</span>
+<span class="fc" id="L127">        x[1] = BigInteger.ONE;</span>
+<span class="fc" id="L128">        BigInteger[] frobenius = x;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int i = 1; i &lt;= degree; i++) {</span>
+<span class="fc" id="L130">            work.consume(&quot;verify.rabin-round&quot;, 1);</span>
+<span class="fc" id="L131">            frobenius = power(frobenius, modulus, polynomial);</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">            if (checkpoints.contains(i) &amp;&amp; gcd(polynomial, subtract(frobenius, x)).length != 1) return false;</span>
+        }
+<span class="fc" id="L134">        work.consume(&quot;verify.rabin-final&quot;, degree + 1L);</span>
+<span class="fc" id="L135">        return equal(x, frobenius);</span>
+    }
+
+    private BigInteger[] zeros(long size) {
+<span class="fc" id="L139">        work.reserveVector(size, 1);</span>
+<span class="fc" id="L140">        work.consume(&quot;verify.allocate-initialize&quot;, size);</span>
+<span class="fc" id="L141">        BigInteger[] result = new BigInteger[(int) size];</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if ((i &amp; 1023) == 0) work.checkpoint(&quot;verify.initialize&quot;);</span>
+<span class="fc" id="L144">            result[i] = BigInteger.ZERO;</span>
+        }
+<span class="fc" id="L146">        work.checkpoint(&quot;verify.initialize&quot;);</span>
+<span class="fc" id="L147">        return result;</span>
+    }
+
+    private BigInteger[] trim(BigInteger[] source) {
+<span class="fc" id="L151">        int size = source.length;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        while (size &gt; 0) {</span>
+<span class="fc" id="L153">            work.consume(&quot;verify.trim&quot;, 1);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (source[size - 1].signum() != 0) break;</span>
+<span class="fc" id="L155">            size--;</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (size == source.length) return source;</span>
+<span class="fc" id="L158">        return copy(source, size);</span>
+    }
+
+    private BigInteger[] copy(BigInteger[] source, int size) {
+<span class="fc" id="L162">        work.reserveVector(size, 1);</span>
+<span class="fc" id="L163">        BigInteger[] result = new BigInteger[size];</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if ((i &amp; 1023) == 0) work.checkpoint(&quot;verify.copy&quot;);</span>
+<span class="fc" id="L166">            result[i] = source[i];</span>
+        }
+<span class="fc" id="L168">        work.checkpoint(&quot;verify.copy&quot;);</span>
+<span class="fc" id="L169">        return result;</span>
+    }
+
+    boolean equal(BigInteger[] left, BigInteger[] right) {
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (left.length != right.length) return false;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (int i = 0; i &lt; left.length; i++) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if ((i &amp; 1023) == 0) work.checkpoint(&quot;verify.compare&quot;);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (!left[i].equals(right[i])) return false;</span>
+        }
+<span class="fc" id="L178">        work.checkpoint(&quot;verify.compare&quot;);</span>
+<span class="fc" id="L179">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

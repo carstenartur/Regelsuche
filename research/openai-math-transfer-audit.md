@@ -170,7 +170,49 @@ Kosten und Reproduktionsbefehle. Die Arbeitseinheiten verschiedener APIs sind
 keine untereinander normierten Laufzeitmessungen. Aufbau, neue Suche und Prüfung
 müssen vor einem behaupteten Verbrauchernutzen zusätzlich amortisiert werden.
 
-### Ausgeführte Integration
+### Anschließende Implementierung der empfohlenen Suchverfahren
+
+Auf Basis von Regelsuche `d4784fcde5f92e9dc222e760af4febccc30e9f4e`
+ergänzt der nächste Schritt die oben beschriebenen Prüfer um tatsächliche
+begrenzte Erzeuger. Die vorangehende Tabelle dokumentiert den ersten Transfer;
+insbesondere ihre Aussagen „kein allgemeiner LP-Löser“ und zum damaligen
+`int`-Primkörper beschreiben diesen früheren Stand.
+
+| Empfehlung | Jetzt implementiert | Weiterhin geltende Grenze |
+| --- | --- | --- |
+| LP-Belege selbst finden und verwenden | [Exakter Zwei-Phasen-Simplex und affine Folgerungen](linear-program-search.md), einschließlich konkreter Gegenpunkte und separatem Prüfer | Ressourcenbegrenzter Standard-Simplex, kein stark polynomialer Algorithmus der Familie 380 |
+| Größere Primmoduli praktisch erschließen | [Typisierter BigInteger-Körper, SFD/DDF/EDF und unabhängiger Komplettprüfer](large-prime-factorization.md) | Große Primannahme bleibt im Status sichtbar; randomisierte Suche, keine deterministische Bitkomplexität der Familie 142 |
+| Reparaturpläne selbst entdecken und wiederverwenden | [Quellengesteuerte Prädiktoren, exakte Rangzerlegung und vorbereitete Ausführung](operator-residual-repair.md) | Endliche rationale Matrizen; vollständige Erwerbskosten, starke Direkt- und Spezialkontrollen in einer lokalen Messung |
+| Gemeinsames Skalarzentrum automatisch finden | [Konfigurierbare endliche Gitterpolicy](rational-formula-realization.md#ein-gemeinsames-skalarzentrum-automatisch-suchen) unter einem gemeinsamen Budget | Originaldomänen bleiben erhalten; ausschließlich an Matrizen definierte Formeln können offen bleiben |
+| Frühere Greedy-Bedingungen zu neuen Folgerungen verbinden | Separater [Primachsen-Verbraucher](https://github.com/carstenartur/primachsenraum) mit authentifiziertem Ausgangspräfix und unabhängigem Belegprüfer | Neue Herleitung von $T_{751}=47.796$ aus kleineren Quellen, kein neuer empirischer Zahlenwert und keine uniforme Frist |
+
+Die generischen Verfahren liegen in den vorhandenen Kern- und
+Mathematikmodulen; das SDK delegiert. Primzahlspezifische Voraussetzungen und
+Chronologie bleiben im Consumer. Es wurde kein fremder Bibliothekscode in
+die neuen Implementierungen kopiert und keine zusätzliche Bibliothek
+eingebunden. Der vollständige Funktionenkörper-Unterbau der Familie 142,
+universelle rationale Trefferlisten und ein allgemeiner Fristsatz bleiben
+die ausdrücklich zurückgestellten Forschungsaufgaben.
+
+Die vollständigen betroffenen Java-Modulsuiten laufen nach der Erweiterung
+mit 3.507 erfassten Tests: 1.232 Core, 181 E-Graph, 811 Search, 45 Validation,
+878 Mathematik und 360 SDK. Es gibt keine Fehler oder Fehlschläge; ein
+bereits optionaler Metrikexport bleibt ohne Exportkonfiguration übersprungen.
+Alle 35 geänderten Java-Quellen einschließlich Tests und Messprogramm bestehen
+zusätzlich `javac -Xlint:all -Werror`. Die 72 Java-Tests des Primachsen-Consumers
+bestehen auch gegen diesen neuen SDK-Quellstand. Ein vollständiger lokaler
+SDK-Paketbau ist erfolgreich; der vollständige Gesamtprodukt-Build wird
+zusätzlich in CI geprüft.
+
+Frische unabhängige Reviews kontrollierten die mathematischen Verträge und
+eigene Vergleichsorakel. Zwei dabei gefundene generische Ressourcenlücken sind
+geschlossen: die kumulative Reservierung einer ausgewerteten und anschließend
+rangbedingt verworfenen Prädiktormatrix sowie Abbruchpunkte innerhalb großer
+dichter Polynomkonvertierungen. Deterministische Regressionen prüfen beide
+Korrekturen. Die neue Default-Methode des Arbeitssinks bleibt auch für einen
+gegen die alte Schnittstelle kompilierten Anbieter kompatibel.
+
+### Ausgeführte Integration des ersten Transfers
 
 Die lokalen vollständigen Tests der betroffenen Module umfassen 826 Tests im
 Mathematikmodul, 355 im SDK und 72 im Primachsen-Consumer: keine Fehler oder

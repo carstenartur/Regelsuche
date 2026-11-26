@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OperatorResidualSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">OperatorResidualSearch.java</span></div><h1>OperatorResidualSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/** Source-derived finite predictor search with independently checked residuals. */
+public final class OperatorResidualSearch {
+    private OperatorResidualSearch() {}
+<span class="fc" id="L19">    public enum Predictor { DIRECT, SUPPLIED, ZERO, IDENTITY, DIAGONAL, TRIDIAGONAL }</span>
+    public record Policy(List&lt;Predictor&gt; predictors, int maximumResidualRank) {
+<span class="fc" id="L21">        public Policy {</span>
+<span class="fc" id="L22">            predictors = List.copyOf(predictors);</span>
+<span class="pc bpc" id="L23" title="2 of 6 branches missed.">            if (predictors.contains(Predictor.DIRECT) || predictors.contains(Predictor.SUPPLIED) || maximumResidualRank &lt; 0)</span>
+<span class="fc" id="L24">                throw new IllegalArgumentException(&quot;INVALID_RESIDUAL_SEARCH_POLICY&quot;);</span>
+<span class="fc" id="L25">        }</span>
+        public static Policy defaults() {
+<span class="fc" id="L27">            return new Policy(List.of(Predictor.ZERO, Predictor.IDENTITY, Predictor.DIAGONAL, Predictor.TRIDIAGONAL), 16);</span>
+        }
+    }
+<span class="fc" id="L30">    public record Candidate(Predictor predictor, int residualRank, Optional&lt;Cost&gt; cost) {}</span>
+    public record Discovery(PreparedOperator operator, List&lt;Candidate&gt; candidates) {
+<span class="fc" id="L32">        public Discovery { candidates = List.copyOf(candidates); }</span>
+    }
+    public static Result&lt;Discovery&gt; discover(PolynomialMatrix source, Policy policy, IterationLimits limits,
+                                             BooleanSupplier cancelled) {
+<span class="fc" id="L36">        Objects.requireNonNull(policy);</span>
+<span class="fc" id="L37">        return discover(source, policy, policy.predictors().size(), limits, cancelled);</span>
+    }
+
+    /** An enclosing search can additionally limit how many declared predictors may be considered. */
+    public static Result&lt;Discovery&gt; discover(PolynomialMatrix source, Policy policy, int maximumCandidates,
+                                             IterationLimits limits, BooleanSupplier cancelled) {
+<span class="fc" id="L43">        Objects.requireNonNull(policy);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L45">        return OperatorChecks.run(limits, cancelled, checks -&gt; {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">            if (policy.predictors().size() &gt; maximumCandidates)</span>
+<span class="nc" id="L47">                throw new OperatorChecks.Rejected(Status.STOPPED, &quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L48">            checks.input(source);</span>
+<span class="fc" id="L49">            checks.work.cells(policy.predictors().size());</span>
+<span class="fc" id="L50">            var direct = new Plan(source, new ExactMatrixExpression.Matrix(&quot;source&quot;, source), Optional.empty());</span>
+<span class="fc" id="L51">            var best = PreparedOperator.create(source, direct, Predictor.DIRECT, 0, null, checks);</span>
+<span class="fc" id="L52">            var candidates = new ArrayList&lt;Candidate&gt;();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (var kind : policy.predictors()) {</span>
+<span class="fc" id="L54">                checks.work.charge(1);</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">                if (kind == Predictor.IDENTITY &amp;&amp; source.rows() != source.columns()) continue;</span>
+<span class="fc" id="L56">                var predictor = predictor(source, kind, checks);</span>
+<span class="fc" id="L57">                checks.reserve(source.rows(), source.columns());</span>
+<span class="fc" id="L58">                var value = checks.algebra.evaluate(predictor);</span>
+<span class="fc" id="L59">                var factors = factorResidual(source, value, checks);</span>
+<span class="fc" id="L60">                int rank = factors.map(f -&gt; f.lift().columns()).orElse(0);</span>
+<span class="fc" id="L61">                checks.reserve(1, 3);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">                if (rank &gt; policy.maximumResidualRank()) {</span>
+<span class="fc" id="L63">                    candidates.add(new Candidate(kind, rank, Optional.empty()));</span>
+<span class="fc" id="L64">                    continue;</span>
+                }
+<span class="fc" id="L66">                var plan = new Plan(source, predictor, factors);</span>
+<span class="fc" id="L67">                var prepared = PreparedOperator.create(source, plan, kind, rank, best.directCost(), checks);</span>
+<span class="fc" id="L68">                candidates.add(new Candidate(kind, rank, Optional.of(prepared.cost())));</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                if (prepared.cost().total() &lt; best.cost().total()) best = prepared;</span>
+<span class="fc" id="L70">            }</span>
+<span class="fc" id="L71">            return new Discovery(best, candidates);</span>
+        });
+    }
+    public static Result&lt;PreparedOperator&gt; prepare(PolynomialMatrix source, Plan plan, IterationLimits limits,
+                                                   BooleanSupplier cancelled) {
+<span class="fc" id="L76">        Objects.requireNonNull(plan);</span>
+<span class="pc" id="L77">        return OperatorChecks.run(limits, cancelled, checks -&gt; PreparedOperator.create(source, plan,</span>
+<span class="pc" id="L78">            Predictor.SUPPLIED, plan.correction().map(f -&gt; f.lift().columns()).orElse(0), null, checks));</span>
+    }
+
+    private static ExactMatrixExpression predictor(PolynomialMatrix source, Predictor kind, OperatorChecks checks) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (kind == Predictor.IDENTITY) return new ExactMatrixExpression.Identity(source.rows());</span>
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        var matrix = checks.matrix(source.rows(), source.columns(), (row, column) -&gt; switch (kind) {</span>
+<span class="fc" id="L84">            case ZERO -&gt; Polynomial.zero();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            case DIAGONAL -&gt; row.equals(column) ? source.get(row, column) : Polynomial.zero();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            case TRIDIAGONAL -&gt; Math.abs(row - column) &lt;= 1 ? source.get(row, column) : Polynomial.zero();</span>
+<span class="nc" id="L87">            default -&gt; throw new IllegalArgumentException(&quot;INVALID_PREDICTOR&quot;);</span>
+        });
+<span class="fc" id="L89">        return new ExactMatrixExpression.Matrix(kind.name(), matrix);</span>
+    }
+
+    /** R=C*V: C consists of original pivot columns, V of the nonzero rows of RREF(R). */
+    private static Optional&lt;Factors&gt; factorResidual(PolynomialMatrix source, PolynomialMatrix predictor,
+                                                     OperatorChecks checks) {
+<span class="fc" id="L95">        int rows = source.rows();</span>
+<span class="fc" id="L96">        int columns = source.columns();</span>
+<span class="fc" id="L97">        checks.reserve(rows, columns);</span>
+<span class="fc" id="L98">        checks.reserve(rows, columns);</span>
+<span class="fc" id="L99">        checks.reserve(1, columns);</span>
+<span class="fc" id="L100">        var original = new ExactRational[rows][columns];</span>
+<span class="fc" id="L101">        var reduced = new ExactRational[rows][columns];</span>
+<span class="fc bfc" id="L102" title="All 4 branches covered.">        for (int row = 0; row &lt; rows; row++) for (int column = 0; column &lt; columns; column++) {</span>
+<span class="fc" id="L103">            original[row][column] = checks.work.sub(rational(source.get(row, column), checks),</span>
+<span class="fc" id="L104">                rational(predictor.get(row, column), checks));</span>
+<span class="fc" id="L105">            reduced[row][column] = original[row][column];</span>
+        }
+<span class="fc" id="L107">        int[] pivots = new int[columns];</span>
+<span class="fc" id="L108">        int rank = 0;</span>
+<span class="fc bfc" id="L109" title="All 4 branches covered.">        for (int column = 0; column &lt; columns &amp;&amp; rank &lt; rows; column++) {</span>
+<span class="fc" id="L110">            int pivot = rank;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            while (pivot &lt; rows) {</span>
+<span class="fc" id="L112">                checks.work.charge(1);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (!reduced[pivot][column].isZero()) break;</span>
+<span class="fc" id="L114">                pivot++;</span>
+            }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (pivot == rows) continue;</span>
+<span class="fc" id="L117">            var swap = reduced[rank];</span>
+<span class="fc" id="L118">            reduced[rank] = reduced[pivot];</span>
+<span class="fc" id="L119">            reduced[pivot] = swap;</span>
+<span class="fc" id="L120">            var divisor = reduced[rank][column];</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (int j = column; j &lt; columns; j++)</span>
+<span class="fc" id="L122">                reduced[rank][j] = checks.work.div(reduced[rank][j], divisor);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L124">                checks.work.charge(1);</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">                if (row == rank || reduced[row][column].isZero()) continue;</span>
+<span class="fc" id="L126">                var scale = reduced[row][column];</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                for (int j = column; j &lt; columns; j++)</span>
+<span class="fc" id="L128">                    reduced[row][j] = checks.work.sub(reduced[row][j], checks.work.mul(scale, reduced[rank][j]));</span>
+            }
+<span class="fc" id="L130">            pivots[rank++] = column;</span>
+        }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (rank == 0) return Optional.empty();</span>
+<span class="fc" id="L133">        var lift = checks.matrix(rows, rank,</span>
+<span class="fc" id="L134">            (i,j) -&gt; Polynomial.constant(Rational.fromExact(original[i][pivots[j]])));</span>
+<span class="fc" id="L135">        var coordinates = checks.matrix(rank, columns,</span>
+<span class="fc" id="L136">            (i,j) -&gt; Polynomial.constant(Rational.fromExact(reduced[i][j])));</span>
+<span class="fc" id="L137">        return Optional.of(new Factors(lift, coordinates));</span>
+    }
+
+    private static ExactRational rational(Polynomial value, OperatorChecks checks) {
+<span class="fc" id="L141">        checks.work.charge(1);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (value.isZero()) return ExactRational.ZERO;</span>
+<span class="fc" id="L143">        var coefficient = value.terms().values().iterator().next();</span>
+<span class="fc" id="L144">        return checks.work.check(new ExactRational(coefficient.numerator(), coefficient.denominator()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

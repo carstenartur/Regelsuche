@@ -2,11 +2,14 @@
 
 import de.regelsuche.math.algorithms.algebra.OccupiedWorkspace;
 import de.regelsuche.math.algorithms.algebra.OperatorResidualPlans;
+import de.regelsuche.math.algorithms.algebra.OperatorResidualSearch;
+import de.regelsuche.math.algorithms.algebra.PreparedOperator;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
 import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
 import de.regelsuche.sdk.optimization.CancellationToken;
 import de.regelsuche.sdk.optimization.OptimizationBudget;
+import de.regelsuche.scalar.ExactRational;
 import java.util.List;
 
 import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
@@ -15,34 +18,49 @@ import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
 public final class OperatorPlanSdk {
     private OperatorPlanSdk() {}
 
+    public static Result&lt;OperatorResidualSearch.Discovery&gt; discover(PolynomialMatrix source,
+            OperatorResidualSearch.Policy policy, OptimizationBudget budget, CancellationToken cancel) {
+<span class="fc" id="L23">        return OperatorResidualSearch.discover(source, policy, budget.maximumCandidates(), limits(budget), cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;PreparedOperator&gt; prepare(PolynomialMatrix source, Plan plan, OptimizationBudget budget,
+            CancellationToken cancel) {
+<span class="nc" id="L28">        return OperatorResidualSearch.prepare(source, plan, limits(budget), cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;List&lt;ExactRational&gt;&gt; apply(PreparedOperator prepared, List&lt;ExactRational&gt; vector,
+            OptimizationBudget budget, CancellationToken cancel) {
+<span class="fc" id="L33">        return prepared.apply(vector, limits(budget), cancel::isCancelled);</span>
+    }
+
     public static Result&lt;Plan&gt; spectral(PolynomialMatrix source, ExactMatrixExpression predictor,
             PolynomialMatrix basis, PolynomialMatrix inverse, OptimizationBudget budget, CancellationToken cancel) {
-<span class="fc" id="L20">        return OperatorResidualPlans.spectral(source, predictor, basis, inverse, limits(budget), cancel::isCancelled);</span>
+<span class="fc" id="L38">        return OperatorResidualPlans.spectral(source, predictor, basis, inverse, limits(budget), cancel::isCancelled);</span>
     }
 
     public static Result&lt;Cost&gt; verify(PolynomialMatrix source, Plan plan, OptimizationBudget budget,
             CancellationToken cancel) {
-<span class="fc" id="L25">        return OperatorResidualPlans.verify(source, plan, limits(budget), cancel::isCancelled);</span>
+<span class="fc" id="L43">        return OperatorResidualPlans.verify(source, plan, limits(budget), cancel::isCancelled);</span>
     }
 
     public static Result&lt;Selection&gt; select(PolynomialMatrix source, List&lt;Plan&gt; plans, OptimizationBudget budget,
             CancellationToken cancel) {
-<span class="fc" id="L30">        return OperatorResidualPlans.select(source, plans, budget.maximumCandidates(), limits(budget), cancel::isCancelled);</span>
+<span class="fc" id="L48">        return OperatorResidualPlans.select(source, plans, budget.maximumCandidates(), limits(budget), cancel::isCancelled);</span>
     }
 
     public static Result&lt;OccupiedWorkspace.Comparison&gt; verifyWorkspace(PolynomialMatrix first, PolynomialMatrix second,
             OccupiedWorkspace.Schedule schedule, OptimizationBudget budget, CancellationToken cancel) {
-<span class="fc" id="L35">        return OccupiedWorkspace.verify(first, second, schedule, limits(budget), cancel::isCancelled);</span>
+<span class="fc" id="L53">        return OccupiedWorkspace.verify(first, second, schedule, limits(budget), cancel::isCancelled);</span>
     }
 
     public static Result&lt;OccupiedWorkspace.State&gt; applyWorkspace(PolynomialMatrix first, PolynomialMatrix second,
             OccupiedWorkspace.Schedule schedule, OccupiedWorkspace.State input, OptimizationBudget budget,
             CancellationToken cancel) {
-<span class="fc" id="L41">        return OccupiedWorkspace.apply(first, second, schedule, input, limits(budget), cancel::isCancelled);</span>
+<span class="fc" id="L59">        return OccupiedWorkspace.apply(first, second, schedule, input, limits(budget), cancel::isCancelled);</span>
     }
 
     private static IterationLimits limits(OptimizationBudget budget) {
-<span class="fc" id="L45">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+<span class="fc" id="L63">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

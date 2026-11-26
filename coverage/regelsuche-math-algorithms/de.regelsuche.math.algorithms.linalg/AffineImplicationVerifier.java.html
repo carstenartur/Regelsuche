@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineImplicationVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">AffineImplicationVerifier.java</span></div><h1>AffineImplicationVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.AffineImplication.Counterexample;
+import de.regelsuche.math.algorithms.linalg.AffineImplication.Evidence;
+import de.regelsuche.math.algorithms.linalg.AffineImplication.Proof;
+import de.regelsuche.math.algorithms.linalg.AffineImplication.Request;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Optimal;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Unbounded;
+import de.regelsuche.math.algorithms.linalg.LinearProgramVerifier.Status;
+import de.regelsuche.math.algorithms.linalg.LinearProgramVerifier.Verification;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/** Independent source-bound replay of affine implication evidence. */
+public final class AffineImplicationVerifier {
+    private AffineImplicationVerifier() {}
+
+    public static Verification verify(Request request, Evidence evidence,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L22">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L24">            return verify(request, evidence, work);</span>
+<span class="fc" id="L25">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L26">            return new Verification(Status.UNAVAILABLE, stop.getMessage(), work.used());</span>
+        }
+    }
+
+    static Verification verify(Request request, Evidence evidence, CertificateWork work) {
+<span class="fc" id="L31">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L32">        work.charge(1);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (evidence == null) return result(&quot;MISSING_EVIDENCE&quot;, work);</span>
+<span class="fc" id="L34">        var problem = request.problem();</span>
+<span class="fc" id="L35">        var bound = evidence.source();</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (problem.constraints() != bound.problem().constraints()</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">                || problem.variables() != bound.problem().variables()) {</span>
+<span class="nc" id="L38">            return result(&quot;SOURCE_MISMATCH&quot;, work);</span>
+        }
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        long boundCells = request == bound ? 0</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            : 1 + (problem == bound.problem() ? 0 : bound.problem().storageCells());</span>
+<span class="fc" id="L42">        work.cells(boundCells);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        long evidenceCells = switch (evidence) {</span>
+<span class="fc" id="L44">            case Proof proof -&gt; LinearProgramVerifier.storageCells(problem, proof.certificate(), work);</span>
+<span class="fc" id="L45">            case Counterexample point -&gt; problem.storageCells() + point.x().size();</span>
+<span class="fc" id="L46">        };</span>
+<span class="fc" id="L47">        work.cells(1 + boundCells + evidenceCells);</span>
+<span class="fc" id="L48">        var upperBound = work.check(request.upperBound());</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        if (request != bound &amp;&amp; !upperBound.equals(work.check(bound.upperBound()))) {</span>
+<span class="fc" id="L50">            return result(&quot;SOURCE_MISMATCH&quot;, work);</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!LinearProgramVerifier.sameSource(problem, bound.problem(), work)) {</span>
+<span class="fc" id="L53">            return result(&quot;SOURCE_MISMATCH&quot;, work);</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        return switch (evidence) {</span>
+<span class="fc" id="L56">            case Proof proof -&gt; checkProof(request, proof, 1 + boundCells, work);</span>
+<span class="fc" id="L57">            case Counterexample point -&gt; checkCounterexample(request, point, work);</span>
+        };
+    }
+
+    private static Verification checkProof(Request request, Proof proof,
+            long retainedCells, CertificateWork work) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (proof.certificate() instanceof Unbounded) return result(&quot;NOT_AN_IMPLICATION_PROOF&quot;, work);</span>
+<span class="fc" id="L64">        var checked = LinearProgramVerifier.verify(request.problem(), proof.certificate(),</span>
+            false, retainedCells, work);
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!checked.valid()) return checked;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (proof.certificate() instanceof Optimal optimum) {</span>
+<span class="fc" id="L68">            var value = LinearProgramVerifier.dot(request.problem().c(), optimum.x(), work);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (work.sub(value, request.upperBound()).signum() &gt; 0) {</span>
+<span class="fc" id="L70">                return result(&quot;CONCLUSION_NOT_ENTAILED&quot;, work);</span>
+            }
+        }
+<span class="fc" id="L73">        return result(null, work);</span>
+    }
+
+    private static Verification checkCounterexample(Request request, Counterexample point, CertificateWork work) {
+<span class="fc" id="L77">        var problem = request.problem();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (point.x().size() != problem.variables()) return result(&quot;COUNTEREXAMPLE_SHAPE&quot;, work);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (var value : point.x()) work.check(value);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (int row = 0; row &lt; problem.constraints(); row++) {</span>
+<span class="fc" id="L81">            var value = LinearProgramVerifier.dot(problem.a().get(row), point.x(), work);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (work.sub(value, problem.b().get(row)).signum() &gt; 0) {</span>
+<span class="fc" id="L83">                return result(&quot;COUNTEREXAMPLE_PREMISES&quot;, work);</span>
+            }
+        }
+<span class="fc" id="L86">        var conclusion = LinearProgramVerifier.dot(problem.c(), point.x(), work);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        return result(work.sub(conclusion, request.upperBound()).signum() &gt; 0</span>
+<span class="fc" id="L88">            ? null : &quot;COUNTEREXAMPLE_CONCLUSION&quot;, work);</span>
+    }
+
+    private static Verification result(String rejection, CertificateWork work) {
+<span class="fc" id="L92">        work.charge(0);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        return rejection == null ? new Verification(Status.VERIFIED, &quot;VERIFIED&quot;, work.used())</span>
+<span class="fc" id="L94">            : new Verification(Status.INVALID, rejection, work.used());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

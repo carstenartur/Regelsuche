@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LargePrimeFactorizationVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">LargePrimeFactorizationVerifier.java</span></div><h1>LargePrimeFactorizationVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.SparsePolynomial;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+/**
+ * Independent complete-factorization checking with no field-element enumeration.
+ * The prime assumption remains explicit: Rabin and reconstruction prove the
+ * factorization conditional on primality when the input domain is conditional.
+ */
+public final class LargePrimeFactorizationVerifier {
+    private LargePrimeFactorizationVerifier() {}
+
+    /**
+     * Allocation reservations are cumulative, including arithmetic temporaries,
+     * and never reset between search and checking. Together with the modulus bit
+     * limit they bound coefficient storage; they are not a JVM heap-byte meter.
+     */
+    public record Policy(int maxModulusBitLength, long maxAllocatedCoefficientSlots, long maxNanos) {
+<span class="fc" id="L24">        public Policy {</span>
+<span class="pc bpc" id="L25" title="3 of 6 branches missed.">            if (maxModulusBitLength &lt; 2 || maxAllocatedCoefficientSlots &lt; 1 || maxNanos &lt; 1)</span>
+<span class="nc" id="L26">                throw new IllegalArgumentException(&quot;invalid large-prime verification policy&quot;);</span>
+<span class="fc" id="L27">        }</span>
+    }
+
+    public static LargePrimeFactorization.Result verify(FactorizationRequest&lt;BigInteger&gt; request, Policy policy,
+        LargePrimeFactorization.Certificate certificate, BooleanSupplier cancelled) {
+<span class="fc" id="L32">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L34">        var work = new LargePrimeWorkBudget(request.maxWorkUnits(), policy, cancelled);</span>
+        try {
+<span class="fc" id="L36">            return verifyWithBudget(request, certificate, work);</span>
+<span class="fc" id="L37">        } catch (LargePrimeWorkBudget.Stop stop) {</span>
+<span class="fc" id="L38">            return work.stopped(stop.status, stop.reason);</span>
+<span class="nc" id="L39">        } catch (ArithmeticException invalidField) {</span>
+<span class="nc" id="L40">            return work.stopped(LargePrimeFactorization.Status.UNSUPPORTED, &quot;NON_FIELD_ARITHMETIC&quot;);</span>
+        }
+    }
+
+    /** Same verifier and same non-resettable budget used for producer output and external evidence. */
+    static LargePrimeFactorization.Result verifyWithBudget(FactorizationRequest&lt;BigInteger&gt; request,
+        LargePrimeFactorization.Certificate certificate, LargePrimeWorkBudget work) {
+<span class="fc" id="L47">        var domain = work.prepare(request, &quot;verify.input&quot;);</span>
+<span class="fc" id="L48">        String error = check(request.source(), certificate, domain.modulus(), work);</span>
+<span class="fc" id="L49">        work.consume(&quot;verify.final&quot;, 0);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (error != null) return work.stopped(LargePrimeFactorization.Status.INVALID_EVIDENCE, error);</span>
+<span class="fc" id="L51">        return work.completed(certificate, domain.conditional());</span>
+    }
+
+    private static String check(SparsePolynomial&lt;BigInteger&gt; source, LargePrimeFactorization.Certificate evidence,
+        BigInteger modulus, LargePrimeWorkBudget work) {
+<span class="fc" id="L56">        work.consume(&quot;verify.source-binding&quot;, source.termCount());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!source.ring().coefficientDomain().equals(evidence.source().ring().coefficientDomain())) return &quot;SOURCE_DOMAIN&quot;;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (!samePolynomial(source, evidence.source(), work)) return &quot;SOURCE&quot;;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!source.leadingCoefficient().equals(evidence.unit())) return &quot;UNIT&quot;;</span>
+<span class="fc" id="L60">        int degree = source.degree(0);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (evidence.factors().size() &gt; degree) return &quot;FACTOR_COUNT&quot;;</span>
+<span class="fc" id="L62">        var arithmetic = new IndependentBigPrimePolynomialArithmetic(modulus, work);</span>
+<span class="fc" id="L63">        var original = arithmetic.from(source);</span>
+<span class="fc" id="L64">        var product = arithmetic.constant(evidence.unit());</span>
+<span class="fc" id="L65">        var seen = new ArrayList&lt;SparsePolynomial&lt;BigInteger&gt;&gt;();</span>
+<span class="fc" id="L66">        long remaining = degree;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (var item : evidence.factors()) {</span>
+<span class="fc" id="L68">            work.consume(&quot;verify.factor&quot;, 1);</span>
+<span class="fc" id="L69">            var polynomial = item.polynomial();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (!source.ring().coefficientDomain().equals(polynomial.ring().coefficientDomain())</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                    || !source.ring().equals(polynomial.ring())) return &quot;FACTOR_RING&quot;;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (polynomial.termCount() &gt; degree + 1L) return &quot;FACTOR_SHAPE&quot;;</span>
+<span class="fc" id="L73">            work.consume(&quot;verify.factor-terms&quot;, polynomial.termCount());</span>
+<span class="fc" id="L74">            int factorDegree = polynomial.degree(0);</span>
+<span class="fc" id="L75">            long contribution = (long) factorDegree * item.multiplicity();</span>
+<span class="pc bpc" id="L76" title="1 of 6 branches missed.">            if (factorDegree &lt; 1 || contribution &gt; remaining || !BigInteger.ONE.equals(polynomial.leadingCoefficient()))</span>
+<span class="fc" id="L77">                return &quot;FACTOR_SHAPE&quot;;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (var earlier : seen) {</span>
+<span class="fc" id="L79">                work.consume(&quot;verify.distinct&quot;, polynomial.termCount() + 1L);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (samePolynomial(polynomial, earlier, work)) return &quot;DUPLICATE_FACTOR&quot;;</span>
+<span class="fc" id="L81">            }</span>
+<span class="fc" id="L82">            work.reserve(1);</span>
+<span class="fc" id="L83">            seen.add(polynomial);</span>
+<span class="fc" id="L84">            remaining -= contribution;</span>
+<span class="fc" id="L85">            var factor = arithmetic.from(polynomial);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (!arithmetic.irreducible(factor)) return &quot;REDUCIBLE_FACTOR&quot;;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (int i = 0; i &lt; item.multiplicity(); i++) {</span>
+<span class="fc" id="L88">                work.consume(&quot;verify.multiplicity&quot;, 1);</span>
+<span class="fc" id="L89">                product = arithmetic.multiply(product, factor);</span>
+            }
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        work.consume(&quot;verify.product-comparison&quot;, degree + 1L);</span>
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        return remaining == 0 &amp;&amp; arithmetic.equal(original, product) ? null : &quot;PRODUCT&quot;;</span>
+    }
+
+    private static boolean samePolynomial(SparsePolynomial&lt;BigInteger&gt; left,
+        SparsePolynomial&lt;BigInteger&gt; right, LargePrimeWorkBudget work) {
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (!left.ring().equals(right.ring()) || left.termCount() != right.termCount()) return false;</span>
+<span class="fc" id="L99">        var first = left.terms().entrySet().iterator();</span>
+<span class="fc" id="L100">        var second = right.terms().entrySet().iterator();</span>
+<span class="fc" id="L101">        int index = 0;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        while (first.hasNext()) {</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if ((index++ &amp; 1023) == 0) work.checkpoint(&quot;verify.source-comparison&quot;);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (!first.next().equals(second.next())) return false;</span>
+        }
+<span class="fc" id="L106">        work.checkpoint(&quot;verify.source-comparison&quot;);</span>
+<span class="fc" id="L107">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

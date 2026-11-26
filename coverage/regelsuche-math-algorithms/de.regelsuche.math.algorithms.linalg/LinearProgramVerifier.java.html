@@ -78,7 +78,7 @@ public final class LinearProgramVerifier {
 <span class="fc" id="L78">        };</span>
     }
 
-    private static boolean sameSource(Problem request, Problem bound, CertificateWork work) {
+    static boolean sameSource(Problem request, Problem bound, CertificateWork work) {
 <span class="fc bfc" id="L82" title="All 2 branches covered.">        for (int row = 0; row &lt; request.constraints(); row++) {</span>
 <span class="fc" id="L83">            work.charge(1);</span>
 <span class="fc bfc" id="L84" title="All 2 branches covered.">            if (!sameValues(request.a().get(row), bound.a().get(row), work)) return false;</span>

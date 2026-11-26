@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LargePrimePolynomialArithmetic.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">LargePrimePolynomialArithmetic.java</span></div><h1>LargePrimePolynomialArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.PolynomialRing;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
+/** Budgeted search arithmetic over the existing generic dense polynomial view. */
+final class LargePrimePolynomialArithmetic {
+    private final LargePrimeWorkBudget work;
+    private final LargePrimeWorkBudget.Domain domain;
+    private final PolynomialRing&lt;BigInteger&gt; ring;
+
+    LargePrimePolynomialArithmetic(PolynomialRing&lt;BigInteger&gt; ring, LargePrimeWorkBudget.Domain domain,
+<span class="fc" id="L18">                                   LargePrimeWorkBudget work) {</span>
+<span class="fc" id="L19">        this.ring = ring;</span>
+<span class="fc" id="L20">        this.domain = domain;</span>
+<span class="fc" id="L21">        this.work = work;</span>
+<span class="fc" id="L22">    }</span>
+
+    UnivariatePolynomialView&lt;BigInteger&gt; from(SparsePolynomial&lt;BigInteger&gt; source) {
+<span class="fc" id="L25">        work.reserveVector(source.degree(0) + 1L, 4);</span>
+<span class="fc" id="L26">        work.consume(&quot;search.load&quot;, source.degree(0) + 1L);</span>
+<span class="fc" id="L27">        return UnivariatePolynomialView.from(source, work, &quot;search.load&quot;);</span>
+    }
+
+<span class="fc" id="L30">    UnivariatePolynomialView&lt;BigInteger&gt; one() { return of(List.of(BigInteger.ONE)); }</span>
+<span class="fc" id="L31">    UnivariatePolynomialView&lt;BigInteger&gt; x() { return of(List.of(BigInteger.ZERO, BigInteger.ONE)); }</span>
+
+    private UnivariatePolynomialView&lt;BigInteger&gt; of(List&lt;BigInteger&gt; coefficients) {
+<span class="fc" id="L34">        work.reserveVector(coefficients.size(), 3);</span>
+<span class="fc" id="L35">        work.consume(&quot;search.construct&quot;, coefficients.size());</span>
+<span class="fc" id="L36">        return UnivariatePolynomialView.of(ring, coefficients, work, &quot;search.construct&quot;);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; monic(UnivariatePolynomialView&lt;BigInteger&gt; value) {
+<span class="fc" id="L40">        work.consume(&quot;search.monic&quot;, 1);</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        if (value.isZero() || value.leadingCoefficient().equals(BigInteger.ONE)) return value;</span>
+<span class="fc" id="L42">        work.reserveVector(value.coefficientCount(), 3);</span>
+<span class="fc" id="L43">        work.inversion(&quot;search.normalize-inverse&quot;);</span>
+<span class="fc" id="L44">        var result = value.monic(domain.field(), work, &quot;search.normalize&quot;);</span>
+<span class="fc" id="L45">        work.consume(&quot;search.normalize-complete&quot;, 0);</span>
+<span class="fc" id="L46">        return result;</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; derivative(UnivariatePolynomialView&lt;BigInteger&gt; value) {
+<span class="fc" id="L50">        work.reserveVector(value.coefficientCount(), 3);</span>
+<span class="fc" id="L51">        return value.derivative(work, &quot;search.derivative&quot;);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; subtract(UnivariatePolynomialView&lt;BigInteger&gt; left,
+                                                 UnivariatePolynomialView&lt;BigInteger&gt; right) {
+<span class="fc" id="L56">        work.reserveVector(Math.max(left.coefficientCount(), right.coefficientCount()), 3);</span>
+<span class="fc" id="L57">        return left.subtract(right, work, &quot;search.subtract&quot;);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; add(UnivariatePolynomialView&lt;BigInteger&gt; left,
+                                            UnivariatePolynomialView&lt;BigInteger&gt; right) {
+<span class="fc" id="L62">        work.reserveVector(Math.max(left.coefficientCount(), right.coefficientCount()), 3);</span>
+<span class="fc" id="L63">        return left.add(right, work, &quot;search.add&quot;);</span>
+    }
+
+    private UnivariatePolynomialView.DivisionResult&lt;BigInteger&gt; divide(UnivariatePolynomialView&lt;BigInteger&gt; value,
+                                                                       UnivariatePolynomialView&lt;BigInteger&gt; monic) {
+        // Three copies for each of quotient and remainder, before the generic
+        // view allocates any coefficient array. All divisors here are monic.
+<span class="fc" id="L70">        work.reserveVector(value.coefficientCount(), 6);</span>
+<span class="fc" id="L71">        return value.divideAndRemainderMonic(monic, work, &quot;search.divide&quot;);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; remainder(UnivariatePolynomialView&lt;BigInteger&gt; value,
+                                                  UnivariatePolynomialView&lt;BigInteger&gt; modulus) {
+<span class="fc" id="L76">        work.consume(&quot;search.remainder&quot;, 1);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (value.degree() &lt; modulus.degree()) return value;</span>
+<span class="fc" id="L78">        return divide(value, modulus).remainder();</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; quotient(UnivariatePolynomialView&lt;BigInteger&gt; value,
+                                                 UnivariatePolynomialView&lt;BigInteger&gt; divisor) {
+<span class="fc" id="L83">        var result = divide(value, divisor);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (!result.remainder().isZero()) throw new ArithmeticException(&quot;inexact polynomial quotient&quot;);</span>
+<span class="fc" id="L85">        return result.quotient();</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; gcd(UnivariatePolynomialView&lt;BigInteger&gt; first,
+                                            UnivariatePolynomialView&lt;BigInteger&gt; second) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        while (!second.isZero()) {</span>
+<span class="fc" id="L91">            work.consume(&quot;search.gcd&quot;, 1);</span>
+<span class="fc" id="L92">            second = monic(second);</span>
+<span class="fc" id="L93">            var next = remainder(first, second);</span>
+<span class="fc" id="L94">            first = second;</span>
+<span class="fc" id="L95">            second = next;</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return monic(first);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; multiplyMod(UnivariatePolynomialView&lt;BigInteger&gt; left,
+        UnivariatePolynomialView&lt;BigInteger&gt; right, UnivariatePolynomialView&lt;BigInteger&gt; modulus) {
+<span class="fc" id="L102">        work.reserveVector(left.coefficientCount() + (long) right.coefficientCount(), 3);</span>
+<span class="fc" id="L103">        return remainder(left.multiply(right, work, &quot;search.multiply&quot;), modulus);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; power(UnivariatePolynomialView&lt;BigInteger&gt; base, BigInteger exponent,
+                                              UnivariatePolynomialView&lt;BigInteger&gt; modulus) {
+<span class="fc" id="L108">        var result = one();</span>
+<span class="fc" id="L109">        var reduced = remainder(base, modulus);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int bit = exponent.bitLength() - 1; bit &gt;= 0; bit--) {</span>
+<span class="fc" id="L111">            work.consume(&quot;search.power-bit&quot;, 1);</span>
+<span class="fc" id="L112">            result = multiplyMod(result, result, modulus);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (exponent.testBit(bit)) result = multiplyMod(result, reduced, modulus);</span>
+        }
+<span class="fc" id="L115">        return result;</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; randomBelowDegree(int degree, Random random) {
+<span class="fc" id="L119">        work.reserveVector(degree, 4);</span>
+<span class="fc" id="L120">        var coefficients = new ArrayList&lt;BigInteger&gt;(degree);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int i = 0; i &lt; degree; i++) {</span>
+            BigInteger coefficient;
+            do {
+<span class="fc" id="L124">                work.consume(&quot;search.random-coefficient&quot;, (work.modulusBits() + 31L) / 32);</span>
+<span class="fc" id="L125">                coefficient = new BigInteger(work.modulusBits(), random);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            } while (coefficient.compareTo(domain.modulus()) &gt;= 0);</span>
+<span class="fc" id="L127">            coefficients.add(coefficient);</span>
+        }
+<span class="fc" id="L129">        return of(coefficients);</span>
+    }
+
+    UnivariatePolynomialView&lt;BigInteger&gt; frobeniusRoot(UnivariatePolynomialView&lt;BigInteger&gt; value) {
+        // A nonconstant p-th power has degree at least p. Only then may p
+        // safely be narrowed to an exponent index, even for a huge modulus.
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (domain.modulus().compareTo(BigInteger.valueOf(value.degree())) &gt; 0)</span>
+<span class="nc" id="L136">            throw new ArithmeticException(&quot;nonconstant inseparable residual below characteristic&quot;);</span>
+<span class="fc" id="L137">        int characteristic = domain.modulus().intValueExact();</span>
+<span class="fc" id="L138">        work.reserveVector(value.degree() / characteristic + 1L, 4);</span>
+<span class="fc" id="L139">        var coefficients = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int i = 0; i &lt;= value.degree(); i++) {</span>
+<span class="fc" id="L141">            work.consume(&quot;search.frobenius-root&quot;, 1);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (i % characteristic == 0) coefficients.add(value.coefficient(i));</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            else if (value.coefficient(i).signum() != 0)</span>
+<span class="nc" id="L144">                throw new ArithmeticException(&quot;invalid inseparable residual&quot;);</span>
+        }
+<span class="fc" id="L146">        return of(coefficients);</span>
+    }
+
+    SparsePolynomial&lt;BigInteger&gt; sparse(UnivariatePolynomialView&lt;BigInteger&gt; value) {
+<span class="fc" id="L150">        work.reserveVector(value.coefficientCount(), 8);</span>
+<span class="fc" id="L151">        work.consume(&quot;search.issue-factor&quot;, value.coefficientCount());</span>
+<span class="fc" id="L152">        return value.toSparsePolynomial(work, &quot;search.issue-factor&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

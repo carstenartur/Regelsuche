@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LinearProgramSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">LinearProgramSearch.java</span></div><h1>LinearProgramSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.scalar.ExactRational.NEGATIVE_ONE;
+import static de.regelsuche.scalar.ExactRational.ONE;
+import static de.regelsuche.scalar.ExactRational.ZERO;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Certificate;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Infeasible;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Optimal;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Problem;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Unbounded;
+import de.regelsuche.math.algorithms.linalg.LinearProgramVerifier.Status;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Bounded exact two-phase simplex with independent checking on the original problem. */
+public final class LinearProgramSearch {
+    private LinearProgramSearch() {}
+
+<span class="fc" id="L26">    public record Result(Status status, String reason, long work, Optional&lt;Certificate&gt; certificate) {}</span>
+
+    /**
+     * Searches for infeasibility, optimality or an improving ray. Variables are unrestricted.
+     * An exhausted budget returns UNAVAILABLE with no mathematical classification.
+     */
+    public static Result search(Problem problem, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L33">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L35">            var certificate = search(problem, 0, work);</span>
+<span class="fc" id="L36">            work.charge(0);</span>
+<span class="fc" id="L37">            return new Result(Status.VERIFIED, &quot;VERIFIED&quot;, work.used(), Optional.of(certificate));</span>
+<span class="fc" id="L38">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L39">            return new Result(Status.UNAVAILABLE, stop.getMessage(), work.used(), Optional.empty());</span>
+        }
+    }
+
+    /** The implication consumer shares this accounting object, including its deadline. */
+    static Certificate search(Problem problem, long retainedCells, CertificateWork work) {
+<span class="fc" id="L45">        Objects.requireNonNull(problem);</span>
+<span class="fc" id="L46">        var tableau = new Tableau(problem, retainedCells, work);</span>
+<span class="fc" id="L47">        var certificate = tableau.solve();</span>
+<span class="fc" id="L48">        var verified = LinearProgramVerifier.verify(problem, certificate, false,</span>
+<span class="fc" id="L49">            tableau.verificationRetainedCells(), work);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (!verified.valid()) throw new CertificateWork.Stop(&quot;OUTPUT_&quot; + verified.reason());</span>
+<span class="fc" id="L51">        work.charge(0);</span>
+<span class="fc" id="L52">        return certificate;</span>
+    }
+
+    /**
+     * Rows represent M_B^-1 M z = M_B^-1 b. The last row contains negative reduced
+     * costs and the objective value. Columns are x+, x-, original slacks, artificials.
+     * The original slack columns retain the dual row transformation, including row signs.
+     */
+    private static final class Tableau {
+        private final Problem problem;
+        private final CertificateWork work;
+        private final int rows;
+        private final int variables;
+        private final int ordinary;
+        private final int columns;
+        private final long retainedCells;
+        private final long tableauCells;
+        private final ExactRational[][] matrix;
+        private final int[] basis;
+
+<span class="fc" id="L72">        private Tableau(Problem problem, long retainedCells, CertificateWork work) {</span>
+<span class="fc" id="L73">            this.problem = problem;</span>
+<span class="fc" id="L74">            this.work = work;</span>
+<span class="fc" id="L75">            this.retainedCells = retainedCells;</span>
+<span class="fc" id="L76">            rows = problem.constraints();</span>
+<span class="fc" id="L77">            variables = problem.variables();</span>
+<span class="fc" id="L78">            work.cells(retainedCells);</span>
+<span class="fc" id="L79">            work.cells(problem.storageCells());</span>
+            // These individual bounds precede narrowing or multiplying dimensions.
+<span class="fc" id="L81">            long width = 2L * variables + 2L * rows + 1;</span>
+<span class="fc" id="L82">            work.cells(width);</span>
+<span class="fc" id="L83">            columns = (int) width - 1;</span>
+<span class="fc" id="L84">            ordinary = 2 * variables + rows;</span>
+<span class="fc" id="L85">            tableauCells = (rows + 1L) * (columns + 2L) + rows;</span>
+            // Reserve matrix, row references, basis, output arrays and immutable snapshots.
+<span class="fc" id="L87">            work.cells(retainedCells + problem.storageCells() + tableauCells</span>
+                + 4L * variables + 2L * rows + 16);
+<span class="fc" id="L89">            work.charge(tableauCells);</span>
+<span class="fc" id="L90">            matrix = new ExactRational[rows + 1][columns + 1];</span>
+<span class="fc" id="L91">            basis = new int[rows];</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (var row : matrix) {</span>
+<span class="fc" id="L93">                work.charge(columns + 1L);</span>
+<span class="fc" id="L94">                Arrays.fill(row, ZERO);</span>
+            }
+<span class="fc" id="L96">            initialize();</span>
+<span class="fc" id="L97">        }</span>
+
+        private void initialize() {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            for (var coefficient : problem.c()) work.check(coefficient);</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L102">                var bound = work.check(problem.b().get(row));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                boolean negative = bound.signum() &lt; 0;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                for (int column = 0; column &lt; variables; column++) {</span>
+<span class="fc" id="L105">                    var value = work.check(problem.a().get(row).get(column));</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                    if (negative) value = work.sub(ZERO, value);</span>
+<span class="fc" id="L107">                    matrix[row][column] = value;</span>
+<span class="fc" id="L108">                    matrix[row][variables + column] = work.sub(ZERO, value);</span>
+                }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                matrix[row][2 * variables + row] = negative ? NEGATIVE_ONE : ONE;</span>
+<span class="fc" id="L111">                matrix[row][ordinary + row] = ONE;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                matrix[row][columns] = negative ? work.sub(ZERO, bound) : bound;</span>
+<span class="fc" id="L113">                basis[row] = ordinary + row;</span>
+<span class="fc" id="L114">                matrix[rows][ordinary + row] = ONE;</span>
+            }
+            // Maximize minus the sum of artificial variables from their feasible initial basis.
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                for (int column = 0; column &lt;= columns; column++) {</span>
+<span class="fc" id="L119">                    matrix[rows][column] = work.sub(matrix[rows][column], matrix[row][column]);</span>
+                }
+            }
+<span class="fc" id="L122">        }</span>
+
+        private Certificate solve() {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            if (optimize(columns) &gt;= 0) throw new CertificateWork.Stop(&quot;PHASE_ONE_UNBOUNDED&quot;);</span>
+<span class="fc" id="L126">            int phaseOneSign = work.check(matrix[rows][columns]).signum();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (phaseOneSign &lt; 0) return new Infeasible(problem, multiplier(true));</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (phaseOneSign &gt; 0) throw new CertificateWork.Stop(&quot;PHASE_ONE_INVARIANT&quot;);</span>
+<span class="fc" id="L129">            removeArtificialBasics();</span>
+<span class="fc" id="L130">            originalObjective();</span>
+<span class="fc" id="L131">            int entering = optimize(ordinary);</span>
+<span class="fc" id="L132">            var point = point();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (entering &gt;= 0) return new Unbounded(problem, point, ray(entering));</span>
+<span class="fc" id="L134">            return new Optimal(problem, point, multiplier(false));</span>
+        }
+
+        /** Bland's smallest entering index and smallest basic index among ratio ties. */
+        private int optimize(int allowedColumns) {
+            while (true) {
+<span class="fc" id="L140">                int entering = -1;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                for (int column = 0; column &lt; allowedColumns; column++) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                    if (work.check(matrix[rows][column]).signum() &lt; 0) {</span>
+<span class="fc" id="L143">                        entering = column;</span>
+<span class="fc" id="L144">                        break;</span>
+                    }
+                }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if (entering &lt; 0) return -1;</span>
+<span class="fc" id="L148">                int leaving = -1;</span>
+<span class="fc" id="L149">                ExactRational minimum = null;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L151">                    var coefficient = work.check(matrix[row][entering]);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                    if (coefficient.signum() &lt;= 0) continue;</span>
+<span class="fc" id="L153">                    var ratio = work.div(matrix[row][columns], coefficient);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                    int comparison = minimum == null ? -1 : work.sub(ratio, minimum).signum();</span>
+<span class="fc bfc" id="L155" title="All 6 branches covered.">                    if (comparison &lt; 0 || comparison == 0 &amp;&amp; basis[row] &lt; basis[leaving]) {</span>
+<span class="fc" id="L156">                        leaving = row;</span>
+<span class="fc" id="L157">                        minimum = ratio;</span>
+                    }
+                }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                if (leaving &lt; 0) return entering;</span>
+<span class="fc" id="L161">                pivot(leaving, entering);</span>
+<span class="fc" id="L162">            }</span>
+        }
+
+        private void pivot(int leaving, int entering) {
+<span class="fc" id="L166">            var pivot = work.check(matrix[leaving][entering]);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            for (int column = 0; column &lt;= columns; column++) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                if (column != entering) {</span>
+<span class="fc" id="L169">                    matrix[leaving][column] = work.div(matrix[leaving][column], pivot);</span>
+                }
+            }
+<span class="fc" id="L172">            matrix[leaving][entering] = ONE;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            for (int row = 0; row &lt;= rows; row++) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                if (row == leaving) continue;</span>
+<span class="fc" id="L175">                var factor = work.check(matrix[row][entering]);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                if (factor.isZero()) continue;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                for (int column = 0; column &lt;= columns; column++) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                    if (column != entering) {</span>
+<span class="fc" id="L179">                        matrix[row][column] = work.sub(matrix[row][column],</span>
+<span class="fc" id="L180">                            work.mul(factor, matrix[leaving][column]));</span>
+                    }
+                }
+<span class="fc" id="L183">                matrix[row][entering] = ZERO;</span>
+            }
+<span class="fc" id="L185">            work.charge(1);</span>
+<span class="fc" id="L186">            basis[leaving] = entering;</span>
+<span class="fc" id="L187">        }</span>
+
+        private void removeArtificialBasics() {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L191">                work.charge(1);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (basis[row] &lt; ordinary) continue;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if (!work.check(matrix[row][columns]).isZero()) {</span>
+<span class="nc" id="L194">                    throw new CertificateWork.Stop(&quot;ARTIFICIAL_BASIS_INVARIANT&quot;);</span>
+                }
+<span class="fc" id="L196">                int entering = 0;</span>
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">                while (entering &lt; ordinary &amp;&amp; work.check(matrix[row][entering]).isZero()) entering++;</span>
+                // Original slacks make [A,-A,I] full row rank, even with redundant constraints.
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                if (entering == ordinary) throw new CertificateWork.Stop(&quot;ARTIFICIAL_BASIS_INVARIANT&quot;);</span>
+<span class="fc" id="L200">                pivot(row, entering);</span>
+            }
+<span class="fc" id="L202">        }</span>
+
+        private void originalObjective() {
+<span class="fc" id="L205">            work.charge(columns + 1L);</span>
+<span class="fc" id="L206">            Arrays.fill(matrix[rows], ZERO);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            for (int column = 0; column &lt; variables; column++) {</span>
+<span class="fc" id="L208">                var value = work.check(problem.c().get(column));</span>
+<span class="fc" id="L209">                matrix[rows][column] = work.sub(ZERO, value);</span>
+<span class="fc" id="L210">                matrix[rows][variables + column] = value;</span>
+            }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L213">                work.charge(1);</span>
+<span class="fc" id="L214">                int basic = basis[row];</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                if (basic &gt;= 2 * variables) continue;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                var cost = basic &lt; variables ? problem.c().get(basic)</span>
+<span class="fc" id="L217">                    : work.sub(ZERO, problem.c().get(basic - variables));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                if (cost.isZero()) continue;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                for (int column = 0; column &lt;= columns; column++) {</span>
+<span class="fc" id="L220">                    matrix[rows][column] = work.add(matrix[rows][column], work.mul(cost, matrix[row][column]));</span>
+                }
+            }
+<span class="fc" id="L223">        }</span>
+
+        private List&lt;ExactRational&gt; point() {
+<span class="fc" id="L226">            work.charge(2L * variables);</span>
+<span class="fc" id="L227">            var result = new ExactRational[variables];</span>
+<span class="fc" id="L228">            Arrays.fill(result, ZERO);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L230">                work.charge(1);</span>
+<span class="fc" id="L231">                int basic = basis[row];</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                if (basic &lt; variables) result[basic] = work.add(result[basic], matrix[row][columns]);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                else if (basic &lt; 2 * variables) {</span>
+<span class="fc" id="L234">                    int column = basic - variables;</span>
+<span class="fc" id="L235">                    result[column] = work.sub(result[column], matrix[row][columns]);</span>
+                }
+            }
+<span class="fc" id="L238">            return List.copyOf(Arrays.asList(result));</span>
+        }
+
+        private List&lt;ExactRational&gt; multiplier(boolean normalizeContradiction) {
+<span class="fc" id="L242">            work.charge(2L * rows);</span>
+<span class="fc" id="L243">            var result = new ExactRational[rows];</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            var scale = normalizeContradiction ? work.div(NEGATIVE_ONE, matrix[rows][columns]) : ONE;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L246">                result[row] = work.mul(scale, matrix[rows][2 * variables + row]);</span>
+            }
+<span class="fc" id="L248">            return List.copyOf(Arrays.asList(result));</span>
+        }
+
+        private List&lt;ExactRational&gt; ray(int entering) {
+<span class="fc" id="L252">            work.charge(2L * variables);</span>
+<span class="fc" id="L253">            var result = new ExactRational[variables];</span>
+<span class="fc" id="L254">            Arrays.fill(result, ZERO);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (entering &lt; variables) result[entering] = ONE;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            else if (entering &lt; 2 * variables) result[entering - variables] = NEGATIVE_ONE;</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
+<span class="fc" id="L258">                work.charge(1);</span>
+<span class="fc" id="L259">                int basic = basis[row];</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">                if (basic &lt; variables) result[basic] = work.sub(result[basic], matrix[row][entering]);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                else if (basic &lt; 2 * variables) {</span>
+<span class="fc" id="L262">                    int column = basic - variables;</span>
+<span class="fc" id="L263">                    result[column] = work.add(result[column], matrix[row][entering]);</span>
+                }
+            }
+<span class="fc" id="L266">            var gain = work.sub(ZERO, matrix[rows][entering]);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            for (int column = 0; column &lt; variables; column++) result[column] = work.div(result[column], gain);</span>
+<span class="fc" id="L268">            return List.copyOf(Arrays.asList(result));</span>
+        }
+
+        private long verificationRetainedCells() {
+<span class="fc" id="L272">            return retainedCells + tableauCells + 2L * variables + rows + 16;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

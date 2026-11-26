@@ -59,7 +59,7 @@ public final class OperatorResidualPlans {
 <span class="fc" id="L59">        return OperatorChecks.run(limits, cancel, checks -&gt; verify(source, plan, checks));</span>
     }
 
-    private static Cost verify(PolynomialMatrix source, Plan plan, OperatorChecks checks) {
+    static Cost verify(PolynomialMatrix source, Plan plan, OperatorChecks checks) {
 <span class="pc bpc" id="L63" title="1 of 2 branches missed.">        need(plan != null, &quot;MISSING_PLAN&quot;);</span>
 <span class="fc" id="L64">        checks.input(source);</span>
 <span class="fc" id="L65">        checks.input(plan.source());</span>

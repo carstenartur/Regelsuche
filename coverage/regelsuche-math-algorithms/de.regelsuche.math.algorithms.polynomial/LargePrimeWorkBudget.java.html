@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LargePrimeWorkBudget.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">LargePrimeWorkBudget.java</span></div><h1>LargePrimeWorkBudget.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.BigPrimeField;
+import de.regelsuche.polynomial.ExactField;
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.PolynomialWorkSink;
+import de.regelsuche.polynomial.PrimeField;
+import java.math.BigInteger;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** One non-resettable work, allocation and elapsed-time budget, including final verification. */
+final class LargePrimeWorkBudget implements PolynomialWorkSink {
+    private final LargePrimeFactorizationVerifier.Policy policy;
+    private final BooleanSupplier cancelled;
+    private final PolynomialWorkBudget work;
+<span class="fc" id="L19">    private final long started = System.nanoTime();</span>
+    private long coefficientSlots;
+<span class="fc" id="L21">    private long bitWeight = 1;</span>
+    private int modulusBits;
+    private int attempts;
+
+<span class="fc" id="L25">    LargePrimeWorkBudget(long maxWork, LargePrimeFactorizationVerifier.Policy policy, BooleanSupplier cancelled) {</span>
+<span class="fc" id="L26">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L27">        this.cancelled = Objects.requireNonNull(cancelled, &quot;cancelled&quot;);</span>
+<span class="fc" id="L28">        work = new PolynomialWorkBudget(maxWork);</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    @Override public void checkpoint(String stage) { check(); }</span>
+
+    @Override public void consume(String stage, long units) {
+<span class="fc" id="L34">        check();</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (units &lt; 0) throw new IllegalArgumentException(&quot;negative work&quot;);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (units &gt; Long.MAX_VALUE / bitWeight) stop(&quot;WORK_LIMIT&quot;);</span>
+        try {
+<span class="fc" id="L38">            work.consume(stage, units * bitWeight);</span>
+<span class="fc" id="L39">        } catch (PolynomialWorkBudget.LimitReached exhausted) {</span>
+<span class="nc" id="L40">            stop(&quot;WORK_LIMIT&quot;);</span>
+<span class="fc" id="L41">        }</span>
+        // A conservative cumulative reservation for scalar arithmetic temporaries.
+        // Explicit polynomial/container allocations are reserved by their callers.
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (units &gt; Long.MAX_VALUE / 16) stop(&quot;ALLOCATION_LIMIT&quot;);</span>
+<span class="fc" id="L45">        reserve(16 * units);</span>
+<span class="fc" id="L46">    }</span>
+
+    void reserve(long slots) {
+<span class="fc" id="L49">        check();</span>
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">        if (slots &lt; 0 || slots &gt; policy.maxAllocatedCoefficientSlots() - coefficientSlots)</span>
+<span class="nc" id="L51">            stop(&quot;ALLOCATION_LIMIT&quot;);</span>
+<span class="fc" id="L52">        coefficientSlots += slots;</span>
+<span class="fc" id="L53">    }</span>
+
+    void reserveVector(long size, long copies) {
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        if (size &lt; 0 || size &gt; Integer.MAX_VALUE - 8L) stop(&quot;DEGREE_LIMIT&quot;);</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (copies &lt; 0 || size &gt; Long.MAX_VALUE / Math.max(1, copies)) stop(&quot;ALLOCATION_LIMIT&quot;);</span>
+<span class="fc" id="L58">        reserve(size * copies + 1);</span>
+<span class="fc" id="L59">    }</span>
+
+    void inversion(String stage) {
+        // Extended Euclid is on at most b-bit inputs. Poll before and after the
+        // bounded BigInteger primitive; account b modular-operation units.
+<span class="fc" id="L64">        consume(stage, Math.max(1, modulusBits));</span>
+<span class="fc" id="L65">    }</span>
+
+    void attempt(int maximum) {
+<span class="fc" id="L68">        consume(&quot;search.split-attempt&quot;, 1);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (attempts &gt;= maximum) stop(&quot;SPLIT_ATTEMPT_LIMIT&quot;);</span>
+<span class="fc" id="L70">        attempts++;</span>
+<span class="fc" id="L71">    }</span>
+
+<span class="nc" id="L73">    int attempts() { return attempts; }</span>
+<span class="fc" id="L74">    int modulusBits() { return modulusBits; }</span>
+<span class="fc" id="L75">    PolynomialWorkLedger ledger() { return work.ledger(); }</span>
+
+    Domain prepare(FactorizationRequest&lt;BigInteger&gt; request, String stage) {
+<span class="fc" id="L78">        consume(stage + &quot;.entry&quot;, 0);</span>
+<span class="fc" id="L79">        var source = request.source();</span>
+        Domain domain;
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (source.ring().coefficientDomain() instanceof PrimeField small) {</span>
+<span class="fc" id="L82">            domain = new Domain(small, small.modulus(), false);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        } else if (source.ring().coefficientDomain() instanceof BigPrimeField large) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            domain = new Domain(large, large.modulus(), large.primality() == BigPrimeField.Primality.ASSUMED_PRIME);</span>
+        } else {
+<span class="fc" id="L86">            throw new Stop(LargePrimeFactorization.Status.UNSUPPORTED, &quot;REQUIRES_PRIME_FIELD&quot;);</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (source.ring().variableCount() != 1)</span>
+<span class="nc" id="L89">            throw new Stop(LargePrimeFactorization.Status.UNSUPPORTED, &quot;REQUIRES_UNIVARIATE_POLYNOMIAL&quot;);</span>
+<span class="fc" id="L90">        modulusBits = domain.modulus().bitLength();</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (modulusBits &gt; policy.maxModulusBitLength()) stop(&quot;MODULUS_BIT_LIMIT&quot;);</span>
+<span class="fc" id="L92">        long words = (modulusBits + 31L) / 32;</span>
+<span class="fc" id="L93">        bitWeight = words * words;</span>
+<span class="fc" id="L94">        consume(stage + &quot;.source-terms&quot;, source.termCount());</span>
+<span class="fc" id="L95">        var limits = request.structuralLimits();</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (source.degree(0) &gt; limits.maxTotalDegree()) stop(&quot;MAX_TOTAL_DEGREE_EXCEEDED&quot;);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (source.termCount() &gt; limits.maxTerms()) stop(&quot;MAX_TERMS_EXCEEDED&quot;);</span>
+<span class="fc" id="L98">        int index = 0;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (BigInteger coefficient : source.terms().values()) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if ((index++ &amp; 1023) == 0) checkpoint(stage + &quot;.coefficient-bits&quot;);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (domain.field().bitLength(coefficient) &gt; limits.maxCoefficientBitLength())</span>
+<span class="nc" id="L102">                stop(&quot;MAX_COEFFICIENT_BIT_LENGTH_EXCEEDED&quot;);</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">        reserveVector(source.degree(0) + 1L, 4);</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">        if (domain.conditional() &amp;&amp; compositeWitness(domain.modulus(), stage + &quot;.modulus-screen&quot;))</span>
+<span class="fc" id="L106">            throw new Stop(LargePrimeFactorization.Status.UNSUPPORTED, &quot;COMPOSITE_MODULUS&quot;);</span>
+<span class="fc" id="L107">        return domain;</span>
+    }
+
+    /** Fixed-base Miller-Rabin can disprove the assumption, never establish it. */
+    private boolean compositeWitness(BigInteger modulus, String stage) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (modulus.equals(BigInteger.TWO)) return false;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!modulus.testBit(0)) return true;</span>
+<span class="fc" id="L114">        consume(stage, 2);</span>
+<span class="fc" id="L115">        BigInteger minusOne = modulus.subtract(BigInteger.ONE);</span>
+<span class="fc" id="L116">        int twos = minusOne.getLowestSetBit();</span>
+<span class="fc" id="L117">        BigInteger oddPart = minusOne.shiftRight(twos);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int base : new int[]{2, 3, 5, 7, 11, 13, 17}) {</span>
+<span class="fc" id="L119">            consume(stage, 1);</span>
+<span class="fc" id="L120">            BigInteger a = BigInteger.valueOf(base);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (modulus.equals(a)) return false;</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (a.compareTo(modulus) &gt;= 0) continue;</span>
+<span class="fc" id="L123">            BigInteger value = scalarPow(a, oddPart, modulus, stage);</span>
+<span class="fc bfc" id="L124" title="All 4 branches covered.">            if (value.equals(BigInteger.ONE) || value.equals(minusOne)) continue;</span>
+<span class="fc" id="L125">            boolean passed = false;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            for (int i = 1; i &lt; twos; i++) {</span>
+<span class="fc" id="L127">                consume(stage, 1);</span>
+<span class="fc" id="L128">                value = value.multiply(value).mod(modulus);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                if (value.equals(minusOne)) { passed = true; break; }</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                if (value.equals(BigInteger.ONE)) break;</span>
+            }
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (!passed) return true;</span>
+        }
+<span class="fc" id="L134">        return false;</span>
+    }
+
+    private BigInteger scalarPow(BigInteger base, BigInteger exponent, BigInteger modulus, String stage) {
+<span class="fc" id="L138">        BigInteger result = BigInteger.ONE;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (int bit = exponent.bitLength() - 1; bit &gt;= 0; bit--) {</span>
+<span class="fc" id="L140">            consume(stage, 1);</span>
+<span class="fc" id="L141">            result = result.multiply(result).mod(modulus);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (exponent.testBit(bit)) {</span>
+<span class="fc" id="L143">                consume(stage, 1);</span>
+<span class="fc" id="L144">                result = result.multiply(base).mod(modulus);</span>
+            }
+        }
+<span class="fc" id="L147">        return result;</span>
+    }
+
+    private void check() {
+<span class="pc bfc" id="L151" title="All 4 branches covered.">        if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) stop(&quot;CANCELLED&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (System.nanoTime() - started &gt;= policy.maxNanos()) stop(&quot;TIME_LIMIT&quot;);</span>
+<span class="fc" id="L153">    }</span>
+
+<span class="fc" id="L155">    static void stop(String reason) { throw new Stop(LargePrimeFactorization.Status.INCONCLUSIVE, reason); }</span>
+
+    LargePrimeFactorization.Result stopped(LargePrimeFactorization.Status status, String reason) {
+<span class="fc" id="L158">        return new LargePrimeFactorization.Result(status, Optional.empty(), reason, ledger(), coefficientSlots, attempts);</span>
+    }
+
+    LargePrimeFactorization.Result completed(LargePrimeFactorization.Certificate certificate, boolean conditional) {
+<span class="fc" id="L162">        consume(&quot;final&quot;, 0);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        return new LargePrimeFactorization.Result(conditional ? LargePrimeFactorization.Status.COMPLETE_CONDITIONAL</span>
+<span class="fc" id="L164">            : LargePrimeFactorization.Status.COMPLETE, Optional.of(certificate), &quot;&quot;, ledger(), coefficientSlots, attempts);</span>
+    }
+
+<span class="fc" id="L167">    record Domain(ExactField&lt;BigInteger&gt; field, BigInteger modulus, boolean conditional) {}</span>
+
+    static final class Stop extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final LargePrimeFactorization.Status status;
+        final String reason;
+        Stop(LargePrimeFactorization.Status status, String reason) {
+<span class="fc" id="L174">            super(reason, null, false, false);</span>
+<span class="fc" id="L175">            this.status = status;</span>
+<span class="fc" id="L176">            this.reason = reason;</span>
+<span class="fc" id="L177">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

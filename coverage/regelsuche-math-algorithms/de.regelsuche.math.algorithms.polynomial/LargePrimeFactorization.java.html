@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LargePrimeFactorization.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.polynomial</a> &gt; <span class="el_source">LargePrimeFactorization.java</span></div><h1>LargePrimeFactorization.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.polynomial;
+
+import de.regelsuche.polynomial.FactorizationRequest;
+import de.regelsuche.polynomial.PolynomialFactor;
+import de.regelsuche.polynomial.PolynomialWorkLedger;
+import de.regelsuche.polynomial.SparsePolynomial;
+import de.regelsuche.polynomial.UnivariatePolynomialView;
+import java.math.BigInteger;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Bounded standard factorization over prime moduli of arbitrary permitted bit size. */
+public final class LargePrimeFactorization {
+    private LargePrimeFactorization() {}
+
+<span class="fc" id="L21">    public enum Status { COMPLETE, COMPLETE_CONDITIONAL, INVALID_EVIDENCE, UNSUPPORTED, INCONCLUSIVE }</span>
+
+    public record Policy(LargePrimeFactorizationVerifier.Policy resources, int maxSplitAttempts, long randomSeed) {
+<span class="fc" id="L24">        public Policy {</span>
+<span class="fc" id="L25">            Objects.requireNonNull(resources, &quot;resources&quot;);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (maxSplitAttempts &lt; 0) throw new IllegalArgumentException(&quot;negative split attempt limit&quot;);</span>
+<span class="fc" id="L27">        }</span>
+    }
+
+    public record Certificate(SparsePolynomial&lt;BigInteger&gt; source, BigInteger unit,
+                              List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; factors) {
+<span class="fc" id="L32">        public Certificate {</span>
+<span class="fc" id="L33">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L34">            Objects.requireNonNull(unit, &quot;unit&quot;);</span>
+<span class="fc" id="L35">            factors = List.copyOf(factors);</span>
+<span class="fc" id="L36">        }</span>
+    }
+
+    public record Result(Status status, Optional&lt;Certificate&gt; certificate, String reason,
+                         PolynomialWorkLedger work, long allocatedCoefficientSlots, int splitAttempts) {
+<span class="fc" id="L41">        public Result {</span>
+<span class="fc" id="L42">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L43">            Objects.requireNonNull(certificate, &quot;certificate&quot;);</span>
+<span class="fc" id="L44">            Objects.requireNonNull(reason, &quot;reason&quot;);</span>
+<span class="fc" id="L45">            Objects.requireNonNull(work, &quot;work&quot;);</span>
+<span class="fc bfc" id="L46" title="All 4 branches covered.">            boolean complete = status == Status.COMPLETE || status == Status.COMPLETE_CONDITIONAL;</span>
+<span class="pc bpc" id="L47" title="3 of 6 branches missed.">            if (complete != certificate.isPresent() || allocatedCoefficientSlots &lt; 0 || splitAttempts &lt; 0)</span>
+<span class="nc" id="L48">                throw new IllegalArgumentException(&quot;inconsistent factorization result&quot;);</span>
+<span class="fc" id="L49">        }</span>
+    }
+
+    public static Result factor(FactorizationRequest&lt;BigInteger&gt; request, Policy policy, BooleanSupplier cancelled) {
+<span class="fc" id="L53">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L54">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L55">        var work = new LargePrimeWorkBudget(request.maxWorkUnits(), policy.resources(), cancelled);</span>
+        try {
+<span class="fc" id="L57">            var domain = work.prepare(request, &quot;search.input&quot;);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (request.maxCandidates() == 0) LargePrimeWorkBudget.stop(&quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L59">            var arithmetic = new LargePrimePolynomialArithmetic(request.source().ring(), domain, work);</span>
+<span class="fc" id="L60">            var original = arithmetic.from(request.source());</span>
+<span class="fc" id="L61">            var search = new Search(arithmetic, domain.modulus(), work, policy);</span>
+<span class="fc" id="L62">            search.squareFree(arithmetic.monic(original), 1);</span>
+<span class="fc" id="L63">            work.reserveVector(search.factors.size(), 2);</span>
+<span class="fc" id="L64">            var certificate = new Certificate(request.source(), original.leadingCoefficient(), search.factors);</span>
+<span class="fc" id="L65">            return LargePrimeFactorizationVerifier.verifyWithBudget(request, certificate, work);</span>
+<span class="fc" id="L66">        } catch (LargePrimeWorkBudget.Stop stop) {</span>
+<span class="fc" id="L67">            return work.stopped(stop.status, stop.reason);</span>
+<span class="nc" id="L68">        } catch (ArithmeticException invalidField) {</span>
+<span class="nc" id="L69">            return work.stopped(Status.UNSUPPORTED, &quot;NON_FIELD_ARITHMETIC&quot;);</span>
+        }
+    }
+
+    private static final class Search {
+        private final LargePrimePolynomialArithmetic arithmetic;
+        private final BigInteger prime;
+        private final LargePrimeWorkBudget work;
+        private final Policy policy;
+        private final Random random;
+<span class="fc" id="L79">        private final List&lt;PolynomialFactor&lt;BigInteger&gt;&gt; factors = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L81">        Search(LargePrimePolynomialArithmetic arithmetic, BigInteger prime, LargePrimeWorkBudget work, Policy policy) {</span>
+<span class="fc" id="L82">            this.arithmetic = arithmetic;</span>
+<span class="fc" id="L83">            this.prime = prime;</span>
+<span class="fc" id="L84">            this.work = work;</span>
+<span class="fc" id="L85">            this.policy = policy;</span>
+<span class="fc" id="L86">            random = new Random(policy.randomSeed());</span>
+<span class="fc" id="L87">        }</span>
+
+        /** Derivative/GCD layers, including recursively extracted p-th powers. */
+        void squareFree(UnivariatePolynomialView&lt;BigInteger&gt; value, int scale) {
+<span class="fc" id="L91">            work.consume(&quot;search.square-free&quot;, 1);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (value.isOne()) return;</span>
+<span class="fc" id="L93">            var common = arithmetic.gcd(value, arithmetic.derivative(value));</span>
+<span class="fc" id="L94">            var remaining = arithmetic.quotient(value, common);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (int multiplicity = 1; !remaining.isOne(); multiplicity++) {</span>
+<span class="fc" id="L96">                work.consume(&quot;search.multiplicity-layer&quot;, 1);</span>
+<span class="fc" id="L97">                var intersection = arithmetic.gcd(remaining, common);</span>
+<span class="fc" id="L98">                var layer = arithmetic.quotient(remaining, intersection);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (!layer.isOne()) distinctDegree(layer, Math.multiplyExact(scale, multiplicity));</span>
+<span class="fc" id="L100">                remaining = intersection;</span>
+<span class="fc" id="L101">                common = arithmetic.quotient(common, intersection);</span>
+            }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (!common.isOne()) {</span>
+<span class="fc" id="L104">                var root = arithmetic.frobeniusRoot(common);</span>
+                // The degree check in frobeniusRoot proves that p fits an int.
+<span class="fc" id="L106">                squareFree(root, Math.multiplyExact(scale, prime.intValueExact()));</span>
+            }
+<span class="fc" id="L108">        }</span>
+
+        /** Standard Frobenius DDF: no field-element scan and no x^(p^d) expansion. */
+        private void distinctDegree(UnivariatePolynomialView&lt;BigInteger&gt; value, int multiplicity) {
+<span class="fc" id="L112">            var remaining = value;</span>
+<span class="fc" id="L113">            var x = arithmetic.x();</span>
+<span class="fc" id="L114">            var frobenius = x;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            for (int degree = 1; 2L * degree &lt;= remaining.degree(); degree++) {</span>
+<span class="fc" id="L116">                work.consume(&quot;search.distinct-degree&quot;, 1);</span>
+<span class="fc" id="L117">                frobenius = arithmetic.power(frobenius, prime, remaining);</span>
+<span class="fc" id="L118">                var group = arithmetic.gcd(remaining, arithmetic.subtract(frobenius, x));</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (!group.isOne()) {</span>
+<span class="fc" id="L120">                    equalDegree(group, degree, multiplicity);</span>
+<span class="fc" id="L121">                    remaining = arithmetic.quotient(remaining, group);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    if (!remaining.isOne()) frobenius = arithmetic.remainder(frobenius, remaining);</span>
+                }
+            }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (!remaining.isOne()) issue(remaining, multiplicity);</span>
+<span class="fc" id="L126">        }</span>
+
+        /** Iterative Cantor-Zassenhaus splitting with one total attempt allowance. */
+        private void equalDegree(UnivariatePolynomialView&lt;BigInteger&gt; value, int degree, int multiplicity) {
+<span class="fc" id="L130">            var pending = new ArrayDeque&lt;UnivariatePolynomialView&lt;BigInteger&gt;&gt;();</span>
+<span class="fc" id="L131">            work.reserve(1);</span>
+<span class="fc" id="L132">            pending.push(value);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            while (!pending.isEmpty()) {</span>
+<span class="fc" id="L134">                work.consume(&quot;search.equal-degree&quot;, 1);</span>
+<span class="fc" id="L135">                var current = pending.pop();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (current.degree() == degree) {</span>
+<span class="fc" id="L137">                    issue(current, multiplicity);</span>
+<span class="fc" id="L138">                    continue;</span>
+                }
+                UnivariatePolynomialView&lt;BigInteger&gt; divisor;
+                do {
+<span class="fc" id="L142">                    work.attempt(policy.maxSplitAttempts());</span>
+<span class="fc" id="L143">                    var candidate = arithmetic.randomBelowDegree(current.degree(), random);</span>
+<span class="fc" id="L144">                    divisor = arithmetic.gcd(current, candidate);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                    if (proper(divisor, current)) break;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                    if (divisor.degree() == current.degree()) continue;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                    var splitter = prime.equals(BigInteger.TWO)</span>
+<span class="fc" id="L148">                        ? trace(candidate, degree, current)</span>
+<span class="fc" id="L149">                        : oddSplitter(candidate, degree, current);</span>
+<span class="fc" id="L150">                    divisor = arithmetic.gcd(current, splitter);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                } while (!proper(divisor, current));</span>
+<span class="fc" id="L152">                work.reserve(2);</span>
+<span class="fc" id="L153">                pending.push(divisor);</span>
+<span class="fc" id="L154">                pending.push(arithmetic.quotient(current, divisor));</span>
+<span class="fc" id="L155">            }</span>
+<span class="fc" id="L156">        }</span>
+
+        private UnivariatePolynomialView&lt;BigInteger&gt; trace(UnivariatePolynomialView&lt;BigInteger&gt; candidate,
+            int degree, UnivariatePolynomialView&lt;BigInteger&gt; modulus) {
+<span class="fc" id="L160">            var sum = candidate;</span>
+<span class="fc" id="L161">            var power = candidate;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (int i = 1; i &lt; degree; i++) {</span>
+<span class="fc" id="L163">                work.consume(&quot;search.binary-trace&quot;, 1);</span>
+<span class="fc" id="L164">                power = arithmetic.power(power, BigInteger.TWO, modulus);</span>
+<span class="fc" id="L165">                sum = arithmetic.add(sum, power);</span>
+            }
+<span class="fc" id="L167">            return sum;</span>
+        }
+
+        private UnivariatePolynomialView&lt;BigInteger&gt; oddSplitter(UnivariatePolynomialView&lt;BigInteger&gt; candidate,
+            int degree, UnivariatePolynomialView&lt;BigInteger&gt; modulus) {
+<span class="fc" id="L172">            work.consume(&quot;search.odd-exponent&quot;, 2);</span>
+<span class="fc" id="L173">            var power = arithmetic.power(candidate, prime.subtract(BigInteger.ONE).shiftRight(1), modulus);</span>
+<span class="fc" id="L174">            var norm = power;</span>
+            // Product of Frobenius conjugates of a^((p-1)/2) equals
+            // a^((p^degree-1)/2). Only p-bit exponents are ever materialized.
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (int i = 1; i &lt; degree; i++) {</span>
+<span class="fc" id="L178">                work.consume(&quot;search.odd-norm&quot;, 1);</span>
+<span class="fc" id="L179">                power = arithmetic.power(power, prime, modulus);</span>
+<span class="fc" id="L180">                norm = arithmetic.multiplyMod(norm, power, modulus);</span>
+            }
+<span class="fc" id="L182">            return arithmetic.subtract(norm, arithmetic.one());</span>
+        }
+
+        private static boolean proper(UnivariatePolynomialView&lt;BigInteger&gt; divisor,
+                                      UnivariatePolynomialView&lt;BigInteger&gt; value) {
+<span class="fc bfc" id="L187" title="All 4 branches covered.">            return divisor.degree() &gt; 0 &amp;&amp; divisor.degree() &lt; value.degree();</span>
+        }
+
+        private void issue(UnivariatePolynomialView&lt;BigInteger&gt; factor, int multiplicity) {
+<span class="fc" id="L191">            work.reserve(1);</span>
+<span class="fc" id="L192">            factors.add(new PolynomialFactor&lt;&gt;(arithmetic.sparse(factor), multiplicity));</span>
+<span class="fc" id="L193">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

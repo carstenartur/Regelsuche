@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AffineImplication.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.linalg</a> &gt; <span class="el_source">AffineImplication.java</span></div><h1>AffineImplication.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.linalg;
+
+import static de.regelsuche.scalar.ExactRational.ONE;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Certificate;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Infeasible;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Optimal;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Problem;
+import de.regelsuche.math.algorithms.linalg.LinearProgramCertificates.Unbounded;
+import de.regelsuche.scalar.ExactRational;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/** Decides a bounded affine implication by finding and checking exact LP evidence. */
+public final class AffineImplication {
+    private AffineImplication() {}
+
+    /** Asks whether the original rows Ax &lt;= b imply c^T x &lt;= upperBound. */
+    public record Request(Problem problem, ExactRational upperBound) {
+<span class="fc" id="L25">        public Request {</span>
+<span class="fc" id="L26">            Objects.requireNonNull(problem);</span>
+<span class="fc" id="L27">            Objects.requireNonNull(upperBound);</span>
+<span class="fc" id="L28">        }</span>
+    }
+
+<span class="fc" id="L31">    public enum Status { PROVED, REFUTED, UNAVAILABLE }</span>
+
+    public sealed interface Evidence permits Proof, Counterexample {
+        Request source();
+    }
+
+    /** A checked infeasibility certificate or an optimum no larger than the requested bound. */
+    public record Proof(Request source, Certificate certificate) implements Evidence {
+<span class="fc" id="L39">        public Proof {</span>
+<span class="fc" id="L40">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L41">            Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L42">        }</span>
+    }
+
+    /** A concrete point satisfying every premise and strictly violating the conclusion. */
+    public record Counterexample(Request source, List&lt;ExactRational&gt; x) implements Evidence {
+<span class="fc" id="L47">        public Counterexample {</span>
+<span class="fc" id="L48">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L49">            x = List.copyOf(x);</span>
+<span class="fc" id="L50">        }</span>
+    }
+
+<span class="fc" id="L53">    public record Result(Status status, String reason, long work, Optional&lt;Evidence&gt; evidence) {}</span>
+
+    public static Result search(Request request, IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L56">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L57">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L59">            work.cells(request.problem().storageCells() + 1);</span>
+<span class="fc" id="L60">            work.check(request.upperBound());</span>
+<span class="fc" id="L61">            var evidence = propose(request, work);</span>
+<span class="fc" id="L62">            var checked = AffineImplicationVerifier.verify(request, evidence, work);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (!checked.valid()) throw new CertificateWork.Stop(&quot;OUTPUT_&quot; + checked.reason());</span>
+<span class="fc" id="L64">            work.charge(0);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            var status = evidence instanceof Proof ? Status.PROVED : Status.REFUTED;</span>
+<span class="fc" id="L66">            return new Result(status, status.name(), work.used(), Optional.of(evidence));</span>
+<span class="fc" id="L67">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L68">            return new Result(Status.UNAVAILABLE, stop.getMessage(), work.used(), Optional.empty());</span>
+        }
+    }
+
+    private static Evidence propose(Request request, CertificateWork work) {
+<span class="fc" id="L73">        var certificate = LinearProgramSearch.search(request.problem(), 1, work);</span>
+<span class="fc bfc" id="L74" title="All 3 branches covered.">        return switch (certificate) {</span>
+<span class="fc" id="L75">            case Infeasible ignored -&gt; new Proof(request, certificate);</span>
+<span class="fc" id="L76">            case Optimal optimum -&gt; {</span>
+<span class="fc" id="L77">                var value = LinearProgramVerifier.dot(request.problem().c(), optimum.x(), work);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">                yield work.sub(value, request.upperBound()).signum() &lt;= 0</span>
+<span class="fc" id="L79">                    ? new Proof(request, optimum) : new Counterexample(request, optimum.x());</span>
+            }
+<span class="fc" id="L81">            case Unbounded unbounded -&gt; counterexample(request, unbounded, work);</span>
+        };
+    }
+
+    private static Counterexample counterexample(Request request, Unbounded ray, CertificateWork work) {
+<span class="fc" id="L86">        var problem = request.problem();</span>
+<span class="fc" id="L87">        var value = LinearProgramVerifier.dot(problem.c(), ray.x(), work);</span>
+<span class="fc" id="L88">        var missing = work.sub(request.upperBound(), value);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (missing.signum() &lt; 0) return new Counterexample(request, ray.x());</span>
+        // The checked ray has unit objective gain. This step strictly crosses the bound.
+<span class="fc" id="L91">        var step = work.add(missing, ONE);</span>
+<span class="fc" id="L92">        int variables = problem.variables();</span>
+<span class="fc" id="L93">        work.cells(problem.storageCells() + 1 + 4L * variables + 16);</span>
+<span class="fc" id="L94">        work.charge(2L * variables);</span>
+<span class="fc" id="L95">        var point = new ExactRational[variables];</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (int column = 0; column &lt; variables; column++) {</span>
+<span class="fc" id="L97">            point[column] = work.add(ray.x().get(column), work.mul(step, ray.v().get(column)));</span>
+        }
+<span class="fc" id="L99">        return new Counterexample(request, Arrays.asList(point));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

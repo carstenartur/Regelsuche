@@ -11,20 +11,24 @@
 public interface PolynomialWorkSink {
     void consume(String stage, long units);
 
+    /** Optional cancellation/time checkpoint; it does not add arithmetic work. */
+<span class="fc" id="L15">    default void checkpoint(String stage) { }</span>
+
+
     static PolynomialWorkSink none() {
-<span class="fc" id="L15">        return NoOp.INSTANCE;</span>
+<span class="fc" id="L19">        return NoOp.INSTANCE;</span>
     }
 
-<span class="fc" id="L18">    enum NoOp implements PolynomialWorkSink {</span>
-<span class="fc" id="L19">        INSTANCE;</span>
+<span class="fc" id="L22">    enum NoOp implements PolynomialWorkSink {</span>
+<span class="fc" id="L23">        INSTANCE;</span>
 
         @Override
         public void consume(String stage, long units) {
-<span class="pc bpc" id="L23" title="3 of 6 branches missed.">            if (stage == null || stage.isBlank() || units &lt; 0) {</span>
-<span class="nc" id="L24">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L27" title="3 of 6 branches missed.">            if (stage == null || stage.isBlank() || units &lt; 0) {</span>
+<span class="nc" id="L28">                throw new IllegalArgumentException(</span>
                     &quot;polynomial work entry is invalid&quot;);
             }
-<span class="fc" id="L27">        }</span>
+<span class="fc" id="L31">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

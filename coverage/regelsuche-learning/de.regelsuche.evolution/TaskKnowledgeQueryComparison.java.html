@@ -170,7 +170,7 @@ import java.util.regex.Pattern;
         }
 <span class="fc" id="L171">        long wall = previous.paidIncludingSetupAndAudit().wallNanos() - candidate.paidIncludingSetupAndAudit().wallNanos();</span>
 <span class="fc" id="L172">        long cpu = previous.paidIncludingSetupAndAudit().cpuNanos() - candidate.paidIncludingSetupAndAudit().cpuNanos();</span>
-<span class="pc bpc" id="L173" title="2 of 6 branches missed.">        return new Comparison(previous.repetition(), previous.scenario(), quality, previous.knownWork() - candidate.knownWork(),</span>
+<span class="pc bpc" id="L173" title="4 of 6 branches missed.">        return new Comparison(previous.repetition(), previous.scenario(), quality, previous.knownWork() - candidate.knownWork(),</span>
             wall, cpu, quality &amp;&amp; wall &gt; 0 &amp;&amp; cpu &gt; 0);
     }
     private KnowledgeCostGate.Cost elapsed(KnowledgeCostGate.Cost start) {

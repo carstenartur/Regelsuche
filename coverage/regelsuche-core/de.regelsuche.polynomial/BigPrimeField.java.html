@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BigPrimeField.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.polynomial</a> &gt; <span class="el_source">BigPrimeField.java</span></div><h1>BigPrimeField.java</h1><pre class="source lang-java linenums">package de.regelsuche.polynomial;
+
+import java.math.BigInteger;
+import java.util.Objects;
+
+/**
+ * BigInteger modulus with an explicit prime-field assumption.
+ *
+ * &lt;p&gt;{@link #assumingPrime(BigInteger)} does not prove primality. Algorithms
+ * must retain that hypothesis in their result. Only {@link #of(int)} supplies
+ * the existing deterministic int-range primality guarantee. The guarantee is
+ * part of the domain identity, so evidence cannot silently discard it.&lt;/p&gt;
+ */
+public final class BigPrimeField implements ExactField&lt;BigInteger&gt; {
+<span class="fc" id="L15">    public enum Primality { DETERMINISTIC_INT, ASSUMED_PRIME }</span>
+
+    private final BigInteger modulus;
+    private final Primality primality;
+    private final String id;
+
+<span class="fc" id="L21">    private BigPrimeField(BigInteger modulus, Primality primality) {</span>
+<span class="fc" id="L22">        this.modulus = Objects.requireNonNull(modulus, &quot;modulus&quot;);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (modulus.compareTo(BigInteger.TWO) &lt; 0) {</span>
+<span class="fc" id="L24">            throw new IllegalArgumentException(&quot;prime modulus must be at least two&quot;);</span>
+        }
+<span class="fc bfc" id="L26" title="All 4 branches covered.">        if ((!modulus.testBit(0) &amp;&amp; !modulus.equals(BigInteger.TWO))</span>
+<span class="fc bfc" id="L27" title="All 4 branches covered.">                || (modulus.bitLength() &lt;= 31 &amp;&amp; !PrimeField.isPrimeModulus(modulus.intValueExact()))) {</span>
+<span class="fc" id="L28">            throw new IllegalArgumentException(&quot;composite prime-field modulus&quot;);</span>
+        }
+<span class="fc" id="L30">        this.primality = Objects.requireNonNull(primality, &quot;primality&quot;);</span>
+<span class="fc" id="L31">        id = &quot;regelsuche.coefficients.big-prime-field/v1/p=&quot; + modulus + &quot;/&quot; + primality;</span>
+<span class="fc" id="L32">    }</span>
+
+    public static BigPrimeField of(int prime) {
+<span class="fc" id="L35">        return new BigPrimeField(PrimeField.of(prime).modulus(), Primality.DETERMINISTIC_INT);</span>
+    }
+
+    /** Declare the hypothesis that modulus is prime; no probable-prime test is a proof. */
+    public static BigPrimeField assumingPrime(BigInteger modulus) {
+<span class="fc" id="L40">        return new BigPrimeField(modulus, Primality.ASSUMED_PRIME);</span>
+    }
+
+<span class="nc" id="L43">    public BigInteger modulus() { return modulus; }</span>
+<span class="fc" id="L44">    public Primality primality() { return primality; }</span>
+<span class="fc" id="L45">    @Override public String id() { return id; }</span>
+<span class="fc" id="L46">    @Override public BigInteger characteristic() { return modulus; }</span>
+<span class="nc" id="L47">    @Override public BigInteger zero() { return BigInteger.ZERO; }</span>
+<span class="nc" id="L48">    @Override public BigInteger one() { return BigInteger.ONE; }</span>
+<span class="nc" id="L49">    @Override public BigInteger fromInteger(BigInteger value) { return canonical(value); }</span>
+
+    @Override public BigInteger canonical(BigInteger value) {
+<span class="fc" id="L52">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        return value.signum() &gt;= 0 &amp;&amp; value.compareTo(modulus) &lt; 0 ? value : value.mod(modulus);</span>
+    }
+
+    @Override public BigInteger add(BigInteger left, BigInteger right) {
+<span class="fc" id="L57">        BigInteger sum = canonical(left).add(canonical(right));</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        return sum.compareTo(modulus) &gt;= 0 ? sum.subtract(modulus) : sum;</span>
+    }
+
+    @Override public BigInteger negate(BigInteger value) {
+<span class="fc" id="L62">        BigInteger residue = canonical(value);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        return residue.signum() == 0 ? BigInteger.ZERO : modulus.subtract(residue);</span>
+    }
+
+    @Override public BigInteger multiply(BigInteger left, BigInteger right) {
+<span class="fc" id="L67">        return canonical(left).multiply(canonical(right)).mod(modulus);</span>
+    }
+
+    @Override public BigInteger divide(BigInteger dividend, BigInteger divisor) {
+<span class="fc" id="L71">        BigInteger residue = canonical(divisor);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (residue.signum() == 0) throw new ArithmeticException(&quot;division by zero in prime field&quot;);</span>
+<span class="fc" id="L73">        return canonical(dividend).multiply(residue.modInverse(modulus)).mod(modulus);</span>
+    }
+
+<span class="nc bnc" id="L76" title="All 2 branches missed.">    @Override public boolean isZero(BigInteger value) { return canonical(value).signum() == 0; }</span>
+<span class="nc" id="L77">    @Override public String canonicalText(BigInteger value) { return canonical(value).toString(); }</span>
+<span class="nc" id="L78">    @Override public int bitLength(BigInteger value) { return canonical(value).bitLength(); }</span>
+
+    @Override public boolean equals(Object other) {
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        return this == other || other instanceof BigPrimeField field</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">            &amp;&amp; modulus.equals(field.modulus) &amp;&amp; primality == field.primality;</span>
+    }
+<span class="nc" id="L84">    @Override public int hashCode() { return Objects.hash(modulus, primality); }</span>
+<span class="nc" id="L85">    @Override public String toString() { return &quot;F_&quot; + modulus + &quot;[&quot; + primality + &quot;]&quot;; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
