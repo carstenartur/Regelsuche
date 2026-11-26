@@ -14,13 +14,13 @@
     <executions>
       <execution><id>shared-power-strict-main</id><phase>process-classes</phase><goals><goal>compile</goal></goals>
         <configuration>
-          <includes><include>**/SharedPower*.java</include></includes>
+          <includes><include>**/SharedPower*.java</include><include>**/Quadratic*.java</include></includes>
           <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
         </configuration>
       </execution>
       <execution><id>shared-power-strict-tests</id><phase>process-test-classes</phase><goals><goal>testCompile</goal></goals>
         <configuration>
-          <testIncludes><testInclude>**/SharedPower*Test.java</testInclude></testIncludes>
+          <testIncludes><testInclude>**/SharedPower*Test.java</testInclude><testInclude>**/Quadratic*Test.java</testInclude></testIncludes>
           <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
         </configuration>
       </execution>
