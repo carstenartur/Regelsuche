@@ -91,6 +91,27 @@ class StudentDiscoveryStarterTest(unittest.TestCase):
     def test_custom_package_and_provider(self):
         self.assert_generated("org.example.generated")
 
+    def test_checkout_wrapper_generates_a_project_accepted_by_the_consumer_gate(self):
+        repository = SCRIPT.resolve().parent.parent
+        consumer_spec = importlib.util.spec_from_file_location(
+            "student_consumer", SCRIPT.with_name("verify-student-java-sdk-consumer.py")
+        )
+        consumer = importlib.util.module_from_spec(consumer_spec)
+        consumer_spec.loader.exec_module(consumer)
+        try:
+            starter.generate(
+                repository, self.output, "org.example.generated",
+                "generated-regelsuche-domain", "generated-geometric-sequence",
+                "generated-geometric-sequence-provider",
+            )
+        except SystemExit as error:
+            self.fail(f"the maintained checkout cannot generate its own starter: {error}")
+        manifest = consumer.verify_generated_project_shape(self.output)
+        self.assertEqual("9.9.2", manifest["gradleWrapperVersion"])
+        for relative in starter.WRAPPER_FILES:
+            self.assertEqual((repository / relative).read_bytes(),
+                             (self.output / relative).read_bytes())
+
     def test_original_package_is_a_valid_choice(self):
         self.assert_generated("example")
 

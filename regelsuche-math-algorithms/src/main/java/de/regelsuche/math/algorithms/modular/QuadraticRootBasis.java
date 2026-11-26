@@ -19,6 +19,7 @@ final class QuadraticRootBasis {
     private final Map<Integer, Factor> factors = new HashMap<>();
     private final BigInteger p;
     private final CertificateWork work;
+    private final int[] aliases;
     private final int root;
     private final int base;
     private final int scale;
@@ -35,22 +36,33 @@ final class QuadraticRootBasis {
         this.p = contract.modulus();
         this.work = work;
         var original = contract.original();
-        work.cells(retainedCells() + original.prefix().size() + original.equal().steps().size());
+        int count = original.prefix().size() + original.equal().steps().size();
+        work.cells(12L + INPUTS + 2L * count);
+        aliases = new int[INPUTS + count];
         source.addAll(original.prefix());
         source.addAll(original.equal().steps());
-        root = original.equal().real();
+        for (int i = 0; i < INPUTS; i++) aliases[i] = i;
+        for (int ref = INPUTS; ref < aliases.length; ref++) {
+            work.charge(1);
+            aliases[ref] = representative(ref);
+        }
+        root = aliases[original.equal().real()];
         var power = sourceStep(root);
         if (power.op() != Op.POWER || original.equal().normalizeRealCharacter()) throw unsupported();
-        int sourceBase = power.left();
+        int sourceBase = aliases[power.left()];
         int square;
-        if (original.guardLeft() == sourceBase) square = original.guardRight();
-        else if (original.guardRight() == sourceBase) square = original.guardLeft();
+        if (aliases[original.guardLeft()] == sourceBase) square = aliases[original.guardRight()];
+        else if (aliases[original.guardRight()] == sourceBase) square = aliases[original.guardLeft()];
         else throw unsupported();
         var guard = sourceStep(square);
-        if (guard.left() != root || !(guard.op() == Op.SQUARE || guard.op() == Op.MULTIPLY && guard.right() == root)) {
-            throw unsupported();
-        }
-        base = factor(sourceBase).register();
+        boolean squaresOperand = switch (guard.op()) {
+            case SQUARE -> true;
+            case POWER -> guard.literal().equals(BigInteger.TWO);
+            case MULTIPLY -> aliases[guard.right()] == root;
+            default -> false;
+        };
+        if (!squaresOperand || aliases[guard.left()] != root) throw unsupported();
+        base = factor(power.left()).register();
         var imaginary = factor(original.equal().imaginary());
         scale = imaginary.register();
         if (!imaginary.degree().equals(BigInteger.ONE.negate())) throw unsupported();
@@ -64,7 +76,7 @@ final class QuadraticRootBasis {
 
     /** Caller-owned state that remains live while the shared power search or verifier runs. */
     long retainedCells() {
-        return 12L + source.size() + (long) CELLS_PER_STEP * steps.size() + (long) CELLS_PER_FACTOR * factors.size();
+        return 12L + aliases.length + source.size() + (long) CELLS_PER_STEP * steps.size() + (long) CELLS_PER_FACTOR * factors.size();
     }
 
     private static IllegalArgumentException unsupported() { return new IllegalArgumentException("UNSUPPORTED_POWER_SOURCE"); }
@@ -72,6 +84,29 @@ final class QuadraticRootBasis {
     private Step sourceStep(int ref) {
         if (ref < INPUTS || ref - INPUTS >= source.size()) throw unsupported();
         return source.get(ref - INPUTS);
+    }
+
+    // Every alias is an unconditional field identity. The verifier still interprets the unmodified source.
+    private int representative(int ref) {
+        var step = sourceStep(ref);
+        if (step.left() < 0) return ref;
+        int a = aliases[step.left()];
+        if (step.op() == Op.NEGATE && a >= INPUTS && sourceStep(a).op() == Op.NEGATE) {
+            return aliases[sourceStep(a).left()];
+        }
+        if (step.right() < 0) return ref;
+        int b = aliases[step.right()];
+        if (step.op() == Op.MULTIPLY) {
+            if (isConstant(a, BigInteger.ONE)) return b;
+            if (isConstant(b, BigInteger.ONE)) return a;
+        }
+        if (step.op() == Op.ADD && isConstant(a, BigInteger.ZERO)) return b;
+        if ((step.op() == Op.ADD || step.op() == Op.SUBTRACT) && isConstant(b, BigInteger.ZERO)) return a;
+        return ref;
+    }
+
+    private boolean isConstant(int ref, BigInteger value) {
+        return ref >= INPUTS && sourceStep(ref).op() == Op.CONSTANT && value.equals(sourceStep(ref).literal());
     }
 
     private int append(Step step) {
@@ -124,7 +159,11 @@ final class QuadraticRootBasis {
                 case MULTIPLY -> new Factor(product(a.register(), b.register()), a.degree().add(b.degree()));
                 case INVERSE -> new Factor(inverse(a.register()), a.degree().negate());
                 case ADD, SUBTRACT -> {
-                    if (!a.degree().equals(b.degree())) throw unsupported();
+                    if (!a.degree().equals(b.degree())) {
+                        // A neutral zero may carry degree zero beside a nonzero-degree operand.
+                        if (aliases[ref] == ref) throw unsupported();
+                        yield factor(aliases[ref]);
+                    }
                     yield new Factor(append(new Step(step.op(), a.register(), b.register(), step.literal())), a.degree());
                 }
                 case NEGATE -> new Factor(append(Step.negate(a.register())), a.degree());

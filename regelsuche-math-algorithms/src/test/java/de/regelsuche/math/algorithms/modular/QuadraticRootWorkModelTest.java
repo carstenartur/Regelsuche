@@ -21,7 +21,7 @@ class QuadraticRootWorkModelTest {
     @Test void documentedProgramsKeepExactResultsAtTheirReportedWorkLimits() throws IOException {
         var table = new StringBuilder("case\tsearchWork\tpreparationWork\texecutionPositiveNorm\texecutionNegativeNorm\treplayPositiveNorm\treplayNegativeNorm\n");
         for (var p : List.of(valueOf(43), P61, P381)) {
-            var source = source(p);
+            var source = source(p, false);
             var found = QuadraticRootSearch.search(source, new SharedPowerPlan.Weights(1, 1, 1000), 64, LIMITS, () -> false);
             var certificate = found.certificate().orElseThrow();
             var preparation = QuadraticRootEvaluation.prepare(source, certificate, LIMITS, () -> false);
@@ -46,18 +46,40 @@ class QuadraticRootWorkModelTest {
                     .append(preparation.work()).append('\t').append(positive.work()).append('\t').append(negative.work())
                     .append('\t').append(replayPositive.work()).append('\t').append(replayNegative.work()).append('\n');
         }
+        var source = source(P381, true);
+        var weights = new SharedPowerPlan.Weights(1, 1, 10);
+        var portfolio = QuadraticRootSearch.portfolio(source, weights, 64, LIMITS, () -> false);
+        assertEquals(4, portfolio.certificates().size(), portfolio.reason());
+        var best = portfolio.certificates().getFirst();
+        var checked = QuadraticRootVerifier.verify(source, best, LIMITS, () -> false);
+        assertTrue(checked.valid(), checked.reason());
+        assertEquals(1855, source.original().score(weights));
+        assertEquals(1235, best.program().score(weights));
+        assertTrue(QuadraticRootVerifier.verify(source, best, LIMITS.withMaximumWork(checked.work()), () -> false).valid());
+        assertEquals("WORK_LIMIT", QuadraticRootVerifier.verify(source, best,
+                LIMITS.withMaximumWork(checked.work() - 1), () -> false).reason());
+        table.append("381-bit-denominator-portfolio\t").append(portfolio.work()).append('\t').append(checked.work())
+                .append("\tNA\tNA\tNA\tNA\n");
         Files.createDirectories(Path.of("target"));
         Files.writeString(Path.of("target/quadratic-root-work-model.tsv"), table);
     }
 
-    private static QuadraticRootContract source(BigInteger p) {
+    private static QuadraticRootContract source(BigInteger p, boolean denominator) {
         var half = p.add(ONE).shiftRight(1);
         var exponent = p.add(ONE).shiftRight(2);
         var prefix = List.of(constant(half), add(0, 2), multiply(4, 3), power(5, exponent), square(6));
-        var program = new QuadraticRootProgram(prefix, 7, 5,
-                new QuadraticRootProgram.Arm(List.of(multiply(1, 3), inverse(6), multiply(8, 9)), 6, 10, false),
-                new QuadraticRootProgram.Arm(List.of(subtract(0, 2), multiply(8, 3), power(9, exponent),
-                        multiply(1, 3), inverse(10), multiply(11, 12)), 10, 13, false));
+        QuadraticRootProgram program;
+        if (denominator) {
+            program = new QuadraticRootProgram(prefix, 5, 7,
+                    new QuadraticRootProgram.Arm(List.of(constant(TWO), multiply(6, 8), inverse(9), multiply(1, 10)), 6, 11, false),
+                    new QuadraticRootProgram.Arm(List.of(subtract(0, 2), multiply(8, 3), power(9, exponent),
+                            constant(TWO), multiply(10, 11), inverse(12), multiply(1, 13)), 10, 14, false));
+        } else {
+            program = new QuadraticRootProgram(prefix, 7, 5,
+                    new QuadraticRootProgram.Arm(List.of(multiply(1, 3), inverse(6), multiply(8, 9)), 6, 10, false),
+                    new QuadraticRootProgram.Arm(List.of(subtract(0, 2), multiply(8, 3), power(9, exponent),
+                            multiply(1, 3), inverse(10), multiply(11, 12)), 10, 13, false));
+        }
         var proof = p.equals(P61) ? proof61() : PrimeEvidenceCatalog.forModulus(p).orElseThrow();
         return new QuadraticRootContract("documented-work-model", p, proof, program, QuadraticRootContract.Observation.EXACT_PAIR);
     }
