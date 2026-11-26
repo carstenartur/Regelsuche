@@ -463,7 +463,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0, ref: "${{ github.event.pull_request.head.sha || github.sha }}" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+          # Share the full polynomial reactor cache, not the short preflight or pilot cache.
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
+            .mvn/polynomial-study-cache-scope.txt
       - name: Run full affected test suites and verify all 675 native study rows
         run: >-
           mvn --batch-mode --no-transfer-progress -Pnative-polynomial-comparison -pl regelsuche-release -am
@@ -490,7 +499,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0, ref: "${{ github.event.pull_request.head.sha || github.sha }}" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+          # Share the full polynomial reactor cache, not the short preflight or pilot cache.
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
+            .mvn/polynomial-study-cache-scope.txt
       - name: Run full affected test suites and verify and audit all 729 typed study rows
         run: >-
           mvn --batch-mode --no-transfer-progress -Ptyped-polynomial-comparison -pl regelsuche-release -am
@@ -517,7 +535,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0, ref: "${{ github.event.pull_request.head.sha || github.sha }}" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+          # Share the full polynomial reactor cache, not the short preflight or pilot cache.
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
+            .mvn/polynomial-study-cache-scope.txt
       - name: Run full affected test suites and verify all 492 schema rows in 36 actual sequences
         run: >-
           mvn --batch-mode --no-transfer-progress -Pschema-polynomial-comparison -pl regelsuche-release -am

@@ -17,6 +17,18 @@ Bei wiederaufgenommenen Strategien bleiben frühere Befunde über ihre
 Versuchslinks auffindbar. Die [Pflegeanleitung](../documentation-conventions.md#codeverweise-im-strategien-index)
 erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 
+## Gemeinsame Potenzen unter expliziten Ausgabebeobachtungen
+
+- **Hypothese.** Mehrere Potenzen derselben Gruppenbasis können gemeinsame Zwischenergebnisse verwenden, wenn die Quelle exakte Gleichheit oder ausdrücklich Gleichheit nach einer weiteren Potenz verlangt.
+- **Umsetzungsstand.** `SharedPowerSearch` vergleicht exakte und beobachtungsreduzierte Exponenten mit denselben begrenzten Wiederverwendungsregeln. `SharedPowerVerifier` rekonstruiert Exponenten und prüft jede Beobachtung unabhängig unter `x^n=1`. Der modulare Adapter prüft diese konkrete Voraussetzung; das SDK delegiert.
+- **Befund.** Im [sechsteiligen Strukturvergleich](../../research/benchmarks/shared-power-relations/README.md) sinkt die explizite Modellarbeit des Quadratpaares modulo 1019 von 22 auf 14 und des Kubikpaares modulo 103 von 7 auf 2. Exakte benachbarte Potenzen bleiben bei 19; bei p31 mit günstiger Inversion gewinnt der exakte Vergleich. Sämtliche Such- und Prüfarbeit wird ausgewiesen. Die Tests vergleichen außerdem 864 Feldbasen und prüfen 3528 nichtreelle Fp43-Wurzeln einschließlich beider Normvorzeichen. [Vertrag und zusätzliche Consumer-Pflichten](shared-power-relations.md)
+- **Folgerung.** Gemeinsame Potenzen und freigegebene Beobachtungen im Kern wiederverwenden. Die endliche Suche liefert keine globale Minimalität oder gemessene Laufzeitersparnis. Einzelne Quadratbeobachtungen ersetzen keine Korrelation mehrerer Vorzeichen und keine kanonische Normalisierung des vollständigen Consumers.
+
+- [`SharedPowerSearch.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/SharedPowerSearch.java#L17) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/SharedPowerSearch.java | public final class SharedPowerSearch { -->
+- [`SharedPowerVerifier.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/SharedPowerVerifier.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/SharedPowerVerifier.java | public final class SharedPowerVerifier { -->
+- [`SharedPowerSearchTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/SharedPowerSearchTest.java#L12) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/SharedPowerSearchTest.java | class SharedPowerSearchTest { -->
+- [`SharedPowerSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/SharedPowerSdk.java#L13) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/SharedPowerSdk.java | public final class SharedPowerSdk { -->
+
 ## Exakte lokale boolesche Constraints zählen
 
 - **Hypothese.** Die Elimination lokaler Faktoren kann exakte Gesamt- und bedingte Anzahlen mit einer nachrechenbaren Spur liefern, ohne jede globale Belegung einzeln aufzuzählen.
