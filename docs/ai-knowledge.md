@@ -172,6 +172,35 @@ not change which tasks, assertions or artifact contracts are executed.
 
 ## Context-debt trend baseline
 
+### Accepted main after shared-power schedules (2026-11-26)
+
+The reference is merged main `dea66e6f2955ad18b81f739d21f3674ea07884ab`,
+tree `7759063592fdf9f4bc5ebd86584388a0f2847c35`. Before merge,
+[PR #1406 CI run 45749173449](https://github.com/carstenartur/Regelsuche/actions/runs/45749173449)
+passed all fourteen source authorities and aggregate `ciCheck` on the exact same
+tree. The quality artifact binds the clean CI checkout and its native reports.
+All 293 indexed file hashes and lengths were verified, including 64 tracked
+files compared with their Git blobs on merged main.
+
+The native gate passed with **919,570** estimated context tokens and concept
+radius **126**, up **14,095** tokens and **1** radius unit from the preceding
+reference. The active baseline is a byte-for-byte copy of the
+[complete snapshot](../ai-knowledge/baseline-history/2026-11-26-main-dea66e6f/metrics-snapshot.json)
+projected by the unchanged v0.1.10 extractor from the
+[accepted complexity report](../ai-knowledge/baseline-history/2026-11-26-main-dea66e6f/accepted-complexity.json).
+
+[PR #1407's original CI](https://github.com/carstenartur/Regelsuche/actions/runs/45760390430/job/139709097371)
+reported **923,550** tokens and rejected its **+18,075** increase against the
+preceding reference. The unchanged extractor reproduces the original snapshot
+and trend byte for byte. Using the accepted main reference for that same
+measurement gives [a passing trend](../ai-knowledge/baseline-history/2026-11-26-main-dea66e6f/replayed-trend.json)
+at **+3,980** tokens and **+1** radius unit. Only merged main supplies baseline
+values. The updated PR still requires fresh extraction and CI.
+[Provenance](../ai-knowledge/baseline-history/2026-11-26-main-dea66e6f/provenance.json)
+binds the exact reports and unchanged policies. To replay the decisions, use
+the [existing projection procedure](../ai-knowledge/baseline-history/2026-11-24-main-f183aedd/README.md#reproduce-the-native-projection)
+with the retained reports in the new history directory.
+
 ### Accepted main before bounded mathematical transfers (2026-11-25)
 
 [Main CI 45655429380](https://github.com/carstenartur/Regelsuche/actions/runs/45655429380)
@@ -179,7 +208,7 @@ passed on `44ce67edab538c5c5a69f992e75f3f222ec4fd72`: all fourteen source
 authorities, aggregate `ciCheck`, and report publication succeeded. Its original
 native reports measured **905,475** estimated context tokens and concept radius
 **125**, passing the preceding reference at **+14,490** tokens and **+2** radius
-units. The active [complete snapshot](../ai-knowledge/baseline-history/2026-11-25-main-44ce67ed/metrics-snapshot.json)
+units. The previous [complete snapshot](../ai-knowledge/baseline-history/2026-11-25-main-44ce67ed/metrics-snapshot.json)
 is projected from that accepted measurement by the unchanged released v0.1.10
 extractor. The original quality artifact's API digest, all 293 indexed file
 lengths and hashes, and 64 exact tracked source Git blobs were verified.
