@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DynamicTest;
@@ -36,6 +38,25 @@ class QualityAcceptanceCollectionTest {
                 }
             }
         }
+        bindSyntheticVisualReports();
+    }
+
+    private void bindSyntheticVisualReports() throws Exception {
+        Path screenshots = root.resolve("app/src/e2eTest/resources/screenshots");
+        var policy = JSON.readTree(screenshots.resolve("visual-regression-policy.json").toFile());
+        for (var entry : policy.required("baselines").properties()) {
+            String name = entry.getKey().replaceFirst("\\.png$", "");
+            Path report = root.resolve("build/reports/visual-regression/" + name + ".comparison.json");
+            var comparison = (ObjectNode) JSON.readTree(report.toFile());
+            // These reports are synthetic fixtures, paired with the checkout's current baseline bytes.
+            comparison.put("baselineSha256", sha256(screenshots.resolve("baseline/" + entry.getKey())));
+            comparison.put("actualSha256", sha256(report.resolveSibling(name + ".actual.png")));
+            JSON.writeValue(report.toFile(), comparison);
+        }
+    }
+
+    private static String sha256(Path path) throws Exception {
+        return "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)));
     }
 
     @Test void retainsAllOriginalPolicyAndResultBytesWithoutReevaluatingTheDecisions() throws Exception {
