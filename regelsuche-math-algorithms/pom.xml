@@ -28,6 +28,23 @@
       <artifactId>regelsuche-search</artifactId>
     </dependency>
   </dependencies>
+  <build><plugins><plugin>
+    <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId>
+    <executions>
+      <execution><id>shared-power-strict-main</id><phase>process-classes</phase><goals><goal>compile</goal></goals>
+        <configuration>
+          <includes><include>**/SharedPower*.java</include><include>**/PrimeEvidence*.java</include><include>**/Quadratic*.java</include></includes>
+          <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
+        </configuration>
+      </execution>
+      <execution><id>shared-power-strict-tests</id><phase>process-test-classes</phase><goals><goal>testCompile</goal></goals>
+        <configuration>
+          <testIncludes><testInclude>**/SharedPower*Test.java</testInclude><testInclude>**/PrimeEvidenceTest.java</testInclude><testInclude>**/Quadratic*Test.java</testInclude></testIncludes>
+          <compilerArgs><arg>-Xlint:all</arg><arg>-Werror</arg></compilerArgs><failOnWarning>true</failOnWarning>
+        </configuration>
+      </execution>
+    </executions>
+  </plugin></plugins></build>
   <profiles><profile><id>sdk-release</id><build><plugins>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-source-plugin</artifactId>
       <executions><execution><id>sdk-sources</id><goals><goal>jar-no-fork</goal></goals></execution></executions></plugin>
