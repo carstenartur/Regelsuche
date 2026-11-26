@@ -436,7 +436,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with: { fetch-depth: 0, ref: "${{ github.event.pull_request.head.sha || github.sha }}" }
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+          # Keep this authority's dependency cache separate from shorter verification jobs.
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
+            .mvn/polynomial-pilot-cache-scope.txt
       - name: Reproduce the original frozen experiment in pinned Java and SymPy workers
         run: >-
           mvn --batch-mode --no-transfer-progress -Ppolynomial-comparison -pl regelsuche-release -am
@@ -612,7 +621,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
-        with: { distribution: temurin, java-version: '25', verify-signature: true, cache: maven }
+        with:
+          distribution: temurin
+          java-version: '25'
+          verify-signature: true
+          cache: maven
+          # Keep this authority's dependency cache separate from shorter verification jobs.
+          cache-dependency-path: |
+            **/pom.xml
+            .mvn/maven.config
+            .mvn/checked-proof-cache-scope.txt
       - name: Retain the exact proof-authority source
         run: git archive --format=zip --output=/tmp/checked-proof-source.zip HEAD
       - name: Execute every checked proof suite and both independent proof projects inside the worker
