@@ -37,6 +37,49 @@ des Koordinatenpaares je Verzweigungsarm betrachtet. Eine mögliche
 gemeinsame Vorzeichennormalisierung ist Teil des ausführbaren Programms.
 Die Auswahl einer Permutation ist ein Suchergebnis.
 
+Die Basiserkennung erkennt Multiplikation mit eins, Addition oder
+Subtraktion von null und doppelte Negation an Wurzel- und Guardregistern.
+Das Quadrat im Vergleich erkennt sie als Quadratoperation, Multiplikation
+der Wurzel mit sich selbst oder Potenz mit Exponent zwei. Der Beleg bindet
+weiterhin das unveränderte Original. Die unabhängige Prüfung muss beide
+vollständigen Programme erklären.
+
+`SharedPowerSearch.portfolio` behält unterschiedliche geprüfte Potenzpläne.
+`QuadraticRootSearch.portfolio` beziehungsweise die dünne SDK-Fassade
+`QuadraticRootSdk.portfolio` liefern daraus unveränderliche Listen
+vollständiger, unabhängig geprüfter Programme. Der globale Kandidatenetat
+wird zwischen den Potenzplänen verteilt. Für kleine Etaten wird der
+günstigste Plan zuerst untersucht; es gibt keinen Vollständigkeitsanspruch.
+Bei den besuchten Ausgängen werden nur solche Kombinationen verworfen,
+die auf beiden Pfaden mindestens ebenso viele Negationen und
+Charakterauswahlen benötigen wie eine andere Kombination.
+
+Bleibt das Portfolio nach einer unvollständigen Paaraufzählung leer, lautet
+der Grund `CANDIDATE_LIMIT`. Dies unterscheidet ein zu kleines Suchbudget
+vom vollständigen negativen Ergebnis `NO_PROVED_BRANCH_PAIR`. Bereits
+vollständig geprüfte Funde bleiben bei einem kleinen Kandidatenetat
+`VERIFIED`; daraus folgt keine globale Minimalität. Fehler im ursprünglichen
+Wurzelvertrag behalten ihren eigenen Ablehnungsgrund.
+
+Die voreingestellte Ordnung bewertet den vollständigen Gleichheits- und
+Ungleichheitspfad jeweils einmal. Sie zählt die binäre Potenzarbeit nach
+den angegebenen Gruppenoperationsgewichten, einen Punkt je Potenzaufruf,
+Guard, Addition, Subtraktion oder Negation und acht Punkte je
+Charakterauswahl. Der Einzelaufruf `search` liefert nur eine gegenüber
+dem Original streng günstigere Variante; andernfalls lautet der Grund
+`NO_COST_IMPROVEMENT`. Das Portfolio hält auch andere geprüfte Varianten
+für die eigene Kostenbewertung des Consumers bereit. Java-Schutzprüfungen,
+Speicherallokation und konkrete JDK-Potenzalgorithmen sind in dieser
+mathematischen Voreinstellung nicht bepreist.
+
+Beim 381-Bit-Original mit dem Nenner `2*r` und den Gewichten `(1,1,10)`
+liefert der Etat von 64 Ausgabepaaren vier geprüfte Programme. Der
+Strukturwert sinkt von 1855 auf 1235. Die Suche benötigt 1003408 statt
+der historischen 504157 Arbeitseinheiten; die unabhängige Wiederprüfung
+421108 statt 421099. Die zusätzlichen Alternativen kosten Sucharbeit.
+Diese Zahlen beschreiben genau diese Quelle und Konfiguration und
+belegen keinen Laufzeitgewinn des erzeugten Java-Codes.
+
 Die Prüfung rekonstruiert sowohl das Original als auch den Kandidaten.
 Mit `X=(a+g)/2` und `H=b/2` gilt unter den Eingabebedingungen
 
@@ -152,9 +195,9 @@ Arbeitsmengen; dies sind keine Zeitmessungen:
 
 | Modul | Vorbereitung einmal | Vorbereitete Auswertung (g=2 / g=p−2) | Auswertung mit erneuter Prüfung (g=2 / g=p−2) |
 |---|---:|---:|---:|
-| 43 | 726 | 24 / 28 | 750 / 754 |
-| `2^61−1` | 2419 | 79 / 87 | 2498 / 2506 |
-| Katalogmodul mit 381 Bit | 365763 | 14049 / 14093 | 379812 / 379856 |
+| 43 | 734 | 24 / 28 | 758 / 762 |
+| `2^61−1` | 2427 | 79 / 87 | 2506 / 2514 |
+| Katalogmodul mit 381 Bit | 365771 | 14049 / 14093 | 379820 / 379864 |
 
 Der Import des 61-Bit-Belegs benötigt zusätzlich 3623 Arbeitseinheiten
 und passt in `OptimizationBudget.DEFAULT`. Die Zahlen beziehen sich auf

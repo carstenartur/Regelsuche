@@ -68,6 +68,20 @@ public record QuadraticRootProgram(List<Step> prefix, int guardLeft, int guardRi
                 counts[Op.NEGATE.ordinal()], arm.normalizeRealCharacter() ? 1 : 0, weighted);
     }
 
+    /**
+     * Default structural estimate for one traversal of each path. Includes binary-chain group work,
+     * one unit per power call, guard, addition, subtraction or negation, and eight per character
+     * selection. Literal references carry no group work. Consumers can price each path separately.
+     */
+    public long score(SharedPowerPlan.Weights weights) {
+        return score(cost(true, weights)) + score(cost(false, weights));
+    }
+
+    private static long score(PathCost path) {
+        return path.weightedGroupWork() + path.powerCalls() + 1L + path.additions() + path.subtractions()
+                + path.negations() + 8L * path.characterSelections();
+    }
+
     private static List<Step> block(List<Step> steps) {
         var copy = new ArrayList<Step>();
         for (var step : steps) {
