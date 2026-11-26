@@ -13,7 +13,7 @@ class CytoscapeWebAssetContractTest {
     private static final String RESOURCE =
         "web/vendor/cytoscape/cytoscape.min.js";
     private static final String EXPECTED_VERSION_ASSIGNMENT =
-        "version=\"3.34.4\"";
+        "version=\"3.35.0\"";
 
     @Test
     void packagedAssetMatchesTheReviewedCytoscapeRevision()
@@ -27,7 +27,7 @@ class CytoscapeWebAssetContractTest {
                 RESOURCE + " is unexpectedly small: "
                     + javascript.length() + " characters");
             assertTrue(javascript.contains(EXPECTED_VERSION_ASSIGNMENT), () ->
-                RESOURCE + " does not expose the reviewed Cytoscape 3.34.4 "
+                RESOURCE + " does not expose the reviewed Cytoscape 3.35.0 "
                     + "runtime revision");
         }
     }
