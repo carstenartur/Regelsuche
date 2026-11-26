@@ -1,7 +1,7 @@
 # Playwright Java image pins browser binaries, system libraries and fonts to the
 # exact Playwright version used by app/build.gradle. The project dependency is
 # still resolved from the checkout; the image only supplies the runtime stack.
-FROM mcr.microsoft.com/playwright/java:v1.65.0-noble@sha256:33872378140440f017536054734d761e01a3908e17bb30f675ae1c959daa46f4
+FROM mcr.microsoft.com/playwright/java:v1.65.1-noble@sha256:3cbef0eaf6c98292b2b209817bad5f2da150cdff7df8eea56c2001a4c716fcd9
 
 WORKDIR /workspace
 COPY . .
