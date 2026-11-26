@@ -13,6 +13,15 @@ integration. New source methods do not retroactively become part of a release.
 
 ## Exact finite certificates in current source
 
+`power.QuadraticRootSdk.search`, `verify` and `evaluate` expose bounded
+source-program search for roots in a quadratic extension over a certified
+prime field. The core derives shared powers, searches signed coordinate
+permutations and independently replays the original and candidate programs.
+`EXACT_PAIR` and `UP_TO_JOINT_SIGN` are distinct contracts. The SDK delegates
+budgets and cancellation; a Java consumer must establish the input domain,
+effects and emitted-code equivalence. See [field program contracts and exact
+prime evidence](../docs/research/quadratic-root-programs.md).
+
 `combinatorics.FiniteConstraintSdk.count` and `verify` provide exact weighted
 Boolean model counts, conditional counts through source-bound fixed variables,
 an elimination trace and a positive-weight witness. The verifier independently
