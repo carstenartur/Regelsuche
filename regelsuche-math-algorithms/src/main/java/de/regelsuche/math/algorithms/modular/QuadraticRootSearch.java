@@ -100,7 +100,9 @@ public final class QuadraticRootSearch {
                     }
                 }
             }
-            if (ranked.isEmpty()) throw new IllegalArgumentException("NO_PROVED_BRANCH_PAIR");
+            if (ranked.isEmpty()) throw new IllegalArgumentException(
+                    budget.tried < (long) powers.candidates().size() * PERMUTATIONS * PERMUTATIONS
+                            ? "CANDIDATE_LIMIT" : "NO_PROVED_BRANCH_PAIR");
             work.cells(retained + 3L * ranked.size());
             ranked.sort((a, b) -> {
                 work.charge(1);

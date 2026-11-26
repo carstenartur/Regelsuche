@@ -216,6 +216,45 @@ class QuadraticRootTest {
         assertTrue(stop.certificates().isEmpty());
     }
 
+    @Test void anUnsuccessfulCandidateCapReportsUnexploredAlternatives() {
+        var source = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var limited = QuadraticRootSearch.portfolio(source, WEIGHTS, 1, LIMITS, () -> false);
+        assertTrue(limited.certificates().isEmpty());
+        assertEquals(1, limited.candidates());
+        assertEquals("CANDIDATE_LIMIT", limited.reason());
+        assertEquals(limited.reason(), QuadraticRootSearch.search(source, WEIGHTS, 1, LIMITS, () -> false).reason());
+        assertFalse(QuadraticRootSearch.portfolio(source, WEIGHTS, 8, LIMITS, () -> false).certificates().isEmpty());
+    }
+
+    @Test void invalidRootProgramsRemainProofFailuresEvenWithSmallCandidateCaps() {
+        var source = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var original = source.original();
+        var unequal = original.unequal();
+        var different = new QuadraticRootProgram(original.prefix(), original.guardLeft(), original.guardRight(),
+                original.equal(), new QuadraticRootProgram.Arm(unequal.steps(), unequal.real(), unequal.real(), false));
+        var contract = new QuadraticRootContract("different-output", source.modulus(), source.primeEvidence(), different, EXACT_PAIR);
+        for (int cap : new int[]{1, 384}) {
+            var rejected = QuadraticRootSearch.portfolio(contract, WEIGHTS, cap, LIMITS, () -> false);
+            assertTrue(rejected.certificates().isEmpty());
+            assertEquals("SOURCE_IS_NOT_A_ROOT", rejected.reason());
+            assertEquals(0, rejected.candidates());
+        }
+    }
+
+    @Test void anExactCompletePairAllowanceRetainsTheVerifiedPortfolio() {
+        var contract = source(BigInteger.valueOf(43), EXACT_PAIR);
+        var complete = QuadraticRootSearch.portfolio(contract, WEIGHTS, 384, LIMITS, () -> false);
+        assertEquals("VERIFIED", complete.reason());
+        assertFalse(complete.certificates().isEmpty());
+        assertTrue(complete.candidates() > 1);
+        var exact = QuadraticRootSearch.portfolio(contract, WEIGHTS, complete.candidates(), LIMITS, () -> false);
+        assertEquals("VERIFIED", exact.reason());
+        assertEquals(complete.certificates(), exact.certificates());
+        var bounded = QuadraticRootSearch.portfolio(contract, WEIGHTS, 8, LIMITS, () -> false);
+        assertEquals("VERIFIED", bounded.reason());
+        assertFalse(bounded.certificates().isEmpty());
+    }
+
     @Test void anAlreadyCheapestCompleteProgramHasNoMathematicalImprovement() {
         var source = source(BigInteger.valueOf(31), EXACT_PAIR);
         var cheapInverse = new SharedPowerPlan.Weights(1, 1, 1);

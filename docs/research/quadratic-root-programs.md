@@ -54,6 +54,13 @@ Bei den besuchten Ausgängen werden nur solche Kombinationen verworfen,
 die auf beiden Pfaden mindestens ebenso viele Negationen und
 Charakterauswahlen benötigen wie eine andere Kombination.
 
+Bleibt das Portfolio nach einer unvollständigen Paaraufzählung leer, lautet
+der Grund `CANDIDATE_LIMIT`. Dies unterscheidet ein zu kleines Suchbudget
+vom vollständigen negativen Ergebnis `NO_PROVED_BRANCH_PAIR`. Bereits
+vollständig geprüfte Funde bleiben bei einem kleinen Kandidatenetat
+`VERIFIED`; daraus folgt keine globale Minimalität. Fehler im ursprünglichen
+Wurzelvertrag behalten ihren eigenen Ablehnungsgrund.
+
 Die voreingestellte Ordnung bewertet den vollständigen Gleichheits- und
 Ungleichheitspfad jeweils einmal. Sie zählt die binäre Potenzarbeit nach
 den angegebenen Gruppenoperationsgewichten, einen Punkt je Potenzaufruf,
