@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SharedPowerPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">SharedPowerPlan.java</span></div><h1>SharedPowerPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/** Bounded, untrusted schedules for powers of one group element. */
+public final class SharedPowerPlan {
+    public static final int MAX_BITS = 4096;
+    public static final int MAX_OUTPUTS = 64;
+    public static final int MAX_STEPS = 4096;
+
+    private SharedPowerPlan() {}
+
+    /** Requires y^k=(x^e)^k. Only k=1 requires equality of the raw values. */
+    public record Output(BigInteger exponent, BigInteger observationPower) {
+<span class="fc" id="L18">        public Output {</span>
+<span class="fc" id="L19">            bounded(exponent);</span>
+<span class="fc" id="L20">            positive(observationPower);</span>
+<span class="fc" id="L21">        }</span>
+    }
+
+    /**
+     * Conditional group assumption x^n=1; n need not be the exact order.
+     * Each observation power must divide n. This neither establishes primality
+     * nor authorizes a normalization or a correlation between output signs.
+     */
+    public record Request(BigInteger orderMultiple, List&lt;Output&gt; outputs) {
+<span class="fc" id="L30">        public Request {</span>
+<span class="fc" id="L31">            positive(orderMultiple);</span>
+<span class="fc" id="L32">            outputs = copy(outputs, MAX_OUTPUTS);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (outputs.isEmpty()) throw new IllegalArgumentException(&quot;EMPTY_OUTPUTS&quot;);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            for (var output : outputs) {</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                if (!orderMultiple.mod(output.observationPower()).equals(BigInteger.ZERO)) {</span>
+<span class="fc" id="L36">                    throw new IllegalArgumentException(&quot;OBSERVATION_MUST_DIVIDE_ORDER&quot;);</span>
+                }
+<span class="fc" id="L38">            }</span>
+<span class="fc" id="L39">        }</span>
+    }
+
+<span class="fc" id="L42">    public enum Operation { POWER, MULTIPLY, INVERSE }</span>
+
+    /** Node 0 is 1, node 1 is x; step i produces node i+2. POWER always powers x. */
+    public record Step(Operation operation, int left, int right, BigInteger exponent) {
+<span class="fc" id="L46">        public Step {</span>
+<span class="fc" id="L47">            Objects.requireNonNull(operation);</span>
+<span class="fc" id="L48">            bounded(exponent);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (operation == Operation.POWER) {</span>
+<span class="pc bpc" id="L50" title="2 of 6 branches missed.">                if (exponent.signum() &lt; 0 || left != 1 || right != 0) {</span>
+<span class="fc" id="L51">                    throw new IllegalArgumentException(&quot;INVALID_POWER_STEP&quot;);</span>
+                }
+<span class="pc bpc" id="L53" title="2 of 6 branches missed.">            } else if (exponent.signum() != 0 || operation == Operation.INVERSE &amp;&amp; right != 0) {</span>
+<span class="nc" id="L54">                throw new IllegalArgumentException(&quot;INVALID_STEP_ARGUMENTS&quot;);</span>
+            }
+<span class="fc" id="L56">        }</span>
+
+<span class="fc" id="L58">        public static Step power(BigInteger exponent) { return new Step(Operation.POWER, 1, 0, exponent); }</span>
+<span class="fc" id="L59">        public static Step multiply(int left, int right) { return new Step(Operation.MULTIPLY, left, right, BigInteger.ZERO); }</span>
+<span class="fc" id="L60">        public static Step inverse(int value) { return new Step(Operation.INVERSE, value, 0, BigInteger.ZERO); }</span>
+    }
+
+    public record Schedule(List&lt;Step&gt; steps, List&lt;Integer&gt; outputs) {
+<span class="fc" id="L64">        public Schedule {</span>
+<span class="fc" id="L65">            steps = copy(steps, MAX_STEPS);</span>
+<span class="fc" id="L66">            outputs = copy(outputs, MAX_OUTPUTS);</span>
+<span class="fc" id="L67">        }</span>
+    }
+
+    /** Source-bound program evidence. Recheck against the expected request before accepting it. */
+    public record Certificate(Request source, Schedule schedule) {
+<span class="fc" id="L72">        public Certificate {</span>
+<span class="fc" id="L73">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L74">            Objects.requireNonNull(schedule);</span>
+<span class="fc" id="L75">        }</span>
+    }
+
+    /** Explicit operation weights; binary-chain estimates do not model BigInteger's actual window algorithm. */
+    public record Weights(long multiplication, long squaring, long inverse) {
+<span class="fc" id="L80">        public Weights {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (long value : new long[]{multiplication, squaring, inverse}) {</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">                if (value &lt; 1 || value &gt; 1_000_000_000L) throw new IllegalArgumentException(&quot;INVALID_COST_WEIGHT&quot;);</span>
+            }
+<span class="fc" id="L84">        }</span>
+    }
+
+    /** Outer calls plus separate binary-chain estimates inside POWER; none are measured runtime counts. */
+<span class="fc" id="L88">    public record Cost(int powerCalls, int multiplications, int squarings, int inversions,</span>
+            int estimatedPowerMultiplications, int estimatedPowerSquarings, long weighted) {}
+
+    static long powerCost(BigInteger exponent, Weights weights) {
+<span class="fc" id="L92">        return Math.max(0, exponent.bitLength() - 1L) * weights.squaring()</span>
+<span class="fc" id="L93">                + Math.max(0, exponent.bitCount() - 1L) * weights.multiplication();</span>
+    }
+
+    static void bounded(BigInteger value) {
+<span class="pc bpc" id="L97" title="2 of 6 branches missed.">        if (value == null || value.getClass() != BigInteger.class || value.abs().bitLength() &gt; MAX_BITS) {</span>
+<span class="fc" id="L98">            throw new IllegalArgumentException(&quot;POWER_INTEGER_LIMIT&quot;);</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    private static void positive(BigInteger value) {
+<span class="fc" id="L103">        bounded(value);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (value.signum() &lt;= 0) throw new IllegalArgumentException(&quot;POSITIVE_POWER_PARAMETER_REQUIRED&quot;);</span>
+<span class="fc" id="L105">    }</span>
+
+    private static &lt;T&gt; List&lt;T&gt; copy(List&lt;T&gt; values, int maximum) {
+<span class="fc" id="L108">        Objects.requireNonNull(values);</span>
+<span class="fc" id="L109">        var result = new ArrayList&lt;T&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (var value : values) {</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (result.size() == maximum) throw new IllegalArgumentException(&quot;POWER_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L112">            result.add(Objects.requireNonNull(value));</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">        return List.copyOf(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SharedPowerVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.modular</a> &gt; <span class="el_source">SharedPowerVerifier.java</span></div><h1>SharedPowerVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.modular;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.modular.SharedPowerPlan.*;
+
+/** Symbolic exponent replay, independent of the proposal search and modular evaluator. */
+public final class SharedPowerVerifier {
+    private SharedPowerVerifier() {}
+
+    public record Verification(boolean valid, String reason, Optional&lt;Cost&gt; cost,
+            List&lt;BigInteger&gt; outputExponents, long work) {
+<span class="fc" id="L20">        public Verification { outputExponents = List.copyOf(outputExponents); }</span>
+    }
+
+    /** Proves every advertised observation for all group elements satisfying x^n=1. */
+    public static Verification verify(Request expected, Certificate certificate, Weights weights,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L26">        return verify(expected, certificate, weights, new CertificateWork(limits, cancellation), 0);</span>
+    }
+
+    static Verification verify(Request expected, Certificate certificate, Weights weights,
+            CertificateWork work, long retainedCells) {
+<span class="fc" id="L31">        Objects.requireNonNull(expected);</span>
+<span class="fc" id="L32">        Objects.requireNonNull(certificate);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(weights);</span>
+<span class="fc" id="L34">        long start = work.used();</span>
+        try {
+<span class="fc" id="L36">            inspect(expected, work);</span>
+<span class="fc" id="L37">            inspect(certificate.source(), work);</span>
+<span class="fc" id="L38">            work.charge(1L + expected.outputs().size() + certificate.source().outputs().size());</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (!expected.equals(certificate.source())) return failure(&quot;SOURCE_MISMATCH&quot;, work, start);</span>
+<span class="fc" id="L40">            var schedule = certificate.schedule();</span>
+<span class="fc" id="L41">            work.cells(retainedCells + 3L * (schedule.steps().size() + 2) + 3L * expected.outputs().size());</span>
+<span class="fc" id="L42">            work.charge(1L + schedule.steps().size() + schedule.outputs().size());</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (schedule.outputs().size() != expected.outputs().size()) {</span>
+<span class="fc" id="L44">                return failure(&quot;OUTPUT_COUNT_MISMATCH&quot;, work, start);</span>
+            }
+<span class="fc" id="L46">            var n = expected.orderMultiple();</span>
+<span class="fc" id="L47">            var exponents = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc" id="L48">            exponents.add(BigInteger.ZERO);</span>
+<span class="fc" id="L49">            exponents.add(BigInteger.ONE.mod(n));</span>
+<span class="fc" id="L50">            int powers = 0, multiplications = 0, squarings = 0, inversions = 0;</span>
+<span class="fc" id="L51">            int powerMultiplications = 0, powerSquarings = 0;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            for (var step : schedule.steps()) {</span>
+<span class="fc" id="L53">                work.charge(1);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">                if (step.left() &lt; 0 || step.left() &gt;= exponents.size()</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">                        || step.right() &lt; 0 || step.right() &gt;= exponents.size()) {</span>
+<span class="fc" id="L56">                    return failure(&quot;INVALID_REFERENCE&quot;, work, start);</span>
+                }
+                BigInteger exponent;
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">                switch (step.operation()) {</span>
+                    case POWER -&gt; {
+<span class="fc" id="L61">                        work.check(step.exponent());</span>
+<span class="fc" id="L62">                        exponent = step.exponent().mod(n);</span>
+<span class="fc" id="L63">                        powers++;</span>
+<span class="fc" id="L64">                        powerSquarings += Math.max(0, step.exponent().bitLength() - 1);</span>
+<span class="fc" id="L65">                        powerMultiplications += Math.max(0, step.exponent().bitCount() - 1);</span>
+<span class="fc" id="L66">                    }</span>
+                    case MULTIPLY -&gt; {
+<span class="fc" id="L68">                        exponent = exponents.get(step.left()).add(exponents.get(step.right())).mod(n);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                        if (step.left() == step.right()) squarings++;</span>
+<span class="fc" id="L70">                        else multiplications++;</span>
+<span class="fc" id="L71">                    }</span>
+                    case INVERSE -&gt; {
+<span class="fc" id="L73">                        exponent = exponents.get(step.left()).negate().mod(n);</span>
+<span class="fc" id="L74">                        inversions++;</span>
+<span class="fc" id="L75">                    }</span>
+<span class="nc" id="L76">                    default -&gt; throw new IllegalStateException(&quot;UNKNOWN_OPERATION&quot;);</span>
+                }
+<span class="fc" id="L78">                work.check(exponent);</span>
+<span class="fc" id="L79">                exponents.add(exponent);</span>
+<span class="fc" id="L80">            }</span>
+<span class="fc" id="L81">            var observed = new ArrayList&lt;BigInteger&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            for (int i = 0; i &lt; schedule.outputs().size(); i++) {</span>
+<span class="fc" id="L83">                work.charge(1);</span>
+<span class="fc" id="L84">                int ref = schedule.outputs().get(i);</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">                if (ref &lt; 0 || ref &gt;= exponents.size()) return failure(&quot;INVALID_REFERENCE&quot;, work, start);</span>
+<span class="fc" id="L86">                var output = expected.outputs().get(i);</span>
+<span class="fc" id="L87">                var value = exponents.get(ref);</span>
+<span class="fc" id="L88">                var difference = value.subtract(output.exponent());</span>
+<span class="fc" id="L89">                work.check(difference);</span>
+<span class="fc" id="L90">                work.charge(1L + words(difference) * words(output.observationPower()));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                if (!difference.multiply(output.observationPower()).mod(n).equals(BigInteger.ZERO)) {</span>
+<span class="fc" id="L92">                    return failure(&quot;OBSERVATION_MISMATCH&quot;, work, start);</span>
+                }
+<span class="fc" id="L94">                observed.add(value);</span>
+            }
+<span class="fc" id="L96">            long cost = weights.multiplication() * (multiplications + powerMultiplications)</span>
+<span class="fc" id="L97">                    + weights.squaring() * (squarings + powerSquarings)</span>
+<span class="fc" id="L98">                    + weights.inverse() * inversions;</span>
+<span class="fc" id="L99">            work.charge(1L + observed.size());</span>
+<span class="fc" id="L100">            return new Verification(true, &quot;VERIFIED&quot;, Optional.of(new Cost(powers, multiplications,</span>
+<span class="fc" id="L101">                    squarings, inversions, powerMultiplications, powerSquarings, cost)), observed, work.used() - start);</span>
+<span class="fc" id="L102">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L103">            return failure(stop.getMessage(), work, start);</span>
+        }
+    }
+
+    static void inspect(Request request, CertificateWork work) {
+<span class="fc" id="L108">        work.cells(1L + 3L * request.outputs().size());</span>
+<span class="fc" id="L109">        work.check(request.orderMultiple());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (var output : request.outputs()) {</span>
+<span class="fc" id="L111">            work.check(output.exponent());</span>
+<span class="fc" id="L112">            work.check(output.observationPower());</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+<span class="fc" id="L116">    static long words(BigInteger value) { return 1L + value.abs().bitLength() / Long.SIZE; }</span>
+
+    private static Verification failure(String reason, CertificateWork work, long start) {
+<span class="fc" id="L119">        return new Verification(false, reason, Optional.empty(), List.of(), work.used() - start);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
