@@ -124,6 +124,12 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
         return SolverExecution.create(obligation, translation, result);
     }
 
+    /** Exact, premise-free comparison of polynomial zero equations, not expression identities. */
+    public boolean proportionalEquationDifferences(Expression first, Expression second) {
+        return isPolynomial(first) && isPolynomial(second)
+            && service.proportionalEquationDifferences(expressions.render(first), expressions.render(second));
+    }
+
     private static String canonicalPayload(Map<String, Object> payload) {
         TreeMap<String, String> ordered = new TreeMap<>();
         payload.forEach((key, value) -> ordered.put(
