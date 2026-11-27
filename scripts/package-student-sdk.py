@@ -153,7 +153,7 @@ def package(root, repository, version, output):
                     data = data.replace(b'0.5.0-SNAPSHOT', version.encode()).replace(b'0.4.0-SNAPSHOT', version.encode())
                 members[relative.as_posix()] = data
     members['README.md'] = (f'# Regelsuche Java SDK {version}\n\n'
-        'Run the [seven checked calculations](examples/external-consumers/checked-math-java25/README.md) with Java 25 and Maven 3.9.9+:\n\n'
+        'Run the [ten checked calculations](examples/external-consumers/checked-math-java25/README.md) with Java 25 and Maven 3.9.9+:\n\n'
         '```sh\nmvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify\n```\n\n'
         "The bundled Maven projects use this archive's SDK version without overrides.\n"
         'The [SDK guide](docs/java-sdk-quickstart.md) also documents the published Central release and historical archives.\n\n'
