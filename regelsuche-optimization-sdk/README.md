@@ -13,6 +13,24 @@ integration. New source methods do not retroactively become part of a release.
 
 ## Exact finite certificates in current source
 
+The current source also provides three connected checked-plan APIs. They
+require this `0.5.4-SNAPSHOT` source build; release 0.5.3 predates them.
+
+| Task | Typed entry point | Contract |
+| --- | --- | --- |
+| Noncommutative rational comparison at matrix centers | `noncommutative.RationalFormulaSdk.compare`, `verifyComparison` | Supplied centers or bounded generic `MatrixPolicy`; original inverse obligations remain binding. |
+| Rational spectral batch repair | `algebra.SpectralBatchSdk` | Construct, verify, prepare, discover and apply checked plans for bounded rational involutions, with frequency-dependent exception supports. |
+| Executable composition of bilinear and operator search | `algebra.ComposedBilinearSdk` | Search or discover U/V/W stages, independently verify the complete procedure and execute a prepared batch. |
+
+Composition shares one work, retained-state and deadline budget across all
+children, including failed attempts. Its candidate limit counts top-level
+acquisition and declared residual/spectral recipes across stages. Internal
+bilinear subsets remain charged work; they are not additional top-level
+slots. Arithmetic costs include the complete executable stages and use the
+same sparse direct baseline. They are not JVM timing measurements.
+See the [proofs, comparisons and limits](../docs/research/spectral-matrix-composition.md)
+and the [ten standalone examples](../examples/external-consumers/checked-math-java25/README.md).
+
 `power.QuadraticRootSdk.search`, `verify` and `evaluate` expose bounded
 source-program search for roots in a quadratic extension over a certified
 prime field. The core derives shared powers, searches signed coordinate

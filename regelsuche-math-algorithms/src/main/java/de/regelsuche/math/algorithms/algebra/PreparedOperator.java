@@ -62,7 +62,7 @@ public final class PreparedOperator {
         });
     }
 
-    private sealed interface Node permits Sparse, Unit, Composition, Addition {
+    sealed interface Node permits Sparse, Unit, Composition, Addition {
         int rows();
         int columns();
         Cost cost();
@@ -126,7 +126,7 @@ public final class PreparedOperator {
         }
     }
 
-    private static Node compile(ExactMatrixExpression expression, OperatorChecks checks) {
+    static Node compile(ExactMatrixExpression expression, OperatorChecks checks) {
         checks.work.charge(1);
         checks.reserve(1, 1);
         return switch (expression) {

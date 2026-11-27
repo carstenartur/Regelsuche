@@ -59,6 +59,26 @@ class CheckedMathExamplesTest {
             output(() -> BoundedPlanning.main(new String[0])).lines().toList());
     }
 
+    @Test void comparesRationalFormulasAtMatrixCenters() {
+        assertEquals(List.of("scalar grid: INCONCLUSIVE",
+                "matrix-center equality: EQUAL_ON_SHARED_DOMAIN; replay=true",
+                "same center, different functions: DISTINCT; replay=true"),
+            output(() -> MatrixCenterIdentity.main(new String[0])).lines().toList());
+    }
+
+    @Test void executesSpectralRepairAndKeepsTheCheaperBaseline() {
+        assertEquals(List.of("repair supports: [[0], [1], [2]]; forward rows=2; inverse rows=2",
+                "repair output: [[3, 4, 3], [-8, -2, 1], [-1, -6, -3]]",
+                "batch operations: repair=162, direct=21; selected=DIRECT"),
+            output(() -> SpectralRepair.main(new String[0])).lines().toList());
+    }
+
+    @Test void executesTheOptimizedComposedStages() {
+        assertEquals(List.of("centered product: [49/4, 25/4, 9/4, 1/4, 1/4, 9/4, 25/4, 49/4]",
+                "operations per pair: direct=248, composed=54; replay=true", "searched stages: [U, V, W]"),
+            output(() -> ComposedBilinearPlans.main(new String[0])).lines().toList());
+    }
+
     private static String output(Runnable program) {
         var original = System.out;
         var bytes = new ByteArrayOutputStream();

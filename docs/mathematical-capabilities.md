@@ -10,7 +10,7 @@ Der veröffentlichte Maven-Einstieg ist
 Dieser Checkout entwickelt `0.5.4-SNAPSHOT`. Ein Quellcode-Einstieg, eine
 vorhandene Demo und ein veröffentlichter Binärstand sind getrennte Aussagen.
 Ein eigener Build dieses Checkouts ist für die neuen APIs erforderlich.
-Die sieben [Mathematikbeispiele als Maven-Projekt](../examples/external-consumers/checked-math-java25/README.md)
+Die zehn [Mathematikbeispiele als Maven-Projekt](../examples/external-consumers/checked-math-java25/README.md)
 bieten dafür einen vollständigen Installations- und Ausführungspfad. Das
 SDK-Paket enthält dieses Projekt mit einer an seine Archivversion gebundenen
 Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
@@ -42,7 +42,9 @@ Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
 | Rationaler 2×2×2-Rangnachweis und Eingabebasiswechsel | `BilinearRankBound`, `BilinearProductLearning` | `BilinearProgramSdk` | nein | ausführbare, unabhängig geprüfte Studie |
 | Exakte LP-Suche, affine Implikation und Farkas-Trägerreduktion | `LinearProgramSearch`, `AffineImplication`, unabhängige Prüfer, `FarkasSparsifier` | `LinearProgramSdk.search`, `imply`, `verifyImplication`, `sparsify` | nein | begrenzter klassischer rationaler Simplex; Java-/SDK-Aufruf |
 | Automatische rationale Operatorreparatur, vorbereitete Ausführung und belegte Hilfsregister | `OperatorResidualSearch`, `PreparedOperator`, `OperatorResidualPlans`, `OccupiedWorkspace` | `OperatorPlanSdk.discover`, `prepare`, `apply` und Prüfeinstiege | nein | Java-/SDK-Aufruf mit starker direkter Vergleichsrechnung und getrennten Erwerbskosten |
-| Rationale nichtkommutative Vergleiche und automatische Skalarzentrumssuche | `RationalFormulaComparison`, `RationalFormulaCenterSearch` | `RationalFormulaSdk.compare`, `verifyComparison` | nein | begrenzte Zentrumssuche; Gleichheit auf gemeinsamem ursprünglichem Definitionsbereich |
+| Rationale nichtkommutative Vergleiche und automatische Skalar-/Matrixzentrumssuche | `RationalFormulaComparison`, `RationalFormulaMatrixComparison`, `RationalFormulaCenterSearch` | `RationalFormulaSdk.compare`, `verifyComparison` | nein | begrenzte generische Zentrumssuche; Gleichheit auf gemeinsamem ursprünglichem Definitionsbereich in allen Matrixordnungen |
+| Exakte spektrale Batch-Reparatur rationaler Involutionen | `SpectralBatchRepair`, `SpectralBatchRepairVerifier`, `PreparedSpectralBatch` | `SpectralBatchSdk` | nein | ausführbares Java-Beispiel mit wechselnden Ausnahmeträgern, vollständigen Kosten und starker direkter Kontrolle |
+| Zusammengesetzte bilineare und lineare Suchpläne | `ComposedBilinearSearch`, `ComposedBilinearVerifier`, `ComposedBilinearPrepared` | `ComposedBilinearSdk` | nein | ausführbare U/V/W-Unterpläne mit gemeinsamem Budget und unabhängigem Gesamtprüfer |
 | Primkörperfaktorisierung mit Vielfachheiten | `PrimeFieldMultiplicity` | `PrimeFieldFactorizationSdk` | nein | Java-/SDK-Aufruf unter der bestehenden Feld- und Arbeitsgrenze |
 | Vollständige Polynomfaktorisierung über großen Primmoduli | `BigPrimeField`, `LargePrimeFactorization`, `LargePrimeFactorizationVerifier` | zusätzliche `PrimeFieldFactorizationSdk.factor`-/`verify`-Überladungen | nein | echter `BigInteger`-Modulus; bei angenommener Primzahleigenschaft ausdrücklich bedingtes Ergebnis |
 | Zyklische Energie-/Kreditzertifikate | `EnergyGame`, `EnergyGameVerifier` | `EnergyGameSdk` | nein | ausführbares Java-Beispiel; keine eigene Eingabemaske |
@@ -58,6 +60,7 @@ wird nicht ausgeführt und es wird daraus keine gemessene Zeitersparnis abgeleit
 - [LP-Zertifikate und Farkas-Reduktion](research/linear-program-certificates.md),
   [automatische LP-Suche und affine Implikation](research/linear-program-search.md),
   [Operatorreparatur und belegter Speicher](research/operator-residual-repair.md),
+  [spektrale Reparatur, Matrixzentren und Plan-Komposition](research/spectral-matrix-composition.md),
   [rationale Formelvergleiche](research/rational-formula-realization.md),
   [Primkörperfaktoren mit Vielfachheiten](research/prime-field-multiplicities.md),
   [Faktorisierung über großen Primmoduli](research/large-prime-factorization.md).
