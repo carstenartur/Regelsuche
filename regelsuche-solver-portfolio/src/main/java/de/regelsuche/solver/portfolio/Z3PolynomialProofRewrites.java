@@ -35,6 +35,10 @@ final class Z3PolynomialProofRewrites {
         if (left.equals(right)) return true;
         if (left instanceof Real a && right instanceof Real b) return polynomial(a, b);
         if (!(left instanceof Formula a) || !(right instanceof Formula b)) return false;
+        return equivalentFormulas(a, b, depth);
+    }
+
+    private boolean equivalentFormulas(Formula a, Formula b, int depth) {
         Truth first = truth(a, depth + 1), second = truth(b, depth + 1);
         if (first != null && second != null) return first == second;
         if (a instanceof Negation n && b instanceof Negation m) {
@@ -46,6 +50,10 @@ final class Z3PolynomialProofRewrites {
         if (b instanceof Negation n && n.operand() instanceof Negation inner) {
             return equivalent(a, inner.operand(), depth + 1);
         }
+        return equivalentRelations(a, b, depth);
+    }
+
+    private boolean equivalentRelations(Formula a, Formula b, int depth) {
         if (a instanceof Order firstOrder && b instanceof Order secondOrder) {
             // Preserve direction: unlike equations, sign reversal is not valid for inequalities.
             return polynomial(values.difference(firstOrder.upper(), firstOrder.lower()),
@@ -63,6 +71,10 @@ final class Z3PolynomialProofRewrites {
         if (b instanceof Conjunction conjunction && a instanceof Negation negation) {
             return deMorgan(conjunction, negation);
         }
+        return equivalentEquations(a, b, depth);
+    }
+
+    private boolean equivalentEquations(Formula a, Formula b, int depth) {
         if (a instanceof Equality equation && b instanceof Disjunction disjunction) {
             return zeroProduct(equation, disjunction);
         }
