@@ -86,6 +86,23 @@ public class PolynomialNormalFormEquivalenceService implements PolynomialEquival
         return parsePolynomial(polynomialExpression).map(Polynomial::toCanonicalString);
     }
 
+    /**
+     * Check whether two polynomial differences are equal up to a nonzero rational scalar.
+     * This preserves their zero sets, not the values or signs of the expressions.
+     */
+    public boolean proportionalEquationDifferences(String first, String second) {
+        if (!isEnabled()) {
+            return false;
+        }
+        var left = parsePolynomial(first);
+        var right = parsePolynomial(second);
+        if (left.isEmpty() || right.isEmpty()) {
+            return false;
+        }
+        var order = new GradedReverseLexOrder();
+        return left.orElseThrow().monic(order).equals(right.orElseThrow().monic(order));
+    }
+
     public List<String> eliminateLinearVariable(List<String> equationsEqualZero, String variable) {
         if (!isEnabled() || equationsEqualZero == null || equationsEqualZero.isEmpty() || variable == null || variable.isBlank()) {
             return List.of();
