@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConflictMatchingVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.combinatorics</a> &gt; <span class="el_source">ConflictMatchingVerifier.java</span></div><h1>ConflictMatchingVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.combinatorics;
+
+import static de.regelsuche.scalar.ExactRational.ONE;
+import static de.regelsuche.scalar.ExactRational.ZERO;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.combinatorics.ConflictMatching.Bound;
+import de.regelsuche.math.algorithms.combinatorics.ConflictMatching.Certificate;
+import de.regelsuche.math.algorithms.combinatorics.ConflictMatching.Request;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.LinearProgramVerifier.Status;
+import de.regelsuche.scalar.ExactRational;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+/**
+ * Direct weighted-cover replay. This checker neither constructs nor solves a linear program.
+ * Summing edge cover inequalities over a compatible matching charges each vertex and each
+ * conflict at most once, so the sum of all nonnegative weights bounds its cardinality.
+ */
+public final class ConflictMatchingVerifier {
+    private ConflictMatchingVerifier() {}
+
+<span class="fc" id="L27">    public record Verification(Status status, String reason, long work, Optional&lt;Bound&gt; bound) {</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        public boolean valid() { return status == Status.VERIFIED; }</span>
+    }
+
+    public static Verification verify(Request source, Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancellation) {
+<span class="fc" id="L33">        Objects.requireNonNull(source);</span>
+<span class="fc" id="L34">        var work = new CertificateWork(limits, cancellation);</span>
+        try {
+<span class="fc" id="L36">            work.charge(1);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (certificate == null) return invalid(&quot;MISSING_CERTIFICATE&quot;, work);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            if (!sameShape(source, certificate.source())) return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (certificate.leftWeights().size() != source.graph().leftCount()</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                    || certificate.rightWeights().size() != source.graph().rightCount()</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                    || certificate.conflictWeights().size() != source.conflicts().size()) {</span>
+<span class="fc" id="L42">                return invalid(&quot;CERTIFICATE_SHAPE&quot;, work);</span>
+            }
+<span class="fc" id="L44">            long retained = ConflictMatching.sourceCells(source);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if (source != certificate.source()) retained += ConflictMatching.sourceCells(certificate.source());</span>
+<span class="fc" id="L46">            retained += (long) certificate.leftWeights().size() + certificate.rightWeights().size()</span>
+<span class="fc" id="L47">                + certificate.conflictWeights().size() + source.graph().edges().size() + 16;</span>
+<span class="fc" id="L48">            work.cells(retained);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (!sameSource(source, certificate.source(), work)) return invalid(&quot;SOURCE_MISMATCH&quot;, work);</span>
+<span class="fc" id="L50">            ExactRational total = ZERO;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            for (var vector : List.of(certificate.leftWeights(), certificate.rightWeights(),</span>
+<span class="fc" id="L52">                    certificate.conflictWeights())) {</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                for (var value : vector) {</span>
+<span class="fc" id="L54">                    work.charge(1);</span>
+                    // BigInteger is extensible: never invoke supplied numeric overrides in replay.
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                    if (value.numerator().getClass() != BigInteger.class</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                            || value.denominator().getClass() != BigInteger.class) {</span>
+<span class="fc" id="L58">                        return invalid(&quot;NON_CANONICAL_WEIGHT&quot;, work);</span>
+                    }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                    if (work.check(value).signum() &lt; 0) return invalid(&quot;NEGATIVE_WEIGHT&quot;, work);</span>
+<span class="fc" id="L61">                    total = work.add(total, value);</span>
+<span class="fc" id="L62">                }</span>
+<span class="fc" id="L63">            }</span>
+<span class="fc" id="L64">            var coverage = new ExactRational[source.graph().edges().size()];</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            for (int index = 0; index &lt; coverage.length; index++) {</span>
+<span class="fc" id="L66">                work.charge(1);</span>
+<span class="fc" id="L67">                var edge = source.graph().edges().get(index);</span>
+<span class="fc" id="L68">                coverage[index] = work.add(certificate.leftWeights().get(edge.left()),</span>
+<span class="fc" id="L69">                    certificate.rightWeights().get(edge.right()));</span>
+            }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (int index = 0; index &lt; source.conflicts().size(); index++) {</span>
+<span class="fc" id="L72">                work.charge(1);</span>
+<span class="fc" id="L73">                var conflict = source.conflicts().get(index);</span>
+<span class="fc" id="L74">                var weight = certificate.conflictWeights().get(index);</span>
+<span class="fc" id="L75">                coverage[conflict.first()] = work.add(coverage[conflict.first()], weight);</span>
+<span class="fc" id="L76">                coverage[conflict.second()] = work.add(coverage[conflict.second()], weight);</span>
+            }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (var value : coverage) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                if (work.sub(value, ONE).signum() &lt; 0) return invalid(&quot;UNCOVERED_EDGE&quot;, work);</span>
+            }
+<span class="fc" id="L81">            work.charge(1);</span>
+<span class="fc" id="L82">            var floor = work.check(total.numerator().divide(total.denominator()));</span>
+<span class="fc" id="L83">            int vertexBound = Math.min(source.graph().leftCount(), source.graph().rightCount());</span>
+<span class="fc" id="L84">            int upper = floor.min(BigInteger.valueOf(vertexBound)).intValueExact();</span>
+<span class="fc" id="L85">            var bound = new Bound(total, upper, source.graph().leftCount() - upper);</span>
+<span class="fc" id="L86">            work.charge(0);</span>
+<span class="fc" id="L87">            return new Verification(Status.VERIFIED, &quot;VERIFIED&quot;, work.used(), Optional.of(bound));</span>
+<span class="fc" id="L88">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L89">            return new Verification(Status.UNAVAILABLE, stop.getMessage(), work.used(), Optional.empty());</span>
+        }
+    }
+
+    private static boolean sameShape(Request first, Request second) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        return first.graph().leftCount() == second.graph().leftCount()</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            &amp;&amp; first.graph().rightCount() == second.graph().rightCount()</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            &amp;&amp; first.graph().edges().size() == second.graph().edges().size()</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            &amp;&amp; first.conflicts().size() == second.conflicts().size();</span>
+    }
+
+    private static boolean sameSource(Request first, Request second, CertificateWork work) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (int index = 0; index &lt; first.graph().edges().size(); index++) {</span>
+<span class="fc" id="L102">            work.charge(1);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (!first.graph().edges().get(index).equals(second.graph().edges().get(index))) return false;</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int index = 0; index &lt; first.conflicts().size(); index++) {</span>
+<span class="fc" id="L106">            work.charge(1);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (!first.conflicts().get(index).equals(second.conflicts().get(index))) return false;</span>
+        }
+<span class="fc" id="L109">        return true;</span>
+    }
+
+    private static Verification invalid(String reason, CertificateWork work) {
+<span class="fc" id="L113">        work.charge(0);</span>
+<span class="fc" id="L114">        return new Verification(Status.INVALID, reason, work.used(), Optional.empty());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

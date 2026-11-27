@@ -60,6 +60,23 @@ gleichen Pivotspalten. Der exakte Zertifikatsprüfer bleibt unverändert.
 
 ## Wichtige zusätzliche Möglichkeiten
 
+### Ergänzung vom 27. November 2026: Konflikte im Matching-Graphen
+
+Der weiterhin gleiche OpenAI-Katalogstand `3344da59991ed94f9ba711217b29c1d760badfa6`
+liefert keinen neuen uniformen Primzahlsatz. Der inzwischen vorhandene begrenzte
+[LP-Erzeuger](linear-program-search.md) ermöglicht aber einen zusätzlichen
+allgemeinen Verbraucher: [Matching-Schranken mit unvereinbaren Kanten](conflict-matching.md).
+Sein unabhängiger Prüfer kontrolliert direkt eine gewichtete Kantenüberdeckung.
+Zwei gewöhnlich matchbare, aber gegenseitig unvereinbare Zuordnungen liefern
+dadurch ein echtes zusätzliches endliches Defizit. Der viergliedrige
+Konfliktfall dokumentiert zugleich, dass die Relaxation unvollständig bleibt.
+
+Der Zusammenhang zu Familie 380 besteht in den geprüften primal-dualen
+Ausgabeformen. Die neue Anwendung ist keine Implementierung des stark
+polynomialen Verfahrens der Quelle. Primzahlspezifische Konfliktbegründungen
+bleiben im Primachsenraum-Consumer; Regelsuche enthält nur die allgemeine Methode.
+Die nachfolgende Tabelle vom 25. November beschreibt ihren damaligen Stand.
+
 ### Ergänzung vom 22. November 2026: begrenzte Suchfähigkeiten
 
 Ausgehend von `98a60e30629f65bc12bb573e9beb46b04053e66c` ergänzt der aktuelle
