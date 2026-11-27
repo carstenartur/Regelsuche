@@ -83,51 +83,83 @@ class QuadraticRootNormalizationTest {
         int tuples = 0;
         for (int p : new int[]{3, 7, 11, 19}) {
             var root = certificate(p);
-            var c = root.contract();
-            var m = c.modulus();
-            var prepared = QuadraticRootEvaluation.prepare(c, root, LIMITS, () -> false).plan().orElseThrow();
-            for (boolean realFirst : new boolean[]{true, false}) {
-                var selector = realFirst ? QuadraticRootNormalization.ParitySelector.realFirst()
-                        : QuadraticRootNormalization.ParitySelector.imaginaryFirst();
-                var spec = normalizer(m, selector);
-                var verified = QuadraticRootNormalization.verifyNormalized(c, spec,
-                        new QuadraticRootNormalization.Certificate(root, spec), LIMITS, () -> false);
-                assertTrue(verified.valid(), verified.reason());
-                for (int x = 0; x < p; x++) for (int y = 0; y < p; y++) for (int t = 0; t <= 1; t++) {
-                    var pair = new Pair(x, y);
-                    assertEquals(pair.normalizeFirst(realFirst, t, p), pair.normalizeMask(selector.mask(), t, p));
-                }
-            }
-            for (int a = 0; a < p; a++) for (int b = 1; b < p; b++) for (int g = 0; g < p; g++) {
-                if (Math.floorMod(g * g - a * a - b * b, p) != 0) continue;
-                tuples++;
-                // Independent source oracle: select the branch by squaring its root, then form b/(2r).
-                var delta = BigInteger.valueOf((long) (a + g) * ((p + 1) / 2)).mod(m);
-                var exponent = BigInteger.valueOf((p + 1) / 4);
-                var r = delta.modPow(exponent, m);
-                if (!r.multiply(r).mod(m).equals(delta)) {
-                    delta = BigInteger.valueOf((long) (a - g) * ((p + 1) / 2)).mod(m);
-                    r = delta.modPow(exponent, m);
-                }
-                var original = new Pair(r.intValueExact(), BigInteger.valueOf(b).multiply(r.shiftLeft(1).modInverse(m)).mod(m).intValueExact());
-                var pair = prepared.evaluate(BigInteger.valueOf(a), BigInteger.valueOf(b), BigInteger.valueOf(g),
-                        LIMITS, () -> false).pair().orElseThrow();
-                var actual = new Pair(pair.real().intValueExact(), pair.imaginary().intValueExact());
+            var pairs = canonicalPairs(p);
+            assertSelector(root, pairs, true);
+            assertSelector(root, pairs, false);
+            var prepared = QuadraticRootEvaluation.prepare(root.contract(), root, LIMITS, () -> false).plan().orElseThrow();
+            var inputs = nonrealNormInputs(p);
+            tuples += inputs.size();
+            for (var input : inputs) {
+                var original = input.sourceRoot(p);
+                var actual = input.candidateRoot(prepared);
                 if (!original.equals(actual)) differentRaw++;
-                // Includes zero scale, either axis, and arbitrary ring multipliers.
-                for (int h = 0; h < p; h++) for (int k = 0; k < p; k++) {
-                    var factor = new Pair(h, k);
-                    var oldScaled = original.times(factor, p);
-                    var newScaled = factor.times(actual, p);
-                    for (int target = 0; target <= 1; target++) {
-                        assertEquals(oldScaled.normalizeFirst(true, target, p), newScaled.normalizeFirst(true, target, p));
-                        assertEquals(oldScaled.normalizeFirst(false, target, p), newScaled.normalizeFirst(false, target, p));
-                    }
-                }
+                assertScaledObservations(original, actual, pairs, p);
             }
         }
         assertEquals(464, tuples);
         assertTrue(differentRaw > 0);
+    }
+
+    private static List<Pair> canonicalPairs(int p) {
+        var pairs = new ArrayList<Pair>();
+        for (int x = 0; x < p; x++) for (int y = 0; y < p; y++) pairs.add(new Pair(x, y));
+        return pairs;
+    }
+
+    private static void assertSelector(QuadraticRootSearch.Certificate root, List<Pair> pairs, boolean realFirst) {
+        var c = root.contract();
+        int p = c.modulus().intValueExact();
+        var selector = realFirst ? QuadraticRootNormalization.ParitySelector.realFirst()
+                : QuadraticRootNormalization.ParitySelector.imaginaryFirst();
+        var spec = normalizer(c.modulus(), selector);
+        var verified = QuadraticRootNormalization.verifyNormalized(c, spec,
+                new QuadraticRootNormalization.Certificate(root, spec), LIMITS, () -> false);
+        assertTrue(verified.valid(), verified.reason());
+        for (var pair : pairs) for (int target = 0; target <= 1; target++) {
+            assertEquals(pair.normalizeFirst(realFirst, target, p), pair.normalizeMask(selector.mask(), target, p));
+        }
+    }
+
+    private record Input(int a, int b, int g) {
+        Pair sourceRoot(int p) {
+            // Independent source oracle: select the branch by squaring its root, then form b/(2r).
+            var m = BigInteger.valueOf(p);
+            var delta = BigInteger.valueOf((long) (a + g) * ((p + 1) / 2)).mod(m);
+            var exponent = BigInteger.valueOf((p + 1) / 4);
+            var r = delta.modPow(exponent, m);
+            if (!r.multiply(r).mod(m).equals(delta)) {
+                delta = BigInteger.valueOf((long) (a - g) * ((p + 1) / 2)).mod(m);
+                r = delta.modPow(exponent, m);
+            }
+            var imaginary = BigInteger.valueOf(b).multiply(r.shiftLeft(1).modInverse(m)).mod(m);
+            return new Pair(r.intValueExact(), imaginary.intValueExact());
+        }
+
+        Pair candidateRoot(QuadraticRootEvaluation.Prepared prepared) {
+            var pair = prepared.evaluate(BigInteger.valueOf(a), BigInteger.valueOf(b), BigInteger.valueOf(g),
+                    LIMITS, () -> false).pair().orElseThrow();
+            return new Pair(pair.real().intValueExact(), pair.imaginary().intValueExact());
+        }
+    }
+
+    private static List<Input> nonrealNormInputs(int p) {
+        var inputs = new ArrayList<Input>();
+        for (int a = 0; a < p; a++) for (int b = 1; b < p; b++) for (int g = 0; g < p; g++) {
+            if (Math.floorMod(g * g - a * a - b * b, p) == 0) inputs.add(new Input(a, b, g));
+        }
+        return inputs;
+    }
+
+    private static void assertScaledObservations(Pair original, Pair actual, List<Pair> factors, int p) {
+        // Includes zero scale, either axis, and every ring multiplier.
+        for (var factor : factors) {
+            var oldScaled = original.times(factor, p);
+            var newScaled = factor.times(actual, p);
+            for (int target = 0; target <= 1; target++) {
+                assertEquals(oldScaled.normalizeFirst(true, target, p), newScaled.normalizeFirst(true, target, p));
+                assertEquals(oldScaled.normalizeFirst(false, target, p), newScaled.normalizeFirst(false, target, p));
+            }
+        }
     }
 
     @Test void changedSourcesModulusSelectorAndRawProofFailClosed() {
