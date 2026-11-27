@@ -7,6 +7,8 @@ import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.St
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier.Assignment;
 import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier.Matrix;
 import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -14,113 +16,202 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.BooleanSupplier;
 
-/** Bounded scalar-center discovery retaining every original inverse-domain obligation. */
+/** Bounded center discovery retaining every original inverse-domain obligation. */
 public final class RationalFormulaCenterSearch {
     private RationalFormulaCenterSearch() {}
 
     /** Cartesian grid, in supplied value order and ascending variable-id order. */
     public record Policy(List&lt;ExactRational&gt; values, int maximumCenters) {
-<span class="fc" id="L23">        public Policy {</span>
-<span class="fc" id="L24">            values = List.copyOf(values);</span>
-<span class="fc bfc" id="L25" title="All 4 branches covered.">            if (values.isEmpty() || maximumCenters &lt; 0) throw new IllegalArgumentException(&quot;INVALID_CENTER_POLICY&quot;);</span>
-<span class="fc" id="L26">        }</span>
+<span class="fc" id="L25">        public Policy {</span>
+<span class="fc" id="L26">            values = List.copyOf(values);</span>
+<span class="fc bfc" id="L27" title="All 4 branches covered.">            if (values.isEmpty() || maximumCenters &lt; 0) throw new IllegalArgumentException(&quot;INVALID_CENTER_POLICY&quot;);</span>
+<span class="fc" id="L28">        }</span>
 
         public static Policy defaults() {
-<span class="fc" id="L29">            return new Policy(List.of(ExactRational.ZERO, ExactRational.ONE, ExactRational.NEGATIVE_ONE,</span>
-<span class="fc" id="L30">                ExactRational.integer(2), ExactRational.integer(-2)), 256);</span>
+<span class="fc" id="L31">            return new Policy(List.of(ExactRational.ZERO, ExactRational.ONE, ExactRational.NEGATIVE_ONE,</span>
+<span class="fc" id="L32">                ExactRational.integer(2), ExactRational.integer(-2)), 256);</span>
+        }
+    }
+
+    /**
+     * Entry grids in supplied order/value order, ascending variable ids, then row-major entries.
+     * Exhausting this finite grid is inconclusive; it does not prove an empty common domain.
+     */
+    public record MatrixPolicy(List&lt;ExactRational&gt; values, List&lt;Integer&gt; orders, int maximumCenters) {
+<span class="fc" id="L41">        public MatrixPolicy {</span>
+<span class="fc" id="L42">            values = List.copyOf(values);</span>
+<span class="fc" id="L43">            orders = List.copyOf(orders);</span>
+<span class="fc bfc" id="L44" title="All 6 branches covered.">            if (values.isEmpty() || orders.isEmpty() || maximumCenters &lt; 0</span>
+<span class="fc bfc" id="L45" title="All 6 branches covered.">                || orders.stream().anyMatch(order -&gt; order &lt; 1) || new HashSet&lt;&gt;(orders).size() != orders.size())</span>
+<span class="fc" id="L46">                throw new IllegalArgumentException(&quot;INVALID_MATRIX_CENTER_POLICY&quot;);</span>
+<span class="fc" id="L47">        }</span>
+
+        public static MatrixPolicy defaults() {
+<span class="fc" id="L50">            return new MatrixPolicy(List.of(ExactRational.ZERO, ExactRational.ONE, ExactRational.NEGATIVE_ONE),</span>
+<span class="fc" id="L51">                List.of(1, 2), 256);</span>
         }
     }
 
     /** Evidence is an ordinary comparison certificate, independently replayable without this search. */
-<span class="fc" id="L35">    public record Result(Status status, Optional&lt;Assignment&gt; center, Optional&lt;Evidence&gt; evidence,</span>
+<span class="fc" id="L56">    public record Result(Status status, Optional&lt;Assignment&gt; center, Optional&lt;Evidence&gt; evidence,</span>
                          String reason, long work, int centersTried) {}
 
     public static Result compare(RationalFormula left, RationalFormula right, Policy policy,
                                  IterationLimits limits, BooleanSupplier cancelled) {
-<span class="fc" id="L40">        Objects.requireNonNull(left);</span>
-<span class="fc" id="L41">        Objects.requireNonNull(right);</span>
-<span class="fc" id="L42">        Objects.requireNonNull(policy);</span>
-<span class="fc" id="L43">        var work = new RationalFormulaWork(limits, cancelled);</span>
-<span class="fc" id="L44">        int tried = 0;</span>
+<span class="fc" id="L61">        Objects.requireNonNull(left);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(right);</span>
+<span class="fc" id="L63">        Objects.requireNonNull(policy);</span>
+<span class="fc" id="L64">        var work = new RationalFormulaWork(limits, cancelled);</span>
+<span class="fc" id="L65">        int tried = 0;</span>
         try {
-<span class="fc" id="L46">            work.ledger.charge(0);</span>
-<span class="fc" id="L47">            work.reserve(policy.values().size());</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">            for (var value : policy.values()) work.ledger.check(value);</span>
-<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (policy.maximumCenters() == 0) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
-<span class="fc" id="L50">            var variables = new TreeSet&lt;Integer&gt;();</span>
-<span class="fc" id="L51">            collect(left, variables, work, 1);</span>
-<span class="fc" id="L52">            collect(right, variables, work, 1);</span>
-<span class="fc" id="L53">            work.reserve(3L * variables.size());</span>
-<span class="fc" id="L54">            var ids = List.copyOf(variables);</span>
-<span class="fc" id="L55">            int[] digits = new int[ids.size()];</span>
-<span class="fc" id="L56">            var leftCertificate = RationalFormulaRealization.build(left, work);</span>
-<span class="fc" id="L57">            var rightCertificate = RationalFormulaRealization.build(right, work);</span>
+<span class="fc" id="L67">            work.ledger.charge(0);</span>
+<span class="fc" id="L68">            work.reserve(policy.values().size());</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (var value : policy.values()) work.ledger.check(value);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (policy.maximumCenters() == 0) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L71">            var variables = new TreeSet&lt;Integer&gt;();</span>
+<span class="fc" id="L72">            collect(left, variables, work, 1);</span>
+<span class="fc" id="L73">            collect(right, variables, work, 1);</span>
+<span class="fc" id="L74">            work.reserve(3L * variables.size());</span>
+<span class="fc" id="L75">            var ids = List.copyOf(variables);</span>
+<span class="fc" id="L76">            int[] digits = new int[ids.size()];</span>
+<span class="fc" id="L77">            var leftCertificate = RationalFormulaRealization.build(left, work);</span>
+<span class="fc" id="L78">            var rightCertificate = RationalFormulaRealization.build(right, work);</span>
             do {
-<span class="fc bfc" id="L59" title="All 2 branches covered.">                if (tried == policy.maximumCenters()) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
-<span class="fc" id="L60">                work.ledger.charge(1);</span>
-<span class="fc" id="L61">                work.reserve(5L * ids.size() + 2);</span>
-<span class="fc" id="L62">                var assignments = new TreeMap&lt;Integer, Matrix&gt;();</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">                for (int index = 0; index &lt; ids.size(); index++) {</span>
-<span class="fc" id="L64">                    work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(index + 1));</span>
-<span class="fc" id="L65">                    assignments.put(ids.get(index), new Matrix(1, List.of(policy.values().get(digits[index]))));</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (tried == policy.maximumCenters()) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L81">                work.ledger.charge(1);</span>
+<span class="fc" id="L82">                work.reserve(5L * ids.size() + 2);</span>
+<span class="fc" id="L83">                var assignments = new TreeMap&lt;Integer, Matrix&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                for (int index = 0; index &lt; ids.size(); index++) {</span>
+<span class="fc" id="L85">                    work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(index + 1));</span>
+<span class="fc" id="L86">                    assignments.put(ids.get(index), new Matrix(1, List.of(policy.values().get(digits[index]))));</span>
                 }
-<span class="fc" id="L67">                var center = new Assignment(1, assignments);</span>
-<span class="fc" id="L68">                tried++;</span>
-<span class="fc" id="L69">                var comparison = RationalFormulaComparison.comparePrepared(left, right, leftCertificate,</span>
+<span class="fc" id="L88">                var center = new Assignment(1, assignments);</span>
+<span class="fc" id="L89">                tried++;</span>
+<span class="fc" id="L90">                var comparison = RationalFormulaComparison.comparePrepared(left, right, leftCertificate,</span>
                     rightCertificate, center, work);
-<span class="fc bfc" id="L71" title="All 4 branches covered.">                if (comparison.status() == Status.EQUAL_ON_SHARED_DOMAIN || comparison.status() == Status.DISTINCT) {</span>
-<span class="fc" id="L72">                    work.ledger.charge(0);</span>
-<span class="fc" id="L73">                    return new Result(comparison.status(), Optional.of(center), comparison.evidence(), &quot;&quot;,</span>
-<span class="fc" id="L74">                        work.ledger.used(), tried);</span>
+<span class="fc bfc" id="L92" title="All 4 branches covered.">                if (comparison.status() == Status.EQUAL_ON_SHARED_DOMAIN || comparison.status() == Status.DISTINCT) {</span>
+<span class="fc" id="L93">                    work.ledger.charge(0);</span>
+<span class="fc" id="L94">                    return new Result(comparison.status(), Optional.of(center), comparison.evidence(), &quot;&quot;,</span>
+<span class="fc" id="L95">                        work.ledger.used(), tried);</span>
                 }
-<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (!&quot;UNDEFINED_SCALAR_CENTER&quot;.equals(comparison.reason()))</span>
-<span class="fc" id="L77">                    return open(comparison.reason(), work, tried);</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">            } while (advance(digits, policy.values().size(), work));</span>
-<span class="fc" id="L79">            return open(&quot;CENTER_GRID_EXHAUSTED&quot;, work, tried);</span>
-<span class="fc" id="L80">        } catch (CertificateWork.Stop stopped) {</span>
-<span class="fc" id="L81">            return open(stopped.getMessage(), work, tried);</span>
-<span class="nc" id="L82">        } catch (RationalFormulaVerifier.Rejected rejected) {</span>
-<span class="nc" id="L83">            return open(rejected.getMessage(), work, tried);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (!&quot;UNDEFINED_SCALAR_CENTER&quot;.equals(comparison.reason()))</span>
+<span class="fc" id="L98">                    return open(comparison.reason(), work, tried);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            } while (advance(digits, policy.values().size(), work));</span>
+<span class="fc" id="L100">            return open(&quot;CENTER_GRID_EXHAUSTED&quot;, work, tried);</span>
+<span class="fc" id="L101">        } catch (CertificateWork.Stop stopped) {</span>
+<span class="fc" id="L102">            return open(stopped.getMessage(), work, tried);</span>
+<span class="nc" id="L103">        } catch (RationalFormulaVerifier.Rejected rejected) {</span>
+<span class="nc" id="L104">            return open(rejected.getMessage(), work, tried);</span>
         }
     }
 
+    /** Search all requested matrix entry grids with one cumulative work and allocation ledger. */
+    public static Result compare(RationalFormula left, RationalFormula right, MatrixPolicy policy,
+                                 IterationLimits limits, BooleanSupplier cancelled) {
+<span class="fc" id="L111">        Objects.requireNonNull(left);</span>
+<span class="fc" id="L112">        Objects.requireNonNull(right);</span>
+<span class="fc" id="L113">        Objects.requireNonNull(policy);</span>
+<span class="fc" id="L114">        var work = new RationalFormulaWork(limits, cancelled);</span>
+<span class="fc" id="L115">        int tried = 0;</span>
+        try {
+<span class="fc" id="L117">            work.ledger.charge(0);</span>
+<span class="fc" id="L118">            work.reserve((long) policy.values().size() + policy.orders().size());</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            for (var value : policy.values()) work.ledger.check(value);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (policy.maximumCenters() == 0) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L121">            var variables = new TreeSet&lt;Integer&gt;();</span>
+<span class="fc" id="L122">            collect(left, variables, work, 1);</span>
+<span class="fc" id="L123">            collect(right, variables, work, 1);</span>
+<span class="fc" id="L124">            work.reserve(2L * variables.size());</span>
+<span class="fc" id="L125">            var ids = List.copyOf(variables);</span>
+<span class="fc" id="L126">            var leftCertificate = RationalFormulaRealization.build(left, work);</span>
+<span class="fc" id="L127">            var rightCertificate = RationalFormulaRealization.build(right, work);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            for (int order : policy.orders()) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                if (tried == policy.maximumCenters()) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L130">                long square = (long) order * order;</span>
+<span class="fc" id="L131">                work.ledger.cells(square);</span>
+<span class="fc" id="L132">                long digitCount = square * ids.size();</span>
+<span class="fc" id="L133">                work.reserve(digitCount);</span>
+<span class="fc" id="L134">                int[] digits = new int[(int) digitCount];</span>
+                do {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                    if (tried == policy.maximumCenters()) return open(&quot;CENTER_LIMIT&quot;, work, tried);</span>
+<span class="fc" id="L137">                    work.ledger.charge(1);</span>
+<span class="fc" id="L138">                    var center = matrixAssignment(order, ids, policy.values(), digits, work);</span>
+<span class="fc" id="L139">                    tried++;</span>
+<span class="fc" id="L140">                    var comparison = RationalFormulaComparison.comparePrepared(left, right, leftCertificate,</span>
+                        rightCertificate, center, work);
+<span class="fc bfc" id="L142" title="All 4 branches covered.">                    if (comparison.status() == Status.EQUAL_ON_SHARED_DOMAIN || comparison.status() == Status.DISTINCT) {</span>
+<span class="fc" id="L143">                        work.ledger.charge(0);</span>
+<span class="fc" id="L144">                        return new Result(comparison.status(), Optional.of(center), comparison.evidence(), &quot;&quot;,</span>
+<span class="fc" id="L145">                            work.ledger.used(), tried);</span>
+                    }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                    if (!&quot;UNDEFINED_SCALAR_CENTER&quot;.equals(comparison.reason())</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                        &amp;&amp; !&quot;UNDEFINED_MATRIX_CENTER&quot;.equals(comparison.reason()))</span>
+<span class="fc" id="L149">                        return open(comparison.reason(), work, tried);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                } while (advance(digits, policy.values().size(), work));</span>
+<span class="fc" id="L151">            }</span>
+<span class="fc" id="L152">            return open(&quot;CENTER_GRID_EXHAUSTED&quot;, work, tried);</span>
+<span class="fc" id="L153">        } catch (CertificateWork.Stop stopped) {</span>
+<span class="fc" id="L154">            return open(stopped.getMessage(), work, tried);</span>
+<span class="nc" id="L155">        } catch (RationalFormulaVerifier.Rejected rejected) {</span>
+<span class="nc" id="L156">            return open(rejected.getMessage(), work, tried);</span>
+        }
+    }
+
+    private static Assignment matrixAssignment(int order, List&lt;Integer&gt; ids, List&lt;ExactRational&gt; values,
+                                                int[] digits, RationalFormulaWork work) {
+<span class="fc" id="L162">        int square = order * order;</span>
+<span class="fc" id="L163">        work.reserve(4L * ids.size() + 2);</span>
+<span class="fc" id="L164">        var assignments = new TreeMap&lt;Integer, Matrix&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int index = 0; index &lt; ids.size(); index++) {</span>
+<span class="fc" id="L166">            work.reserve(2L * square);</span>
+<span class="fc" id="L167">            var entries = new ArrayList&lt;ExactRational&gt;(square);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (int entry = 0; entry &lt; square; entry++) {</span>
+<span class="fc" id="L169">                work.ledger.charge(1);</span>
+<span class="fc" id="L170">                entries.add(values.get(digits[index * square + entry]));</span>
+            }
+<span class="fc" id="L172">            work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(index + 1));</span>
+<span class="fc" id="L173">            assignments.put(ids.get(index), new Matrix(order, entries));</span>
+        }
+<span class="fc" id="L175">        return new Assignment(order, assignments);</span>
+    }
+
     private static Result open(String reason, RationalFormulaWork work, int tried) {
-<span class="fc" id="L88">        return new Result(Status.INCONCLUSIVE, Optional.empty(), Optional.empty(), reason, work.ledger.used(), tried);</span>
+<span class="fc" id="L179">        return new Result(Status.INCONCLUSIVE, Optional.empty(), Optional.empty(), reason, work.ledger.used(), tried);</span>
     }
 
     private static void collect(RationalFormula formula, TreeSet&lt;Integer&gt; variables,
                                 RationalFormulaWork work, int depth) {
-<span class="fc" id="L93">        work.enter(depth);</span>
-<span class="fc bfc" id="L94" title="All 5 branches covered.">        switch (formula) {</span>
-<span class="fc" id="L95">            case RationalFormula.Variable variable -&gt; {</span>
-<span class="fc" id="L96">                work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(variables.size() + 1));</span>
-<span class="fc" id="L97">                work.reserve(1);</span>
-<span class="fc" id="L98">                variables.add(variable.id());</span>
-<span class="fc" id="L99">            }</span>
-<span class="fc" id="L100">            case RationalFormula.Scalar scalar -&gt; work.ledger.check(scalar.value());</span>
-<span class="fc" id="L101">            case RationalFormula.Sum sum -&gt; {</span>
-<span class="fc" id="L102">                collect(sum.left(), variables, work, depth + 1);</span>
-<span class="fc" id="L103">                collect(sum.right(), variables, work, depth + 1);</span>
-<span class="fc" id="L104">            }</span>
-<span class="fc" id="L105">            case RationalFormula.Product product -&gt; {</span>
-<span class="fc" id="L106">                collect(product.left(), variables, work, depth + 1);</span>
-<span class="fc" id="L107">                collect(product.right(), variables, work, depth + 1);</span>
-<span class="fc" id="L108">            }</span>
-<span class="fc" id="L109">            case RationalFormula.Inverse inverse -&gt; collect(inverse.operand(), variables, work, depth + 1);</span>
+<span class="fc" id="L184">        work.enter(depth);</span>
+<span class="fc bfc" id="L185" title="All 5 branches covered.">        switch (formula) {</span>
+<span class="fc" id="L186">            case RationalFormula.Variable variable -&gt; {</span>
+<span class="fc" id="L187">                work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(variables.size() + 1));</span>
+<span class="fc" id="L188">                work.reserve(1);</span>
+<span class="fc" id="L189">                variables.add(variable.id());</span>
+<span class="fc" id="L190">            }</span>
+<span class="fc" id="L191">            case RationalFormula.Scalar scalar -&gt; work.ledger.check(scalar.value());</span>
+<span class="fc" id="L192">            case RationalFormula.Sum sum -&gt; {</span>
+<span class="fc" id="L193">                collect(sum.left(), variables, work, depth + 1);</span>
+<span class="fc" id="L194">                collect(sum.right(), variables, work, depth + 1);</span>
+<span class="fc" id="L195">            }</span>
+<span class="fc" id="L196">            case RationalFormula.Product product -&gt; {</span>
+<span class="fc" id="L197">                collect(product.left(), variables, work, depth + 1);</span>
+<span class="fc" id="L198">                collect(product.right(), variables, work, depth + 1);</span>
+<span class="fc" id="L199">            }</span>
+<span class="fc" id="L200">            case RationalFormula.Inverse inverse -&gt; collect(inverse.operand(), variables, work, depth + 1);</span>
         }
-<span class="fc" id="L111">    }</span>
+<span class="fc" id="L202">    }</span>
 
     /** Mixed-radix increment avoids constructing the potentially enormous grid cardinality. */
     private static boolean advance(int[] digits, int radix, RationalFormulaWork work) {
-<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int index = digits.length - 1; index &gt;= 0; index--) {</span>
-<span class="fc" id="L116">            work.ledger.charge(1);</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (digits[index] + 1 &lt; radix) {</span>
-<span class="fc" id="L118">                digits[index]++;</span>
-<span class="fc" id="L119">                return true;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (int index = digits.length - 1; index &gt;= 0; index--) {</span>
+<span class="fc" id="L207">            work.ledger.charge(1);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (digits[index] + 1 &lt; radix) {</span>
+<span class="fc" id="L209">                digits[index]++;</span>
+<span class="fc" id="L210">                return true;</span>
             }
-<span class="fc" id="L121">            digits[index] = 0;</span>
+<span class="fc" id="L212">            digits[index] = 0;</span>
         }
-<span class="fc" id="L123">        return false;</span>
+<span class="fc" id="L214">        return false;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

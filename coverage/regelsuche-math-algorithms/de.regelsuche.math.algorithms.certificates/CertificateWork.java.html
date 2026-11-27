@@ -96,7 +96,7 @@ public final class CertificateWork {
 <span class="fc" id="L96">        cells(retainedCells);</span>
 <span class="fc" id="L97">        var remaining = remainingLimits();</span>
 <span class="fc" id="L98">        long terms = Math.min(remaining.maximumTerms(), MAX_CELLS) - retainedCells;</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (terms &lt; 1) throw new Stop(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (terms &lt; 1) throw new Stop(&quot;TERM_LIMIT&quot;);</span>
 <span class="fc" id="L100">        return new IterationLimits(remaining.maximumWork(), (int) terms, remaining.timeoutMillis());</span>
     }
 

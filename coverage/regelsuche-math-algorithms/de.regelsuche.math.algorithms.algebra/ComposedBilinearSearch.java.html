@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComposedBilinearSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">ComposedBilinearSearch.java</span></div><h1>ComposedBilinearSearch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.ComposedBilinearChecks.need;
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/**
+ * Bounded acquisition and composition of exact bilinear and operator programs.
+ * Proposal slots count one acquisition call and each declared residual/spectral recipe across all stages.
+ * They do not count subsets internal to bilinear discovery; every such operation still shares work/time/space.
+ */
+public final class ComposedBilinearSearch {
+    private ComposedBilinearSearch() {}
+
+    public record Policy(OperatorResidualSearch.Policy residual, Optional&lt;SpectralBatchRepair.Policy&gt; spectral) {
+<span class="fc" id="L24">        public Policy { Objects.requireNonNull(residual); Objects.requireNonNull(spectral); }</span>
+        public static Policy residualOnly() {
+<span class="fc" id="L26">            return new Policy(OperatorResidualSearch.Policy.defaults(), Optional.empty());</span>
+        }
+        public static Policy defaults() {
+<span class="fc" id="L29">            return new Policy(OperatorResidualSearch.Policy.defaults(), Optional.of(SpectralBatchRepair.Policy.defaults()));</span>
+        }
+    }
+
+<span class="fc" id="L33">    public enum Stage { U, V, W }</span>
+<span class="fc" id="L34">    public enum Provider { RESIDUAL, SPECTRAL_BASIS, SPECTRAL }</span>
+
+    /** A cost, when present, is for this linear stage's complete batch. */
+    public record Proposal(String name, Optional&lt;Cost&gt; batchCost, String detail) {
+<span class="fc" id="L38">        public Proposal { Objects.requireNonNull(name); Objects.requireNonNull(batchCost); Objects.requireNonNull(detail); }</span>
+    }
+
+    public record Attempt(Stage stage, Provider provider, int proposalSlots, long work, Status status,
+                          String detail, List&lt;Proposal&gt; proposals, Optional&lt;Cost&gt; bestBatchCost) {
+<span class="fc" id="L43">        public Attempt { proposals = List.copyOf(proposals); Objects.requireNonNull(bestBatchCost); }</span>
+    }
+
+    /** Supplied seed verification is paid here; its earlier external discovery cost is not observable. */
+<span class="fc" id="L47">    public record Accounting(boolean suppliedSeed, long acquisitionWork, long compositionWork, int attemptedCandidates) {}</span>
+
+    /** VERIFIED means an exact executable procedure, not global optimality outside the finite policy. */
+    public record Discovery(BilinearProgram.Request request, ComposedBilinearPrepared prepared,
+                            Accounting accounting, List&lt;Attempt&gt; attempts) {
+<span class="fc" id="L52">        public Discovery { attempts = List.copyOf(attempts); }</span>
+    }
+
+    public static Result&lt;Discovery&gt; search(BilinearProgram.Request request,
+            BilinearProgram seed, int batchWidth, Policy policy, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L58">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L59">        Objects.requireNonNull(seed);</span>
+<span class="fc" id="L60">        validate(policy, maximumCandidates);</span>
+<span class="fc" id="L61">        return ComposedBilinearChecks.run(limits, cancel, checks -&gt; {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            need(batchWidth &gt; 0, &quot;INVALID_BATCH_WIDTH&quot;);</span>
+<span class="fc" id="L63">            checks.retain(checks.requestCells(request) + checks.programCells(seed) + policyCells(policy));</span>
+<span class="fc" id="L64">            request.checkInputs(checks.work);</span>
+<span class="fc" id="L65">            BilinearProgramVerifier.check(request, seed, checks.retained, checks.work);</span>
+<span class="fc" id="L66">            long acquisition = checks.work.used();</span>
+<span class="fc" id="L67">            return compose(request, seed, batchWidth, policy, new Slots(maximumCandidates),</span>
+                true, acquisition, checks);
+        });
+    }
+
+    public static Result&lt;Discovery&gt; discover(BilinearProgram.Tensor tensor,
+            int maximumProducts, int batchWidth, Policy policy, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L75">        Objects.requireNonNull(tensor);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (maximumProducts &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_PRODUCT_LIMIT&quot;);</span>
+<span class="fc" id="L77">        validate(policy, maximumCandidates);</span>
+<span class="fc" id="L78">        return ComposedBilinearChecks.run(limits, cancel, checks -&gt; {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            need(batchWidth &gt; 0, &quot;INVALID_BATCH_WIDTH&quot;);</span>
+<span class="fc" id="L80">            checks.retain(policyCells(policy));</span>
+<span class="fc" id="L81">            var slots = new Slots(maximumCandidates);</span>
+<span class="fc" id="L82">            slots.take(1, checks);</span>
+            // This package-level entry shares the very same CertificateWork, including its original deadline.
+<span class="fc" id="L84">            var acquired = BilinearFormDiscovery.discover(tensor, maximumProducts, checks.retained, checks.work);</span>
+<span class="fc" id="L85">            var request = acquired.request();</span>
+<span class="fc" id="L86">            var seed = acquired.witness().program();</span>
+<span class="fc" id="L87">            checks.retain(checks.requestCells(request) + checks.programCells(seed) + acquired.lowerBound().retainedCells());</span>
+<span class="fc" id="L88">            long acquisition = checks.work.used();</span>
+<span class="fc" id="L89">            return compose(request, seed, batchWidth, policy, slots, false, acquisition, checks);</span>
+        });
+    }
+
+    private static void validate(Policy policy, int maximumCandidates) {
+<span class="fc" id="L94">        Objects.requireNonNull(policy);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 0) throw new IllegalArgumentException(&quot;NEGATIVE_CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L96">    }</span>
+
+    private static long policyCells(Policy policy) {
+<span class="fc" id="L99">        return 8L + policy.residual().predictors().size() + policy.spectral().map(p -&gt; p.recipes().size()).orElse(0);</span>
+    }
+
+    private static Discovery compose(BilinearProgram.Request request, BilinearProgram seed, int batchWidth,
+            Policy policy, Slots slots, boolean supplied, long acquisition, ComposedBilinearChecks checks) {
+<span class="fc" id="L104">        var stages = new ArrayList&lt;ComposedBilinearPlan.Stage&gt;(3);</span>
+<span class="fc" id="L105">        var attempts = new ArrayList&lt;Attempt&gt;();</span>
+<span class="fc" id="L106">        checks.retain(16);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (!seed.u().isEmpty()) {</span>
+<span class="fc" id="L108">            var sources = List.of(seed.u(), seed.v(), seed.w());</span>
+<span class="fc" id="L109">            var names = Stage.values();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L111">                var source = checks.matrix(sources.get(i));</span>
+<span class="fc" id="L112">                var stage = select(names[i], source, batchWidth, policy, slots, attempts, checks);</span>
+<span class="fc" id="L113">                checks.retain(checks.stageCells(stage));</span>
+<span class="fc" id="L114">                stages.add(stage);</span>
+            }
+        }
+<span class="fc" id="L117">        var plan = new ComposedBilinearPlan(seed, batchWidth, stages);</span>
+        // Reconstruct from evidence, not the search's prepared handles or reported costs.
+<span class="fc" id="L119">        var prepared = ComposedBilinearVerifier.prepare(request, batchWidth, plan, checks);</span>
+<span class="fc" id="L120">        checks.work.charge(0);</span>
+<span class="fc" id="L121">        var accounting = new Accounting(supplied, acquisition, checks.work.used() - acquisition, slots.used);</span>
+<span class="fc" id="L122">        return new Discovery(request, prepared, accounting, attempts);</span>
+    }
+
+    private static ComposedBilinearPlan.Stage select(Stage name, PolynomialMatrix source, int batchWidth,
+            Policy policy, Slots slots, List&lt;Attempt&gt; attempts, ComposedBilinearChecks checks) {
+<span class="fc" id="L127">        int residualSlots = policy.residual().predictors().size();</span>
+<span class="fc" id="L128">        slots.take(residualSlots, checks);</span>
+<span class="fc" id="L129">        var residualResult = checks.child(limits -&gt; OperatorResidualSearch.discover(source, policy.residual(),</span>
+            residualSlots, limits, checks.cancelled));
+<span class="fc" id="L131">        var residual = checks.require(residualResult);</span>
+<span class="fc" id="L132">        var incumbent = residual.operator();</span>
+<span class="fc" id="L133">        var bestCost = ComposedBilinearChecks.scale(incumbent.cost(), batchWidth);</span>
+<span class="fc" id="L134">        ComposedBilinearPlan.Stage best = new ComposedBilinearPlan.Linear(incumbent.plan());</span>
+        // Include the incumbent while the independent spectral provider works alongside it.
+<span class="fc" id="L136">        checks.retain(8L * checks.linearCells(incumbent.plan()));</span>
+<span class="fc" id="L137">        checks.retain(12L + 6L * residual.candidates().size());</span>
+<span class="fc" id="L138">        var residualProposals = new ArrayList&lt;Proposal&gt;(residual.candidates().size());</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (var candidate : residual.candidates()) {</span>
+<span class="fc" id="L140">            checks.work.charge(1);</span>
+<span class="fc" id="L141">            residualProposals.add(new Proposal(candidate.predictor().name(),</span>
+<span class="fc" id="L142">                candidate.cost().map(cost -&gt; ComposedBilinearChecks.scale(cost, batchWidth)),</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                candidate.cost().isPresent() ? &quot;CHECKED&quot; : &quot;RESIDUAL_RANK_LIMIT&quot;));</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">        attempts.add(new Attempt(name, Provider.RESIDUAL, residualSlots, residualResult.work(), residualResult.status(),</span>
+<span class="fc" id="L146">            residualResult.detail(), residualProposals, Optional.of(bestCost)));</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (policy.spectral().isEmpty()) return best;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (source.rows() != source.columns()) {</span>
+<span class="fc" id="L149">            checks.retain(12);</span>
+<span class="fc" id="L150">            attempts.add(new Attempt(name, Provider.SPECTRAL_BASIS, 0, 0, Status.UNSUPPORTED,</span>
+<span class="fc" id="L151">                &quot;RECTANGULAR_STAGE&quot;, List.of(), Optional.empty()));</span>
+<span class="fc" id="L152">            return best;</span>
+        }
+
+<span class="fc" id="L155">        var derived = checks.child(limits -&gt; SpectralBatchRepair.deriveProblem(source, batchWidth, limits, checks.cancelled));</span>
+<span class="fc" id="L156">        checks.retain(12);</span>
+<span class="fc" id="L157">        attempts.add(new Attempt(name, Provider.SPECTRAL_BASIS, 0, derived.work(), derived.status(),</span>
+<span class="fc" id="L158">            derived.detail(), List.of(), Optional.empty()));</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (derived.status() == Status.UNSUPPORTED) return best;</span>
+<span class="fc" id="L160">        var problem = checks.require(derived);</span>
+<span class="fc" id="L161">        checks.retain(checks.problemCells(problem));</span>
+<span class="fc" id="L162">        var spectralPolicy = policy.spectral().orElseThrow();</span>
+<span class="fc" id="L163">        int spectralSlots = spectralPolicy.recipes().size();</span>
+<span class="fc" id="L164">        slots.take(spectralSlots, checks);</span>
+<span class="fc" id="L165">        var spectralResult = checks.child(limits -&gt; SpectralBatchRepair.discover(problem, spectralPolicy,</span>
+            spectralSlots, limits, checks.cancelled));
+<span class="fc" id="L167">        var spectral = checks.require(spectralResult);</span>
+<span class="fc" id="L168">        var candidate = spectral.operator();</span>
+<span class="fc" id="L169">        var proposed = new ComposedBilinearPlan.Spectral(candidate.problem(), candidate.certificate());</span>
+<span class="fc" id="L170">        checks.retain(candidate.retainedCells());</span>
+<span class="fc" id="L171">        checks.retain(12L + 6L * spectral.candidates().size());</span>
+<span class="fc" id="L172">        var spectralProposals = new ArrayList&lt;Proposal&gt;(spectral.candidates().size());</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (var trace : spectral.candidates()) {</span>
+<span class="fc" id="L174">            checks.work.charge(1);</span>
+<span class="fc" id="L175">            spectralProposals.add(new Proposal(trace.recipe(), trace.cost(), trace.detail()));</span>
+<span class="fc" id="L176">        }</span>
+<span class="fc" id="L177">        attempts.add(new Attempt(name, Provider.SPECTRAL, spectralSlots, spectralResult.work(), spectralResult.status(),</span>
+<span class="fc" id="L178">            spectralResult.detail(), spectralProposals, Optional.of(candidate.cost())));</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (candidate.cost().total() &lt; bestCost.total()) best = proposed;</span>
+<span class="fc" id="L180">        return best;</span>
+    }
+
+    private static final class Slots {
+        final int maximum;
+        int used;
+<span class="fc" id="L186">        Slots(int maximum) { this.maximum = maximum; }</span>
+        void take(int count, ComposedBilinearChecks checks) {
+<span class="fc" id="L188">            checks.work.charge(1);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (count &gt; maximum - used) throw new CertificateWork.Stop(&quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L190">            used += count;</span>
+<span class="fc" id="L191">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

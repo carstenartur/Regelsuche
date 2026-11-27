@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PreparedSpectralBatch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">PreparedSpectralBatch.java</span></div><h1>PreparedSpectralBatch.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+import static de.regelsuche.math.algorithms.algebra.OperatorChecks.need;
+import static de.regelsuche.math.algorithms.algebra.SpectralBatchMath.*;
+
+/**
+ * Immutable checked program; the repair branch transforms check rows, never all
+ * source outputs.
+ */
+public final class PreparedSpectralBatch {
+<span class="fc" id="L21">    public enum Kind {</span>
+<span class="fc" id="L22">        DIRECT, SPECTRAL_DIRECT, REPAIR</span>
+    }
+
+<span class="fc" id="L25">    public record CostBreakdown(Cost predictors, Cost checks, Cost forwardTransforms, Cost tables,</span>
+            Cost inverseTransforms, Cost lifts, Cost combination, int predictorApplications, int forwardRows,
+            int inverseRows) {
+        public Cost total() {
+<span class="fc" id="L29">            return predictors.plus(checks).plus(forwardTransforms).plus(tables)</span>
+<span class="fc" id="L30">                    .plus(inverseTransforms).plus(lifts).plus(combination);</span>
+        }
+    }
+
+    private final SpectralBatchRepair.Certificate certificate;
+    private final Kind kind;
+    private final List&lt;PreparedOperator.Node&gt; predictors;
+    private final PreparedOperator.Node h, ht, analysis, synthesis;
+    private final List&lt;PreparedOperator.Node&gt; tables;
+    private final List&lt;ExactRational&gt; signs;
+    private final CostBreakdown breakdown;
+    private final Cost directCost, spectralDirectCost;
+    private final long retainedCells;
+
+    private PreparedSpectralBatch(SpectralBatchRepair.Certificate certificate, Kind kind,
+            List&lt;PreparedOperator.Node&gt; predictors, PreparedOperator.Node h, PreparedOperator.Node ht,
+            PreparedOperator.Node analysis, PreparedOperator.Node synthesis, List&lt;PreparedOperator.Node&gt; tables,
+            List&lt;ExactRational&gt; signs, CostBreakdown breakdown, Cost directCost, Cost spectralDirectCost,
+<span class="fc" id="L48">            long retainedCells) {</span>
+<span class="fc" id="L49">        this.certificate = certificate;</span>
+<span class="fc" id="L50">        this.kind = kind;</span>
+<span class="fc" id="L51">        this.predictors = List.copyOf(predictors);</span>
+<span class="fc" id="L52">        this.h = h;</span>
+<span class="fc" id="L53">        this.ht = ht;</span>
+<span class="fc" id="L54">        this.analysis = analysis;</span>
+<span class="fc" id="L55">        this.synthesis = synthesis;</span>
+<span class="fc" id="L56">        this.tables = List.copyOf(tables);</span>
+<span class="fc" id="L57">        this.signs = List.copyOf(signs);</span>
+<span class="fc" id="L58">        this.breakdown = breakdown;</span>
+<span class="fc" id="L59">        this.directCost = directCost;</span>
+<span class="fc" id="L60">        this.spectralDirectCost = spectralDirectCost;</span>
+<span class="fc" id="L61">        this.retainedCells = retainedCells;</span>
+<span class="fc" id="L62">    }</span>
+
+    static PreparedSpectralBatch compile(SpectralBatchRepair.Certificate certificate,
+            SpectralBatchRepairVerifier.Checked checked, Kind kind, OperatorChecks c) {
+<span class="fc" id="L66">        var problem = certificate.problem();</span>
+<span class="fc" id="L67">        int n = problem.source().rows(), w = problem.batchWidth(), s = certificate.syndromeWidth();</span>
+<span class="fc" id="L68">        long retained = 32L * (3L * n * n + w + (long) w * n + 1);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (var expression : certificate.predictors()) {</span>
+<span class="fc" id="L70">            retained = Math.addExact(retained, expressionCells(expression, c));</span>
+<span class="fc" id="L71">            c.work.cells(retained);</span>
+<span class="fc" id="L72">        }</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (s &gt; 0)</span>
+<span class="fc" id="L74">            retained = Math.addExact(retained, 32L * (2L * s * w + (long) n * s * s + (long) n * w + w + 1));</span>
+<span class="fc" id="L75">        reserveRetained(retained, c);</span>
+<span class="fc" id="L76">        var source = PreparedOperator.compile(new ExactMatrixExpression.Matrix(&quot;source&quot;, problem.source()), c);</span>
+<span class="fc" id="L77">        var analysis = PreparedOperator.compile(new ExactMatrixExpression.Matrix(&quot;analysis&quot;, problem.inverse()), c);</span>
+<span class="fc" id="L78">        var synthesis = PreparedOperator.compile(new ExactMatrixExpression.Matrix(&quot;synthesis&quot;, problem.basis()), c);</span>
+<span class="fc" id="L79">        var d = PreparedOperator.compile(new ExactMatrixExpression.Matrix(&quot;spectrum&quot;, diagonal(checked.target(), c)),</span>
+                c);
+<span class="fc" id="L81">        var direct = scale(source.cost(), w);</span>
+<span class="fc" id="L82">        var spectralDirect = scale(analysis.cost().plus(d.cost()).plus(synthesis.cost()), w);</span>
+<span class="fc" id="L83">        c.reserve(w, 1);</span>
+<span class="fc" id="L84">        var programs = new ArrayList&lt;PreparedOperator.Node&gt;();</span>
+<span class="fc" id="L85">        var pc = ZERO_COST;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (var expression : certificate.predictors()) {</span>
+<span class="fc" id="L87">            var program = PreparedOperator.compile(expression, c);</span>
+<span class="fc" id="L88">            programs.add(program);</span>
+<span class="fc" id="L89">            pc = pc.plus(program.cost());</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (s == 0) {</span>
+<span class="fc" id="L92">            return new PreparedSpectralBatch(certificate, kind, programs, null, null, analysis, synthesis, List.of(),</span>
+<span class="fc" id="L93">                    checked.target(),</span>
+                    new CostBreakdown(pc, ZERO_COST, ZERO_COST, ZERO_COST, ZERO_COST, ZERO_COST, ZERO_COST, w, 0, 0),
+                    direct, spectralDirect, retained);
+        }
+<span class="fc" id="L97">        var h = PreparedOperator.compile(new ExactMatrixExpression.Matrix(&quot;checks&quot;, certificate.checks().orElseThrow()),</span>
+                c);
+<span class="fc" id="L99">        var ht = PreparedOperator</span>
+<span class="fc" id="L100">                .compile(new ExactMatrixExpression.Matrix(&quot;lift&quot;, transpose(certificate.checks().orElseThrow(), c)), c);</span>
+<span class="fc" id="L101">        c.reserve(n, 1);</span>
+<span class="fc" id="L102">        var tables = new ArrayList&lt;PreparedOperator.Node&gt;();</span>
+<span class="fc" id="L103">        var tc = ZERO_COST;</span>
+<span class="fc" id="L104">        int negatives = 0;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int nu = 0; nu &lt; n; nu++) {</span>
+<span class="fc" id="L106">            var table = PreparedOperator</span>
+<span class="fc" id="L107">                    .compile(new ExactMatrixExpression.Matrix(&quot;repair&quot;, certificate.frequencies().get(nu).repair()), c);</span>
+<span class="fc" id="L108">            tables.add(table);</span>
+<span class="fc" id="L109">            tc = tc.plus(table.cost());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (checked.target().get(nu).equals(ExactRational.NEGATIVE_ONE))</span>
+<span class="fc" id="L111">                negatives++;</span>
+        }
+<span class="fc" id="L113">        tc = tc.plus(new Cost((long) s * negatives, (long) s * n));</span>
+<span class="fc" id="L114">        var costs = new CostBreakdown(scale(pc, 4), scale(h.cost(), 2L * n), scale(analysis.cost(), 2L * s), tc,</span>
+<span class="fc" id="L115">                scale(synthesis.cost(), 2L * s), scale(ht.cost(), 2L * n), new Cost(2L * w * n, 3L * w * n), 4 * w,</span>
+                2 * s, 2 * s);
+<span class="fc" id="L117">        return new PreparedSpectralBatch(certificate, kind, programs, h, ht, analysis, synthesis, tables,</span>
+<span class="fc" id="L118">                checked.target(), costs, direct, spectralDirect, retained);</span>
+    }
+
+    private static long expressionCells(ExactMatrixExpression expression, OperatorChecks c) {
+<span class="fc" id="L122">        c.work.charge(1);</span>
+<span class="pc bpc" id="L123" title="2 of 5 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L124">            case ExactMatrixExpression.Matrix m -&gt;</span>
+<span class="fc" id="L125">                32L * (1L + m.value().rows() + (long) m.value().rows() * m.value().columns());</span>
+<span class="fc" id="L126">            case ExactMatrixExpression.Identity ignored -&gt; 32L;</span>
+<span class="fc" id="L127">            case ExactMatrixExpression.Product p -&gt;</span>
+<span class="fc" id="L128">                Math.addExact(32, Math.addExact(expressionCells(p.left(), c), expressionCells(p.right(), c)));</span>
+<span class="nc" id="L129">            case ExactMatrixExpression.Sum a -&gt;</span>
+<span class="nc" id="L130">                Math.addExact(32, Math.addExact(expressionCells(a.left(), c), expressionCells(a.right(), c)));</span>
+<span class="nc" id="L131">            default -&gt; throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
+        };
+    }
+
+    public SpectralBatchRepair.Problem problem() {
+<span class="fc" id="L136">        return certificate.problem();</span>
+    }
+
+    public SpectralBatchRepair.Certificate certificate() {
+<span class="fc" id="L140">        return certificate;</span>
+    }
+
+    public Kind kind() {
+<span class="fc" id="L144">        return kind;</span>
+    }
+
+    public Cost cost() {
+<span class="fc" id="L148">        return breakdown.total();</span>
+    }
+
+    public Cost directCost() {
+<span class="fc" id="L152">        return directCost;</span>
+    }
+
+    public Cost spectralDirectCost() {
+<span class="nc" id="L156">        return spectralDirectCost;</span>
+    }
+
+    public CostBreakdown costBreakdown() {
+<span class="fc" id="L160">        return breakdown;</span>
+    }
+
+    /**
+     * Conservative scalar/reference-cell bound for the retained certificate and
+     * compiled program.
+     */
+    public long retainedCells() {
+<span class="fc" id="L168">        return retainedCells;</span>
+    }
+
+    public Result&lt;List&lt;List&lt;ExactRational&gt;&gt;&gt; apply(List&lt;List&lt;ExactRational&gt;&gt; rows, IterationLimits limits,
+            BooleanSupplier cancel) {
+<span class="fc" id="L173">        var envelope = new CertificateWork(limits, cancel);</span>
+        try {
+<span class="fc" id="L175">            var result = OperatorChecks.run(envelope.remainingLimits(retainedCells), cancel, c -&gt; execute(rows, c));</span>
+<span class="fc" id="L176">            envelope.chargeCompleted(result.work());</span>
+<span class="fc" id="L177">            envelope.charge(0);</span>
+<span class="fc" id="L178">            return new Result&lt;&gt;(result.status(), result.detail(), result.value(), envelope.used());</span>
+<span class="fc" id="L179">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L180">            return new Result&lt;&gt;(Status.STOPPED, stop.getMessage(), Optional.empty(), envelope.used());</span>
+        }
+    }
+
+    private List&lt;List&lt;ExactRational&gt;&gt; execute(List&lt;List&lt;ExactRational&gt;&gt; rows, OperatorChecks c) {
+<span class="fc" id="L185">        int w = problem().batchWidth(), n = problem().source().rows(), s = certificate.syndromeWidth();</span>
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">        need(rows != null &amp;&amp; rows.size() == w, &quot;BATCH_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L187">        c.reserve(w, n);</span>
+<span class="fc" id="L188">        var input = new ExactRational[w][n];</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (int i = 0; i &lt; w; i++) {</span>
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">            need(rows.get(i) != null &amp;&amp; rows.get(i).size() == n, &quot;VECTOR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                need(rows.get(i).get(j) != null, &quot;MISSING_VECTOR_VALUE&quot;);</span>
+<span class="fc" id="L193">                input[i][j] = c.work.check(rows.get(i).get(j));</span>
+            }
+        }
+<span class="fc" id="L196">        var y = applyPredictors(input, c);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (s == 0)</span>
+<span class="fc" id="L198">            return snapshot(y, c);</span>
+<span class="fc" id="L199">        var u = applySame(analysis, mix(h, y, c), c);</span>
+<span class="fc" id="L200">        var v = applySame(analysis, mix(h, input, c), c);</span>
+<span class="fc" id="L201">        c.reserve(s, n);</span>
+<span class="fc" id="L202">        c.reserve(s, n);</span>
+<span class="fc" id="L203">        var a = new ExactRational[s][n];</span>
+<span class="fc" id="L204">        var b = new ExactRational[s][n];</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (int nu = 0; nu &lt; n; nu++) {</span>
+<span class="fc" id="L206">            c.reserve(s, 1);</span>
+<span class="fc" id="L207">            var r = new ExactRational[s];</span>
+<span class="fc" id="L208">            boolean positive = signs.get(nu).equals(ExactRational.ONE);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            for (int k = 0; k &lt; s; k++)</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                r[k] = positive ? c.work.sub(u[k][nu], v[k][nu]) : c.work.add(u[k][nu], v[k][nu]);</span>
+<span class="fc" id="L211">            var column = tables.get(nu).apply(r, c);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            for (int k = 0; k &lt; s; k++) {</span>
+<span class="fc" id="L213">                a[k][nu] = column[k];</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                b[k][nu] = positive ? column[k] : c.work.mul(ExactRational.NEGATIVE_ONE, column[k]);</span>
+            }
+        }
+<span class="fc" id="L217">        var z = mix(ht, applySame(synthesis, a, c), c);</span>
+<span class="fc" id="L218">        var fz = mix(ht, applySame(synthesis, b, c), c); // obtained from compressed checks, NOT an F application</span>
+<span class="fc" id="L219">        var p3 = applyPredictors(applyPredictors(y, c), c);</span>
+<span class="fc" id="L220">        var pz = applyPredictors(z, c);</span>
+<span class="fc" id="L221">        c.reserve(w, n);</span>
+<span class="fc" id="L222">        var out = new ExactRational[w][n];</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        for (int i = 0; i &lt; w; i++)</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L225">                var hermite = c.work.sub(c.work.mul(THREE_HALVES, y[i][j]), c.work.mul(HALF, p3[i][j]));</span>
+<span class="fc" id="L226">                out[i][j] = c.work.add(c.work.sub(hermite, pz[i][j]), fz[i][j]);</span>
+            }
+<span class="fc" id="L228">        return snapshot(out, c);</span>
+    }
+
+    private ExactRational[][] applyPredictors(ExactRational[][] input, OperatorChecks c) {
+<span class="fc" id="L232">        c.reserve(input.length, input[0].length);</span>
+<span class="fc" id="L233">        var out = new ExactRational[input.length][];</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        for (int i = 0; i &lt; input.length; i++)</span>
+<span class="fc" id="L235">            out[i] = predictors.get(i).apply(input[i], c);</span>
+<span class="fc" id="L236">        return out;</span>
+    }
+
+    private static ExactRational[][] applySame(PreparedOperator.Node program, ExactRational[][] input, OperatorChecks c) {
+<span class="fc" id="L240">        c.reserve(input.length, program.rows());</span>
+<span class="fc" id="L241">        var out = new ExactRational[input.length][];</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (int i = 0; i &lt; input.length; i++)</span>
+<span class="fc" id="L243">            out[i] = program.apply(input[i], c);</span>
+<span class="fc" id="L244">        return out;</span>
+    }
+
+    private static ExactRational[][] mix(PreparedOperator.Node program, ExactRational[][] input, OperatorChecks c) {
+<span class="fc" id="L248">        int n = input[0].length;</span>
+<span class="fc" id="L249">        c.reserve(program.rows(), n);</span>
+<span class="fc" id="L250">        var out = new ExactRational[program.rows()][n];</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (int nu = 0; nu &lt; n; nu++) {</span>
+<span class="fc" id="L252">            c.reserve(input.length, 1);</span>
+<span class="fc" id="L253">            var column = new ExactRational[input.length];</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (int i = 0; i &lt; input.length; i++)</span>
+<span class="fc" id="L255">                column[i] = input[i][nu];</span>
+<span class="fc" id="L256">            var mixed = program.apply(column, c);</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            for (int i = 0; i &lt; mixed.length; i++)</span>
+<span class="fc" id="L258">                out[i][nu] = mixed[i];</span>
+        }
+<span class="fc" id="L260">        return out;</span>
+    }
+
+    private static List&lt;List&lt;ExactRational&gt;&gt; snapshot(ExactRational[][] values, OperatorChecks c) {
+<span class="fc" id="L264">        c.reserve(values.length, values[0].length);</span>
+<span class="fc" id="L265">        var rows = new ArrayList&lt;List&lt;ExactRational&gt;&gt;();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (var row : values)</span>
+<span class="fc" id="L267">            rows.add(List.of(row));</span>
+<span class="fc" id="L268">        return List.copyOf(rows);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -103,10 +103,37 @@ mvn -pl regelsuche-optimization-sdk -am \
   -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
+## Vergleich am vorgegebenen gemeinsamen Matrixzentrum
+
+Die `Assignment`-Überladung von `RationalFormulaSdk.compare` unterstützt auch
+gemeinsame Matrixzentren höherer Ordnung. Der Kern verwendet jede Variable
+mit jeder Matrixeinheit als unabhängige Störungsrichtung. Ein separater
+Prüfer rekonstruiert die Invarianzbedingungen in Originalkoordinaten oder
+wertet den erzeugten Gegenzeugen an beiden ursprünglichen Formelbäumen aus.
+Der Gleichheitsbeleg gilt auf dem gemeinsamen ursprünglichen
+Definitionsbereich in allen Matrixordnungen. Eine zufällige Übereinstimmung
+an einem Zentrum oder eine Identität nur auf Matrizen fester Ordnung genügt
+nicht. Der [Beweis und die Gegenkontrollen](spectral-matrix-composition.md#1-formelvergleich-an-einem-matrixzentrum)
+erläutern diese Unterscheidung.
+
+`RationalFormulaCenterSearch.MatrixPolicy(values, orders, maximumCenters)`
+enumeriert Matrixeinträge aus einer endlichen Werteliste. Die entsprechende
+`compare`-Überladung sucht ohne vorgegebenes Zentrum. Alle erfolglosen
+Versuche, gespeicherten Tabellen und die Abschlussprüfung teilen denselben
+Etat. Die bisherige Skalarpolicy und ihre Statusgründe bleiben erhalten.
+
+Für $H=XY-YX$ ist $H^{-1}H$ an jedem Skalarpunkt undefiniert. Ein zulässiges
+Zentrum der Ordnung zwei erlaubt trotzdem den universellen Vergleich mit
+eins. Die begrenzte Matrixsuche findet ein solches Zentrum generisch.
+`CENTER_LIMIT` oder `CENTER_GRID_EXHAUSTED` bedeutet weiterhin
+`INCONCLUSIVE`, ohne Gleichheits- oder Ungleichheitsbeleg.
+Das [externe Java-Beispiel](../../examples/external-consumers/checked-math-java25/src/main/java/example/MatrixCenterIdentity.java)
+zeigt den Unterschied zum Skalarpfad und prüft beide Ergebnisarten erneut.
+
 ## Vergleich am vorgegebenen gemeinsamen Skalarpunkt
 
 `RationalFormulaSdk.compare(left, right, center, limits, token)` erwartet zwei
-rationale Formelquellen und eine `Assignment` der Ordnung eins. Alle benutzten
+rationale Formelquellen; dieser Abschnitt beschreibt eine `Assignment` der Ordnung eins. Alle benutzten
 Variablen brauchen einen rationalen Wert. Die beiden ursprünglichen Bäume
 müssen dort definiert sein. Der Algorithmus überprüft ihre Inversenvorkommen
 mit der konkreten Auswertung. Bei einem singulären Zentrum, einer fehlenden

@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComposedBilinearChecks.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">ComposedBilinearChecks.java</span></div><h1>ComposedBilinearChecks.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.certificates.CertificateWork;
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixAlgebra;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/** Shared parent account. Child work is posted before observing cancellation on return. */
+final class ComposedBilinearChecks {
+    final CertificateWork work;
+    final BooleanSupplier cancelled;
+    long retained;
+
+<span class="fc" id="L25">    private ComposedBilinearChecks(IterationLimits limits, BooleanSupplier cancelled) {</span>
+<span class="fc" id="L26">        this.work = new CertificateWork(limits, cancelled);</span>
+<span class="fc" id="L27">        this.cancelled = cancelled;</span>
+<span class="fc" id="L28">    }</span>
+
+    static &lt;T&gt; Result&lt;T&gt; run(IterationLimits limits, BooleanSupplier cancelled,
+                             Function&lt;ComposedBilinearChecks, T&gt; operation) {
+<span class="fc" id="L32">        var checks = new ComposedBilinearChecks(limits, cancelled);</span>
+        try {
+<span class="fc" id="L34">            checks.work.charge(0);</span>
+<span class="fc" id="L35">            T result = operation.apply(checks);</span>
+<span class="fc" id="L36">            checks.work.charge(0);</span>
+<span class="fc" id="L37">            return new Result&lt;&gt;(Status.VERIFIED, &quot;&quot;, Optional.of(result), checks.work.used());</span>
+<span class="fc" id="L38">        } catch (CertificateWork.Stop stop) {</span>
+<span class="fc" id="L39">            return new Result&lt;&gt;(Status.STOPPED, stop.getMessage(), Optional.empty(), checks.work.used());</span>
+<span class="fc" id="L40">        } catch (BilinearProgram.Rejection invalid) {</span>
+<span class="fc" id="L41">            return new Result&lt;&gt;(Status.INVALID, invalid.getMessage(), Optional.empty(), checks.work.used());</span>
+<span class="fc" id="L42">        } catch (Failure failure) {</span>
+<span class="fc" id="L43">            return new Result&lt;&gt;(failure.status, failure.getMessage(), Optional.empty(), checks.work.used());</span>
+        }
+    }
+
+    static final class Failure extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        final Status status;
+<span class="fc" id="L50">        Failure(Status status, String reason) { super(reason, null, false, false); this.status = status; }</span>
+    }
+
+    static void need(boolean condition, String reason) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (!condition) throw new Failure(Status.INVALID, reason);</span>
+<span class="fc" id="L55">    }</span>
+
+    void retain(long cells) {
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        if (cells &lt; 0 || cells &gt; Long.MAX_VALUE - retained) throw new CertificateWork.Stop(&quot;TERM_LIMIT&quot;);</span>
+<span class="fc" id="L59">        long next = retained + cells;</span>
+<span class="fc" id="L60">        work.cells(next);</span>
+<span class="fc" id="L61">        retained = next;</span>
+<span class="fc" id="L62">    }</span>
+
+    &lt;T&gt; Result&lt;T&gt; child(Function&lt;IterationLimits, Result&lt;T&gt;&gt; operation) {
+<span class="fc" id="L65">        var allowance = work.remainingLimits(retained);</span>
+<span class="fc" id="L66">        var result = operation.apply(allowance);</span>
+<span class="pc bpc" id="L67" title="3 of 6 branches missed.">        if (result == null || result.work() &lt; 0 || result.work() &gt; allowance.maximumWork())</span>
+<span class="nc" id="L68">            throw new IllegalStateException(&quot;INVALID_CHILD_WORK&quot;);</span>
+<span class="fc" id="L69">        work.chargeCompleted(result.work());</span>
+<span class="fc" id="L70">        work.charge(0);</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        if ((result.status() == Status.VERIFIED) != result.value().isPresent())</span>
+<span class="nc" id="L72">            throw new IllegalStateException(&quot;INVALID_CHILD_RESULT&quot;);</span>
+<span class="fc" id="L73">        return result;</span>
+    }
+
+    &lt;T&gt; T require(Result&lt;T&gt; result) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (result.status() != Status.VERIFIED) throw new Failure(result.status(), result.detail());</span>
+<span class="fc" id="L78">        return result.requireValue();</span>
+    }
+
+    long requestCells(BilinearProgram.Request request) {
+<span class="fc" id="L82">        return BilinearProgram.matrixCells(request.tensor().outputs())</span>
+<span class="fc" id="L83">            + BilinearProgram.matrixCells(request.leftForms()) + BilinearProgram.matrixCells(request.rightForms()) + 4;</span>
+    }
+
+    long programCells(BilinearProgram program) {
+<span class="fc" id="L87">        return BilinearProgram.matrixCells(program.u()) + BilinearProgram.matrixCells(program.v())</span>
+<span class="fc" id="L88">            + BilinearProgram.matrixCells(program.w()) + 4;</span>
+    }
+
+    long matrixCells(PolynomialMatrix matrix) {
+<span class="fc" id="L92">        work.charge(1);</span>
+<span class="fc" id="L93">        return (long) matrix.rows() * (matrix.columns() + 1L) + 1;</span>
+    }
+
+    /** A conservative scalar/reference bound, charging the complete source tree before compilation. */
+    long expressionCells(ExactMatrixExpression expression, int depth) {
+<span class="fc" id="L98">        work.charge(1);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (depth &gt; ExactMatrixAlgebra.MAX_DEPTH) throw new CertificateWork.Stop(&quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
+<span class="pc bpc" id="L100" title="3 of 5 branches missed.">        long result = switch (expression) {</span>
+<span class="fc" id="L101">            case ExactMatrixExpression.Matrix matrix -&gt; 2 + matrixCells(matrix.value());</span>
+<span class="fc" id="L102">            case ExactMatrixExpression.Identity ignored -&gt; 2;</span>
+<span class="nc" id="L103">            case ExactMatrixExpression.Product product -&gt; 2 + expressionCells(product.left(), depth + 1)</span>
+<span class="nc" id="L104">                + expressionCells(product.right(), depth + 1);</span>
+<span class="nc" id="L105">            case ExactMatrixExpression.Sum sum -&gt; 2 + expressionCells(sum.left(), depth + 1)</span>
+<span class="nc" id="L106">                + expressionCells(sum.right(), depth + 1);</span>
+<span class="nc" id="L107">            default -&gt; throw new Failure(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
+<span class="fc" id="L108">        };</span>
+<span class="fc" id="L109">        work.cells(retained + result);</span>
+<span class="fc" id="L110">        return result;</span>
+    }
+
+    long linearCells(OperatorResidualPlans.Plan plan) {
+<span class="fc" id="L114">        long cells = 4 + matrixCells(plan.source()) + expressionCells(plan.predictor(), 0);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (plan.correction().isPresent()) {</span>
+<span class="fc" id="L116">            var factors = plan.correction().orElseThrow();</span>
+<span class="fc" id="L117">            cells += 4 + matrixCells(factors.lift()) + matrixCells(factors.coordinates());</span>
+        }
+<span class="fc" id="L119">        work.cells(retained + cells);</span>
+<span class="fc" id="L120">        return cells;</span>
+    }
+
+    long problemCells(SpectralBatchRepair.Problem problem) {
+<span class="fc" id="L124">        return 4 + matrixCells(problem.source()) + matrixCells(problem.basis()) + matrixCells(problem.inverse());</span>
+    }
+
+    long spectralCells(ComposedBilinearPlan.Spectral stage) {
+<span class="fc" id="L128">        var certificate = stage.certificate();</span>
+<span class="fc" id="L129">        long cells = 8 + problemCells(stage.problem()) + problemCells(certificate.problem());</span>
+<span class="fc" id="L130">        cells += certificate.predictors().size() + (long) certificate.nodes().size() + certificate.frequencies().size();</span>
+<span class="fc" id="L131">        work.cells(retained + cells);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (var predictor : certificate.predictors()) {</span>
+<span class="fc" id="L133">            cells += expressionCells(predictor, 0);</span>
+<span class="fc" id="L134">            work.cells(retained + cells);</span>
+<span class="fc" id="L135">        }</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (certificate.checks().isPresent()) cells += matrixCells(certificate.checks().orElseThrow());</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (var frequency : certificate.frequencies()) {</span>
+<span class="fc" id="L138">            work.charge(1);</span>
+<span class="fc" id="L139">            cells += 2L + frequency.support().size() + matrixCells(frequency.repair());</span>
+<span class="fc" id="L140">            work.cells(retained + cells);</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">        return cells;</span>
+    }
+
+    long stageCells(ComposedBilinearPlan.Stage stage) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        return switch (stage) {</span>
+<span class="fc" id="L147">            case ComposedBilinearPlan.Linear linear -&gt; linearCells(linear.plan());</span>
+<span class="fc" id="L148">            case ComposedBilinearPlan.Spectral spectral -&gt; spectralCells(spectral);</span>
+        };
+    }
+
+    PolynomialMatrix matrix(List&lt;List&lt;ExactRational&gt;&gt; source) {
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">        need(!source.isEmpty() &amp;&amp; !source.getFirst().isEmpty(), &quot;EMPTY_OPERATOR_STAGE&quot;);</span>
+<span class="fc" id="L154">        int rows = source.size();</span>
+<span class="fc" id="L155">        int columns = source.getFirst().size();</span>
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">        if (rows &gt; ExactMatrixAlgebra.MAX_DIMENSION || columns &gt; ExactMatrixAlgebra.MAX_DIMENSION)</span>
+<span class="nc" id="L157">            throw new CertificateWork.Stop(&quot;MATRIX_DIMENSION_LIMIT&quot;);</span>
+<span class="fc" id="L158">        retain(2L * rows * (columns + 1L) + 2);</span>
+<span class="fc" id="L159">        var entries = new ArrayList&lt;List&lt;Polynomial&gt;&gt;(rows);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (var row : source) {</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            need(row.size() == columns, &quot;PROGRAM_SHAPE&quot;);</span>
+<span class="fc" id="L162">            work.charge(1);</span>
+<span class="fc" id="L163">            var values = new ArrayList&lt;Polynomial&gt;(columns);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            for (var value : row) values.add(Polynomial.constant(Rational.fromExact(work.check(value))));</span>
+<span class="fc" id="L165">            entries.add(List.copyOf(values));</span>
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">        return new PolynomialMatrix(entries);</span>
+    }
+
+    static OperatorResidualPlans.Cost scale(OperatorResidualPlans.Cost cost, int batchWidth) {
+<span class="fc" id="L171">        return new OperatorResidualPlans.Cost(Math.multiplyExact(cost.multiplies(), batchWidth),</span>
+<span class="fc" id="L172">            Math.multiplyExact(cost.additions(), batchWidth));</span>
+    }
+
+    static ComposedBilinearPlan.Cost scale(BilinearProgram.Cost cost, int batchWidth) {
+<span class="fc" id="L176">        return new ComposedBilinearPlan.Cost(Math.multiplyExact(cost.variableMultiplications(), batchWidth),</span>
+<span class="fc" id="L177">            Math.multiplyExact(cost.constantMultiplications(), batchWidth), Math.multiplyExact(cost.additions(), batchWidth));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComposedBilinearVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">ComposedBilinearVerifier.java</span></div><h1>ComposedBilinearVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.ComposedBilinearChecks.need;
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.Result;
+
+/** Independently expands the source tensor and rechecks every stage against U, V or W. */
+public final class ComposedBilinearVerifier {
+    private ComposedBilinearVerifier() {}
+
+    /** No claimed cost, predictor label or acquisition history is trusted. */
+    public static Result&lt;ComposedBilinearPlan.Cost&gt; verify(BilinearProgram.Request request,
+            int batchWidth, ComposedBilinearPlan plan, IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L20">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L21">        return ComposedBilinearChecks.run(limits, cancel, checks -&gt; prepare(request, batchWidth, plan, checks).cost());</span>
+    }
+
+    public static Result&lt;ComposedBilinearPrepared&gt; prepare(BilinearProgram.Request request,
+            int batchWidth, ComposedBilinearPlan plan, IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L26">        Objects.requireNonNull(request);</span>
+<span class="fc" id="L27">        return ComposedBilinearChecks.run(limits, cancel, checks -&gt; prepare(request, batchWidth, plan, checks));</span>
+    }
+
+    static ComposedBilinearPrepared prepare(BilinearProgram.Request request, int batchWidth,
+            ComposedBilinearPlan plan, ComposedBilinearChecks checks) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        need(plan != null, &quot;MISSING_COMPOSED_PLAN&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 4 branches missed.">        need(batchWidth &gt; 0 &amp;&amp; batchWidth == plan.batchWidth(), &quot;BATCH_WIDTH_MISMATCH&quot;);</span>
+<span class="fc" id="L34">        int rank = plan.program().u().size();</span>
+<span class="pc bpc" id="L35" title="1 of 4 branches missed.">        need(plan.stages().size() == (rank == 0 ? 0 : 3), &quot;STAGE_COUNT_MISMATCH&quot;);</span>
+<span class="fc" id="L36">        long retainedBefore = checks.retained;</span>
+<span class="fc" id="L37">        checks.retain(checks.requestCells(request) + checks.programCells(plan.program()) + 8);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (var stage : plan.stages()) checks.retain(checks.stageCells(stage));</span>
+<span class="fc" id="L39">        request.checkInputs(checks.work);</span>
+<span class="fc" id="L40">        var direct = BilinearProgramVerifier.check(request, plan.program(), checks.retained, checks.work);</span>
+<span class="fc" id="L41">        var directCost = ComposedBilinearChecks.scale(direct, batchWidth);</span>
+<span class="fc" id="L42">        var cost = new ComposedBilinearPlan.Cost((long) rank * batchWidth, 0, 0);</span>
+<span class="fc" id="L43">        var executors = new ArrayList&lt;ComposedBilinearPrepared.ExecutableStage&gt;(plan.stages().size());</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (rank != 0) {</span>
+<span class="fc" id="L45">            var matrices = List.of(plan.program().u(), plan.program().v(), plan.program().w());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L47">                PolynomialMatrix expected = checks.matrix(matrices.get(i));</span>
+<span class="fc" id="L48">                var stage = plan.stages().get(i);</span>
+                ComposedBilinearPrepared.ExecutableStage executable;
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                if (stage instanceof ComposedBilinearPlan.Linear linear) {</span>
+<span class="fc" id="L51">                    var compiled = checks.require(checks.child(limits -&gt; OperatorResidualSearch.prepare(expected,</span>
+<span class="fc" id="L52">                        linear.plan(), limits, checks.cancelled)));</span>
+                    // The compiler retains sparse (column, coefficient) entries and its source tree.
+<span class="fc" id="L54">                    checks.retain(8L * checks.linearCells(linear.plan()));</span>
+<span class="fc" id="L55">                    executable = new ComposedBilinearPrepared.LinearStage(compiled);</span>
+<span class="fc" id="L56">                } else {</span>
+<span class="fc" id="L57">                    var spectral = (ComposedBilinearPlan.Spectral) stage;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                    need(spectral.problem().batchWidth() == batchWidth, &quot;BATCH_WIDTH_MISMATCH&quot;);</span>
+<span class="fc" id="L59">                    checks.work.charge((long) expected.rows() * expected.columns());</span>
+<span class="fc" id="L60">                    need(expected.equals(spectral.problem().source()), &quot;STAGE_SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L61">                    var problem = new SpectralBatchRepair.Problem(expected, spectral.problem().basis(),</span>
+<span class="fc" id="L62">                        spectral.problem().inverse(), batchWidth);</span>
+                    // Preparation invokes the independent spectral checker, including the original source binding.
+<span class="fc" id="L64">                    var compiled = checks.require(checks.child(limits -&gt; SpectralBatchRepair.prepare(problem,</span>
+<span class="fc" id="L65">                        spectral.certificate(), limits, checks.cancelled)));</span>
+<span class="fc" id="L66">                    checks.retain(compiled.retainedCells());</span>
+<span class="fc" id="L67">                    executable = new ComposedBilinearPrepared.SpectralStage(compiled);</span>
+                }
+<span class="fc" id="L69">                cost = cost.plus(executable.batchCost(batchWidth));</span>
+<span class="fc" id="L70">                executors.add(executable);</span>
+            }
+        }
+<span class="fc" id="L73">        checks.work.charge(0);</span>
+<span class="fc" id="L74">        return ComposedBilinearPrepared.checked(plan, request.tensor(), executors, cost, directCost,</span>
+            checks.retained - retainedBefore);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

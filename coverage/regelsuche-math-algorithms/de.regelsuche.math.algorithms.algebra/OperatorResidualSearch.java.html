@@ -74,8 +74,8 @@ public final class OperatorResidualSearch {
     public static Result&lt;PreparedOperator&gt; prepare(PolynomialMatrix source, Plan plan, IterationLimits limits,
                                                    BooleanSupplier cancelled) {
 <span class="fc" id="L76">        Objects.requireNonNull(plan);</span>
-<span class="pc" id="L77">        return OperatorChecks.run(limits, cancelled, checks -&gt; PreparedOperator.create(source, plan,</span>
-<span class="pc" id="L78">            Predictor.SUPPLIED, plan.correction().map(f -&gt; f.lift().columns()).orElse(0), null, checks));</span>
+<span class="fc" id="L77">        return OperatorChecks.run(limits, cancelled, checks -&gt; PreparedOperator.create(source, plan,</span>
+<span class="fc" id="L78">            Predictor.SUPPLIED, plan.correction().map(f -&gt; f.lift().columns()).orElse(0), null, checks));</span>
     }
 
     private static ExactMatrixExpression predictor(PolynomialMatrix source, Predictor kind, OperatorChecks checks) {

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RationalFormulaMatrixComparison.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.noncommutative</a> &gt; <span class="el_source">RationalFormulaMatrixComparison.java</span></div><h1>RationalFormulaMatrixComparison.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.noncommutative;
+
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Binding;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Evidence;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Invariant;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Span;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaComparison.Witness;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier.Assignment;
+import de.regelsuche.math.algorithms.noncommutative.RationalFormulaVerifier.Matrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.TreeMap;
+
+import static de.regelsuche.scalar.ExactRational.ONE;
+import static de.regelsuche.scalar.ExactRational.ZERO;
+
+/** Matrix-center reachability; certificates are checked in unnormalized source coordinates. */
+final class RationalFormulaMatrixComparison {
+    private RationalFormulaMatrixComparison() {}
+
+    /** Applying a coefficient prepends its matrix-unit letter to the parent's word. */
+<span class="fc" id="L25">    private record Path(int variable, int row, int column, Path suffix, int length) {}</span>
+<span class="fc" id="L26">    private record Reachable(ExactRational[] column, Path path) {}</span>
+
+    static Evidence search(Binding binding, RationalFormulaWork work) {
+<span class="fc" id="L29">        var pencil = new MatrixCenteredDifferencePencil(binding, work);</span>
+<span class="fc" id="L30">        var inverse = pencil.inverseCenter();</span>
+<span class="fc" id="L31">        var span = new Span(pencil.order, work);</span>
+<span class="fc" id="L32">        var queue = new ArrayDeque&lt;Reachable&gt;();</span>
+<span class="fc" id="L33">        var columns = new ArrayList&lt;List&lt;ExactRational&gt;&gt;();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        for (int input = 0; input &lt; pencil.centerOrder; input++) {</span>
+<span class="fc" id="L35">            var initial = pencil.apply(inverse, pencil.input(input));</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">            if (span.insert(initial)) {</span>
+<span class="fc" id="L37">                work.reserve(2);</span>
+<span class="fc" id="L38">                queue.add(new Reachable(initial, null));</span>
+            }
+        }
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        while (!queue.isEmpty()) {</span>
+<span class="fc" id="L42">            var state = queue.remove();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!pencil.outputIsZero(state.column()))</span>
+<span class="fc" id="L44">                return new Witness(binding, point(binding.center(), state.path(), work));</span>
+<span class="fc" id="L45">            work.reserve(pencil.order + 1L);</span>
+<span class="fc" id="L46">            columns.add(List.of(state.column()));</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            for (int variable : pencil.variables()) {</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">                for (int a = 0; a &lt; pencil.centerOrder; a++) for (int b = 0; b &lt; pencil.centerOrder; b++) {</span>
+<span class="fc" id="L49">                    var next = pencil.apply(inverse, pencil.negativeCoefficient(variable, a, b, state.column()));</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                    if (span.insert(next)) {</span>
+<span class="fc" id="L51">                        work.reserve(8);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                        var path = new Path(variable, a, b, state.path(), state.path() == null ? 1 : state.path().length() + 1);</span>
+<span class="fc" id="L53">                        queue.add(new Reachable(next, path));</span>
+                    }
+                }
+<span class="fc" id="L56">            }</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        work.reserve((long) columns.size() * (pencil.order + 1));</span>
+<span class="fc" id="L59">        return new Invariant(binding, columns);</span>
+    }
+
+    /**
+     * Rebuild K, U, V and the full alphabet from the checked sources. No search inverse is used.
+     * im(V) subset im(KB), D_t im(B) subset im(KB), and UB=0 imply invariance at every
+     * ampliation of this center. Direct sums of m copies transfer equality to arbitrary sizes.
+     */
+    static boolean verify(Binding binding, List&lt;List&lt;ExactRational&gt;&gt; columns, RationalFormulaWork work) {
+<span class="fc" id="L68">        var pencil = new MatrixCenteredDifferencePencil(binding, work);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (columns.size() &gt; pencil.order) return false;</span>
+<span class="fc" id="L70">        var images = new Span(pencil.order, work);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (var column : columns) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (column.size() != pencil.order) return false;</span>
+<span class="fc" id="L73">            work.reserve(column.size());</span>
+<span class="fc" id="L74">            var values = column.toArray(ExactRational[]::new);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            for (var value : values) work.ledger.check(value);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (!pencil.outputIsZero(values)) return false;</span>
+<span class="fc" id="L77">            images.insert(pencil.applyCenter(values));</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (int input = 0; input &lt; pencil.centerOrder; input++)</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (!images.contains(pencil.input(input))) return false;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (var column : columns) {</span>
+<span class="fc" id="L82">            work.reserve(column.size());</span>
+<span class="fc" id="L83">            var values = column.toArray(ExactRational[]::new);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            for (int variable : pencil.variables()) {</span>
+<span class="fc bfc" id="L85" title="All 4 branches covered.">                for (int a = 0; a &lt; pencil.centerOrder; a++) for (int b = 0; b &lt; pencil.centerOrder; b++) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                    if (!images.contains(pencil.negativeCoefficient(variable, a, b, values))) return false;</span>
+                }
+<span class="fc" id="L88">            }</span>
+<span class="fc" id="L89">        }</span>
+<span class="fc" id="L90">        return true;</span>
+    }
+
+    /** Repeated center diagonal blocks keep every original inverse defined; replay checks the result. */
+    private static Assignment point(Assignment center, Path word, RationalFormulaWork work) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (word == null) return center;</span>
+<span class="fc" id="L96">        int blocks = word.length() + 1;</span>
+<span class="fc" id="L97">        long expandedOrder = (long) center.order() * blocks;</span>
+<span class="fc" id="L98">        work.ledger.cells(expandedOrder);</span>
+<span class="fc" id="L99">        int size = (int) expandedOrder;</span>
+<span class="fc" id="L100">        var variables = new TreeMap&lt;Integer, Matrix&gt;();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (var entry : center.variables().entrySet()) {</span>
+<span class="fc" id="L102">            work.reserve(2L * size * size + 2);</span>
+<span class="fc" id="L103">            var values = new ExactRational[size * size];</span>
+<span class="fc" id="L104">            Arrays.fill(values, ZERO);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (int block = 0; block &lt; blocks; block++) {</span>
+<span class="fc bfc" id="L106" title="All 4 branches covered.">                for (int a = 0; a &lt; center.order(); a++) for (int b = 0; b &lt; center.order(); b++) {</span>
+<span class="fc" id="L107">                    work.ledger.charge(1);</span>
+<span class="fc" id="L108">                    values[(block * center.order() + a) * size + block * center.order() + b] =</span>
+<span class="fc" id="L109">                        entry.getValue().entries().get(a * center.order() + b);</span>
+                }
+            }
+<span class="fc" id="L112">            int block = 0;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            for (var path = word; path != null; path = path.suffix(), block++) {</span>
+<span class="fc" id="L114">                work.ledger.charge(1);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                if (path.variable() == entry.getKey())</span>
+<span class="fc" id="L116">                    values[(block * center.order() + path.row()) * size</span>
+<span class="fc" id="L117">                        + (block + 1) * center.order() + path.column()] = ONE;</span>
+            }
+<span class="fc" id="L119">            work.ledger.charge(1L + Integer.SIZE - Integer.numberOfLeadingZeros(variables.size() + 1));</span>
+<span class="fc" id="L120">            variables.put(entry.getKey(), new Matrix(size, Arrays.asList(values)));</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return new Assignment(size, variables);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

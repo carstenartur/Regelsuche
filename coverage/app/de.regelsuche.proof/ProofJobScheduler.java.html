@@ -428,8 +428,8 @@ public final class ProofJobScheduler implements AutoCloseable {
     public void close() {
 <span class="fc" id="L429">        synchronized (this) {</span>
 <span class="fc" id="L430">            closing = true;</span>
-<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (activeAttempt != null) {</span>
-<span class="fc" id="L432">                jobRepository.findById(activeAttempt.job.id()).ifPresent(job -&gt; requestStop(job, &quot;SCHEDULER_SHUTDOWN&quot;));</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            if (activeAttempt != null) {</span>
+<span class="nc" id="L432">                jobRepository.findById(activeAttempt.job.id()).ifPresent(job -&gt; requestStop(job, &quot;SCHEDULER_SHUTDOWN&quot;));</span>
             }
 <span class="fc" id="L434">        }</span>
 <span class="fc" id="L435">        scheduler.shutdownNow();</span>

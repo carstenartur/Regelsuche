@@ -20,7 +20,7 @@ Vertex `a` belongs to Max, vertex `b` to Min. Edges, in order, are `a -> b` with
 
 Core entry points are `EnergyGame.solve` and `EnergyGameVerifier.verify`; the SDK delegates through `EnergyGameSdk.solve` and `EnergyGameSdk.verify`. Use an explicit `OptimizationBudget`. Work, wall time, cancellation, interruption, retained cells and 65,536-bit numeric growth are guarded. Runtime can depend on the credit bound; there is no quasipolynomial-time implementation or performance claim.
 
-The [complete Java example](../../examples/external-consumers/checked-math-java25/src/main/java/example/EnergyCredits.java) prints credits `2`, `0` and selected Max edge `0`. Build and run it through the [standalone Maven consumer](../../examples/external-consumers/checked-math-java25/README.md); `mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify` runs all seven examples after the source SDK has been installed. The published 0.5.3 SDK does not contain this API.
+The [complete Java example](../../examples/external-consumers/checked-math-java25/src/main/java/example/EnergyCredits.java) prints credits `2`, `0` and selected Max edge `0`. Build and run it through the [standalone Maven consumer](../../examples/external-consumers/checked-math-java25/README.md); `mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify` runs all ten examples after the source SDK has been installed. The published 0.5.3 SDK does not contain this API.
 
 ## Evidence
 

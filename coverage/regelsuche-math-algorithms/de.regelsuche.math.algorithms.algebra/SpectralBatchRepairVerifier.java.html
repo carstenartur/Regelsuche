@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SpectralBatchRepairVerifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">SpectralBatchRepairVerifier.java</span></div><h1>SpectralBatchRepairVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+import static de.regelsuche.math.algorithms.algebra.OperatorChecks.need;
+import static de.regelsuche.math.algorithms.algebra.SpectralBatchMath.*;
+
+/**
+ * Independently checks spectral supports and finite syndrome identities; never
+ * constructs a table.
+ */
+public final class SpectralBatchRepairVerifier {
+    private SpectralBatchRepairVerifier() {}
+
+    public static Result&lt;Cost&gt; verify(SpectralBatchRepair.Problem expected, SpectralBatchRepair.Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L23">        return OperatorChecks.run(limits, cancel, c -&gt; {</span>
+<span class="fc" id="L24">            var checked = check(expected, certificate, c);</span>
+<span class="fc" id="L25">            return PreparedSpectralBatch.compile(certificate, checked, PreparedSpectralBatch.Kind.REPAIR, c).cost();</span>
+        });
+    }
+
+<span class="fc" id="L29">    record Checked(List&lt;ExactRational&gt; target) {}</span>
+
+    static Checked check(SpectralBatchRepair.Problem expected, SpectralBatchRepair.Certificate certificate,
+            OperatorChecks c) {
+<span class="fc" id="L33">        checkSourceBinding(expected, certificate, c);</span>
+<span class="fc" id="L34">        var z = target(expected, c);</span>
+<span class="fc" id="L35">        int n = expected.source().rows(), width = expected.batchWidth(), s = certificate.syndromeWidth();</span>
+<span class="fc" id="L36">        var p = predictorSpectra(expected, certificate, n, width, s, c);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (s == 0) {</span>
+<span class="fc" id="L38">            checkExactPredictions(certificate, p, z, c);</span>
+<span class="fc" id="L39">            return new Checked(z);</span>
+        }
+<span class="fc" id="L41">        var h = checkSyndromeMatrix(certificate, width, s, c);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        need(certificate.frequencies().size() == n, &quot;FREQUENCY_COUNT_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (int nu = 0; nu &lt; n; nu++)</span>
+<span class="fc" id="L44">            checkFrequencyRepair(certificate.frequencies().get(nu), p, z.get(nu), h, nu, c);</span>
+<span class="fc" id="L45">        return new Checked(z);</span>
+    }
+
+    private static void checkSourceBinding(SpectralBatchRepair.Problem expected,
+            SpectralBatchRepair.Certificate certificate, OperatorChecks c) {
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        need(expected != null &amp;&amp; certificate != null, &quot;MISSING_SPECTRAL_EVIDENCE&quot;);</span>
+<span class="fc" id="L51">        c.input(expected.source());</span>
+<span class="fc" id="L52">        c.input(expected.basis());</span>
+<span class="fc" id="L53">        c.input(expected.inverse());</span>
+<span class="fc" id="L54">        c.input(certificate.problem().source());</span>
+<span class="fc" id="L55">        c.input(certificate.problem().basis());</span>
+<span class="fc" id="L56">        c.input(certificate.problem().inverse());</span>
+<span class="fc" id="L57">        need(expected.equals(certificate.problem()), &quot;SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L58">    }</span>
+
+    private static List&lt;List&lt;ExactRational&gt;&gt; predictorSpectra(SpectralBatchRepair.Problem expected,
+            SpectralBatchRepair.Certificate certificate, int n, int width, int s, OperatorChecks c) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        need(certificate.predictors().size() == width, &quot;PREDICTOR_COUNT_MISMATCH&quot;);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        need(s &gt;= 0 &amp;&amp; s &lt;= width, &quot;SYNDROME_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L64">        c.reserve(width, n);</span>
+<span class="fc" id="L65">        var p = new ArrayList&lt;List&lt;ExactRational&gt;&gt;();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (var expression : certificate.predictors())</span>
+<span class="fc" id="L67">            p.add(prediction(expected, expression, c));</span>
+<span class="fc" id="L68">        return p;</span>
+    }
+
+    private static void checkExactPredictions(SpectralBatchRepair.Certificate certificate,
+            List&lt;List&lt;ExactRational&gt;&gt; p, List&lt;ExactRational&gt; z, OperatorChecks c) {
+<span class="pc bpc" id="L73" title="3 of 6 branches missed.">        need(certificate.nodes().isEmpty() &amp;&amp; certificate.checks().isEmpty() &amp;&amp; certificate.frequencies().isEmpty(),</span>
+                &quot;UNEXPECTED_SYNDROME_DATA&quot;);
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        for (var row : p)</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            for (int nu = 0; nu &lt; z.size(); nu++) {</span>
+<span class="fc" id="L77">                c.work.charge(1);</span>
+<span class="fc" id="L78">                need(row.get(nu).equals(z.get(nu)), &quot;MISSING_EXCEPTION&quot;);</span>
+            }
+<span class="fc" id="L80">    }</span>
+
+    private static PolynomialMatrix checkSyndromeMatrix(SpectralBatchRepair.Certificate certificate,
+            int width, int s, OperatorChecks c) {
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        need(certificate.nodes().size() == width &amp;&amp; certificate.checks().isPresent(), &quot;MISSING_CHECK_MATRIX&quot;);</span>
+<span class="fc" id="L85">        var h = certificate.checks().orElseThrow();</span>
+<span class="fc" id="L86">        c.input(h);</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">        need(h.rows() == s &amp;&amp; h.columns() == width, &quot;CHECK_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int i = 0; i &lt; width; i++) {</span>
+<span class="fc" id="L89">            var node = c.work.check(certificate.nodes().get(i));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (int j = 0; j &lt; i; j++) {</span>
+<span class="fc" id="L91">                c.work.charge(1);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                need(!node.equals(certificate.nodes().get(j)), &quot;DUPLICATE_CHECK_NODE&quot;);</span>
+            }
+<span class="fc" id="L94">            var power = ExactRational.ONE;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (int k = 0; k &lt; s; k++) {</span>
+<span class="fc" id="L96">                need(value(h.get(k, i), c).equals(power), &quot;CHECK_MATRIX_MISMATCH&quot;);</span>
+<span class="fc" id="L97">                power = c.work.mul(power, node);</span>
+            }
+        }
+<span class="fc" id="L100">        return h;</span>
+    }
+
+    private static void checkFrequencyRepair(SpectralBatchRepair.Frequency table,
+            List&lt;List&lt;ExactRational&gt;&gt; p, ExactRational z, PolynomialMatrix h, int nu, OperatorChecks c) {
+<span class="fc" id="L105">        int width = p.size(), s = h.rows();</span>
+<span class="fc" id="L106">        c.reserve(width, 1);</span>
+<span class="fc" id="L107">        var support = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int i = 0; i &lt; width; i++) {</span>
+<span class="fc" id="L109">            c.work.charge(1);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (!p.get(i).get(nu).equals(z))</span>
+<span class="fc" id="L111">                support.add(i);</span>
+        }
+<span class="fc" id="L113">        need(support.equals(table.support()), &quot;EXCEPTION_SUPPORT_MISMATCH&quot;);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        need(support.size() &lt;= s, &quot;EXCEPTION_WIDTH_MISMATCH&quot;);</span>
+<span class="fc" id="L115">        c.input(table.repair());</span>
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">        need(table.repair().rows() == s &amp;&amp; table.repair().columns() == s, &quot;REPAIR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L117">        checkRepairIdentity(support, table.repair(), p, z, h, nu, c);</span>
+<span class="fc" id="L118">    }</span>
+
+    /** Check H_J^T A H_J=D directly, independent of the producer's Vandermonde inverse. */
+    private static void checkRepairIdentity(List&lt;Integer&gt; support, PolynomialMatrix repair,
+            List&lt;List&lt;ExactRational&gt;&gt; p, ExactRational z, PolynomialMatrix h, int nu, OperatorChecks c) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int a = 0; a &lt; support.size(); a++)</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (int b = 0; b &lt; support.size(); b++) {</span>
+<span class="fc" id="L125">                var sum = decoderEntry(h, repair, support.get(a), support.get(b), c);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                var want = a == b ? c.work.mul(ExactRational.NEGATIVE_ONE, c.work.div(</span>
+<span class="fc" id="L127">                        c.work.add(p.get(support.get(a)).get(nu), c.work.mul(TWO, z)), TWO))</span>
+<span class="fc" id="L128">                        : ExactRational.ZERO;</span>
+<span class="fc" id="L129">                need(sum.equals(want), &quot;REPAIR_IDENTITY_MISMATCH&quot;);</span>
+            }
+<span class="fc" id="L131">    }</span>
+
+    private static ExactRational decoderEntry(PolynomialMatrix h, PolynomialMatrix repair,
+            int row, int column, OperatorChecks c) {
+<span class="fc" id="L135">        var sum = ExactRational.ZERO;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (int k = 0; k &lt; h.rows(); k++)</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            for (int l = 0; l &lt; h.rows(); l++)</span>
+<span class="fc" id="L138">                sum = c.work.add(sum, c.work.mul(value(h.get(k, row), c),</span>
+<span class="fc" id="L139">                        c.work.mul(value(repair.get(k, l), c), value(h.get(l, column), c))));</span>
+<span class="fc" id="L140">        return sum;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComposedBilinearPlan.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">ComposedBilinearPlan.java</span></div><h1>ComposedBilinearPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.representation.RepresentationBridge;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * A proposed fixed-width certificate for Ux, Vy and W((Ux).*(Vy)).
+ * A nonzero-rank program has exactly three stages, in U/V/W order; zero rank has none.
+ * These records are evidence to be checked, never authority to execute.
+ */
+public record ComposedBilinearPlan(BilinearProgram program, int batchWidth, List&lt;Stage&gt; stages) {
+<span class="fc" id="L13">    public ComposedBilinearPlan {</span>
+<span class="fc" id="L14">        Objects.requireNonNull(program);</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (batchWidth &lt; 1) throw new IllegalArgumentException(&quot;INVALID_BATCH_WIDTH&quot;);</span>
+<span class="fc" id="L16">        stages = List.copyOf(stages);</span>
+<span class="fc" id="L17">    }</span>
+
+    /** Both stage families assert the same exact rational linear map as their expected source. */
+    public sealed interface Stage permits Linear, Spectral {
+        default RepresentationBridge.Relation relation() {
+<span class="nc" id="L22">            return RepresentationBridge.Relation.LINEAR_MAP_REPRESENTATION_EQUIVALENCE;</span>
+        }
+    }
+
+    public record Linear(OperatorResidualPlans.Plan plan) implements Stage {
+<span class="fc" id="L27">        public Linear { Objects.requireNonNull(plan); }</span>
+    }
+
+    /** The basis, inverse, spectrum, exceptional sets and batch width remain in the evidence. */
+    public record Spectral(SpectralBatchRepair.Problem problem,
+                           SpectralBatchRepair.Certificate certificate) implements Stage {
+<span class="fc" id="L33">        public Spectral { Objects.requireNonNull(problem); Objects.requireNonNull(certificate); }</span>
+    }
+
+    /** Counts execution arithmetic for one complete batch, excluding acquisition and checking. */
+    public record Cost(long variableMultiplications, long constantMultiplications, long additions) {
+<span class="fc" id="L38">        public Cost {</span>
+<span class="pc bpc" id="L39" title="3 of 6 branches missed.">            if (variableMultiplications &lt; 0 || constantMultiplications &lt; 0 || additions &lt; 0)</span>
+<span class="nc" id="L40">                throw new IllegalArgumentException(&quot;NEGATIVE_EXECUTION_COST&quot;);</span>
+<span class="fc" id="L41">        }</span>
+        public long total() {
+<span class="fc" id="L43">            return Math.addExact(variableMultiplications, Math.addExact(constantMultiplications, additions));</span>
+        }
+        Cost plus(OperatorResidualPlans.Cost linear) {
+<span class="fc" id="L46">            return new Cost(variableMultiplications, Math.addExact(constantMultiplications, linear.multiplies()),</span>
+<span class="fc" id="L47">                Math.addExact(additions, linear.additions()));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

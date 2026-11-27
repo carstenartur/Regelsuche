@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SpectralBatchMath.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">SpectralBatchMath.java</span></div><h1>SpectralBatchMath.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.equivalence.Rational;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixAlgebra;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorChecks.need;
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/** Bounded arithmetic shared by construction, verification and execution. */
+final class SpectralBatchMath {
+    private SpectralBatchMath() {}
+
+<span class="fc" id="L19">    static final ExactRational TWO = ExactRational.integer(2);</span>
+<span class="fc" id="L20">    static final ExactRational HALF = new ExactRational(java.math.BigInteger.ONE, java.math.BigInteger.TWO);</span>
+<span class="fc" id="L21">    static final ExactRational THREE_HALVES = new ExactRational(java.math.BigInteger.valueOf(3),</span>
+            java.math.BigInteger.TWO);
+<span class="fc" id="L23">    static final Cost ZERO_COST = new Cost(0, 0);</span>
+
+    static void batch(int width, OperatorChecks c) {
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        need(width &gt; 0, &quot;INVALID_BATCH_WIDTH&quot;);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (width &gt; ExactMatrixAlgebra.MAX_DIMENSION)</span>
+<span class="fc" id="L28">            throw new OperatorChecks.Rejected(Status.STOPPED, &quot;BATCH_WIDTH_LIMIT&quot;);</span>
+<span class="fc" id="L29">    }</span>
+
+    static List&lt;ExactRational&gt; target(SpectralBatchRepair.Problem p, OperatorChecks c) {
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        need(p != null, &quot;MISSING_PROBLEM&quot;);</span>
+<span class="fc" id="L33">        batch(p.batchWidth(), c);</span>
+<span class="fc" id="L34">        c.input(p.source());</span>
+<span class="fc" id="L35">        c.input(p.basis());</span>
+<span class="fc" id="L36">        c.input(p.inverse());</span>
+<span class="fc" id="L37">        int n = p.source().rows();</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (n != p.source().columns())</span>
+<span class="nc" id="L39">            throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;SOURCE_NOT_SQUARE&quot;);</span>
+<span class="pc bpc" id="L40" title="3 of 6 branches missed.">        need(p.basis().rows() == n &amp;&amp; p.basis().columns() == n &amp;&amp; p.inverse().rows() == n</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">                &amp;&amp; p.inverse().columns() == n, &quot;BASIS_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L42">        var unit = c.unit(n);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        need(c.algebra.equal(c.times(p.basis(), p.inverse()), unit)</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                &amp;&amp; c.algebra.equal(c.times(p.inverse(), p.basis()), unit), &quot;BASIS_INVERSE_MISMATCH&quot;);</span>
+<span class="fc" id="L45">        var values = diagonal(c.times(p.inverse(), c.times(p.source(), p.basis())), c);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (var z : values) {</span>
+<span class="fc" id="L47">            c.work.charge(1);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">            if (!z.equals(ExactRational.ONE) &amp;&amp; !z.equals(ExactRational.NEGATIVE_ONE))</span>
+<span class="nc" id="L49">                throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;SOURCE_NOT_INVOLUTION&quot;);</span>
+<span class="fc" id="L50">        }</span>
+<span class="fc" id="L51">        return values;</span>
+    }
+
+    static List&lt;ExactRational&gt; prediction(SpectralBatchRepair.Problem p, ExactMatrixExpression expression,
+            OperatorChecks c) {
+<span class="fc" id="L56">        var shape = c.inspect(expression, 0);</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        need(shape.rows() == p.source().rows() &amp;&amp; shape.columns() == p.source().columns(),</span>
+                &quot;PREDICTOR_DIMENSION_MISMATCH&quot;);
+<span class="fc" id="L59">        c.reserve(shape.rows(), shape.columns());</span>
+<span class="fc" id="L60">        var value = c.algebra.evaluate(expression);</span>
+<span class="fc" id="L61">        c.input(value);</span>
+<span class="fc" id="L62">        return diagonal(c.times(p.inverse(), c.times(value, p.basis())), c);</span>
+    }
+
+    static List&lt;ExactRational&gt; diagonal(PolynomialMatrix m, OperatorChecks c) {
+<span class="fc" id="L66">        c.reserve(m.rows(), 1);</span>
+<span class="fc" id="L67">        var result = new ArrayList&lt;ExactRational&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int i = 0; i &lt; m.rows(); i++)</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (int j = 0; j &lt; m.columns(); j++) {</span>
+<span class="fc" id="L70">                c.work.charge(1);</span>
+<span class="fc bfc" id="L71" title="All 4 branches covered.">                need(i == j || m.get(i, j).isZero(), &quot;NOT_COMMON_EIGENBASIS&quot;);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                if (i == j)</span>
+<span class="fc" id="L73">                    result.add(value(m.get(i, j), c));</span>
+            }
+<span class="fc" id="L75">        return List.copyOf(result);</span>
+    }
+
+    static ExactRational value(Polynomial p, OperatorChecks c) {
+<span class="fc" id="L79">        c.work.charge(1);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (p.isZero())</span>
+<span class="fc" id="L81">            return ExactRational.ZERO;</span>
+<span class="fc" id="L82">        var r = p.terms().values().iterator().next();</span>
+<span class="fc" id="L83">        return c.work.check(new ExactRational(r.numerator(), r.denominator()));</span>
+    }
+
+    static Polynomial scalar(ExactRational value) {
+<span class="fc" id="L87">        return Polynomial.constant(Rational.fromExact(value));</span>
+    }
+
+    static PolynomialMatrix transpose(PolynomialMatrix m, OperatorChecks c) {
+<span class="fc" id="L91">        return c.matrix(m.columns(), m.rows(), (i, j) -&gt; m.get(j, i));</span>
+    }
+
+    static PolynomialMatrix diagonal(List&lt;ExactRational&gt; d, OperatorChecks c) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        return c.matrix(d.size(), d.size(), (i, j) -&gt; i.equals(j) ? scalar(d.get(i)) : Polynomial.zero());</span>
+    }
+
+    static Cost scale(Cost cost, long factor) {
+<span class="fc" id="L99">        return new Cost(Math.multiplyExact(cost.multiplies(), factor), Math.multiplyExact(cost.additions(), factor));</span>
+    }
+
+    /**
+     * Add a conservative retained-program bound to the same cumulative ledger as
+     * temporary matrices, before allocating the compiled nodes. This also retains
+     * every previous incumbent while discovery prepares a competing program.
+     */
+    static void reserveRetained(long cells, OperatorChecks c) {
+<span class="fc" id="L108">        c.work.cells(cells);</span>
+<span class="fc" id="L109">        int side = ExactMatrixAlgebra.MAX_DIMENSION;</span>
+<span class="fc" id="L110">        int block = side * side;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        while (cells &gt;= block) {</span>
+<span class="fc" id="L112">            c.reserve(side, side);</span>
+<span class="fc" id="L113">            cells -= block;</span>
+        }
+<span class="fc" id="L115">        int rows = (int) cells / side;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (rows &gt; 0)</span>
+<span class="fc" id="L117">            c.reserve(rows, side);</span>
+<span class="fc" id="L118">        int tail = (int) cells % side;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (tail &gt; 0)</span>
+<span class="nc" id="L120">            c.reserve(1, tail);</span>
+<span class="fc" id="L121">    }</span>
+
+    static PolynomialMatrix inverse(PolynomialMatrix input, OperatorChecks c) {
+<span class="fc" id="L124">        int n = input.rows();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        need(n == input.columns(), &quot;INVERSE_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L126">        c.reserve(n, n);</span>
+<span class="fc" id="L127">        c.reserve(n, n);</span>
+<span class="fc" id="L128">        var a = new ExactRational[n][n];</span>
+<span class="fc" id="L129">        var b = new ExactRational[n][n];</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++)</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L132">                a[i][j] = value(input.get(i, j), c);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                b[i][j] = i == j ? ExactRational.ONE : ExactRational.ZERO;</span>
+            }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="fc" id="L136">            int pivot = k;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            while (pivot &lt; n) {</span>
+<span class="fc" id="L138">                c.work.charge(1);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                if (!a[pivot][k].isZero())</span>
+<span class="fc" id="L140">                    break;</span>
+<span class="nc" id="L141">                pivot++;</span>
+            }
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            need(pivot &lt; n, &quot;SINGULAR_MATRIX&quot;);</span>
+<span class="fc" id="L144">            var swap = a[k];</span>
+<span class="fc" id="L145">            a[k] = a[pivot];</span>
+<span class="fc" id="L146">            a[pivot] = swap;</span>
+<span class="fc" id="L147">            swap = b[k];</span>
+<span class="fc" id="L148">            b[k] = b[pivot];</span>
+<span class="fc" id="L149">            b[pivot] = swap;</span>
+<span class="fc" id="L150">            var d = a[k][k];</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L152">                a[k][j] = c.work.div(a[k][j], d);</span>
+<span class="fc" id="L153">                b[k][j] = c.work.div(b[k][j], d);</span>
+            }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L156">                c.work.charge(1);</span>
+<span class="fc bfc" id="L157" title="All 4 branches covered.">                if (i == k || a[i][k].isZero())</span>
+<span class="fc" id="L158">                    continue;</span>
+<span class="fc" id="L159">                var factor = a[i][k];</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L161">                    a[i][j] = c.work.sub(a[i][j], c.work.mul(factor, a[k][j]));</span>
+<span class="fc" id="L162">                    b[i][j] = c.work.sub(b[i][j], c.work.mul(factor, b[k][j]));</span>
+                }
+            }
+        }
+<span class="fc" id="L166">        return c.matrix(n, n, (i, j) -&gt; scalar(b[i][j]));</span>
+    }
+
+    /** Independent columns of F+I and F-I span the rational eigenspaces. */
+    static SpectralBatchRepair.Problem derive(PolynomialMatrix source, int width, OperatorChecks c) {
+<span class="fc" id="L171">        batch(width, c);</span>
+<span class="fc" id="L172">        c.input(source);</span>
+<span class="fc" id="L173">        int n = source.rows();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (n != source.columns())</span>
+<span class="fc" id="L175">            throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;SOURCE_NOT_SQUARE&quot;);</span>
+<span class="fc" id="L176">        var unit = c.unit(n);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (!c.algebra.equal(c.times(source, source), unit))</span>
+<span class="fc" id="L178">            throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;SOURCE_NOT_INVOLUTION&quot;);</span>
+<span class="fc" id="L179">        c.reserve(n, n);</span>
+<span class="fc" id="L180">        c.reserve(n, n);</span>
+<span class="fc" id="L181">        c.reserve(n, 1);</span>
+<span class="fc" id="L182">        var originals = new ArrayList&lt;ExactRational[]&gt;();</span>
+<span class="fc" id="L183">        var reduced = new ArrayList&lt;ExactRational[]&gt;();</span>
+<span class="fc" id="L184">        var pivots = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int sign : new int[] { 1, -1 })</span>
+<span class="fc bfc" id="L186" title="All 4 branches covered.">            for (int column = 0; column &lt; n &amp;&amp; originals.size() &lt; n; column++) {</span>
+<span class="fc" id="L187">                c.reserve(n, 1);</span>
+<span class="fc" id="L188">                c.reserve(n, 1);</span>
+<span class="fc" id="L189">                var original = new ExactRational[n];</span>
+<span class="fc" id="L190">                var v = new ExactRational[n];</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L192">                    original[i] = c.work.add(value(source.get(i, column), c),</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                            ExactRational.integer(i == column ? sign : 0));</span>
+<span class="fc" id="L194">                    v[i] = original[i];</span>
+                }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                for (int k = 0; k &lt; reduced.size(); k++) {</span>
+<span class="fc" id="L197">                    var factor = v[pivots.get(k)];</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                    for (int i = 0; i &lt; n; i++)</span>
+<span class="fc" id="L199">                        v[i] = c.work.sub(v[i], c.work.mul(factor, reduced.get(k)[i]));</span>
+                }
+<span class="fc" id="L201">                int pivot = 0;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                while (pivot &lt; n) {</span>
+<span class="fc" id="L203">                    c.work.charge(1);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                    if (!v[pivot].isZero())</span>
+<span class="fc" id="L205">                        break;</span>
+<span class="fc" id="L206">                    pivot++;</span>
+                }
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                if (pivot == n)</span>
+<span class="fc" id="L209">                    continue;</span>
+<span class="fc" id="L210">                var divisor = v[pivot];</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                for (int i = 0; i &lt; n; i++)</span>
+<span class="fc" id="L212">                    v[i] = c.work.div(v[i], divisor);</span>
+<span class="fc" id="L213">                originals.add(original);</span>
+<span class="fc" id="L214">                reduced.add(v);</span>
+<span class="fc" id="L215">                pivots.add(pivot);</span>
+            }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        need(originals.size() == n, &quot;INCOMPLETE_INVOLUTION_BASIS&quot;);</span>
+<span class="fc" id="L218">        var basis = c.matrix(n, n, (i, j) -&gt; scalar(originals.get(j)[i]));</span>
+<span class="fc" id="L219">        var result = new SpectralBatchRepair.Problem(source, basis, inverse(basis, c), width);</span>
+<span class="fc" id="L220">        target(result, c);</span>
+<span class="fc" id="L221">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

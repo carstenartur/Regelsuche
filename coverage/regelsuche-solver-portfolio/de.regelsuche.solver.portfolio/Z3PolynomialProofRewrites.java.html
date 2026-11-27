@@ -35,23 +35,79 @@ final class Z3PolynomialProofRewrites {
 <span class="fc bfc" id="L35" title="All 2 branches covered.">        if (left.equals(right)) return true;</span>
 <span class="pc bpc" id="L36" title="1 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) return polynomial(a, b);</span>
 <span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if (!(left instanceof Formula a) || !(right instanceof Formula b)) return false;</span>
-<span class="fc" id="L38">        Truth first = truth(a, depth + 1), second = truth(b, depth + 1);</span>
-<span class="pc bpc" id="L39" title="1 of 6 branches missed.">        if (first != null &amp;&amp; second != null) return first == second;</span>
-<span class="fc bfc" id="L40" title="All 4 branches covered.">        if (a instanceof Negation n &amp;&amp; b instanceof Negation m) {</span>
-<span class="fc" id="L41">            return equivalent(n.operand(), m.operand(), depth + 1);</span>
+<span class="fc" id="L38">        return equivalentFormulas(a, b, depth);</span>
+    }
+
+    private boolean equivalentFormulas(Formula a, Formula b, int depth) {
+<span class="fc" id="L42">        Truth first = truth(a, depth + 1), second = truth(b, depth + 1);</span>
+<span class="pc bpc" id="L43" title="1 of 6 branches missed.">        if (first != null &amp;&amp; second != null) return first == second;</span>
+<span class="fc bfc" id="L44" title="All 4 branches covered.">        if (a instanceof Negation n &amp;&amp; b instanceof Negation m) {</span>
+<span class="fc" id="L45">            return equivalent(n.operand(), m.operand(), depth + 1);</span>
         }
-<span class="fc bfc" id="L43" title="All 4 branches covered.">        if (a instanceof Equality equation &amp;&amp; b instanceof Disjunction disjunction) {</span>
-<span class="fc" id="L44">            return zeroProduct(equation, disjunction);</span>
+<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (a instanceof Negation n &amp;&amp; n.operand() instanceof Negation inner) {</span>
+<span class="fc" id="L48">            return equivalent(inner.operand(), b, depth + 1);</span>
         }
-<span class="pc bpc" id="L46" title="3 of 4 branches missed.">        if (a instanceof Disjunction disjunction &amp;&amp; b instanceof Equality equation) {</span>
-<span class="nc" id="L47">            return zeroProduct(equation, disjunction);</span>
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">        if (b instanceof Negation n &amp;&amp; n.operand() instanceof Negation inner) {</span>
+<span class="nc" id="L51">            return equivalent(a, inner.operand(), depth + 1);</span>
         }
-<span class="pc bpc" id="L49" title="1 of 4 branches missed.">        if (a instanceof Equality n &amp;&amp; b instanceof Equality m) {</span>
-<span class="pc bpc" id="L50" title="3 of 4 branches missed.">            return equivalent(n.left(), m.left(), depth + 1) &amp;&amp; equivalent(n.right(), m.right(), depth + 1)</span>
-<span class="pc bpc" id="L51" title="3 of 4 branches missed.">                || equivalent(n.left(), m.right(), depth + 1) &amp;&amp; equivalent(n.right(), m.left(), depth + 1)</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">                || equivalentRealEquations(n, m);</span>
+<span class="fc" id="L53">        return equivalentRelations(a, b, depth);</span>
+    }
+
+    private boolean equivalentRelations(Formula a, Formula b, int depth) {
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (a instanceof Order firstOrder &amp;&amp; b instanceof Order secondOrder) {</span>
+            // Preserve direction: unlike equations, sign reversal is not valid for inequalities.
+<span class="fc" id="L59">            return polynomial(values.difference(firstOrder.upper(), firstOrder.lower()),</span>
+<span class="fc" id="L60">                values.difference(secondOrder.upper(), secondOrder.lower()));</span>
         }
-<span class="fc" id="L54">        return false;</span>
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        if (a instanceof Equality equation &amp;&amp; b instanceof Conjunction conjunction) {</span>
+<span class="fc" id="L63">            return oppositeOrders(equation, conjunction);</span>
+        }
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (b instanceof Equality equation &amp;&amp; a instanceof Conjunction conjunction) {</span>
+<span class="nc" id="L66">            return oppositeOrders(equation, conjunction);</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">        if (a instanceof Conjunction conjunction &amp;&amp; b instanceof Negation negation) {</span>
+<span class="fc" id="L69">            return deMorgan(conjunction, negation);</span>
+        }
+<span class="pc bpc" id="L71" title="3 of 4 branches missed.">        if (b instanceof Conjunction conjunction &amp;&amp; a instanceof Negation negation) {</span>
+<span class="nc" id="L72">            return deMorgan(conjunction, negation);</span>
+        }
+<span class="fc" id="L74">        return equivalentEquations(a, b, depth);</span>
+    }
+
+    private boolean equivalentEquations(Formula a, Formula b, int depth) {
+<span class="fc bfc" id="L78" title="All 4 branches covered.">        if (a instanceof Equality equation &amp;&amp; b instanceof Disjunction disjunction) {</span>
+<span class="fc" id="L79">            return zeroProduct(equation, disjunction);</span>
+        }
+<span class="pc bpc" id="L81" title="3 of 4 branches missed.">        if (a instanceof Disjunction disjunction &amp;&amp; b instanceof Equality equation) {</span>
+<span class="nc" id="L82">            return zeroProduct(equation, disjunction);</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (a instanceof Equality n &amp;&amp; b instanceof Equality m) {</span>
+<span class="fc bfc" id="L85" title="All 4 branches covered.">            return equivalent(n.left(), m.left(), depth + 1) &amp;&amp; equivalent(n.right(), m.right(), depth + 1)</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">                || equivalent(n.left(), m.right(), depth + 1) &amp;&amp; equivalent(n.right(), m.left(), depth + 1)</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                || equivalentRealEquations(n, m);</span>
+        }
+<span class="fc" id="L89">        return false;</span>
+    }
+
+    /** Antisymmetry and reflexivity of the real order, with both directions present. */
+    private static boolean oppositeOrders(Equality equation, Conjunction conjunction) {
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (!(equation.left() instanceof Real left) || !(equation.right() instanceof Real right)</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                || conjunction.operands().size() != 2</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                || !(conjunction.operands().get(0) instanceof Order first)</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                || !(conjunction.operands().get(1) instanceof Order second)) return false;</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        return first.lower().equals(second.upper()) &amp;&amp; first.upper().equals(second.lower())</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">            &amp;&amp; (first.lower().equals(left) &amp;&amp; first.upper().equals(right)</span>
+<span class="pc bnc" id="L100" title="All 4 branches missed.">                || first.lower().equals(right) &amp;&amp; first.upper().equals(left));</span>
+    }
+
+    /** A conjunction is exactly the negation of the disjunction of its complements. */
+    private static boolean deMorgan(Conjunction conjunction, Negation negation) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!(negation.operand() instanceof Disjunction disjunction)</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                || conjunction.operands().size() != disjunction.operands().size()) return false;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (int i = 0; i &lt; conjunction.operands().size(); i++) {</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (!complements(conjunction.operands().get(i), disjunction.operands().get(i))) return false;</span>
+        }
+<span class="fc" id="L110">        return true;</span>
     }
 
     /**
@@ -60,78 +116,90 @@ final class Z3PolynomialProofRewrites {
      * and the product of every disjunct's difference; no native factorization is trusted.
      */
     private boolean zeroProduct(Equality equation, Disjunction disjunction) {
-<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (!(equation.left() instanceof Real left) || !(equation.right() instanceof Real right)) return false;</span>
-<span class="fc" id="L64">        Real product = null;</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (Formula operand : disjunction.operands()) {</span>
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">            if (!(operand instanceof Equality factor) || !(factor.left() instanceof Real a)</span>
-<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                    || !(factor.right() instanceof Real b)) return false;</span>
-<span class="fc" id="L68">            Real difference = values.difference(a, b);</span>
-<span class="fc bfc" id="L69" title="All 2 branches covered.">            product = product == null ? difference : values.product(product, difference);</span>
-<span class="fc" id="L70">        }</span>
-<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        return product != null &amp;&amp; (polynomial(values.difference(left, right), product)</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            || polynomial(values.difference(right, left), product));</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (!(equation.left() instanceof Real left) || !(equation.right() instanceof Real right)) return false;</span>
+<span class="fc" id="L120">        Real product = null;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (Formula operand : disjunction.operands()) {</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            if (!(operand instanceof Equality factor) || !(factor.left() instanceof Real a)</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                    || !(factor.right() instanceof Real b)) return false;</span>
+<span class="fc" id="L124">            Real difference = values.difference(a, b);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            product = product == null ? difference : values.product(product, difference);</span>
+<span class="fc" id="L126">        }</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        return product != null &amp;&amp; (polynomial(values.difference(left, right), product)</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            || polynomial(values.difference(right, left), product));</span>
     }
 
     /** Both equations hold exactly when their difference is zero. Only polynomial identities
      * between differences (possibly with reversed orientation) justify this rewrite. */
     private boolean equivalentRealEquations(Equality first, Equality second) {
-<span class="pc bpc" id="L78" title="2 of 4 branches missed.">        if (!(first.left() instanceof Real a) || !(first.right() instanceof Real b)</span>
-<span class="pc bpc" id="L79" title="2 of 4 branches missed.">                || !(second.left() instanceof Real c) || !(second.right() instanceof Real d)) return false;</span>
-<span class="fc" id="L80">        Real difference = values.difference(a, b);</span>
-<span class="fc bfc" id="L81" title="All 2 branches covered.">        return polynomial(difference, values.difference(c, d))</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">            || polynomial(difference, values.difference(d, c));</span>
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        if (!(first.left() instanceof Real a) || !(first.right() instanceof Real b)</span>
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">                || !(second.left() instanceof Real c) || !(second.right() instanceof Real d)) return false;</span>
+<span class="fc" id="L136">        Real difference = values.difference(a, b);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        return polynomial(difference, values.difference(c, d))</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            || polynomial(difference, values.difference(d, c));</span>
     }
 
     /** null means not proved constant; REFUTED polynomial identity is not universal disequality. */
     private Truth truth(Formula formula, int depth) {
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new Invalid();</span>
-<span class="fc bfc" id="L88" title="All 4 branches covered.">        return switch (formula) {</span>
-<span class="fc" id="L89">            case Truth constant -&gt; constant;</span>
-<span class="fc" id="L90">            case Negation negation -&gt; {</span>
-<span class="fc" id="L91">                Truth child = truth(negation.operand(), depth + 1);</span>
-<span class="pc bpc" id="L92" title="1 of 4 branches missed.">                yield child == null ? null : child == Truth.TRUE ? Truth.FALSE : Truth.TRUE;</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new Invalid();</span>
+<span class="fc bfc" id="L144" title="All 6 branches covered.">        return switch (formula) {</span>
+<span class="fc" id="L145">            case Truth constant -&gt; constant;</span>
+<span class="fc" id="L146">            case Negation negation -&gt; {</span>
+<span class="fc" id="L147">                Truth child = truth(negation.operand(), depth + 1);</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">                yield child == null ? null : child == Truth.TRUE ? Truth.FALSE : Truth.TRUE;</span>
             }
-<span class="fc" id="L94">            case Equality equality -&gt; equalityTruth(equality, depth + 1);</span>
-<span class="fc" id="L95">            case Disjunction disjunction -&gt; disjunctionTruth(disjunction, depth + 1);</span>
+<span class="fc" id="L150">            case Equality equality -&gt; equalityTruth(equality, depth + 1);</span>
+<span class="fc" id="L151">            case Disjunction disjunction -&gt; disjunctionTruth(disjunction, depth + 1);</span>
+<span class="fc" id="L152">            case Conjunction conjunction -&gt; conjunctionTruth(conjunction, depth + 1);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            case Order order -&gt; order.lower().equals(order.upper()) ? Truth.TRUE : null;</span>
         };
     }
 
     private Truth disjunctionTruth(Disjunction disjunction, int depth) {
-<span class="fc" id="L100">        boolean unknown = false;</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (Formula operand : disjunction.operands()) {</span>
-<span class="fc" id="L102">            Truth value = truth(operand, depth + 1);</span>
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (value == Truth.TRUE) return Truth.TRUE;</span>
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            unknown |= value == null;</span>
-<span class="fc" id="L105">        }</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        return unknown ? null : Truth.FALSE;</span>
+<span class="fc" id="L158">        boolean unknown = false;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (Formula operand : disjunction.operands()) {</span>
+<span class="fc" id="L160">            Truth value = truth(operand, depth + 1);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (value == Truth.TRUE) return Truth.TRUE;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            unknown |= value == null;</span>
+<span class="fc" id="L163">        }</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        return unknown ? null : Truth.FALSE;</span>
+    }
+
+    private Truth conjunctionTruth(Conjunction conjunction, int depth) {
+<span class="fc" id="L168">        boolean unknown = false;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (Formula operand : conjunction.operands()) {</span>
+<span class="fc" id="L170">            Truth value = truth(operand, depth + 1);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (value == Truth.FALSE) return Truth.FALSE;</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            unknown |= value == null;</span>
+<span class="fc" id="L173">        }</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        return unknown ? null : Truth.TRUE;</span>
     }
 
     private Truth equalityTruth(Equality equality, int depth) {
-<span class="fc" id="L110">        Value left = equality.left(), right = equality.right();</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (left.equals(right)) return Truth.TRUE;</span>
-<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) {</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (polynomial(a, b)) return Truth.TRUE;</span>
-<span class="pc bpc" id="L114" title="3 of 4 branches missed.">            if (a.expression() instanceof Literal &amp;&amp; b.expression() instanceof Literal) return Truth.FALSE;</span>
-<span class="fc" id="L115">            return null;</span>
+<span class="fc" id="L178">        Value left = equality.left(), right = equality.right();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (left.equals(right)) return Truth.TRUE;</span>
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) {</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (polynomial(a, b)) return Truth.TRUE;</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            if (a.expression() instanceof Literal &amp;&amp; b.expression() instanceof Literal) return Truth.FALSE;</span>
+<span class="fc" id="L183">            return null;</span>
         }
-<span class="nc" id="L117">        Truth a = truth(asFormula(left), depth + 1), b = truth(asFormula(right), depth + 1);</span>
-<span class="nc bnc" id="L118" title="All 6 branches missed.">        return a == null || b == null ? null : a == b ? Truth.TRUE : Truth.FALSE;</span>
+<span class="nc" id="L185">        Truth a = truth(asFormula(left), depth + 1), b = truth(asFormula(right), depth + 1);</span>
+<span class="nc bnc" id="L186" title="All 6 branches missed.">        return a == null || b == null ? null : a == b ? Truth.TRUE : Truth.FALSE;</span>
     }
 
     private boolean polynomial(Real left, Real right) {
-<span class="fc" id="L122">        var key = new Pair(left, right);</span>
-<span class="fc" id="L123">        Boolean old = cache.get(key);</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (old != null) return old;</span>
-<span class="fc" id="L125">        long estimate = (long) (left.size() + right.size()) * (left.monomials() + right.monomials());</span>
-<span class="pc bpc" id="L126" title="1 of 4 branches missed.">        if (++calls &gt; 128 || (admittedWork += estimate) &gt; 262_144) throw new Invalid();</span>
-<span class="fc" id="L127">        var obligation = Obligation.create(&quot;native-polynomial-rewrite&quot;, source.declarations(), source.theories(),</span>
-<span class="fc" id="L128">            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),</span>
-<span class="fc" id="L129">            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        boolean result = backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;</span>
-<span class="fc" id="L131">        cache.put(key, result);</span>
-<span class="fc" id="L132">        return result;</span>
+<span class="fc" id="L190">        var key = new Pair(left, right);</span>
+<span class="fc" id="L191">        Boolean old = cache.get(key);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (old != null) return old;</span>
+<span class="fc" id="L193">        long estimate = (long) (left.size() + right.size()) * (left.monomials() + right.monomials());</span>
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">        if (++calls &gt; 128 || (admittedWork += estimate) &gt; 262_144) throw new Invalid();</span>
+<span class="fc" id="L195">        var obligation = Obligation.create(&quot;native-polynomial-rewrite&quot;, source.declarations(), source.theories(),</span>
+<span class="fc" id="L196">            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),</span>
+<span class="fc" id="L197">            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        boolean result = backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;</span>
+<span class="fc" id="L199">        cache.put(key, result);</span>
+<span class="fc" id="L200">        return result;</span>
     }
 
-<span class="fc" id="L135">    private record Pair(Real left, Real right) { }</span>
+<span class="fc" id="L203">    private record Pair(Real left, Real right) { }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

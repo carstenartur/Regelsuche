@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SpectralBatchSdk.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.algebra</a> &gt; <span class="el_source">SpectralBatchSdk.java</span></div><h1>SpectralBatchSdk.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.algebra;
+
+import de.regelsuche.math.algorithms.algebra.PreparedSpectralBatch;
+import de.regelsuche.math.algorithms.algebra.SpectralBatchRepair;
+import de.regelsuche.math.algorithms.algebra.SpectralBatchRepairVerifier;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.sdk.optimization.CancellationToken;
+import de.regelsuche.sdk.optimization.OptimizationBudget;
+import de.regelsuche.scalar.ExactRational;
+import java.util.List;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+
+/**
+ * Exact rational batch repair with the caller's shared work, state, candidate and
+ * cancellation limits.
+ */
+public final class SpectralBatchSdk {
+    private SpectralBatchSdk() {}
+
+    public static Result&lt;SpectralBatchRepair.Problem&gt; deriveProblem(PolynomialMatrix source, int batchWidth,
+            OptimizationBudget budget, CancellationToken cancel) {
+<span class="nc" id="L25">        return SpectralBatchRepair.deriveProblem(source, batchWidth, limits(budget), cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;SpectralBatchRepair.Certificate&gt; construct(SpectralBatchRepair.Problem problem,
+            List&lt;ExactMatrixExpression&gt; predictors, OptimizationBudget budget, CancellationToken cancel) {
+<span class="nc" id="L30">        return SpectralBatchRepair.construct(problem, predictors, limits(budget), cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;PreparedSpectralBatch&gt; prepare(SpectralBatchRepair.Problem problem,
+            SpectralBatchRepair.Certificate certificate, OptimizationBudget budget, CancellationToken cancel) {
+<span class="nc" id="L35">        return SpectralBatchRepair.prepare(problem, certificate, limits(budget), cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;SpectralBatchRepair.Discovery&gt; discover(PolynomialMatrix source, int batchWidth,
+            SpectralBatchRepair.Policy policy, OptimizationBudget budget, CancellationToken cancel) {
+<span class="fc" id="L40">        return SpectralBatchRepair.discover(source, batchWidth, policy, budget.maximumCandidates(), limits(budget),</span>
+<span class="fc" id="L41">                cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;SpectralBatchRepair.Discovery&gt; discover(SpectralBatchRepair.Problem problem,
+            SpectralBatchRepair.Policy policy, OptimizationBudget budget, CancellationToken cancel) {
+<span class="nc" id="L46">        return SpectralBatchRepair.discover(problem, policy, budget.maximumCandidates(), limits(budget),</span>
+<span class="nc" id="L47">                cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;Cost&gt; verify(SpectralBatchRepair.Problem problem, SpectralBatchRepair.Certificate certificate,
+            OptimizationBudget budget, CancellationToken cancel) {
+<span class="fc" id="L52">        return SpectralBatchRepairVerifier.verify(problem, certificate, limits(budget), cancel::isCancelled);</span>
+    }
+
+    public static Result&lt;List&lt;List&lt;ExactRational&gt;&gt;&gt; apply(PreparedSpectralBatch prepared, List&lt;List&lt;ExactRational&gt;&gt; input,
+            OptimizationBudget budget, CancellationToken cancel) {
+<span class="fc" id="L57">        return prepared.apply(input, limits(budget), cancel::isCancelled);</span>
+    }
+
+    private static IterationLimits limits(OptimizationBudget budget) {
+<span class="fc" id="L61">        return new IterationLimits(budget.maximumWork(), budget.maximumStates(), budget.timeoutMillis());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

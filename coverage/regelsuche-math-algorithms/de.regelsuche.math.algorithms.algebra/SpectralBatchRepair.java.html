@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SpectralBatchRepair.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.algebra</a> &gt; <span class="el_source">SpectralBatchRepair.java</span></div><h1>SpectralBatchRepair.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.algebra;
+
+import de.regelsuche.math.algorithms.equivalence.Polynomial;
+import de.regelsuche.math.algorithms.iteration.IterationLimits;
+import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
+import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BooleanSupplier;
+
+import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
+import static de.regelsuche.math.algorithms.algebra.OperatorChecks.need;
+import static de.regelsuche.math.algorithms.algebra.SpectralBatchMath.*;
+
+/**
+ * Finite rational specialization of full-rate Hermite repair, with source-derived
+ * bounded search.
+ */
+public final class SpectralBatchRepair {
+    private SpectralBatchRepair() {}
+
+    public record Problem(PolynomialMatrix source, PolynomialMatrix basis, PolynomialMatrix inverse, int batchWidth) {
+<span class="fc" id="L27">        public Problem {</span>
+<span class="fc" id="L28">            Objects.requireNonNull(source);</span>
+<span class="fc" id="L29">            Objects.requireNonNull(basis);</span>
+<span class="fc" id="L30">            Objects.requireNonNull(inverse);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">            if (batchWidth &lt; 1)</span>
+<span class="nc" id="L32">                throw new IllegalArgumentException(&quot;INVALID_BATCH_WIDTH&quot;);</span>
+<span class="fc" id="L33">        }</span>
+    }
+
+    public record Frequency(List&lt;Integer&gt; support, PolynomialMatrix repair) {
+<span class="fc" id="L37">        public Frequency {</span>
+<span class="fc" id="L38">            support = List.copyOf(support);</span>
+<span class="fc" id="L39">            Objects.requireNonNull(repair);</span>
+<span class="fc" id="L40">        }</span>
+    }
+
+    public record Certificate(Problem problem, List&lt;ExactMatrixExpression&gt; predictors, int syndromeWidth,
+            List&lt;ExactRational&gt; nodes, Optional&lt;PolynomialMatrix&gt; checks, List&lt;Frequency&gt; frequencies) {
+<span class="fc" id="L45">        public Certificate {</span>
+<span class="fc" id="L46">            Objects.requireNonNull(problem);</span>
+<span class="fc" id="L47">            predictors = List.copyOf(predictors);</span>
+<span class="fc" id="L48">            nodes = List.copyOf(nodes);</span>
+<span class="fc" id="L49">            Objects.requireNonNull(checks);</span>
+<span class="fc" id="L50">            frequencies = List.copyOf(frequencies);</span>
+<span class="fc" id="L51">        }</span>
+    }
+
+<span class="fc" id="L54">    public enum Recipe {</span>
+<span class="fc" id="L55">        ZERO, IDENTITY, DIAGONAL, TRIDIAGONAL, SPECTRAL_PARTITION</span>
+    }
+
+    public record Policy(List&lt;Recipe&gt; recipes, int maximumSupport) {
+<span class="fc" id="L59">        public Policy {</span>
+<span class="fc" id="L60">            recipes = List.copyOf(recipes);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (maximumSupport &lt; 0)</span>
+<span class="nc" id="L62">                throw new IllegalArgumentException(&quot;INVALID_SUPPORT_LIMIT&quot;);</span>
+<span class="fc" id="L63">        }</span>
+
+        public static Policy defaults() {
+<span class="fc" id="L66">            return new Policy(List.of(Recipe.ZERO, Recipe.IDENTITY, Recipe.DIAGONAL, Recipe.TRIDIAGONAL,</span>
+                    Recipe.SPECTRAL_PARTITION), 16);
+        }
+    }
+
+<span class="fc" id="L71">    public record Candidate(String recipe, int syndromeWidth, Optional&lt;Cost&gt; cost, String detail) {}</span>
+
+    public record Discovery(PreparedSpectralBatch operator, List&lt;Candidate&gt; candidates) {
+<span class="fc" id="L74">        public Discovery {</span>
+<span class="fc" id="L75">            candidates = List.copyOf(candidates);</span>
+<span class="fc" id="L76">        }</span>
+    }
+
+    public static Result&lt;Problem&gt; deriveProblem(PolynomialMatrix source, int batchWidth, IterationLimits limits,
+            BooleanSupplier cancel) {
+<span class="fc" id="L81">        return OperatorChecks.run(limits, cancel, c -&gt; derive(source, batchWidth, c));</span>
+    }
+
+    public static Result&lt;Certificate&gt; construct(Problem problem, List&lt;ExactMatrixExpression&gt; predictors,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L86">        return OperatorChecks.run(limits, cancel, c -&gt; {</span>
+<span class="fc" id="L87">            var result = construct(problem, predictors, c);</span>
+<span class="fc" id="L88">            SpectralBatchRepairVerifier.check(problem, result, c);</span>
+<span class="fc" id="L89">            return result;</span>
+        });
+    }
+
+    public static Result&lt;PreparedSpectralBatch&gt; prepare(Problem expected, Certificate certificate,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L95">        return OperatorChecks.run(limits, cancel,</span>
+<span class="fc" id="L96">                c -&gt; prepare(expected, certificate, PreparedSpectralBatch.Kind.REPAIR, c));</span>
+    }
+
+    public static Result&lt;Discovery&gt; discover(Problem problem, Policy policy, int maximumCandidates,
+            IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L101">        return OperatorChecks.run(limits, cancel, c -&gt; discover(problem, policy, maximumCandidates, c));</span>
+    }
+
+    public static Result&lt;Discovery&gt; discover(PolynomialMatrix source, int batchWidth, Policy policy,
+            int maximumCandidates, IterationLimits limits, BooleanSupplier cancel) {
+<span class="fc" id="L106">        return OperatorChecks.run(limits, cancel, c -&gt; {</span>
+<span class="fc" id="L107">            policy(policy, maximumCandidates, c);</span>
+<span class="fc" id="L108">            return discover(derive(source, batchWidth, c), policy, maximumCandidates, c);</span>
+        });
+    }
+
+    private static PreparedSpectralBatch prepare(Problem expected, Certificate certificate, PreparedSpectralBatch.Kind kind,
+            OperatorChecks c) {
+<span class="fc" id="L114">        var checked = SpectralBatchRepairVerifier.check(expected, certificate, c);</span>
+<span class="fc" id="L115">        return PreparedSpectralBatch.compile(certificate, checked, kind, c);</span>
+    }
+
+    private static Certificate construct(Problem problem, List&lt;ExactMatrixExpression&gt; predictors, OperatorChecks c) {
+<span class="fc" id="L119">        var z = target(problem, c);</span>
+<span class="fc" id="L120">        int n = problem.source().rows(), w = problem.batchWidth();</span>
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">        need(predictors != null &amp;&amp; predictors.size() == w, &quot;PREDICTOR_COUNT_MISMATCH&quot;);</span>
+<span class="fc" id="L122">        c.reserve(w, n);</span>
+<span class="fc" id="L123">        var p = new ArrayList&lt;List&lt;ExactRational&gt;&gt;();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (var expression : predictors)</span>
+<span class="fc" id="L125">            p.add(prediction(problem, expression, c));</span>
+<span class="fc" id="L126">        c.reserve(n, w);</span>
+<span class="fc" id="L127">        var supports = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc" id="L128">        int maximum = 0;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int nu = 0; nu &lt; n; nu++) {</span>
+<span class="fc" id="L130">            var support = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            for (int i = 0; i &lt; w; i++) {</span>
+<span class="fc" id="L132">                c.work.charge(1);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                if (!p.get(i).get(nu).equals(z.get(nu)))</span>
+<span class="fc" id="L134">                    support.add(i);</span>
+            }
+<span class="fc" id="L136">            maximum = Math.max(maximum, support.size());</span>
+<span class="fc" id="L137">            supports.add(List.copyOf(support));</span>
+        }
+<span class="fc" id="L139">        int s = maximum;</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (s == 0)</span>
+<span class="fc" id="L141">            return new Certificate(problem, predictors, 0, List.of(), Optional.empty(), List.of());</span>
+<span class="fc" id="L142">        c.reserve(w, 1);</span>
+<span class="fc" id="L143">        c.reserve(s, w);</span>
+<span class="fc" id="L144">        var nodes = new ArrayList&lt;ExactRational&gt;();</span>
+<span class="fc" id="L145">        var powers = new ExactRational[s][w];</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int i = 0; i &lt; w; i++) {</span>
+<span class="fc" id="L147">            var node = ExactRational.integer(i + 1L);</span>
+<span class="fc" id="L148">            nodes.add(node);</span>
+<span class="fc" id="L149">            var power = ExactRational.ONE;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (int k = 0; k &lt; s; k++) {</span>
+<span class="fc" id="L151">                powers[k][i] = power;</span>
+<span class="fc" id="L152">                power = c.work.mul(power, node);</span>
+            }
+        }
+<span class="fc" id="L155">        var h = c.matrix(s, w, (i, j) -&gt; scalar(powers[i][j]));</span>
+<span class="fc" id="L156">        c.reserve(n, 1);</span>
+<span class="fc" id="L157">        var frequencies = new ArrayList&lt;Frequency&gt;();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (int nu = 0; nu &lt; n; nu++) {</span>
+<span class="fc" id="L159">            var support = supports.get(nu);</span>
+<span class="fc" id="L160">            int j = support.size();</span>
+            PolynomialMatrix a;
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (j == 0)</span>
+<span class="fc" id="L163">                a = c.matrix(s, s, (i, k) -&gt; Polynomial.zero());</span>
+            else {
+<span class="fc" id="L165">                var v = c.matrix(j, j, (row, column) -&gt; h.get(row, support.get(column)));</span>
+<span class="fc" id="L166">                var inverse = inverse(v, c);</span>
+<span class="fc" id="L167">                var left = c.matrix(j, s,</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                        (row, column) -&gt; column &lt; j ? inverse.get(row, column) : Polynomial.zero());</span>
+<span class="fc" id="L169">                int frequency = nu;</span>
+<span class="fc" id="L170">                var d = c.matrix(j, j, (row, column) -&gt; {</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                    if (!row.equals(column))</span>
+<span class="fc" id="L172">                        return Polynomial.zero();</span>
+<span class="fc" id="L173">                    var value = c.work.div(c.work.add(p.get(support.get(row)).get(frequency),</span>
+<span class="fc" id="L174">                            c.work.mul(TWO, z.get(frequency))), TWO);</span>
+<span class="fc" id="L175">                    return scalar(c.work.mul(ExactRational.NEGATIVE_ONE, value));</span>
+                });
+<span class="fc" id="L177">                a = c.times(transpose(left, c), c.times(d, left));</span>
+            }
+<span class="fc" id="L179">            frequencies.add(new Frequency(support, a));</span>
+        }
+<span class="fc" id="L181">        return new Certificate(problem, predictors, s, nodes, Optional.of(h), frequencies);</span>
+    }
+
+    private static void policy(Policy policy, int maximumCandidates, OperatorChecks c) {
+<span class="fc" id="L185">        Objects.requireNonNull(policy);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (maximumCandidates &lt; 0)</span>
+<span class="nc" id="L187">            throw new IllegalArgumentException(&quot;NEGATIVE_CANDIDATE_LIMIT&quot;);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (policy.recipes().size() &gt; maximumCandidates)</span>
+<span class="fc" id="L189">            throw new OperatorChecks.Rejected(Status.STOPPED, &quot;CANDIDATE_LIMIT&quot;);</span>
+<span class="fc" id="L190">        c.work.cells(policy.recipes().size());</span>
+<span class="fc" id="L191">    }</span>
+
+    private static Discovery discover(Problem problem, Policy policy, int maximumCandidates, OperatorChecks c) {
+<span class="fc" id="L194">        policy(policy, maximumCandidates, c);</span>
+<span class="fc" id="L195">        var z = target(problem, c);</span>
+<span class="fc" id="L196">        int w = problem.batchWidth();</span>
+<span class="fc" id="L197">        var source = new ExactMatrixExpression.Matrix(&quot;source&quot;, problem.source());</span>
+<span class="fc" id="L198">        var direct = new Certificate(problem, Collections.nCopies(w, source), 0, List.of(), Optional.empty(), List.of());</span>
+<span class="fc" id="L199">        var best = prepare(problem, direct, PreparedSpectralBatch.Kind.DIRECT, c);</span>
+<span class="fc" id="L200">        var spectral = conjugate(problem, diagonal(z, c));</span>
+<span class="fc" id="L201">        var spectralCertificate = new Certificate(problem, Collections.nCopies(w, spectral), 0, List.of(),</span>
+<span class="fc" id="L202">                Optional.empty(), List.of());</span>
+<span class="fc" id="L203">        var alternative = prepare(problem, spectralCertificate, PreparedSpectralBatch.Kind.SPECTRAL_DIRECT, c);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (alternative.cost().total() &lt; best.cost().total())</span>
+<span class="fc" id="L205">            best = alternative;</span>
+<span class="fc" id="L206">        var candidates = new ArrayList&lt;Candidate&gt;();</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (var recipe : policy.recipes()) {</span>
+<span class="fc" id="L208">            c.work.charge(1);</span>
+            try {
+<span class="fc" id="L210">                var proposed = construct(problem, predictors(problem, z, recipe, c), c);</span>
+<span class="fc" id="L211">                int s = proposed.syndromeWidth();</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (s &gt; policy.maximumSupport()) {</span>
+<span class="nc" id="L213">                    candidates.add(new Candidate(recipe.name(), s, Optional.empty(), &quot;SUPPORT_LIMIT&quot;));</span>
+<span class="nc" id="L214">                    continue;</span>
+                }
+<span class="fc" id="L216">                var prepared = prepare(problem, proposed, PreparedSpectralBatch.Kind.REPAIR, c);</span>
+<span class="fc" id="L217">                candidates.add(new Candidate(recipe.name(), s, Optional.of(prepared.cost()), &quot;&quot;));</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                if (prepared.cost().total() &lt; best.cost().total())</span>
+<span class="nc" id="L219">                    best = prepared;</span>
+<span class="fc" id="L220">            } catch (OperatorChecks.Rejected rejected) {</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">                if (rejected.status != Status.INVALID || !rejected.getMessage().equals(&quot;NOT_COMMON_EIGENBASIS&quot;))</span>
+<span class="nc" id="L222">                    throw rejected;</span>
+<span class="fc" id="L223">                candidates.add(new Candidate(recipe.name(), -1, Optional.empty(), rejected.getMessage()));</span>
+<span class="fc" id="L224">            }</span>
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">        c.work.cells(best.retainedCells());</span>
+<span class="fc" id="L227">        return new Discovery(best, candidates);</span>
+    }
+
+    private static List&lt;ExactMatrixExpression&gt; predictors(Problem p, List&lt;ExactRational&gt; z, Recipe recipe,
+            OperatorChecks c) {
+<span class="fc" id="L232">        int n = p.source().rows(), w = p.batchWidth();</span>
+<span class="fc" id="L233">        c.reserve(w, 1);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (recipe == Recipe.SPECTRAL_PARTITION) {</span>
+<span class="fc" id="L235">            var result = new ArrayList&lt;ExactMatrixExpression&gt;();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            for (int i = 0; i &lt; w; i++) {</span>
+<span class="fc" id="L237">                final int row = i;</span>
+<span class="fc" id="L238">                var d = c.matrix(n, n,</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">                        (a, b) -&gt; a.equals(b) &amp;&amp; a % w != row ? scalar(z.get(a)) : Polynomial.zero());</span>
+<span class="fc" id="L240">                result.add(conjugate(p, d));</span>
+            }
+<span class="fc" id="L242">            return List.copyOf(result);</span>
+        }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (recipe == Recipe.IDENTITY)</span>
+<span class="fc" id="L245">            return Collections.nCopies(w, new ExactMatrixExpression.Identity(n));</span>
+<span class="pc bpc" id="L246" title="1 of 4 branches missed.">        var m = c.matrix(n, n, (i, j) -&gt; switch (recipe) {</span>
+<span class="fc" id="L247">            case ZERO -&gt; Polynomial.zero();</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            case DIAGONAL -&gt; i.equals(j) ? p.source().get(i, j) : Polynomial.zero();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            case TRIDIAGONAL -&gt; Math.abs(i - j) &lt;= 1 ? p.source().get(i, j) : Polynomial.zero();</span>
+<span class="nc" id="L250">            default -&gt; throw new IllegalArgumentException(&quot;INVALID_PREDICTOR_RECIPE&quot;);</span>
+        });
+<span class="fc" id="L252">        return Collections.nCopies(w, new ExactMatrixExpression.Matrix(recipe.name(), m));</span>
+    }
+
+    private static ExactMatrixExpression conjugate(Problem p, PolynomialMatrix d) {
+<span class="fc" id="L256">        return new ExactMatrixExpression.Product(new ExactMatrixExpression.Matrix(&quot;basis&quot;, p.basis()),</span>
+                new ExactMatrixExpression.Product(new ExactMatrixExpression.Matrix(&quot;diagonal&quot;, d),
+<span class="fc" id="L258">                        new ExactMatrixExpression.Matrix(&quot;inverse&quot;, p.inverse())));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

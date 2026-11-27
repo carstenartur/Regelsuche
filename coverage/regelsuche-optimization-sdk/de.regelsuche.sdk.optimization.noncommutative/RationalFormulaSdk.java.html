@@ -41,9 +41,15 @@ public final class RationalFormulaSdk {
 <span class="fc" id="L41">        return RationalFormulaCenterSearch.compare(left, right, policy, limits, cancellation::isCancelled);</span>
     }
 
+    /** Search bounded matrix entry grids and return an independently replayable comparison. */
+    public static RationalFormulaCenterSearch.Result compare(RationalFormula left, RationalFormula right,
+        RationalFormulaCenterSearch.MatrixPolicy policy, IterationLimits limits, CancellationToken cancellation) {
+<span class="fc" id="L47">        return RationalFormulaCenterSearch.compare(left, right, policy, limits, cancellation::isCancelled);</span>
+    }
+
     public static RationalFormulaComparison.Result verifyComparison(RationalFormula left, RationalFormula right,
         Assignment center, RationalFormulaComparison.Evidence evidence, IterationLimits limits, CancellationToken cancellation) {
-<span class="fc" id="L46">        return RationalFormulaComparison.verify(left, right, center, evidence, limits, cancellation::isCancelled);</span>
+<span class="fc" id="L52">        return RationalFormulaComparison.verify(left, right, center, evidence, limits, cancellation::isCancelled);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
