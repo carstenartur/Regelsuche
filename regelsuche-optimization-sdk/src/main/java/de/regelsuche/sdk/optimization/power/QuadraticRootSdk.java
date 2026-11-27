@@ -3,6 +3,7 @@ package de.regelsuche.sdk.optimization.power;
 import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.modular.QuadraticRootContract;
 import de.regelsuche.math.algorithms.modular.QuadraticRootEvaluation;
+import de.regelsuche.math.algorithms.modular.QuadraticRootNormalization;
 import de.regelsuche.math.algorithms.modular.QuadraticRootSearch;
 import de.regelsuche.math.algorithms.modular.QuadraticRootVerifier;
 import de.regelsuche.math.algorithms.modular.SharedPowerPlan;
@@ -28,6 +29,14 @@ public final class QuadraticRootSdk {
     public static QuadraticRootVerifier.Result verify(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,
             OptimizationBudget budget, CancellationToken cancellation) {
         return QuadraticRootVerifier.verify(expected, certificate, limits(budget), cancellation::isCancelled);
+    }
+
+    /** Replay the root and its downstream exact normalized observation with a single budget. */
+    public static QuadraticRootVerifier.Result verifyNormalized(QuadraticRootContract expectedRoot,
+            QuadraticRootNormalization.Contract expectedNormalizer, QuadraticRootNormalization.Certificate supplied,
+            OptimizationBudget budget, CancellationToken cancellation) {
+        return QuadraticRootNormalization.verifyNormalized(expectedRoot, expectedNormalizer, supplied, limits(budget),
+                cancellation::isCancelled);
     }
 
     public static QuadraticRootEvaluation.Preparation prepare(QuadraticRootContract expected, QuadraticRootSearch.Certificate certificate,

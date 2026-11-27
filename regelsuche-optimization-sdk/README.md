@@ -17,7 +17,11 @@ integration. New source methods do not retroactively become part of a release.
 source-program search for roots in a quadratic extension over a certified
 prime field. The core derives shared powers, searches signed coordinate
 permutations and independently replays the original and candidate programs.
-`EXACT_PAIR` and `UP_TO_JOINT_SIGN` are distinct contracts. The SDK delegates
+`EXACT_PAIR` and `UP_TO_JOINT_SIGN` are distinct raw observations.
+`verifyNormalized(expectedRoot, expectedNormalizer, certificate, budget, cancellation)`
+also verifies exact equality after an independently specified parity selector
+chooses a common orientation for the same target bit. The consumer binds that
+selector, target and conditional joint negation to the observed source. The SDK delegates
 budgets and cancellation; a Java consumer must establish the input domain,
 effects and emitted-code equivalence. See [field program contracts and exact
 prime evidence](../docs/research/quadratic-root-programs.md).
