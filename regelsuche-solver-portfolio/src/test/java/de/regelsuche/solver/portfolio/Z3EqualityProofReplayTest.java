@@ -47,6 +47,36 @@ class Z3EqualityProofReplayTest {
     }
 
     @Test
+    void replaysNativeCancellationOfEqualAddends() {
+        // Captured from Z3 4.13.3.0: x = y and not (x+1 = y+1), with proof production enabled.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x25 (= x y)))
+            (let (($x69 (not $x25)))
+            (let ((@x72 (rewrite (= (not (= (+ x (to_real 1)) (+ y (to_real 1)))) $x69))))
+            (let (($x32 (not (= (+ x (to_real 1)) (+ y (to_real 1))))))
+            (let ((@x33 (asserted $x32)))
+            (let ((@x26 (asserted $x25)))
+            (unit-resolution @x26 (mp @x33 @x72 $x69) false)))))))))
+            """;
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x+1", "y+1", "x = y"), proof));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x+1", "y+2", "x = y"),
+            proof.replace("(+ y (to_real 1))", "(+ y (to_real 2))")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x+1", "y+1", "y = x"), proof));
+    }
+
+    @Test
+    void checksEquationDifferenceWithReversedOrientation() {
+        String equality = "(= (+ x 1.0) (+ y 1.0))";
+        String proof = contradiction("(mp (asserted (= y x)) (rewrite (= (= y x) "
+            + equality + ")) " + equality + ")", equality);
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x+1", "y+1", "y = x"), proof));
+        String invalid = proof.replace("(+ y 1.0)", "(+ y 2.0)");
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x+1", "y+2", "y = x"), invalid));
+    }
+
+    @Test
     void rejectsConditionalRewriteEvenWhenExternalSolverReportsUnsat() throws IOException {
         assertFalse(Z3EqualityProofReplay.verifies(statement("x*z", "y*z", "x = y"), captured("premise-eliminated")));
         assertFalse(Z3EqualityProofReplay.verifies(statement("x*z", "y*z"),
