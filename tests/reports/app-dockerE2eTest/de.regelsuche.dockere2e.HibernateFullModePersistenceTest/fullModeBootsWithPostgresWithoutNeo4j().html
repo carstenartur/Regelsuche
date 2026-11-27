@@ -63,7 +63,7 @@
 </td>
 <td>
 <div class="infoBox duration">
-<div class="counter">13.713s</div>
+<div class="counter">11.678s</div>
 <p>duration</p>
 </div>
 </td>
@@ -88,15 +88,15 @@
 <div class="clipboard-copy-btn-container">
 <button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Copy</button>
 </div>
-<pre id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Nov 27, 2026 1:34:29 AM org.hibernate.jpa.internal.util.LogHelper logPersistenceUnitInformation
+<pre id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Nov 27, 2026 7:21:04 AM org.hibernate.jpa.internal.util.LogHelper logPersistenceUnitInformation
 INFO: HHH008540: Processing PersistenceUnitInfo [name: regelsuche-postgresql]
-Nov 27, 2026 1:34:30 AM org.hibernate.Version logVersion
+Nov 27, 2026 7:21:04 AM org.hibernate.Version logVersion
 INFO: HHH000001: Hibernate ORM core version 7.4.17.Final
-Nov 27, 2026 1:34:31 AM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProvider configure
+Nov 27, 2026 7:21:05 AM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProvider configure
 WARN: HHH10001002: Using built-in connection pool (not intended for production use)
-Nov 27, 2026 1:34:32 AM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
+Nov 27, 2026 7:21:06 AM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
 INFO: HHH10001005: Database info:
-	Database JDBC URL [jdbc:postgresql://localhost:32771/regelsuche]
+	Database JDBC URL [jdbc:postgresql://localhost:32772/regelsuche]
 	Database driver: PostgreSQL JDBC Driver
 	Database dialect: PostgreSQLDialect
 	Database version: 16.14
@@ -107,24 +107,24 @@ INFO: HHH10001005: Database info:
 	Pool: DriverManagerConnectionProvider
 	Minimum pool size: 1
 	Maximum pool size: 20
-Nov 27, 2026 1:34:33 AM org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchPreIntegrationService$Initiator initiateService
+Nov 27, 2026 7:21:07 AM org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchPreIntegrationService$Initiator initiateService
 INFO: HSEARCH000034: Hibernate Search version 8.4.1.Final
-Nov 27, 2026 1:34:39 AM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+Nov 27, 2026 7:21:12 AM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
 INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-Nov 27, 2026 1:34:40 AM org.apache.lucene.internal.vectorization.VectorizationProvider lookup
+Nov 27, 2026 7:21:13 AM org.apache.lucene.internal.vectorization.VectorizationProvider lookup
 WARNING: You are running with Java 23 or later. To make full use of the Vector API, please update Apache Lucene.
-Nov 27, 2026 1:34:40 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-2066641957199086147/hibernate-search/BenchmarkResultEntity'
-Nov 27, 2026 1:34:40 AM org.apache.lucene.store.MemorySegmentIndexInputProvider &lt;init&gt;
+Nov 27, 2026 7:21:13 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9618186160104434745/hibernate-search/BenchmarkResultEntity'
+Nov 27, 2026 7:21:13 AM org.apache.lucene.store.MemorySegmentIndexInputProvider &lt;init&gt;
 INFO: Using MemorySegmentIndexInput and native madvise support with Java 21 or later; to disable start with -Dorg.apache.lucene.store.MMapDirectory.enableMemorySegments=false
-Nov 27, 2026 1:34:40 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-2066641957199086147/hibernate-search/ExportReportEntity'
-Nov 27, 2026 1:34:40 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-2066641957199086147/hibernate-search/HypothesisCandidateEntity'
-Nov 27, 2026 1:34:40 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-2066641957199086147/hibernate-search/SearchIndexDocument'
-Nov 27, 2026 1:34:40 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-2066641957199086147/hibernate-search/SeedExpressionEntity'
+Nov 27, 2026 7:21:13 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9618186160104434745/hibernate-search/ExportReportEntity'
+Nov 27, 2026 7:21:13 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9618186160104434745/hibernate-search/HypothesisCandidateEntity'
+Nov 27, 2026 7:21:13 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9618186160104434745/hibernate-search/SearchIndexDocument'
+Nov 27, 2026 7:21:13 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9618186160104434745/hibernate-search/SeedExpressionEntity'
 </pre>
 </span>
 </div>
@@ -138,7 +138,7 @@ INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-20666
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.9.2</a> at Nov 27, 2026, 1:44:13 AM</p>
+<a href="https://www.gradle.org">Gradle 9.9.2</a> at Nov 27, 2026, 7:31:10 AM</p>
 </div>
 </div>
 </body>

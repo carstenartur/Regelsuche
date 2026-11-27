@@ -61,7 +61,7 @@ public final class QuadraticRootVerifier {
 <span class="fc bfc" id="L61" title="All 4 branches covered.">        if (!template.prefix().equals(program.prefix()) || template.guardLeft() != program.guardLeft()</span>
 <span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || template.guardRight() != program.guardRight()) throw new IllegalArgumentException(&quot;POWER_BINDING_MISMATCH&quot;);</span>
 <span class="fc" id="L63">        var lanes = lanes(expected, program, work);</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!matches(lanes, true, program.equal(), expected.observation(), work)</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!matches(lanes, true, program.equal(), expected.observation(), work)</span>
 <span class="fc bfc" id="L65" title="All 2 branches covered.">                || !matches(lanes, false, program.unequal(), expected.observation(), work)) {</span>
 <span class="fc" id="L66">            throw new IllegalArgumentException(&quot;COORDINATE_MISMATCH&quot;);</span>
         }

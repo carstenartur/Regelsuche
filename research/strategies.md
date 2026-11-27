@@ -34,7 +34,17 @@ erklärt, wie sich die Zeilenverweise neu erzeugen lassen.
 - [`QuadraticRootPreparedTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootPreparedTest.java#L11) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootPreparedTest.java | class QuadraticRootPreparedTest { -->
 - [`PrimeEvidenceJsonTest.java`](../../regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/power/PrimeEvidenceJsonTest.java#L19) <!-- strategy-code: regelsuche-optimization-sdk/src/test/java/de/regelsuche/sdk/optimization/power/PrimeEvidenceJsonTest.java | class PrimeEvidenceJsonTest { -->
 - [`QuadraticRootTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootTest.java#L18) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootTest.java | class QuadraticRootTest { -->
-- [`QuadraticRootSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/QuadraticRootSdk.java#L14) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/QuadraticRootSdk.java | public final class QuadraticRootSdk { -->
+- [`QuadraticRootSdk.java`](../../regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/QuadraticRootSdk.java#L15) <!-- strategy-code: regelsuche-optimization-sdk/src/main/java/de/regelsuche/sdk/optimization/power/QuadraticRootSdk.java | public final class QuadraticRootSdk { -->
+
+## Exakte Ausgabe nach gemeinsamer Vorzeichenwahl
+
+- **Hypothese.** Verschiedene Zwischenwurzeln desselben Wurzelprogramms können nach einer quellgebundenen Vorzeichenwahl exakt dieselbe geordnete Ausgabe haben.
+- **Umsetzungsstand.** `QuadraticRootNormalization` bindet den Wurzelbeleg an den unabhängig rekonstruierten Normalisierervertrag. Der Prüfer spielt den vollständigen Wurzelbeleg nach und verlangt an den acht Nichtnull-Zellen der Paritätstabelle jeweils einen Bitwechsel unter gemeinsamer Negation. Für das Nullpaar sind beide Ausgänge gleich.
+- **Befund.** Direkte Auswertung aller 512 Wähler über allen Paaren modulo 3 und beiden Zielbits bestätigt genau die 32 akzeptierten Tabellen. Bei allen 464 zulässigen nichtreellen Eingabetripeln über 3, 7, 11 und 19 stimmen die normierten Ausgaben der ursprünglichen Zweigformel und des geprüften Kandidaten für beide Koordinatenprioritäten, beide Zielbits und alle Multiplikationsfaktoren überein. [Beweis und Reproduktion](quadratic-root-programs.md#exakte-beobachtung-nach-gemeinsamer-vorzeichenwahl)
+- **Folgerung.** Der Consumer kann die gelockerte Suche verwenden, sobald er Zielbit, Normalisierer, Zwischenschritte und Beobachtungen aus tatsächlichem Quellcode belegt. Die endliche Prüfung liefert eine Gleichheitsaussage. Ein Laufzeitvergleich hängt vom jeweiligen erzeugten Programm ab.
+
+- [`QuadraticRootNormalization.java`](../../regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/QuadraticRootNormalization.java#L10) <!-- strategy-code: regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/modular/QuadraticRootNormalization.java | public final class QuadraticRootNormalization { -->
+- [`QuadraticRootNormalizationTest.java`](../../regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootNormalizationTest.java#L15) <!-- strategy-code: regelsuche-math-algorithms/src/test/java/de/regelsuche/math/algorithms/modular/QuadraticRootNormalizationTest.java | class QuadraticRootNormalizationTest { -->
 
 ## Gemeinsame Potenzen unter expliziten Ausgabebeobachtungen
 
