@@ -140,6 +140,10 @@ final class Z3ProofValues {
             result.size(), result.monomials(), result.degree(), result.coefficients());
     }
 
+    Real difference(Real left, Real right) {
+        return binary(BinaryOperator.SUBTRACT, left, right);
+    }
+
     private Real binary(BinaryOperator operator, Real left, Real right) {
         int size = admit(1L + left.size() + right.size());
         int degree = Math.max(left.degree(), right.degree());
