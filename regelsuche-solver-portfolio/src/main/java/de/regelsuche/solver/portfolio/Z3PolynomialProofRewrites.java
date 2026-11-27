@@ -17,12 +17,16 @@ import java.util.Map;
 /** Every rewrite is checked without premises; a native rule label is never sufficient. */
 final class Z3PolynomialProofRewrites {
     private final Obligation source;
+    private final Z3ProofValues values;
     private final PolynomialNormalFormSolverBackend backend = new PolynomialNormalFormSolverBackend();
     private final Map<Pair, Boolean> cache = new HashMap<>();
     private int calls;
     private long admittedWork;
 
-    Z3PolynomialProofRewrites(Obligation source) { this.source = source; }
+    Z3PolynomialProofRewrites(Obligation source, Z3ProofValues values) {
+        this.source = source;
+        this.values = values;
+    }
 
     boolean verifies(Equality equality) { return equivalent(equality.left(), equality.right(), 0); }
 
@@ -38,9 +42,20 @@ final class Z3PolynomialProofRewrites {
         }
         if (a instanceof Equality n && b instanceof Equality m) {
             return equivalent(n.left(), m.left(), depth + 1) && equivalent(n.right(), m.right(), depth + 1)
-                || equivalent(n.left(), m.right(), depth + 1) && equivalent(n.right(), m.left(), depth + 1);
+                || equivalent(n.left(), m.right(), depth + 1) && equivalent(n.right(), m.left(), depth + 1)
+                || equivalentRealEquations(n, m);
         }
         return false;
+    }
+
+    /** Both equations hold exactly when their difference is zero. Only polynomial identities
+     * between differences (possibly with reversed orientation) justify this rewrite. */
+    private boolean equivalentRealEquations(Equality first, Equality second) {
+        if (!(first.left() instanceof Real a) || !(first.right() instanceof Real b)
+                || !(second.left() instanceof Real c) || !(second.right() instanceof Real d)) return false;
+        Real difference = values.difference(a, b);
+        return polynomial(difference, values.difference(c, d))
+            || polynomial(difference, values.difference(d, c));
     }
 
     /** null means not proved constant; REFUTED polynomial identity is not universal disequality. */
