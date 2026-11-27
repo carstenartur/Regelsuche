@@ -40,12 +40,36 @@ final class Z3PolynomialProofRewrites {
         if (a instanceof Negation n && b instanceof Negation m) {
             return equivalent(n.operand(), m.operand(), depth + 1);
         }
+        if (a instanceof Equality equation && b instanceof Disjunction disjunction) {
+            return zeroProduct(equation, disjunction);
+        }
+        if (a instanceof Disjunction disjunction && b instanceof Equality equation) {
+            return zeroProduct(equation, disjunction);
+        }
         if (a instanceof Equality n && b instanceof Equality m) {
             return equivalent(n.left(), m.left(), depth + 1) && equivalent(n.right(), m.right(), depth + 1)
                 || equivalent(n.left(), m.right(), depth + 1) && equivalent(n.right(), m.left(), depth + 1)
                 || equivalentRealEquations(n, m);
         }
         return false;
+    }
+
+    /**
+     * Over the reals a product is zero iff at least one factor is zero.
+     * Independently establish the polynomial identity between the equation difference
+     * and the product of every disjunct's difference; no native factorization is trusted.
+     */
+    private boolean zeroProduct(Equality equation, Disjunction disjunction) {
+        if (!(equation.left() instanceof Real left) || !(equation.right() instanceof Real right)) return false;
+        Real product = null;
+        for (Formula operand : disjunction.operands()) {
+            if (!(operand instanceof Equality factor) || !(factor.left() instanceof Real a)
+                    || !(factor.right() instanceof Real b)) return false;
+            Real difference = values.difference(a, b);
+            product = product == null ? difference : values.product(product, difference);
+        }
+        return product != null && (polynomial(values.difference(left, right), product)
+            || polynomial(values.difference(right, left), product));
     }
 
     /** Both equations hold exactly when their difference is zero. Only polynomial identities
@@ -68,7 +92,18 @@ final class Z3PolynomialProofRewrites {
                 yield child == null ? null : child == Truth.TRUE ? Truth.FALSE : Truth.TRUE;
             }
             case Equality equality -> equalityTruth(equality, depth + 1);
+            case Disjunction disjunction -> disjunctionTruth(disjunction, depth + 1);
         };
+    }
+
+    private Truth disjunctionTruth(Disjunction disjunction, int depth) {
+        boolean unknown = false;
+        for (Formula operand : disjunction.operands()) {
+            Truth value = truth(operand, depth + 1);
+            if (value == Truth.TRUE) return Truth.TRUE;
+            unknown |= value == null;
+        }
+        return unknown ? null : Truth.FALSE;
     }
 
     private Truth equalityTruth(Equality equality, int depth) {
