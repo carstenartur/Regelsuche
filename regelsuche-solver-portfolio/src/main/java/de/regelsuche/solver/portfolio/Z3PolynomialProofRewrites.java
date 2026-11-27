@@ -40,6 +40,29 @@ final class Z3PolynomialProofRewrites {
         if (a instanceof Negation n && b instanceof Negation m) {
             return equivalent(n.operand(), m.operand(), depth + 1);
         }
+        if (a instanceof Negation n && n.operand() instanceof Negation inner) {
+            return equivalent(inner.operand(), b, depth + 1);
+        }
+        if (b instanceof Negation n && n.operand() instanceof Negation inner) {
+            return equivalent(a, inner.operand(), depth + 1);
+        }
+        if (a instanceof Order firstOrder && b instanceof Order secondOrder) {
+            // Preserve direction: unlike equations, sign reversal is not valid for inequalities.
+            return polynomial(values.difference(firstOrder.upper(), firstOrder.lower()),
+                values.difference(secondOrder.upper(), secondOrder.lower()));
+        }
+        if (a instanceof Equality equation && b instanceof Conjunction conjunction) {
+            return oppositeOrders(equation, conjunction);
+        }
+        if (b instanceof Equality equation && a instanceof Conjunction conjunction) {
+            return oppositeOrders(equation, conjunction);
+        }
+        if (a instanceof Conjunction conjunction && b instanceof Negation negation) {
+            return deMorgan(conjunction, negation);
+        }
+        if (b instanceof Conjunction conjunction && a instanceof Negation negation) {
+            return deMorgan(conjunction, negation);
+        }
         if (a instanceof Equality equation && b instanceof Disjunction disjunction) {
             return zeroProduct(equation, disjunction);
         }
@@ -52,6 +75,27 @@ final class Z3PolynomialProofRewrites {
                 || equivalentRealEquations(n, m);
         }
         return false;
+    }
+
+    /** Antisymmetry and reflexivity of the real order, with both directions present. */
+    private static boolean oppositeOrders(Equality equation, Conjunction conjunction) {
+        if (!(equation.left() instanceof Real left) || !(equation.right() instanceof Real right)
+                || conjunction.operands().size() != 2
+                || !(conjunction.operands().get(0) instanceof Order first)
+                || !(conjunction.operands().get(1) instanceof Order second)) return false;
+        return first.lower().equals(second.upper()) && first.upper().equals(second.lower())
+            && (first.lower().equals(left) && first.upper().equals(right)
+                || first.lower().equals(right) && first.upper().equals(left));
+    }
+
+    /** A conjunction is exactly the negation of the disjunction of its complements. */
+    private static boolean deMorgan(Conjunction conjunction, Negation negation) {
+        if (!(negation.operand() instanceof Disjunction disjunction)
+                || conjunction.operands().size() != disjunction.operands().size()) return false;
+        for (int i = 0; i < conjunction.operands().size(); i++) {
+            if (!complements(conjunction.operands().get(i), disjunction.operands().get(i))) return false;
+        }
+        return true;
     }
 
     /**
@@ -93,6 +137,8 @@ final class Z3PolynomialProofRewrites {
             }
             case Equality equality -> equalityTruth(equality, depth + 1);
             case Disjunction disjunction -> disjunctionTruth(disjunction, depth + 1);
+            case Conjunction conjunction -> conjunctionTruth(conjunction, depth + 1);
+            case Order order -> order.lower().equals(order.upper()) ? Truth.TRUE : null;
         };
     }
 
@@ -104,6 +150,16 @@ final class Z3PolynomialProofRewrites {
             unknown |= value == null;
         }
         return unknown ? null : Truth.FALSE;
+    }
+
+    private Truth conjunctionTruth(Conjunction conjunction, int depth) {
+        boolean unknown = false;
+        for (Formula operand : conjunction.operands()) {
+            Truth value = truth(operand, depth + 1);
+            if (value == Truth.FALSE) return Truth.FALSE;
+            unknown |= value == null;
+        }
+        return unknown ? null : Truth.TRUE;
     }
 
     private Truth equalityTruth(Equality equality, int depth) {

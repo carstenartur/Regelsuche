@@ -8,6 +8,7 @@ import de.regelsuche.solver.ir.SolverIr.Relation;
 import de.regelsuche.solver.ir.SolverIr.Sort;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -117,7 +118,7 @@ public final class Z3EqualityProofReplay {
                 case "monotonicity" -> congruence(node);
                 case "rewrite" -> rewrite(node.items(2));
                 case "mp" -> modusPonens(node.items(4));
-                case "unit-resolution" -> resolve(node.items(4));
+                case "unit-resolution" -> resolve(node);
                 case "not-or-elim" -> notOrElimination(node.items(3));
                 default -> throw new Invalid();
             };
@@ -214,17 +215,47 @@ public final class Z3EqualityProofReplay {
             Formula result = values.formula(nodes.get(2));
             if (!(source.conclusion() instanceof Negation negation)
                     || !(negation.operand() instanceof Disjunction disjunction)
-                    || !(result instanceof Negation selected)
-                    || !disjunction.operands().contains(selected.operand())) throw new Invalid();
+                    || disjunction.operands().stream().noneMatch(operand -> complements(operand, result))) {
+                throw new Invalid();
+            }
             return new Step(result, source.dependencies());
         }
 
-        private Step resolve(List<Node> nodes) {
-            Step a = step(nodes.get(1)), b = step(nodes.get(2));
-            boolean opposite = a.conclusion() instanceof Negation n && n.operand().equals(b.conclusion())
-                || b.conclusion() instanceof Negation m && m.operand().equals(a.conclusion());
-            if (!nodes.get(3).is("false") || !opposite) throw new Invalid();
-            return new Step(Truth.FALSE, union(a, b));
+        private Step resolve(Node node) {
+            var nodes = node.children();
+            if (nodes.size() < 4 || nodes.size() > 131) throw new Invalid();
+            Step first = step(nodes.get(1));
+            Formula result = values.formula(nodes.getLast());
+            Step second = step(nodes.get(2));
+            if (nodes.size() == 4) {
+                if (complements(first.conclusion(), second.conclusion())) {
+                    if (result != Truth.FALSE) throw new Invalid();
+                    return new Step(result, union(first, second));
+                }
+            }
+            if (!(first.conclusion() instanceof Disjunction clause)) throw new Invalid();
+            var remaining = new ArrayList<>(clause.operands());
+            var used = (BitSet) first.dependencies().clone();
+            for (int i = 2; i < nodes.size() - 1; i++) {
+                Step unit = i == 2 ? second : step(nodes.get(i));
+                int matched = -1;
+                for (int j = 0; j < remaining.size(); j++) {
+                    if (complements(remaining.get(j), unit.conclusion())) {
+                        matched = j;
+                        break;
+                    }
+                }
+                if (matched < 0) throw new Invalid();
+                remaining.remove(matched);
+                used.or(unit.dependencies());
+            }
+            boolean exact = switch (remaining.size()) {
+                case 0 -> result == Truth.FALSE;
+                case 1 -> result.equals(remaining.getFirst());
+                default -> result instanceof Disjunction rest && rest.operands().equals(remaining);
+            };
+            if (!exact) throw new Invalid();
+            return new Step(result, used);
         }
 
         private static BitSet union(Step first, Step second) {
