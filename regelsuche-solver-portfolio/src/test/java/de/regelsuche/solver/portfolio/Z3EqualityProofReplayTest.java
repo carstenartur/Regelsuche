@@ -77,6 +77,56 @@ class Z3EqualityProofReplayTest {
     }
 
     @Test
+    void replaysNativeZeroProductWithThreeFactorsAndRejectsForgery() {
+        // Captured from Z3 4.13.3.0 with proof production: x = 0 implies x*y*z = 0.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x51 (not (or (= z 0.0) (= y 0.0) (= x 0.0)))))
+            (let (($x43 (not (= (* x y z) 0.0))))
+            (let ((@x42 (mp (asserted (not (= (* x y z) (to_real 0)))) (rewrite (= (not (= (* x y z) (to_real 0))) $x43)) $x43)))
+            (let ((@x58 (not-or-elim (mp @x42 (rewrite (= $x43 $x51)) $x51) (not (= x 0.0)))))
+            (let (($x31 (= x 0.0)))
+            (let ((@x29 (mp (asserted (= x (to_real 0))) (rewrite (= (= x (to_real 0)) $x31)) $x31)))
+            (unit-resolution @x29 @x58 false)))))))))
+            """;
+        var statement = statement("x*y*z", "0", "x = 0");
+        assertTrue(Z3EqualityProofReplay.verifies(statement, proof));
+        assertFalse(Z3EqualityProofReplay.verifies(statement,
+            proof.replace("(or (= z 0.0) (= y 0.0) (= x 0.0))", "(or (= y 0.0) (= x 0.0))")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement,
+            proof.replace("(= z 0.0)", "(= z 1.0)")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement,
+            proof.replace("(not-or-elim", "(unsupported-rule")));
+    }
+
+    @Test
+    void replaysNativeFactoredEquationAndRequiresSelectedDisjunct() {
+        // Captured from Z3 4.13.3.0: x = 1 implies x*y = y.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x55 (= x 1.0)))
+            (let (($x70 (not $x55)))
+            (let (($x6 (= (+ x (- 1.0)) 0.0)))
+            (let (($x58 (not $x6)))
+            (let (($x48 (not (or (= y 0.0) $x6))))
+            (let (($x18 (not (= (* x y) y))))
+            (let ((@x7 (asserted $x18)))
+            (let ((@x72 (mp (not-or-elim (mp @x7 (rewrite (= $x18 $x48)) $x48) $x58) (rewrite (= $x58 $x70)) $x70)))
+            (let ((@x53 (mp (asserted (= x (to_real 1))) (rewrite (= (= x (to_real 1)) $x55)) $x55)))
+            (unit-resolution @x53 @x72 false))))))))))))
+            """;
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x*y", "y", "x = 1"), proof));
+        // The negative goal does not imply the negation of an unrelated factor.
+        String forged = wrap("(unit-resolution (asserted (= z 0.0)) "
+            + "(not-or-elim (mp (asserted (not (= (* x y) 0.0))) "
+            + "(rewrite (= (not (= (* x y) 0.0)) (not (or (= x 0.0) (= y 0.0))))) "
+            + "(not (or (= x 0.0) (= y 0.0)))) (not (= z 0.0))) false)");
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x*y", "0", "z = 0"), forged));
+    }
+
+    @Test
     void rejectsConditionalRewriteEvenWhenExternalSolverReportsUnsat() throws IOException {
         assertFalse(Z3EqualityProofReplay.verifies(statement("x*z", "y*z", "x = y"), captured("premise-eliminated")));
         assertFalse(Z3EqualityProofReplay.verifies(statement("x*z", "y*z"),
