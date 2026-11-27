@@ -1,6 +1,6 @@
 package example;
 
-/** Runs all seven checked calculations using only the externally resolved SDK. */
+/** Runs all ten checked calculations using only the externally resolved SDK. */
 public final class CheckedMathExamples {
     private CheckedMathExamples() {}
 
@@ -12,5 +12,8 @@ public final class CheckedMathExamples {
         RationalMatrixFormula.main(args);
         DynamicQuotient.main(args);
         BoundedPlanning.main(args);
+        MatrixCenterIdentity.main(args);
+        SpectralRepair.main(args);
+        ComposedBilinearPlans.main(args);
     }
 }

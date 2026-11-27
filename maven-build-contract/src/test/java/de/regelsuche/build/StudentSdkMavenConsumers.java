@@ -22,6 +22,12 @@ final class StudentSdkMavenConsumers {
     private static final String GROUP = "io.github.carstenartur";
     private static final List<String> REMOVED_ENV = List.of("MAVEN_ARGS", "MAVEN_OPTS", "MAVEN_PROJECTBASEDIR",
         "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS");
+    static final List<Consumer> CONSUMERS = List.of(
+        new Consumer("hello-rule-java25", "example.HelloRule", Set.of("regelsuche-core", "regelsuche-egraph",
+            "regelsuche-search", "regelsuche-plugin-api"), 2),
+        new Consumer("checked-math-java25", "example.CheckedMathExamples", Set.of("regelsuche-core",
+            "regelsuche-egraph", "regelsuche-search", "regelsuche-math-algorithms", "regelsuche-validation",
+            "regelsuche-optimization-sdk"), 10));
 
     private StudentSdkMavenConsumers() {}
 
@@ -40,13 +46,7 @@ final class StudentSdkMavenConsumers {
             JsonNode manifest = extract(archive, version, extracted);
             Path settings = Files.writeString(scratch.resolve("empty-settings.xml"),
                 "<settings xmlns=\"http://maven.apache.org/SETTINGS/1.2.0\"/>\n");
-            var specs = List.of(
-                new Consumer("hello-rule-java25", "example.HelloRule", Set.of("regelsuche-core", "regelsuche-egraph",
-                    "regelsuche-search", "regelsuche-plugin-api"), 2),
-                new Consumer("checked-math-java25", "example.CheckedMathExamples", Set.of("regelsuche-core",
-                    "regelsuche-egraph", "regelsuche-search", "regelsuche-math-algorithms", "regelsuche-validation",
-                    "regelsuche-optimization-sdk"), 7));
-            for (var spec : specs) {
+            for (var spec : CONSUMERS) {
                 var result = new LinkedHashMap<String, Object>();
                 consumers.put(spec.name(), result);
                 Path logs = Files.createDirectory(evidence.resolve(spec.name()));
@@ -192,5 +192,5 @@ final class StudentSdkMavenConsumers {
         return Files.readString(log);
     }
 
-    private record Consumer(String name, String main, Set<String> modules, int tests) {}
+    record Consumer(String name, String main, Set<String> modules, int tests) {}
 }

@@ -94,7 +94,7 @@ Fremdabhängigkeiten benötigen beim ersten Lauf weiterhin Netzwerkzugriff.
 
 ## Neuere Mathematik aus dem Quell-SDK oder einem neuen Archiv
 
-Die sieben [geprüften Mathematikbeispiele](../examples/external-consumers/checked-math-java25/README.md)
+Die zehn [geprüften Mathematikbeispiele](../examples/external-consumers/checked-math-java25/README.md)
 verwenden APIs nach Release 0.5.3. Aus dem aktuellen Checkout:
 
 ```bash
@@ -105,8 +105,8 @@ mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify
 Aus einem entpackten SDK-Archiv, das dieses Projekt enthält, genügt der zweite
 Befehl im Archiv-Wurzelverzeichnis. Das erzeugte Beispiel-POM bindet die
 Archivversion; zusätzliche Versionsparameter und ein handgebautes `lib/`
-sind nicht erforderlich. `verify` prüft sieben konkrete Ergebnisse und führt
-anschließend alle sieben Programme aus. Ein solches lokales Archiv ist kein
+sind nicht erforderlich. `verify` prüft zehn konkrete Ergebnisse und führt
+anschließend alle zehn Programme aus. Ein solches lokales Archiv ist kein
 Nachweis einer Veröffentlichung. Das SDK 0.5.3 enthält diese APIs noch nicht.
 
 ## Historische Reproduktion mit SDK 0.5.2

@@ -1,6 +1,6 @@
-# Seven checked mathematical calculations
+# Ten checked mathematical calculations
 
-This independent Maven project runs seven typed SDK examples. It needs
+This independent Maven project runs ten typed SDK examples. It needs
 **JDK 25** and **Maven 3.9.9 or newer in the 3.x line**. The APIs are part of the
 current source SDK and are absent from the published 0.5.3 SDK.
 
@@ -15,7 +15,7 @@ mvn -f examples/external-consumers/checked-math-java25/pom.xml clean verify
 
 The packager binds the example POM to the archive's own SDK version. No version
 override or manually assembled classpath is needed. Maven compiles the programs,
-runs seven result checks, and then executes all seven calculations. Third-party
+runs ten result checks, and then executes all ten calculations. Third-party
 dependencies and Maven plugins need Central access on first use.
 
 ## From the current source checkout
@@ -46,8 +46,10 @@ Run that Java command inside this project. Windows uses `;` instead of `:`.
 | `BilinearSearch` | Search with supplied forms and discovery from coefficients alone. Joint replay of the lower and upper bounds proves three rational bilinear products suffice and are necessary. Evaluating the discovered plan gives `[8,22,15]`. The example also selects and executes integer schedules for operands bounded by 8 and 2,048 magnitude bits. Each schedule reports predicted limb work, allocated words and objects. The bounded portfolios select four and three variable products respectively. Both executions agree with direct `BigInteger` convolution, including a signed 2,048-bit input. |
 | `RationalMatrixFormula` | Original inverse remains undefined on singular `X`; defined value `[2,1,0,3]` |
 | `DynamicQuotient` | Undefined modulo `T-1`, value `2` modulo `T+1`, with checked factor coverage |
-
 | `BoundedPlanning` | Compact 62-variable OR count `4,611,686,018,427,387,903`; explicit fixed Min-Fill; rational simplification with original-domain replay, missing-assumption and extra-hole controls; matching rational rank bounds of three for complex multiplication. |
+| `MatrixCenterIdentity` | An inverse commutator has no scalar center; a matrix center proves its product with the commutator equals one, and a coincident but different function receives a checked witness. |
+| `SpectralRepair` | Frequency supports `{0}`, `{1}`, `{2}` use two forward and two inverse check rows; exact outputs agree. Repair costs 162 operations versus direct 21, so discovery retains direct. |
+| `ComposedBilinearPlans` | Generically optimized U/V/W stages compute the centered componentwise product with 54 operations versus direct 248; all eight outputs and the full certificate are checked. |
 
 The SDK verifies each source-bound certificate within its explicit budgets.
 These finite results have the assumptions in the supplied requests. A stopped

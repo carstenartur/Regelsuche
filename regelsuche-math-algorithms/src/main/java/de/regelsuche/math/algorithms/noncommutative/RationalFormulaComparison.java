@@ -17,7 +17,7 @@ import java.util.function.BooleanSupplier;
 import static de.regelsuche.scalar.ExactRational.ONE;
 import static de.regelsuche.scalar.ExactRational.ZERO;
 
-/** Decides equality on the shared defined matrix domain around a supplied common scalar center. */
+/** Decides equality on the shared defined matrix domain around a supplied common matrix center. */
 public final class RationalFormulaComparison {
     private RationalFormulaComparison() {}
 
@@ -32,7 +32,10 @@ public final class RationalFormulaComparison {
 
     public sealed interface Evidence permits Invariant, Witness { Binding binding(); }
 
-    /** Columns in the original, unshifted realization coordinates. */
+    /**
+     * Columns in the original, unshifted realization coordinates. For a center of order m,
+     * the coordinates are (pencil coordinate, center coordinate), of dimension pencil order times m.
+     */
     public record Invariant(Binding binding, List<List<ExactRational>> columns) implements Evidence {
         public Invariant { Objects.requireNonNull(binding); columns = columns.stream().map(List::copyOf).toList(); }
     }
@@ -67,7 +70,6 @@ public final class RationalFormulaComparison {
                               Binding prepared, RationalFormulaWork work) {
         try {
             work.ledger.charge(0);
-            if (center.order() != 1) return failure(Status.INCONCLUSIVE, "REQUIRES_SCALAR_CENTER", work);
             Binding binding;
             if (evidence == null) {
                 binding = prepared != null ? prepared : new Binding(RationalFormulaRealization.build(left, work),
@@ -81,11 +83,14 @@ public final class RationalFormulaComparison {
             }
             if (evaluate(left, binding.left(), center, work).isEmpty()
                 || evaluate(right, binding.right(), center, work).isEmpty())
-                return failure(Status.INCONCLUSIVE, "UNDEFINED_SCALAR_CENTER", work);
-            var pencil = new CenteredDifferencePencil(binding, work);
-            if (evidence == null) evidence = search(pencil, binding, work);
+                return failure(Status.INCONCLUSIVE,
+                    center.order() == 1 ? "UNDEFINED_SCALAR_CENTER" : "UNDEFINED_MATRIX_CENTER", work);
+            var pencil = center.order() == 1 ? new CenteredDifferencePencil(binding, work) : null;
+            if (evidence == null) evidence = pencil != null ? search(pencil, binding, work)
+                : RationalFormulaMatrixComparison.search(binding, work);
             boolean valid = switch (evidence) {
-                case Invariant invariant -> checkInvariant(pencil, invariant.columns(), work);
+                case Invariant invariant -> pencil != null ? checkInvariant(pencil, invariant.columns(), work)
+                    : RationalFormulaMatrixComparison.verify(binding, invariant.columns(), work);
                 case Witness witness -> {
                     var a = evaluate(left, binding.left(), witness.assignment(), work);
                     var b = evaluate(right, binding.right(), witness.assignment(), work);
@@ -116,9 +121,11 @@ public final class RationalFormulaComparison {
             int levels = Integer.SIZE - Integer.numberOfLeadingZeros(b.variables().size());
             work.ledger.charge(1L + 2L * levels);
             var rhs = b.variables().get(entry.getKey());
-            if (entry.getValue().order() != 1 || rhs == null || rhs.order() != 1) return false;
-            if (!work.ledger.check(entry.getValue().entries().getFirst())
-                    .equals(work.ledger.check(rhs.entries().getFirst()))) return false;
+            if (entry.getValue().order() != a.order() || rhs == null || rhs.order() != b.order()) return false;
+            for (int index = 0; index < entry.getValue().entries().size(); index++) {
+                if (!work.ledger.check(entry.getValue().entries().get(index))
+                        .equals(work.ledger.check(rhs.entries().get(index)))) return false;
+            }
         }
         return true;
     }
@@ -199,7 +206,7 @@ public final class RationalFormulaComparison {
     }
 
     /** Incremental exact row echelon form, indexed by the first nonzero coordinate. */
-    private static final class Span {
+    static final class Span {
         private final ExactRational[][] pivots;
         private final RationalFormulaWork work;
 

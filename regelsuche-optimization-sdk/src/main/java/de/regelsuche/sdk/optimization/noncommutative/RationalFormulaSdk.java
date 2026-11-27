@@ -41,6 +41,12 @@ public final class RationalFormulaSdk {
         return RationalFormulaCenterSearch.compare(left, right, policy, limits, cancellation::isCancelled);
     }
 
+    /** Search bounded matrix entry grids and return an independently replayable comparison. */
+    public static RationalFormulaCenterSearch.Result compare(RationalFormula left, RationalFormula right,
+        RationalFormulaCenterSearch.MatrixPolicy policy, IterationLimits limits, CancellationToken cancellation) {
+        return RationalFormulaCenterSearch.compare(left, right, policy, limits, cancellation::isCancelled);
+    }
+
     public static RationalFormulaComparison.Result verifyComparison(RationalFormula left, RationalFormula right,
         Assignment center, RationalFormulaComparison.Evidence evidence, IterationLimits limits, CancellationToken cancellation) {
         return RationalFormulaComparison.verify(left, right, center, evidence, limits, cancellation::isCancelled);
