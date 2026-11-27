@@ -28,6 +28,52 @@ zurückstufen. Der aufrufende Compiler muss sämtliche Bereichsbedingungen
 beweisen oder tatsächlich ausgeführte Bedingungen mit unverändertem
 Originalpfad erzeugen.
 
+## Exakte Beobachtung nach gemeinsamer Vorzeichenwahl
+
+Die Suche mit `UP_TO_JOINT_SIGN` darf eine andere Zwischenwurzel liefern.
+`QuadraticRootSdk.verifyNormalized` prüft, ob beide Wurzeln nach einem
+bestimmten nachfolgenden Schritt dasselbe geordnete Koordinatenpaar ergeben.
+Der Aufrufer rekonstruiert dafür neben dem Wurzelvertrag unabhängig einen
+`QuadraticRootNormalization.Contract` mit eigener Quellidentität, Modul und
+Vorzeichenwähler. Der zusammengesetzte Beleg bindet diesen Vertrag an den
+Wurzelbeleg. Der Kern gleicht beide Verträge und den gemeinsamen Modul ab
+und prüft Primzahlzeugnis, ursprüngliches Programm, Kandidat und Wähler
+innerhalb desselben Etats.
+
+Der Normalisierer behält das kanonische Paar, wenn dessen Vorzeichenbit dem
+unveränderten Zielbit aus `{0,1}` entspricht. Andernfalls negiert er beide
+Koordinaten modulo der belegten Primzahl. Der Wähler enthält neun Bits.
+Sein Bit an Position `3 * realClass + imaginaryClass` gehört zum jeweiligen
+Koordinatenpaar. Die Klassen sind null (0), gerade und von null verschieden
+(1) sowie ungerade (2). Die Fabriken `realFirst()` und `imaginaryFirst()`
+verwenden die Parität der ersten von null verschiedenen Koordinate in der
+angegebenen Reihenfolge.
+
+Bei ungeradem Modul hat `p−x` für jedes `0<x<p` die entgegengesetzte
+Parität. Somit vertauscht die kanonische Negation die Klassen 1 und 2 und
+erhält die Klasse 0. Der Prüfer verlangt für jedes der acht von (0,0)
+verschiedenen Klassenpaare einen Bitwechsel unter gemeinsamer Negation.
+Damit wird von den beiden Orientierungen für beide möglichen Zielbits genau
+dieselbe ausgewählt. Das Nullpaar bleibt bei jeder Wahl gleich. Die acht
+Zellen bilden vier Zweiergruppen. Einschließlich der freien Wahl am Nullpaar
+erfüllen genau `2⁵ = 32` der 512 Wähler diese Bedingung.
+
+Ein unabhängiger Test führt alle 512 Wähler auf allen Paaren modulo 3 mit
+beiden Zielbits aus und vergleicht das Ergebnis mit dem Prüfer. Über den
+Primkörpern 3, 7, 11 und 19 vergleicht ein zweiter Test alle 464 zulässigen
+nichtreellen Eingabetripel mit der ursprünglichen Zweigformel. Er erhält
+tatsächlich verschiedene Zwischenwurzeln und prüft die exakten normierten
+Ergebnisse für beide Koordinatenprioritäten und Ziele. Die Multiplikation
+mit allen Faktoren des jeweiligen Erweiterungskörpers umfasst auch das
+Nullpaar und Ergebnisse auf beiden Achsen.
+
+Die Freigabe gilt für diese mathematische Beobachtung. Ein Compiler muss
+die tatsächliche Bitberechnung, den unveränderten Zielwert, die gemeinsame
+Negation sowie sämtliche Verwendungen des Zwischenwerts an die Quellen
+binden. Liegen dazwischen etwa Multiplikationen, muss er deren Verträglichkeit
+mit gemeinsamer Negation und die Gleichheit der übrigen Operanden nachweisen.
+Die Kosten der erzeugten Ausführung wurden in diesem Versuch nicht gemessen.
+
 ## Suche und unabhängige Prüfung
 
 Aus dem ursprünglichen Programm gewinnt die Suche die Potenz und ihren
