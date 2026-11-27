@@ -118,6 +118,7 @@ public final class Z3EqualityProofReplay {
                 case "rewrite" -> rewrite(node.items(2));
                 case "mp" -> modusPonens(node.items(4));
                 case "unit-resolution" -> resolve(node.items(4));
+                case "not-or-elim" -> notOrElimination(node.items(3));
                 default -> throw new Invalid();
             };
         }
@@ -205,6 +206,17 @@ public final class Z3EqualityProofReplay {
             Formula result = values.formula(nodes.get(3));
             if (!implication.left().equals(premise.conclusion()) || !implication.right().equals(result)) throw new Invalid();
             return new Step(result, union(premise, bridge));
+        }
+
+        /** A negated disjunction entails the negation of each of its actual operands. */
+        private Step notOrElimination(List<Node> nodes) {
+            Step source = step(nodes.get(1));
+            Formula result = values.formula(nodes.get(2));
+            if (!(source.conclusion() instanceof Negation negation)
+                    || !(negation.operand() instanceof Disjunction disjunction)
+                    || !(result instanceof Negation selected)
+                    || !disjunction.operands().contains(selected.operand())) throw new Invalid();
+            return new Step(result, source.dependencies());
         }
 
         private Step resolve(List<Node> nodes) {
