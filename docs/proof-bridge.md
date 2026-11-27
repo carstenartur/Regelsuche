@@ -121,7 +121,14 @@ remain available to the congruence checker even when an n-ary term is folded
 into the existing binary IR.
 
 The supported proof rules are `asserted`, `refl`, `symm`, ordered `trans`/`trans*`,
-`monotonicity`, `rewrite`, `mp` and two-complement `unit-resolution`.
+`monotonicity`, `rewrite`, `mp`, `not-or-elim` and bounded `unit-resolution`.
+For real non-strict orders, `>=` is parsed in reversed `<=` orientation;
+normalization checks the exact directed polynomial difference, never its
+negative. An equality can be rewritten as exactly two opposite non-strict
+orders (antisymmetry), with checked De Morgan and double-negation rewrites.
+Clause resolution removes one actual complementary occurrence per unit and
+requires the exact remaining clause (or `false` for no remaining operands).
+No unrelated unit, omitted literal or unchecked arithmetic lemma is admitted.
 Congruence checks the operator, argument count and an exact equality proof for
 each changed argument. A proof carrying premise dependencies must cover at
 least one changed argument position that has not already been covered; an

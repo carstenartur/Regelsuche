@@ -127,6 +127,66 @@ class Z3EqualityProofReplayTest {
     }
 
     @Test
+    void replaysNativeOrderAntisymmetryAndMultiUnitResolution() {
+        // Captured from Z3 4.13.3.0: x = 0 implies 0 = x.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x44 (>= x 0.0)))
+            (let (($x57 (or (not (<= x 0.0)) (not $x44))))
+            (let (($x58 (not $x57)))
+            (let ((@x62 (trans (rewrite (= (= x 0.0) (and (<= x 0.0) $x44))) (rewrite (= (and (<= x 0.0) $x44) $x58)) (= (= x 0.0) $x58))))
+            (let (($x31 (= x 0.0)))
+            (let ((@x29 (mp (asserted (= x (to_real 0))) (rewrite (= (= x (to_real 0)) $x31)) $x31)))
+            (let ((@x63 (mp @x29 @x62 $x58)))
+            (let ((@x72 (trans (monotonicity @x62 (= (not $x31) (not $x58))) (rewrite (= (not $x58) $x57)) (= (not $x31) $x57))))
+            (let (($x45 (not $x31)))
+            (let (($x41 (not (= 0.0 x))))
+            (let (($x33 (not (= (to_real 0) x))))
+            (let ((@x35 (asserted $x33)))
+            (let ((@x42 (mp (mp @x35 (rewrite (= $x33 $x41)) $x41) (rewrite (= $x41 $x45)) $x45)))
+            (unit-resolution (mp @x42 @x72 $x57) (not-or-elim @x63 (<= x 0.0)) (not-or-elim @x63 $x44) false))))))))))))))))
+            """;
+        var statement = statement("0", "x", "x = 0");
+        assertTrue(Z3EqualityProofReplay.verifies(statement, proof));
+        assertFalse(Z3EqualityProofReplay.verifies(statement, proof.replace("(>= x 0.0)", "(<= x 0.0)")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement, proof.replace("(not-or-elim @x63 $x44)", "")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement,
+            proof.replace("(not-or-elim @x63 $x44)", "(not-or-elim @x63 (<= x 0.0))")));
+    }
+
+    @Test
+    void replaysNativeOrderNormalizationWithoutReversingDirection() {
+        // Captured from Z3 4.13.3.0: x = y implies x - y = 0.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let ((?x35 (+ x (* (- 1.0) y))))
+            (let (($x50 (>= ?x35 0.0)))
+            (let (($x58 (or (not (<= ?x35 0.0)) (not $x50))))
+            (let (($x59 (not $x58)))
+            (let ((@x61 (rewrite (= (and (<= ?x35 0.0) $x50) $x59))))
+            (let ((@x55 (monotonicity (rewrite (= (<= x y) (<= ?x35 0.0))) (rewrite (= (>= x y) $x50)) (= (and (<= x y) (>= x y)) (and (<= ?x35 0.0) $x50)))))
+            (let ((@x65 (trans (rewrite (= (= x y) (and (<= x y) (>= x y)))) (trans @x55 @x61 (= (and (<= x y) (>= x y)) $x59)) (= (= x y) $x59))))
+            (let (($x25 (= x y)))
+            (let ((@x26 (asserted $x25)))
+            (let ((@x66 (mp @x26 @x65 $x59)))
+            (let ((@x72 (trans (rewrite (= (= ?x35 0.0) (and (<= ?x35 0.0) $x50))) @x61 (= (= ?x35 0.0) $x59))))
+            (let ((@x79 (trans (monotonicity @x72 (= (not (= ?x35 0.0)) (not $x59))) (rewrite (= (not $x59) $x58)) (= (not (= ?x35 0.0)) $x58))))
+            (let (($x41 (= ?x35 0.0)))
+            (let (($x39 (not $x41)))
+            (let ((@x42 (mp (asserted (not (= (- x y) (to_real 0)))) (rewrite (= (not (= (- x y) (to_real 0))) $x39)) $x39)))
+            (unit-resolution (mp @x42 @x79 $x58) (not-or-elim @x66 (<= ?x35 0.0)) (not-or-elim @x66 $x50) false))))))))))))))))))
+            """;
+        var statement = statement("x-y", "0", "x = y");
+        assertTrue(Z3EqualityProofReplay.verifies(statement, proof));
+        assertFalse(Z3EqualityProofReplay.verifies(statement,
+            proof.replace("(rewrite (= (<= x y) (<= ?x35 0.0)))", "(rewrite (= (<= x y) (>= ?x35 0.0)))")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x-y", "1", "x = y"),
+            proof.replace("(- x y) (to_real 0)", "(- x y) (to_real 1)")));
+    }
+
+    @Test
     void rejectsConditionalRewriteEvenWhenExternalSolverReportsUnsat() throws IOException {
         assertFalse(Z3EqualityProofReplay.verifies(statement("x*z", "y*z", "x = y"), captured("premise-eliminated")));
         assertFalse(Z3EqualityProofReplay.verifies(statement("x*z", "y*z"),
