@@ -25,7 +25,7 @@ final class Z3ProofValues {
     Z3ProofValues(Set<String> symbols) { this.symbols = Set.copyOf(symbols); }
 
     sealed interface Value permits Real, Formula { int size(); }
-    sealed interface Formula extends Value permits Equality, Negation, Truth { }
+    sealed interface Formula extends Value permits Equality, Negation, Disjunction, Truth { }
 
     /** Arguments retain native operator positions; mathematical identity is the existing IR. */
     record Real(Expression expression, BinaryOperator operator, List<Real> arguments,
@@ -39,6 +39,7 @@ final class Z3ProofValues {
         Equality reverse() { return new Equality(right, left, size); }
     }
     record Negation(Formula operand, int size) implements Formula { }
+    record Disjunction(List<Formula> operands, int size) implements Formula { }
     enum Truth implements Formula {
         TRUE, FALSE;
         @Override public int size() { return 1; }
@@ -74,6 +75,7 @@ final class Z3ProofValues {
                 yield equality(value(args.get(1)), value(args.get(2)));
             }
             case "not" -> negate(formula(node.items(2).get(1)));
+            case "or" -> disjunction(node);
             case "to_real" -> integerCoercion(node);
             case "/" -> {
                 var args = node.items(3);
@@ -104,6 +106,19 @@ final class Z3ProofValues {
         return new Equality(left, right, size);
     }
     Negation negate(Formula value) { return new Negation(value, admit(1L + value.size())); }
+
+    private Disjunction disjunction(Node node) {
+        var children = node.children();
+        if (children.size() < 3 || children.size() > 129) throw new Invalid();
+        var operands = new ArrayList<Formula>();
+        long size = 1;
+        for (int i = 1; i < children.size(); i++) {
+            Formula operand = formula(children.get(i));
+            size += operand.size();
+            operands.add(operand);
+        }
+        return new Disjunction(List.copyOf(operands), admit(size));
+    }
 
     private Real integerCoercion(Node node) {
         Real value = asReal(value(node.items(2).get(1)));
@@ -142,6 +157,10 @@ final class Z3ProofValues {
 
     Real difference(Real left, Real right) {
         return binary(BinaryOperator.SUBTRACT, left, right);
+    }
+
+    Real product(Real left, Real right) {
+        return binary(BinaryOperator.MULTIPLY, left, right);
     }
 
     private Real binary(BinaryOperator operator, Real left, Real right) {
@@ -238,6 +257,7 @@ final class Z3ProofValues {
             case Real real -> real.arguments();
             case Equality equality -> List.of(equality.left(), equality.right());
             case Negation negation -> List.of(negation.operand());
+            case Disjunction disjunction -> disjunction.operands();
             case Truth ignored -> List.of();
         };
     }
@@ -247,6 +267,7 @@ final class Z3ProofValues {
             return a.operator() != null && a.operator() == b.operator();
         }
         return left instanceof Equality && right instanceof Equality
-            || left instanceof Negation && right instanceof Negation;
+            || left instanceof Negation && right instanceof Negation
+            || left instanceof Disjunction && right instanceof Disjunction;
     }
 }
