@@ -1,6 +1,6 @@
 # Mathematische Funktionen: Quelle, Release und Oberfläche
 
-Stand: 26. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
+Stand: 27. November 2026. Diese Seite beschreibt die **Verfügbarkeit** der
 genannten Funktionen. Mathematische Verträge und ausgeführte Vergleiche stehen
 in den verlinkten Fachseiten; der [Strategien-Index](research/strategies.md)
 führt Hypothesen, Befunde und Folgerungen.
@@ -22,6 +22,7 @@ Konfiguration; ein erzeugtes Archiv ist noch keine Veröffentlichung.
 | Aktivierte Kongruenzen, CRT, exakte Überdeckung und Bonferroni | `CongruenceCoverage` | `CongruenceCoverageSdk` | nein | Java-/SDK-Beispiele; keine eigene Eingabemaske |
 | Hunter-Survivor-Untergrenze | `HunterCoverage` | `HunterCoverageSdk` | nein | ausführbares Java-Beispiel |
 | Maximales bipartites Matching und Hall-Zeuge | `BipartiteMatching` | `BipartiteMatchingSdk` | nein | Live-Zertifikatsdemo |
+| Matching-Schranken mit unvereinbaren Kanten | `ConflictMatching`, `ConflictMatchingVerifier` | `ConflictMatchingSdk` | nein | [exakte gewichtete Belege](research/conflict-matching.md); keine eigene Eingabemaske |
 | Endliche Polynomkongruenzen | `PolynomialCongruence` | `PolynomialCongruenceSdk` | nein | Java-/SDK-Beispiele |
 | Modulare Kernsubstitution mit exakter Prüfung | `ModularKernel`, `ModularKernelVerifier` | `ModularKernelSdk` | nein | Java-/SDK-Beispiele |
 | Beschränkte nichtkommutative Identitätsprüfung | `NoncommutativeIdentity` | `NoncommutativeIdentitySdk` | nein | experimenteller Java-Einstieg |
