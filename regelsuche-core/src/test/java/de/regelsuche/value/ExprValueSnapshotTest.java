@@ -121,6 +121,45 @@ class ExprValueSnapshotTest {
         }
     }
 
+    @Test void unreachablePrefixWithValidRootAndDigestIsRejectedAtomically() {
+        try (var source = new ExprValueArena(20); var destination = new ExprValueArena(20)) {
+            var x = source.snapshot(source.intern(new VariableExpr("x")));
+            var unused = new ExprValueSnapshot.Node("VARIABLE", "unused", List.of());
+            var unreachable = new ExprValueSnapshot.Snapshot(x.version(), 1, x.digest(),
+                List.of(unused, x.nodes().getFirst()));
+            var existing = destination.intern(new VariableExpr("retained"));
+            String digest = destination.digest(existing);
+            assertThrows(IllegalArgumentException.class,
+                () -> destination.restore(unreachable, x.digest(), 10_000));
+            assertEquals(1, destination.size());
+            assertEquals(1, destination.digestComputations());
+            assertEquals(digest, destination.digest(existing));
+        }
+    }
+
+    @Test void wideSharedDagRetainsCanonicalDepthFirstOrderAndRoundTrips() {
+        Expr x = new VariableExpr("x");
+        Expr y = new VariableExpr("y");
+        Expr shared = new de.regelsuche.ast.FunctionExpr("pair", List.of(x, y));
+        Expr root = new de.regelsuche.ast.FunctionExpr("wide",
+            java.util.Collections.nCopies(20_000, shared));
+        try (var first = new ExprValueArena(4); var second = new ExprValueArena(4)) {
+            second.intern(y);
+            var id = first.intern(root);
+            var snapshot = first.snapshot(id);
+            assertEquals(List.of(
+                new ExprValueSnapshot.Node("VARIABLE", "x", List.of()),
+                new ExprValueSnapshot.Node("VARIABLE", "y", List.of()),
+                new ExprValueSnapshot.Node("FUNCTION", "pair", List.of(0, 1)),
+                new ExprValueSnapshot.Node("FUNCTION", "wide", java.util.Collections.nCopies(20_000, 2))),
+                snapshot.nodes());
+            byte[] bytes = ExprValueSnapshot.encode(snapshot, 100_000);
+            var restored = second.restore(ExprValueSnapshot.decode(bytes, 4, 100_000), snapshot.digest(), 100_000);
+            assertArrayEquals(bytes, ExprValueSnapshot.encode(second.snapshot(restored), 100_000));
+            assertSame(restored, second.intern(root));
+        }
+    }
+
     @Test void deepSharedDagUsesLinearSnapshotStorage() {
         Expr expression = new VariableExpr("x");
         for (int i = 0; i < 4000; i++) expression = new BinaryExpr(expression, BinaryOperator.POW, expression);

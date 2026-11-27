@@ -284,26 +284,46 @@ public final class ExprValueArena implements AutoCloseable {
         return new NodeView(node.kind(), atomText(node), children);
     }
 
+    /** One suspended DFS frame per active ancestor, not per unresolved operand. */
+    private static final class SnapshotVisit {
+        final int id;
+        final Key key;
+        final int[] edges;
+        int next;
+
+        SnapshotVisit(int id, Key key, int[] edges) {
+            this.id = id;
+            this.key = key;
+            this.edges = edges;
+        }
+    }
+
+    private SnapshotVisit snapshotVisit(int id) {
+        Key key = entries.get(id);
+        return new SnapshotVisit(id, key, snapshotEdges(key));
+    }
+
     /** Canonical reachable DAG with allocation-independent local numbering. */
     public synchronized ExprValueSnapshot.Snapshot snapshot(ValueId root) {
         String expected = digest(root); // Validate ownership and populate the bounded Merkle cache.
         var numbering = new HashMap<Integer, Integer>();
         var nodes = new ArrayList<ExprValueSnapshot.Node>();
-        var pending = new ArrayDeque<Integer>();
-        pending.push(root.index);
+        var pending = new ArrayDeque<SnapshotVisit>();
+        pending.push(snapshotVisit(root.index));
         while (!pending.isEmpty()) {
-            int current = pending.peek();
-            if (numbering.containsKey(current)) { pending.pop(); continue; }
-            var key = entries.get(current);
-            int[] edges = snapshotEdges(key);
-            boolean waiting = false;
-            for (int i = edges.length - (key.unordered() ? 2 : 1); i >= 0; i -= key.unordered() ? 2 : 1)
-                if (!numbering.containsKey(edges[i])) { pending.push(edges[i]); waiting = true; }
-            if (waiting) continue;
+            var visit = pending.peek();
+            var key = visit.key;
+            int[] edges = visit.edges;
+            if (visit.next < edges.length) {
+                int child = edges[visit.next];
+                visit.next += key.unordered() ? 2 : 1;
+                if (!numbering.containsKey(child)) pending.push(snapshotVisit(child));
+                continue;
+            }
             var mapped = new ArrayList<Integer>(edges.length);
             for (int i = 0; i < edges.length; i++)
                 mapped.add(key.unordered() && i % 2 == 1 ? edges[i] : numbering.get(edges[i]));
-            numbering.put(current, nodes.size());
+            numbering.put(visit.id, nodes.size());
             nodes.add(new ExprValueSnapshot.Node(key.kind().name(), atomText(key), mapped));
             pending.pop();
         }
@@ -342,13 +362,30 @@ public final class ExprValueArena implements AutoCloseable {
                 mapped.add(id);
             }
             var root = mapped.get(snapshot.root());
-            if (!digest(root).equals(expectedDigest) || snapshot(root).nodes().size() != mapped.size())
+            requireReachableNodes(snapshot);
+            if (!digest(root).equals(expectedDigest))
                 throw new IllegalArgumentException("snapshot structure differs from binding");
             return root;
         } catch (RuntimeException rejected) {
             while (entries.size() > start) index.remove(entries.removeLast());
             while (digests.size() > digestStart) digests.removeLast();
             throw rejected;
+        }
+    }
+
+    /**
+     * All edges have already been validated as backward references by restoreNode.
+     * A reverse pass therefore checks reachability without reconstructing a second snapshot.
+     */
+    private static void requireReachableNodes(ExprValueSnapshot.Snapshot snapshot) {
+        boolean[] reachable = new boolean[snapshot.nodes().size()];
+        reachable[snapshot.root()] = true;
+        for (int i = snapshot.root(); i >= 0; i--) {
+            if (!reachable[i]) throw new IllegalArgumentException("unreachable snapshot node");
+            var node = snapshot.nodes().get(i);
+            boolean ac = Kind.ADD.name().equals(node.kind()) || Kind.MUL.name().equals(node.kind());
+            for (int j = 0; j < node.edges().size(); j += ac ? 2 : 1)
+                reachable[node.edges().get(j)] = true;
         }
     }
 
