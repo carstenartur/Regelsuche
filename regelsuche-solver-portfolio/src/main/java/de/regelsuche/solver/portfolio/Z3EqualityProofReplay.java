@@ -51,7 +51,7 @@ public final class Z3EqualityProofReplay {
 
         Checker(Obligation obligation) {
             values = new Z3ProofValues(obligation.declarations().stream().map(d -> d.name()).collect(Collectors.toSet()));
-            rewrites = new Z3PolynomialProofRewrites(obligation);
+            rewrites = new Z3PolynomialProofRewrites(obligation, values);
         }
 
         Equality equality(Relation relation, de.regelsuche.solver.ir.SolverIr.Expression left,
