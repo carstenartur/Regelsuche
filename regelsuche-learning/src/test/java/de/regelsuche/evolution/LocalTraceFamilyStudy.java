@@ -6,6 +6,7 @@ import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.search.moves.*;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.TransformationProvenance;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
@@ -26,7 +27,7 @@ public final class LocalTraceFamilyStudy {
             List<Trace> train, List<Gate> gate, List<CheckedLearnedSchemaModel.Attempt> attempts) { }
     record Freeze(String protocol, String inventory, Map<String, Integer> priorities, long orderTrainingWork,
             long tallyWork, Formation whole, Formation local) { }
-    record Step(String rule, String kind, String source, String target, long verification) { }
+    record Step(String rule, String kind, String source, String target, long verification, String schemaId) { }
     record Row(String family, int n, String source, int maximumNodes, String outcome, boolean solved,
             boolean accountingComplete, String output, long outputScore, long queryWork, long verification,
             long finalReplay, long externalAudit, List<Step> steps) { }
@@ -178,13 +179,21 @@ public final class LocalTraceFamilyStudy {
             if (!step.verification().accepted()) throw new IllegalStateException("unverified selected move");
             steps.add(new Step(step.move().ruleId(), step.move().sourceKind().name(),
                 ExpressionFormatter.format(step.source().expression()), ExpressionFormatter.format(step.target().expression()),
-                step.verification().work()));
+                step.verification().work(), schemaId(step.move())));
         }
         boolean solved = result.withinBudget() && result.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED
             && result.outputScore() <= input.nodes();
         return new Row(input.family(), input.n(), input.source(), input.nodes(), result.search().outcome().name(), solved,
             result.accountingComplete(), output, result.outputScore(), result.totalWork(),
             result.search().metrics().verificationWork(), result.replayWork(), audit[0], List.copyOf(steps));
+    }
+
+    private static String schemaId(SearchMove move) {
+        if (move.sourceKind() != SearchMove.SourceKind.LEARNED) return null;
+        if (move.provenance() instanceof TransformationProvenance.ExactTheoryStep checked) {
+            return checked.evidence().binding().theoryStepId();
+        }
+        throw new IllegalStateException("learned move has no exact schema identity");
     }
 
     private static String writeJson(Path path, Object value) throws IOException {
