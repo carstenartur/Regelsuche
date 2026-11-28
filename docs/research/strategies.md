@@ -359,6 +359,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`ExactFinitePolynomialTraceLearner.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/ExactFinitePolynomialTraceLearner.java#L36) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/ExactFinitePolynomialTraceLearner.java | public final class ExactFinitePolynomialTraceLearner { -->
 - [`FinitePolynomialStrategySearch.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/FinitePolynomialStrategySearch.java#L35) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/FinitePolynomialStrategySearch.java | public final class FinitePolynomialStrategySearch { -->
 
+## Gemeinsame Teilableitungen aus verschiedenen Aufgaben lernen
+
+- **Hypothese.** Zwei gelöste Aufgaben mit unterschiedlichen Gesamtumformungen können dieselbe lokale mehrschrittige Ableitung enthalten. Ihre Verallgemeinerung kann in einem weiteren Kontext Sucharbeit ersparen.
+- **Umsetzungsstand.** `CumulativeTaskKnowledge.learnLocalBatch` untersucht in den unabhängig geprüften Lösungswegen echte Mehrschrittabschnitte. Ändert ein Schritt nur einen Operanden, kann die Suche die Änderungen in diesem Teilbaum getrennt verfolgen. Ein Schritt am gemeinsamen Vorfahren beendet den lokalen Abschnitt. Herkunftsbelege binden Elternmodell, Trainingsquelle, Ergebnis, Regelabfolge, Position und ursprüngliche Schrittindizes. Budgetierte Bildung, symbolische Identitätsprüfung, Validierung und erneute Prüfung im Empfänger verwenden denselben Aufgabenlöser wie der Vergleich mit vollständigen Endpunkten.
+- **Befund.** Im vorab festgelegten öffentlichen Vergleich erzeugt die lokale Formation drei geprüfte Schemata, die Endpunktformation keines. Auf zwölf von 24 neuen Aufgaben wurde das vollständige Kompensationsschema 16-mal angewendet. Gegen denselben Solver mit abgeschalteten Schema-Anbietern spart die Suche auf diesen zwölf Aufgaben 196 Einheiten und benötigt auf den übrigen zwölf 1.128 zusätzliche. Beide Arme lösen 16 Aufgaben. [Familien, Ablation und reproduzierte Ergebnisse](local-trace-transfer-v1/results.md)
+- **Folgerung.** Die Suche kann einen in mehreren Trainingstraces vorkommenden Teilbeweis in neuen Kontexten ausführen. Auf diesem Panel überwiegt der zusätzliche Suchaufwand für vergebliche Prüfungen; Erwerb und Wiederherstellung erhöhen die Gesamtarbeit weiter.
+
+- [`TaskSubpathMiner.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskSubpathMiner.java#L12) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskSubpathMiner.java | final class TaskSubpathMiner { -->
+- [`TaskSubpathLearningTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java#L13) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java | class TaskSubpathLearningTest { -->
+
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
 - **Hypothese.** Vorbereitetes und geprüftes Wissen reduziert Wiederherstellungs- und Prüfarbeit und amortisiert eine neue Wissensgeneration.
