@@ -44,9 +44,19 @@ Vor der ersten Ausführung wurde das [Protokoll veröffentlicht](https://github.
 
 Eine zweite Serie nach der Begrenzung sehr langer Herkunftsmarken rekonstruierte TRAIN-Dateien und Modellbytes identisch. 432 von 432 fachlichen Paaren stimmten mit dem Erstlauf überein. Die zusätzliche Erfassung der Kennung aus dem Beleg jedes ausgewählten gelernten Schritts bestätigte die oben ausgewiesenen 16 Anwendungen. [Wiederholungsbeleg mit Schema-IDs](evidence/reproduction.json)
 
-Mit JDK 25 und Maven im Projektverzeichnis ausführen. Jeder Maven-Aufruf startet eine neue Test-JVM. Neue Ausgabepfade verwenden, da der Runner vorhandene Ergebnisse schützt.
+### Nachträglicher Lauf nach einer weiteren Quellenkorrektur
+
+Nach Veröffentlichung des [Erstbefunds](https://github.com/carstenartur/Regelsuche/commit/0a9b5fc9e6ec23ab8eca4fd50488ee20a36f7a6c) erhielt der Miner eine genauere Bindung an Trainingsquelle, Ziel und Pfad. Außerdem beendet eine Änderung an einem gemeinsamen Vorfahren nur das jeweilige lokale Segment. Für den [korrigierten Stand](https://github.com/carstenartur/Regelsuche/commit/aa3a8e5d6b0ed73e569927f572b8e865f936a473) wurde die Studie auf denselben bereits bekannten Fällen erneut ausgeführt. Ihr neuer TRAIN-Digest lautet `sha256:0c7296ad0464030e227d7e3535d7ea3449a04b412407ef3a2396a4f212d21c06`.
+
+Die Formation kostete jetzt 8.781 statt 4.337 Einheiten. Dadurch stieg der Erwerb einschließlich Prioritäten auf 13.543 und der Gesamtaufwand von LOCAL auf 21.597 Einheiten. In den drei Nachläufen blieben alle 432 Fall-/Arm-Ergebnisse einschließlich Abfragearbeit, Endausgaben, Pfaden und Zahl der verwendeten Schemata fachlich identisch. Bei den 16 Lernschritten pro Lauf änderte sich die Kennung des Anbieters infolge der neuen Modellherkunft; die vom Beleg bezeichnete mathematische Schema-ID blieb dieselbe. Diese Wiederholung verwendet offenliegende FINAL-Ergebnisse. [Arbeitskonten, Modell-Digests und Zeitreihen des Nachlaufs](evidence/follow-up.json)
+
+### Befehle
+
+Für die identische historische Wiederholung den veröffentlichten Stand mit Schema-ID-Erfassung verwenden. Mit JDK 25 und Maven im Projektverzeichnis ausführen. Jeder Maven-Aufruf startet eine neue Test-JVM. Neue Ausgabepfade verwenden, da der Runner vorhandene Ergebnisse schützt.
 
 ```sh
+git worktree add --detach ../local-trace-reproduction d70e17dcfdd5e4c0d188a6ca233285225afec5e8
+cd ../local-trace-reproduction
 study_dir=$(mktemp -d)
 study_digest=sha256:e08c31e2002624414e2daa827859c2ff1188b4886a2362eac798a1f5ef1fbc02
 mvn -B -pl regelsuche-learning -am -Dtest=LocalTraceFamilyStudyTest \
@@ -59,3 +69,5 @@ for rotation in 0 1 2; do
     -DlocalTrace.rotation="$rotation" -DlocalTrace.output="$study_dir/final-$rotation.json" test
 done
 ```
+
+Für den nachträglichen Lauf stattdessen den veröffentlichten Stand `aa3a8e5d6b0ed73e569927f572b8e865f936a473`, ein neues Arbeitsverzeichnis und dessen oben angegebenen neuen TRAIN-Digest wählen.
