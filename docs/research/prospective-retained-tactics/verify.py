@@ -1,6 +1,7 @@
 """Verify two opposite-order retained-tactic runs from their raw ledgers and proof paths."""
 import argparse
 import json
+from itertools import islice
 from pathlib import Path
 import re
 import runpy
@@ -23,6 +24,33 @@ MODEL_FOR = {"AUTO_OLD": "old", "CHECKED_OLD": "old", "PREVIOUS_POLICY": "fresh"
              "RETAINED_FORCED": "union", "RETAINED": "union", "DROP_ALL": "union"}
 
 
+def verify_calibration(bill, old_study):
+    manifest = json.loads(read(old_study / "training", "training.json"))
+    require(len(manifest["calibration"]) == 46, "changed calibration source panel")
+    selected = list(manifest["calibration"][::4])
+    source_work = sum(1 + len(task["source"]) for task in selected)
+    for family in ("A", "B"):
+        prefix = read(old_study / "results" / family, "BASE.jsonl").splitlines(keepends=True)[:20]
+        require(len(prefix) == 20 and all(line.endswith(b"\n") and not line.endswith(b"\r\n") for line in prefix),
+                "unrecognized source ledger encoding")
+        source_work += sum(map(len, prefix))
+        for i, line in enumerate(prefix[16:20], start=16):
+            row = json.loads(line)
+            require(row["index"] == i, "unordered calibration source ledger")
+            selected.append(dict(source=row["source"], depth=32, cap=row["cap"], target=row["target"]))
+    seed = "efb9439d38f8f0fa4e20ce5ffbedc34fa5248519"
+    block = list(islice(parent["previous"]["expected_cases"](seed),32,40))
+    require(len(block) == 8, "incomplete mixed calibration block")
+    source_work += sum(1 + len(source) for _,_,source in block)
+    for topology, _, source in block[:4]:
+        selected.append(dict(source=source, depth=32, cap=8192, target=17 if topology == "H" else 19))
+    require(len(selected) == len(bill["calibrationSources"]) == 24, "wrong calibration cohort size")
+    for task, stored in zip(selected, bill["calibrationSources"], strict=True):
+        require(set(stored) == {"source","depth","cap","target"} and parent["tree"](task["source"]) == parent["tree"](stored["source"])
+                and all(task[k] == stored[k] for k in ("depth","cap","target")), "wrong calibration task or budget")
+    require(bill["calibrationSourceWork"] == source_work, "incorrect calibration source charge")
+
+
 def materials():
     old_study = RESEARCH / "prospective-tactic-transfer"
     (old, fresh), charges, sources = parent["materials"](old_study)
@@ -30,7 +58,7 @@ def materials():
     receipt = json.loads(read(train, "receipt.json"))
     sources.extend(verify_acquisition.verify(STUDY, json.loads(read(train, "acquired.json"))))
     sources.extend(t["source"] for t in receipt["calibrationSources"])
-    require(receipt["calibrationSourceWork"] >= 0, "invalid calibration source charge")
+    verify_calibration(receipt, old_study)
     libraries = {"old": old, "fresh": fresh}
     for label, name in (("acquired", "acquired.json"), ("priorUnion", "prior-union.json"), ("union", "union.json")):
         raw = read(train, name).decode()
