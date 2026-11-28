@@ -186,7 +186,13 @@ public final class CheckedSchemaTaskSolver {
         var compiled = new CheckedSchemaMatcherPlan.Compilation(preparation.revision() + "+state-tactic/v1",
             SchematicProofPlan.hash(identity), Math.addExact(preparation.workUnits(),preparationWork + identity.length()),
             preparation.includedSchemas(), preparation.patternNodeVisits(), preparation.orderingComparisons());
-        var subset = new java.util.ArrayList<>(baseline.session.providers());
+        var primitive = baseline.asHeuristicPrimitiveFallback();
+        return new CheckedSchemaTaskSolver(session,compiled,false,false,false,false,selectedPlan,
+            primitiveRoute,primitive,true,dispatch);
+    }
+
+    CheckedSchemaTaskSolver asHeuristicPrimitiveFallback() {
+        var subset = new java.util.ArrayList<>(session.providers());
         // A heuristic route can omit applicable learned moves. Primitive witnesses are unchanged,
         // but exhausting just these providers cannot establish completeness for the full inventory.
         if (!subset.isEmpty()) {
@@ -200,10 +206,7 @@ public final class CheckedSchemaTaskSolver {
                 }
             });
         }
-        var primitive = new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(subset,List.of(),
-            baseline.session.verifier()),null);
-        return new CheckedSchemaTaskSolver(session,compiled,false,false,false,false,selectedPlan,
-            primitiveRoute,primitive,true,dispatch);
+        return new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(subset,List.of(),session.verifier()),null);
     }
 
     CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
@@ -255,6 +258,28 @@ public final class CheckedSchemaTaskSolver {
     public Solution solve(Task task) {
         return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
             var scoped = scopedTask(task);
+            var result = new TypedSourceOnlySearch().searchUntil(scoped.problem(), scoped.objective(),
+                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE);
+            return new Solution(task, result, scoped.checkedSteps());
+        });
+    }
+
+    /** Run the selected lane and keep any proposal ablation downstream of its admission. */
+    Solution solveWithAdmission(Task task, java.util.Set<String> disabledSchemas) {
+        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
+            var scoped = scopedTask(task, prepare(task), disabledSchemas);
+            if (preparation == null && scoped.objective() == NativeNodeCountObjective.INSTANCE
+                    && !de.regelsuche.retention.RetainedOperation.isObserved()) {
+                var count = new CostAwareTacticRouter.QueryNodeCount();
+                var original = scoped.problem();
+                var problem = new TypedMoveSearch.Problem(original.source(), original.context(), original.providers(),
+                    original.policy(), original.verifier(), original.stateScore(), original.mode(), original.scheduling(),
+                    original.budget(), (state, context) -> {
+                        var size = count.evaluate(state);
+                        return new StateValue.Assessment(Math.toIntExact(size.value()), -size.value(), size.work(), 0, Map.of());
+                    });
+                scoped = new ScopedTask(problem, count, scoped.checkedSteps());
+            }
             var result = new TypedSourceOnlySearch().searchUntil(scoped.problem(), scoped.objective(),
                 task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE);
             return new Solution(task, result, scoped.checkedSteps());
@@ -351,6 +376,10 @@ public final class CheckedSchemaTaskSolver {
     }
 
     private ScopedTask scopedTask(Task task, Prepared prepared) {
+        return scopedTask(task, prepared, null);
+    }
+
+    private ScopedTask scopedTask(Task task, Prepared prepared, java.util.Set<String> disabledSchemas) {
         // The primitive control retains its batch scheduler and ordinary node-count objective.
         String goal = tactics == null ? null : TaskKnowledgeProfile.objectiveKey(task);
         PrimitiveSchemaReachability.Decision decision;
@@ -368,7 +397,7 @@ public final class CheckedSchemaTaskSolver {
         }
         var solver = decision != null && decision.primitiveOnly() ? primitiveFallback : this;
         var receipts = solver.selectedPlan == null ? null : new CheckedDomainSizeReceipts(solver.selectedPlan.bounds(),
-            solver.tactics,goal);
+            solver.tactics,goal,disabledSchemas);
         boolean share = solver.shareNodeGoal && receipts != null && prepared.objective() == NativeNodeCountObjective.INSTANCE;
         var problem = solver.problem(task, decision, receipts, share);
         return new ScopedTask(problem, share ? receipts::scoreGoal : prepared.objective(), prepared.checkedSteps());

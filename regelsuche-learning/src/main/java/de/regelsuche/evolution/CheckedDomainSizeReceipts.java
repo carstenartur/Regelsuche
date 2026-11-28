@@ -18,9 +18,15 @@ final class CheckedDomainSizeReceipts implements RetainedGraph.View {
 
     private final LearnedTacticPolicy.Dispatch tactics;
     private final String goal;
+    private final java.util.Set<String> disabledSchemas;
 
     CheckedDomainSizeReceipts(CheckedLearnedSchemaModel.Bounds bounds) { this(bounds,null,null); }
     CheckedDomainSizeReceipts(CheckedLearnedSchemaModel.Bounds bounds, LearnedTacticPolicy.Dispatch tactics, String goal) {
+        this(bounds, tactics, goal, null);
+    }
+    CheckedDomainSizeReceipts(CheckedLearnedSchemaModel.Bounds bounds, LearnedTacticPolicy.Dispatch tactics, String goal,
+            java.util.Set<String> disabledSchemas) {
+        this.disabledSchemas = disabledSchemas;
         this.bounds = bounds;
         this.tactics = tactics;
         this.goal = goal;
@@ -30,9 +36,9 @@ final class CheckedDomainSizeReceipts implements RetainedGraph.View {
     }
 
     boolean disabled(String schemaId, de.regelsuche.search.moves.IncrementalProviderContract.Meter meter) {
-        if (tactics == null) return false;
+        if (tactics == null && disabledSchemas == null) return false;
         meter.charge(de.regelsuche.search.moves.IncrementalProviderContract.Operation.MATCH,1);
-        return tactics.disabled().contains(schemaId);
+        return (disabledSchemas == null ? tactics.disabled() : disabledSchemas).contains(schemaId);
     }
 
     synchronized TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state) {
@@ -76,6 +82,6 @@ final class CheckedDomainSizeReceipts implements RetainedGraph.View {
     }
 
     @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-        visitor.reference(bounds); visitor.reference(sizes); visitor.reference(tactics); visitor.reference(goal);
+        visitor.reference(bounds); visitor.reference(sizes); visitor.reference(tactics); visitor.reference(goal); visitor.reference(disabledSchemas);
     }
 }
