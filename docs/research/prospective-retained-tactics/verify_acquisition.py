@@ -49,7 +49,8 @@ def verify(study, model):
         require(len(lines) == 6 and all(l.endswith(b"\n") for l in lines), "incomplete archive prefix")
         rows = [json.loads(raw) for raw in lines]
         require(batch["readWork"] == sum(map(len, lines)), "unpaid archive input bytes")
-        require(natural(batch["load"]) and natural(batch["referenceSetup"]), "invalid acquisition setup")
+        base = json.loads(read(archive / stream, "summary.json"))["arms"]["BASE"]["setup"]
+        require(natural(batch["load"]) and batch["referenceSetup"] == base["preparation"], "invalid acquisition setup")
         require(re.fullmatch("sha256:[0-9a-f]{64}", batch["modelHash"]) is not None, "missing batch model ID")
         lessons, gates = batch["training"], batch["gates"]
         require([r["index"] for r in lessons] == [0, 1, 2] and [r["index"] for r in gates] == [3, 4, 5],
@@ -82,6 +83,12 @@ def verify(study, model):
             patterns = tuple(parent["freeze_tree"](schema[side]) for side in ("source", "target"))
             parent["check_provenance"]({"supportingObservationIds": origins}, patterns, lessons)
             supporting[rule].update(origins)
+    hashes = [batch["modelHash"] for batch in batches]
+    if hashes[0] != hashes[1]:
+        links = [a["observationIds"] for a in model["attempts"] if a["status"] == "RETAINED_LIBRARIES"]
+        require(links == [hashes], "combined model does not name both archived acquisitions")
+    else:
+        require("sha256:" + sha(read(training, "acquired.json")) == hashes[0], "incorrect reused archive model")
     require(set(supporting) == set(rules), "retained schema lacks archived proof provenance")
     for rule, origins in supporting.items():
         require(origins == set(rules[rule]["supportingObservationIds"]), "lost or unrecognized archive origins")
