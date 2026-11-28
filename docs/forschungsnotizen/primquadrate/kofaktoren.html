@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Warum eine endliche Liste von Kofaktoren bei fast allen Primzahlen scheitert, obwohl für alle geprüften Primzahlen 1 modulo 4 bis 11.170.477 der Kofaktor 181 genügt.">
+  <title>Wie weit reicht eine feste Kofaktorliste? · Regelsuche</title>
+  <link rel="stylesheet" href="../stil.css">
+</head>
+<body>
+  <header><a href="index.html">Primquadrate und erste Vielfache</a> · <a href="../">Alle Forschungsnotizen</a></header>
+  <main><article>
+    <p class="meta">Primachsenraum · Mathematischer Anhang · 28. November 2026</p>
+    <h1>Wie weit reicht eine feste Kofaktorliste?</h1>
+    <p>Für jede der 368.306 Primzahlen <i>p</i> ≡ 1 modulo 4 bis einschließlich 11.170.477 findet sich ein <i>m</i> ≤ 181 mit <i>mp</i> ∈ <i>J</i>. Hier ist <i>J</i> = {2<i>g</i> + 1 : <i>g</i> ∈ <i>G</i>} und <i>G</i> die kanonische Greedy-Folge. Definiere <i>M</i>(<i>p</i>) als kleinsten solchen Kofaktor und setze <i>M</i>(<i>p</i>) = ∞, falls kein Vielfaches vorkommt.</p>
+    <p><strong>Satz.</strong> Für jedes feste <i>K</i> ≥ 1 und jedes <i>a</i> ∈ {1, 3} geht der Anteil der Primzahlen <i>p</i> ≤ <i>X</i> mit <i>M</i>(<i>p</i>) ≤ <i>K</i> unter den Primzahlen <i>p</i> ≤ <i>X</i> mit <i>p</i> ≡ <i>a</i> modulo 4 gegen null. Das gilt auch für <i>K</i> = 181. Es lässt offen, welche Primzahlen später mit größerem Kofaktor erscheinen und ab welcher Grenze der Effekt numerisch sichtbar wird.</p>
+
+    <h2>Welche Primzahlen Sperren liefern</h2>
+    <p>Die Greedy-Folge beginnt bei 0 und nimmt nacheinander jeden Offset auf, bei dessen Hinzunahme weiterhin zu jeder Primzahl eine Restklasse fehlt. Ungerade Offsets scheiden wegen der Restklassen modulo 2 aus. Die möglichen Normwerte 2<i>g</i> + 1 sind also 1 modulo 4. Für ungerades <i>s</i> entspricht eine fehlende Offsetklasse genau einer fehlenden Normklasse, weil 2 modulo <i>s</i> invertierbar ist.</p>
+    <p>Sei <i>T</i> die Menge aller ungeraden Primteiler von Elementen aus <i>J</i>. Für <i>s</i> ∈ <i>T</i> kommt die Nullklasse modulo <i>s</i> in <i>J</i> vor. Mindestens eine andere Klasse <i>b</i><sub><i>s</i></sub> fehlt für immer. Denn wenn alle endlich vielen Klassen irgendwann aufträten, träten sie schon in einem einzigen endlichen, unzulässigen Präfix auf. Wähle pro <i>s</i> eine solche fehlende Klasse.</p>
+    <p>Wird eine Primzahleingabe ℓ ≡ 1 modulo 4 abgelehnt, gibt es eine Sperrprimzahl <i>s</i>, für die alle <i>s</i> − 1 übrigen Klassen bereits vertreten sind. Modulo 2 bleibt die Normbedingung erfüllt, also ist <i>s</i> ungerade. Da es vor ℓ insgesamt (ℓ − 1)/4 mögliche Normwerte gibt, gilt ℓ ≥ 4(<i>s</i> − 1) + 1 ≥ 2<i>s</i>. Somit ist ℓ modulo <i>s</i> ungleich null. Die Nullklasse ist bereits belegt, also <i>s</i> ∈ <i>T</i>. Die letzte freie Klasse ist eindeutig, mithin ℓ ≡ <i>b</i><sub><i>s</i></sub> modulo <i>s</i>.</p>
+
+    <h2>Warum die Kehrwertsumme über <i>T</i> divergiert</h2>
+    <p>Nehmen wir an, die Summe von 1/<i>s</i> über <i>T</i> sei endlich. Dann ist das Produkt <i>P</i> = ∏<sub><i>s</i>∈<i>T</i></sub>(1 − 1/(<i>s</i>−1)) positiv. Fixiere eine endliche Teilmenge <i>S</i> von <i>T</i>. Unter den Primzahlen ℓ ≡ 1 modulo 4 meidet ein relativer Anteil ∏<sub><i>s</i>∈<i>S</i></sub>(1 − 1/(<i>s</i>−1)) sämtliche Klassen <i>b</i><sub><i>s</i></sub> für <i>s</i> ∈ <i>S</i>. Das folgt aus dem chinesischen Restsatz und dem Primzahlsatz für feste arithmetische Progressionen. Partielle Summation liefert für die Kehrwertsumme dieser Primzahlen bis <i>X</i>, geteilt durch log log <i>X</i>, denselben Produktwert mal 1/2 im Grenzwert. Dieser ist mindestens <i>P</i>/2.</p>
+    <p>Wie viel davon kann eine weitere Sperrprimzahl <i>s</i> abdecken? Für ihren Rest <i>b</i><sub><i>s</i></sub> liefert Brun–Titchmarsh bei <i>t</i> ≥ 2<i>s</i> die gleichmäßige obere Schranke <i>Ct</i>/((<i>s</i>−1) log(<i>t</i>/<i>s</i>)) für die Zahl der Primzahlen bis <i>t</i> in dieser Klasse. Partielle Summation ab 2<i>s</i> ergibt für ihre Kehrwertsumme bis <i>X</i> höchstens <i>C</i>′(1 + log log <i>X</i>)/<i>s</i> mit einer absoluten Konstanten <i>C</i>′. Im Integral liefert die Substitution <i>v</i> = log(<i>t</i>/<i>s</i>) den Faktor ∫ d<i>v</i>/<i>v</i> mit positiver Untergrenze log 2. Liegt <i>X</i> unter 2<i>s</i>, liefert diese Sperre bis <i>X</i> keinen Beitrag.</p>
+    <p>Die angenommenen Primzahlen gehören selbst zu <i>T</i> und haben nach Annahme beschränkte Kehrwertsumme. Alle übrigen gerade gezählten Primzahlen müssen eine Sperre aus <i>T</i> außerhalb von <i>S</i> treffen. Wähle nun <i>S</i> so groß, dass <i>C</i>′∑<sub><i>s</i>∈<i>T</i>∖<i>S</i></sub>1/<i>s</i> &lt; <i>P</i>/4. Nach Division durch log log <i>X</i> hat ihre gesamte Masse dann einen oberen Grenzwert von höchstens <i>P</i>/4. Das widerspricht der unteren Schranke <i>P</i>/2. Die Summe über <i>T</i> divergiert.</p>
+
+    <h2>Von der Divergenz zur natürlichen Dichte</h2>
+    <p>Fixiere jetzt <i>m</i> ≥ 1 und <i>a</i> ∈ {1, 3}. Wenn <i>mp</i> ∈ <i>J</i>, muss <i>p</i> bei jedem <i>s</i> ∈ <i>T</i>, das <i>m</i> nicht teilt, die Einheitenklasse <i>b</i><sub><i>s</i></sub><i>m</i><sup>−1</sup> modulo <i>s</i> meiden. Für jede endliche Auswahl <i>S</i> dieser <i>s</i> ist die obere relative <em>natürliche</em> Dichte solcher Primzahlen in der Klasse <i>a</i> modulo 4 höchstens das Produkt ∏<sub><i>s</i>∈<i>S</i></sub>(1 − 1/(<i>s</i>−1)). Der Primzahlsatz in Progressionen wird jeweils auf den festen Modul 4∏<sub><i>s</i>∈<i>S</i></sub><i>s</i> angewandt. Die endlich vielen Teiler von <i>m</i> ändern die Divergenz nicht. Durch Vergrößern von <i>S</i> wird die obere Schranke beliebig klein. Zum Schluss vereinigt man die endlich vielen Mengen für 1 ≤ <i>m</i> ≤ <i>K</i>. Das beweist den Satz für beide Primzahlklassen.</p>
+    <h2>Ein endliches Gegenbeispiel zur Schranke 181</h2>
+    <p>Bei <i>p</i> = 36.233.161 schließen bereits 23 gesättigte Primmoduln alle <i>m</i> ≤ 184 aus. Von 1 bis 184 kommen nur die 46 Werte <i>m</i> ≡ 1 modulo 4 infrage. Für jeden davon liegt der zugehörige Offset (<i>mp</i> − 1)/2 in einer dauerhaft fehlenden Offsetklasse. Ob der nächste Kandidat 185 tatsächlich einen Treffer liefert, bleibt offen.</p>
+    <details><summary>Die 46 Ausschlüsse nachrechnen</summary>
+      <p>Das folgende Python-Programm prüft die Primzahl und die 46 Kongruenzen. Das Wörterbuch enthält pro Sperrprimzahl den fehlenden <em>Offsetrest</em>. Die Sättigungen lassen sich über das öffentliche Rechenpaket unabhängig prüfen. Dazu die Programme <code>generator</code>, <code>verify_prefix</code> und <code>saturation</code> gemäß den Anleitungen in <code>reproduction/counting</code> und <code>reproduction/factor-support</code> bauen. Für dieses Beispiel reicht das Präfix bis zum Offset 76.725.950. Alle 23 Restklassen wurden für diese Fassung in seinen 4.306.240 angenommenen Offsets nachgezählt. Im von <code>saturation derive</code> erzeugten und mit <code>saturation verify</code> geprüften Katalog müssen die Spalten <code>prime</code> und <code>missing_residue</code> die folgenden Paare enthalten. <a href="../greedy-prime-offsets/Moree-2088-reproduction.zip">Rechenpaket mit Quelltexten (ZIP)</a></p>
+      <pre><code>from math import isqrt
+p = 36233161
+assert all(p % d for d in range(2, isqrt(p) + 1))
+missing = {
+    3: 1, 5: 4, 7: 3, 11: 5, 13: 1, 17: 7, 29: 25,
+    41: 13, 101: 13, 113: 29, 173: 112, 181: 4,
+    313: 261, 397: 238, 401: 330, 421: 129, 757: 249,
+    1381: 434, 1861: 460, 4621: 2081, 47969: 45094,
+    152833: 10568, 400217: 69099,
+}
+for m in range(1, 185, 4):
+    g = (m * p - 1) // 2
+    assert any(g % s == r for s, r in missing.items())
+print("Alle 46 Kandidaten bis 184 sind gesperrt.")</code></pre>
+    </details>
+    <h2>Quellen und Prüfstand</h2>
+    <p>Die qualitative Herleitung verwendet den Primzahlsatz in arithmetischen Progressionen mit festem Modul sowie den Satz von Brun–Titchmarsh, wie er bei Dimitris Koukoulopoulos, <cite lang="en">The Distribution of Prime Numbers</cite>, Satz 20.1, formuliert ist. Die Notiz und die Nachrechnung entstanden mit erheblicher KI-Unterstützung. Eine unabhängige fachliche Begutachtung steht aus. <a href="https://dms.umontreal.ca/~koukoulo/documents/publications/primes.pdf">Koukoulopoulos (PDF)</a> · <a href="https://www.math.tau.ac.il/~rudnick/courses/sieves2015/BrunTitchmarsh.pdf">Brun–Titchmarsh und Primzahlen in Progressionen (PDF)</a></p>
+  </article></main>
+</body>
+</html>

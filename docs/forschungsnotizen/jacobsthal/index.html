@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Eine zusätzliche logarithmische Ersparnis für die Jacobsthal-Funktion als Folgerung aus dem quantitativen Siebsatz von OpenAI.">
+  <title>Eine Logarithmuspotenz für die Jacobsthal-Funktion · Regelsuche</title>
+  <link rel="stylesheet" href="../stil.css">
+  <style>
+    .gleichung { margin-inline: 1em; font-variant-numeric: lining-nums; }
+    .gleichung sup, .gleichung sub { line-height: 0; }
+    @media print { .gleichung { margin-block: 2.5mm; } }
+  </style>
+</head>
+<body>
+  <header class="screen-only"><a href="../">Regelsuche · Forschungsnotizen und Preprints</a></header>
+  <main>
+    <article>
+      <p class="meta">Primachsenraum · Mathematischer Arbeitsentwurf · Fassung 1 vom 28. November 2026</p>
+      <h1>Eine Logarithmuspotenz für die Jacobsthal-Funktion</h1>
+      <p>Wie lang muss ein Block aufeinanderfolgender ganzer Zahlen sein, damit er zu einem vorgegebenen Modul <i>m</i> wenigstens eine teilerfremde Zahl enthält? Die Jacobsthal-Funktion <i>h</i>(<i>k</i>) gibt die kleinste Länge an, die für alle Moduln mit höchstens <i>k</i> verschiedenen Primteilern und alle Lagen des Blocks genügt.</p>
+      <p class="screen-only"><a href="jacobsthal-v1.pdf">Druckfassung als PDF</a></p>
+
+      <h2>Die Folgerung</h2>
+      <p>Es gibt absolute Konstanten <i>ε</i> &gt; 0 und <i>C</i> &gt; 0, sodass für alle hinreichend großen <i>k</i> gilt</p>
+      <p class="gleichung"><strong><i>h</i>(<i>k</i>) ≤ <i>C k</i>² / [(log <i>k</i>)<sup><i>ε</i></sup> (log log <i>k</i>)²].</strong></p>
+      <p>Satz 1.1 des Preprints von OpenAI liefert bereits die Schranke <i>C k</i>²/(log log(3<i>k</i>))². Hier ist der quantitative <em>Satz 1.2</em> desselben Preprints die wesentliche Voraussetzung. Der zusätzliche Faktor (log <i>k</i>)<sup><i>ε</i></sup> entsteht beim Abschätzen der Verluste durch die größeren Primteiler. Alle Logarithmen sind natürlich. Das Zeichen ≪ bedeutet eine obere Schranke bis auf einen konstanten Faktor. [1]</p>
+
+      <h2>1. Der Beitrag des quantitativen Siebsatzes</h2>
+      <p>Sei <i>Y</i> eine hinreichend große ganze Zahl. Eine Verschiebung bringt jeden Block der Länge <i>Y</i> auf 1 bis <i>Y</i>. Für jeden Primteiler <i>q</i> von <i>m</i> ist dadurch genau eine Restklasse verboten. Weitere ausgeschlossene Klassen an zusätzlichen Primzahlen können die Zahl der übrig bleibenden Stellen nur verringern.</p>
+      <p>Wähle die eindeutige reelle Zahl <i>z</i> &gt; e mit <i>z</i>²/(log <i>z</i>)² = <i>Y</i>. Dann gilt <i>z</i> ∼ ½√<i>Y</i> log <i>Y</i>. Schreibe <i>S</i>(<i>u</i>) für die Stellen, die allen bis <i>u</i> vorgeschriebenen Klassen ausweichen. Für jede Primzahl bis <i>z</i> schreiben wir eine Klasse vor. Satz 1.2 ergibt mit einer absoluten Konstanten <i>c</i><sub>0</sub> &gt; 0</p>
+      <p class="gleichung">|<i>S</i>(<i>z</i>)| ≥ <i>c</i><sub>0</sub><i>D</i>, &nbsp; <i>D</i> = <i>Y</i> log log <i>Y</i> / (log <i>Y</i>)². &emsp;(1)</p>
+      <p>Zum Abgleich mit der Quelle setze <i>L</i> = log <i>z</i>, <i>w</i> = <i>L</i>/(log <i>L</i>)² und <i>B</i> = <i>L</i>/log <i>w</i>. Ihre untere Schranke ist ein konstanter Faktor mal <i>Y</i> ∏<sub><i>p</i>≤<i>w</i></sub>(1 − 1/<i>p</i>)/<i>B</i>², mit dem Produkt über Primzahlen. Nach Mertens hat dies die Größenordnung <i>Y</i> log <i>w</i>/<i>L</i>² und damit <i>D</i>. Die Wahl von <i>z</i> liefert auch mit der Abrundung im Quellsatz genau die Blocklänge <i>Y</i>. [1]</p>
+
+      <h2>2. Wie viel eine weitere Klasse entfernen kann</h2>
+      <p>Die benötigte Obergrenze gilt gleichmäßig für jeden Block von <i>H</i> ganzen Zahlen. Müssen die Zahlen für jede Primzahl <i>r</i> ≤ <i>H</i><sup>1/32</sup> einer beliebigen Klasse ausweichen, so bleiben höchstens <i>C</i><sub>1</sub><i>H</i>/log <i>H</i> übrig. Für die Anwendung des eindimensionalen oberen Siebs ist die lokale Dichte der ausgeschlossenen Klasse 1/<i>r</i>. Der chinesische Restsatz liefert für jede quadratfreie Kombination <i>d</i> die Zahl <i>H</i>/<i>d</i> mit absolutem Fehler höchstens 1. Bis zum Niveau √<i>H</i> summieren sich diese Fehler auf höchstens √<i>H</i>. Das fundamentale Lemma und die Mertenssche Produktformel geben die behauptete Obergrenze. [2, Satz 18.11]</p>
+      <p>Setze <i>W</i> = <i>z</i>(log <i>Y</i>)<sup><i>δ</i></sup> für einen festen, später gewählten Exponenten 0 &lt; <i>δ</i> ≤ 1. Für <i>z</i> &lt; <i>q</i> ≤ <i>W</i> setze in der neuen verbotenen Klasse <i>n</i> = <i>a</i> + <i>qt</i>. Die Parameter <i>t</i> liegen in einem Block der Länge <i>H</i> = <i>Y</i>/<i>q</i> + O(1). Dabei ist log <i>H</i> von der Größenordnung log <i>Y</i>, gleichmäßig auch für <i>δ</i> ≤ 1. Jede Primzahl <i>r</i> ≤ <i>H</i><sup>1/32</sup> liegt unter <i>z</i>. Weil <i>q</i> modulo <i>r</i> invertierbar ist, müssen die Parameter ihrerseits einer Klasse modulo <i>r</i> ausweichen. Also entfernt <i>q</i> höchstens <i>C</i><sub>2</sub><i>Y</i>/(<i>q</i> log <i>Y</i>) Stellen aus <i>S</i>(<i>z</i>).</p>
+      <p class="page-break">In jeder Gruppe (<i>v</i>, 2<i>v</i>] mit <i>v</i> ≥ <i>z</i> ist die Summe der Primzahlkehrwerte nach Tschebyschow höchstens π(2<i>v</i>)/<i>v</i> ≪ 1/log <i>Y</i>. Dabei zählt π(<i>x</i>) die Primzahlen bis <i>x</i>. Zwischen <i>z</i> und <i>W</i> liegen höchstens 1 + <i>δ</i> log log <i>Y</i>/log 2 solcher Gruppen. Selbst je eine zusätzliche Klasse bei <em>allen</em> Primzahlen in diesem Bereich entfernt somit höchstens</p>
+      <p class="gleichung"><i>C</i><sub>3</sub> <i>Y</i>(1 + <i>δ</i> log log <i>Y</i>) / (log <i>Y</i>)². &emsp;(2)</p>
+      <p>Die Konstante <i>C</i><sub>3</sub> ist unabhängig von <i>δ</i>. Wähle nun 0 &lt; <i>δ</i> &lt; min(1, <i>c</i><sub>0</sub>/(4<i>C</i><sub>3</sub>)). Für hinreichend großes <i>Y</i> bleibt nach (1) und (2) wenigstens <i>c</i><sub>0</sub><i>D</i>/2 übrig.</p>
+
+      <h2>3. Vom erhöhten Siebschnitt zur Intervalllänge</h2>
+      <p>Für jede Primzahl <i>q</i> &gt; <i>W</i> enthält ihre verbotene Klasse im ursprünglichen Block höchstens 1 + <i>Y</i>/<i>W</i> Stellen. Ergänze deren Parameterblock auf die einheitliche Länge <i>H</i> = ⌈<i>Y</i>/<i>W</i>⌉ + 2. Das obere Sieb aus Abschnitt 2 gilt auf diesem größeren Block mit denselben kleinen Restklassen, auch wenn <i>q</i> &gt; <i>Y</i> ist. Der Verlust pro Primteiler beträgt deshalb höchstens <i>C</i><sub>4</sub><i>Y</i>/(<i>W</i> log <i>Y</i>).</p>
+      <p>Sind höchstens <i>k</i> Primteiler vorhanden und gilt <i>k</i> ≤ <i>c</i><sub>1</sub>√<i>Y</i> (log <i>Y</i>)<sup><i>δ</i></sup> log log <i>Y</i>, so entfernen sie für hinreichend kleines festes <i>c</i><sub>1</sub> zusammen höchstens <i>c</i><sub>0</sub><i>D</i>/4. Denn <i>W</i> ∼ ½√<i>Y</i> (log <i>Y</i>)<sup>1+<i>δ</i></sup>. Folglich bleiben mindestens <i>c</i><sub>0</sub><i>D</i>/4 teilerfremde Stellen. Dies gilt gleichmäßig in <i>m</i> und der Intervalllage.</p>
+      <p>Setze <i>Y</i> = ⌈<i>A k</i>²/[(log <i>k</i>)<sup>2<i>δ</i></sup>(log log <i>k</i>)²]⌉. Da log <i>Y</i> ∼ 2 log <i>k</i>, erfüllt diese Wahl das Kriterium für jedes hinreichend große <i>k</i>, sobald die feste Zahl <i>A</i> groß genug ist. Das beweist die Folgerung mit <i>ε</i> = 2<i>δ</i>. Der Beweis bestimmt keinen Zahlenwert für <i>ε</i>.</p>
+
+      <h2>Zwei Folgen der Zählung</h2>
+      <p><strong>Wie viele teilerfremde Zahlen bleiben?</strong> Sei <i>C</i><sub><i>m</i></sub>(<i>I</i>) ihre Anzahl im Block <i>I</i>. Wähle bei allen Primzahlen <i>q</i> ≤ <i>W</i>, die <i>m</i> nicht teilen, die künstliche Klasse unabhängig und gleichverteilt. Bei den wirklichen Primteilern bleiben die Klassen fest. Jede schon zu <i>m</i> teilerfremde Stelle überlebt zusätzlich mit Wahrscheinlichkeit <i>P</i> = ∏<sub><i>q</i>≤<i>W</i>, <i>q</i>∤<i>m</i></sub>(1 − 1/<i>q</i>). Jede Wahl lässt nach Abschnitt 3 mindestens <i>c</i><sub>0</sub><i>D</i>/4 Stellen übrig. Also ist <i>P C</i><sub><i>m</i></sub>(<i>I</i>) ≥ <i>c</i><sub>0</sub><i>D</i>/4. Mertens liefert 1/<i>P</i> ≫ (log <i>W</i>) φ(<i>m</i>)/<i>m</i>, wobei φ(<i>m</i>) die zu <i>m</i> teilerfremden Klassen zählt. Unter demselben Größenkriterium für <i>k</i> folgt</p>
+      <p class="gleichung"><i>C</i><sub><i>m</i></sub>(<i>I</i>) ≫ <i>Y</i> [φ(<i>m</i>)/<i>m</i>] log log <i>Y</i> / log <i>Y</i>.</p>
+      <p><strong>Welche Primzahlen braucht eine vollständige Überdeckung?</strong> Seien <i>k</i> ≤ <i>Y</i><sup>2/3</sup> verschiedene Primzahlen gewählt und zusammen überdecken ihre Klassen den ganzen Block. Setze <i>U</i> = <i>k</i> log <i>Y</i>. Die Primzahlen <i>q</i> &gt; <i>Y</i><sup>3/4</sup> treffen zusammen höchstens <i>k</i>(1 + <i>Y</i><sup>1/4</sup>) = o(<i>D</i>) Stellen. Für <i>W</i> &lt; <i>q</i> ≤ <i>Y</i><sup>3/4</sup> liefert der Parameterblock aus Abschnitt 2 erneut den Verlust O(<i>Y</i>/(<i>q</i> log <i>Y</i>)), denn seine Länge beträgt mindestens eine Konstante mal <i>Y</i><sup>1/4</sup>. Die Kehrwertsumme seiner Primzahlen über <i>U</i> ist höchstens <i>k</i>/<i>U</i> = 1/log <i>Y</i>. Somit muss allein für die gewählten Primzahlen <i>W</i> &lt; <i>q</i> ≤ <i>U</i> gelten</p>
+      <p class="gleichung">Σ 1/<i>q</i> ≫ log log <i>Y</i> / log <i>Y</i>.</p>
+      <p class="page-break">Für <i>k</i> ≤ √<i>Y</i> (log <i>Y</i>)<sup><i>A</i></sup> mit festem <i>A</i> stehen zwischen <i>W</i> und <i>U</i> nur O<sub><i>A</i></sub>(log log <i>Y</i>) dyadische Gruppen zur Verfügung. Jede trägt höchstens O(1/log <i>Y</i>) bei. Daher müssen ≫<sub><i>A</i></sub> log log <i>Y</i> Gruppen jeweils mindestens <i>c</i><sub><i>A</i></sub>/log <i>Y</i> beitragen, mit einer festen Zahl <i>c</i><sub><i>A</i></sub> &gt; 0. Einsetzen von <i>v</i> &lt; <i>q</i> ≤ 2<i>v</i> zeigt, dass das einen positiven Anteil aller Primzahlen in jeder dieser Gruppen erfordert.</p>
+
+      <h2>Bezug zur Greedy-Folge A135311</h2>
+      <p>Bei A135311 wird ein Offset aufgenommen, wenn nach seiner Aufnahme für jede Primzahl mindestens eine Restklasse frei bleibt. Der erste Offset ist 0, daher sind alle aufgenommenen Offsets gerade. Angenommen, <i>n</i><sub>∗</sub> = 2<i>g</i><sub>∗</sub> + 1 sei der erste aufgenommene Wert mit einem Primteiler 3 modulo 4. Sei <i>p</i> der kleinste solche Teiler. Aus <i>n</i><sub>∗</sub> ≡ 1 (mod 4) folgt <i>n</i><sub>∗</sub> ≥ <i>p</i>², denn die Anzahl dieser Primfaktoren, mit Vielfachheit, ist gerade. Bis dahin war die Nullklasse modulo <i>p</i> frei, und bei der Aufnahme muss noch eine Klasse <i>a</i> ≠ 0 frei bleiben.</p>
+      <p>Unterhalb <i>p</i>² wurden daher alle positiven Kandidaten <i>n</i> ≡ 1 (mod 4), <i>n</i> ≡ <i>a</i> (mod <i>p</i>) verworfen. Im Parameter der Progression mit Schritt 4<i>p</i> bilden sie ein Intervall der Länge <i>Y</i> = <i>p</i>/4 + O(1). Für jeden Kandidaten wähle eine Primzahl, an der seine Aufnahme die letzte freie Klasse gefüllt hätte. Diese Primzahl ist weder 2 noch <i>p</i>. Ihre einmal entstandene Sperre bleibt dauerhaft und belegt im Parameter genau eine Klasse. Abschnitt 3 erzwingt damit für jedes genügend große <i>p</i> mehr als <i>c</i>√<i>p</i>(log <i>p</i>)<sup><i>δ</i></sup> log log <i>p</i> verschiedene Sperrprimzahlen. Schon die Sperren oberhalb <i>W</i> müssen diese Anzahl erreichen, da jede von ihnen höchstens <i>C</i><sub>4</sub><i>Y</i>/(<i>W</i> log <i>Y</i>) der nach (2) übrigen Stellen trifft. Das ist eine notwendige Bedingung für ein erstes Gegenbeispiel. Ob es überhaupt ein solches gibt, bleibt offen.</p>
+
+      <h2>Quellen und Prüfstand</h2>
+      <ol>
+        <li>OpenAI. <cite>A quadratic bound for Jacobsthal’s function.</cite> 25. September 2026. <a href="https://github.com/openai/math/blob/adc7f1241b42e322a6451854ab7e4b4c146bf78a/preprints/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/build/sections/introduction.tex">Sätze 1.1 und 1.2</a> · <a href="https://github.com/openai/math/blob/adc7f1241b42e322a6451854ab7e4b4c146bf78a/preprints/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/build/sections/assembly.tex">ursprünglicher Übergang zu Satz 1.1</a> · <a href="https://github.com/openai/math/blob/adc7f1241b42e322a6451854ab7e4b4c146bf78a/lean/OAI/NumberTheory/Jacobsthal/Conclusions/IteratedLogBound.lean">Lean-Quelltext zur iterierten Logarithmusschranke</a>.</li>
+        <li>Dimitris Koukoulopoulos. <cite>The Distribution of Prime Numbers.</cite> Graduate Studies in Mathematics 203, American Mathematical Society. <a href="https://dms.umontreal.ca/~koukoulo/documents/publications/primes.pdf#page=201">Satz 18.11 im Autorenexemplar</a> · <a href="https://doi.org/10.1090/gsm/203">Verlagsausgabe</a>.</li>
+        <li>Henryk Iwaniec. <cite>On the problem of Jacobsthal.</cite> Demonstratio Mathematica 11 (1978). <a href="https://doi.org/10.1515/dema-1978-0121">Originalarbeit zur historischen oberen Schranke</a>. Weitere Orientierung bietet die <a href="https://mathcommunity.github.io/oai-math-revised/papers/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/">Literatur- und Formalisierungsübersicht zum OpenAI-Preprint</a>.</li>
+      </ol>
+      <p>Beim Literaturabgleich am 28. November 2026 ergab sich aus [1], [3], der verlinkten Übersicht sowie der Suche nach späteren Arbeiten zu Jacobsthals Funktion kein früherer Beleg für genau diese gleichmäßige zusätzliche Logarithmuspotenz. Die historische Priorität bleibt offen.</p>
+      <p class="meta">Projekt Primachsenraum. Herleitung, Literaturabgleich und Ausarbeitung erfolgten mit erheblicher KI-Unterstützung. Die öffentliche Lean-Formalisierung in [1] betrifft die Schranke mit (log log(3<i>k</i>))². Für die hier abgeleitete zusätzliche Potenz stehen eine unabhängige fachliche Begutachtung und eine eigene formale Verifikation aus.</p>
+    </article>
+  </main>
+</body>
+</html>
