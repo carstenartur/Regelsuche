@@ -106,6 +106,15 @@ final class TaskSubpathMiner {
             if (!step.primitive() || !visited.add(step.after())) return;
             location.append(step.index()).append(',');
         }
-        sink.accept(location.append(']').toString(), source, steps.get(end - 1).after());
+        String origin = location.append(']').toString();
+        if (origin.length() > 400) {
+            // The persisted support ID also contains its lesson and lineage. Preserve all
+            // original indices in at most 128 bits under the snapshot's 512-character limit.
+            var mask = java.math.BigInteger.ZERO;
+            for (var step : steps.subList(start, end)) mask = mask.setBit(step.index());
+            work.add(end - start);
+            origin = trace.path() + "[indices=0x" + mask.toString(16) + "]";
+        }
+        sink.accept(origin, source, steps.get(end - 1).after());
     }
 }
