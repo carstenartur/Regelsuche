@@ -25,6 +25,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
@@ -32,6 +33,9 @@ class HornerTransferStudyTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final List<Long> DEADLINES = List.of(16_384L, 32_768L, 65_536L, 131_072L, 262_144L);
     private static final long PRIMARY = 131_072;
+    private static final long LONG_PRIMARY = 524_288;
+    private static final String FIRST_STUDY_SEED = "05dda9fb837d53f6d37e3925744b009c3b09672d";
+    private static final String LONG_PROTOCOL = "sha256:2f6d5c3be42d8f291f3facac132cd749c9b5b246a257af32aafad52840c81702";
     private static final String PROTOCOL = "sha256:f2c2f07b6709b2bab033721259a39f9d2b3a8bb289dbcb4bfe245f83e3208dda";
     private static final String RECEIPT = "sha256:6863b403ed13292dd4aefde8603ba83b1f7ff221ee5dab091a7f019108947930";
     private static final String SNAPSHOT = "sha256:9e56f3640b85520b8b4090f64aa96c14bb703d3d218ab6fd60c2cdb47e74e223";
@@ -47,7 +51,7 @@ class HornerTransferStudyTest {
         boolean solved, long query, long verificationWithinQuery, long replay, long audit, long completedAt, int learnedSteps, String pathHash) {}
     private record Checkpoint(long budget, int completed, int solved) {}
     private record Summary(long acquisition, long load, long preparation, List<Checkpoint> checkpoints, int totalSolved, long fullCost) {
-        int primarySolved() { return checkpoints.stream().filter(c -> c.budget() == PRIMARY).findFirst().orElseThrow().solved(); }
+        int solvedAt(long budget) { return checkpoints.stream().filter(c -> c.budget() == budget).findFirst().orElseThrow().solved(); }
     }
 
     @Test
@@ -65,12 +69,26 @@ class HornerTransferStudyTest {
         assertThrows(IllegalArgumentException.class, () -> HornerTransferCases.panel("invalid SHA"));
     }
 
+    @Test
+    void pairedResultsCountByTopologyAndRespectTheSharedClock() {
+        var inputs = List.of(new HornerTransferCases.Input(0, 0, HornerTransferCases.Topology.H, "x"),
+            new HornerTransferCases.Input(1, 0, HornerTransferCases.Topology.D, "y"));
+        var rows = new EnumMap<Arm, List<Row>>(Arm.class);
+        for (Arm arm : Arm.values()) rows.put(arm, List.of(clockRow(true, 1), clockRow(false, 2)));
+        rows.put(Arm.REGEN, List.of(clockRow(false, 1), clockRow(true, 2)));
+        var results = topologyResults(inputs, rows, 2);
+        assertTrue(results.contains(new TopologyResult(HornerTransferCases.Topology.H, Arm.BASE, 1, 1, 0, 1, 0, 1)));
+        assertTrue(results.contains(new TopologyResult(HornerTransferCases.Topology.D, Arm.BASE, 1, 0, 0, 0, 1, 0)));
+        assertTrue(topologyResults(inputs, rows, 1).contains(
+            new TopologyResult(HornerTransferCases.Topology.D, Arm.REGEN, 1, 1, 0, 0, 0, 0)));
+    }
+
     private static Row clockRow(boolean solved, long completedAt) {
         return new Row(0, 0, "", "", 0, "", solved, solved, 0, 0, 0, 0, completedAt, 0, "");
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "horner.phase", matches = "final")
+    @EnabledIfSystemProperty(named = "horner.phase", matches = "final|amortization")
     void evaluateFrozenStream() throws IOException {
         Path research = Path.of(System.getProperty("horner.research"));
         String seed = System.getProperty("horner.freeze");
@@ -81,8 +99,15 @@ class HornerTransferStudyTest {
             case 1 -> List.of(Arm.DROP, Arm.REGEN, Arm.PRIOR, Arm.BASE);
             default -> throw new IllegalArgumentException("rotation must be 0 or 1");
         };
-        var inputs = HornerTransferCases.panel(seed);
-        HornerTransferCases.verifySplit(inputs);
+        boolean longStream = System.getProperty("horner.phase").equals("amortization");
+        long primary = longStream ? LONG_PRIMARY : PRIMARY;
+        String protocol = longStream ? LONG_PROTOCOL : PROTOCOL;
+        if (longStream) readChecked(research.resolve("prospective-amortization/protocol.md"), protocol);
+        var inputs = longStream ? HornerTransferCases.mixedPanel(seed) : HornerTransferCases.panel(seed);
+        var split = longStream ? Stream.concat(HornerTransferCases.panel(FIRST_STUDY_SEED).stream(), inputs.stream()).toList() : inputs;
+        HornerTransferCases.verifySplit(split);
+        var deadlines = longStream ? List.of(primary) : DEADLINES;
+        var allRows = new EnumMap<Arm, List<Row>>(Arm.class);
         Path out = Files.createDirectory(Path.of(System.getProperty("horner.output")));
         var summaries = new EnumMap<Arm, Summary>(Arm.class);
         var elapsed = new EnumMap<Arm, Long>(Arm.class);
@@ -93,12 +118,14 @@ class HornerTransferStudyTest {
             var rows = run(arm, setup, inputs, paths);
             elapsed.put(arm, System.nanoTime() - start);
             writeRows(out.resolve(arm.name() + ".jsonl"), rows);
-            summaries.put(arm, summarize(setup, rows));
+            summaries.put(arm, summarize(setup, rows, deadlines));
+            if (longStream) allRows.put(arm, rows);
         }
-        int regen = summaries.get(Arm.REGEN).primarySolved();
-        var report = Map.of("freeze", seed, "protocol", PROTOCOL, "model", SNAPSHOT, "primaryBudget", PRIMARY,
-            "passed", primaryPassed(regen, summaries.get(Arm.BASE).primarySolved(), summaries.get(Arm.DROP).primarySolved()),
-            "improvedOnPriorAtPrimary", regen > summaries.get(Arm.PRIOR).primarySolved(), "arms", summaries);
+        if (longStream) writeJson(out.resolve("topologies.json"), topologyResults(inputs, allRows, primary));
+        int regen = summaries.get(Arm.REGEN).solvedAt(primary);
+        var report = Map.of("freeze", seed, "protocol", protocol, "model", SNAPSHOT, "primaryBudget", primary,
+            "passed", primaryPassed(regen, summaries.get(Arm.BASE).solvedAt(primary), summaries.get(Arm.DROP).solvedAt(primary)),
+            "improvedOnPriorAtPrimary", regen > summaries.get(Arm.PRIOR).solvedAt(primary), "arms", summaries);
         writeJson(out.resolve("summary.json"), new TreeMap<>(report));
         writeJson(out.resolve("paths.json"), paths);
         writeJson(out.resolve("elapsed-nanos.json"), elapsed);
@@ -153,7 +180,7 @@ class HornerTransferStudyTest {
             var earlier = paths.putIfAbsent(hash, path);
             if (earlier != null && !earlier.equals(path)) throw new IllegalStateException("witness hash collision");
             boolean solved = result.withinBudget() && result.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED
-                && result.outputScore() <= HornerTransferCases.MAX_NODES;
+                && result.outputScore() <= task.goal().maximumOutputScore();
             int learned = Math.toIntExact(path.stream().filter(step -> step.learnedEvidence() != null).count());
             rows.add(new Row(input.index(), input.distributed(), input.source(), output, result.outputScore(),
                 result.search().outcome().name(), result.withinBudget(), solved, result.queryWork(),
@@ -182,8 +209,8 @@ class HornerTransferStudyTest {
         });
     }
 
-    private static Summary summarize(Setup setup, List<Row> rows) {
-        var checkpoints = DEADLINES.stream().map(budget -> checkpoint(rows, budget)).toList();
+    private static Summary summarize(Setup setup, List<Row> rows, List<Long> deadlines) {
+        var checkpoints = deadlines.stream().map(budget -> checkpoint(rows, budget)).toList();
         return new Summary(setup.acquisition(), setup.load(), setup.preparation(), checkpoints,
             Math.toIntExact(rows.stream().filter(Row::solved).count()), rows.getLast().completedAt());
     }
@@ -196,6 +223,34 @@ class HornerTransferStudyTest {
             if (row.solved()) solved++;
         }
         return new Checkpoint(budget, completed, solved);
+    }
+
+    private record TopologyResult(HornerTransferCases.Topology topology, Arm arm, int attempts, int fullSolved, long streamWork,
+        int solvedAtDeadline, int regenWins, int regenLosses) {}
+
+    private static List<TopologyResult> topologyResults(List<HornerTransferCases.Input> inputs, Map<Arm, List<Row>> rows, long primary) {
+        var results = new ArrayList<TopologyResult>();
+        for (var topology : HornerTransferCases.Topology.values()) {
+            for (Arm arm : Arm.values()) {
+                int attempts = 0, full = 0, onTime = 0, wins = 0, losses = 0;
+                long work = 0;
+                for (var input : inputs) {
+                    if (input.topology() != topology) continue;
+                    Row row = rows.get(arm).get(input.index());
+                    Row candidate = rows.get(Arm.REGEN).get(input.index());
+                    boolean earned = row.solved() && row.completedAt() <= primary;
+                    boolean regenEarned = candidate.solved() && candidate.completedAt() <= primary;
+                    attempts++;
+                    if (row.solved()) full++;
+                    if (earned) onTime++;
+                    if (regenEarned && !earned) wins++;
+                    if (earned && !regenEarned) losses++;
+                    work = Math.addExact(work, Math.addExact(row.query(), Math.addExact(row.replay(), row.audit())));
+                }
+                results.add(new TopologyResult(topology, arm, attempts, full, work, onTime, wins, losses));
+            }
+        }
+        return results;
     }
 
     private static void writeRows(Path path, List<Row> rows) throws IOException {

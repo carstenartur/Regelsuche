@@ -14,10 +14,15 @@ import java.util.stream.IntStream;
 final class HornerTransferCases {
     static final int MAX_NODES = 17;
     static final MoveSearch.Budget QUERY = new MoveSearch.Budget(32, 32, 200_000, 512, 8_192);
-    record Input(int index, int distributed, String source) {
+    enum Topology {
+        H(MAX_NODES), D(19);
+        private final int nodeBound;
+        Topology(int nodeBound) { this.nodeBound = nodeBound; }
+    }
+    record Input(int index, int distributed, Topology topology, String source) {
         CheckedSchemaTaskSolver.Task task() {
             return new CheckedSchemaTaskSolver.Task(new ExpressionParser().parseExactTerm(source).expression(),
-                List.of(), CheckedSchemaTaskSolver.Goal.atMostNodes(MAX_NODES), QUERY);
+                List.of(), CheckedSchemaTaskSolver.Goal.atMostNodes(topology.nodeBound), QUERY);
         }
     }
 
@@ -31,26 +36,55 @@ final class HornerTransferCases {
             for (int slot = 0; slot < counts.size(); slot++) {
                 int index = 4 * block + slot;
                 int count = counts.get(slot);
-                var positions = order(seed + "/position/" + index + "/", 3);
-                String[] left = {"(a+" + (101 + index) + ")", "e", "i"};
-                String[] right = {"b", "f", "j"};
-                String[] p = {"c", "g", "k"};
-                String[] q = {"d", "h", "l"};
-                String[] coefficients = new String[3];
-                for (int i = 0; i < coefficients.length; i++) {
-                    String u = left[i], v = right[i];
-                    String term = u + "*" + v;
-                    if (positions.subList(0, count).contains(i)) {
-                        term = "(" + u + "*((" + v + "-" + p[i] + ")-" + q[i] + ")+" + u + "*" + q[i] + ")+" + u + "*" + p[i];
-                    } else if (count == 0 && positions.getFirst() == i) {
-                        term = "(" + term + ")+0";
-                    }
-                    coefficients[i] = "(" + term + ")";
-                }
-                inputs.add(new Input(index, count, "(" + coefficients[0] + "*r+" + coefficients[1] + ")*s+" + coefficients[2]));
+                inputs.add(input(seed, index, count, 101 + index, Topology.H));
             }
         }
         return List.copyOf(inputs);
+    }
+
+    private record Stratum(Topology topology, int count) {}
+
+    static List<Input> mixedPanel(String seed) {
+        if (!seed.matches("[0-9a-f]{40}")) throw new IllegalArgumentException("expected the full freeze commit SHA");
+        var inputs = new ArrayList<Input>();
+        var strata = new ArrayList<Stratum>();
+        for (Topology topology : Topology.values()) {
+            for (int count = 0; count < 4; count++) strata.add(new Stratum(topology, count));
+        }
+        for (int block = 0; block < 128; block++) {
+            String prefix = seed + "/order/" + block + "/";
+            Comparator<Stratum> digest = Comparator.comparing(s -> SchematicProofPlan.hash(prefix + s.topology() + "/" + s.count()));
+            var ordered = strata.stream().sorted(digest.thenComparing(s -> s.topology().name()).thenComparingInt(Stratum::count)).toList();
+            for (var stratum : ordered) {
+                int index = inputs.size();
+                inputs.add(input(seed, index, stratum.count(), 10_001 + index, stratum.topology()));
+            }
+        }
+        return List.copyOf(inputs);
+    }
+
+    private static Input input(String seed, int index, int count, int constant, Topology topology) {
+        var positions = order(seed + "/position/" + index + "/", 3);
+        String[] left = {"(a+" + constant + ")", "e", "i"};
+        String[] right = {"b", "f", "j"};
+        String[] p = {"c", "g", "k"};
+        String[] q = {"d", "h", "l"};
+        String[] coefficients = new String[3];
+        for (int i = 0; i < coefficients.length; i++) {
+            String u = left[i], v = right[i];
+            String term = u + "*" + v;
+            if (positions.subList(0, count).contains(i)) {
+                term = "(" + u + "*((" + v + "-" + p[i] + ")-" + q[i] + ")+" + u + "*" + q[i] + ")+" + u + "*" + p[i];
+            } else if (count == 0 && positions.getFirst() == i) {
+                term = "(" + term + ")+0";
+            }
+            coefficients[i] = "(" + term + ")";
+        }
+        String source = switch (topology) {
+            case H -> "(" + coefficients[0] + "*r+" + coefficients[1] + ")*s+" + coefficients[2];
+            case D -> "(" + coefficients[0] + "*r+" + coefficients[1] + "*s)+" + coefficients[2] + "*t";
+        };
+        return new Input(index, count, topology, source);
     }
 
     private static List<Integer> order(String prefix, int count) {

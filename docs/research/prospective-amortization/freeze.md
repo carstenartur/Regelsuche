@@ -1,0 +1,3 @@
+# Freeze for the 1,024-task follow-up
+
+Use the first published commit containing this file as the seed for the two runs of the [follow-up protocol](https://github.com/carstenartur/Regelsuche/commit/c01d8c8061d0bb041f4087f121583a40a71c0ddf). The product implementation and [reproduced training artifacts](../prospective-horner-transfer/freeze.md) are identical to those in the [original 128-task freeze](https://github.com/carstenartur/Regelsuche/commit/05dda9fb837d53f6d37e3925744b009c3b09672d). The extended evaluator also checks the split against those 128 previous inputs. Every block of eight new tasks contains each combination of topology and expanded coefficient count.
