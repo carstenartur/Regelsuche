@@ -228,10 +228,6 @@ final class CheckedSchemaSupport {
                         throw new DomainRejected("checked scalar polynomial structure limit");
                     }
                     switch (node.value()) {
-                        case NumberExpr number -> literal(number.value(), bounds);
-                        case VariableExpr variable -> {
-                            if (variable.name().length() > 128) throw new DomainRejected("checked symbol size limit");
-                        }
                         case BinaryExpr binary -> {
                             if (scan != null) scan.observe(binary.operator(), work);
                             if (!checkSharedSurface || binary.operator() != BinaryOperator.DIV) binaryDomain(binary,bounds);
@@ -241,7 +237,7 @@ final class CheckedSchemaSupport {
                             RetainedOperation.work(2);
                             RetainedOperation.checkpoint();
                         }
-                        default -> throw new DomainRejected("outside checked scalar rational polynomial domain");
+                        default -> scalarLeaf(node.value(), bounds);
                     }
                 }
             } catch (DomainRejected rejected) {
@@ -271,7 +267,17 @@ final class CheckedSchemaSupport {
         return count;
     }
 
-    private static void binaryDomain(BinaryExpr binary, CheckedLearnedSchemaModel.Bounds bounds) {
+    static void scalarLeaf(Expr expression, CheckedLearnedSchemaModel.Bounds bounds) {
+        switch (expression) {
+            case NumberExpr number -> literal(number.value(), bounds);
+            case VariableExpr variable -> {
+                if (variable.name().length() > 128) throw new DomainRejected("checked symbol size limit");
+            }
+            default -> throw new DomainRejected("outside checked scalar rational polynomial domain");
+        }
+    }
+
+    static void binaryDomain(BinaryExpr binary, CheckedLearnedSchemaModel.Bounds bounds) {
         if (binary.operator() == BinaryOperator.DIV && (!(binary.right() instanceof NumberExpr number)
                 || number.value().numerator().signum() == 0)) {
             throw new DomainRejected("checked scalar division needs nonzero literal denominator");

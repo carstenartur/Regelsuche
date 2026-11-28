@@ -389,6 +389,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     public List<Attempt> attempts() { return attempts; }
     public Bounds bounds() { return bounds; }
     public String inventoryHash() { return inventoryHash; }
+    String identity() { return modelHash; }
     public String inventorySemanticsHash() { return inventorySemanticsHash; }
     public List<String> requiredAssumptions() { return requiredAssumptions; }
     /** Additional formation only; the preexisting learner's work must also be paid by callers. */
@@ -842,9 +843,20 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         return verifier(false);
     }
 
+    private enum ReplayMode { CLAIMED_BINDINGS, SOURCE_BINDINGS, SHARED_CONTEXT }
+
+    /** Recheck one rewrite using proof-local size and depth receipts for its immutable subtrees. */
+    public TypedMoveSearch.Verifier verifierWithSharedContext() {
+        return verifier(ReplayMode.SHARED_CONTEXT);
+    }
+
     // Both modes independently match the same source and regenerate the complete evidence.
     // In the optional mode the match itself supplies the substitution for regeneration.
     TypedMoveSearch.Verifier verifier(boolean deriveBindings) {
+        return verifier(deriveBindings ? ReplayMode.SOURCE_BINDINGS : ReplayMode.CLAIMED_BINDINGS);
+    }
+
+    private TypedMoveSearch.Verifier verifier(ReplayMode mode) {
         return (source, move, context) -> {
             var work = new Work();
             work.add(1);
@@ -856,7 +868,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 }
                 if (!(move.provenance() instanceof TransformationProvenance.ExactTheoryStep step)
                         || !move.ruleId().equals(descriptor.id())) return rejected(work, "CHECKED_SCHEMA_PROVENANCE_REQUIRED");
-                var checked = replayBinding(source, step.evidence().binding(), work, deriveBindings);
+                var checked = replayBinding(source, step.evidence().binding(), work, mode);
                 var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());
                 // StateValue assesses capabilities after mathematical admission. MoveSearch overwrites
                 // provider-supplied deltas with that assessment before retaining the witness. These
@@ -879,17 +891,23 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
      */
     public NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
             TypedMoveSearch.Context context) {
-        return replayApplication(source, binding, context, false);
+        return replayApplication(source, binding, context, ReplayMode.CLAIMED_BINDINGS);
     }
 
     /** Validate exported evidence by deriving the bindings from the checked source occurrence. */
     public NativeVerification replayApplicationFromSource(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
             TypedMoveSearch.Context context) {
-        return replayApplication(source, binding, context, true);
+        return replayApplication(source, binding, context, ReplayMode.SOURCE_BINDINGS);
+    }
+
+    /** Independently regenerate the same canonical binding with proof-local subtree receipts. */
+    public NativeVerification replayApplicationWithSharedContext(TypedMoveSearch.State source,
+            ExactTheoryEvidence.Binding binding, TypedMoveSearch.Context context) {
+        return replayApplication(source, binding, context, ReplayMode.SHARED_CONTEXT);
     }
 
     private NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
-            TypedMoveSearch.Context context, boolean deriveBindings) {
+            TypedMoveSearch.Context context, ReplayMode mode) {
         var work = new Work();
         work.add(1);
         try {
@@ -900,7 +918,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 try {
                     if (!NativeMoveProvider.carries(requiredAssumptions,source,context))
                         throw new ReplayRejected("CHECKED_SCHEMA_PREREQUISITES_MISSING");
-                    var checked = replayBinding(source, binding, work, deriveBindings);
+                    var checked = replayBinding(source, binding, work, mode);
                     results[0] = checked;
                     if (!checked.binding().equals(binding))
                         throw new ReplayRejected("CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
@@ -931,7 +949,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     }
 
     private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work,
-            boolean deriveBindings) {
+            ReplayMode mode) {
         var replay = new BindingReplay(source,binding,work);
         RetainedOperation.Frame retained=null,jsonOwner=null;
         Throwable failure=null;
@@ -940,7 +958,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             replay.json=RetainedJson.open();
             RetainedOperation.work(1);
             jsonOwner=RetainedOperation.retain(replay.json);
-            try { replay.run(deriveBindings); }
+            try { replay.run(mode); }
             catch (ReplayRejected | DomainRejected rejected) {
                 replay.rejection=rejected.getMessage();replay.domainRejected=rejected instanceof DomainRejected;
                 RetainedOperation.work(2);
@@ -991,7 +1009,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);
             v.reference(decoded);v.reference(checked);v.reference(rejection);v.reference(json);
         }
-        void run(boolean deriveBindings) {
+        void run(ReplayMode mode) {
             data = read(binding.canonicalEvidenceJson());
             RetainedOperation.work(1);
             RetainedOperation.checkpoint();
@@ -1003,10 +1021,12 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 throw new ReplayRejected("CHECKED_SCHEMA_STALE_SEMANTICS");
             Schema schema = byId.get(text(data, "schemaId"));
             if (schema == null) throw new ReplayRejected("CHECKED_SCHEMA_UNREGISTERED");
-            domain(source.expression(), bounds, work);
-            encodedSource = CODEC.encodeExpression(source.expression());
-            if (!encodedSource.equals(text(data, "source")) || !encodedSource.equals(binding.sourceExpression()))
-                throw new ReplayRejected("CHECKED_SCHEMA_WRONG_SOURCE");
+            // The existing observed path retains/measures every intermediate for native resource audits.
+            boolean shared = mode == ReplayMode.SHARED_CONTEXT && !RetainedOperation.isObserved();
+            if (!shared) {
+                domain(source.expression(), bounds, work);
+                checkEncodedSource();
+            }
             array(data.get("path"), bounds.maximumDepth());
             path = new ArrayList<>();
             RetainedOperation.work(2);
@@ -1017,9 +1037,25 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 RetainedOperation.work(1);
             }
             RetainedOperation.checkpoint();
-            checked = replayOccurrence(schema, source.expression(), encodedSource, path,
-                deriveBindings ? null : this::readBindings, work);
-            if (checked == null) throw new ReplayRejected("CHECKED_SCHEMA_UNCHANGED");
+            if (shared) {
+                var replay = new CheckedSubstitutionReplay(schema, bounds, path, work);
+                Expr target = replay.rewrite(source.expression());
+                checkEncodedSource();
+                // The public witness retains its original proposal cost. The caller pays actual verification work.
+                var canonicalWork = new Work();
+                canonicalWork.add(replay.canonicalApplicationWork());
+                checked = evidence(schema, source.expression(), encodedSource, target, path, replay.bindings(), canonicalWork);
+            } else {
+                checked = replayOccurrence(schema, source.expression(), encodedSource, path,
+                    mode == ReplayMode.CLAIMED_BINDINGS ? this::readBindings : null, work);
+                if (checked == null) throw new ReplayRejected("CHECKED_SCHEMA_UNCHANGED");
+            }
+        }
+
+        private void checkEncodedSource() {
+            encodedSource = CODEC.encodeExpression(source.expression());
+            if (!encodedSource.equals(text(data, "source")) || !encodedSource.equals(binding.sourceExpression()))
+                throw new ReplayRejected("CHECKED_SCHEMA_WRONG_SOURCE");
         }
 
         private Map<String, Expr> readBindings() {
@@ -1057,7 +1093,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         }
     }
 
-    private static final class ReplayRejected extends IllegalArgumentException {
+    static final class ReplayRejected extends IllegalArgumentException {
         ReplayRejected(String reason){super(reason);}
     }
     /** Same concrete occurrence/match/substitution and phase replay for both representations. */
