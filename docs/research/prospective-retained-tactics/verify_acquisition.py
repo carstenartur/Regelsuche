@@ -67,6 +67,8 @@ def verify(study, model):
             audit_witness(gate, reference)
             depth = max(1, len(reference["witness"]) - 1) if reference["solved"] else 32
             require(gate["depth"] == depth, "gate depth differs from measured primitive solution")
+            cap = min(8192, max(1, reference["work"])) if reference["solved"] else 8192
+            require(gate["cap"] == cap, "gate budget differs from measured primitive cost")
             charges = [gate[k] for k in ("base", "previous", "candidate", "routed")]
             require(all(natural(v) for v in charges), "invalid gate charge")
             validation_cost += sum(charges)
