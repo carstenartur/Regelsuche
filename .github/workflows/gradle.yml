@@ -403,7 +403,8 @@ jobs:
           git show -s --format=%ct HEAD > "$evidence/source-epoch.txt"
           source_path=maven-build-contract/src/test/java/de/regelsuche/build
           sha256sum "$source_path/StudentSdkArchive.java" "$source_path/StudentSdkPinnedConsumer.java" \
-            "$source_path/MavenStudentSdkArchiveTest.java" > "$evidence/native-assembler.sha256"
+            "$source_path/MavenStudentSdkArchiveTest.java" "$source_path/StudentSdkStageCache.java" > "$evidence/native-assembler.sha256"
+          java "$source_path/StudentSdkStageCache.java" "$HOME/.m2/repository" "$repository" | tee "$evidence/stage-cache.log"
           version=$(sed -n 's/^version=//p' release.properties)
           archive="$work/regelsuche-sdk-${version}.zip"
           mvn --batch-mode --no-transfer-progress -Psdk-release \
