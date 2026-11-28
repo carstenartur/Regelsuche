@@ -1,0 +1,95 @@
+{
+  "schema": "regelsuche.ai-knowledge.baseline-promotion/v1",
+  "acceptedMain": {
+    "commit": "680b827d4d50b218c6d500084b827b1fb63a95f0",
+    "tree": "cf0b2b8cd88654f59e16b960e0481af612d04d9a",
+    "firstParent": "6e0cb635828588cb9742d0e0c42e9644fec4da1c",
+    "pullRequest": 1421
+  },
+  "acceptedCI": {
+    "runId": 46103374769,
+    "event": "push",
+    "conclusion": "success",
+    "head": "680b827d4d50b218c6d500084b827b1fb63a95f0",
+    "successfulAuthorities": {
+      "Fast build and workflow contracts": 140850600189,
+      "Complete Git-free Maven lifecycle": 140851572171,
+      "Isolated SymPy runtime authority": 140851572174,
+      "Fresh Maven Student SDK archive qualification": 140851572179,
+      "Isolated JMH authority": 140851572185,
+      "Maven pinned native polynomial study": 140851572188,
+      "Maven pinned checked-schema polynomial study": 140851572207,
+      "Complete Maven product and Docker authority": 140851572209,
+      "Checkout-local Gradle authority": 140851572212,
+      "Maven pinned polynomial pilot": 140851572223,
+      "Independent clean and pinned scalar reproduction": 140851572231,
+      "Maven pinned typed polynomial study": 140851572259,
+      "Checked Lean and SMT proof authority": 140851572266,
+      "Typed source-only learning comparison": 140854239462,
+      "Checkout-local ciCheck": 140872048164,
+      "Publish generated reports": 140872505395
+    }
+  },
+  "originalQualityEvidence": {
+    "id": 15249332852,
+    "name": "quality-acceptance-evidence",
+    "size_in_bytes": 29214156,
+    "digest": "sha256:229722db760cbff89507b411e5d07f7bcd0a0149bb1e4156474ecc0e1659d4e8",
+    "indexSha256": "e4ef5c722883801015d8be533df1d03197e681681ebc5b17b2081db0e3a9b232",
+    "indexedFilesVerified": 294,
+    "trackedSourceBlobsVerified": 64,
+    "generatedFilesVerified": 230
+  },
+  "rejectedCI": {
+    "pullRequest": 1424,
+    "head": "b1fb2a162c92adb0369048b7e11baeaebb475c58",
+    "tree": "588e511d7d485584a5e5773a3d8c9f88f642b323",
+    "runId": 46111619757,
+    "jobId": 140876335502,
+    "artifact": {
+      "id": 15249828043,
+      "name": "repository-verification",
+      "digest": "sha256:a066abe6c92a102695af56b20266041411f74c42a9666d65c74181cb1d3c8dc3",
+      "size_in_bytes": 2282111
+    }
+  },
+  "estimates": {
+    "priorBaseline": 919570,
+    "acceptedMainMeasured": 932950,
+    "prMeasured": 935430,
+    "acceptedMainVsPrior": 13380,
+    "prVsPrior": 15860,
+    "prVsAcceptedMain": 2480,
+    "unchangedThreshold": 15000
+  },
+  "featureContribution": {
+    "base": "402794af49c9328e7d63104259497ae88adf1719",
+    "baseTree": "75d9bf60644131051d870d719428b64fe83a3d9a",
+    "changedPaths": 22,
+    "deltaScope": "Native v0.1.10 BasicJavaKnowledgeProvider and MarkdownDocumentScanner on every changed source path in both exact trees. None of the changed paths supplies module, dependency or capability configuration.",
+    "changedPathCountsBefore": {
+      "classes": 8,
+      "tests": 4,
+      "docs": 1
+    },
+    "changedPathCountsAfter": {
+      "classes": 10,
+      "tests": 7,
+      "docs": 2
+    },
+    "weights": {
+      "classes": 260,
+      "tests": 140,
+      "docs": 180
+    },
+    "estimatedContextTokenIncrement": 1120,
+    "impliedBaseEstimate": 934310
+  },
+  "nativeProjection": {
+    "tag": "v0.1.10",
+    "releaseCommit": "b409bed957c31d63ce7b6ef37205890f0f0ebd9a",
+    "driver": "ai-knowledge/baseline-history/2026-11-24-main-f183aedd/ProjectionDriver.java",
+    "method": "Projection of complete original check and complexity reports using the released TrendAnalyzer. Projection is distinct from source rescanning and final CI."
+  },
+  "evidenceBoundary": "The promoted snapshot uses the green main push exclusively. The failed PR reports demonstrate the cumulative rejection and exercise the unchanged limits against the prior accepted main. The exact feature contribution is a paired changed-path calculation, not a new full base CI measurement."
+}
