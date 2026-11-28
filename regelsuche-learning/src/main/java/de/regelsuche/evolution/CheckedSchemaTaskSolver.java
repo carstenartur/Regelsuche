@@ -264,6 +264,16 @@ public final class CheckedSchemaTaskSolver {
         });
     }
 
+    /**
+     * Reuse node counts within this query when the ordinary scheduler scores and checks the
+     * same expression. The primitive lane retains its providers, ordering and completeness.
+     * Prepared sessions keep their configured checker, and observed resource scopes use the
+     * native objective so that all scratch ownership remains visible.
+     */
+    public Solution solveWithSharedNodeCounts(Task task) {
+        return preparation == null ? solveWithAdmission(task, java.util.Set.of()) : solve(task);
+    }
+
     /** Run the selected lane and keep any proposal ablation downstream of its admission. */
     Solution solveWithAdmission(Task task, java.util.Set<String> disabledSchemas) {
         return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
@@ -276,7 +286,8 @@ public final class CheckedSchemaTaskSolver {
                     original.policy(), original.verifier(), original.stateScore(), original.mode(), original.scheduling(),
                     original.budget(), (state, context) -> {
                         var size = count.evaluate(state);
-                        return new StateValue.Assessment(Math.toIntExact(size.value()), -size.value(), size.work(), 0, Map.of());
+                        double priority = breadthFirstPriority ? -state.searchDepth() : -size.value();
+                        return new StateValue.Assessment(Math.toIntExact(size.value()), priority, size.work(), 0, Map.of());
                     });
                 scoped = new ScopedTask(problem, count, scoped.checkedSteps());
             }

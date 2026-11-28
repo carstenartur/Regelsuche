@@ -19,9 +19,9 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 class RetainedTacticDevelopmentTest {
     private static final String TACTIC_SEED = "c7141702e091ff94b5ed2e3c5af5b5d2d66136dd";
 
-    private record Panel(String name, long deadline, List<PairedTacticCases.Input> inputs) {}
+    record Panel(String name, long deadline, List<PairedTacticCases.Input> inputs) {}
 
-    private static List<Panel> panels() {
+    static List<Panel> panels() {
         // The legacy label slots identify the MIXED stratum only in the diagnostic ledger.
         // Its original node goal, empty assumptions and query budget are retained.
         var mixed = HornerTransferCases.mixedPanel(IntervalTransferCases.MIXED_SEED).stream()
