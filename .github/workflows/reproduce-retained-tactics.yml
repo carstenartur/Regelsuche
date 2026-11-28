@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: '98c7013ea6790306e679c642d8dcf5b61fae9c7b'
+          ref: 'ba1e1722039a7fc7fdaff956d769db11ce1d2ef7'
           persist-credentials: false
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
@@ -29,18 +29,11 @@ jobs:
           done
           diff -rq "$RUNNER_TEMP/train-0" "$RUNNER_TEMP/train-1"
           sha256sum "$RUNNER_TEMP"/train-0/*
-      - name: Reproduce earlier public development streams
-        shell: bash
-        run: |
-          for pass in 0 1; do
-            mvn -B -ntp -pl regelsuche-learning -am -Dtest=RetainedTacticDevelopmentTest -Dsurefire.failIfNoSpecifiedTests=false "-Dretained.research=$PWD/docs/research" "-Dretained.rotation=$pass" "-Dretained.development.output=$RUNNER_TEMP/dev-$pass" test
-          done
-          python3 docs/research/prospective-retained-tactics/development/summarize.py "$RUNNER_TEMP/dev-0" "$RUNNER_TEMP/dev-1" --training "$RUNNER_TEMP/train-0" > "$RUNNER_TEMP/development.json"
       - name: Make the independently reproducible measurements available
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: retained-tactic-development-98c7013ea
+          name: retained-tactic-development-ba1e17220
           retention-days: 90
           path: |
             ${{ runner.temp }}/train-0/
