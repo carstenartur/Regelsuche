@@ -3,33 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Mathematische Forschungsnotizen und Manuskripte aus dem Umfeld von Regelsuche mit Belegen, Prüfstand und offenen Fragen.">
+  <meta name="description" content="Das Golomb–Keller-Manuskript, neue Ergebnisse zur Folge A135311 und das Regelsuche-Methodenpapier mit Quellen und Prüfprogrammen.">
   <title>Forschungsnotizen und Preprints · Regelsuche</title>
   <link rel="stylesheet" href="stil.css">
 </head>
 <body>
-  <header class="masthead">
-    <a href="https://github.com/carstenartur/Regelsuche">Regelsuche</a>
-  </header>
+  <header class="masthead"><a href="https://github.com/carstenartur/Regelsuche">Regelsuche</a></header>
   <main>
     <h1>Forschungsnotizen und Preprints</h1>
-    <p class="intro">Mathematische Arbeiten aus dem Umfeld von Regelsuche. Zu jedem Entwurf findest du die untersuchte Frage, die Belege und den Stand der Prüfung.</p>
+    <p class="intro">Manuskripte aus Primachsenraum und Regelsuche mit Quellen, Rechenbelegen und offenen Fragen. Die mathematischen Projektentwürfe sind mit erheblicher KI-Unterstützung entstanden. Eine unabhängige fachliche Begutachtung steht aus.</p>
+    <nav aria-label="Arbeiten auf dieser Seite"><a href="#golomb-keller">Golomb–Keller</a> · <a href="#greedy">Primteiler</a> · <a href="#begleitnotizen">Begleitnotizen</a> · <a href="#methoden">Regelsuche-Methoden</a></nav>
 
-    <article class="entry">
-      <p class="meta">Forschungsnotiz v1 · <time datetime="2026-11-28">28. November 2026</time></p>
-      <h2><a href="a135311/index.html">Welche Primzahlen teilen <span class="formula">2<i>g</i> + 1?</span></a></h2>
-      <p>Für die Greedy-Folge A135311 ergibt sich ein Muster. Unter den ungeraden Primzahlen bis 67 teilen genau diejenigen mindestens einen Wert <span class="formula">2<i>g</i> + 1</span>, die bei Division durch 4 den Rest 1 lassen. Gilt das auch jenseits dieser Grenze?</p>
+    <article class="entry" id="golomb-keller">
+      <p class="meta">Review-Entwurf v6 · 20. November 2026 · Englisch</p>
+      <h2 lang="en">An unconditional upper bound for the Golomb–Keller exponent limsup</h2>
+      <p>Das Manuskript leitet aus der Greedy-Folge für den Limes superior der normierten Golomb–Keller-Exponenten die unbedingte Schranke <span class="formula"><i>C</i><sub>GK</sub> ≤ <i>c</i><sub>∗</sub></span> mit <i>c</i><sub>∗</sub> ≈ 0,430038367231 ab. Die frühere Schranke von Cloitre betrug 0,4332. Ob die neue Schranke erreicht wird, hängt davon ab, ob jedes endliche Greedy-Präfix unendlich oft als Primzahlmuster auftritt.</p>
+      <p><a href="golomb-keller/Golomb_Keller_v6_Review_Draft.pdf">Manuskript v6 lesen (PDF)</a> · <a href="golomb-keller/Golomb_Keller_v6_Source_Verification.zip">Quellen und Prüfprogramme (ZIP)</a></p>
+      <details>
+        <summary>Wie sich das Manuskript von v1 bis v6 entwickelt hat</summary>
+        <ul>
+          <li><strong>v1 · 10. September.</strong> Erste Arbeitsnotiz mit Prüfauftrag.</li>
+          <li><strong>v2 · 13. September.</strong> Berücksichtigt Thompsons Vorarbeit und korrigiert die Behandlung von Einzelmengen, Rundung und Resttermen.</li>
+          <li><strong>v3 · 13. September.</strong> Ergänzt die Danksagung. Die deutsche didaktische Begleitfassung vom 17. September gehört zu dieser Version.</li>
+          <li><strong>v4 · 2. Oktober.</strong> Die zuletzt versandte Fassung erläutert die Zulässigkeit an einem Beispiel und formuliert die Frage zur Zählfunktion separat.</li>
+          <li><strong>v5 · 17. November.</strong> Ergänzt strukturelle Charakterisierung, Stabilität und gewichtete Dominanz an Thompsons Wurzel.</li>
+          <li><strong>v6 · 20. November.</strong> Enthält v5 vollständig und ergänzt Greedy-Optimalität bis zum Randpunkt β, eine endliche Faktorschranke und eine Schranke für den Überschuss bei Verschiebung um drei.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>Die v6-Prüfung selbst ausführen</summary>
+        <p>Das ZIP enthält den datierten Quellenstand des Manuskripts. Der Vermerk „private revision“ in der historischen Anleitung beschreibt den Stand am 20. November. Das hier verlinkte Paket wurde am 28. November öffentlich freigegeben.</p>
+        <p>Nach dem Entpacken im Ordner <code>golomb-keller-v6</code> zuerst <code>sha256sum -c SHA256SUMS</code> und dann mit Python 3.10 oder neuer und NumPy <code>python3 docs/review/golomb-keller/v6-draft/review.py --check</code> ausführen. Die Prüfung gleicht unter anderem die endlichen Rechnungen mit den archivierten Zertifikaten ab. Für die großen historischen Rechenläufe enthält das Paket Programme und Prüfsummen.</p>
+      </details>
     </article>
 
-    <article class="entry">
+    <article class="entry" id="greedy">
+      <p class="meta">Forschungsnotiz · 28. November 2026 · Englisch</p>
+      <h2 lang="en">Which primes divide twice a greedy offset plus one?</h2>
+      <p>Für alle 169.510 ungeraden Primzahlen <i>p</i> &lt; 2.300.003 dokumentiert die Notiz, welche davon einen Wert <span class="formula">2<i>g</i> + 1</span> mit <i>g</i> aus der Greedy-Folge A135311 teilen. Im geprüften Bereich sind es genau die Primzahlen mit Rest 1 modulo 4. Die Frage für beliebige Primzahlen bleibt offen.</p>
+      <p>Für die 2.088 positiven Abstände von Ford, Luca und Moree zeigt eine zweite Rechnung: Für jede Primzahl <i>q</i> ≤ 10<sup>273</sup> ist mindestens eine der Zahlen <span class="formula">1 + <i>bq</i></span> mit einem dieser Abstände <i>b</i> zusammengesetzt. Ein Restklassenfilter grenzt zudem die Kandidaten für Languascos gewichtete Primzahlensuche ein.</p>
+      <p><a href="greedy-prime-offsets/Moree-2088-note.pdf">Forschungsnotiz lesen (PDF)</a> · <a href="greedy-prime-offsets/Moree-2088-reproduction.zip">Zertifikate und Reproduktion (ZIP)</a></p>
+      <h3>Ein Einstieg zum Nachrechnen</h3>
+      <p>Die deutsche Einführung zeigt das Restklassenargument für die 18 ungeraden Primzahlen bis 67. Das kurze Python-Skript erzeugt alle benötigten Folgenglieder aus der Definition.</p>
+      <p><a href="a135311/index.html">Einführung lesen</a> · <a href="a135311/primteiler-a135311-v1.pdf">Deutsche PDF-Fassung</a> · <a href="a135311/pruefen.py">Prüfskript</a></p>
+    </article>
+
+    <section class="entry" id="begleitnotizen">
+      <h2>Begleitnotizen</h2>
+      <ul>
+        <li><a href="begleitnotizen/zaehlfunktion.pdf">Zählfunktion der Greedy-Folge (PDF)</a></li>
+        <li><a href="begleitnotizen/thompsons-wurzel.pdf">Greedy-Optimalität an Thompsons Wurzel und der erste Rekord einer neuen Primachse (PDF)</a></li>
+        <li><a href="begleitnotizen/optimalitaet-und-saettigung.pdf">Optimalität und Sättigung (PDF)</a></li>
+      </ul>
+    </section>
+
+    <article class="entry" id="methoden">
       <p class="meta">Methodenpapier · Arbeitsfassung auf Englisch</p>
-      <h2><a href="https://github.com/carstenartur/Regelsuche/blob/main/paper/manuscript.md" lang="en">Claim-Bounded Autonomous Symbolic Rule Discovery with Machine-Checkable Evidence</a></h2>
-      <p>Wie gewinnt Regelsuche aus eigenen Suchläufen neue Rechenregeln, und welche davon helfen auch bei späteren Aufgaben? Zu jeder Aussage dokumentiert das Projekt, welche Versuche sie stützen und welche Prüfung noch aussteht.</p>
-      <p><a href="https://github.com/carstenartur/Regelsuche/blob/main/paper/claims-and-evidence.md">Aussagen und Belege zum Methodenpapier</a></p>
+      <h2 lang="en">Claim-Bounded Autonomous Symbolic Rule Discovery with Machine-Checkable Evidence</h2>
+      <p>Wie gewinnt Regelsuche aus eigenen Suchläufen neue Rechenregeln, und welche helfen bei späteren Aufgaben? Die Belegübersicht führt die Versuche und ausstehenden Prüfungen zu den einzelnen Aussagen auf.</p>
+      <p><a href="https://github.com/carstenartur/Regelsuche/blob/main/paper/manuscript.md">Methodenmanuskript lesen</a> · <a href="https://github.com/carstenartur/Regelsuche/blob/main/paper/claims-and-evidence.md">Aussagen und Belege</a></p>
     </article>
   </main>
-  <footer class="screen-only">
-    <a href="https://github.com/carstenartur/Regelsuche/issues">Korrekturen und Literaturhinweise auf GitHub</a>
-  </footer>
+  <footer class="screen-only"><a href="SHA256SUMS">SHA-256-Prüfsummen der Downloads</a> · <a href="https://github.com/carstenartur/Regelsuche/issues">Korrekturen und Literaturhinweise auf GitHub</a></footer>
 </body>
 </html>
