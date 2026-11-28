@@ -14,6 +14,12 @@ A primitive rewrite often builds a new root while retaining an entire child expr
 
 The implementation and cache depth were selected using these public cases. All 1,024 MIXED cases succeeded under their individual budgets in both configurations. Its gain therefore comes from reaching more tasks before the stream deadline. The C and D increases also appear under the individual budgets. The observations measure logical work. Wall-clock performance and transfer to external inputs remain open. [Work breakdowns and hashes of all row ledgers](development/subtree-counts.json)
 
+## Frozen transfer panel E
+
+On E, SHARED completed **224 of 256** and SUBTREE completed **208 of 256** by the deadline. Full-stream costs were 170,048 and 172,192 logical units, respectively. All 16 losses occurred in the group with three stages, variant 0 and a case cap of 256. Within each pair both solvers found the same primitive proof. SHARED paid 244 units for search and 12 for final replay, exactly meeting the cap. SUBTREE paid 253 plus 12, exceeding it by nine. Every other query retained its success status. This result favors keeping the choice of counter optional.
+
+Two fresh JVMs executed the frozen comparison in opposite arm orders. Both produced identical result ledgers and proof dictionaries. The independent Python verifier reconstructed every count, checked polynomial equivalence and replayed the recorded primitive steps. The complete six-stream report had SHA-256 `7f364293bd7d9979871c7b1c074fdfd10f70a8fe3c690e4e91dcadc85e8f0af6`.
+
 ## Reproduction
 
 Run the comparison from the repository root with Java 25 and Maven. Each JVM receives a fresh output path. The runner checks every public SHARED aggregate and the SHA-256 digest of its full row ledger against the earlier published study.
