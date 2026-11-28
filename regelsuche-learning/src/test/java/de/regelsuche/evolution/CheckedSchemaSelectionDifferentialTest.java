@@ -2,12 +2,15 @@ package de.regelsuche.evolution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.search.moves.MoveVerifier;
 import de.regelsuche.search.moves.NativeMoveProof;
 import de.regelsuche.search.program.AstTransportObservation;
 import de.regelsuche.search.program.CompiledAstReplayCodec;
 import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.TransformationProvenance;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.ExprIncrementalProvider;
@@ -80,7 +83,14 @@ class CheckedSchemaSelectionDifferentialTest {
         assertEquals(expected.stream().map(CheckedSchemaSelectionDifferentialTest::parse).toList(),
             actual.moves().stream().map(NativeSearchMove::targetExpression).toList(), source);
         assertEquals(proofs(control), proofs(actual), source);
-        for (var move : actual.moves()) assertTrue(model.nativeVerifier().verify(state, move, CONTEXT).accepted(), source);
+        for (var move : actual.moves()) {
+            assertTrue(model.nativeVerifier().verify(state, move, CONTEXT).accepted(), source);
+            var evidence = move.exportLegacy();
+            var reference = model.verifier(true).verify(state, evidence, CONTEXT);
+            var shared = model.verifierWithSharedContext().verify(state, evidence, CONTEXT);
+            assertTrue(shared.accepted(), source);
+            assertEquals(reference.receipts(), shared.receipts(), source);
+        }
     }
 
     private static List<Transformation> proofs(NativeMoveProvider.Batch batch) {
@@ -170,12 +180,19 @@ class CheckedSchemaSelectionDifferentialTest {
         extra.withArray("bindings").addObject().put("name", "unexpected").put("expression", codec.encodeExpression(parse("u")));
         var missing = canonical.deepCopy();
         missing.withArray("bindings").remove(0);
-        for (String mutation : List.of(changed.toString(), extra.toString(), missing.toString(), canonical.toPrettyString())) {
-            var forged = new ExactTheoryEvidence.Binding(binding.sourceExpression(), binding.transformedExpression(),
+        var wrongPath = canonical.deepCopy();
+        wrongPath.withArray("path").add(1);
+        var wrongCost = canonical.deepCopy().put("applicationWork", binding.canonicalWorkUnits() + 1);
+        var wrongTarget = canonical.deepCopy().put("target", codec.encodeExpression(parse("y")));
+        for (String mutation : List.of(changed.toString(), extra.toString(), missing.toString(), canonical.toPrettyString(),
+                wrongPath.toString(), wrongCost.toString(), wrongTarget.toString())) {
+            var contents = new ObjectMapper().readTree(mutation);
+            var forged = new ExactTheoryEvidence.Binding(binding.sourceExpression(), contents.get("target").textValue(),
                 binding.theoryStepId(), SchematicProofPlan.hash(mutation), binding.receiptArtifactId(), binding.runArtifactId(),
-                binding.canonicalWorkUnits(), mutation);
+                contents.get("applicationWork").longValue(), mutation);
             for (var check : List.of(model.replayApplicationFromSource(state(source), forged, context),
-                    model.replayApplication(state(source), forged, context))) {
+                    model.replayApplication(state(source), forged, context),
+                    model.replayApplicationWithSharedContext(state(source), forged, context))) {
                 assertFalse(check.accepted());
                 assertTrue(check.work() > 0);
                 assertNull(check.checkedProof());
@@ -243,6 +260,76 @@ class CheckedSchemaSelectionDifferentialTest {
                     budget.maxStates(), limit, budget.maxComplexityDebt())));
             assertEquals(limit == total, bounded.solved(), "work budget " + limit);
         }
+    }
+
+    @Test void sharedContextRechecksEveryUntouchedSiblingAndReconstructsTheOriginalProposalCost() {
+        Expr sibling = parse("(a+b)*(c+d)+(u-v)*(w+z)");
+        for (int i = 0; i < 3; i++) sibling = new BinaryExpr(sibling, BinaryOperator.ADD, sibling);
+        var input = new BinaryExpr(sibling, BinaryOperator.SUB, parse("(r+0)*1"));
+        var state = state(input);
+        var move = selected.candidates(state, CONTEXT).moves().getFirst().exportLegacy();
+        var binding = ((TransformationProvenance.ExactTheoryStep) move.provenance()).evidence().binding();
+        var prior = model.replayApplicationFromSource(state, binding, CONTEXT);
+        var actual = model.replayApplicationWithSharedContext(state, binding, CONTEXT);
+        assertTrue(actual.accepted());
+        assertEquals(prior.checkedProof().exportLegacy(), actual.checkedProof().exportLegacy());
+        assertTrue(actual.work() < prior.work());
+        var invalid = new BinaryExpr(parse("a/z"), BinaryOperator.SUB, parse("(r+0)*1"));
+        assertThrows(CheckedSchemaSupport.DomainRejected.class,
+            () -> model.replayApplicationWithSharedContext(state(invalid), binding, CONTEXT));
+    }
+
+    @Test void regeneratedExpansionPreservesAbsoluteSizeAndDepthLimitsAcrossReusedSubtrees() throws Exception {
+        var expanded = CheckedLearnedSchemaModelTest.checkedExpansionModel(model).schemas().getFirst();
+        var b = model.bounds();
+        var five = new CheckedLearnedSchemaModel.Bounds(5, b.maximumPatternNodes(), 2, b.maximumCoefficientBits(),
+            b.maximumExponent(), b.maximumExamples(), b.maximumPairAttempts(), b.maximumSchemas(),
+            b.maximumMatchAttempts(), b.maximumCandidates());
+        var exact = new CheckedSubstitutionReplay(expanded, five, List.of(), new CheckedSchemaSupport.Work());
+        assertEquals(parse("(a+0)+0"), exact.rewrite(parse("a+0")));
+        assertThrows(CheckedSchemaSupport.DomainRejected.class, () ->
+            new CheckedSubstitutionReplay(expanded, five, List.of(1), new CheckedSchemaSupport.Work()).rewrite(parse("b-(a+0)")));
+        var depthOnly = new CheckedLearnedSchemaModel.Bounds(64, b.maximumPatternNodes(), 2, b.maximumCoefficientBits(),
+            b.maximumExponent(), b.maximumExamples(), b.maximumPairAttempts(), b.maximumSchemas(),
+            b.maximumMatchAttempts(), b.maximumCandidates());
+        assertThrows(CheckedSchemaSupport.DomainRejected.class, () ->
+            new CheckedSubstitutionReplay(expanded, depthOnly, List.of(), new CheckedSchemaSupport.Work()).rewrite(parse("(a+b)+0")));
+    }
+
+    @Test void sharedContextSolverChargesBothIndependentChecksAtTheExactBoundary() {
+        var query = task("(((r+s)/7)+0)*1", 5);
+        var original = inventory.newTaskSolverWithDomainReceipts(model).solve(query);
+        var optimized = inventory.newTaskSolverWithSharedContext(model);
+        var actual = optimized.solve(query);
+        assertTrue(original.solved() && actual.solved());
+        assertTrue(actual.learnedApplications() > 0);
+        assertEquals(original.evidence().witness().stream().map(TypedMoveSearch.WitnessStep::move).toList(),
+            actual.evidence().witness().stream().map(TypedMoveSearch.WitnessStep::move).toList());
+        var proofWork = actual.evidence().witness().stream().mapToLong(step -> step.verification().work()).sum();
+        assertTrue(proofWork > 0);
+        assertEquals(proofWork, actual.evidence().replayWork());
+        long total = actual.evidence().totalWork();
+        var budget = query.budget();
+        for (long limit : List.of(total - 1, total)) {
+            var bounded = optimized.solve(new CheckedSchemaTaskSolver.Task(query.source(), query.assumptions(), query.goal(),
+                new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),
+                    budget.maxStates(), limit, budget.maxComplexityDebt())));
+            assertEquals(limit == total, bounded.solved(), "work budget " + limit);
+        }
+    }
+
+    @Test void independentlyRebuiltAncestorsRecheckTheNewDenominatorAndExponent() throws Exception {
+        var p = PatternExpr.var("P0");
+        var expansion = CheckedLearnedSchemaModelTest.checkedModel(model, p, PatternExpr.op(BinaryOperator.ADD, p, PatternExpr.num(0)));
+        var schema = expansion.schemas().getFirst();
+        for (String expression : List.of("x/2", "x^2")) {
+            var work = new CheckedSchemaSupport.Work();
+            assertThrows(CheckedSchemaSupport.DomainRejected.class, () ->
+                new CheckedSubstitutionReplay(schema, expansion.bounds(), List.of(1), work).rewrite(parse(expression)));
+            assertTrue(work.units > 0);
+        }
+        var ok = new CheckedSubstitutionReplay(schema, expansion.bounds(), List.of(0), new CheckedSchemaSupport.Work());
+        assertEquals(parse("(x+0)/2"), ok.rewrite(parse("x/2")));
     }
 
     @Test void anAbsentOperatorCanExcludeAllLearnedRulesOnlyIfPrimitivesCannotIntroduceIt() {

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 /** Opt-in live typed execution of admitted traces from the existing target-free TRAIN learner. */
@@ -139,9 +140,53 @@ public final class TypedLearnedMoveInventory {
 
     /** Share the selected cursor's checked occurrence counts with a node-count goal for one query. */
     public CheckedSchemaTaskSolver newTaskSolverWithDomainReceipts(CheckedLearnedSchemaModel model) {
-        return prepareTaskSolver(model, false, true, true).withPrimitiveRoute(primitives,
-            PrimitiveSchemaReachability.compile(inventory, model),
-            PrimitiveSchemaReachability.REVISION + "+regenerated-witness/v1+node-goal-receipts/v1", true);
+        return newTaskSolverWithDomainReceipts(model, false);
+    }
+
+    public CheckedSchemaTaskSolver newTaskSolverWithSharedContext(CheckedLearnedSchemaModel model) {
+        return newTaskSolverWithDomainReceipts(model, true);
+    }
+
+    public CheckedSchemaTaskSolver newTaskSolverWithDomainReceipts(CheckedLearnedSchemaModel model, boolean sharedContext) {
+        var included = model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return selectedSolver(model, sharedContext, included);
+    }
+
+    CheckedSchemaTaskSolver solverForSchema(CheckedLearnedSchemaModel model, String schemaId) {
+        return selectedSolver(model, false, Set.of(schemaId));
+    }
+
+    private CheckedSchemaTaskSolver selectedSolver(CheckedLearnedSchemaModel model, boolean sharedContext, Set<String> included) {
+        var plan = CheckedSchemaMatcherPlan.prepareSelected(model, model.bounds().maximumSchemas(), Map.of(), included);
+        var checkedSession = newSchemaSearchSession(model, List.of(plan.provider()), true, sharedContext);
+        var solver = new CheckedSchemaTaskSolver(checkedSession, plan.compilationReceipt(), plan);
+        String revision = PrimitiveSchemaReachability.REVISION + "+regenerated-witness/v1+node-goal-receipts/v1";
+        return solver.withPrimitiveRoute(primitives, PrimitiveSchemaReachability.compile(inventory, model),
+            sharedContext ? revision + "+common-context/v1" : revision, true);
+    }
+
+    public CheckedSchemaTaskSolver newTaskSolverWithTacticPolicy(CheckedLearnedSchemaModel model,
+            LearnedTacticPolicy policy, boolean sharedContext, boolean ablateTactics) {
+        var disabled = ablateTactics ? model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet()) : Set.<String>of();
+        return newTaskSolverWithTacticPolicy(model, policy, sharedContext, disabled);
+    }
+
+    /** Keep selection and its training costs fixed when disabling individual proved tactics. */
+    public CheckedSchemaTaskSolver newTaskSolverWithTacticPolicy(CheckedLearnedSchemaModel model,
+            LearnedTacticPolicy policy, boolean sharedContext, Set<String> disabled) {
+        policy.requireModel(model);
+        var plans = new java.util.TreeMap<String,CheckedSchemaMatcherPlan>();
+        long preparation = 0;
+        for (var schema : model.schemas()) {
+            var plan = CheckedSchemaMatcherPlan.prepareSelected(model, 1, Map.of(), Set.of(schema.id()));
+            preparation = Math.addExact(preparation, plan.compilationWork() + 2);
+            plans.put(schema.id(), plan);
+        }
+        if (!plans.keySet().containsAll(disabled)) throw new IllegalArgumentException("unknown disabled schema");
+        var dispatch = new LearnedTacticPolicy.Dispatch(policy,Map.copyOf(plans),Set.copyOf(disabled));
+        return newTaskSolverWithDomainReceipts(model, sharedContext).withTacticDispatch(dispatch, newTaskSolver(), preparation);
     }
 
     private CheckedSchemaTaskSolver prepareTaskSolver(CheckedLearnedSchemaModel model, boolean indexed,
@@ -176,11 +221,16 @@ public final class TypedLearnedMoveInventory {
 
     private SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, List<MoveProvider> schemaProviders,
             boolean deriveBindings) {
+        return newSchemaSearchSession(model,schemaProviders,deriveBindings,false);
+    }
+
+    private SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, List<MoveProvider> schemaProviders,
+            boolean deriveBindings, boolean sharedContext) {
         java.util.Objects.requireNonNull(model, "model");
         if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
         var selected = new ArrayList<>(primitives);
         selected.addAll(schemaProviders);
-        var schemas = model.verifier(deriveBindings);
+        var schemas = sharedContext ? model.verifierWithSharedContext() : model.verifier(deriveBindings);
         var primitive = verifier();
         return new SearchSession(selected, List.of(), (source, move, context) ->
             move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitive.verify(source, move, context)

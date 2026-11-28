@@ -16,7 +16,24 @@ final class CheckedDomainSizeReceipts implements RetainedGraph.View {
     private final CheckedLearnedSchemaModel.Bounds bounds;
     private final IdentityHashMap<Expr, Integer> sizes = new IdentityHashMap<>();
 
-    CheckedDomainSizeReceipts(CheckedLearnedSchemaModel.Bounds bounds) { this.bounds = bounds; }
+    private final LearnedTacticPolicy.Dispatch tactics;
+    private final String goal;
+
+    CheckedDomainSizeReceipts(CheckedLearnedSchemaModel.Bounds bounds) { this(bounds,null,null); }
+    CheckedDomainSizeReceipts(CheckedLearnedSchemaModel.Bounds bounds, LearnedTacticPolicy.Dispatch tactics, String goal) {
+        this.bounds = bounds;
+        this.tactics = tactics;
+        this.goal = goal;
+    }
+    CheckedSchemaMatcherPlan choose(Expr state, CheckedSchemaMatcherPlan defaultPlan, Work work) {
+        return tactics == null ? defaultPlan : tactics.choose(state,goal,defaultPlan,work);
+    }
+
+    boolean disabled(String schemaId, de.regelsuche.search.moves.IncrementalProviderContract.Meter meter) {
+        if (tactics == null) return false;
+        meter.charge(de.regelsuche.search.moves.IncrementalProviderContract.Operation.MATCH,1);
+        return tactics.disabled().contains(schemaId);
+    }
 
     synchronized TypedSourceOnlySearch.Score evaluate(TypedMoveSearch.State state) {
         if (RetainedOperation.isObserved()) return NativeNodeCountObjective.INSTANCE.evaluate(state);
@@ -59,6 +76,6 @@ final class CheckedDomainSizeReceipts implements RetainedGraph.View {
     }
 
     @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-        visitor.reference(bounds); visitor.reference(sizes);
+        visitor.reference(bounds); visitor.reference(sizes); visitor.reference(tactics); visitor.reference(goal);
     }
 }

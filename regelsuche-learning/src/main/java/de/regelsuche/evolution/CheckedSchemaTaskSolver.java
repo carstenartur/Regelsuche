@@ -111,6 +111,7 @@ public final class CheckedSchemaTaskSolver {
     private final PrimitiveSchemaReachability primitiveRoute;
     private final CheckedSchemaTaskSolver primitiveFallback;
     private final boolean shareNodeGoal;
+    private final LearnedTacticPolicy.Dispatch tactics;
     private final boolean breadthFirstPriority;
     private final boolean exactPolynomialSteps;
     private final boolean expansionRulesAttached;
@@ -138,6 +139,16 @@ public final class CheckedSchemaTaskSolver {
             CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
             boolean expansionRulesAttached, boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan,
             PrimitiveSchemaReachability primitiveRoute, CheckedSchemaTaskSolver primitiveFallback, boolean shareNodeGoal) {
+        this(session,preparation,breadthFirstPriority,exactPolynomialSteps,expansionRulesAttached,
+            expansionBridgesForOtherGoals,selectedPlan,primitiveRoute,primitiveFallback,shareNodeGoal,null);
+    }
+
+    private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
+            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
+            boolean expansionRulesAttached, boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan,
+            PrimitiveSchemaReachability primitiveRoute, CheckedSchemaTaskSolver primitiveFallback, boolean shareNodeGoal,
+            LearnedTacticPolicy.Dispatch tactics) {
+        this.tactics = tactics;
         this.shareNodeGoal = shareNodeGoal;
         this.primitiveRoute = primitiveRoute;
         this.primitiveFallback = primitiveFallback;
@@ -167,6 +178,32 @@ public final class CheckedSchemaTaskSolver {
             Math.addExact(receipt.workUnits(), route.compilationWork() + identity.length()),
             receipt.includedSchemas(), receipt.patternNodeVisits() + route.patternVisits(), receipt.orderingComparisons());
         return new CheckedSchemaTaskSolver(session, routed, false, false, false, false, selectedPlan, route, fallback, shareNodeGoal);
+    }
+
+    CheckedSchemaTaskSolver withTacticDispatch(LearnedTacticPolicy.Dispatch dispatch, CheckedSchemaTaskSolver baseline,
+            long preparationWork) {
+        var identity = preparation.configurationHash() + ";" + dispatch.policy().fingerprint();
+        var compiled = new CheckedSchemaMatcherPlan.Compilation(preparation.revision() + "+state-tactic/v1",
+            SchematicProofPlan.hash(identity), Math.addExact(preparation.workUnits(),preparationWork + identity.length()),
+            preparation.includedSchemas(), preparation.patternNodeVisits(), preparation.orderingComparisons());
+        var subset = new java.util.ArrayList<>(baseline.session.providers());
+        // A heuristic route can omit applicable learned moves. Primitive witnesses are unchanged,
+        // but exhausting just these providers cannot establish completeness for the full inventory.
+        if (!subset.isEmpty()) {
+            var delegate = subset.getFirst();
+            subset.set(0,new TypedMoveSearch.TypedProvider() {
+                @Override public Descriptor descriptor() { return delegate.descriptor(); }
+                @Override public Batch candidates(MoveState state, MoveContext context) {
+                    var batch = delegate.candidates(state,context);
+                    return new Batch(batch.moves(),batch.work().plus(de.regelsuche.transform.TransformationWorkMetrics.ZERO
+                        .withDelegatedMechanicalWork(1)),false);
+                }
+            });
+        }
+        var primitive = new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(subset,List.of(),
+            baseline.session.verifier()),null);
+        return new CheckedSchemaTaskSolver(session,compiled,false,false,false,false,selectedPlan,
+            primitiveRoute,primitive,true,dispatch);
     }
 
     CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
@@ -315,9 +352,23 @@ public final class CheckedSchemaTaskSolver {
 
     private ScopedTask scopedTask(Task task, Prepared prepared) {
         // The primitive control retains its batch scheduler and ordinary node-count objective.
-        var decision = primitiveRoute == null ? null : primitiveRoute.inspect(task.source(), task.budget().totalWork());
+        String goal = tactics == null ? null : TaskKnowledgeProfile.objectiveKey(task);
+        PrimitiveSchemaReachability.Decision decision;
+        if (tactics == null) {
+            decision = primitiveRoute == null ? null : primitiveRoute.inspect(task.source(), task.budget().totalWork());
+        } else {
+            var paid = new CheckedSchemaSupport.Work();
+            if (task.budget().maxSearchDepth() <= 1 && tactics.policy().select(task.source(),goal,paid).isEmpty()) {
+                decision = new PrimitiveSchemaReachability.Decision(true,0,paid.units);
+            } else {
+                var route = primitiveRoute.inspect(task.source(), task.budget().totalWork());
+                decision = new PrimitiveSchemaReachability.Decision(route.primitiveOnly(),route.nodes(),
+                    Math.addExact(route.work(),paid.units));
+            }
+        }
         var solver = decision != null && decision.primitiveOnly() ? primitiveFallback : this;
-        var receipts = solver.selectedPlan == null ? null : new CheckedDomainSizeReceipts(solver.selectedPlan.bounds());
+        var receipts = solver.selectedPlan == null ? null : new CheckedDomainSizeReceipts(solver.selectedPlan.bounds(),
+            solver.tactics,goal);
         boolean share = solver.shareNodeGoal && receipts != null && prepared.objective() == NativeNodeCountObjective.INSTANCE;
         var problem = solver.problem(task, decision, receipts, share);
         return new ScopedTask(problem, share ? receipts::scoreGoal : prepared.objective(), prepared.checkedSteps());

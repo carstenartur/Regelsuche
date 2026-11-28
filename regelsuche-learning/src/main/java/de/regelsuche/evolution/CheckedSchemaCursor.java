@@ -32,7 +32,7 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
     private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(expression);v.reference(path);}
     }
-    private final CheckedSchemaMatcherPlan plan;
+    private CheckedSchemaMatcherPlan plan;
     private final String encodedSource;
     private final Meter meter;
     private final ArrayDeque<Occurrence> pending = new ArrayDeque<>();
@@ -138,6 +138,14 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
             try {
                 try {
                     if(loadSource()) {
+                        var selected = choosePlan(source,plan,initializationWork);
+                        if (selected == null) {
+                            complete = false;
+                            status = Status.INCONCLUSIVE;
+                            return;
+                        }
+                        plan = selected;
+                        complete &= selected.allSchemasIncluded();
                         int nodes = inspect(source,plan.bounds(),initializationWork);
                         if (plan.selectsSites()) {
                             if (nodes < plan.minimumNodes()) finishSelection();
@@ -163,6 +171,8 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
             }
         }
     }
+    CheckedSchemaMatcherPlan choosePlan(Expr expression, CheckedSchemaMatcherPlan current, Work work) { return current; }
+    boolean disabled(String schemaId, Meter meter) { return false; }
     int inspect(Expr expression, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
         return countedDomain(expression, bounds, work);
     }
@@ -173,6 +183,10 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
         SelectedCursor(CheckedSchemaMatcherPlan plan, String encodedSource, Meter meter, CheckedDomainSizeReceipts receipts) {
             super(plan, encodedSource, null, meter, CheckedSchemaMatcherPlan.ApplicationSteps::result, Transformation::executionWork);
             this.receipts = receipts;
+        }
+        @Override boolean disabled(String schemaId, Meter meter) { return receipts.disabled(schemaId,meter); }
+        @Override CheckedSchemaMatcherPlan choosePlan(Expr expression, CheckedSchemaMatcherPlan current, Work work) {
+            return receipts.choose(expression,current,work);
         }
         @Override int inspect(Expr expression, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
             Integer size = receipts.size(expression, work);
@@ -280,6 +294,10 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
         if (plan.indexedDispatch() || plan.selectsSites()) {
             remainingSchemas &= remainingSchemas - 1;
             schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);
+        }
+        if (disabled(entry.schema().id(),meter)) {
+            complete = false;
+            return;
         }
         // Existing exact matcher is bounded but atomic. A completed match is retained across pulls.
         var outcome = entry.matcher().match(occurrence.expression(), new ExprMatcher.MatchOptions(

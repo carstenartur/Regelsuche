@@ -216,10 +216,15 @@ class CheckedLearnedSchemaModelTest {
     }
     static CheckedLearnedSchemaModel checkedExpansionModel(CheckedLearnedSchemaModel original) throws Exception {
         // A coherent, independently true expansion exercises the rejection path; it is never a stored learned template.
-        var tree = (ObjectNode) new ObjectMapper().readTree(original.toCanonicalJson());
         var sourcePattern = de.regelsuche.transform.PatternExpr.op(ADD,
             de.regelsuche.transform.PatternExpr.var("P0"), de.regelsuche.transform.PatternExpr.num(0));
         var targetPattern = de.regelsuche.transform.PatternExpr.op(ADD, sourcePattern, de.regelsuche.transform.PatternExpr.num(0));
+        return checkedModel(original, sourcePattern, targetPattern);
+    }
+
+    static CheckedLearnedSchemaModel checkedModel(CheckedLearnedSchemaModel original,
+            de.regelsuche.transform.PatternExpr sourcePattern, de.regelsuche.transform.PatternExpr targetPattern) throws Exception {
+        var tree = (ObjectNode) new ObjectMapper().readTree(original.toCanonicalJson());
         String proof = CheckedSchemaSupport.prove(sourcePattern, targetPattern, original.bounds(), new CheckedSchemaSupport.Work());
         var schema = ((ObjectNode) tree.get("schemas").get(0)).deepCopy();
         schema.put("id", "checked-schema:" + SchematicProofPlan.hash(original.inventorySemanticsHash() + "\n" + proof));

@@ -388,7 +388,7 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`CheckedSchemaMatcherPlan.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java#L36) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java | public final class CheckedSchemaMatcherPlan implements RetainedGraph.View { -->
 - [`PrimitiveSchemaReachability.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java#L15) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java | final class PrimitiveSchemaReachability { -->
-- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L31) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
+- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L34) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
 
 ## Distributive Teilableitungen bei gleicher Budgetgrenze
 
@@ -418,8 +418,19 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Befund.** Auf dem bekannten Horner-/Skalarproduktstrom löste der neue Modus 708 Aufgaben, die bisherige Lernsuche 646, die primitive Suche 642 und derselbe neue Modus ohne Lernregeln 699. Auf der prospektiven dritten Familie lagen die entsprechenden Zahlen bei 678, 615, 1.024 und 959. Der unabhängige Prüfer bestätigte 5.120 Ergebniszeilen. [Versuchsplan, Rohdaten und Reproduktion](prospective-interval-transfer/README.md)
 - **Folgerung.** Die gemeinsame Knotenzählung spart Arbeit. Bei den Rechtecksummen gelangten ausschließlich primitive Faktorisierungsschritte in die Beweise. Dort kostete das Bereithalten der Lernregeln im optimierten Solver 109.568 zusätzliche Einheiten.
 
-- [`TypedLearnedMoveInventory.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedLearnedMoveInventory.java#L141) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedLearnedMoveInventory.java | public CheckedSchemaTaskSolver newTaskSolverWithDomainReceipts(CheckedLearnedSchemaModel model) { -->
+- [`TypedLearnedMoveInventory.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedLearnedMoveInventory.java#L142) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedLearnedMoveInventory.java | public CheckedSchemaTaskSolver newTaskSolverWithDomainReceipts(CheckedLearnedSchemaModel model) { -->
 - [`IntervalTransferStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/IntervalTransferStudyTest.java#L25) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/IntervalTransferStudyTest.java | class IntervalTransferStudyTest { -->
+
+## Aus eigenen Beweisen lernen, welche Taktik sich im nächsten Suchzustand lohnt
+
+- **Hypothese.** Eine Suche kann aus selbst gefundenen Beweisen wiederverwendbare Schritte gewinnen, ihre Kosten an anderen Fällen messen und pro Zwischenzustand eine geeignete Regel wählen. Wenn eine Regel trifft, könnte ein günstigerer unabhängiger Prüfer die eingesparte Suche stärker ins Gewicht fallen lassen.
+- **Umsetzungsstand.** Der Versuch vergleicht die zustandsabhängige Taktikwahl und die unabhängige Prüfung konkreter Substitutionen mit der primitiven Suche, den historischen Verfahren und Kontrollen derselben frischen Regelbibliothek. [Vorab festgelegte Familien, Kontrollen und Abnahmekriterien](prospective-tactic-transfer/protocol.md)
+- **Befund.** Mit den bisherigen sieben Schemata erhöhte der neue Prüfer die Zahl der rechtzeitigen Lösungen auf dem öffentlichen Entwicklungsstrom von 708 auf 720. Nach Abschalten der Vorschläge bei identischem Startaufwand wurden 698 Fälle rechtzeitig gelöst. Die aktiven Lernregeln sparten 21.948 Einheiten. Die neue Auswahl mit demselben Modell erreichte 510. Auf zwei zurückgehaltenen Familien lag die frisch trainierte Auswahl mit 256 und 192 hinter der primitiven Suche mit 352 und 320. Keiner der neuen Belege enthielt eine der sechs frisch erlernten Taktiken. [Kontrollen, Kosten und Ablation](prospective-tactic-transfer/README.md)
+- **Folgerung.** Die Prüfung gemeinsamen Kontexts spart bei tieferen Beweisschritten Arbeit. Vor einer Standardaktivierung der Taktikwahl müssen auch die Kosten eines erfolglosen Regelversuchs durch eingesparte primitive Suche gedeckt sein. Den nächsten Transfertest auf neuen Familien durchführen.
+
+- [`LearnedTacticPolicy.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/LearnedTacticPolicy.java#L17) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/LearnedTacticPolicy.java | public final class LearnedTacticPolicy implements RetainedGraph.View { -->
+- [`CheckedSubstitutionReplay.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSubstitutionReplay.java#L14) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSubstitutionReplay.java | final class CheckedSubstitutionReplay { -->
+- [`PairedTacticStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/PairedTacticStudyTest.java#L30) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/PairedTacticStudyTest.java | class PairedTacticStudyTest { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
