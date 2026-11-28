@@ -172,8 +172,4 @@ final class ComposedBilinearChecks {
             Math.multiplyExact(cost.additions(), batchWidth));
     }
 
-    static ComposedBilinearPlan.Cost scale(BilinearProgram.Cost cost, int batchWidth) {
-        return new ComposedBilinearPlan.Cost(Math.multiplyExact(cost.variableMultiplications(), batchWidth),
-            Math.multiplyExact(cost.constantMultiplications(), batchWidth), Math.multiplyExact(cost.additions(), batchWidth));
-    }
 }

@@ -130,6 +130,12 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
             && service.proportionalEquationDifferences(expressions.render(first), expressions.render(second));
     }
 
+    /** Exact positive rescaling of directed differences, without assuming any premises. */
+    public boolean positivelyProportionalDifferences(Expression first, Expression second) {
+        return isPolynomial(first) && isPolynomial(second)
+            && service.positivelyProportionalDifferences(expressions.render(first), expressions.render(second));
+    }
+
     private static String canonicalPayload(Map<String, Object> payload) {
         TreeMap<String, String> ordered = new TreeMap<>();
         payload.forEach((key, value) -> ordered.put(

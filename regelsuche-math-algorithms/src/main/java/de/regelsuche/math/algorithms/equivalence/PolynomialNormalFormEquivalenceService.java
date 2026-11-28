@@ -91,6 +91,15 @@ public class PolynomialNormalFormEquivalenceService implements PolynomialEquival
      * This preserves their zero sets, not the values or signs of the expressions.
      */
     public boolean proportionalEquationDifferences(String first, String second) {
+        return proportionalDifferences(first, second, false);
+    }
+
+    /** A strictly positive rational rescaling preserves the sign of a polynomial difference. */
+    public boolean positivelyProportionalDifferences(String first, String second) {
+        return proportionalDifferences(first, second, true);
+    }
+
+    private boolean proportionalDifferences(String first, String second, boolean positiveOnly) {
         if (!isEnabled()) {
             return false;
         }
@@ -99,8 +108,18 @@ public class PolynomialNormalFormEquivalenceService implements PolynomialEquival
         if (left.isEmpty() || right.isEmpty()) {
             return false;
         }
+        Polynomial a = left.orElseThrow(), b = right.orElseThrow();
+        if (a.isZero() || b.isZero()) {
+            return a.isZero() && b.isZero();
+        }
         var order = new GradedReverseLexOrder();
-        return left.orElseThrow().monic(order).equals(right.orElseThrow().monic(order));
+        return (!positiveOnly || sameLeadingSign(a, b, order))
+            && a.monic(order).equals(b.monic(order));
+    }
+
+    private static boolean sameLeadingSign(Polynomial a, Polynomial b, MonomialOrder order) {
+        return a.leadingTerm(order).orElseThrow().coefficient().numerator().signum()
+            == b.leadingTerm(order).orElseThrow().coefficient().numerator().signum();
     }
 
     public List<String> eliminateLinearVariable(List<String> equationsEqualZero, String variable) {

@@ -82,8 +82,7 @@ final class Z3ProofValues {
             case "<=", ">=" -> {
                 var args = node.items(3);
                 Real a = asReal(value(args.get(1))), b = asReal(value(args.get(2)));
-                yield new Order(node.head("<=") ? a : b, node.head("<=") ? b : a,
-                    admit(1L + a.size() + b.size()));
+                yield node.head("<=") ? order(a, b) : order(b, a);
             }
             case "to_real" -> integerCoercion(node);
             case "/" -> {
@@ -114,6 +113,10 @@ final class Z3ProofValues {
         int size = admit(1L + left.size() + right.size());
         return new Equality(left, right, size);
     }
+    Order order(Real lower, Real upper) {
+        return new Order(lower, upper, admit(1L + lower.size() + upper.size()));
+    }
+
     Negation negate(Formula value) { return new Negation(value, admit(1L + value.size())); }
 
     private Formula connective(Node node) {
