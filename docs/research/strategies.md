@@ -369,6 +369,17 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - [`TaskSubpathMiner.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskSubpathMiner.java#L12) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskSubpathMiner.java | final class TaskSubpathMiner { -->
 - [`TaskSubpathLearningTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java#L13) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java | class TaskSubpathLearningTest { -->
 
+## Gelernte Regeln vor der Anwendung auswählen
+
+- **Hypothese.** Die Struktur einer gelernten Regel kann vergebliche Anwendungsversuche ausschließen. Fehlt ein für alle gelernten Regeln erforderlicher Operator und kann keine primitive Regel ihn neu einführen, kann die gesamte Aufgabe den primitiven Suchpfad verwenden.
+- **Umsetzungsstand.** Die Vorauswahl bereitet Wurzel- und Kindformen sowie Mindestgrößen aus den geprüften Mustern vor. Sie untersucht jeden neuen Suchzustand und teilt bereits geprüfte Größen innerhalb derselben Anfrage. Die optionale Erreichbarkeitsprüfung wertet das konkrete primitive Inventar aus. Beweisprüfung und abschließende Wiederholung jedes gewählten Lernschritts bleiben unabhängig.
+- **Befund.** Auf dem bereits bekannten Panel löst die Variante mit Erreichbarkeitsprüfung 16 von 24 Aufgaben und verwendet 16 belegte Lernschritte auf zwölf Aufgaben. Die Abfragearbeit sinkt von 6.656 auf 5.668 Einheiten. Das sind 496 weniger als bei derselben Vorbereitung mit entfernten gelernten Anbietern und 56 weniger als bei der historischen Ablation. Die primitive Standardsuche benötigt 4.540. [Vergleich auf den eingefrorenen Aufgaben](local-trace-transfer-v1/selection/README.md)
+- **Folgerung.** Die neue Auswahl spart auf dem gesamten Panel Abfragearbeit. Mit Erwerb, Laden und Vorbereitung kostet ein Durchgang 21.303 Einheiten gegenüber 20.665 bei der historischen Ablation. Für denselben vorbereiteten Modellstand und dieselbe Aufgabenmischung decken rechnerisch 13 Durchgänge die zusätzlichen 694 Vorbereitungseinheiten. Die Übertragung auf andere Aufgabenmischungen bleibt offen.
+
+- [`CheckedSchemaMatcherPlan.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java#L36) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java | public final class CheckedSchemaMatcherPlan implements RetainedGraph.View { -->
+- [`PrimitiveSchemaReachability.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java#L15) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java | final class PrimitiveSchemaReachability { -->
+- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L22) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
+
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
 - **Hypothese.** Vorbereitetes und geprüftes Wissen reduziert Wiederherstellungs- und Prüfarbeit und amortisiert eine neue Wissensgeneration.
