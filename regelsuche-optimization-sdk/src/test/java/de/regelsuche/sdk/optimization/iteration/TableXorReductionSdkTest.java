@@ -1,5 +1,6 @@
 package de.regelsuche.sdk.optimization.iteration;
 
+import de.regelsuche.math.algorithms.iteration.OrderedInputPrefix.Schedule;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import static de.regelsuche.ast.iteration.TableXorReduction.Storage.FIRST_STORE_
 import static de.regelsuche.ast.iteration.TableXorReduction.Storage.ZERO_XOR_REDUCE_THEN_STORE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +98,45 @@ class TableXorReductionSdkTest {
         assertThrows(IllegalArgumentException.class, () -> TableXorReductionSdk.evaluate(scalar, table, new byte[1][0], inputs, 1, 1, 0, 1));
         table[255] = new byte[128];
         assertThrows(IllegalArgumentException.class, () -> TableXorReductionSdk.evaluate(scalar, table, coefficients, inputs, 1, 1, 0, 1));
+    }
+
+    @Test
+    void prefixAndConditionalTailReplayTheOriginalIndices() {
+        for (var order : List.of(List.of(OUTPUT, POSITION, INPUT), List.of(POSITION, OUTPUT, INPUT))) {
+            var source = TableXorReductionSdk.describe(order, ZERO_XOR_REDUCE_THEN_STORE);
+            for (int width : List.of(1, 2, 4, 16)) {
+                var plan = TableXorReductionSdk.orderedPrefixPlan(source, width).orElseThrow();
+                assertTrue(TableXorReductionSdk.verifyOrderedPrefix(source, plan));
+                for (int count : List.of(Integer.MIN_VALUE, -1, 0, 1, width - 1, width, width + 1, 31)) {
+                    var expected = new ArrayList<Integer>();
+                    for (int index = 0; index < count; index++) expected.add(index);
+                    var actual = new ArrayList<Integer>();
+                    if (count >= plan.prefixThreshold()) actual.addAll(plan.prefixIndices());
+                    int tail = count >= plan.tailThreshold() ? plan.fastTailStart() : plan.fallbackTailStart();
+                    for (int index = tail; index < count; index++) actual.add(index);
+                    assertEquals(expected, actual);
+                }
+            }
+        }
+    }
+
+    @Test
+    void rejectsSchedulesThatSkipDuplicateOrReorderReads() {
+        var source = TableXorReductionSdk.describe(List.of(POSITION, OUTPUT, INPUT), ZERO_XOR_REDUCE_THEN_STORE);
+        var canonical = List.of(0, 1, 2, 3);
+        var invalid = List.of(new Schedule(3, canonical, 4, 4, 0),
+                new Schedule(4, canonical, 5, 4, 0),
+                new Schedule(4, canonical, 4, 3, 0),
+                new Schedule(4, canonical, 4, 4, 1),
+                new Schedule(4, List.of(0, 2, 1, 3), 4, 4, 0),
+                new Schedule(4, List.of(0, 1, 1, 3), 4, 4, 0),
+                new Schedule(4, List.of(0, 1, 3), 4, 4, 0));
+        for (var schedule : invalid) assertFalse(TableXorReductionSdk.verifyOrderedPrefix(source, schedule));
+        assertTrue(TableXorReductionSdk.orderedPrefixPlan(source, 0).isEmpty());
+        assertTrue(TableXorReductionSdk.orderedPrefixPlan(source, Integer.MAX_VALUE).isEmpty());
+        var writes = TableXorReductionSdk.describe(List.of(OUTPUT, INPUT, POSITION), FIRST_STORE_THEN_XOR);
+        assertTrue(TableXorReductionSdk.orderedPrefixPlan(writes, 4).isEmpty());
+        assertFalse(TableXorReductionSdk.verifyOrderedPrefix(writes, new Schedule(4, canonical, 4, 4, 0)));
     }
 
     // Independent recurrence: multiply one operand by x and reduce after each shift.
