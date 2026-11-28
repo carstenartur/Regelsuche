@@ -110,6 +110,7 @@ public final class CheckedSchemaTaskSolver {
     private final CheckedSchemaMatcherPlan selectedPlan;
     private final PrimitiveSchemaReachability primitiveRoute;
     private final CheckedSchemaTaskSolver primitiveFallback;
+    private final boolean shareNodeGoal;
     private final boolean breadthFirstPriority;
     private final boolean exactPolynomialSteps;
     private final boolean expansionRulesAttached;
@@ -122,21 +123,22 @@ public final class CheckedSchemaTaskSolver {
 
     CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session, CheckedSchemaMatcherPlan.Compilation preparation,
             CheckedSchemaMatcherPlan selectedPlan) {
-        this(session, preparation, false, false, false, false, selectedPlan);
+        this(session, preparation, false, false, false, false, selectedPlan, false);
     }
 
     private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
             boolean expansionRulesAttached,
-            boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan) {
+            boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan, boolean shareNodeGoal) {
         this(session, preparation, breadthFirstPriority, exactPolynomialSteps, expansionRulesAttached,
-            expansionBridgesForOtherGoals, selectedPlan, null, null);
+            expansionBridgesForOtherGoals, selectedPlan, null, null, shareNodeGoal);
     }
 
     private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
             boolean expansionRulesAttached, boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan,
-            PrimitiveSchemaReachability primitiveRoute, CheckedSchemaTaskSolver primitiveFallback) {
+            PrimitiveSchemaReachability primitiveRoute, CheckedSchemaTaskSolver primitiveFallback, boolean shareNodeGoal) {
+        this.shareNodeGoal = shareNodeGoal;
         this.primitiveRoute = primitiveRoute;
         this.primitiveFallback = primitiveFallback;
         this.session = Objects.requireNonNull(session, "session");
@@ -150,6 +152,11 @@ public final class CheckedSchemaTaskSolver {
 
     CheckedSchemaTaskSolver withPrimitiveRoute(List<MoveProvider> primitives, PrimitiveSchemaReachability route,
             String routeRevision) {
+        return withPrimitiveRoute(primitives, route, routeRevision, false);
+    }
+
+    CheckedSchemaTaskSolver withPrimitiveRoute(List<MoveProvider> primitives, PrimitiveSchemaReachability route,
+            String routeRevision, boolean shareNodeGoal) {
         var guarded = new java.util.ArrayList<>(primitives);
         guarded.set(0, route.withDomainCheck(guarded.getFirst()));
         var fallback = new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(guarded, List.of(), session.verifier()), null);
@@ -159,7 +166,7 @@ public final class CheckedSchemaTaskSolver {
         var routed = new CheckedSchemaMatcherPlan.Compilation(revision, SchematicProofPlan.hash(identity),
             Math.addExact(receipt.workUnits(), route.compilationWork() + identity.length()),
             receipt.includedSchemas(), receipt.patternNodeVisits() + route.patternVisits(), receipt.orderingComparisons());
-        return new CheckedSchemaTaskSolver(session, routed, false, false, false, false, selectedPlan, route, fallback);
+        return new CheckedSchemaTaskSolver(session, routed, false, false, false, false, selectedPlan, route, fallback, shareNodeGoal);
     }
 
     CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
@@ -174,12 +181,12 @@ public final class CheckedSchemaTaskSolver {
         var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),
             (source, move, context) -> verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));
         return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps,
-            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan);
+            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan, shareNodeGoal);
     }
 
     CheckedSchemaTaskSolver withExactPolynomialSteps() {
         return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true,
-            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan);
+            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan, shareNodeGoal);
     }
 
     CheckedSchemaTaskSolver withDirectPolynomial(boolean sharedArithmetic) {
@@ -193,12 +200,12 @@ public final class CheckedSchemaTaskSolver {
 
     private CheckedSchemaTaskSolver withOnlyPolynomialProvider(StructuralConstructionProvider provider) {
         var standalone = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());
-        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false, null);
+        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false, null, false);
     }
 
     CheckedSchemaTaskSolver withExpansionRules(boolean bridgesForOtherGoals) {
         return new CheckedSchemaTaskSolver(StructuralExpansionRules.attach(session, preparation != null), preparation,
-            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals, selectedPlan);
+            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals, selectedPlan, shareNodeGoal);
     }
 
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
@@ -209,24 +216,25 @@ public final class CheckedSchemaTaskSolver {
 
     /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
     public Solution solve(Task task) {
-        var prepared = prepare(task);
-        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().searchUntil(problem(task), prepared.objective(),
-                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
-        return new Solution(task, result, prepared.checkedSteps());
+        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
+            var scoped = scopedTask(task);
+            var result = new TypedSourceOnlySearch().searchUntil(scoped.problem(), scoped.objective(),
+                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE);
+            return new Solution(task, result, scoped.checkedSteps());
+        });
     }
 
     /** A retained path replaces proposal generation only; both verification passes remain fresh. */
     Solution replay(Task task, TypedMoveSearch.TypedProvider path) {
-        var prepared = prepare(task);
-        var original = problem(task);
+        var scoped = scopedTask(task);
+        var original = scoped.problem();
         var replay = new TypedMoveSearch.Problem(original.source(), original.context(), List.of(path),
             TypedMoveSearch.Policy.INVENTORY_ORDER, original.verifier(), original.stateScore(), original.mode(),
             MoveSearch.Scheduling.STAGED, original.budget(), original.stateValue());
         var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().searchUntil(replay, prepared.objective(),
+            () -> new TypedSourceOnlySearch().searchUntil(replay, scoped.objective(),
                 task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));
-        return new Solution(task, result, prepared.checkedSteps());
+        return new Solution(task, result, scoped.checkedSteps());
     }
 
     /** Source-only arithmetic minimization with the same frontier, paid objective and final replay. */
@@ -239,18 +247,20 @@ public final class CheckedSchemaTaskSolver {
     TypedSourceOnlySearch.Result simplify(Expr source, List<String> assumptions,
             MoveSearch.Budget budget, TypedSourceOnlySearch.Objective objective) {
         var task = new Task(source, assumptions, new Goal(objective, Long.MIN_VALUE), budget);
-        var prepared = prepare(task);
-        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().search(problem(task), prepared.objective()));
+        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
+            var scoped = scopedTask(task);
+            return new TypedSourceOnlySearch().search(scoped.problem(), scoped.objective());
+        });
     }
 
     /** Continue the same checked frontier and independently replay a bounded set of alternatives. */
     public TypedSearchAlternatives.Result explore(Task task, long reserveWork, int maximumAlternatives) {
-        var prepared = prepare(task);
-        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
-            () -> new TypedSourceOnlySearch().searchAlternatives(problem(task), prepared.objective(),
+        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
+            var scoped = scopedTask(task);
+            return new TypedSourceOnlySearch().searchAlternatives(scoped.problem(), scoped.objective(),
                 task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE,
-                reserveWork, maximumAlternatives));
+                reserveWork, maximumAlternatives);
+        });
     }
 
     private record Prepared(TypedSourceOnlySearch.Objective objective, boolean checkedSteps) { }
@@ -292,22 +302,35 @@ public final class CheckedSchemaTaskSolver {
         }
     }
 
-    // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
-    TypedMoveSearch.Problem problem(Task task) {
-        if (primitiveRoute == null) return problem(task, null);
-        var decision = primitiveRoute.inspect(task.source(), task.budget().totalWork());
-        var solver = decision.primitiveOnly() ? primitiveFallback : this;
-        return solver.problem(task, decision);
+    /** A fresh problem and its matching objective. Both belong to this query only. */
+    record ScopedTask(TypedMoveSearch.Problem problem, TypedSourceOnlySearch.Objective objective, boolean checkedSteps) {}
+
+    ScopedTask scopedTask(Task task) {
+        return scopedTask(task, prepare(task));
     }
 
-    private TypedMoveSearch.Problem problem(Task task, PrimitiveSchemaReachability.Decision decision) {
+    TypedMoveSearch.Problem problem(Task task) {
+        return scopedTask(task, new Prepared(task.goal().objective(), false)).problem();
+    }
+
+    private ScopedTask scopedTask(Task task, Prepared prepared) {
+        // The primitive control retains its batch scheduler and ordinary node-count objective.
+        var decision = primitiveRoute == null ? null : primitiveRoute.inspect(task.source(), task.budget().totalWork());
+        var solver = decision != null && decision.primitiveOnly() ? primitiveFallback : this;
+        var receipts = solver.selectedPlan == null ? null : new CheckedDomainSizeReceipts(solver.selectedPlan.bounds());
+        boolean share = solver.shareNodeGoal && receipts != null && prepared.objective() == NativeNodeCountObjective.INSTANCE;
+        var problem = solver.problem(task, decision, receipts, share);
+        return new ScopedTask(problem, share ? receipts::scoreGoal : prepared.objective(), prepared.checkedSteps());
+    }
+
+    private TypedMoveSearch.Problem problem(Task task, PrimitiveSchemaReachability.Decision decision,
+            CheckedDomainSizeReceipts receipts, boolean sharedGoal) {
         var standalone = standalonePolynomial();
-        var receipts = selectedPlan == null ? null : new CheckedDomainSizeReceipts(selectedPlan.bounds());
         long routingWork = bindRoot(task, decision, receipts);
         var providers = providersFor(task, standalone);
         // Bind one per-task receipt map to the selected cursor and substitute its provider.
         // The state-value ledger pays once at root, including on already-satisfied tasks.
-        long querySetup = receipts == null ? 0 : providers.size() + 10L;
+        long querySetup = receipts == null ? 0 : providers.size() + 10L + (sharedGoal ? 1 : 0);
         if (receipts != null) {
             var replacement = selectedPlan.provider(receipts);
             providers = providers.stream().map(provider -> provider.descriptor().id().equals(replacement.descriptor().id())

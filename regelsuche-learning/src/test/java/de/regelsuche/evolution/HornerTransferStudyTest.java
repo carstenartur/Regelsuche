@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.ast.Expr;
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.search.moves.MoveSearch;
@@ -25,12 +26,13 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 class HornerTransferStudyTest {
-    private static final ObjectMapper JSON = new ObjectMapper();
+    static final ObjectMapper JSON = new ObjectMapper();
     private static final List<Long> DEADLINES = List.of(16_384L, 32_768L, 65_536L, 131_072L, 262_144L);
     private static final long PRIMARY = 131_072;
     private static final long LONG_PRIMARY = 524_288;
@@ -38,19 +40,20 @@ class HornerTransferStudyTest {
     private static final String LONG_PROTOCOL = "sha256:2f6d5c3be42d8f291f3facac132cd749c9b5b246a257af32aafad52840c81702";
     private static final String PROTOCOL = "sha256:f2c2f07b6709b2bab033721259a39f9d2b3a8bb289dbcb4bfe245f83e3208dda";
     private static final String RECEIPT = "sha256:6863b403ed13292dd4aefde8603ba83b1f7ff221ee5dab091a7f019108947930";
-    private static final String SNAPSHOT = "sha256:9e56f3640b85520b8b4090f64aa96c14bb703d3d218ab6fd60c2cdb47e74e223";
+    static final String SNAPSHOT = "sha256:9e56f3640b85520b8b4090f64aa96c14bb703d3d218ab6fd60c2cdb47e74e223";
     private static final EvolutionGenome INVENTORY = TraceStrategyTransferExample.inventory();
 
-    private enum Arm { BASE, PRIOR, REGEN, DROP }
-    private record Frozen(String snapshot, long acquisition) {}
-    private record Setup(CheckedSchemaTaskSolver solver, long acquisition, long load, long preparation) {
+    enum Arm { BASE, PRIOR, REGEN, DROP, FAST, FAST_DROP }
+    private static final List<Arm> HISTORICAL_ARMS = List.of(Arm.BASE, Arm.PRIOR, Arm.REGEN, Arm.DROP);
+    record Frozen(String snapshot, long acquisition) {}
+    record Setup(CheckedSchemaTaskSolver solver, long acquisition, long load, long preparation) {
         long total() { return Math.addExact(acquisition, Math.addExact(load, preparation)); }
     }
-    private record Step(String rule, String source, String target, String learnedEvidence, long verification) {}
-    private record Row(int index, int distributed, String source, String output, long score, String outcome, boolean withinQueryBudget,
+    record Step(String rule, String source, String target, String learnedEvidence, long verification) {}
+    record Row(int index, int distributed, String source, String output, long score, String outcome, boolean withinQueryBudget,
         boolean solved, long query, long verificationWithinQuery, long replay, long audit, long completedAt, int learnedSteps, String pathHash) {}
-    private record Checkpoint(long budget, int completed, int solved) {}
-    private record Summary(long acquisition, long load, long preparation, List<Checkpoint> checkpoints, int totalSolved, long fullCost) {
+    record Checkpoint(long budget, int completed, int solved) {}
+    record Summary(long acquisition, long load, long preparation, List<Checkpoint> checkpoints, int totalSolved, long fullCost) {
         int solvedAt(long budget) { return checkpoints.stream().filter(c -> c.budget() == budget).findFirst().orElseThrow().solved(); }
     }
 
@@ -74,7 +77,7 @@ class HornerTransferStudyTest {
         var inputs = List.of(new HornerTransferCases.Input(0, 0, HornerTransferCases.Topology.H, "x"),
             new HornerTransferCases.Input(1, 0, HornerTransferCases.Topology.D, "y"));
         var rows = new EnumMap<Arm, List<Row>>(Arm.class);
-        for (Arm arm : Arm.values()) rows.put(arm, List.of(clockRow(true, 1), clockRow(false, 2)));
+        for (Arm arm : HISTORICAL_ARMS) rows.put(arm, List.of(clockRow(true, 1), clockRow(false, 2)));
         rows.put(Arm.REGEN, List.of(clockRow(false, 1), clockRow(true, 2)));
         var results = topologyResults(inputs, rows, 2);
         assertTrue(results.contains(new TopologyResult(HornerTransferCases.Topology.H, Arm.BASE, 1, 1, 0, 1, 0, 1)));
@@ -115,7 +118,7 @@ class HornerTransferStudyTest {
         for (Arm arm : order) {
             long start = System.nanoTime();
             Setup setup = prepare(arm, frozen);
-            var rows = run(arm, setup, inputs, paths);
+            var rows = run(arm, setup, inputs, paths, ExpressionFormatter::format);
             elapsed.put(arm, System.nanoTime() - start);
             writeRows(out.resolve(arm.name() + ".jsonl"), rows);
             summaries.put(arm, summarize(setup, rows, deadlines));
@@ -133,7 +136,7 @@ class HornerTransferStudyTest {
 
     private static boolean primaryPassed(int learned, int base, int drop) { return learned > base && learned > drop; }
 
-    private static Frozen readFrozenInputs(Path research) throws IOException {
+    static Frozen readFrozenInputs(Path research) throws IOException {
         readChecked(research.resolve("prospective-horner-transfer/protocol.md"), PROTOCOL);
         var previous = research.resolve("prospective-distributive-coverage");
         var receipt = JSON.readTree(readChecked(previous.resolve("freeze.json"), RECEIPT));
@@ -145,71 +148,80 @@ class HornerTransferStudyTest {
         return new Frozen(readChecked(previous.resolve("snapshot.json"), SNAPSHOT), acquisition);
     }
 
-    private static String readChecked(Path path, String digest) throws IOException {
+    static String readChecked(Path path, String digest) throws IOException {
         String contents = Files.readString(path);
         if (!SchematicProofPlan.hash(contents).equals(digest)) throw new IllegalStateException("freeze mismatch in " + path);
         return contents;
     }
 
-    private static Setup prepare(Arm arm, Frozen frozen) {
+    static Setup prepare(Arm arm, Frozen frozen) {
         var inventory = TypedLearnedMoveInventory.primitives(INVENTORY);
         if (arm == Arm.BASE) {
             var base = inventory.newTaskSolver();
             return new Setup(base, 0, 0, base.preparationWork());
         }
         var model = CheckedLearnedSchemaModel.load(TaskKnowledgeSnapshot.decode(frozen.snapshot()).model(), INVENTORY.contentHash());
-        var solver = arm == Arm.PRIOR ? inventory.newTaskSolverWithSelection(model, true)
-            : inventory.newTaskSolverWithRegeneratedWitness(model);
+        var solver = switch (arm) {
+            case PRIOR -> inventory.newTaskSolverWithSelection(model, true);
+            case REGEN, DROP -> inventory.newTaskSolverWithRegeneratedWitness(model);
+            case FAST, FAST_DROP -> inventory.newTaskSolverWithDomainReceipts(model);
+            case BASE -> throw new IllegalStateException("primitive arm with model");
+        };
         return new Setup(solver, frozen.acquisition(), model.loadWork(), solver.preparationWork());
     }
 
-    private static List<Row> run(Arm arm, Setup setup, List<HornerTransferCases.Input> inputs,
-            Map<String, List<Step>> paths) throws IOException {
+    static List<Row> run(Arm arm, Setup setup, List<? extends TransferStudyInput> inputs,
+            Map<String, List<Step>> paths, Function<Expr, String> format) throws IOException {
         var rows = new ArrayList<Row>();
         long clock = setup.total();
         for (var input : inputs) {
             var task = input.task();
-            var result = arm == Arm.DROP ? drop(setup.solver(), task) : setup.solver().solve(task).evidence();
+            var result = switch (arm) {
+                case DROP, FAST_DROP -> drop(setup.solver(), task, arm);
+                default -> setup.solver().solve(task).evidence();
+            };
             if (!result.accountingComplete()) throw new IllegalStateException("incomplete solver accounting on " + input.index());
-            String output = ExpressionFormatter.format(result.incumbent().expression());
+            String output = format.apply(result.incumbent().expression());
             long[] audit = {0};
             ExactPolynomialAnalysis.withProductWork(n -> audit[0] = Math.addExact(audit[0], n)).requireEquivalent(input.source(), output);
             clock = Math.addExact(clock, Math.addExact(result.totalWork(), audit[0]));
-            var path = result.witness().stream().map(HornerTransferStudyTest::step).toList();
+            var path = result.witness().stream().map(s -> step(s, format)).toList();
             String hash = SchematicProofPlan.hash(JSON.writeValueAsString(path));
             var earlier = paths.putIfAbsent(hash, path);
             if (earlier != null && !earlier.equals(path)) throw new IllegalStateException("witness hash collision");
             boolean solved = result.withinBudget() && result.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED
                 && result.outputScore() <= task.goal().maximumOutputScore();
             int learned = Math.toIntExact(path.stream().filter(step -> step.learnedEvidence() != null).count());
-            rows.add(new Row(input.index(), input.distributed(), input.source(), output, result.outputScore(),
+            rows.add(new Row(input.index(), input.variant(), input.source(), output, result.outputScore(),
                 result.search().outcome().name(), result.withinBudget(), solved, result.queryWork(),
                 result.search().metrics().verificationWork(), result.replayWork(), audit[0], clock, learned, hash));
         }
         return rows;
     }
 
-    private static Step step(TypedMoveSearch.WitnessStep step) {
+    private static Step step(TypedMoveSearch.WitnessStep step, Function<Expr, String> format) {
         if (!step.verification().accepted()) throw new IllegalStateException("rejected witness step");
         String evidence = step.move().sourceKind() == SearchMove.SourceKind.LEARNED
             ? ((TransformationProvenance.ExactTheoryStep) step.move().provenance()).evidence().binding().evidenceHash() : null;
-        return new Step(step.move().ruleId(), ExpressionFormatter.format(step.source().expression()),
-            ExpressionFormatter.format(step.target().expression()), evidence, step.verification().work());
+        return new Step(step.move().ruleId(), format.apply(step.source().expression()),
+            format.apply(step.target().expression()), evidence, step.verification().work());
     }
 
-    // These solvers use an unchanged native node-count objective. Filter only after paid routing.
-    private static TypedSourceOnlySearch.Result drop(CheckedSchemaTaskSolver solver, CheckedSchemaTaskSolver.Task task) {
+    // Remove only the learned providers, preserving each arm's paid routing and objective.
+    private static TypedSourceOnlySearch.Result drop(CheckedSchemaTaskSolver solver, CheckedSchemaTaskSolver.Task task, Arm arm) {
         return CompiledAstReplayCodec.withExpressionCache(256, 2_000_000, () -> {
-            var p = solver.problem(task);
+            var scoped = arm == Arm.FAST_DROP ? solver.scopedTask(task) : null;
+            var p = scoped != null ? scoped.problem() : solver.problem(task);
+            var objective = scoped != null ? scoped.objective() : task.goal().objective();
             var providers = p.providers().stream().filter(provider -> provider.descriptor().sourceKind() != SearchMove.SourceKind.LEARNED).toList();
             var ablated = new TypedMoveSearch.Problem(p.source(), p.context(), providers, p.policy(), p.verifier(),
                 p.stateScore(), p.mode(), p.scheduling(), p.budget(), p.stateValue());
-            return new TypedSourceOnlySearch().searchUntil(ablated, task.goal().objective(),
+            return new TypedSourceOnlySearch().searchUntil(ablated, objective,
                 task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE);
         });
     }
 
-    private static Summary summarize(Setup setup, List<Row> rows, List<Long> deadlines) {
+    static Summary summarize(Setup setup, List<Row> rows, List<Long> deadlines) {
         var checkpoints = deadlines.stream().map(budget -> checkpoint(rows, budget)).toList();
         return new Summary(setup.acquisition(), setup.load(), setup.preparation(), checkpoints,
             Math.toIntExact(rows.stream().filter(Row::solved).count()), rows.getLast().completedAt());
@@ -231,7 +243,7 @@ class HornerTransferStudyTest {
     private static List<TopologyResult> topologyResults(List<HornerTransferCases.Input> inputs, Map<Arm, List<Row>> rows, long primary) {
         var results = new ArrayList<TopologyResult>();
         for (var topology : HornerTransferCases.Topology.values()) {
-            for (Arm arm : Arm.values()) {
+            for (Arm arm : HISTORICAL_ARMS) {
                 int attempts = 0, full = 0, onTime = 0, wins = 0, losses = 0;
                 long work = 0;
                 for (var input : inputs) {
@@ -253,7 +265,7 @@ class HornerTransferStudyTest {
         return results;
     }
 
-    private static void writeRows(Path path, List<Row> rows) throws IOException {
+    static void writeRows(Path path, List<Row> rows) throws IOException {
         try (BufferedWriter writer = Files.newBufferedWriter(path, StandardOpenOption.CREATE_NEW)) {
             for (var row : rows) {
                 writer.write(JSON.writeValueAsString(row));
@@ -262,7 +274,7 @@ class HornerTransferStudyTest {
         }
     }
 
-    private static void writeJson(Path path, Object value) throws IOException {
+    static void writeJson(Path path, Object value) throws IOException {
         Files.writeString(path, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(value) + "\n", StandardOpenOption.CREATE_NEW);
     }
 }

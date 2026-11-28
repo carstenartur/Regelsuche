@@ -137,6 +137,13 @@ public final class TypedLearnedMoveInventory {
             PrimitiveSchemaReachability.compile(inventory, model), PrimitiveSchemaReachability.REVISION + "+regenerated-witness/v1");
     }
 
+    /** Share the selected cursor's checked occurrence counts with a node-count goal for one query. */
+    public CheckedSchemaTaskSolver newTaskSolverWithDomainReceipts(CheckedLearnedSchemaModel model) {
+        return prepareTaskSolver(model, false, true, true).withPrimitiveRoute(primitives,
+            PrimitiveSchemaReachability.compile(inventory, model),
+            PrimitiveSchemaReachability.REVISION + "+regenerated-witness/v1+node-goal-receipts/v1", true);
+    }
+
     private CheckedSchemaTaskSolver prepareTaskSolver(CheckedLearnedSchemaModel model, boolean indexed,
             boolean selectSites, boolean deriveBindings) {
         java.util.Objects.requireNonNull(model, "model");

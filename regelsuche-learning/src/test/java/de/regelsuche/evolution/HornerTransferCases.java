@@ -1,8 +1,6 @@
 package de.regelsuche.evolution;
 
 import de.regelsuche.math.algorithms.equivalence.ExactPolynomialAnalysis;
-import de.regelsuche.parse.ExpressionParser;
-import de.regelsuche.search.moves.MoveSearch;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -13,17 +11,14 @@ import java.util.stream.IntStream;
 /** Seeded public source fixture. Structural labels never enter the solver. */
 final class HornerTransferCases {
     static final int MAX_NODES = 17;
-    static final MoveSearch.Budget QUERY = new MoveSearch.Budget(32, 32, 200_000, 512, 8_192);
     enum Topology {
         H(MAX_NODES), D(19);
         private final int nodeBound;
         Topology(int nodeBound) { this.nodeBound = nodeBound; }
     }
-    record Input(int index, int distributed, Topology topology, String source) {
-        CheckedSchemaTaskSolver.Task task() {
-            return new CheckedSchemaTaskSolver.Task(new ExpressionParser().parseExactTerm(source).expression(),
-                List.of(), CheckedSchemaTaskSolver.Goal.atMostNodes(topology.nodeBound), QUERY);
-        }
+    record Input(int index, int distributed, Topology topology, String source) implements TransferStudyInput {
+        @Override public int variant() { return distributed; }
+        @Override public int nodeBound() { return topology.nodeBound; }
     }
 
     private HornerTransferCases() {}
@@ -87,7 +82,7 @@ final class HornerTransferCases {
         return new Input(index, count, topology, source);
     }
 
-    private static List<Integer> order(String prefix, int count) {
+    static List<Integer> order(String prefix, int count) {
         Comparator<Integer> digest = Comparator.comparing(i -> SchematicProofPlan.hash(prefix + i));
         return IntStream.range(0, count).boxed().sorted(digest.thenComparingInt(Integer::intValue)).toList();
     }
@@ -105,8 +100,11 @@ final class HornerTransferCases {
     }
 
     private static void requireDistinct(Set<List<String>> seen, String source) {
-        var signature = new ExactPolynomialAnalysis().normalForm(source).terms().values().stream()
+        if (!seen.add(coefficientSignature(source))) throw new IllegalStateException("coefficient signatures do not establish disjointness");
+    }
+
+    static List<String> coefficientSignature(String source) {
+        return new ExactPolynomialAnalysis().normalForm(source).terms().values().stream()
             .map(Object::toString).sorted().toList();
-        if (!seen.add(signature)) throw new IllegalStateException("coefficient signatures do not establish disjointness");
     }
 }

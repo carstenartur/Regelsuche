@@ -29,7 +29,8 @@ public final class CumulativeTaskKnowledge {
     public enum Strategy { BASELINE, KNOWLEDGE_FIRST, AUTOMATIC }
     /** Runtime matcher selection. Existing checked snapshots can be opened in any mode. */
     public enum MatcherPreparation {
-        STANDARD, SHAPE_INDEX, OCCURRENCE_SELECTION, OCCURRENCE_SELECTION_WITH_ROUTING, REGENERATED_WITNESS_WITH_ROUTING;
+        STANDARD, SHAPE_INDEX, OCCURRENCE_SELECTION, OCCURRENCE_SELECTION_WITH_ROUTING,
+        REGENERATED_WITNESS_WITH_ROUTING, DOMAIN_RECEIPTS_WITH_ROUTING;
 
         private CheckedSchemaTaskSolver prepare(TypedLearnedMoveInventory inventory, CheckedLearnedSchemaModel model) {
             return switch (this) {
@@ -38,6 +39,7 @@ public final class CumulativeTaskKnowledge {
                 case OCCURRENCE_SELECTION -> inventory.newTaskSolverWithSelection(model);
                 case OCCURRENCE_SELECTION_WITH_ROUTING -> inventory.newTaskSolverWithSelection(model, true);
                 case REGENERATED_WITNESS_WITH_ROUTING -> inventory.newTaskSolverWithRegeneratedWitness(model);
+                case DOMAIN_RECEIPTS_WITH_ROUTING -> inventory.newTaskSolverWithDomainReceipts(model);
             };
         }
     }

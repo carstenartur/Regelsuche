@@ -409,7 +409,7 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Folgerung.** Für diese Aufgaben spart das vorbereitete Modell 3.443 Arbeitseinheiten gegenüber der primitiven Suche. Der anfängliche Erwerbs- und Vorbereitungsaufwand von 12.828 Einheiten ist nach 128 Aufgaben noch nicht gedeckt.
 - **Vorab festgelegter Folgeversuch.** Auf 1.024 neuen Horner- und Skalarproduktaufgaben erreichte der neue Lernsolver bei 524.288 Gesamteinheiten 646 Lösungen, die primitive Suche 642, der frühere Lernsolver 635 und der neue Solver ohne Lernregeln 541. Der vollständige Durchlauf kostete 823.252 gegenüber 834.410 Einheiten primitiv. Alle vier Arme lösten am Ende alle Aufgaben. Der Vorteil von 1,34 Prozent gilt für diesen synthetischen Aufgabenstrom einschließlich Erwerb, Vorbereitung, Suche und unabhängiger Prüfungen. [Protokoll, Rohdaten und unabhängige Prüfung](prospective-amortization/README.md)
 
-- [`HornerTransferStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java#L32) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java | class HornerTransferStudyTest { -->
+- [`HornerTransferStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java#L34) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java | class HornerTransferStudyTest { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
