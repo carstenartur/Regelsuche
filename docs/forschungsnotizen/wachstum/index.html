@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Eine untere Schranke für die Anzahl der Greedy-Offsets von A135311 und die Belegung von Restklassen vor dem Quadrat einer Primzahl.">
+  <title>Wie rasch wächst die Greedy-Folge? · Regelsuche</title>
+  <link rel="stylesheet" href="../stil.css">
+</head>
+<body>
+  <header class="screen-only"><a href="../">Regelsuche · Forschungsnotizen und Preprints</a></header>
+  <main><article>
+    <p class="meta">Primachsenraum · Forschungsnotiz · Fassung 1 vom 28. November 2026</p>
+    <h1>Wie rasch wächst die Greedy-Folge?</h1>
+    <p class="intro">Jede Aufnahme muss bei jeder Primzahl eine Restklasse frei lassen. Trotzdem wächst die Anzahl der aufgenommenen Zahlen bis <i>X</i> mindestens wie √<i>X</i> mal eine Potenz des Logarithmus mit Exponent größer als eins. Für fast jede Primzahl sind dadurch schon deutlich vor ihrem Quadrat fast alle Restklassen mehrfach belegt.</p>
+    <p class="screen-only"><a href="wachstum-v1.pdf">Notiz als PDF lesen</a> · <a href="../begleitnotizen/zaehlfunktion.pdf">Frühere Notiz zur Zählfunktion</a></p>
+
+    <h2>Zwei Greedy-Folgen</h2>
+    <p>Beginne mit 0. Gehe die positiven ganzen Zahlen der Reihe nach durch und füge einen Kandidaten hinzu, wenn danach bei jeder Primzahl noch eine Restklasse frei ist. Die aufgenommenen Zahlen bilden die Folge <i>G</i> (OEIS A135311). Sie beginnt mit 0, 2, 6, 8, 12, 18. Da 0 schon die gerade Klasse modulo 2 belegt, sind alle Glieder gerade. Wir zählen in der Skala <i>J</i> = {2<i>g</i> + 1 : <i>g</i> ∈ <i>G</i>}. Dort beginnen die Werte mit 1, 5, 13, 17, 25, 37 und liegen alle bei 1 modulo 4.</p>
+    <p>Zum Vergleich diene die Menge <i>H</i>. Durchlaufe 1 und alle Zahlen, deren Primteiler sämtlich 1 modulo 4 sind. Nimm einen Kandidaten auf, wenn bei jeder Primzahl 1 modulo 4 noch eine Restklasse frei bleibt. Ob <i>J</i> und <i>H</i> übereinstimmen, ist offen. Im Beweis werden sie unabhängig behandelt.</p>
+    <p>Für <i>S</i> ∈ {<i>J</i>, <i>H</i>} sei <i>K</i><sub><i>S</i></sub>(<i>X</i>) die Anzahl seiner Elemente zwischen 1 und <i>X</i>. Alle Logarithmen sind natürlich. Das Zeichen ≫ bedeutet „mindestens ein festes positives Vielfaches von“, ≪ entsprechend „höchstens ein festes Vielfaches von“.</p>
+    <h2>Ergebnisse</h2>
+    <p><strong>Wachstum.</strong> Es gibt ein absolutes δ &gt; 0, sodass für alle hinreichend großen <i>X</i> und beide Mengen gilt</p>
+    <p><i>K</i><sub><i>S</i></sub>(<i>X</i>) ≫ √<i>X</i> (log <i>X</i>)<sup>1+δ</sup>.</p>
+    <p><strong>Belegung.</strong> Für ein absolutes η &gt; 0 gilt für fast alle Primzahlen <i>p</i> zugleich in beiden Mengen: Bis <i>p</i><sup>2</sup>/(log <i>p</i>)<sup>η</sup> enthalten alle bis auf O(<i>p</i>/(log <i>p</i>)<sup>η</sup>) Klassen jeweils mindestens (log <i>p</i>)<sup>1+η</sup> verschiedene aufgenommene Zahlen. „Fast alle“ bezeichnet natürliche Dichte eins unter allen Primzahlen. Dasselbe gilt relativ zu den Primzahlen 3 modulo 4.</p>
+
+    <h2>Was bleibt offen?</h2>
+    <p>Die frühere Begleitnotiz leitete für <i>G</i> eine untere Schranke von der Größenordnung √<i>x</i> her. Der zusätzliche Logarithmusfaktor liefert nun genügend Folgenglieder für eine Aussage über fast alle Primmoduln. Perrys Vermutung, wonach die Zählfunktion von <i>G</i> asymptotisch wie die Primzahlanzahl wächst, bleibt offen. Auch die vollständige Belegung aller zulässigen Restklassen an einer bestimmten Primzahl ist durch diese Abschätzungen unentschieden. Ein einziger fehlender Rest trägt zum Gesamtvariationsabstand nur in der Größenordnung 1/<i>p</i> bei.</p>
+
+    <section class="page-break">
+    <h2>1. Wie weit ein System von Sperren reichen muss</h2>
+    <p>Betrachte ein Intervall aus <i>M</i> aufeinanderfolgenden ganzen Zahlen. Jede verwendete Primzahl sperrt eine beliebig gewählte Restklasse. Setze <i>z</i> = √<i>M</i> log(<i>M</i>)/4 und <i>D</i> = <i>M</i> log log(<i>M</i>)/(log <i>M</i>)<sup>2</sup>. Wir zeigen, dass für geeignete absolute <i>c</i>, δ &gt; 0 und hinreichend großes <i>M</i> mindestens eine der folgenden Aussagen zutrifft.</p>
+    <ul>
+      <li>Mindestens <i>cD</i> Stellen des Intervalls bleiben frei.</li>
+      <li>Mindestens eine verwendete Primzahl ist größer als <i>z</i>(log <i>M</i>)<sup>δ</sup>.</li>
+    </ul>
+    <p>Ergänze für jede noch unbenutzte Primzahl bis <i>z</i> eine beliebige Sperre. Satz 1.2 des Preprints von OpenAI [1] liefert nach diesen kleinen Sperren mindestens <i>c</i><sub>0</sub><i>D</i> Überlebende in den ersten <i>Y</i> = ⌊<i>z</i><sup>2</sup>/(log <i>z</i>)<sup>2</sup>⌋ Stellen. Denn <i>Y</i> ∼ <i>M</i>/4, und die Schranke des Satzes hat die Größenordnung <i>Y</i> log log(<i>z</i>)/(log <i>z</i>)<sup>2</sup>. Eine Verschiebung des Intervalls verschiebt nur die Reste. Die ergänzten Sperren können die Zahl der Überlebenden lediglich verkleinern.</p>
+    <p>Gelte nun <i>s</i> ≤ <i>Z</i> = <i>z</i>(log <i>M</i>)<sup>δ</sup> für alle verwendeten Primzahlen. Für <i>z</i> &lt; <i>s</i> ≤ <i>Z</i> liegen die gesperrten Stellen auf einer Progression <i>b</i> + <i>st</i>. Die zugehörigen <i>t</i> passen in ein Intervall der Länge <i>U</i> = ⌈<i>M</i>/<i>s</i>⌉ + 1. Für 0 &lt; δ ≤ 1 und großes <i>M</i> gilt <i>M</i><sup>1/4</sup> ≤ <i>U</i> ≪ <i>M</i>/<i>s</i>, also log <i>U</i> ≍ log <i>M</i>. Für jede Primzahl bis <i>U</i><sup>1/32</sup> ≤ <i>z</i> ist <i>s</i> invertierbar. Eine kleine Sperre wird daher wieder zu genau einer gesperrten Parameterklasse.</p>
+    <p>Das eindimensionale obere Sieb [2, Satz 18.11(a)] lässt in diesem Parameterintervall O(<i>U</i>/log <i>U</i>) Stellen übrig. Im Detail beträgt der Zählfehler bei jedem quadratfreien Produkt <i>d</i> der Siebprimzahlen wegen des chinesischen Restsatzes höchstens eins. Siebt man bis <i>U</i><sup>1/32</sup> mit Niveau <i>U</i><sup>1/2</sup>, ist der Gesamtfehler O(√<i>U</i>). Der Hauptterm ist nach dem Mertens-Produkt O(<i>U</i>/log <i>U</i>). Eine große Primzahl entfernt somit höchstens O(<i>M</i>/(<i>s</i> log <i>M</i>)) Überlebende des kleinen Siebs.</p>
+    <p>Nach der Mertens-Abschätzung ist die Summe der Kehrwerte der Primzahlen zwischen <i>z</i> und <i>Z</i> gleich log(log <i>Z</i>/log <i>z</i>) + O(1/log <i>z</i>). Die Zahl aller zusätzlich gesperrten Überlebenden ist also höchstens</p>
+    <p><i>C M</i> (1 + δ log log <i>M</i>)/(log <i>M</i>)<sup>2</sup></p>
+    <p>mit einem von δ unabhängigen <i>C</i>. Wähle zuerst ein positives δ ≤ 1 mit <i>C</i>δ &lt; <i>c</i><sub>0</sub>/4 und dann <i>M</i> hinreichend groß. Wenigstens <i>c</i><sub>0</sub><i>D</i>/2 Stellen bleiben frei. Das beweist die Alternative.</p>
+    </section>
+
+    <section class="page-break">
+    <h2>2. Von den Sperren zur Zählfunktion</h2>
+    <p>Schreibe die Kandidaten als <i>n</i> = 4<i>t</i> + 1 ≤ <i>X</i>. Die <i>t</i> bilden ein Intervall aus <i>M</i> = ⌊(<i>X</i> − 1)/4⌋ + 1 Stellen. Wird bei <i>J</i> ein Kandidat abgelehnt, so würde er an wenigstens einer ungeraden Primzahl <i>s</i> die letzte freie Klasse füllen. Deren Rest bleibt bei <i>s</i> für alle Zeiten gesperrt. Sammle für jede bis <i>X</i> wirksame Sperrprimzahl diesen einen Rest. Die affine Abbildung von <i>t</i> nach <i>g</i> = 2<i>t</i> ist bei jedem solchen <i>s</i> umkehrbar. Jede Ablehnung ist jetzt erfasst und alle aufgenommenen Zahlen vermeiden sämtliche Sperren. Eine wirksame Primzahl erfüllt <i>s</i> − 1 ≤ <i>K</i><sub><i>J</i></sub>(<i>X</i>), weil vor der ersten Ablehnung schon <i>s</i> − 1 verschiedene Klassen belegt sein mussten.</p>
+    <p>Für <i>H</i> sammle entsprechend alle tatsächlich wirksamen Sperren an Primzahlen 1 modulo 4. Für jede Primzahl <i>q</i> ≡ 3 (mod 4) bis √<i>X</i> füge die Klasse <i>n</i> ≡ 0 (mod <i>q</i>) hinzu. Das erfasst genau die Kandidaten mit unerlaubter Faktorisierung. Bei <i>n</i> ≡ 1 (mod 4) treten Primteiler 3 modulo 4 mit gerader Gesamtvielfachheit auf. Treten sie überhaupt auf, so ist einer von ihnen höchstens √<i>n</i>. Da 4 bei jedem dieser Moduln invertierbar ist, entspricht auch jede dieser Sperren einer Klasse von <i>t</i>. Für großes <i>X</i> liegen die hinzugefügten Moduln alle unter <i>z</i>.</p>
+    <p>In beiden Fällen sind genau <i>K</i><sub><i>S</i></sub>(<i>X</i>) Stellen frei. Ist diese Zahl mindestens <i>cD</i>, folgt die Wachstumsbehauptung bereits aus <i>M</i> ∼ <i>X</i>/4. Andernfalls erzwingt Abschnitt 1 eine tatsächlich wirksame Primzahl <i>s</i> &gt; <i>z</i>(log <i>M</i>)<sup>δ</sup>. Mit <i>K</i><sub><i>S</i></sub>(<i>X</i>) ≥ <i>s</i> − 1 folgt dieselbe Behauptung. Für die Offsets selbst gilt #{<i>g</i> ∈ <i>G</i> : <i>g</i> ≤ <i>x</i>} = <i>K</i><sub><i>J</i></sub>(2<i>x</i> + 1).</p>
+    <h2>3. Viele Vertreter vor der Quadratgrenze</h2>
+    <p>Wähle 0 &lt; η ≤ δ/5. Für <i>P</i>/2 &lt; <i>p</i> ≤ <i>P</i> verwende zunächst die gemeinsame Grenze <i>X</i> = ⌊<i>P</i><sup>2</sup>/(10(log <i>P</i>)<sup>η</sup>)⌋. Mit <i>K</i> = <i>K</i><sub><i>S</i></sub>(<i>X</i>) gilt jetzt <i>K</i> ≫ <i>P</i> (log <i>P</i>)<sup>1+δ−η/2</sup>. Sei <i>N</i><sub><i>p,a</i></sub> die Anzahl der ersten <i>K</i> Werte mit Rest <i>a</i> modulo <i>p</i>.</p>
+    <p>Wende die Parseval-Identität auf die <i>p</i> Restklassen und dann das additive große Sieb [3] auf den Indikator von <i>S</i> ∩ [1, <i>X</i>] an. Die Brüche <i>b</i>/<i>p</i> mit 1 ≤ <i>b</i> &lt; <i>p</i> sind verschiedene gekürzte Brüche. Daher gilt, summiert über die Primzahlen des Fensters,</p>
+    <p>∑<sub><i>p</i></sub> <i>p</i> ∑<sub><i>a</i> mod <i>p</i></sub> (<i>N</i><sub><i>p,a</i></sub> − <i>K</i>/<i>p</i>)<sup>2</sup> ≤ (<i>X</i> + <i>P</i><sup>2</sup>)<i>K</i>.</p>
+    <h3>Ausnahmen und die individuelle Grenze</h3>
+    <p>Die normierte Varianz <i>V</i><sub><i>p</i></sub> sei die innere Quadratsumme aus Abschnitt 3, multipliziert mit <i>p</i>/<i>K</i><sup>2</sup>. Sowohl alle Primzahlen des Fensters als auch die Primzahlen 3 modulo 4 darin sind nach dem Primzahlsatz für arithmetische Progressionen von der Größenordnung <i>P</i>/log <i>P</i>. In jeder dieser Gruppen ist der Mittelwert von <i>V</i><sub><i>p</i></sub> deshalb ≪ (log <i>P</i>)<sup>−δ+η/2</sup>.</p>
+    <p>Eine Klasse mit weniger als <i>K</i>/(2<i>p</i>) Vertretern trägt mindestens 1/(4<i>p</i>) zur Varianz bei. Übersteigt die Anzahl solcher Klassen <i>p</i>/(log <i>P</i>)<sup>η</sup>, ist <i>V</i><sub><i>p</i></sub> ≥ 1/(4(log <i>P</i>)<sup>η</sup>). Der Anteil dieser Primzahlen ist also O((log <i>P</i>)<sup>−δ+3η/2</sup>) und strebt gegen null. Vereinige die Ausnahmen für beide Mengen und bei jeder übrigen Primzahl die beiden Mengen schwach besetzter Klassen. Die Schranke bleibt bis auf einen Faktor zwei erhalten. Für jede andere Klasse gilt in jeder der beiden Folgen <i>K</i>/(2<i>p</i>) ≥ (log <i>p</i>)<sup>1+η</sup> für hinreichend großes <i>P</i>.</p>
+    <p>Für jedes <i>p</i> im Fenster liegt <i>X</i> unter seiner individuellen Grenze <i>p</i><sup>2</sup>/(log <i>p</i>)<sup>η</sup>. Alle gezählten Vertreter stehen deshalb rechtzeitig zur Verfügung. Summiert man die Ausnahmezahlen über dyadische Fenster, ergibt sich die behauptete natürliche Dichte eins.</p>
+    </section>
+
+    <section class="page-break">
+    <h2>4. Die Verteilung bis zum Quadrat</h2>
+    <p>Auch zwischen dieser Grenze und <i>p</i><sup>2</sup> bleibt die Verteilung kontrolliert. Sei <i>d</i>(<i>p</i>, <i>T</i>) die halbe Summe der absoluten Abweichungen der empirischen Klassenanteile von 1/<i>p</i>. Wähle β &gt; 0 mit η/2 + 3β &lt; δ. Dann gilt für fast alle <i>p</i> im obigen Sinn gleichzeitig in beiden Folgen</p>
+    <p>sup {<i>d</i>(<i>p</i>, <i>T</i>) : <i>p</i><sup>2</sup>/(log <i>p</i>)<sup>η</sup> ≤ <i>T</i> ≤ <i>p</i><sup>2</sup>} ≪ (log <i>p</i>)<sup>−β</sup>.</p>
+    <p>Zum Beweis setze ε = (log <i>P</i>)<sup>−β</sup>. Markiere die Präfixgrößen <i>K</i><sub>0</sub> = <i>K</i><sub><i>S</i></sub>(<i>X</i>) und <i>K</i><sub><i>j</i>+1</sub> = ⌈(1 + ε)<i>K</i><sub><i>j</i></sub>⌉ bis <i>K</i><sub><i>S</i></sub>(<i>P</i><sup>2</sup>). Im großen Sieb hat jedes markierte Präfix Trägerlänge höchstens <i>P</i><sup>2</sup>. Cauchy–Schwarz gibt 4<i>d</i><sup>2</sup> ≤ <i>V</i><sub><i>p</i></sub>, also ∑<sub><i>p</i></sub> <i>d</i><sup>2</sup> ≪ <i>P</i><sup>2</sup>/<i>K</i><sub><i>j</i></sub> je Stand. Da ∑<sub><i>j</i></sub> 1/<i>K</i><sub><i>j</i></sub> ≪ 1/(ε<i>K</i><sub>0</sub>), ist der Anteil der Primzahlen, bei denen auch nur einmal <i>d</i> &gt; ε gilt, O((log <i>P</i>)<sup>−δ+η/2+3β</sup>). Zwischen zwei Markierungen erhöht sich die Präfixgröße um höchstens ε<i>K</i><sub><i>j</i></sub> + 1. Der Anteil neu hinzugekommener Werte ist höchstens ε + 1/<i>K</i><sub>0</sub>. Um mehr kann sich der Abstand der Klassenverteilung nicht ändern. Das gilt auch nach der letzten Marke.</p>
+    <h2>Grundlagen und Prüfstand</h2>
+    <ol>
+      <li>OpenAI, <cite>A quadratic bound for Jacobsthal’s function</cite>, Preprint vom 25. September 2026, Satz 1.2. Der Beweis oben setzt die dort formulierte quantitative Untergrenze für beliebig vorgegebene Reste voraus. <a href="https://github.com/openai/math/blob/adc7f1241b42e322a6451854ab7e4b4c146bf78a/preprints/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/paper.pdf">Zitierte Fassung</a> · <a href="https://github.com/openai/math/blob/adc7f1241b42e322a6451854ab7e4b4c146bf78a/preprints/A-quadratic-bound-for-Jacobsthals-function-September-25-2026/build/sections/introduction.tex">Wortlaut der Sätze</a>.</li>
+      <li>Dimitris Koukoulopoulos, <cite>The Distribution of Prime Numbers</cite>, Kap. 12 zum Primzahlsatz in arithmetischen Progressionen und Satz 18.11(a) zum fundamentalen Sieblemma. <a href="https://dms.umontreal.ca/~koukoulo/documents/publications/primes.pdf">Vorabfassung des Autors</a>.</li>
+      <li>Kiran S. Kedlaya, <cite>Notes on analytic number theory</cite>, Satz 16.1, additive Siebungleichung für reduzierte Brüche. <a href="https://kskedlaya.org/ant/chap-largesieve2.html">Satz und Beweis</a>.</li>
+      <li>R. Michael Perry, <cite>A Number Sequence Relating to the Closepacking of Primes</cite>. <a href="https://oeis.org/A274260/a274260.pdf">Aufsatz</a> · <a href="https://oeis.org/A135311">OEIS A135311</a>. Die frühere Projektfassung dokumentiert die endlichen Zählungen und die √<i>x</i>-Schranke in Abschnitt 7.4. <a href="../begleitnotizen/zaehlfunktion.pdf">Begleitnotiz zur Zählfunktion</a>.</li>
+    </ol>
+    <p><strong>Entstehung.</strong> Die Anwendung auf die beiden Greedy-Folgen stammt aus dem Primachsenraum-Projekt. KI war an der mathematischen Herleitung und an der Ausarbeitung des Textes wesentlich beteiligt. Die Voraussetzungen der verwendeten Siebsätze, die Exponenten und die Quantoren wurden für diese Fassung mit den angegebenen Quellen abgeglichen. Eine unabhängige fachliche Begutachtung steht aus.</p>
+    </section>
+  </article></main>
+</body>
+</html>

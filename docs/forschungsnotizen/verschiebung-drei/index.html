@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ein Nachtrag zu Abschnitt 15 des Golomb–Keller-Manuskripts v6 mit einer schärferen Schranke für den möglichen Gewichtsvorsprung bei Verschiebung um drei.">
+  <title>Wie viel Gewicht kann eine andere zulässige Menge gewinnen? · Regelsuche</title>
+  <link rel="stylesheet" href="../stil.css">
+</head>
+<body>
+  <header class="screen-only"><a href="../">Regelsuche · Forschungsnotizen und Preprints</a></header>
+  <main>
+    <p class="meta">Projekt Primachsenraum · Nachtrag zu Golomb–Keller v6, Abschnitt 15 · 28. November 2026</p>
+    <h1>Verschiebung um drei</h1>
+    <p class="intro">Wie viel Gewicht kann eine andere zulässige Menge gegenüber der Greedy-Folge gewinnen? An deren Wurzel <i>x</i><sub>3</sub> bleibt der größtmögliche Vorsprung unter 10<sup>−14 764 337</sup>. In v6 lag die Schranke bei 10<sup>−10 000 000</sup>. Ob der Vorsprung genau null ist, bleibt offen.</p>
+    <h2>Gewichte und erste Abweichung</h2>
+    <p>Eine Menge <i>H</i> nichtnegativer ganzer Zahlen heißt zulässig, wenn sie modulo jeder Primzahl mindestens eine Restklasse auslässt. Hier enthalte sie stets 0. Die Greedy-Folge <i>G</i> prüft die Zahlen aufsteigend und nimmt jede auf, für die die Menge zulässig bleibt. Sie beginnt mit 0, 2, 6, 8, 12, 18, 20, 26. Für 0 &lt; <i>x</i> &lt; 1 setze</p>
+    <p><i>W</i>(<i>H</i>, <i>x</i>) = ∑<sub><i>h</i>∈<i>H</i></sub> <i>x</i><sup><i>h</i>+3</sup> und <i>F</i><sub>3</sub>(<i>x</i>) = sup<sub><i>H</i></sub> <i>W</i>(<i>H</i>, <i>x</i>).</p>
+    <p>Die eindeutige Wurzel von <i>W</i>(<i>G</i>, <i>x</i>) = 1 liegt zwischen ℓ = 0,784587368 und <i>u</i> = 0,784587369. Das folgt durch Summieren bis Offset 160 und Abschätzen des Rests durch eine geometrische Reihe.</p>
+    <p>Für <i>H</i> ≠ <i>G</i> liegt die erste Abweichung <i>t</i> in <i>G</i>. Ein früherer Ausschluss wäre durch den gemeinsamen Präfix auch für <i>H</i> erzwungen gewesen. Ein Gleichstand oder Gewinn verlangt, dass spätere zusätzliche Elemente von <i>H</i> den Verlust bei <i>t</i> ausgleichen. Abschnitt 15 von v6 schließt <i>t</i> = 2, 6, 8 aus. Danach erzwingen 0, 2, 6, 8 für beide Mengen die zulässigen Phasen <i>R</i> = {0, 2, 6, 8, 12, 18, 20, 26} modulo 30.</p>
+    <p>Nach Division durch <i>x</i><sup><i>t</i>+3</sup> ist der Verlust bei <i>t</i> gleich 1. Für <i>r</i> = <i>t</i> mod 30 ist die Summe aller danach möglichen positiven Beiträge höchstens</p>
+    <p><i>T</i><sub><i>r</i></sub>(<i>x</i>) = (∑ <i>x</i><sup><i>j</i></sup>) / (1 − <i>x</i><sup>30</sup>), summiert über 1 ≤ <i>j</i> ≤ 30 mit (<i>r</i> + <i>j</i>) mod 30 ∈ <i>R</i>.</p>
+    <p>Jede von null verschiedene Phase liefert <i>T</i><sub><i>r</i></sub>(<i>u</i>) &lt; 1. In Phase null fällt die Summe unter 1, sobald einer der Beiträge bei +2, +6, +8 fehlt oder alle drei bei +12, +18, +20 fehlen. Also muss <i>H</i> die ersten drei Positionen und mindestens eine der letzten drei zusätzlich zu <i>G</i> besetzen.</p>
+    <h2 class="page-break">Vier verschiedene Sperrprimzahlen</h2>
+    <p>Sei <i>d</i> der erste zusätzliche Abstand aus {12, 18, 20}. Vor <i>t</i> + <i>d</i> darf <i>H</i> außer <i>t</i> keinen Term aus <i>G</i> verlieren. Ein Verlust bei +12 ließe höchstens <i>T</i><sub>0</sub>(<i>u</i>) − <i>u</i><sup>12</sup> − ℓ<sup>12</sup> &lt; 1. Ein Verlust bei +18 ohne Zusatzgewinn bei +12 ließe höchstens <i>T</i><sub>0</sub>(<i>u</i>) − <i>u</i><sup>12</sup> − <i>u</i><sup>18</sup> − ℓ<sup>18</sup> &lt; 1. Hier streicht jede Potenz von <i>u</i> einen möglichen Gewinn und die Potenz von ℓ zählt einen sicheren Verlust.</p>
+    <p>Bei jeder der vier neuen Positionen würde die Aufnahme in <i>G</i> die letzte freie Klasse einer Primzahl füllen. Die ersten drei dieser Primzahlen erreichen genau bei <i>t</i> den Zustand mit nur noch einer freien Klasse. Die vierte erreicht ihn bei <i>t</i>, <i>t</i> + 12 oder <i>t</i> + 18, jeweils vor ihrem Ausschluss. Vor <i>t</i> wäre die Klasse auch für <i>H</i> gesperrt gewesen. Die vier Primzahlen sind verschieden, weil alle Primteiler der Abstandsdifferenzen höchstens 7 sind und die Primzahlen bis 7 bereits bei Offset 18 gesättigt sind. <i>H</i> muss bei jeder der vier Primzahlen die Klasse von <i>t</i> frei lassen.</p>
+    <p>Unter den ersten <i>N</i> Greedy-Termen kommen damit höchstens ⌊π(<i>N</i> + 3)/4⌋ Stellen als erste Abweichung infrage. Dabei zählt π die Primzahlen bis zum angegebenen Argument. Die Starts sind verschiedene Vielfache von 30, die Fenster bis +18 also disjunkt. Jedes Fenster benötigt vier neue Primzahlen. Bis +18 können höchstens zwei weitere Greedy-Terme hinzukommen. Die <i>p</i> − 1 besetzten Klassen einer neuen Sperre erfordern daher <i>p</i> ≤ <i>N</i> + 3.</p>
+    <h2>Vom endlichen Präfix zum Supremum</h2>
+    <p>Das Präfix bis 140 000 000 enthält 7 576 936 Terme. Sein Katalog weist 57 118 gesättigte Primzahlen aus. Unter den 6 752 Sättigungen bei einem <i>t</i> &gt; 8 in Phase null sperrt keine erstmals eine der Pflichtpositionen +2, +6, +8. Damit scheidet der gesamte Präfix als Ort der ersten Abweichung eines gleich guten oder besseren Konkurrenten aus.</p>
+    <p>Für spätere Starts teilen beide Mengen diesen Präfix. Die fünf Positionen <i>t</i>, <i>t</i> + 2, <i>t</i> + 6, <i>t</i> + 8, <i>t</i> + <i>d</i> müssen die bereits gesperrten Klassen vermeiden. Zwei vollständige Scans – Restklassentest je Start und Sieben arithmetischer Progressionen – ergeben als erstes offenes Fenster <i>T</i> = 140 136 240 mit <i>d</i> = 12. Dieser Test lässt die tatsächliche Greedy-Entscheidung bei <i>T</i> offen.</p>
+    <p>Alle Elemente sind gerade. Ein positiver Überschuss ist deshalb höchstens <i>x</i><sub>3</sub><sup><i>T</i>+5</sup>/(1 − <i>x</i><sub>3</sub><sup>2</sup>). Wegen <i>u</i><sup>5</sup> &lt; 1 − <i>u</i><sup>2</sup> und 10<sup>59</sup><i>u</i><sup>560</sup> &lt; 1 folgt eine gemeinsame strikte Obergrenze von 10 hoch −59⌊<i>T</i>/560⌋. Da <i>G</i> selbst zulässig ist, gilt somit <strong>0 ≤ <i>F</i><sub>3</sub>(<i>x</i><sub>3</sub>) − 1 &lt; 10<sup>−14 764 337</sup></strong>.</p>
+    <p>Auch die Wurzel <i>z</i> mit <i>F</i><sub>3</sub>(<i>z</i>) = 1 rückt entsprechend nahe. Für ε = 10<sup>−14 764 337</sup> setze <i>y</i> = <i>x</i><sub>3</sub>/(1 + ε)<sup>1/3</sup>. Wegen der Exponenten ≥ 3 gilt <i>F</i><sub>3</sub>(<i>y</i>) ≤ (<i>y</i>/<i>x</i><sub>3</sub>)<sup>3</sup><i>F</i><sub>3</sub>(<i>x</i><sub>3</sub>) &lt; 1. Aus der Stetigkeit und strikten Monotonie folgt <i>y</i> &lt; <i>z</i> ≤ <i>x</i><sub>3</sub>, also 0 ≤ <i>x</i><sub>3</sub> − <i>z</i> &lt; ε/3.</p>
+    <h2>Nachrechnung und Entstehung</h2>
+    <p>Im entpackten <a href="verschiebung-drei-nachweis.zip">Prüfpaket</a> kontrolliert <code>python3 -B pruefen.py</code> die Bruchungleichungen und beide Scans mit dem vollständigen Sättigungskatalog. Die Anleitung enthält außerdem die Befehle zum Neuaufbau aus der Definition. Die Fragestellung stammt aus dem Primachsenraum-Projekt. Die Beweisentwicklung, diese Fassung und die Prüfprogramme entstanden mit erheblicher KI-Unterstützung. Eine unabhängige fachliche Begutachtung steht aus.</p>
+    <p><a href="../golomb-keller/Golomb_Keller_v6_Review_Draft.pdf">Golomb–Keller v6, Abschnitt 15 (PDF)</a> · <a href="https://oeis.org/A135311">Greedy-Folge A135311 (OEIS)</a></p>
+  </main>
+</body>
+</html>
