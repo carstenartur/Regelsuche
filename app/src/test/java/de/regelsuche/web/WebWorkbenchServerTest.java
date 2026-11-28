@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -228,9 +229,10 @@ class WebWorkbenchServerTest {
     }
 
     private HttpURLConnection postSignedCnf(String clauses, int maximumWork) throws IOException {
-        return postJson("/api/certificate-demos/cnf/" + java.util.UUID.randomUUID(), """
+        String body = String.format(Locale.ROOT, """
             {"variableCount":62,"clauses":%s,"fixed":[1],"maximumWork":%d}
-            """.formatted(clauses, maximumWork));
+            """, clauses, maximumWork);
+        return postJson("/api/certificate-demos/cnf/" + java.util.UUID.randomUUID(), body);
     }
 
     private HttpURLConnection postPairReduction(String request) throws IOException {
