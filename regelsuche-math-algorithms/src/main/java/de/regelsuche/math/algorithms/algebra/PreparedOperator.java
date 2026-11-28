@@ -34,7 +34,8 @@ public final class PreparedOperator {
         OperatorResidualPlans.verify(source, plan, checks);
         Node program = compile(plan.expression(), checks);
         if (directCost == null) {
-            directCost = predictor == OperatorResidualSearch.Predictor.DIRECT ? program.cost() : sparse(source, checks).cost();
+            // Verification already identified this single matrix with the source, including for supplied plans.
+            directCost = program instanceof Sparse || program instanceof Unit ? program.cost() : sparse(source, checks).cost();
         }
         return new PreparedOperator(plan, predictor, rank, program, directCost);
     }

@@ -73,6 +73,24 @@ class OperatorResidualSearchTest {
             shared.apply(List.of(third, third.multiply(integer(2)), NEGATIVE_ONE), LIMITS, () -> false).requireValue());
     }
 
+    @Test void restoringASuppliedDirectMatrixFitsItsOriginalPreparationBudget() {
+        var directOnly = new OperatorResidualSearch.Policy(List.of(), 0);
+        for (int size : List.of(8, 16)) {
+            var source = FIXTURES.identity(size);
+            var limits = new IterationLimits(1_000_000, size == 8 ? 600 : 2_400, 10_000);
+            var discovered = OperatorResidualSearch.discover(source, directOnly, limits, () -> false)
+                .requireValue().operator();
+            var supplied = new OperatorResidualPlans.Plan(source, new ExactMatrixExpression.Matrix("external", source),
+                Optional.empty());
+            var restored = OperatorResidualSearch.prepare(source, supplied, limits, () -> false);
+            assertEquals(VERIFIED, restored.status(), restored.detail());
+            assertEquals(discovered.cost(), restored.requireValue().directCost());
+            assertEquals(discovered.cost(), restored.requireValue().cost());
+            var input = java.util.Collections.nCopies(size, integer(-3));
+            assertEquals(input, restored.requireValue().apply(input, limits, () -> false).requireValue());
+        }
+    }
+
     @Test void singleUseScalingsNeedNoExtraExecutionCells() {
         var source = FIXTURES.matrix(8, 8, (i, j) -> Polynomial.constant(Rational.of(2 + i + 8 * j)));
         var directOnly = new OperatorResidualSearch.Policy(List.of(), 0);
