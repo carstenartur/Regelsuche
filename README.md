@@ -253,6 +253,14 @@ gemischten Folge um 1,2 Prozent. Neun Treffer betrafen zuvor ungesehene
 Eingaben. Auf der gemischten Folge stieg die mediane CPU-Zeit von 180 auf
 220 Millisekunden. [Messung und Java-Einstieg](docs/research/variable-renaming-query-path.md)
 
+Auf einem vorab festgelegten Strom von 1.024 neuen Horner- und
+Skalarproduktaufgaben löste der Lernsolver bei gleichem Gesamtbudget **646
+Aufgaben**, die primitive Suche **642**. Training, Modellvorbereitung, Suche
+und unabhängige Prüfungen sind eingerechnet. Für alle 1.024 Aufgaben sank der
+Aufwand von 834.410 auf 823.252 logische Einheiten (1,34 Prozent). Im ersten,
+kürzeren Versuch lösten beide 128 von 128 Aufgaben.
+[Versuchsplan, Vergleichsarme und Rohdaten](docs/research/prospective-amortization/README.md)
+
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
 misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier
