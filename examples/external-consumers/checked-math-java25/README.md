@@ -48,8 +48,8 @@ Run that Java command inside this project. Windows uses `;` instead of `:`.
 | `DynamicQuotient` | Undefined modulo `T-1`, value `2` modulo `T+1`, with checked factor coverage |
 | `BoundedPlanning` | Compact 62-variable OR count `4,611,686,018,427,387,903`; explicit fixed Min-Fill; rational simplification with original-domain replay, missing-assumption and extra-hole controls; matching rational rank bounds of three for complex multiplication. |
 | `MatrixCenterIdentity` | An inverse commutator has no scalar center; a matrix center proves its product with the commutator equals one, and a coincident but different function receives a checked witness. |
-| `SpectralRepair` | Frequency supports `{0}`, `{1}`, `{2}` use two forward and two inverse check rows; exact outputs agree. Repair costs 162 operations versus direct 21, so discovery retains direct. |
-| `ComposedBilinearPlans` | Generically optimized U/V/W stages compute the centered componentwise product with 54 operations versus direct 248; all eight outputs and the full certificate are checked. |
+| `SpectralRepair` | Frequency supports `{0}`, `{1}`, `{2}` use two forward and two inverse check rows; exact outputs agree. Repair costs 158 operations versus direct 18, so discovery retains direct. |
+| `ComposedBilinearPlans` | Generically optimized U/V/W stages compute the centered componentwise product in 40 arithmetic operations. The direct stages also reuse scaled inputs and require 152 operations. The example checks all eight outputs and replays the certificate. |
 
 The SDK verifies each source-bound certificate within its explicit budgets.
 These finite results have the assumptions in the supplied requests. A stopped

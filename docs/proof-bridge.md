@@ -123,8 +123,10 @@ into the existing binary IR.
 The supported proof rules are `asserted`, `refl`, `symm`, ordered `trans`/`trans*`,
 `monotonicity`, `rewrite`, `mp`, `not-or-elim` and bounded `unit-resolution`.
 For real non-strict orders, `>=` is parsed in reversed `<=` orientation;
-normalization checks the exact directed polynomial difference, never its
-negative. An equality can be rewritten as exactly two opposite non-strict
+normalization checks the exact directed polynomial difference up to a strictly
+positive rational scalar, never a negative or zero scalar. Non-strict order
+premises and goals are accepted through the typed IR, with the same exact
+asserted-leaf and dependency checks as equality premises. An equality can be rewritten as exactly two opposite non-strict
 orders (antisymmetry), with checked De Morgan and double-negation rewrites.
 Clause resolution removes one actual complementary occurrence per unit and
 requires the exact remaining clause (or `false` for no remaining operands).
@@ -139,12 +141,15 @@ minimal. Boolean equality, negation and constants support the
 equivalences used by native normalization proofs; `mp` checks both sides of
 the claimed equivalence. Every polynomial `rewrite` is checked without
 premises by `PolynomialNormalFormSolverBackend`. The native rule name grants
-no authority. For real equations only, both differences may also be compared
+no authority. For real equations, both differences may also be compared
 up to a nonzero rational scalar: their exact monic normal forms must coincide,
 including the distinction between zero and nonzero polynomials. This does not
 permit cancelling a variable factor, equating rescaled expression values, or
-reversing an inequality. These checks share the existing polynomial work
-limits and cache separately from ordinary identity checks.
+reversing an inequality. For non-strict orders, the leading coefficients of
+both nonzero differences must additionally have the same sign; two zero
+differences are allowed but a zero and a nonzero difference are not.
+Identity, nonzero rescaling and positive rescaling share the existing
+polynomial work limits and have separate cache modes.
 A failed polynomial identity check is never interpreted as a
 disequality valid for every assignment: `x = 0` is neither constantly true
 nor constantly false.
@@ -164,7 +169,7 @@ advantage or a complete cost model:
 | --- | --- |
 | Proof object | 131,072 UTF-8 bytes; also at most 131,072 Java characters |
 | Wire syntax | 8,192 nodes, depth 128, atom length 256 |
-| Typed request | 128 real declarations and 128 equality premises |
+| Typed request | 128 real declarations and 128 equality or non-strict order premises |
 | Native arithmetic arguments and scalar literal text | 128 arguments; 256 characters per literal |
 | Expanded term/formula size | 4,096 per value; cumulative admission charge 65,536 |
 | Polynomial expansion estimate | 256 monomials, total degree 32, literal power exponent 1–20 |

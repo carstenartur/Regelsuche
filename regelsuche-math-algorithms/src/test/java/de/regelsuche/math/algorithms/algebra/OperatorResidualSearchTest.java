@@ -55,6 +55,53 @@ class OperatorResidualSearchTest {
             prepared.apply(List.of(ONE, integer(2), integer(3)), LIMITS, () -> false).requireValue());
     }
 
+    @Test void directRectangularPlanSharesOnlyEqualScalingsOfTheSameInput() {
+        var source = matrix(new long[]{2,-2,1}, new long[]{2,-2,0}, new long[]{-2,2,1}, new long[]{0,0,0});
+        var distinct = matrix(new long[]{2,-2,1}, new long[]{3,-3,0}, new long[]{-2,2,1}, new long[]{0,0,0});
+        var directOnly = new OperatorResidualSearch.Policy(List.of(), 0);
+        var shared = OperatorResidualSearch.discover(source, directOnly, LIMITS, () -> false).requireValue().operator();
+        var control = OperatorResidualSearch.discover(distinct, directOnly, LIMITS, () -> false).requireValue().operator();
+        assertEquals(new OperatorResidualPlans.Cost(4, 5), shared.cost());
+        assertEquals(new OperatorResidualPlans.Cost(6, 5), control.cost());
+        var input = List.of(integer(4), ONE, integer(2));
+        var applied = shared.apply(input, LIMITS, () -> false);
+        assertEquals(List.of(integer(8), integer(6), integer(-4), ZERO), applied.requireValue());
+        // Same sparse row shapes and small integer sizes; actual replay pays for two fewer products.
+        assertTrue(applied.work() < control.apply(input, LIMITS, () -> false).work());
+        var third = ONE.divide(integer(3));
+        assertEquals(List.of(third.multiply(integer(-5)), third.multiply(integer(-2)), third.negate(), ZERO),
+            shared.apply(List.of(third, third.multiply(integer(2)), NEGATIVE_ONE), LIMITS, () -> false).requireValue());
+    }
+
+    @Test void restoringASuppliedDirectMatrixFitsItsOriginalPreparationBudget() {
+        var directOnly = new OperatorResidualSearch.Policy(List.of(), 0);
+        for (int size : List.of(8, 16)) {
+            var source = FIXTURES.identity(size);
+            var limits = new IterationLimits(1_000_000, size == 8 ? 600 : 2_400, 10_000);
+            var discovered = OperatorResidualSearch.discover(source, directOnly, limits, () -> false)
+                .requireValue().operator();
+            var supplied = new OperatorResidualPlans.Plan(source, new ExactMatrixExpression.Matrix("external", source),
+                Optional.empty());
+            var restored = OperatorResidualSearch.prepare(source, supplied, limits, () -> false);
+            assertEquals(VERIFIED, restored.status(), restored.detail());
+            assertEquals(discovered.cost(), restored.requireValue().directCost());
+            assertEquals(discovered.cost(), restored.requireValue().cost());
+            var input = java.util.Collections.nCopies(size, integer(-3));
+            assertEquals(input, restored.requireValue().apply(input, limits, () -> false).requireValue());
+        }
+    }
+
+    @Test void singleUseScalingsNeedNoExtraExecutionCells() {
+        var source = FIXTURES.matrix(8, 8, (i, j) -> Polynomial.constant(Rational.of(2 + i + 8 * j)));
+        var directOnly = new OperatorResidualSearch.Policy(List.of(), 0);
+        var direct = OperatorResidualSearch.discover(source, directOnly, LIMITS, () -> false).requireValue().operator();
+        var input = java.util.Collections.nCopies(8, ONE);
+        var expected = List.of(integer(240), integer(248), integer(256), integer(264),
+            integer(272), integer(280), integer(288), integer(296));
+        assertEquals(expected, direct.apply(input, new IterationLimits(10_000, 24, 1_000), () -> false).requireValue());
+        assertEquals("TERM_LIMIT", direct.apply(input, new IterationLimits(10_000, 23, 1_000), () -> false).detail());
+    }
+
     @Test void diagonalAndIdentityHaveStrongDirectBaselines() {
         var diagonal = matrix(new long[]{2,0,0}, new long[]{0,1,0}, new long[]{0,0,0});
         var prepared = OperatorResidualSearch.discover(diagonal, OperatorResidualSearch.Policy.defaults(), LIMITS,
