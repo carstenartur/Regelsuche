@@ -197,6 +197,11 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
     /** Opt-in useful independently replayed prefixes and single non-learned construction capabilities. */
     static CheckedLearnedSchemaModel extendFromSolutions(CheckedLearnedSchemaModel parent,
             List<CheckedSchemaTaskSolver.Solution> solutions, boolean includeVerifiedProgress) {
+        return extendFromSolutions(parent, solutions, includeVerifiedProgress, false);
+    }
+
+    static CheckedLearnedSchemaModel extendFromSolutions(CheckedLearnedSchemaModel parent,
+            List<CheckedSchemaTaskSolver.Solution> solutions, boolean includeVerifiedProgress, boolean includeSubpaths) {
         Objects.requireNonNull(parent, "parent");
         solutions = List.copyOf(solutions);
         if (solutions.size() > parent.bounds.maximumExamples()) throw new IllegalArgumentException("too many lessons");
@@ -204,8 +209,10 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         var work = new Work();
         var attempts = new ArrayList<Attempt>();
         var examples = new ArrayList<ObservedPair>();
+        var subpaths = new ArrayList<ObservedPair>();
         var seen = new HashSet<String>();
         var provenance = new StringBuilder(parent.modelHash);
+        if (includeSubpaths) provenance.append("\ntask-subpaths/v1");
         for (int i = 0; i < solutions.size(); i++) {
             var solution = solutions.get(i);
             String observationId = "task-" + i;
@@ -227,12 +234,31 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 addPair(examples, seen, observationId, 0, solution.evidence().witness().size(), source, target, work);
                 provenance.append('\n').append(CODEC.encodeExpression(source)).append('\n')
                     .append(CODEC.encodeExpression(target)).append('\n').append(lineage);
+                if (includeSubpaths) {
+                    int allowance = parent.bounds.maximumExamples() / solutions.size() - 1;
+                    addTaskSubpaths(solution.evidence().witness(), observationId, parent.bounds,
+                        allowance, subpaths, seen, provenance, work, attempts);
+                }
             } catch (IllegalArgumentException unsupported) {
                 attempts.add(new Attempt(List.of(observationId), "TRACE_ONLY", unsupported.getMessage()));
             }
         }
+        examples.addAll(subpaths);
         return form(parent.inventoryHash, SchematicProofPlan.hash(provenance.toString()), parent.bounds,
             examples, parent.schemas, work, attempts);
+    }
+
+    private static void addTaskSubpaths(List<TypedMoveSearch.WitnessStep> witness, String observationId,
+            Bounds bounds, int allowance, List<ObservedPair> examples, Set<String> seen, StringBuilder provenance,
+            Work work, List<Attempt> attempts) {
+        boolean complete = TaskSubpathMiner.mine(witness, bounds, allowance, work, (location, source, target) -> {
+            String origin = observationId + ":" + location;
+            if (recordPair(examples, seen, observationId, origin, source, target)) {
+                provenance.append('\n').append(origin).append(':').append(CODEC.encodeExpression(source))
+                    .append(':').append(CODEC.encodeExpression(target));
+            }
+        });
+        if (!complete) attempts.add(new Attempt(List.of(observationId), "EXTRACTION_LIMIT", "UNEXAMINED_TASK_SUBPATHS"));
     }
 
     private static CheckedLearnedSchemaModel form(String inventoryHash, String origin, Bounds bounds,
@@ -341,10 +367,16 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             else break;
         }
         work.add(1);
-        if (source.equals(target)) return;
+        recordPair(output, seen, inputId, inputId + ":" + start + "-" + end, source, target);
+    }
+
+    private static boolean recordPair(List<ObservedPair> output, Set<String> seen, String inputId, String origin,
+            Expr source, Expr target) {
+        if (source.equals(target)) return false;
         String key = inputId + ":" + CODEC.encodeExpression(source) + ":" + CODEC.encodeExpression(target);
-        if (seen.add(key)) output.add(new ObservedPair(inputId, inputId + ":" + start + "-" + end,
-            new TypedPatternGeneralizer.Example(source, target)));
+        if (!seen.add(key)) return false;
+        output.add(new ObservedPair(inputId, origin, new TypedPatternGeneralizer.Example(source, target)));
+        return true;
     }
 
     public List<Schema> schemas() { return schemas; }

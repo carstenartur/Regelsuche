@@ -349,6 +349,21 @@ public final class CumulativeTaskKnowledge {
     /** Bounded phases may overrun atomically, but their full work remains paid and cannot promote knowledge. */
     public Update learnBatch(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validationTasks,
             long maximumAcquisitionWork) {
+        return learnBatch(lessons, validationTasks, maximumAcquisitionWork, false);
+    }
+
+    /**
+     * Also mine proper multi-step subpaths of the lessons' verified witnesses. This allows
+     * different tasks to share a composition even when their complete solutions differ.
+     * The same acquisition budget, symbolic checker and validation policy apply.
+     */
+    public Update learnLocalBatch(List<CheckedSchemaTaskSolver.Task> lessons,
+            List<CheckedSchemaTaskSolver.Task> validationTasks, long maximumAcquisitionWork) {
+        return learnBatch(lessons, validationTasks, maximumAcquisitionWork, true);
+    }
+
+    private Update learnBatch(List<CheckedSchemaTaskSolver.Task> lessons,
+            List<CheckedSchemaTaskSolver.Task> validationTasks, long maximumAcquisitionWork, boolean includeSubpaths) {
         if (de.regelsuche.retention.RetainedOperation.isObserved()
                 && (constructionProfile.requiresExactPolynomialSteps()
                     || lessons.stream().anyMatch(task -> StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
@@ -359,13 +374,13 @@ public final class CumulativeTaskKnowledge {
         lessons = bounded(lessons, 2); validationTasks = bounded(validationTasks, 1);
         var progress = new Progress();
         // Invalid/non-polynomial/overlapping batches are rejected before running any lesson.
-        progress.split = disjoint(lessons, validationTasks);
+        progress.split = disjoint(lessons, validationTasks, includeSubpaths);
         try {
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             if (!learnLessons(lessons, progress, maximumAcquisitionWork)) return limited(progress);
             var candidate = CheckedLearnedSchemaModel.extendFromSolutions(model,
                 progress.training.stream().flatMap(e -> e.solution().stream()).toList(),
-                constructionProfile != TaskConstructionProfile.NONE);
+                constructionProfile != TaskConstructionProfile.NONE, includeSubpaths);
             progress.formation = candidate.formationWork(); progress.attempts = candidate.attempts();
             if (progress.costs().total() > maximumAcquisitionWork) return limited(progress);
             boolean newSchemas = !candidate.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(java.util.stream.Collectors.toSet())
@@ -496,10 +511,18 @@ public final class CumulativeTaskKnowledge {
         return copy;
     }
     static long disjoint(List<CheckedSchemaTaskSolver.Task> lessons, List<CheckedSchemaTaskSolver.Task> validation) {
+        return disjoint(lessons, validation, false);
+    }
+
+    private static long disjoint(List<CheckedSchemaTaskSolver.Task> lessons,
+            List<CheckedSchemaTaskSolver.Task> validation, boolean distinctLessons) {
         long[] work = {0};
         var exact = new ExactPolynomialAnalysis(units -> work[0] = sum(work[0], units));
         var training = new HashSet<String>();
-        for (var task : lessons) training.add(alphaIdentity(task, exact, work));
+        for (var task : lessons) {
+            if (!training.add(alphaIdentity(task, exact, work)) && distinctLessons)
+                throw new IllegalArgumentException("task subpath learning requires distinct TRAIN polynomials");
+        }
         for (var task : validation) if (training.contains(alphaIdentity(task, exact, work)))
             throw new IllegalArgumentException("lesson/validation polynomial alpha overlap");
         return work[0];
