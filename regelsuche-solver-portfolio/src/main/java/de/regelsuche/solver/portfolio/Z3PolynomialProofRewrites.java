@@ -55,9 +55,9 @@ final class Z3PolynomialProofRewrites {
 
     private boolean equivalentRelations(Formula a, Formula b, int depth) {
         if (a instanceof Order firstOrder && b instanceof Order secondOrder) {
-            // Preserve direction: unlike equations, sign reversal is not valid for inequalities.
-            return polynomial(values.difference(firstOrder.upper(), firstOrder.lower()),
-                values.difference(secondOrder.upper(), secondOrder.lower()));
+            // Only positive rescaling preserves the directed difference's sign.
+            return checkPolynomial(values.difference(firstOrder.upper(), firstOrder.lower()),
+                values.difference(secondOrder.upper(), secondOrder.lower()), Comparison.POSITIVE_SCALE);
         }
         if (a instanceof Equality equation && b instanceof Conjunction conjunction) {
             return oppositeOrders(equation, conjunction);
@@ -132,7 +132,7 @@ final class Z3PolynomialProofRewrites {
     private boolean equivalentRealEquations(Equality first, Equality second) {
         if (!(first.left() instanceof Real a) || !(first.right() instanceof Real b)
                 || !(second.left() instanceof Real c) || !(second.right() instanceof Real d)) return false;
-        return checkPolynomial(values.difference(a, b), values.difference(c, d), true);
+        return checkPolynomial(values.difference(a, b), values.difference(c, d), Comparison.NONZERO_SCALE);
     }
 
     /** null means not proved constant; REFUTED polynomial identity is not universal disequality. */
@@ -184,18 +184,20 @@ final class Z3PolynomialProofRewrites {
     }
 
     private boolean polynomial(Real left, Real right) {
-        return checkPolynomial(left, right, false);
+        return checkPolynomial(left, right, Comparison.IDENTITY);
     }
 
-    private boolean checkPolynomial(Real left, Real right, boolean proportional) {
-        var key = new Pair(left, right, proportional);
+    private boolean checkPolynomial(Real left, Real right, Comparison comparison) {
+        var key = new Pair(left, right, comparison);
         Boolean old = cache.get(key);
         if (old != null) return old;
         long estimate = (long) (left.size() + right.size()) * (left.monomials() + right.monomials());
         if (++calls > 128 || (admittedWork += estimate) > 262_144) throw new Invalid();
-        boolean result = proportional
-            ? backend.proportionalEquationDifferences(left.expression(), right.expression())
-            : polynomialIdentity(left, right);
+        boolean result = switch (comparison) {
+            case IDENTITY -> polynomialIdentity(left, right);
+            case NONZERO_SCALE -> backend.proportionalEquationDifferences(left.expression(), right.expression());
+            case POSITIVE_SCALE -> backend.positivelyProportionalDifferences(left.expression(), right.expression());
+        };
         cache.put(key, result);
         return result;
     }
@@ -207,5 +209,7 @@ final class Z3PolynomialProofRewrites {
         return backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;
     }
 
-    private record Pair(Real left, Real right, boolean proportional) { }
+    private enum Comparison { IDENTITY, NONZERO_SCALE, POSITIVE_SCALE }
+
+    private record Pair(Real left, Real right, Comparison comparison) { }
 }
