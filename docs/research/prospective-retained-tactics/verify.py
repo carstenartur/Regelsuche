@@ -8,6 +8,7 @@ import runpy
 
 from admission_cases import expected_cases, validate_split
 import verify_acquisition
+from verify_sparse import validate_fit
 
 
 STUDY = Path(__file__).resolve().parent
@@ -79,12 +80,7 @@ def materials():
         require(all(type(bill[k]) is int and bill[k] >= 0 for k in ("acquisition", "load", "calibration")),
                 "invalid cost")
         require(re.fullmatch("sha256:[0-9a-f]{64}", bill["admission"]) is not None, "unbound gate")
-        trials = bill["trials"]
-        require([t["index"] for t in trials] == list(range(len(receipt["calibrationSources"]))), "missing trial")
-        require(all(type(t[k]) is int and t[k] >= 0 for t in trials for k in ("primitiveWork","learnedWork","learnedSteps")),
-                "invalid calibration trial")
-        require(bill["calibration"] >= sum(t["primitiveWork"]+t["learnedWork"] for t in trials),
-                "unpaid calibration attempts")
+        validate_fit(bill, receipt["calibrationSources"])
     require(receipt["old"]["acquisition"] == 9130 and receipt["fresh"]["acquisition"] == charges["acquisition"],
             "historical acquisition mismatch")
     for charge, extra in (("acquisition", "acquiredAcquisition"), ("load", "acquiredLoad")):
