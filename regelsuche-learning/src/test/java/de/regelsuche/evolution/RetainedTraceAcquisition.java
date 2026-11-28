@@ -110,7 +110,7 @@ final class RetainedTraceAcquisition {
         for (int i=0;i<update.validation().size();i++) {
             var v=update.validation().get(i);
             var row=taskReceipt(prefix.rows().get(i+3));
-            row.put("depth",gates.get(i).budget().maxDepth());
+            row.put("depth",gates.get(i).budget().maxSearchDepth());
             row.put("reference",references.get(i));
             row.put("base",v.baseline().totalWork());
             row.put("previous",v.previous().totalWork());

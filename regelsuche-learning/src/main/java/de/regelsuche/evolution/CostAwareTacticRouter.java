@@ -10,10 +10,12 @@ import de.regelsuche.search.moves.MoveSearch;
 import de.regelsuche.search.moves.NativeNodeCountObjective;
 import de.regelsuche.search.moves.TypedMoveSearch;
 import de.regelsuche.search.moves.TypedSourceOnlySearch;
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,10 +28,10 @@ public final class CostAwareTacticRouter {
     public record Fit(Admission admission, long work, List<Trial> trials) {
         public Fit { trials = List.copyOf(trials); }
     }
-    public record Result(long selectionWork, boolean admitted, TypedSourceOnlySearch.Result evidence, long originalBudget) {
+    public record Result(long selectionWork, boolean admitted, TypedSourceOnlySearch.Result evidence, long originalBudget, boolean laneSolved) {
         public long totalWork() { return Math.addExact(selectionWork, evidence.totalWork()); }
         public boolean withinBudget() { return evidence.withinBudget() && totalWork() <= originalBudget; }
-        public boolean solved() { return withinBudget() && evidence.search().outcome() == MoveSearch.Outcome.QUALITY_REACHED; }
+        public boolean solved() { return withinBudget() && laneSolved; }
     }
 
     public static final class Admission implements RetainedGraph.View {
@@ -81,6 +83,30 @@ public final class CostAwareTacticRouter {
         }
     }
 
+    /** Materialize one flag per schema even in an ablation, so every configuration pays the same preparation. */
+    private static final class KnockoutMask extends AbstractSet<String> implements RetainedGraph.View {
+        private final Map<String,Boolean> flags;
+        private final int disabledCount;
+        KnockoutMask(CheckedLearnedSchemaModel model, Set<String> disabled) {
+            var entries = new HashMap<String,Boolean>();
+            int count = 0;
+            for (var schema : model.schemas()) {
+                boolean exclude = disabled.contains(schema.id());
+                entries.put(schema.id(), exclude);
+                if (exclude) count++;
+            }
+            if (count != disabled.size()) throw new IllegalArgumentException("unknown disabled schema");
+            flags = Map.copyOf(entries);
+            disabledCount = count;
+        }
+        @Override public int size() { return disabledCount; }
+        @Override public boolean contains(Object id) { return Boolean.TRUE.equals(flags.get(id)); }
+        @Override public Iterator<String> iterator() {
+            return flags.entrySet().stream().filter(Map.Entry::getValue).map(Map.Entry::getKey).iterator();
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) { visitor.reference(flags); }
+    }
+
     private final Admission admission;
     private final CheckedSchemaTaskSolver primitive;
     private final CheckedSchemaTaskSolver learned;
@@ -90,15 +116,11 @@ public final class CostAwareTacticRouter {
     private CostAwareTacticRouter(TypedLearnedMoveInventory inventory, CheckedLearnedSchemaModel model,
             Admission admission, Set<String> disabled) {
         if (!model.identity().equals(admission.model)) throw new IllegalArgumentException("admission belongs to a different model");
-        var ids = new HashSet<String>();
-        for (var schema : model.schemas()) ids.add(schema.id());
-        if (!ids.containsAll(disabled)) throw new IllegalArgumentException("unknown disabled schema");
         this.admission = admission;
         this.primitive = inventory.newTaskSolver().asHeuristicPrimitiveFallback();
         this.learned = inventory.newTaskSolverWithSharedContext(model);
-        this.disabled = Set.copyOf(disabled);
-        // Reserve the full knockout mask for every configuration, including the enabled arm.
-        preparation = Math.addExact(learned.preparationWork(), 3L * ids.size() + inventory.primitiveProviders().size() + 6);
+        this.disabled = new KnockoutMask(model, disabled);
+        preparation = Math.addExact(learned.preparationWork(), 3L * model.schemas().size() + inventory.primitiveProviders().size() + 6);
     }
 
     public static CostAwareTacticRouter prepare(EvolutionGenome genome, CheckedLearnedSchemaModel model,
@@ -168,7 +190,7 @@ public final class CostAwareTacticRouter {
             admit = input != null && (admission.accepted.contains(input) || admission.accepted.contains(input.anyDepth()));
         }
         var answer = (admit ? learned : primitive).solveWithAdmission(remaining(task, work.units), disabled);
-        return new Result(work.units, admit, answer.evidence(), task.budget().totalWork());
+        return new Result(work.units, admit, answer.evidence(), task.budget().totalWork(), answer.solved());
     }
 
     private static CheckedSchemaTaskSolver.Task remaining(CheckedSchemaTaskSolver.Task task, long spent) {
