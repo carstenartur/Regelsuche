@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Eine nachrechenbare Primachsenraum-Notiz über Primteiler von 2g + 1 für die Greedy-Folge A135311.">
+  <title>Welche Primzahlen teilen 2g + 1? · Regelsuche</title>
+  <link rel="stylesheet" href="../stil.css">
+</head>
+<body>
+  <header class="screen-only"><a href="../">Regelsuche · Forschungsnotizen und Preprints</a></header>
+  <main>
+    <article>
+      <p class="meta">Primachsenraum · Forschungsnotiz · Fassung 1 vom 28. November 2026</p>
+      <h1>Welche Primzahlen teilen 2<i>g</i> + 1?</h1>
+      <p>Die Folge A135311 beginnt mit 0, 2, 6, 8, 12 und 18. Aus diesen Abständen <i>g</i> entstehen die ungeraden Zahlen 1, 5, 13, 17, 25 und 37. Ihre Primteiler lassen alle den Rest 1 bei Division durch 4. Hält dieses Muster, wenn man die Folge fortsetzt?</p>
+      <p class="screen-only"><a href="primteiler-a135311-v1.pdf">Notiz als PDF lesen</a> · <a href="pruefen.py" download>Prüfskript herunterladen</a></p>
+
+      <h2>Was sich bis 67 entscheiden lässt</h2>
+      <p>Für jede ungerade Primzahl <i>p</i> ≤ 67 gilt: Mindestens ein Glied <i>g</i> der Folge erfüllt <i>p</i> ∣ (2<i>g</i> + 1) genau dann, wenn <i>p</i> ≡ 1 (mod 4). Für diese 18 Primzahlen gilt die Aussage über die ganze Folge. Der unten angegebene Nachweis benötigt nur die ersten 157 Glieder.</p>
+
+      <h2>Warum ein endliches Präfix genügt</h2>
+      <p>Man beginnt mit 0. Danach nimmt man jeweils die kleinste größere ganze Zahl auf, für die das bisherige Präfix modulo jeder Primzahl mindestens eine Restklasse frei lässt. Beim Prüfen von <i>m</i> Zahlen reichen die Primzahlen bis <i>m</i> aus. Für jede größere Primzahl gibt es mehr Restklassen als Zahlen im Präfix.</p>
+      <p>Für ungerades <i>p</i> ist 2<i>g</i> + 1 genau dann durch <i>p</i> teilbar, wenn <i>g</i> den Rest (<i>p</i> − 1)/2 hat. Ein einziges solches Folgenglied belegt die Teilbarkeit. Sind umgekehrt bereits alle anderen <i>p</i> − 1 Reste belegt, muss diese letzte Klasse für immer frei bleiben. Belegte Klassen bleiben auch beim Verlängern des Präfixes belegt.</p>
+      <p><strong>Beispiel 7.</strong> Die ersten sechs Glieder 0, 2, 6, 8, 12, 18 haben modulo 7 die Reste 0, 2, 6, 1, 5, 4. Ein späteres Glied mit Rest 3 würde alle Klassen füllen und kann daher nie aufgenommen werden. Also teilt 7 keinen Wert 2<i>g</i> + 1. Für 29 reicht dagegen ein Zeuge: 72 ist ein Folgenglied und 2 · 72 + 1 = 145 = 5 · 29.</p>
+
+      <section>
+        <h2>Die ersten entscheidenden Folgenglieder</h2>
+        <p>Jedes Paar in der Tabelle nennt die Primzahl <i>p</i> und das erste Folgenglied <i>g</i>, an dem die Entscheidung feststeht.</p>
+        <table>
+          <thead><tr><th scope="col">Entscheidung</th><th scope="col">Paare (<i>p</i>, <i>g</i>)</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Teiler gefunden</th><td>(5, 2), (13, 6), (17, 8), (29, 72), (37, 18), (41, 20), (53, 26), (61, 30)</td></tr>
+            <tr><th scope="row">Dauerhaft ausgeschlossen</th><td>(3, 2), (7, 18), (11, 36), (19, 168), (23, 176), (31, 246), (43, 452), (47, 578), (59, 812), (67, 996)</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="page-break">
+        <h2>Wo die Rechnung endet</h2>
+        <p>Gilt dieselbe Äquivalenz für jede ungerade Primzahl? Das Argument entscheidet einen Einzelfall, sobald ein Zeuge oder ein Ausschluss vorliegt. Warum für beliebig große Primzahlen stets die vorhergesagte Entscheidung eintreten sollte, bleibt hier offen. Schon bei 71 lässt der gewählte Ausschnitt drei Restklassen frei, darunter den gesuchten Rest 35.</p>
+      </section>
+
+      <h2>Nachrechnen und einordnen</h2>
+      <p>Das <a href="pruefen.py">Prüfskript</a> erzeugt die Folge aus der Definition. Mit <code>python3 pruefen.py</code> prüft es alle Kandidaten von 0 bis 1.000. Es findet 157 Glieder bis einschließlich 998 und gibt für jede ungerade Primzahl bis 71 den ersten Zeugen, den ersten Ausschluss oder den offenen Status aus.</p>
+      <p>Die Folge und Tabellen der verbotenen Reste und Sättigungsindizes sind öffentlich dokumentiert. Diese Notiz rechnet einen Ausschnitt nach und formuliert dessen Teilbarkeitsaussage. Wer die Übertragung auf größere Primzahlen oder eine frühere Behandlung dieser Frage kennt, kann einen <a href="https://github.com/carstenartur/Regelsuche/issues">Literaturhinweis oder eine Korrektur beitragen</a>.</p>
+      <p><strong>Entstehung und Prüfstand.</strong> Die Fragestellung stammt aus dem Primachsenraum-Projekt. OpenAI Codex hat diese Fassung, die Darstellung des Arguments und das Prüfskript ausgearbeitet. Das Skript wurde ausgeführt und die Tabellenwerte wurden mit einer zweiten Berechnung verglichen. Eine unabhängige fachliche Begutachtung steht aus.</p>
+
+      <h2>Quellen</h2>
+      <ul>
+        <li>OEIS: <a href="https://oeis.org/A135311">A135311, Greedy-Folge</a>. Zur Kontrolle der Ausschlüsse: R. Michael Perrys Tabellen <a href="https://oeis.org/A274260">A274260, verbotene Reste</a> und <a href="https://oeis.org/A274261">A274261, erster Sättigungsindex</a>.</li>
+        <li>R. Michael Perry, <a href="https://oeis.org/A274260/a274260.pdf"><cite>A Number Sequence Relating to the Closepacking of Primes</cite></a>, Abb. 2. Perry dokumentiert dort die verbotenen Restklassen der Greedy-Folge.</li>
+        <li>Kevin Ford, Florian Luca und Pieter Moree, <cite>Values of the Euler φ-function not divisible by a given odd prime, and the distribution of Euler–Kronecker constants for cyclotomic fields</cite>, Mathematics of Computation 83 (2014), § 1.4. Hier wird die Greedy-Folge im Zusammenhang mit zulässigen Mengen beschrieben. <a href="https://doi.org/10.1090/S0025-5718-2013-02749-4">DOI 10.1090/S0025-5718-2013-02749-4</a>.</li>
+        <li>Alessandro Languasco, <cite>Efficient computation of the Euler–Kronecker constants of prime cyclotomic fields</cite>, Research in Number Theory 7 (2021), Artikel 2, § 4.5. Dort wird dieselbe Folge für eine andere Teilfrage verwendet. <a href="https://doi.org/10.1007/s40993-020-00213-1">DOI 10.1007/s40993-020-00213-1</a>.</li>
+      </ul>
+    </article>
+  </main>
+</body>
+</html>
