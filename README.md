@@ -722,6 +722,7 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
 
 ## Dokumentation nach Zielgruppe
 
+- [Forschungsnotizen und Preprints](https://carstenartur.github.io/Regelsuche/forschungsnotizen/) mit Belegen und Prüfstand.
 - **Nutzung:** [Getting Started](docs/getting-started.md),
   [Web-Workbench](docs/web-workbench.md),
   [User Workflows](docs/user-workflows.md),
